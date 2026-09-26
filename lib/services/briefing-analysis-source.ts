@@ -114,6 +114,7 @@ export function projectBriefingAnalysisSource(
     notes,
     today: {
       scheduledCount: today.length,
+      scheduledBehaviorRefs: input.context.cadence.occurrences.map((item) => item.behaviorRef),
       unresolved: today.filter((item) => item.status === "unresolved")
         .map((item) => ({ ref: item.ref, behaviorRef: item.behaviorRef, startTime: item.schedule.startTime.slice(0, 5) })),
     },

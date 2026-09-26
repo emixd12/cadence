@@ -121,7 +121,7 @@ export const BRIEFING_ANALYSIS_LANES: readonly BriefingAnalysisLaneContract[] = 
     requiredInputs: ["history_occurrences", "not_completed_notes"],
     optionalSource: "notes",
     lookback: { minDays: 14, maxDays: 90 },
-    sufficiency: `≥${T.notes.minNotes} nonempty Notes on Not Completed occurrences across ≥${T.notes.minDistinctDates} dates. A theme needs ≥${T.notes.minNotes} cited Notes.`,
+    sufficiency: `A content term shared by ≥${T.notes.minNotes} nonempty Notes on Not Completed occurrences across ≥${T.notes.minDistinctDates} dates. Only that group reaches the model, and a theme must cite ≥${T.notes.minNotes} of them.`,
     permittedProposals: ["obstacle_plan"],
     unsupportedInput: "unavailable",
   },
@@ -160,10 +160,12 @@ export function resolveBriefingAnalysis(input: ResolveBriefingAnalysisInput): Br
     occurrence.localDate >= lookback.start && occurrence.localDate < lookback.end &&
     (!behaviors || behaviors.has(occurrence.behaviorRef)));
   const scopedToday = {
-    scheduledCount: source.today.scheduledCount,
+    scheduledCount: behaviors && source.today.scheduledBehaviorRefs
+      ? source.today.scheduledBehaviorRefs.filter((ref) => behaviors.has(ref)).length
+      : source.today.scheduledCount,
     unresolved: source.today.unresolved.filter((item) => !behaviors || behaviors.has(item.behaviorRef)),
   };
-  const context: LaneContext = { input, lookback, occurrences, today: scopedToday, periods: schedulePeriods(source, lookback) };
+  const context: LaneContext = { input, lookback, occurrences, today: scopedToday, periods: schedulePeriods(source, lookback, behaviors) };
 
   const lanes: BriefingAnalysisLaneResult[] = [];
   const findings: BriefingFinding[] = [];
@@ -554,24 +556,60 @@ function notesFailureThemes(context: LaneContext): LaneOutput {
   let candidates = 0;
   for (const [behaviorRef, items] of [...byRef.entries()].sort(([left], [right]) => left < right ? -1 : 1)) {
     candidates += 1;
-    const dates = new Set(items.map((note) => note.localDate));
-    if (items.length < T.notes.minNotes || dates.size < T.notes.minDistinctDates) continue;
+    // The theme is a shared term found deterministically; the model only names the obstacle.
+    const theme = sharedNoteTerm(items);
+    if (!theme) continue;
     const notCompleted = [...eligible.values()].filter((row) => row.behaviorRef === behaviorRef).length;
-    const recent = [...items].sort((left, right) => left.localDate > right.localDate ? -1 : left.localDate < right.localDate ? 1 : 0).slice(0, T.notes.maxEvidence);
+    const group = theme.notes;
+    const recent = [...group].sort((left, right) => left.localDate > right.localDate ? -1 : left.localDate < right.localDate ? 1 : 0).slice(0, T.notes.maxEvidence);
     findings.push(finding(context, {
-      laneId: "notes-failure-themes", behaviorRef, key: "notes", evidenceBand: `notes:${Math.min(3, Math.floor(items.length / 3))}`,
+      laneId: "notes-failure-themes", behaviorRef, key: `notes:${theme.stem}`, evidenceBand: `notes:${Math.min(3, Math.floor(group.length / 3))}`,
       startLocalDate: context.lookback.start,
-      counts: { notes: items.length, notCompleted, dates: dates.size },
-      rates: { notedShare: round(items.length / notCompleted) },
+      counts: { notes: group.length, notesWithText: items.length, notCompleted, dates: new Set(group.map((note) => note.localDate)).size },
+      rates: { notedShare: round(group.length / notCompleted) },
       coverage: tallyCoverage(context.occurrences.filter((row) => row.behaviorRef === behaviorRef)),
-      rule: "notes", materiality: round(items.length / notCompleted),
+      rule: "notes", materiality: round(group.length / notCompleted),
       relevantToday: context.today.unresolved.some((item) => item.behaviorRef === behaviorRef),
-      proposal: { kind: "obstacle_plan", detail: { notes: items.length } },
+      proposal: { kind: "obstacle_plan", detail: { notes: group.length, sharedTerm: theme.word } },
       limitations: ["user_written_notes", "association_not_cause"],
       evidenceRefs: recent.map((note) => note.ref),
     }));
   }
   return { candidates, findings };
+}
+
+const NOTE_STOPWORDS = new Set(("the and but for not was were with too very just again then than this that from into onto over after before about " +
+  "had has have did does got get its it's i'm ive i've you your they them our out off all any can cant can't didnt didn't dont don't wont won't " +
+  "would could should because also really still more less some much many what when where which who why how day today time").split(" "));
+
+function noteStem(word: string): string {
+  if (word.length > 5 && word.endsWith("ing")) return word.slice(0, -3);
+  if (word.length > 4 && word.endsWith("ed")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * The most widely shared content term across a Behavior's Notes, when at least
+ * the minimum number of Notes on distinct dates contain it. Ties break alphabetically.
+ */
+function sharedNoteTerm<T extends Readonly<{ text: string; localDate: string }>>(items: readonly T[]): Readonly<{ stem: string; word: string; notes: T[] }> | null {
+  const byStem = new Map<string, { word: string; notes: T[] }>();
+  for (const note of items) {
+    const words = note.text.toLowerCase().normalize("NFKC").split(/[^\p{L}']+/u).map((word) => word.replace(/^'+|'+$/g, ""))
+      .filter((word) => word.length >= 3 && !NOTE_STOPWORDS.has(word));
+    for (const word of new Set(words)) {
+      const stem = noteStem(word);
+      const entry = byStem.get(stem) ?? { word, notes: [] };
+      if (!entry.notes.includes(note)) entry.notes.push(note);
+      byStem.set(stem, entry);
+    }
+  }
+  const candidates = [...byStem.entries()].filter(([, entry]) =>
+    entry.notes.length >= T.notes.minNotes && new Set(entry.notes.map((note) => note.localDate)).size >= T.notes.minDistinctDates);
+  candidates.sort(([leftStem, left], [rightStem, right]) => right.notes.length - left.notes.length || (leftStem < rightStem ? -1 : 1));
+  const best = candidates[0];
+  return best ? { stem: best[0], word: best[1].word, notes: best[1].notes } : null;
 }
 
 type FindingDraft = Readonly<{
@@ -617,11 +655,12 @@ function finding(context: LaneContext, draft: FindingDraft): BriefingFinding {
 }
 
 /** Current schedule-period start per Behavior; reminder/category-only revisions never split periods. */
-function schedulePeriods(source: BriefingAnalysisSource, lookback: Lookback): ReadonlyMap<string, string> | null {
+function schedulePeriods(source: BriefingAnalysisSource, lookback: Lookback, behaviors: ReadonlySet<string> | null): ReadonlyMap<string, string> | null {
   if (source.configurationPeriods.state !== "available") return null;
   const starts = new Map<string, string>();
   for (const period of source.configurationPeriods.records as readonly BriefingAnalysisConfigurationPeriod[]) {
-    if (!period.startsSchedulePeriod || period.effectiveLocalDate > lookback.end) continue;
+    // An unselected Behavior's schedule change cannot shorten a scoped analysis.
+    if (!period.startsSchedulePeriod || period.effectiveLocalDate > lookback.end || (behaviors && !behaviors.has(period.behaviorRef))) continue;
     const current = starts.get(period.behaviorRef);
     if (!current || period.effectiveLocalDate > current) starts.set(period.behaviorRef, period.effectiveLocalDate);
   }

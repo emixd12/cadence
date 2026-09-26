@@ -130,6 +130,8 @@ export type BriefingAnalysisSource = Readonly<{
   /** Today's scheduled load by Behavior, used for relevance only. */
   today: Readonly<{
     scheduledCount: number;
+    /** One Behavior ref per occurrence scheduled today, so a narrowed scope can recount load. */
+    scheduledBehaviorRefs?: readonly string[];
     unresolved: readonly Readonly<{ ref: string; behaviorRef: string; startTime: string }>[];
   }>;
 }>;

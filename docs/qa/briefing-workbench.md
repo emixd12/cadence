@@ -630,6 +630,11 @@ values cannot bypass the cooldown; cross-lane ranking divides materiality by eac
 lane's threshold; the unknown-return line no longer blames a missing base, and only
 current legs contribute overlaps; the Notes disclosure names the actual send condition.
 
+PR review follow-up: Note themes are now found deterministically — a content term shared
+by at least three Notes on two dates — and only that group reaches the model; unrelated
+Notes produce no finding. Schedule load recounts today's load and ignores schedule changes
+for Behaviors outside the configured scope. The word-limit instruction names tip text.
+
 ### Remaining gates
 
 - Live check that the strict schema's always-present `tip` field returns `null` for the

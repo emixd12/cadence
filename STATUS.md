@@ -968,6 +968,10 @@ info@identityscaffolding.com, and the Verification Center for
 verified and shown to users; data access remains verified; no reviewer request
 appears; the three declared scopes are unchanged. Post-approval smoke checks
 remain outstanding. Ticket 141 and rollout gates remain unchanged.
+September 26 scheduled follow-up could not independently repeat that pane check:
+the Identity Scaffolding Chrome session is unavailable, and automatic approval
+review blocked broad Claude inspection. The recorded September 26 result above
+is preserved; this automation obtained no new provider decision.
 Unrelated working-tree changes were excluded from the isolated releases.
 
 Ticket 138: Cloudflare's initially empty `cadence-me.com` zone now has two
