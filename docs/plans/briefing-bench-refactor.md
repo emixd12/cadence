@@ -82,9 +82,9 @@ The new behavior needs: a server-stored generated brief per account and local
 date, a visible Show today's brief control after dismissal, retention and deletion
 rules, updated disclosure copy, and a `docs/DECISIONS.md` entry.
 
-Interpretation to confirm with the owner before implementing Phase 6: "7am cutoff"
-is read as "the day's brief is generated from the first opening at or after
-7:00 AM local, then stored". Openings before 7:00 AM show no automatic brief.
+Confirmed by the owner on September 27, 2026: "7am cutoff" means the day's brief is
+generated from the first opening at or after 7:00 AM local, then stored. Openings
+before 7:00 AM show no automatic brief.
 
 Pre-generation at 7:00 AM by a server job (so even the first opening is instant)
 is **not** in scope. Every advisor read requires the user's own current session
@@ -337,7 +337,7 @@ regression or evidence fixture, per the shared verification rules above Ticket 1
 | 3 | 178 | Day-range analysis endpoint and grid (§6.2, §6.5 part 3) | 176 |
 | 4 | 179 | Generation modes, 100-call budget, run store and report (§6.3, §6.4) | 178 |
 | 5 | 180 | Bench route split and layout (§6.5), glossary and catalog updates | 179 |
-| 6 | 181 | Stored daily brief and reopen (§6.6) | 175; owner confirms §3 interpretation |
+| 6 | 181 | Stored daily brief and reopen (§6.6) | 175 |
 
 Phase 6 is independent of the bench and can run in parallel after Phase 0.
 
@@ -391,5 +391,4 @@ Phase 6 is independent of the bench and can run in parallel after Phase 0.
 - **Range cost:** a 90-day range runs 90 snapshot reconstructions; measure and cap.
 - **Stored briefs hold generated personal text:** Phase 6 needs a disclosure update
   and a retention test; it reverses a documented privacy statement.
-- **"7am cutoff" interpretation** (§3) must be confirmed before Phase 6.
 - **Pre-generation** at 7:00 AM stays a follow-up requiring a privileged-path review.

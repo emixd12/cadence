@@ -779,5 +779,7 @@ storage; replay reads Google Calendar for past dates.
 This reverses the documented "no stored briefing text" and "do not reopen dismissed
 output" rules once implemented. `docs/plans/briefing-bench-refactor.md` records the
 pain points, current system, conflicts to resolve and phases (proposed Tickets
-175–181). No code changed with this decision. The 7:00 AM interpretation and past
-Calendar reads under Google verification remain to be confirmed before their phases.
+175–181). No code changed with this decision. The owner confirmed the 7:00 AM
+interpretation: the first opening at or after 7:00 AM local generates and stores the
+day's brief; earlier openings show none. Past Calendar reads under Google
+verification remain to be confirmed before their phase.
