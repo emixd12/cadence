@@ -765,3 +765,19 @@ Implementation decisions, recorded for owner review:
   that the model stated UTC instants as local times, a defect that predates these tickets.
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
+
+## 2026-09-27: Replay-based briefing bench and stored daily brief
+
+The owner asked to test the advisor across many days and all lanes on their own
+dogfooded account, with less clutter, and consented to using their data (including
+model transmission) for this evaluation. They decided: the day's brief is the first
+run at or after 7:00 AM local, stored so later openings and a reopen after dismissal
+show it without a new model run; the workbench budget rises to 100 model calls per
+hour; workbench runs are saved with their settings in compact, git-ignored local
+storage; replay reads Google Calendar for past dates.
+
+This reverses the documented "no stored briefing text" and "do not reopen dismissed
+output" rules once implemented. `docs/plans/briefing-bench-refactor.md` records the
+pain points, current system, conflicts to resolve and phases (proposed Tickets
+175–181). No code changed with this decision. The 7:00 AM interpretation and past
+Calendar reads under Google verification remain to be confirmed before their phases.
