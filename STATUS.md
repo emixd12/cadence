@@ -20,6 +20,24 @@ Its job is to answer:
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
 
+## Supabase CPU alert mitigation — September 27, 2026
+
+Investigation found a continuing Daily Brief `40001` retry storm: 8,638,404
+Calendar-disclosure errors on September 25 and 359,874 in a September 27 hour.
+The prepared migration replaces three application-conflict error codes with
+`55000`, preserving consent, grants and admission behavior. Existing adapters
+already return `context_changed` / HTTP 409. It preserves both main and the newer
+hosted writer definitions. Web and linked desktop share the fix; local-only
+desktop and marketing are unaffected; native mobile remains deferred.
+
+Repository checks, production build and 2,211 tests pass (40 skipped). A local PGlite SQL regression
+fails before the migration and passes afterward for both writer versions,
+including privilege preservation and rejected-write rollback. Full Supabase
+replay is blocked by denied Docker socket access. Hosted rollout remains open:
+production has PR #82/#83 migrations absent from main, which must be reconciled
+before the new migration deploys. No hosted mutation or CPU recovery is claimed.
+Evidence, SQL smoke and owner actions: `docs/qa/2026-09-27-supabase-cpu.md`.
+
 ## Security alert triage — September 26, 2026
 
 After PR #80 merged, CodeQL rescanned `main` and reports zero open

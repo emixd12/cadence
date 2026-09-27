@@ -150,7 +150,7 @@ begin
   begin
     perform public.save_daily_brief_preferences(true, false, 0);
     raise exception 'Stale Daily Brief revision was accepted.';
-  exception when sqlstate '40001' then
+  exception when sqlstate '55000' then
     null;
   end;
 
@@ -208,7 +208,7 @@ begin
       3
     );
     raise exception 'Stale Calendar disclosure fence was accepted.';
-  exception when sqlstate '40001' then
+  exception when sqlstate '55000' then
     null;
   end;
   perform public.save_daily_brief_preferences(true, false, 3);

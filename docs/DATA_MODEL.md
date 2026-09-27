@@ -1857,6 +1857,15 @@ No prompts, model output, raw facts or credentials are persisted in these tables
 Rollback disables the feature or removes the server key; keep additive migrations
 until a separately reviewed removal migration is needed.
 
+Migration `20260927172354_fix_daily_brief_nonretryable_conflicts.sql` changes
+the Daily Brief stale-preference and stale-Calendar guards from `40001` to
+`55000`. These are application conflicts; retrying the same database transaction
+cannot refresh the supplied revision or renew disclosure. The repository already
+maps `55000` to `context_changed`, which the route returns as HTTP 409. The
+migration preserves the installed function bodies and privileges. It patches
+the v2 preference writer when present, otherwise the original writer. No table,
+RPC signature, generated TypeScript type, consent rule or admission limit changes.
+
 Migration `20260919010200_add_advisor_read_admission.sql` adds private operational
 read-admission state. Each row binds its lease to `user_id` and `client_id`; it
 contains no titles, context, provider payloads, or credentials. Account deletion

@@ -99,4 +99,20 @@ describe("Daily Brief repository", () => {
       expect.objectContaining<Partial<DailyBriefStorageError>>({ code: "session" }),
     );
   });
+
+  it.each(["55000", "40001"])("surfaces %s conflicts without retrying the RPC", async (code) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code } });
+    await expect(beginDailyBrief({ rpc } as never, {
+      installationId: "14700000-0000-4000-8000-000000000001",
+      retry: false,
+      expectedRevision: 3,
+    })).rejects.toMatchObject({ code: "context_changed" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    rpc.mockClear();
+    await expect(saveDailyBriefPreferences(
+      { rpc } as never, { enabled: true, includeCalendar: true }, 2,
+    )).rejects.toMatchObject({ code: "context_changed" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
 });
