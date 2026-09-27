@@ -20,7 +20,24 @@ Its job is to answer:
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
 
-## Supabase CPU alert mitigation — September 27, 2026
+## Supabase CPU alert production fix — September 27, 2026
+
+The owner authorized immediate remediation. Supabase applied migration
+`20260927173716_fix_daily_brief_nonretryable_conflicts` at 13:37 New York time.
+Readback confirms exactly three error-code changes and preserved function
+bodies, owners and grants. PostgREST sessions are idle; an 80.7-second observation
+recorded 53 commits, zero rollbacks, and no active Daily Brief sessions. No
+restart, compute resize, account-data or consent change was needed. CPU percentage
+was not directly measured. Calendar disclosure must still be renewed deliberately
+in Settings if the owner wants to resume Calendar-inclusive briefs.
+
+The fix branch records the already-applied PR #82/#83 migrations byte-for-byte,
+their related public RPC types, and the new migration's actual provider-assigned
+version. Hosted statements match all three files. Application PR integration
+and full Docker/Supabase replay remain separate work. Detailed evidence:
+`docs/qa/2026-09-27-supabase-cpu.md`.
+
+## Supabase CPU alert initial investigation — September 27, 2026
 
 Investigation found a continuing Daily Brief `40001` retry storm: 8,638,404
 Calendar-disclosure errors on September 25 and 359,874 in a September 27 hour.

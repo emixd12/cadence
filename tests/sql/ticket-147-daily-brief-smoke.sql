@@ -28,7 +28,7 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if preference <> '{"enabled":false,"include_calendar":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null}'::jsonb then
+  if preference - 'include_reminder_history' - 'include_notes' <> '{"enabled":false,"include_calendar":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null}'::jsonb then
     raise exception 'Daily Brief defaults changed: %', preference;
   end if;
 
@@ -102,9 +102,11 @@ begin
     raise exception 'Successful Daily Brief attempt was not recorded.';
   end if;
 
+  -- Ticket 168 permits deliberate recovery after completion; automatic starts
+  -- must still remain suppressed on both the original and current schema.
   decision := public.begin_daily_brief(
     '14700000-0000-4000-8000-000000000101',
-    true,
+    false,
     1
   );
   if decision ->> 'state' <> 'already_attempted' then

@@ -1559,6 +1559,17 @@ export type Database = {
         Returns: Json
       }
       read_account_sync_snapshot: { Args: never; Returns: Json }
+      read_advisor_analysis_snapshot: {
+        Args: {
+          history_start_local_date: string
+          include_notes: boolean
+          include_reminders: boolean
+          revision_only: boolean
+          selected_behavior_ids: string[]
+          target_local_date: string
+        }
+        Returns: Json
+      }
       read_advisor_cadence_revision: {
         Args: {
           history_occurrence_limit: number
@@ -1580,9 +1591,19 @@ export type Database = {
         Returns: Json
       }
       read_daily_brief_preferences: { Args: never; Returns: Json }
+      read_daily_brief_tip_history: { Args: never; Returns: Json }
       read_note_shortcut_context: {
         Args: { target_behavior_id: string }
         Returns: Json
+      }
+      record_daily_brief_tip: {
+        Args: {
+          p_expected_revision: number
+          p_fingerprint: string
+          p_installation_id: string
+          p_lease_token: string
+        }
+        Returns: boolean
       }
       release_advisor_day_context_read: {
         Args: { p_client_id: string; p_lease_token: string }
@@ -1593,6 +1614,16 @@ export type Database = {
           p_enabled: boolean
           p_expected_revision: number
           p_include_calendar: boolean
+        }
+        Returns: Json
+      }
+      save_daily_brief_preferences_v2: {
+        Args: {
+          p_enabled: boolean
+          p_expected_revision: number
+          p_include_calendar: boolean
+          p_include_notes: boolean
+          p_include_reminder_history: boolean
         }
         Returns: Json
       }

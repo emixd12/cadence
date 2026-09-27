@@ -1,8 +1,44 @@
 # September 25 Supabase CPU alert
 
-Investigated September 27, 2026 against main `5e7ebdeb67082ebae12b41713507b027bdf726c8`.
-Only aggregate hosted diagnostics and function definitions were read. No hosted
-schema, data, session, configuration or compute changes were made.
+Initially investigated September 27, 2026 against main `5e7ebdeb67082ebae12b41713507b027bdf726c8`.
+The owner subsequently authorized immediate remediation. The deployment record
+below supersedes the initial rollout hold.
+
+## Authorized production deployment
+
+On September 27 at 13:37 New York time, the connected Supabase migration interface
+applied `20260927173716_fix_daily_brief_nonretryable_conflicts` successfully.
+The local CLI had no available credential. The repository filename now matches
+the version assigned by Supabase; migration history was not repaired or rewritten.
+
+Readback compared every affected function definition, owner and ACL with the
+pre-deployment snapshot. Only the three `40001` to `55000` substitutions changed.
+The newer bounded-recovery and optional-source behavior remains intact.
+
+The fix branch now includes the two previously applied migration files from
+PR #82/#83, copied byte-for-byte from those branches. Each statement matches the
+hosted migration history in order. The related public RPC type additions are also
+copied from PR #83. This records already-live schema; it does not deploy those PRs'
+application features. Main and the unrelated application releases remain unchanged.
+
+Recovery checks:
+
+- At 13:37:47, PostgREST sessions were idle.
+- From 13:39:28 through 13:40:49, database counters recorded 53 commits and
+  **zero rollbacks** across 80.7 seconds. The statistics-reset timestamp did not
+  change. Both endpoint checks found zero active PostgREST sessions and zero
+  sessions whose last query was the Daily Brief acquisition RPC.
+- No backend cancellation, restart, compute resize or provider configuration
+  change was necessary. The performance advisor findings remain unchanged.
+- The log query currently returned error records only through 13:28:23, earlier
+  than deployment. That result does not establish a precise cutoff or prove
+  immediate log freshness. Recovery evidence therefore uses live database
+  activity and counter deltas. The CPU percentage was not directly measured.
+- Calendar disclosure remains unchanged. If Daily Brief reports changed context,
+  the owner must deliberately re-save the intended Calendar inclusion in Settings.
+
+The production retry guard is fixed. Full Docker/Supabase replay and integration
+of the application PRs remain separate release work, not incident containment.
 
 ## Finding
 
@@ -65,7 +101,7 @@ Do not add/drop indexes or resize compute solely from this inventory.
 
 ## Mitigation
 
-`20260927172354_fix_daily_brief_nonretryable_conflicts.sql` changes three
+`20260927173716_fix_daily_brief_nonretryable_conflicts.sql` changes three
 application-conflict guards from `40001` to `55000`: stale/missing/disabled
 preferences on acquisition, stale Calendar disclosure, and stale preference save.
 The existing repository maps `55000` to `context_changed`; the route returns
@@ -103,9 +139,10 @@ marketing do not call these RPCs. Future native mobile remains deferred.
 - `npm ci` hit an unrelated AgentMail binary extraction failure. Dependency
   installation with `--ignore-scripts` succeeded without lockfile changes.
 
-## Hosted rollout and owner actions
+## Original rollout plan (superseded by the deployment record above)
 
-This change is prepared, not deployed. No CPU recovery is claimed.
+The following describes the original hold before the owner authorized deployment.
+The deployment record above is authoritative for current status.
 
 1. Reconcile migration history before rollout. Production already has
    `20260926150000_daily_brief_bounded_recovery` from PR #82 and
