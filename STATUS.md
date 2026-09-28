@@ -20,6 +20,29 @@ Its job is to answer:
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
 
+## Tickets 175–177 briefing review workbench — September 28, 2026
+
+The owner asked to implement Phases 0–2 of `docs/plans/2026-09-27-briefing-bench-review.md`
+and authorized full account capture for local reviews. Tickets 175–177 are complete in
+source. Production Daily Brief is unchanged except the shared `realistic-timing` fix,
+which only matters once `advisor-analysis` is promoted.
+
+- 175: midnight-ending ranges end the next day in `realistic-timing`; plain-language lane,
+  state and tip-decision labels; reading-burden, repetition and internal-term warnings
+  (`packages/core/src/services/briefing-review.ts`).
+- 176: the workbench opens on Compare with Saved reviews. Cases, candidates, runs and
+  prose feedback persist under `.local/briefing-bench/` (0700/0600, 30-day retention,
+  delete). Account cases keep captured inputs for exact reruns.
+- 177: review packets for coding agents, validated proposal files, owner decisions, and
+  candidate-only reruns on a saved case's captured clock after current consent checks.
+
+Verification: agents, interactions, resolvers, core, design-system, lint, TypeScript,
+tests (2,435 passed, 29 skipped) and build pass. An earlier full run failed
+`tests/desktop-release-acceptance.test.ts` once under load; it is under the parallel
+Ticket 115 edits and passed alone and on the final run. Browser QA ran one synthetic
+comparison. See `docs/qa/briefing-workbench.md`. Remaining: owner review of
+real account comparisons; Phases 3–5 are not ticketed.
+
 ## Tickets 169–174 advisor analysis, tips and travel — September 26, 2026
 
 Tickets 169–173 are implemented in source; Ticket 174 is in progress. The production

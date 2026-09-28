@@ -194,6 +194,14 @@ Production returns 404. GET uses existing sign-in and returns current briefing
 access plus authorized Behavior labels only; it never captures context or generates.
 POST accepts either a known fixture ID plus two validated configurations, or exact
 fields `mode: "account"`, `accountRef`, `preferenceRevision` and two configurations.
+Tickets 176–177 add an optional `review` object (case ID and candidate records) that
+saves the case and every run locally, and `mode: "saved"` with `accountRef` (or null)
+to rerun one or two configurations on a saved case's frozen inputs.
+`GET/POST /api/dev/briefing-reviews` call `briefing-review.service.ts` with the same
+guard. GET lists or opens saved cases (`source=synthetic|account`, optional `caseId`)
+and never returns captured account inputs. POST saves feedback and proposal
+decisions, writes a review packet, or deletes a case. Account sources require sign-in
+and use the owner's partition.
 The expected account reference is a mismatch guard, never an owner selector.
 Account mode authenticates through the existing first-party request boundary and
 uses revocable briefing/Calendar consent. One capture supplies both history windows.

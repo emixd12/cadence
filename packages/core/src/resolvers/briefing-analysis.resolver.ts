@@ -305,7 +305,9 @@ function realisticTiming(context: LaneContext): LaneOutput {
       if (marked.toPlainDate().toString() !== row.localDate) return [];
       const markedMinute = marked.hour * 60 + marked.minute;
       const start = minutes(row.startTime);
-      const end = row.scheduleKind === "range" && row.endTime ? minutes(row.endTime) : start;
+      const rangeEnd = row.scheduleKind === "range" && row.endTime ? minutes(row.endTime) : start;
+      // Like the planner, a range ending at or before its start ends the next day (22:00–00:00 ends at midnight).
+      const end = rangeEnd <= start && row.scheduleKind === "range" && row.endTime ? rangeEnd + 1440 : rangeEnd;
       // A mark inside a reserved range is on time; outside, measure from the nearer bound.
       const lag = markedMinute < start ? markedMinute - start : markedMinute > end ? markedMinute - end : 0;
       return [{ row, lag, markedMinute }];

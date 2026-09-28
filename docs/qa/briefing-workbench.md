@@ -644,3 +644,86 @@ for Behaviors outside the configured scope. The word-limit instruction names tip
 - Hosted migration of `20260926150000` and `20260926170000` under deployment authority.
 - Deployed-web and installed-desktop acceptance of recovery, tips and travel lines.
 - Wording re-sample after the final mechanics instruction.
+
+## Compare, saved reviews and feedback-to-candidate loop (Tickets 175–177) — September 28, 2026
+
+Source: `docs/plans/2026-09-27-briefing-bench-review.md`, Phases 0–2. The owner
+authorized full account capture for local reviews (Decision 2026-09-27).
+
+### Editorial target
+
+Review the complete rendered brief, not individual fields.
+
+- The opening explains what matters today, beyond the visible Timeline.
+- The overview usually contains one or two distinct planning points.
+- At most one historical observation appears, relevant to today and supported.
+- A next step appears only when evidence supports it.
+- Quiet days stay short; no tip is a successful outcome.
+- The prose names Behaviors and concrete consequences, without internal terms,
+  judgment, generic encouragement or repeated advice.
+- Marks describe logging time, not when a Behavior happened. Suggestions stay read-only.
+- Start with 80–120 visible words. This is a working range, not a validated
+  reading-speed formula. Never hide material uncertainty to meet it.
+
+After one reading, ask: "What matters today?" and "Was any part unclear, repetitive,
+or unnecessary?"
+
+### Workflow
+
+1. Compare opens first. Choose Synthetic or My account, then Run new comparison.
+   A is the baseline, B the candidate. Each column shows the production bubble,
+   visible word count, repetition and internal-term warnings, and collapsed evidence.
+2. Write feedback in prose. A judgment is optional. Select text inside an output and
+   choose Quote selected text to anchor the comment; add replacement wording if useful.
+3. Open "Turn feedback into a candidate" and choose Write review packet. Ask a coding
+   agent to read the packet path shown and write one proposal file.
+4. Choose Check for proposals. Load a configuration proposal into B, or let the agent
+   make a repository change. Then choose Rerun candidate on this case. A stays pinned.
+5. Record Accept, Needs correction (with a note) or Reject. Promotion remains a
+   separate reviewed repository change.
+
+### Storage
+
+`.local/briefing-bench/v1/<synthetic|account-<ref>>/<case>/` holds `case.json`,
+`candidates.jsonl`, `runs.jsonl`, `feedback.jsonl`, `dispositions.jsonl`,
+`review-packet.md` and `proposals/`. Directories are 0700 and files 0600. Cases
+expire after 30 days and can be deleted from Saved reviews. Account `case.json`
+holds the captured contexts, analysis source and Behavior reference map; the reviews
+API never returns them to the browser. Runs keep withheld output, failures and
+cancellations. A failed write shows "Not saved" and keeps the visible result.
+
+### Verification
+
+- Resolver: a 21:00–00:00 range treats 23:30 marks as on time and 18:00 marks as
+  three hours early; next-day 00:30 marks stay excluded. Before the fix, 23:30 marks
+  measured 1,410 minutes late.
+- Provider-free service tests: case, candidate and run persistence; file modes;
+  anchored feedback and rejected foreign quotations; packet content; proposal
+  validation and malformed-file reporting; dispositions; candidate-only reruns on the
+  same frozen facts; cancellation keeping completed runs; storage failure; deletion,
+  retention and path-like IDs; production and cross-origin refusal.
+- Account tests: captured inputs saved once in the owner partition and withheld from
+  GET; reruns on the captured clock without a new capture; refusal for an uncaptured
+  history window, disabled briefing, a Behavior deleted since capture, and another
+  signed-in owner.
+- DOM tests (26): Compare default, explicit runs, saved-case reload, withheld failures,
+  result retention after edits, cancellation, Not saved, feedback with quotation,
+  draft retention across views, candidate rerun with pinned baseline, packet and
+  proposal loading, decisions, Saved reviews reopen after remount and confirmed delete,
+  browser storage limited to configuration drafts, and account binding and clearing.
+- Browser QA on `http://127.0.0.1:4321/design-system?preview=briefing-workbench`:
+  one synthetic comparison (sparse, marking offset; Cadence default vs Advisor
+  analysis; gpt-5.6-luna, invented facts only). Both runs passed validation and saved.
+  A rendered 49 visible words; B rendered 137 and showed the pattern tip with its
+  evidence line. Feedback saved, the packet was written with configuration
+  differences and the exact comment, and both survived a reload. At 375 px, A stacks
+  above B with no horizontal overflow.
+- Observation from that run: B restated the tip's timing pattern in its overview.
+  The five-word repetition warning did not flag it because the wording differed.
+  Semantic repetition still needs the owner's reading and feedback.
+
+### Remaining gates
+
+- Owner review of real account comparisons through this workflow.
+- Plan Phases 3–5 (historical days, sequence and lane-preview batches with call
+  budgets, promotion) are not ticketed or implemented.

@@ -12473,8 +12473,9 @@ Scope and acceptance:
   server success without delivery, refresh, expiry, manual retry, parallel tabs,
   revoked consent and account changes. Record latency by phase and result code without
   private content. Demonstrate bounded loading and recovery on actual release targets.
-- Preserve owner-clicked private comparisons, frozen-snapshot comparisons, memory-only
-  private output and allowance separation. Record authorized synthetic-provider,
+- Preserve owner-clicked private comparisons, frozen-snapshot comparisons and allowance
+  separation. Ticket 176 replaces memory-only private output with owner-authorized
+  local case storage (Decision 2026-09-27). Record authorized synthetic-provider,
   owner-account, deployed-web and installed-desktop evidence separately.
 - Release 168 independently when its checks pass. Promote later evidence/prose changes
   through the existing reviewed preset/policy mechanism. Preserve existing consent,
@@ -12503,3 +12504,141 @@ Platform impact:
 Verification: all shared checks, the expanded deterministic/DOM fixture suites,
 reviewed live outputs under existing authority, hosted and installed acceptance,
 and rollback. Record actual pass/fail results, remaining gates and reviewer findings.
+
+## Ticket 175: Trustworthy briefing review baseline
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 0 of the
+briefing-bench audit (`docs/plans/2026-09-27-briefing-bench-review.md`).
+Dependencies: Tickets 169–174.
+
+Goal: make each observation's origin readable and define the editorial target before
+comparing prose.
+
+Scope and acceptance:
+
+- `realistic-timing` treats a range ending at or before its start as ending the next
+  day, matching the planner (21:00–00:00 ends at midnight). Same-day marks remain the
+  lane's rule; next-day marks stay excluded. Regression tests cover both sides.
+- The workbench shows plain-language lane names, lane states, unavailable reasons and
+  tip decisions with Behavior titles (`packages/core/src/services/briefing-review.ts`).
+- Editorial target, stated in `docs/qa/briefing-workbench.md`: open with what matters
+  today; usually one or two planning points; at most one supported historical
+  observation; a next step only when evidence supports it; quiet days stay short.
+  Start with 80–120 visible words, a working range rather than a validated formula.
+- The Compare view counts every rendered word (evidence, limitation, option, travel and
+  status lines) and warns about five-word phrases repeated between the overview,
+  suggestions and tip, and about internal vocabulary. A term inside a Behavior title
+  is not flagged. Warnings never reject or rewrite output; production validation,
+  tip provenance and tip-history semantics are unchanged.
+
+Implementation references: `packages/core/src/resolvers/briefing-analysis.resolver.ts`,
+`packages/core/src/services/briefing-review.ts`, `app/design-system/BriefingReview.tsx`,
+`tests/briefing-analysis.resolver.test.ts`, `tests/briefing-review.test.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Resolver fix affects Daily Brief tips when the `advisor-analysis` preset is promoted; review warnings are workbench-only. |
+| Desktop | The resolver fix reaches linked desktop through shared core; no desktop UI change. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable: shared core only; native mobile remains deferred. |
+
+Verification: resolver, core review and workbench DOM tests; all required checks.
+
+## Ticket 176: Compare view with saved results and anchored prose feedback
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 1 of the
+briefing-bench audit. Dependencies: Ticket 175.
+
+Goal: make reading two complete briefs and commenting in prose the primary workbench
+task, and keep that work across reloads.
+
+Scope and acceptance:
+
+- `/design-system?preview=briefing-workbench` opens on Compare, with a Saved reviews
+  view. Compare shows A (baseline) and B (candidate) in equal columns using the
+  production bubble, with evidence, differences and configuration collapsed below.
+  Narrow screens stack A above B.
+- Run new comparison saves a case, both candidates and every run, including withheld
+  output, failures and cancellations, under `.local/briefing-bench/v1/<partition>/`.
+  Cancelling keeps runs that finished first. A failed write shows "Not saved" and
+  keeps the visible result.
+- Configuration edits no longer erase results; a column notes when its draft changed
+  since the run. Drafts and unsaved feedback survive view switches.
+- Feedback saves the exact comment, an optional judgment (Prefer A, Prefer B, Both
+  work, Neither works), an optional quotation that must come from the linked output,
+  and optional replacement wording, all linked to run and candidate IDs.
+- Owner-authorized storage policy (Decision 2026-09-27): synthetic and My account cases
+  persist locally. Account cases save the minimal captured inputs once per case so
+  they can be rerun exactly; the reviews API never returns those inputs to the
+  browser. Directories are 0700, files 0600, cases expire after 30 days and can be
+  deleted from Saved reviews. Each account has its own partition.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`app/design-system/BriefingReview.tsx`, `lib/services/briefing-bench-store.ts`,
+`lib/services/briefing-review.service.ts`, `lib/services/briefing-workbench.service.ts`,
+`app/api/dev/briefing-reviews/route.ts`, `interaction-registry.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only workbench and loopback routes; production returns 404. |
+| Desktop | Not applicable: the workbench is not a desktop feature. |
+| Marketing | Not applicable: no public surface or claim changes. |
+| Future mobile | Responsive stacked columns verified at 375 px; native mobile remains deferred. |
+
+Verification: `tests/briefing-bench-review.test.ts`, `tests/briefing-bench-account.test.ts`,
+`tests/briefing-workbench.dom.test.tsx`, browser QA on port 4321, all required checks.
+
+## Ticket 177: Turn feedback into reviewable candidates
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 2 of the
+briefing-bench audit. Dependencies: Ticket 176.
+
+Goal: connect one prose comment to one specific, testable change and its rerun.
+
+Scope and acceptance:
+
+- Write review packet produces `review-packet.md` in the case directory: candidates,
+  configuration differences, every run with versions, reading warnings, evidence
+  lines and lane decisions, exact feedback, earlier proposals, and the proposal
+  schema. An existing coding agent reads it; no agent framework runs in Cadence.
+- An agent writes `proposals/<id>.json` naming the interpreted problem, its owner
+  (configuration, prompt, resolver, presentation or evidence), the change, expected
+  effect, possible regression and cases to rerun. The workbench validates and lists
+  proposals, ignores malformed files by name, and never executes them.
+- Configuration proposals load into candidate B with their lineage. Repository
+  proposals change code on a branch; each run records model, prompt revision
+  (`DAILY_BRIEF_PROMPT_REVISION`), configuration revision and pipeline version, so
+  before/after differences stay visible.
+- Rerun candidate on this case reruns only B on the saved case's inputs and captured
+  clock; the baseline output stays pinned. Synthetic reruns require unchanged fixture
+  versions. Account reruns require the same signed-in owner, enabled briefing, the
+  sources the case captured, a connected Calendar when captured, and every captured
+  Behavior still active. A configuration needing inputs the case did not capture is
+  refused (`input_not_captured`). Production freshness checks are unchanged.
+- The owner records Accept, Needs correction (with a note) or Reject per proposal.
+  Feedback and proposals never become production rules; promotion stays a reviewed
+  repository change.
+
+Not in scope (plan Phases 3–5, not yet ticketed): historical day selection and
+reconstruction, sequence and lane-preview batches with call budgets, and candidate
+promotion. Stored daily briefs remain a separate product proposal.
+
+Implementation references: `lib/services/briefing-review.service.ts`,
+`lib/services/briefing-workbench.service.ts`, `lib/services/daily-brief-consumer.ts`,
+`app/design-system/BriefingReview.tsx`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only workbench; production Daily Brief is unchanged. |
+| Desktop | Not applicable: no desktop surface; promoted changes reach desktop through their own tickets. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable beyond the responsive workbench. |
+
+Verification: packet, proposal validation, disposition, same-case rerun, account rerun
+authorization and refusal tests; all required checks.

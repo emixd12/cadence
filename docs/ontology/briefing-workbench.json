@@ -2331,7 +2331,8 @@
       ],
       "relatedIds": [
         "workbench.mode.synthetic",
-        "workbench.mode.account"
+        "workbench.mode.account",
+        "workbench.mode.saved"
       ]
     },
     {
@@ -2354,7 +2355,7 @@
       "id": "workbench.mode.account",
       "label": "My account mode",
       "category": "Workbench",
-      "definition": "Uses one authorized hosted snapshot. Private results and Behavior selections stay in memory and clear on access changes.",
+      "definition": "Uses one authorized hosted snapshot. Each comparison saves the captured inputs, outputs and feedback locally for 30 days so it can be reread and rerun; a rerun rechecks current consent. Account or consent changes close the open case.",
       "contracts": [
         {
           "path": "lib/services/briefing-account-context.service.ts",
@@ -2365,6 +2366,23 @@
         "workbench.mode",
         "account.enabled",
         "account.includeCalendar"
+      ]
+    },
+    {
+      "id": "workbench.mode.saved",
+      "label": "Saved case rerun",
+      "category": "Workbench",
+      "definition": "Reruns one or two configurations on a saved case's frozen inputs and captured clock. Synthetic cases need unchanged fixtures; account cases need the same owner and current consent for every captured source.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode",
+        "workbench.mode.account",
+        "workbench.mode.synthetic"
       ]
     },
     {
@@ -2499,7 +2517,12 @@
         "workbench.error.context-incomplete",
         "workbench.error.same-account-required",
         "workbench.error.account-unavailable",
-        "workbench.error.comparison-failed"
+        "workbench.error.comparison-failed",
+        "workbench.error.case-not-found",
+        "workbench.error.review-only",
+        "workbench.error.input-not-captured",
+        "workbench.error.fixture-changed",
+        "workbench.error.review-unavailable"
       ]
     },
     {
@@ -4424,6 +4447,85 @@
       "relatedIds": [
         "analysis.lane",
         "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.error.case-not-found",
+      "label": "case_not_found",
+      "category": "Workbench",
+      "definition": "The saved case is gone. It may have expired after 30 days or been deleted.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        },
+        {
+          "path": "lib/services/briefing-review.service.ts",
+          "symbol": "readBriefingReviews"
+        }
+      ],
+      "relatedIds": [
+        "workbench.error"
+      ]
+    },
+    {
+      "id": "workbench.error.review-only",
+      "label": "review_only",
+      "category": "Workbench",
+      "definition": "The case saved no inputs, so it can be reread but not rerun exactly. Run a new comparison.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        }
+      ],
+      "relatedIds": [
+        "workbench.error"
+      ]
+    },
+    {
+      "id": "workbench.error.input-not-captured",
+      "label": "input_not_captured",
+      "category": "Workbench",
+      "definition": "The configuration needs an input the saved case did not capture, such as another history window. Run a new comparison instead.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        }
+      ],
+      "relatedIds": [
+        "workbench.error"
+      ]
+    },
+    {
+      "id": "workbench.error.fixture-changed",
+      "label": "fixture_changed",
+      "category": "Workbench",
+      "definition": "The synthetic fixture changed since the case was saved, so a rerun would not use the same facts.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        }
+      ],
+      "relatedIds": [
+        "workbench.error"
+      ]
+    },
+    {
+      "id": "workbench.error.review-unavailable",
+      "label": "review_unavailable",
+      "category": "Workbench",
+      "definition": "Saved reviews could not be read or written. Visible results stay on screen; check the development server.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-review.service.ts",
+          "symbol": "writeBriefingReview"
+        }
+      ],
+      "relatedIds": [
+        "workbench.error"
       ]
     }
   ]

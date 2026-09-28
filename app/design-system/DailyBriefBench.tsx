@@ -9,12 +9,12 @@ import { BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId 
 import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, type BriefingAnalysisFixtureId } from "@/lib/services/briefing-analysis-fixtures";
 import { BRIEFING_ANALYSIS_LANES } from "@cadence/core/resolvers/briefing-analysis.resolver";
 type Account = { settings: DailyBriefSettings; behaviors: { ref: string; title: string }[] };
-type Comparison = { mode?: 'account' | 'synthetic'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
+type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
 
 async function fetchAccount(signal: AbortSignal): Promise<Account> {
   const response = await fetch('/api/dev/briefing-comparison', { signal, cache: 'no-store', credentials: 'same-origin' });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? 'account_unavailable');
+  if (!response.ok) throw new Error(`${body.error ?? 'account_unavailable'}${typeof body.recovery === 'string' ? `. ${body.recovery}` : ''}`);
   return body;
 }
 
@@ -22,6 +22,8 @@ import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { BriefingWorkbenchGuide } from "./BriefingWorkbenchGuide";
+import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type FeedbackDraft, type ViewRun } from "./BriefingReview";
+import type { BenchCaseDetail, BenchCaseSummary, BenchProposal } from "@/lib/services/briefing-bench-store";
 
 const client: DailyBriefClient = {
   preferences: async () => ({ accountRef: "bench-account", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York" }),
@@ -36,47 +38,84 @@ export function DailyBriefBubbleBench() {
   }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
 }
 
-type InspectorAnalysis = { result?: { lanes?: { laneId: string; state: string; reason: string | null }[]; findings?: { id: string; relevantToday: boolean; materiality: number }[] }; selection?: { tipId: string | null; decisions?: { findingId: string; decision: string }[] } } | null;
-
-/** Readable lane states and tip selection reasons beside each candidate output. */
-function AnalysisSummary({ inspector }: { inspector: unknown }) {
-  const analysis = (inspector && typeof inspector === 'object' ? (inspector as { analysis?: InspectorAnalysis }).analysis : null) ?? null;
-  if (!analysis?.result) return <p className="text-sm">Analysis: no lanes selected.</p>;
-  return <div className="text-sm" aria-label="Analysis findings and selection">
-    <p className="font-bold">Analysis</p>
-    <ul>{(analysis.result.lanes ?? []).filter((lane) => lane.state !== 'not_selected').map((lane) => <li key={lane.laneId}>{lane.laneId}: {lane.state.replaceAll('_', ' ')}{lane.reason ? ` (${lane.reason.replaceAll('_', ' ')})` : ''}</li>)}</ul>
-    <p>Tip: {analysis.selection?.tipId ?? 'none offered'}</p>
-    {analysis.selection?.decisions?.length ? <ul>{analysis.selection.decisions.map((item) => <li key={item.findingId}>{item.findingId}: {item.decision.replaceAll('_', ' ')}</li>)}</ul> : null}
-  </div>;
-}
-
 export function DailyBriefSettingsBench() {
   return <DailyBriefSettingsPanel client={client} />;
 }
 
-/** Internal controls only; drafts and review notes never activate the hosted preset. */
+type Side = { label: string; rationale: string; parentCandidateId: string | null; proposalId: string | null };
+type PublicCase = Omit<BenchCaseDetail["case"], "inputs"> & { rerunnable: boolean };
+type CaseDetail = Omit<BenchCaseDetail, "case"> & { case: PublicCase };
+type ReviewResponse = { caseId: string; saved: boolean; runIds: string[]; candidateIds: string[] };
+
+const REVIEWS = "/api/dev/briefing-reviews";
+const newId = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`}`.toLowerCase();
+const clearScopes = (configs: BriefingConfig[]) => configs.map(config => ({ ...config, scope: { ...config.scope, behaviorRefs: 'all' as const }, planner: { ...config.planner, movableBehaviorRefs: [] } }));
+
+async function reviewRequest<T>(input: { method?: 'POST'; query?: string; body?: unknown; signal?: AbortSignal }): Promise<T> {
+  const response = await fetch(`${REVIEWS}${input.query ?? ''}`, { method: input.method, cache: 'no-store', credentials: 'same-origin', signal: input.signal,
+    ...(input.body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input.body) } : {}) });
+  const body = await response.json();
+  if (!response.ok) throw new Error(`${body.error ?? 'review_unavailable'}${typeof body.recovery === 'string' ? `. ${body.recovery}` : ''}`);
+  return body as T;
+}
+
+/** Saved runs of one role, newest last, with their candidate labels and configurations. */
+function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): ViewRun[] {
+  return detail.runs.flatMap((run) => {
+    const candidate = detail.candidates.find((item) => item.id === run.candidateId);
+    return candidate?.role === role ? [{ ...run, label: candidate.label, config: candidate.config }] : [];
+  });
+}
+
+/**
+ * Development-only review workbench (Tickets 174–177). Compare reads two outputs
+ * side by side; runs and prose feedback are saved locally. Drafts and feedback
+ * never activate the hosted preset.
+ */
 export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: string }) {
+  const [view, setView] = useState<'compare' | 'saved'>('compare');
   const [configs, setConfigs] = useState<BriefingConfig[]>([DEFAULT_BRIEFING_CONFIG, BRIEFING_PRESETS[1]?.config ?? DEFAULT_BRIEFING_CONFIG]);
+  const [sides, setSides] = useState<[Side, Side]>([
+    { label: 'Baseline', rationale: '', parentCandidateId: null, proposalId: null },
+    { label: 'Candidate', rationale: '', parentCandidateId: null, proposalId: null },
+  ]);
   const [fixtureId, setFixtureId] = useState<BriefingFixtureId>("sparse");
   const [analysisFixtureId, setAnalysisFixtureId] = useState<BriefingAnalysisFixtureId>("none");
   const [mode, setMode] = useState<'synthetic' | 'account'>('synthetic');
   const [account, setAccount] = useState<Account | null>(null);
+  const [accountError, setAccountError] = useState("");
   const [accountLoading, setAccountLoading] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
-  const [result, setResult] = useState<Comparison | null>(null);
-  const [snapshotExpired, setSnapshotExpired] = useState(false);
+  const [detail, setDetail] = useState<CaseDetail | null>(null);
+  const [unsaved, setUnsaved] = useState<{ runs: [ViewRun, ViewRun]; capturedAt?: string; expiresAt?: string; mode: 'synthetic' | 'account' } | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<BriefingConfig | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
-  const [notes, setNotes] = useState("");
+  const [feedback, setFeedback] = useState<FeedbackDraft>(EMPTY_FEEDBACK);
+  const [savingFeedback, setSavingFeedback] = useState(false);
+  const [packetPath, setPacketPath] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [cases, setCases] = useState<BenchCaseSummary[]>([]);
+  const [retentionDays, setRetentionDays] = useState<number | null>(null);
+  const [casesLoading, setCasesLoading] = useState(false);
+  const [casesError, setCasesError] = useState("");
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const pendingCase = useRef<string | null>(null);
+  const columns = useRef<HTMLDivElement>(null);
   useEffect(() => () => request.current?.abort(), []);
-  const invalidate = useCallback(() => {
+  const source = mode;
+  const accountRef = mode === 'account' ? account?.settings.accountRef ?? null : null;
+
+  /** Withdraws pending work. Saved results stay on disk; `clearCase` also closes the open case. */
+  const invalidate = useCallback((clearCase = false) => {
     generation.current++;
     request.current?.abort();
-    setRunning(false); setResult(null); setSnapshotExpired(false); setError(""); setNotes("");
+    setRunning(false); setError("");
+    if (clearCase) { setDetail(null); setUnsaved(null); setSelectedRunId(null); setPacketPath(null); setNotice(""); }
   }, []);
   useEffect(() => {
     if (mode !== 'account') return;
@@ -84,11 +123,11 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     let controller: AbortController | null = null;
     let previous: Account | null = null;
     const clear = () => {
-      controller?.abort(); previous = null; invalidate(); setAccount(null); setJsonDraft('');
-      setConfigs(current => current.map(config => ({ ...config, scope: { ...config.scope, behaviorRefs: 'all' }, planner: { ...config.planner, movableBehaviorRefs: [] } })));
+      controller?.abort(); previous = null; invalidate(true); setAccount(null); setJsonDraft('');
+      setConfigs(clearScopes);
     };
     const refresh = async () => {
-      controller?.abort(); setAccountLoading(true); controller = new AbortController();
+      controller?.abort(); setAccountLoading(true); setAccountError(""); controller = new AbortController();
       const current = controller;
       try {
         const value = await fetchAccount(current.signal);
@@ -97,58 +136,100 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
           previous = value; setAccount(value);
         }
       } catch (failure) {
-        if (active && !current.signal.aborted) { clear(); setError(failure instanceof Error ? failure.message : 'account_unavailable'); }
+        if (active && !current.signal.aborted) { clear(); setAccountError(failure instanceof Error ? failure.message : 'account_unavailable'); }
       } finally { if (active && controller === current) setAccountLoading(false); }
     };
-    const visibility = () => { if (document.hidden) clear(); else void refresh(); };
     const focus = () => { void refresh(); };
     void refresh();
     window.addEventListener('focus', focus);
-    window.addEventListener('pagehide', clear); document.addEventListener('visibilitychange', visibility);
-    return () => { active = false; controller?.abort(); invalidate();
-      window.removeEventListener('focus', focus);
-      window.removeEventListener('pagehide', clear); document.removeEventListener('visibilitychange', visibility); };
+    return () => { active = false; controller?.abort(); invalidate(true); window.removeEventListener('focus', focus); };
   }, [mode, accessVersion, invalidate]);
-  useEffect(() => {
-    if (result?.mode !== 'account' || !result.expiresAt) return;
-    const timer = setTimeout(() => setSnapshotExpired(true), Math.max(0, Date.parse(result.expiresAt) - Date.now()));
-    return () => clearTimeout(timer);
-  }, [result]);
+
+  const loadCase = useCallback(async (caseId: string, signal?: AbortSignal) => {
+    const body = await reviewRequest<{ detail: CaseDetail }>({ query: `?source=${source}&caseId=${caseId}`, signal });
+    setDetail(body.detail); setUnsaved(null);
+    setSelectedRunId(savedRuns(body.detail, 'candidate').at(-1)?.id ?? null);
+    return body.detail;
+  }, [source]);
+  const loadCasesFor = useCallback(async (from: 'synthetic' | 'account') => {
+    setCasesLoading(true); setCasesError("");
+    try {
+      const body = await reviewRequest<{ cases: BenchCaseSummary[]; retentionDays: number }>({ query: `?source=${from}` });
+      setCases(body.cases); setRetentionDays(body.retentionDays);
+    } catch (failure) { setCases([]); setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
+    finally { setCasesLoading(false); }
+  }, []);
+  const loadCases = useCallback(() => loadCasesFor(source), [loadCasesFor, source]);
+
   function switchMode(value: 'synthetic' | 'account') {
-    invalidate(); setAccount(null); setJsonDraft(''); setSaved(null);
-    setConfigs(current => current.map(config => ({ ...config, scope: { ...config.scope, behaviorRefs: 'all' }, planner: { ...config.planner, movableBehaviorRefs: [] } })));
+    invalidate(true); setAccount(null); setAccountError(''); setJsonDraft(''); setSaved(null); setCases([]);
+    setConfigs(clearScopes);
     setMode(value);
+    if (view === 'saved') void loadCasesFor(value);
   }
   function change(index: number, config: BriefingConfig) {
-    invalidate();
-    try { const validated = parseBriefingConfig(config); setConfigs((current) => current.map((entry, i) => i === index ? validated : entry)); }
+    try { const validated = parseBriefingConfig(config); setConfigs((current) => current.map((entry, i) => i === index ? validated : entry)); setError(""); }
     catch { setError("Configuration is invalid. Check the bounds and selected behaviors."); }
   }
-  async function run() {
+  const accountBlocked = mode === 'account' && (!account?.settings.enabled || !account.settings.available || accountLoading);
+  const canRerun = !!detail?.case.rerunnable && !running && !accountBlocked;
+
+  /** Runs A and B on a new snapshot, or only B on the open case's frozen inputs. */
+  async function run(kind: 'new' | 'rerun') {
     if (mode === 'account' && (!account?.settings.enabled || !account.settings.available)) return;
+    if (kind === 'rerun' && !detail) return;
     invalidate();
     const version = generation.current;
-    const controller = new AbortController(); request.current = controller; setRunning(true);
+    const controller = new AbortController(); request.current = controller; setRunning(true); setNotice("");
+    const caseId = kind === 'new' ? newId('case') : detail!.case.id;
+    const previous = kind === 'rerun' ? detail!.candidates.filter((item) => item.role === 'candidate') : [];
+    const reuse = previous.find((item) => JSON.stringify(item.config) === JSON.stringify(configs[1]) && item.label === sides[1].label.trim());
+    const indexes = kind === 'new' ? [0, 1] : [1];
+    const candidates = indexes.map((index) => ({ id: index === 1 && reuse ? reuse.id : newId('cand'), label: sides[index].label.trim() || (index ? 'Candidate' : 'Baseline'),
+      role: index ? 'candidate' as const : 'baseline' as const, parentCandidateId: sides[index].parentCandidateId, proposalId: sides[index].proposalId, rationale: sides[index].rationale }));
+    const runConfigs = indexes.map((index) => configs[index]);
+    const review = { caseId, candidates };
+    pendingCase.current = caseId;
     try {
+      const body = kind === 'rerun' ? { mode: 'saved', accountRef, configs: runConfigs, review }
+        : mode === 'account' ? { mode, configs: runConfigs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review }
+          : { fixtureId, configs: runConfigs, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }), review };
       const response = await fetch("/api/dev/briefing-comparison", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === 'account' ? { mode, configs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision } : { fixtureId, configs, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }) }), signal: controller.signal, cache: "no-store", credentials: 'same-origin' });
-      const body = await response.json();
+        body: JSON.stringify(body), signal: controller.signal, cache: "no-store", credentials: 'same-origin' });
+      const result = await response.json() as Comparison & { review?: ReviewResponse };
       if (version !== generation.current) return;
-      if (!response.ok) throw new Error(`${body.error ?? "comparison_failed"}${typeof body.recovery === 'string' ? `. ${body.recovery}` : ''}`);
-      if (mode === 'account') {
+      if (!response.ok) throw new Error(`${(result as { error?: string }).error ?? "comparison_failed"}${typeof (result as { recovery?: string }).recovery === 'string' ? `. ${(result as { recovery?: string }).recovery}` : ''}`);
+      if (mode === 'account' && kind === 'new') {
         const current = await fetchAccount(controller.signal);
         if (version !== generation.current) return;
-        if (body.mode !== 'account' || current.settings.accountRef !== body.accountRef || current.settings.accountRef !== account?.settings.accountRef ||
-            !current.settings.enabled || current.settings.revision !== body.preferenceRevision || current.settings.revision !== account?.settings.revision ||
+        if (result.mode !== 'account' || current.settings.accountRef !== result.accountRef || current.settings.accountRef !== account?.settings.accountRef ||
+            !current.settings.enabled || current.settings.revision !== result.preferenceRevision || current.settings.revision !== account?.settings.revision ||
             current.settings.localDate !== account?.settings.localDate || current.settings.timezone !== account?.settings.timezone ||
-            !body.expiresAt || Date.parse(body.expiresAt) <= Date.now()) throw new Error('context_changed');
+            !result.expiresAt || Date.parse(result.expiresAt) <= Date.now()) throw new Error('context_changed');
       }
-      setResult(body);
+      if (result.review?.saved) {
+        await loadCase(caseId, controller.signal);
+        if (version !== generation.current) return;
+      } else if (kind === 'new') {
+        const toView = (index: number): ViewRun => ({ id: null, candidateId: null, label: candidates[index]!.label, config: runConfigs[index], model: result.model,
+          promptRevision: result.promptRevision, ...result.results[index]! });
+        setDetail(null); setUnsaved({ runs: [toView(0), toView(1)], capturedAt: result.capturedAt, expiresAt: result.expiresAt, mode: result.mode === 'account' ? 'account' : 'synthetic' });
+        setNotice(result.review ? 'Not saved. These results stay visible until you leave or run again.' : '');
+      } else {
+        setNotice('Not saved. The rerun finished, but its result could not be stored.');
+      }
     } catch (failure) { if (version === generation.current) {
-      if (mode === 'account') { setAccount(null); setJsonDraft(''); setConfigs(current => current.map(config => ({ ...config, scope: { ...config.scope, behaviorRefs: 'all' }, planner: { ...config.planner, movableBehaviorRefs: [] } }))); }
+      if (mode === 'account' && kind === 'new' && failure instanceof Error && failure.message === 'context_changed') { setAccount(null); setJsonDraft(''); setConfigs(clearScopes); }
       setError(failure instanceof Error ? failure.message : "comparison_failed");
     } }
-    finally { if (version === generation.current) setRunning(false); }
+    finally { if (version === generation.current) { setRunning(false); pendingCase.current = null; } }
+  }
+  /** Stops the pending request. Runs that finished before cancellation remain saved and are reloaded. */
+  async function cancel() {
+    const caseId = pendingCase.current;
+    invalidate(); pendingCase.current = null;
+    if (!caseId) return;
+    try { await loadCase(caseId); setNotice('Cancelled. Completed results were kept.'); } catch { /* Nothing was saved before cancellation. */ }
   }
   function save(index: number) {
     if (mode === 'account') return;
@@ -164,32 +245,76 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     const url = URL.createObjectURL(new Blob([JSON.stringify(parseBriefingConfig(configs[index]), null, 2)], { type: "application/json" }));
     const link = document.createElement("a"); link.href = url; link.download = "cadence-briefing-config.json"; link.click(); URL.revokeObjectURL(url);
   }
-  return <main className="mx-auto min-h-dvh max-w-7xl space-y-6 px-4 py-8 text-neutral-950" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-    <header className="space-y-2"><a href="/design-system" className="underline">Design system</a><h1 className="text-2xl">Briefing workbench</h1>
-      <p><a className="underline" href="#briefing-term-config.recipe">Recipe: Daily Brief</a> · {configs[0].recipe.version} · Policy {DAILY_BRIEF_POLICY_VERSION}</p>
-      <p>Practical day constraints and supported opportunities. Completion inputs never authorize ledger recaps.</p>
-      <p>Compare configurations against one frozen snapshot. Saving a draft never activates it.</p>
-      <p className="text-sm">Two sequential attempts per comparison; six comparisons per server hour. Comparisons do not use the daily briefing allowance.</p>
-    </header>
-    <BriefingWorkbenchGuide repositoryRoot={repositoryRoot} />
-    <label className="block">Context source<select aria-label="Context source" className="ml-3 min-h-11 border p-2" value={mode} onChange={event => switchMode(event.target.value as 'synthetic' | 'account')}><option value="synthetic">Synthetic</option><option value="account">My account</option></select></label>
-    {mode === 'synthetic' ? <><label className="block">Synthetic snapshot<select className="ml-3 min-h-11 border p-2" value={fixtureId} onChange={(event) => { invalidate(); setFixtureId(event.target.value as BriefingFixtureId); }}>{BRIEFING_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
-      <label className="block">Analysis scenario<select aria-label="Analysis scenario" className="ml-3 min-h-11 border p-2" value={analysisFixtureId} onChange={(event) => { invalidate(); setAnalysisFixtureId(event.target.value as BriefingAnalysisFixtureId); }}>{BRIEFING_ANALYSIS_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
-      <p className="text-sm">Model runs send only synthetic fixtures to OpenAI. Frozen clock: 2026-11-01 07:00 America/New_York. Fixture {BRIEFING_FIXTURE_VERSION}; analysis {BRIEFING_ANALYSIS_FIXTURE_VERSION}. Comparisons never read or record tip history.</p></> : <div className="space-y-2 text-sm" aria-label="Account comparison access">
-      <p>Run comparison sends your authorized hosted Behavior facts and selected references to OpenAI. Calendar timing is sent only when enabled here and in Settings. Provider retention still applies.</p>
-      <p>Local-only and unsynced desktop records are absent. Private results and Behavior selections clear when you leave this tab. Save and export are available in Synthetic mode.</p>
-      {accountLoading ? <p role="status">Checking account access…</p> : !account ? <a className="mr-4 inline-flex min-h-11 items-center underline" href="/login?next=%2Fdesign-system%3Fpreview%3Dbriefing-workbench">Sign in to My account</a> : <>
-        <p>{account.settings.enabled ? `Briefing access enabled · ${account.settings.timezone}` : 'Enable Daily Brief in Settings before comparing account data.'}</p>
-        {!account.settings.available ? <p>Model generation is not configured on this server.</p> : null}
-        <p>{account.settings.includeCalendar ? 'Calendar model-data permission is enabled. Each configuration can exclude it.' : 'Calendar model-data permission is off. Calendar will be excluded.'}</p>
-      </>}
-      <a className="inline-flex min-h-11 items-center underline" href="/settings">Open briefing settings</a>
-      <button type="button" className="ml-4 min-h-11 underline" onClick={() => setAccessVersion(value => value + 1)}>Refresh account access</button>
-    </div>}
-    <div className="grid gap-8 lg:grid-cols-2">{configs.map((config, index) => <section key={index} aria-label={`Configuration ${index + 1}`} className="min-w-0 space-y-4 border-t pt-4">
-      <h2 className="text-xl">Configuration {index + 1}</h2>
+
+  const baselineRuns = detail ? savedRuns(detail, 'baseline') : unsaved ? [unsaved.runs[0]] : [];
+  const candidateRuns = detail ? savedRuns(detail, 'candidate') : unsaved ? [unsaved.runs[1]] : [];
+  const runA = baselineRuns.at(-1) ?? null;
+  const runB = candidateRuns.find((item) => item.id === selectedRunId) ?? candidateRuns.at(-1) ?? null;
+  const labelOf = (candidateId: string | null) => detail?.candidates.find((item) => item.id === candidateId)?.label ?? 'none';
+
+  function quoteSelection() {
+    const selection = window.getSelection();
+    const text = selection?.toString().replace(/\s+/gu, ' ').trim() ?? '';
+    const node = selection?.anchorNode ?? null;
+    const side = node ? (node instanceof Element ? node : node.parentElement)?.closest('[data-review-side]')?.getAttribute('data-review-side') : null;
+    const target = side === 'A' ? runA : side === 'B' ? runB : null;
+    if (!text || !target?.id) { setError('Select text inside output A or B first.'); return; }
+    setError(''); setFeedback({ ...feedback, quote: { runId: target.id, text: text.slice(0, 1000) } });
+  }
+  async function saveFeedback() {
+    if (!detail) return;
+    setSavingFeedback(true); setError('');
+    try {
+      await reviewRequest({ method: 'POST', body: { source, action: 'feedback', caseId: detail.case.id, runIds: [runA?.id ?? null, runB?.id ?? null],
+        preference: feedback.preference, comment: feedback.comment, quote: feedback.quote, replacement: feedback.replacement || null } });
+      setFeedback(EMPTY_FEEDBACK);
+      await loadCase(detail.case.id);
+    } catch (failure) { setError(`Feedback not saved. ${failure instanceof Error ? failure.message : 'review_unavailable'}`); }
+    finally { setSavingFeedback(false); }
+  }
+  async function caseAction(body: Record<string, unknown>, after?: (value: Record<string, unknown>) => void) {
+    if (!detail) return;
+    setBusy(true); setError('');
+    try { const value = await reviewRequest<Record<string, unknown>>({ method: 'POST', body: { source, caseId: detail.case.id, ...body } }); after?.(value); await loadCase(detail.case.id); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'review_unavailable'); }
+    finally { setBusy(false); }
+  }
+  function loadProposal(proposal: BenchProposal) {
+    if (proposal.change.kind !== 'configuration') return;
+    try {
+      const config = parseBriefingConfig(proposal.change.config);
+      setConfigs((current) => [current[0], config]);
+      setSides((current) => [current[0], { label: proposal.change.kind === 'configuration' ? proposal.change.label : 'Candidate', rationale: proposal.interpretedProblem,
+        parentCandidateId: proposal.change.kind === 'configuration' ? proposal.change.parentCandidateId : null, proposalId: proposal.id }]);
+      setNotice(`Loaded “${proposal.change.label}” into candidate B. Rerun the candidate to compare it on this case.`);
+    } catch (failure) { setError(`The proposal configuration is invalid. ${failure instanceof Error ? failure.message : ''}`); }
+  }
+  /** Opens a saved case and continues from its configurations; the next rerun records the latest candidate as its parent. */
+  async function openCase(id: string) {
+    invalidate(true);
+    try {
+      const opened = await loadCase(id);
+      const baseline = opened.candidates.find((item) => item.role === 'baseline');
+      const latest = opened.candidates.filter((item) => item.role === 'candidate').at(-1);
+      try {
+        setConfigs((current) => [baseline ? parseBriefingConfig(baseline.config) : current[0], latest ? parseBriefingConfig(latest.config) : current[1]]);
+        setSides((current) => [baseline ? { ...current[0], label: baseline.label } : current[0],
+          latest ? { label: latest.label, rationale: '', parentCandidateId: latest.id, proposalId: null } : current[1]]);
+      } catch { setNotice('This case was saved with a configuration version the workbench no longer reads. Drafts were kept.'); }
+      setView('compare');
+    } catch (failure) { setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
+  }
+  async function deleteCase(id: string) {
+    try {
+      await reviewRequest({ method: 'POST', body: { source, action: 'delete', caseId: id } });
+      if (detail?.case.id === id) invalidate(true);
+      await loadCases();
+    } catch (failure) { setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
+  }
+
+  const editor = (index: number) => { const config = configs[index]; return <section aria-label={`Configuration ${index + 1}`} className="min-w-0 space-y-4 pt-2">
       <p className="text-sm">Daily Brief · Recipe {config.recipe.version}</p>
-      <label className="block">Load preset<select aria-label={`Preset ${index + 1}`} className="ml-3 min-h-11 max-w-full border p-2" value="" onChange={(event) => { const preset = BRIEFING_PRESETS.find((entry) => entry.id === event.target.value); if (preset) change(index, preset.config); }}><option value="">Choose preset</option>{BRIEFING_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
+      <label className="block">Load preset<select aria-label={`Preset ${index + 1}`} className="ml-3 min-h-11 max-w-full border p-2" value={BRIEFING_PRESETS.find((preset) => JSON.stringify(preset.config) === JSON.stringify(config))?.id ?? ""} onChange={(event) => { const preset = BRIEFING_PRESETS.find((entry) => entry.id === event.target.value); if (preset) change(index, preset.config); }}><option value="">Choose preset</option>{BRIEFING_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
       <fieldset className="grid gap-3 sm:grid-cols-2"><legend className="mb-2">Voice</legend>
         {([['tone', ['calm', 'warm', 'matter_of_fact']], ['directness', ['gentle', 'balanced', 'direct']], ['encouragement', ['low', 'moderate', 'high']]] as const).map(([field, values]) => <label key={field} className="grid gap-1">{field}<select aria-label={`${field} ${index + 1}`} className="min-h-11 border p-2" value={config[field]} onChange={(event) => change(index, { ...config, [field]: event.target.value })}>{values.map((value) => <option key={value}>{value}</option>)}</select></label>)}
         <label className="grid gap-1">Maximum words<input aria-label={`Maximum words ${index + 1}`} className="min-h-11 w-full border p-2" type="number" min={40} max={180} value={config.length.maxWords} onChange={(event) => change(index, { ...config, length: { maxWords: Number(event.target.value) } })} /></label>
@@ -253,16 +378,70 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         <button className="min-h-11 underline" type="button" onClick={() => setJsonDraft(JSON.stringify(config, null, 2))}>Edit JSON</button>
       </div>
       <details><summary className="min-h-11 cursor-pointer py-2">Configuration JSON</summary><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(config, null, 2)}</pre></details>
-    </section>)}</div>
-    <details><summary className="min-h-11 cursor-pointer py-2">Import or edit configuration JSON</summary><label className="block">Configuration only<textarea aria-label="Configuration JSON editor" className="mt-2 h-64 w-full border p-3 font-mono text-xs" value={jsonDraft} onChange={(event) => setJsonDraft(event.target.value)} /></label>{[0, 1].map((index) => <button key={index} type="button" className="mr-4 min-h-11 underline" onClick={() => { try { change(index, parseBriefingConfig(JSON.parse(jsonDraft))); } catch (failure) { setError(`Invalid configuration JSON. ${failure instanceof Error ? failure.message : 'Unsupported configuration.'}`); } }}>Load into configuration {index + 1}</button>)}</details>
-    {saved ? <p role="status">Configuration draft saved locally.</p> : null}
-    <div className="flex flex-wrap gap-4 border-t pt-4"><button type="button" disabled={running || (mode === 'account' && (!account?.settings.enabled || !account.settings.available || accountLoading))} className="min-h-11 border px-4 disabled:opacity-50" onClick={run}>{running ? 'Running comparison…' : 'Run comparison'}</button>{running ? <button className="min-h-11 underline" onClick={invalidate}>Cancel comparison</button> : null}</div>
-    {error ? <p role="alert">Comparison unavailable: {error}</p> : null}
-    {!result ? <details><summary className="min-h-11 cursor-pointer py-2">Static long-text fixture (not model-generated)</summary><DailyBriefBubbleBench /></details> : <>
-      <p>Model-generated comparison · {result.model} · {result.mode === 'account' ? `My account · Snapshot ${result.capturedAt}` : result.fixtureVersion} · Usage: {result.usage}. Wording can vary with identical inputs.</p>
-      {snapshotExpired ? <p role="status">Snapshot expired. These results remain available for inspection. Run a new comparison for current advice.</p> : null}
-      <div className="grid gap-8 lg:grid-cols-2">{result.results.map((entry, index) => <section key={index} className="min-w-0 space-y-4"><h2 className="text-xl">Result {index + 1}</h2><p>{entry.validation}; {entry.latencyMs} ms</p><div className="bg-background pt-10 font-sans"><DailyBriefBubble state={entry.state === 'ready' ? 'ready' : 'error'} briefing={entry.briefing} message={entry.error} onDismiss={() => setResult(null)} /></div><AnalysisSummary inspector={entry.inspector} /><details><summary className="min-h-11 cursor-pointer py-2">Inputs, duration sources, versions and planner inspector</summary><p className="text-sm">Input decisions show exclusions, source selection and sample coverage. Excluded raw values stay absent. Catalog ID validity does not prove support.</p><pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(entry.inspector, null, 2)}</pre></details></section>)}</div>
-      <label className="block">Qualitative review notes (memory only)<textarea className="mt-2 min-h-24 w-full border p-3" value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+    </section>; };
+  const caseLine = detail ? `${detail.case.source.mode === 'synthetic' ? `Synthetic · ${detail.case.source.fixtureId.replaceAll('_', ' ')}${detail.case.source.analysisFixtureId ? ` · analysis ${detail.case.source.analysisFixtureId.replaceAll('_', ' ')}` : ''}` : 'My account · captured snapshot'} · clock ${detail.case.capturedAt} (${detail.case.timezone}) · saved${detail.case.rerunnable ? '' : ' · Review only: inputs were not kept, so this case cannot be rerun'}`
+    : unsaved ? `${unsaved.mode === 'account' ? `My account · Snapshot ${unsaved.capturedAt}` : 'Synthetic'} · not saved` : null;
+
+  return <main className="mx-auto min-h-dvh max-w-7xl space-y-6 px-4 py-8 text-neutral-950" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+    <header className="space-y-2"><a href="/design-system" className="underline">Design system</a><h1 className="text-2xl">Briefing workbench</h1>
+      <p><a className="underline" href="#briefing-term-config.recipe">Recipe: Daily Brief</a> · {configs[0].recipe.version} · Policy {DAILY_BRIEF_POLICY_VERSION}</p>
+      <p>Read two Daily Briefs side by side and say which works. Aim for a 45-second read: one or two planning points, and at most one observation when the evidence supports it.</p>
+      <p className="text-sm">Two sequential attempts per comparison; six comparisons per server hour. Comparisons do not use the daily briefing allowance. Saving a draft never activates it.</p>
+    </header>
+    <nav aria-label="Workbench views" className="flex gap-4 border-b">
+      {([['compare', 'Compare'], ['saved', 'Saved reviews']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={view === value}
+        className={`min-h-11 px-1 ${view === value ? 'border-b-2 border-neutral-950 font-bold' : 'underline'}`} onClick={() => { setView(value); if (value === 'saved') void loadCases(); }}>{label}</button>)}
+    </nav>
+    <label className="block">Context source<select aria-label="Context source" className="ml-3 min-h-11 border p-2" value={mode} onChange={event => switchMode(event.target.value as 'synthetic' | 'account')}><option value="synthetic">Synthetic</option><option value="account">My account</option></select></label>
+    {mode === 'synthetic' ? <div className="flex flex-wrap gap-x-6"><label className="block">Synthetic snapshot<select className="ml-3 min-h-11 border p-2" value={fixtureId} onChange={(event) => setFixtureId(event.target.value as BriefingFixtureId)}>{BRIEFING_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
+      <label className="block">Analysis scenario<select aria-label="Analysis scenario" className="ml-3 min-h-11 border p-2" value={analysisFixtureId} onChange={(event) => setAnalysisFixtureId(event.target.value as BriefingAnalysisFixtureId)}>{BRIEFING_ANALYSIS_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
+      <p className="w-full text-sm">Model runs send only synthetic fixtures to OpenAI. Frozen clock: 2026-11-01 07:00 America/New_York. Fixture {BRIEFING_FIXTURE_VERSION}; analysis {BRIEFING_ANALYSIS_FIXTURE_VERSION}. Comparisons never read or record tip history.</p></div> : <div className="space-y-2 text-sm" aria-label="Account comparison access">
+      <p>Run new comparison sends your authorized hosted Behavior facts and selected references to OpenAI. Calendar timing is sent only when enabled here and in Settings. Provider retention still applies.</p>
+      <p>Local-only and unsynced desktop records are absent. Each comparison saves the captured inputs, outputs and your feedback on this computer, so you can reread and rerun it. Reruns check your current Settings first. Save and export of configuration drafts stay in Synthetic mode.</p>
+      {accountLoading ? <p role="status">Checking account access…</p> : !account ? accountError && !accountError.startsWith('unauthenticated') ? <p role="alert">Account access unavailable: {accountError}</p> : <a className="mr-4 inline-flex min-h-11 items-center underline" href="/login?next=%2Fdesign-system%3Fpreview%3Dbriefing-workbench">Sign in to My account</a> : <>
+        <p>{account.settings.enabled ? `Briefing access enabled · ${account.settings.timezone}` : 'Enable Daily Brief in Settings before comparing account data.'}</p>
+        {!account.settings.available ? <p>Model generation is not configured on this server.</p> : null}
+        <p>{account.settings.includeCalendar ? 'Calendar model-data permission is enabled. Each configuration can exclude it.' : 'Calendar model-data permission is off. Calendar will be excluded.'}</p>
+      </>}
+      <a className="inline-flex min-h-11 items-center underline" href="/settings">Open briefing settings</a>
+      <button type="button" className="ml-4 min-h-11 underline" onClick={() => setAccessVersion(value => value + 1)}>Refresh account access</button>
+    </div>}
+    {view === 'saved' ? <SavedReviews cases={cases} retentionDays={retentionDays} loading={casesLoading} error={casesError} onOpen={(id) => void openCase(id)} onDelete={(id) => void deleteCase(id)} onRefresh={() => void loadCases()} /> : <>
+      <div className="flex flex-wrap gap-4 border-t pt-4">
+        <button type="button" disabled={running || accountBlocked} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void run('new')}>{running ? 'Running comparison…' : 'Run new comparison'}</button>
+        <button type="button" disabled={!canRerun} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void run('rerun')}>Rerun candidate on this case</button>
+        {running ? <button type="button" className="min-h-11 underline" onClick={() => void cancel()}>Cancel comparison</button> : null}
+      </div>
+      {caseLine ? <p className="text-sm">{caseLine}{runB?.model ? ` · ${runB.model}` : ''}. Wording can vary with identical inputs. A saved case reruns on its captured clock; it is not current advice.</p> : null}
+      {notice ? <p role="status">{notice}</p> : null}
+      {error ? <p role="alert">Comparison unavailable: {error}</p> : null}
+      <div ref={columns} className="grid gap-8 lg:grid-cols-2">
+        <ReadingColumn side="A" title="Baseline" run={runA} draftChanged={!!runA?.config && JSON.stringify(runA.config) !== JSON.stringify(configs[0])} />
+        <ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={!!runB?.config && JSON.stringify(runB.config) !== JSON.stringify(configs[1])} />
+      </div>
+      <RunDifferences a={runA} b={runB} />
+      {detail ? <FeedbackForm draft={feedback} onChange={setFeedback} onQuote={quoteSelection} onSave={() => void saveFeedback()} disabled={!runA && !runB} saving={savingFeedback} />
+        : unsaved ? <p className="text-sm">Feedback needs a saved comparison. Run again to save.</p> : null}
+      {detail ? <FeedbackList feedback={detail.feedback} labelOf={labelOf} /> : null}
+      {detail ? <ProposalPanel proposals={detail.proposals} invalid={detail.invalidProposals} dispositions={detail.dispositions} packetPath={packetPath} busy={busy}
+        onWritePacket={() => void caseAction({ action: 'packet' }, (value) => setPacketPath(typeof value.path === 'string' ? value.path : null))}
+        onRefresh={() => void loadCase(detail.case.id).catch((failure) => setError(failure instanceof Error ? failure.message : 'review_unavailable'))}
+        onLoad={loadProposal} onDecide={(proposal, decision, comment) => void caseAction({ action: 'disposition', proposalId: proposal.id, decision, comment })} /> : null}
+      <BriefingWorkbenchGuide repositoryRoot={repositoryRoot} />
+      <details open><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure A · Baseline</summary>
+        <p className="text-sm">Changes apply to the next new comparison. The open case keeps its baseline output.</p>
+        {editor(0)}
+      </details>
+      <details open><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure B · Candidate</summary>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1">Candidate name<input aria-label="Candidate name" maxLength={80} className="min-h-11 border p-2" value={sides[1].label} onChange={(event) => setSides((current) => [current[0], { ...current[1], label: event.target.value }])} /></label>
+          <label className="grid gap-1">What changed and why<input aria-label="Candidate rationale" maxLength={2000} className="min-h-11 border p-2" value={sides[1].rationale} onChange={(event) => setSides((current) => [current[0], { ...current[1], rationale: event.target.value }])} /></label>
+        </div>
+        {editor(1)}
+      </details>
+      <details><summary className="min-h-11 cursor-pointer py-2">Import or edit configuration JSON</summary><label className="block">Configuration only<textarea aria-label="Configuration JSON editor" className="mt-2 h-64 w-full border p-3 font-mono text-xs" value={jsonDraft} onChange={(event) => setJsonDraft(event.target.value)} /></label>{[0, 1].map((index) => <button key={index} type="button" className="mr-4 min-h-11 underline" onClick={() => { try { change(index, parseBriefingConfig(JSON.parse(jsonDraft))); } catch (failure) { setError(`Invalid configuration JSON. ${failure instanceof Error ? failure.message : 'Unsupported configuration.'}`); } }}>Load into configuration {index + 1}</button>)}</details>
+      {saved ? <p role="status">Configuration draft saved locally.</p> : null}
+      {!runA && !runB ? <details><summary className="min-h-11 cursor-pointer py-2">Static long-text fixture (not model-generated)</summary><DailyBriefBubbleBench /></details> : null}
     </>}
   </main>;
 }

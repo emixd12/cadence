@@ -37,6 +37,16 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
+it('explains why a signed-in account cannot use port 3000', async () => {
+  const { readBriefingWorkbenchAccount } = await import('@/lib/services/briefing-workbench.service');
+  const response = await readBriefingWorkbenchAccount(new Request('http://127.0.0.1:3000/api/dev/briefing-comparison', {
+    headers: { 'sec-fetch-site': 'same-origin' },
+  }));
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: 'access_denied', recovery: 'Open this development workbench on localhost port 4321–4330.' });
+  expect(mocks.authenticate).not.toHaveBeenCalled();
+});
+
 it('captures once, freezes planning, narrows each scope and never consumes daily admission', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
   const narrow = { ...config(30), scope: { ...config(30).scope, includeCalendar: false, behaviorRefs: [] } };

@@ -765,3 +765,29 @@ Implementation decisions, recorded for owner review:
   that the model stated UTC instants as local times, a defect that predates these tickets.
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
+
+## 2026-09-27: Briefing workbench saves reviews locally, including account captures
+
+The owner asked to implement Phases 0–2 of the briefing-bench audit
+(`docs/plans/2026-09-27-briefing-bench-review.md`) as Tickets 175–177, and authorized
+full account capture for the development workbench.
+
+- The complete rendered brief is the review unit. The editorial target is a roughly
+  45-second read: one or two planning points and at most one supported observation.
+  80–120 visible words is a working range, not a validated formula.
+- The workbench saves cases, candidates, runs, prose feedback, agent proposals and
+  owner decisions under `.local/briefing-bench/`. This replaces the earlier rule that
+  private comparison output stays in memory and clears when the tab is hidden.
+  Account cases save the captured inputs once so they can be rerun exactly. Storage
+  is owner-partitioned, 0700/0600, expires after 30 days and supports deletion.
+  `.gitignore` only prevents commits; it is not access control.
+- A saved case reruns on its captured clock. Reruns still need current consent: same
+  owner, enabled briefing, captured sources still disclosed, and captured Behaviors
+  still active. A deleted or archived Behavior withdraws the case from reruns.
+- Feedback becomes a proposal through a Markdown packet read by an existing coding
+  agent. No agent framework or embedded chat is added. Proposals are validated and
+  displayed, never executed, and never become production rules; promotion stays a
+  reviewed repository change.
+- Model-weight training, historical reconstruction (Phase 3), batch and lane-preview
+  review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
+  are not implemented.
