@@ -25,6 +25,7 @@ export type ViewRun = Readonly<{
   inspector: unknown;
   model?: string;
   promptRevision?: string;
+  pipelineVersion?: string;
   createdAt?: string;
   config?: BriefingConfig;
 }>;
@@ -124,7 +125,7 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
     </select></label> : null}
     {!run ? <p className="text-sm">No output yet.</p> : <>
       <p className="text-sm">{run.label} · {run.state === "cancelled" ? "cancelled before completion" : `${run.validation}; ${run.latencyMs} ms`}{draftChanged ? " · the draft has changed since this run" : ""}</p>
-      <div key={run.id ?? `${run.label}-${run.latencyMs}-${run.briefing?.generatedAt ?? run.error}`} ref={measure} className="bg-background pt-10 font-sans">
+      <div key={run.id ?? JSON.stringify(run.briefing ?? run.error ?? run.state)} ref={measure} className="bg-background pt-10 font-sans">
         {run.state === "cancelled" ? <p className="text-sm">No output. The request was cancelled.</p>
           : <DailyBriefBubble state={run.state === "ready" ? "ready" : "error"} briefing={run.briefing} message={run.error} onDismiss={() => undefined} />}
       </div>
@@ -141,13 +142,17 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
 export function RunDifferences({ a, b }: { a: ViewRun | null; b: ViewRun | null }) {
   if (!a?.config || !b?.config) return null;
   const differences = diffBriefingConfigs(a.config, b.config);
-  const versions = ([["Model", a.model, b.model], ["Prompt revision", a.promptRevision, b.promptRevision]] as const).filter(([, left, right]) => left !== right);
+  const versions = ([["Model", a.model, b.model], ["Prompt revision", a.promptRevision, b.promptRevision],
+    ["Pipeline", a.pipelineVersion ?? a.briefing?.versions?.pipeline, b.pipelineVersion ?? b.briefing?.versions?.pipeline],
+    ["Planner", a.briefing?.versions?.planner, b.briefing?.versions?.planner],
+    ["References", a.briefing?.versions?.references, b.briefing?.versions?.references]] as const).filter(([, left, right]) => left !== right);
   return <details><summary className="min-h-11 cursor-pointer py-2">Differences between A and B ({differences.length + versions.length})</summary>
     <ul className="text-sm">
       {differences.map((item) => <li key={item.path} className="break-words"><code>{item.path}</code>: {JSON.stringify(item.before)} → {JSON.stringify(item.after)}</li>)}
       {versions.map(([label, left, right]) => <li key={label}>{label}: {left ?? "unknown"} → {right ?? "unknown"}</li>)}
-      {!differences.length && !versions.length ? <li>Same configuration, model and prompt. Wording can still vary between runs.</li> : null}
+      {!differences.length && !versions.length ? <li>No recorded configuration or version differences. Wording can still vary between runs.</li> : null}
     </ul>
+    <p className="text-sm">Source changes inside a version and presentation changes require the frozen evaluation source record. Older runs do not retain those hashes.</p>
   </details>;
 }
 
@@ -241,13 +246,13 @@ export function SavedReviews({ cases, retentionDays, loading, error, onOpen, onD
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   return <section aria-label="Saved reviews" className="space-y-3">
-    <p className="text-sm">Saved on this computer under <code>.local/briefing-bench/</code>{retentionDays ? `. Cases are deleted after ${retentionDays} days` : ""}. Account cases include the captured inputs, so they can be rerun exactly.</p>
+    <p className="text-sm">Saved on this computer under <code>.local/briefing-bench/</code>{retentionDays ? `. Cases expire after ${retentionDays} days; expired files are removed when accessed` : ""}. Account cases include the captured inputs, so they can be rerun exactly.</p>
     <button type="button" className="min-h-11 underline" onClick={onRefresh}>Refresh list</button>
     {loading ? <p role="status">Loading saved reviews…</p> : null}
     {error ? <p role="alert">Saved reviews unavailable: {error}</p> : null}
     {!loading && !error && !cases.length ? <p>No saved reviews yet. Run a comparison in Compare to save one.</p> : null}
     <ul className="space-y-3">{cases.map((item) => <li key={item.id} className="flex flex-wrap items-center gap-x-4 border-t pt-3 text-sm">
-      <span className="min-w-0 grow break-words">{item.source.mode === "synthetic" ? `Synthetic · ${item.source.fixtureId.replaceAll("_", " ")}${item.source.analysisFixtureId ? ` · ${item.source.analysisFixtureId.replaceAll("_", " ")}` : ""}` : "My account · captured"} · {item.localDate} · saved {new Date(item.createdAt).toLocaleString()} · {item.runs} runs · {item.feedback} feedback{item.proposals ? ` · ${item.proposals} proposals` : ""}{item.rerunnable ? "" : " · Review only"}</span>
+      <span className="min-w-0 grow break-words">{item.source.mode === "synthetic" ? `Synthetic · ${item.source.fixtureId.replaceAll("_", " ")}${item.source.analysisFixtureId ? ` · ${item.source.analysisFixtureId.replaceAll("_", " ")}` : ""}` : `My account · ${item.evidenceType}`} · {item.localDate} · saved {new Date(item.createdAt).toLocaleString()} · {item.runs} runs · {item.feedback} feedback{item.proposals ? ` · ${item.proposals} proposals` : ""}{item.rerunnable ? "" : " · Review only"}</span>
       <button type="button" className="min-h-11 underline" onClick={() => onOpen(item.id)}>Open</button>
       {confirming === item.id ? <button type="button" className="min-h-11 underline" onClick={() => { setConfirming(null); onDelete(item.id); }}>Confirm delete</button>
         : <button type="button" className="min-h-11 underline" onClick={() => setConfirming(item.id)}>Delete</button>}

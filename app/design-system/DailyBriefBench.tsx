@@ -9,7 +9,7 @@ import { BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId 
 import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, type BriefingAnalysisFixtureId } from "@/lib/services/briefing-analysis-fixtures";
 import { BRIEFING_ANALYSIS_LANES } from "@cadence/core/resolvers/briefing-analysis.resolver";
 type Account = { settings: DailyBriefSettings; behaviors: { ref: string; title: string }[] };
-type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
+type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error' | 'cancelled'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
 
 async function fetchAccount(signal: AbortSignal): Promise<Account> {
   const response = await fetch('/api/dev/briefing-comparison', { signal, cache: 'no-store', credentials: 'same-origin' });
@@ -23,6 +23,7 @@ import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { BriefingWorkbenchGuide } from "./BriefingWorkbenchGuide";
 import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type FeedbackDraft, type ViewRun } from "./BriefingReview";
+import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchProposal } from "@/lib/services/briefing-bench-store";
 
 const client: DailyBriefClient = {
@@ -63,7 +64,7 @@ async function reviewRequest<T>(input: { method?: 'POST'; query?: string; body?:
 function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): ViewRun[] {
   return detail.runs.flatMap((run) => {
     const candidate = detail.candidates.find((item) => item.id === run.candidateId);
-    return candidate?.role === role ? [{ ...run, label: candidate.label, config: candidate.config }] : [];
+    return candidate?.role === role && run.evaluation?.mode !== 'diagnostic' ? [{ ...run, label: candidate.label, config: candidate.config }] : [];
   });
 }
 
@@ -73,7 +74,7 @@ function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): ViewRun[
  * never activate the hosted preset.
  */
 export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: string }) {
-  const [view, setView] = useState<'compare' | 'saved'>('compare');
+  const [view, setView] = useState<'compare' | 'days' | 'saved'>('compare');
   const [configs, setConfigs] = useState<BriefingConfig[]>([DEFAULT_BRIEFING_CONFIG, BRIEFING_PRESETS[1]?.config ?? DEFAULT_BRIEFING_CONFIG]);
   const [sides, setSides] = useState<[Side, Side]>([
     { label: 'Baseline', rationale: '', parentCandidateId: null, proposalId: null },
@@ -94,7 +95,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<BriefingConfig | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
-  const [feedback, setFeedback] = useState<FeedbackDraft>(EMPTY_FEEDBACK);
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, FeedbackDraft>>({});
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [packetPath, setPacketPath] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,7 +107,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const generation = useRef(0);
   const pendingCase = useRef<string | null>(null);
   const columns = useRef<HTMLDivElement>(null);
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => () => { generation.current++; request.current?.abort(); }, []);
   const source = mode;
   const accountRef = mode === 'account' ? account?.settings.accountRef ?? null : null;
 
@@ -114,9 +115,15 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const invalidate = useCallback((clearCase = false) => {
     generation.current++;
     request.current?.abort();
-    setRunning(false); setError("");
+    setRunning(false); setSavingFeedback(false); setBusy(false); setError("");
     if (clearCase) { setDetail(null); setUnsaved(null); setSelectedRunId(null); setPacketPath(null); setNotice(""); }
   }, []);
+  const clearAccountFailure = useCallback((failure: unknown, from = mode) => {
+    if (from !== 'account' || !(failure instanceof Error) || !/^(context_changed|access_denied|unauthenticated)(?:\.|$)/.test(failure.message)) return;
+    invalidate(true); pendingCase.current = null; setAccount(null); setJsonDraft(''); setConfigs(clearScopes); setFeedbackDrafts({});
+    setCases([]); setCasesError(''); setCasesLoading(false); setAccountLoading(false); setAccountError(failure.message);
+    setSides([{ label: 'Baseline', rationale: '', parentCandidateId: null, proposalId: null }, { label: 'Candidate', rationale: '', parentCandidateId: null, proposalId: null }]);
+  }, [invalidate, mode]);
   useEffect(() => {
     if (mode !== 'account') return;
     let active = true;
@@ -124,46 +131,57 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     let previous: Account | null = null;
     const clear = () => {
       controller?.abort(); previous = null; invalidate(true); setAccount(null); setJsonDraft('');
-      setConfigs(clearScopes);
+      setConfigs(clearScopes); setFeedbackDrafts({}); setCases([]); setCasesError(''); setCasesLoading(false);
+      setSides([{ label: 'Baseline', rationale: '', parentCandidateId: null, proposalId: null }, { label: 'Candidate', rationale: '', parentCandidateId: null, proposalId: null }]);
     };
     const refresh = async () => {
       controller?.abort(); setAccountLoading(true); setAccountError(""); controller = new AbortController();
       const current = controller;
+      const version = generation.current;
       try {
         const value = await fetchAccount(current.signal);
-        if (active && !current.signal.aborted) {
+        if (active && !current.signal.aborted && version === generation.current) {
           if (previous && JSON.stringify(previous.settings) !== JSON.stringify(value.settings)) clear();
           previous = value; setAccount(value);
         }
       } catch (failure) {
-        if (active && !current.signal.aborted) { clear(); setAccountError(failure instanceof Error ? failure.message : 'account_unavailable'); }
+        if (active && !current.signal.aborted && version === generation.current) { clear(); setAccountError(failure instanceof Error ? failure.message : 'account_unavailable'); }
       } finally { if (active && controller === current) setAccountLoading(false); }
     };
     const focus = () => { void refresh(); };
     void refresh();
     window.addEventListener('focus', focus);
-    return () => { active = false; controller?.abort(); invalidate(true); window.removeEventListener('focus', focus); };
+    return () => { active = false; controller?.abort(); window.removeEventListener('focus', focus); };
   }, [mode, accessVersion, invalidate]);
 
-  const loadCase = useCallback(async (caseId: string, signal?: AbortSignal) => {
-    const body = await reviewRequest<{ detail: CaseDetail }>({ query: `?source=${source}&caseId=${caseId}`, signal });
-    setDetail(body.detail); setUnsaved(null);
-    setSelectedRunId(savedRuns(body.detail, 'candidate').at(-1)?.id ?? null);
-    return body.detail;
-  }, [source]);
+  const loadCase = useCallback(async (caseId: string, signal?: AbortSignal, selectLatest = false) => {
+    const version = generation.current;
+    try {
+      const body = await reviewRequest<{ detail: CaseDetail }>({ query: `?source=${source}&caseId=${caseId}`, signal });
+      if (version !== generation.current || signal?.aborted) return null;
+      setDetail(body.detail);
+      if (selectLatest) setUnsaved(null);
+      const runs = savedRuns(body.detail, 'candidate');
+      setSelectedRunId((current) => !selectLatest && runs.some(run => run.id === current) ? current : runs.at(-1)?.id ?? null);
+      return body.detail;
+    } catch (failure) { if (version === generation.current && !signal?.aborted) { clearAccountFailure(failure); throw failure; } return null; }
+  }, [source, clearAccountFailure]);
   const loadCasesFor = useCallback(async (from: 'synthetic' | 'account') => {
+    const version = generation.current;
     setCasesLoading(true); setCasesError("");
     try {
       const body = await reviewRequest<{ cases: BenchCaseSummary[]; retentionDays: number }>({ query: `?source=${from}` });
+      if (version !== generation.current) return;
       setCases(body.cases); setRetentionDays(body.retentionDays);
-    } catch (failure) { setCases([]); setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
-    finally { setCasesLoading(false); }
-  }, []);
+    } catch (failure) { if (version === generation.current) { clearAccountFailure(failure, from); setCases([]); setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); } }
+    finally { if (version === generation.current) setCasesLoading(false); }
+  }, [clearAccountFailure]);
   const loadCases = useCallback(() => loadCasesFor(source), [loadCasesFor, source]);
 
   function switchMode(value: 'synthetic' | 'account') {
     invalidate(true); setAccount(null); setAccountError(''); setJsonDraft(''); setSaved(null); setCases([]);
-    setConfigs(clearScopes);
+    setConfigs(clearScopes); setFeedbackDrafts({}); setCasesError(''); setCasesLoading(false); setRetentionDays(null);
+    setSides([{ label: 'Baseline', rationale: '', parentCandidateId: null, proposalId: null }, { label: 'Candidate', rationale: '', parentCandidateId: null, proposalId: null }]);
     setMode(value);
     if (view === 'saved') void loadCasesFor(value);
   }
@@ -174,24 +192,36 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   const accountBlocked = mode === 'account' && (!account?.settings.enabled || !account.settings.available || accountLoading);
   const canRerun = !!detail?.case.rerunnable && !running && !accountBlocked;
 
+  const baselineRuns = unsaved ? [unsaved.runs[0]] : detail ? savedRuns(detail, 'baseline') : [];
+  const candidateRuns = unsaved ? [unsaved.runs[1]] : detail ? savedRuns(detail, 'candidate') : [];
+  const runA = baselineRuns.at(-1) ?? null;
+  const runB = candidateRuns.find((item) => item.id === selectedRunId) ?? candidateRuns.at(-1) ?? null;
+  const labelOf = (candidateId: string | null) => detail?.candidates.find((item) => item.id === candidateId)?.label ?? 'none';
+  const feedbackKey = JSON.stringify([detail?.case.id, runA?.id, runB?.id]);
+  const feedback = feedbackDrafts[feedbackKey] ?? EMPTY_FEEDBACK;
+  const setFeedback = (draft: FeedbackDraft) => setFeedbackDrafts(current => ({ ...current, [feedbackKey]: draft }));
+
   /** Runs A and B on a new snapshot, or only B on the open case's frozen inputs. */
-  async function run(kind: 'new' | 'rerun') {
+  async function run(kind: 'new' | 'rerun' | 'pair') {
     if (mode === 'account' && (!account?.settings.enabled || !account.settings.available)) return;
-    if (kind === 'rerun' && !detail) return;
+    if (kind !== 'new' && !detail) return;
     invalidate();
     const version = generation.current;
     const controller = new AbortController(); request.current = controller; setRunning(true); setNotice("");
+    if (kind === 'new') setSides(current => current.map(side => ({ ...side, parentCandidateId: null, proposalId: null })) as [Side, Side]);
     const caseId = kind === 'new' ? newId('case') : detail!.case.id;
     const previous = kind === 'rerun' ? detail!.candidates.filter((item) => item.role === 'candidate') : [];
-    const reuse = previous.find((item) => JSON.stringify(item.config) === JSON.stringify(configs[1]) && item.label === sides[1].label.trim());
-    const indexes = kind === 'new' ? [0, 1] : [1];
+    const reuse = previous.find((item) => JSON.stringify(item.config) === JSON.stringify(configs[1]) && item.label === sides[1].label.trim() &&
+      item.rationale === sides[1].rationale.trim() && item.parentCandidateId === sides[1].parentCandidateId && item.proposalId === sides[1].proposalId);
+    const indexes = kind === 'rerun' ? [1] : [0, 1];
     const candidates = indexes.map((index) => ({ id: index === 1 && reuse ? reuse.id : newId('cand'), label: sides[index].label.trim() || (index ? 'Candidate' : 'Baseline'),
-      role: index ? 'candidate' as const : 'baseline' as const, parentCandidateId: sides[index].parentCandidateId, proposalId: sides[index].proposalId, rationale: sides[index].rationale }));
+      role: index ? 'candidate' as const : 'baseline' as const, parentCandidateId: kind === 'new' ? null : sides[index].parentCandidateId,
+      proposalId: kind === 'new' ? null : sides[index].proposalId, rationale: sides[index].rationale }));
     const runConfigs = indexes.map((index) => configs[index]);
     const review = { caseId, candidates };
     pendingCase.current = caseId;
     try {
-      const body = kind === 'rerun' ? { mode: 'saved', accountRef, configs: runConfigs, review }
+      const body = kind !== 'new' ? { mode: 'saved', accountRef, configs: runConfigs, review }
         : mode === 'account' ? { mode, configs: runConfigs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review }
           : { fixtureId, configs: runConfigs, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }), review };
       const response = await fetch("/api/dev/briefing-comparison", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -205,21 +235,24 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         if (result.mode !== 'account' || current.settings.accountRef !== result.accountRef || current.settings.accountRef !== account?.settings.accountRef ||
             !current.settings.enabled || current.settings.revision !== result.preferenceRevision || current.settings.revision !== account?.settings.revision ||
             current.settings.localDate !== account?.settings.localDate || current.settings.timezone !== account?.settings.timezone ||
+            // eslint-disable-next-line react-hooks/purity -- Runs after the response in an explicit click handler, never during render.
             !result.expiresAt || Date.parse(result.expiresAt) <= Date.now()) throw new Error('context_changed');
       }
       if (result.review?.saved) {
-        await loadCase(caseId, controller.signal);
+        await loadCase(caseId, controller.signal, true);
         if (version !== generation.current) return;
-      } else if (kind === 'new') {
+      } else if (kind !== 'rerun') {
         const toView = (index: number): ViewRun => ({ id: null, candidateId: null, label: candidates[index]!.label, config: runConfigs[index], model: result.model,
           promptRevision: result.promptRevision, ...result.results[index]! });
         setDetail(null); setUnsaved({ runs: [toView(0), toView(1)], capturedAt: result.capturedAt, expiresAt: result.expiresAt, mode: result.mode === 'account' ? 'account' : 'synthetic' });
         setNotice(result.review ? 'Not saved. These results stay visible until you leave or run again.' : '');
       } else {
-        setNotice('Not saved. The rerun finished, but its result could not be stored.');
+        if (runA) setUnsaved({ runs: [runA, { id: null, candidateId: null, label: candidates[0]!.label, config: runConfigs[0],
+          model: result.model, promptRevision: result.promptRevision, ...result.results[0]! }], mode });
+        setNotice('Not saved. These results stay visible until you leave or run again.');
       }
     } catch (failure) { if (version === generation.current) {
-      if (mode === 'account' && kind === 'new' && failure instanceof Error && failure.message === 'context_changed') { setAccount(null); setJsonDraft(''); setConfigs(clearScopes); }
+      clearAccountFailure(failure);
       setError(failure instanceof Error ? failure.message : "comparison_failed");
     } }
     finally { if (version === generation.current) { setRunning(false); pendingCase.current = null; } }
@@ -229,7 +262,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     const caseId = pendingCase.current;
     invalidate(); pendingCase.current = null;
     if (!caseId) return;
-    try { await loadCase(caseId); setNotice('Cancelled. Completed results were kept.'); } catch { /* Nothing was saved before cancellation. */ }
+    try { if (await loadCase(caseId, undefined, true)) setNotice('Cancelled. Completed results were kept.'); } catch { /* Nothing was saved before cancellation. */ }
   }
   function save(index: number) {
     if (mode === 'account') return;
@@ -245,13 +278,6 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     const url = URL.createObjectURL(new Blob([JSON.stringify(parseBriefingConfig(configs[index]), null, 2)], { type: "application/json" }));
     const link = document.createElement("a"); link.href = url; link.download = "cadence-briefing-config.json"; link.click(); URL.revokeObjectURL(url);
   }
-
-  const baselineRuns = detail ? savedRuns(detail, 'baseline') : unsaved ? [unsaved.runs[0]] : [];
-  const candidateRuns = detail ? savedRuns(detail, 'candidate') : unsaved ? [unsaved.runs[1]] : [];
-  const runA = baselineRuns.at(-1) ?? null;
-  const runB = candidateRuns.find((item) => item.id === selectedRunId) ?? candidateRuns.at(-1) ?? null;
-  const labelOf = (candidateId: string | null) => detail?.candidates.find((item) => item.id === candidateId)?.label ?? 'none';
-
   function quoteSelection() {
     const selection = window.getSelection();
     const text = selection?.toString().replace(/\s+/gu, ' ').trim() ?? '';
@@ -262,22 +288,27 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     setError(''); setFeedback({ ...feedback, quote: { runId: target.id, text: text.slice(0, 1000) } });
   }
   async function saveFeedback() {
-    if (!detail) return;
+    if (!detail || unsaved) return;
+    const version = generation.current;
     setSavingFeedback(true); setError('');
     try {
       await reviewRequest({ method: 'POST', body: { source, action: 'feedback', caseId: detail.case.id, runIds: [runA?.id ?? null, runB?.id ?? null],
         preference: feedback.preference, comment: feedback.comment, quote: feedback.quote, replacement: feedback.replacement || null } });
-      setFeedback(EMPTY_FEEDBACK);
+      if (version !== generation.current) return;
+      setFeedbackDrafts(current => current[feedbackKey] === feedback ? { ...current, [feedbackKey]: EMPTY_FEEDBACK } : current);
       await loadCase(detail.case.id);
-    } catch (failure) { setError(`Feedback not saved. ${failure instanceof Error ? failure.message : 'review_unavailable'}`); }
-    finally { setSavingFeedback(false); }
+    } catch (failure) { if (version === generation.current) { clearAccountFailure(failure); setError(`Feedback not saved. ${failure instanceof Error ? failure.message : 'review_unavailable'}`); } }
+    finally { if (version === generation.current) setSavingFeedback(false); }
   }
   async function caseAction(body: Record<string, unknown>, after?: (value: Record<string, unknown>) => void) {
     if (!detail) return;
+    const version = generation.current;
     setBusy(true); setError('');
-    try { const value = await reviewRequest<Record<string, unknown>>({ method: 'POST', body: { source, caseId: detail.case.id, ...body } }); after?.(value); await loadCase(detail.case.id); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'review_unavailable'); }
-    finally { setBusy(false); }
+    try { const value = await reviewRequest<Record<string, unknown>>({ method: 'POST', body: { source, caseId: detail.case.id, ...body } });
+      if (version !== generation.current) return;
+      after?.(value); await loadCase(detail.case.id); }
+    catch (failure) { if (version === generation.current) { clearAccountFailure(failure); setError(failure instanceof Error ? failure.message : 'review_unavailable'); } }
+    finally { if (version === generation.current) setBusy(false); }
   }
   function loadProposal(proposal: BenchProposal) {
     if (proposal.change.kind !== 'configuration') return;
@@ -290,26 +321,29 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     } catch (failure) { setError(`The proposal configuration is invalid. ${failure instanceof Error ? failure.message : ''}`); }
   }
   /** Opens a saved case and continues from its configurations; the next rerun records the latest candidate as its parent. */
-  async function openCase(id: string) {
+  async function openCase(id: string, preserveDrafts = false) {
     invalidate(true);
     try {
-      const opened = await loadCase(id);
+      const opened = await loadCase(id, undefined, true);
+      if (!opened) return;
       const baseline = opened.candidates.find((item) => item.role === 'baseline');
       const latest = opened.candidates.filter((item) => item.role === 'candidate').at(-1);
       try {
-        setConfigs((current) => [baseline ? parseBriefingConfig(baseline.config) : current[0], latest ? parseBriefingConfig(latest.config) : current[1]]);
-        setSides((current) => [baseline ? { ...current[0], label: baseline.label } : current[0],
+        if (!preserveDrafts) setConfigs((current) => [baseline ? parseBriefingConfig(baseline.config) : current[0], latest ? parseBriefingConfig(latest.config) : current[1]]);
+        if (!preserveDrafts) setSides((current) => [baseline ? { label: baseline.label, rationale: '', parentCandidateId: null, proposalId: null } : current[0],
           latest ? { label: latest.label, rationale: '', parentCandidateId: latest.id, proposalId: null } : current[1]]);
       } catch { setNotice('This case was saved with a configuration version the workbench no longer reads. Drafts were kept.'); }
-      setView('compare');
+      if (!preserveDrafts) setView('compare');
     } catch (failure) { setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
   }
   async function deleteCase(id: string) {
+    const version = generation.current;
     try {
       await reviewRequest({ method: 'POST', body: { source, action: 'delete', caseId: id } });
+      if (version !== generation.current) return;
       if (detail?.case.id === id) invalidate(true);
       await loadCases();
-    } catch (failure) { setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); }
+    } catch (failure) { if (version === generation.current) { clearAccountFailure(failure); setCasesError(failure instanceof Error ? failure.message : 'review_unavailable'); } }
   }
 
   const editor = (index: number) => { const config = configs[index]; return <section aria-label={`Configuration ${index + 1}`} className="min-w-0 space-y-4 pt-2">
@@ -379,23 +413,23 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
       </div>
       <details><summary className="min-h-11 cursor-pointer py-2">Configuration JSON</summary><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(config, null, 2)}</pre></details>
     </section>; };
-  const caseLine = detail ? `${detail.case.source.mode === 'synthetic' ? `Synthetic · ${detail.case.source.fixtureId.replaceAll('_', ' ')}${detail.case.source.analysisFixtureId ? ` · analysis ${detail.case.source.analysisFixtureId.replaceAll('_', ' ')}` : ''}` : 'My account · captured snapshot'} · clock ${detail.case.capturedAt} (${detail.case.timezone}) · saved${detail.case.rerunnable ? '' : ' · Review only: inputs were not kept, so this case cannot be rerun'}`
-    : unsaved ? `${unsaved.mode === 'account' ? `My account · Snapshot ${unsaved.capturedAt}` : 'Synthetic'} · not saved` : null;
+  const caseLine = unsaved ? `${unsaved.mode === 'account' ? `My account · Snapshot ${unsaved.capturedAt ?? detail?.case.capturedAt ?? 'captured'}` : 'Synthetic'} · not saved`
+    : detail ? `${detail.case.source.mode === 'synthetic' ? `Synthetic · ${detail.case.source.fixtureId.replaceAll('_', ' ')}${detail.case.source.analysisFixtureId ? ` · analysis ${detail.case.source.analysisFixtureId.replaceAll('_', ' ')}` : ''}` : `My account · ${detail.case.evidenceType}`} · clock ${detail.case.capturedAt} (${detail.case.timezone}) · saved${detail.case.rerunnable ? '' : ' · Review only: inputs were not kept, so this case cannot be rerun'}` : null;
 
   return <main className="mx-auto min-h-dvh max-w-7xl space-y-6 px-4 py-8 text-neutral-950" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
     <header className="space-y-2"><a href="/design-system" className="underline">Design system</a><h1 className="text-2xl">Briefing workbench</h1>
       <p><a className="underline" href="#briefing-term-config.recipe">Recipe: Daily Brief</a> · {configs[0].recipe.version} · Policy {DAILY_BRIEF_POLICY_VERSION}</p>
       <p>Read two Daily Briefs side by side and say which works. Aim for a 45-second read: one or two planning points, and at most one observation when the evidence supports it.</p>
-      <p className="text-sm">Two sequential attempts per comparison; six comparisons per server hour. Comparisons do not use the daily briefing allowance. Saving a draft never activates it.</p>
+      <p className="text-sm">Up to two provider calls at once across workbench tabs. Default budget: 100 calls per server hour. Comparisons do not use the daily briefing allowance. Saving a draft never activates it.</p>
     </header>
     <nav aria-label="Workbench views" className="flex gap-4 border-b">
-      {([['compare', 'Compare'], ['saved', 'Saved reviews']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={view === value}
-        className={`min-h-11 px-1 ${view === value ? 'border-b-2 border-neutral-950 font-bold' : 'underline'}`} onClick={() => { setView(value); if (value === 'saved') void loadCases(); }}>{label}</button>)}
+      {([['compare', 'Compare'], ['days', 'Days'], ['saved', 'Saved reviews']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={view === value}
+        className={`min-h-11 px-1 ${view === value ? 'border-b-2 border-neutral-950 font-bold' : 'underline'}`} onClick={() => { setView(value); if (value !== 'compare') void loadCases(); }}>{label}</button>)}
     </nav>
     <label className="block">Context source<select aria-label="Context source" className="ml-3 min-h-11 border p-2" value={mode} onChange={event => switchMode(event.target.value as 'synthetic' | 'account')}><option value="synthetic">Synthetic</option><option value="account">My account</option></select></label>
     {mode === 'synthetic' ? <div className="flex flex-wrap gap-x-6"><label className="block">Synthetic snapshot<select className="ml-3 min-h-11 border p-2" value={fixtureId} onChange={(event) => setFixtureId(event.target.value as BriefingFixtureId)}>{BRIEFING_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
       <label className="block">Analysis scenario<select aria-label="Analysis scenario" className="ml-3 min-h-11 border p-2" value={analysisFixtureId} onChange={(event) => setAnalysisFixtureId(event.target.value as BriefingAnalysisFixtureId)}>{BRIEFING_ANALYSIS_FIXTURE_IDS.map((id) => <option key={id} value={id}>{id.replaceAll("_", " ")}</option>)}</select></label>
-      <p className="w-full text-sm">Model runs send only synthetic fixtures to OpenAI. Frozen clock: 2026-11-01 07:00 America/New_York. Fixture {BRIEFING_FIXTURE_VERSION}; analysis {BRIEFING_ANALYSIS_FIXTURE_VERSION}. Comparisons never read or record tip history.</p></div> : <div className="space-y-2 text-sm" aria-label="Account comparison access">
+      <p className="w-full text-sm">Model runs send only synthetic fixtures to OpenAI. Frozen clock: 2026-11-01 07:00 America/New_York. Fixture {BRIEFING_FIXTURE_VERSION}; analysis {BRIEFING_ANALYSIS_FIXTURE_VERSION}. Sequences use isolated evaluation history; production tip history stays untouched.</p></div> : <div className="space-y-2 text-sm" aria-label="Account comparison access">
       <p>Run new comparison sends your authorized hosted Behavior facts and selected references to OpenAI. Calendar timing is sent only when enabled here and in Settings. Provider retention still applies.</p>
       <p>Local-only and unsynced desktop records are absent. Each comparison saves the captured inputs, outputs and your feedback on this computer, so you can reread and rerun it. Reruns check your current Settings first. Save and export of configuration drafts stay in Synthetic mode.</p>
       {accountLoading ? <p role="status">Checking account access…</p> : !account ? accountError && !accountError.startsWith('unauthenticated') ? <p role="alert">Account access unavailable: {accountError}</p> : <a className="mr-4 inline-flex min-h-11 items-center underline" href="/login?next=%2Fdesign-system%3Fpreview%3Dbriefing-workbench">Sign in to My account</a> : <>
@@ -404,15 +438,22 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         <p>{account.settings.includeCalendar ? 'Calendar model-data permission is enabled. Each configuration can exclude it.' : 'Calendar model-data permission is off. Calendar will be excluded.'}</p>
       </>}
       <a className="inline-flex min-h-11 items-center underline" href="/settings">Open briefing settings</a>
-      <button type="button" className="ml-4 min-h-11 underline" onClick={() => setAccessVersion(value => value + 1)}>Refresh account access</button>
+      <button type="button" className="ml-4 min-h-11 underline" onClick={() => { invalidate(true); setFeedbackDrafts({}); setCases([]); setAccessVersion(value => value + 1); }}>Refresh account access</button>
     </div>}
+    <BriefingDays key={`${mode}:${accountRef}:${account?.settings.revision ?? 0}`} view={view} mode={mode} accountRef={accountRef}
+      preferenceRevision={account?.settings.revision} timezone={account?.settings.timezone}
+      blocked={running || (mode === 'account' && (!account?.settings.enabled || accountLoading))} configs={configs}
+      labels={sides.map(side => side.label)} fixtureId={fixtureId} analysisFixtureId={analysisFixtureId} cases={cases}
+      onRefresh={() => void loadCases()} onOpen={id => void openCase(id, true).then(() => loadCases())} onAccountFailure={clearAccountFailure} />
     {view === 'saved' ? <SavedReviews cases={cases} retentionDays={retentionDays} loading={casesLoading} error={casesError} onOpen={(id) => void openCase(id)} onDelete={(id) => void deleteCase(id)} onRefresh={() => void loadCases()} /> : <>
       <div className="flex flex-wrap gap-4 border-t pt-4">
         <button type="button" disabled={running || accountBlocked} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void run('new')}>{running ? 'Running comparison…' : 'Run new comparison'}</button>
+        {detail ? <button type="button" disabled={!canRerun} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void run('pair')}>Generate daily brief A and B on this day</button> : null}
         <button type="button" disabled={!canRerun} className="min-h-11 border px-4 disabled:opacity-50" onClick={() => void run('rerun')}>Rerun candidate on this case</button>
         {running ? <button type="button" className="min-h-11 underline" onClick={() => void cancel()}>Cancel comparison</button> : null}
       </div>
       {caseLine ? <p className="text-sm">{caseLine}{runB?.model ? ` · ${runB.model}` : ''}. Wording can vary with identical inputs. A saved case reruns on its captured clock; it is not current advice.</p> : null}
+      {detail?.case.history ? <details><summary className="min-h-11 cursor-pointer py-2">Saved historical evidence limits</summary><p className="text-sm">{detail.case.evidenceType} · observed {detail.case.history.observedAt}. Evaluation clock {detail.case.capturedAt}.</p><ul className="space-y-2 text-sm">{detail.case.history.coverage.map((item, index) => <li key={index}>{item.source.replaceAll('_', ' ')}: {item.state.replaceAll('_', ' ')}. {item.limitations.join(' ')}</li>)}</ul></details> : null}
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <p role="alert">Comparison unavailable: {error}</p> : null}
       <div ref={columns} className="grid gap-8 lg:grid-cols-2">
@@ -420,7 +461,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         <ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={!!runB?.config && JSON.stringify(runB.config) !== JSON.stringify(configs[1])} />
       </div>
       <RunDifferences a={runA} b={runB} />
-      {detail ? <FeedbackForm draft={feedback} onChange={setFeedback} onQuote={quoteSelection} onSave={() => void saveFeedback()} disabled={!runA && !runB} saving={savingFeedback} />
+      {detail && !unsaved ? <FeedbackForm draft={feedback} onChange={setFeedback} onQuote={quoteSelection} onSave={() => void saveFeedback()} disabled={!runA && !runB} saving={savingFeedback} />
         : unsaved ? <p className="text-sm">Feedback needs a saved comparison. Run again to save.</p> : null}
       {detail ? <FeedbackList feedback={detail.feedback} labelOf={labelOf} /> : null}
       {detail ? <ProposalPanel proposals={detail.proposals} invalid={detail.invalidProposals} dispositions={detail.dispositions} packetPath={packetPath} busy={busy}
@@ -428,11 +469,11 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         onRefresh={() => void loadCase(detail.case.id).catch((failure) => setError(failure instanceof Error ? failure.message : 'review_unavailable'))}
         onLoad={loadProposal} onDecide={(proposal, decision, comment) => void caseAction({ action: 'disposition', proposalId: proposal.id, decision, comment })} /> : null}
       <BriefingWorkbenchGuide repositoryRoot={repositoryRoot} />
-      <details open><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure A · Baseline</summary>
+      <details><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure A · Baseline</summary>
         <p className="text-sm">Changes apply to the next new comparison. The open case keeps its baseline output.</p>
         {editor(0)}
       </details>
-      <details open><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure B · Candidate</summary>
+      <details><summary className="min-h-11 cursor-pointer py-2 text-xl">Configure B · Candidate</summary>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1">Candidate name<input aria-label="Candidate name" maxLength={80} className="min-h-11 border p-2" value={sides[1].label} onChange={(event) => setSides((current) => [current[0], { ...current[1], label: event.target.value }])} /></label>
           <label className="grid gap-1">What changed and why<input aria-label="Candidate rationale" maxLength={2000} className="min-h-11 border p-2" value={sides[1].rationale} onChange={(event) => setSides((current) => [current[0], { ...current[1], rationale: event.target.value }])} /></label>

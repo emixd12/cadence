@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,7 +30,7 @@ function get(url: string) {
 let root: string;
 let store: BriefingBenchStore;
 beforeEach(async () => {
-  vi.resetModules();
+  vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget"));
   vi.stubEnv("NODE_ENV", "development");
   root = await mkdtemp(path.join(tmpdir(), "briefing-bench-"));
   store = createBriefingBenchStore(root);
@@ -45,6 +45,26 @@ async function services() {
   const review = await import("@/lib/services/briefing-review.service");
   return { compare: workbench.runBriefingComparison, read: review.readBriefingReviews, write: review.writeBriefingReview };
 }
+
+it("writes a local sequence report with evidence, full text, failures and exact feedback", async () => {
+  const { compare, write } = await services();
+  const response = await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
+    review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }),
+  vi.fn<DailyBriefGenerator>().mockResolvedValueOnce({ text, occurrenceRefs: [], suggestions: [] }).mockResolvedValueOnce({ invalid: true }), store);
+  expect(response.status).toBe(200);
+  const runs = (await store.readCase("synthetic", CASE)).runs;
+  await write(post("/api/dev/briefing-reviews", { source: "synthetic", action: "feedback", caseId: CASE,
+    runIds: runs.map(run => run.id), preference: "prefer_a", comment: "A explains today's conflict. B has no usable output.", quote: null, replacement: null }), store);
+  const report = await write(post("/api/dev/briefing-reviews", { source: "synthetic", action: "sequence_report", caseId: CASE, caseIds: [CASE] }), store);
+  expect(report.status).toBe(200);
+  const saved = await readFile(path.join(store.caseDir("synthetic", CASE), "sequence-report.md"), "utf8");
+  expect(saved).toContain("synthetic");
+  expect(saved).toContain(text);
+  expect(saved).toContain("failed/withheld: 1");
+  expect(saved).toContain("A explains today's conflict. B has no usable output.");
+  expect(saved).toContain('"prefer_a":1');
+  expect(saved).toContain("No promotion or acceptance is inferred.");
+});
 
 describe("saved briefing reviews", () => {
   it("saves the case, both candidates and every run, then returns them after a reload", async () => {
@@ -132,6 +152,61 @@ describe("saved briefing reviews", () => {
     expect(conflict.status).toBe(400);
   });
 
+  it("rejects reused candidate IDs whose proposal lineage or labels changed", async () => {
+    const { compare } = await services();
+    const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue({ text, occurrenceRefs: [], suggestions: [] });
+    await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
+      review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }), generate, store);
+    for (const changed of [{ proposalId: "proposal-0001" }, { parentCandidateId: BASE }, { rationale: "A new interpretation" }, { label: "New name" }, { role: "baseline" }]) {
+      const response = await compare(post("/api/dev/briefing-comparison", { mode: "saved", accountRef: null, configs: [config("warm")],
+        review: { caseId: CASE, candidates: [{ ...candidate(NEXT, "candidate"), ...changed }] } }), generate, store);
+      expect((await response.json()).error).toBe("invalid_request");
+    }
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists malformed configuration proposals by filename instead of accepting them", async () => {
+    const { compare, read, write } = await services();
+    const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue({ text, occurrenceRefs: [], suggestions: [] });
+    await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
+      review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }), generate, store);
+    await write(post("/api/dev/briefing-reviews", { source: "synthetic", action: "packet", caseId: CASE }), store);
+    const proposal = { schemaVersion: 1, kind: "proposal", id: "proposal-0001", caseId: CASE, createdAt: new Date().toISOString(),
+      feedbackIds: [], interpretedProblem: "Reduce repetition.", owner: "configuration",
+      change: { kind: "configuration", label: "Candidate", config: {}, parentCandidateId: NEXT },
+      expectedEffect: "Shorter output.", possibleRegression: "Lost context.", rerunCaseIds: [CASE] };
+    for (const [name, value] of [["incomplete.json", {}], ["array.json", []]] as const) {
+      await writeFile(path.join(root, "synthetic", CASE, "proposals", name), JSON.stringify({ ...proposal, change: { ...proposal.change, config: value } }));
+    }
+    const detail = (await (await read(get(`/api/dev/briefing-reviews?source=synthetic&caseId=${CASE}`), store)).json()).detail;
+    expect(detail.proposals).toEqual([]);
+    expect(detail.invalidProposals).toEqual(["array.json", "incomplete.json"]);
+  });
+
+  it("refuses feedback writes after expiry without requiring a list or detail read", async () => {
+    const { compare, write } = await services();
+    const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue({ text, occurrenceRefs: [], suggestions: [] });
+    const body = await (await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
+      review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }), generate, store)).json();
+    const file = path.join(root, "synthetic", CASE, "case.json");
+    const record = JSON.parse(await readFile(file, "utf8"));
+    await writeFile(file, JSON.stringify({ ...record, createdAt: new Date(Date.now() - BRIEFING_BENCH_RETENTION_DAYS * 86_400_000).toISOString() }));
+    const response = await write(post("/api/dev/briefing-reviews", { source: "synthetic", action: "feedback", caseId: CASE,
+      runIds: body.review.runIds, preference: null, comment: "Keep this feedback.", quote: null, replacement: null }), store);
+    expect(response.status).toBe(404);
+    await expect(stat(path.join(root, "synthetic", CASE))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("reports saved-record read failures instead of returning empty records", async () => {
+    const { compare, read } = await services();
+    const generate = vi.fn<DailyBriefGenerator>().mockResolvedValue({ text, occurrenceRefs: [], suggestions: [] });
+    await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
+      review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }), generate, store);
+    await mkdir(path.join(root, "synthetic", CASE, "feedback.jsonl"));
+    expect((await read(get(`/api/dev/briefing-reviews?source=synthetic&caseId=${CASE}`), store)).status).toBe(500);
+    expect((await read(get("/api/dev/briefing-reviews?source=synthetic"), store)).status).toBe(500);
+  });
+
   it("records a cancelled run and keeps earlier completed runs when the request is aborted", async () => {
     const { compare, read } = await services();
     const controller = new AbortController();
@@ -140,7 +215,9 @@ describe("saved briefing reviews", () => {
       .mockImplementationOnce(() => { controller.abort(); return new Promise(() => undefined); });
     const response = await compare(post("/api/dev/briefing-comparison", { fixtureId: "sparse", configs: [config(), config("warm")],
       review: { caseId: CASE, candidates: [candidate(BASE, "baseline"), candidate(NEXT, "candidate")] } }, controller.signal), generate, store);
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    const partial = await response.json();
+    expect(partial.results.map((result: { state: string }) => result.state)).toEqual(["ready", "cancelled"]);
     const detail = (await (await read(get(`/api/dev/briefing-reviews?source=synthetic&caseId=${CASE}`), store)).json()).detail;
     expect(detail.runs.map((run: { state: string }) => run.state)).toEqual(["ready", "cancelled"]);
   });

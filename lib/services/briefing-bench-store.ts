@@ -2,8 +2,10 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } fro
 import path from "node:path";
 import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
 import type { BriefingAnalysisSource } from "@cadence/core/types/briefing-analysis";
+import type { BriefingAnalysisLaneId } from "@cadence/core/types/briefing-analysis";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
+import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
 
 /**
  * Local, development-only review records for the briefing workbench
@@ -68,14 +70,35 @@ export type BenchCaseInputs = Readonly<{
   configurationRefs: Readonly<Record<string, string>>;
 }>;
 
+export type BenchHistoryCoverage = Readonly<{
+  source: "occurrences" | "completion_history" | "durations" | "configuration" | "timezone" | "notes" | "reminders" | "calendar" | "analysis";
+  startLocalDate: string;
+  endLocalDateExclusive: string;
+  state: "retained" | "synthetic" | "unknown" | "unavailable" | "not_requested" | "capped";
+  retainedRows: number | null;
+  limitations: readonly string[];
+}>;
+
+export type BenchCaseHistory = Readonly<{
+  version: 1;
+  /** Actual request/capture time. Evaluation timestamps never replace this fact. */
+  observedAt: string;
+  logicalTime: string;
+  lookbackDays: readonly number[];
+  coverage: readonly BenchHistoryCoverage[];
+  cutoff: "local-date half-open lookback; current retained state, no as-of reconstruction" | "authored synthetic evaluation";
+}>;
+
 export type BenchCase = Readonly<{
   schemaVersion: typeof BRIEFING_BENCH_SCHEMA_VERSION;
   kind: "case";
   id: string;
   createdAt: string;
   source: BenchCaseSource;
-  /** Synthetic fixtures, or inputs frozen during an authorized capture. Never a reconstruction. */
-  evidenceType: "synthetic" | "captured";
+  /** Reconstructed is reserved for verified retained history; current reads are Retrospective. */
+  evidenceType: "synthetic" | "captured" | "reconstructed" | "retrospective";
+  /** Absent on older cases. Their original evidence label remains readable. */
+  history?: BenchCaseHistory;
   localDate: string;
   timezone: string;
   /** The logical clock for every run of this case. */
@@ -120,6 +143,13 @@ export type BenchRun = Readonly<{
   configurationRevision: string;
   pipelineVersion: string;
   inspector: unknown;
+  evaluation?: Readonly<{
+    sequenceId: string;
+    mode: "daily" | "diagnostic";
+    laneId?: BriefingAnalysisLaneId;
+    label?: string;
+    retainedFingerprints: readonly string[];
+  }>;
 }>;
 
 export type BenchPreference = "prefer_a" | "prefer_b" | "both_work" | "neither_works";
@@ -203,6 +233,19 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
   };
   const ensureDir = (dir: string) => mkdir(dir, { recursive: true, mode: 0o700 });
 
+  async function readCaseRecord(partition: BenchPartition, caseId: string): Promise<BenchCase> {
+    const raw = await readFile(path.join(caseDir(partition, caseId), "case.json"), "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") throw new BriefingBenchStoreError("not_found");
+      throw error;
+    });
+    const record = JSON.parse(raw) as BenchCase;
+    if (!(Date.parse(record.createdAt) > Date.now() - BRIEFING_BENCH_RETENTION_DAYS * 86_400_000)) {
+      await deleteCase(partition, caseId);
+      throw new BriefingBenchStoreError("not_found");
+    }
+    return record;
+  }
+
   async function createCase(partition: BenchPartition, record: BenchCase): Promise<void> {
     const dir = caseDir(partition, record.id);
     await ensureDir(path.dirname(dir));
@@ -217,17 +260,16 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
 
   async function append(partition: BenchPartition, caseId: string, kind: JsonlKind, record: unknown): Promise<void> {
     const dir = caseDir(partition, caseId);
-    await stat(path.join(dir, "case.json")).catch(() => { throw new BriefingBenchStoreError("not_found"); });
+    await readCaseRecord(partition, caseId);
     await appendFile(path.join(dir, `${kind}.jsonl`), `${JSON.stringify(record)}\n`, { mode: 0o600 });
   }
 
   async function readCase(partition: BenchPartition, caseId: string): Promise<BenchCaseDetail> {
     const dir = caseDir(partition, caseId);
-    const raw = await readFile(path.join(dir, "case.json"), "utf8").catch(() => { throw new BriefingBenchStoreError("not_found"); });
-    const record = JSON.parse(raw) as BenchCase;
+    const record = await readCaseRecord(partition, caseId);
     const proposals: BenchProposal[] = [], invalidProposals: string[] = [];
     const proposalDir = path.join(dir, "proposals");
-    for (const name of (await readdir(proposalDir).catch(() => [])).filter((entry) => entry.endsWith(".json")).sort()) {
+    for (const name of (await readDirectory(proposalDir)).filter((entry) => entry.endsWith(".json")).sort()) {
       try {
         const proposal = parseBenchProposal(JSON.parse(await readFile(path.join(proposalDir, name), "utf8")), caseId);
         if (proposal) proposals.push(proposal); else invalidProposals.push(name);
@@ -247,7 +289,7 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
   async function listCases(partition: BenchPartition): Promise<BenchCaseSummary[]> {
     const dir = path.join(root, partition);
     const summaries: BenchCaseSummary[] = [];
-    for (const name of await readdir(dir).catch(() => [] as string[])) {
+    for (const name of await readDirectory(dir)) {
       if (!isBenchId(name)) continue;
       try {
         const detail = await readCase(partition, name);
@@ -256,7 +298,10 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
           localDate: detail.case.localDate, rerunnable: detail.case.source.mode === "synthetic" || !!detail.case.inputs,
           runs: detail.runs.length, feedback: detail.feedback.length, proposals: detail.proposals.length,
         });
-      } catch { /* A partially written case stays invisible until retention removes it. */ }
+      } catch (error) {
+        if (!isBriefingBenchStoreError(error) || error.code !== "not_found") throw error;
+        // A partially written case stays invisible until retention removes it.
+      }
     }
     return summaries.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
@@ -270,17 +315,18 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
     const dir = path.join(root, partition);
     const cutoff = now.getTime() - BRIEFING_BENCH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const deleted: string[] = [];
-    for (const name of await readdir(dir).catch(() => [] as string[])) {
+    for (const name of await readDirectory(dir)) {
       if (!isBenchId(name)) continue;
       const created = await readFile(path.join(dir, name, "case.json"), "utf8").then((raw) => Date.parse((JSON.parse(raw) as BenchCase).createdAt)).catch(async () =>
         (await stat(path.join(dir, name)).catch(() => null))?.mtimeMs ?? now.getTime());
-      if (!(created >= cutoff)) { await deleteCase(partition, name); deleted.push(name); }
+      if (!(created > cutoff)) { await deleteCase(partition, name); deleted.push(name); }
     }
     return deleted;
   }
 
-  async function writeText(partition: BenchPartition, caseId: string, name: "review-packet.md", text: string): Promise<string> {
+  async function writeText(partition: BenchPartition, caseId: string, name: "review-packet.md" | "sequence-report.md", text: string): Promise<string> {
     const dir = caseDir(partition, caseId);
+    await readCaseRecord(partition, caseId);
     await ensureDir(path.join(dir, "proposals"));
     const target = path.join(dir, name);
     await writeFile(target, text, { mode: 0o600 });
@@ -293,11 +339,21 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
 export type BriefingBenchStore = ReturnType<typeof createBriefingBenchStore>;
 
 async function readJsonl<T>(file: string): Promise<T[]> {
-  const raw = await readFile(file, "utf8").catch(() => "");
+  const raw = await readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
   return raw.split("\n").flatMap((line) => {
     if (!line.trim()) return [];
     // A torn final line from an interrupted write is skipped, not fatal.
     try { return [JSON.parse(line) as T]; } catch { return []; }
+  });
+}
+
+async function readDirectory(dir: string): Promise<string[]> {
+  return readdir(dir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
   });
 }
 
@@ -318,6 +374,7 @@ export function parseBenchProposal(value: unknown, caseId: string): BenchProposa
   if (change.kind === "configuration") {
     if (!text(change.label, 80) || !change.config || typeof change.config !== "object" ||
         !(change.parentCandidateId === null || isBenchId(change.parentCandidateId))) return null;
+    try { parseBriefingConfig(change.config); } catch { return null; }
   } else if (change.kind === "repository") {
     if (!text(change.summary, 4000) || !Array.isArray(change.files) || change.files.length > 50 || !change.files.every((file) => text(file, 300))) return null;
   } else return null;

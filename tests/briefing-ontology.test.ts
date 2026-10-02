@@ -108,7 +108,7 @@ const termIdsFor = (prefix: string, values: readonly string[]) =>
 
 describe("briefing workbench ontology", () => {
   it("has stable terms, valid relationships, and traceable source symbols", () => {
-    expect(ontology).toMatchObject({ version: "1.5", scope: "Briefing workbench" });
+    expect(ontology).toMatchObject({ version: "1.6", scope: "Briefing workbench" });
     expect(ontology.terms.length).toBeGreaterThan(0);
     expect(ids.size).toBe(ontology.terms.length);
 
@@ -257,8 +257,8 @@ describe("briefing workbench ontology", () => {
     );
 
     const workbenchFile = sourceFile("app/design-system/DailyBriefBench.tsx");
-    expect(stringLiterals(typeAlias(workbenchFile, "Comparison")).sort()).toEqual(["account", "error", "ready", "saved", "synthetic"]);
-    for (const id of ["workbench.mode.account", "workbench.mode.saved", "workbench.mode.synthetic", "workbench.result.error", "workbench.result.ready"]) {
+    expect(stringLiterals(typeAlias(workbenchFile, "Comparison")).sort()).toEqual(["account", "cancelled", "error", "ready", "saved", "synthetic"]);
+    for (const id of ["workbench.mode.account", "workbench.mode.saved", "workbench.mode.synthetic", "workbench.result.error", "workbench.result.ready", "workbench.result.cancelled"]) {
       expect(ids.has(id)).toBe(true);
     }
   });

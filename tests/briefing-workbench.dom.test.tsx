@@ -34,7 +34,7 @@ const server = {
   save: true,
   mode: "synthetic" as "synthetic" | "account",
   comparison: null as null | ((body: Record<string, unknown>) => Promise<Response> | Response),
-  account: (() => Response.json(accountMetadata())) as () => Response,
+  account: (() => Response.json(accountMetadata())) as () => Response | Promise<Response>,
   posts: [] as Record<string, unknown>[],
 };
 
@@ -132,6 +132,8 @@ describe("Daily Brief workbench: Compare", () => {
     for (const id of BRIEFING_FIXTURE_IDS) await act(() => change(select, id));
     expect(select.value).toBe(BRIEFING_FIXTURE_IDS.at(-1));
     expect(button("Rerun candidate on this case").disabled).toBe(true);
+    const configurations = [...container.querySelectorAll('details')].filter(element => element.querySelector('summary')?.textContent?.startsWith('Configure '));
+    expect(configurations.every(element => !element.open)).toBe(true);
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -219,6 +221,10 @@ describe("Daily Brief workbench: Compare", () => {
     await vi.waitFor(() => expect(output("B").textContent).toContain("Generated candidate"));
     expect(container.textContent).toContain("Not saved.");
     expect(container.querySelector('textarea[aria-label="Feedback comment"]')).toBeNull();
+    const before = output("B").querySelector('[aria-label="Reading review"]')!.textContent;
+    server.results = [ready("Short"), ready("A considerably longer alternative to count despite identical timing metadata")];
+    await act(() => button("Run new comparison").click());
+    expect(output("B").querySelector('[aria-label="Reading review"]')!.textContent).not.toBe(before);
   });
 
   it("saves anchored prose feedback with the compared runs and an in-output quotation", async () => {
@@ -246,6 +252,55 @@ describe("Daily Brief workbench: Compare", () => {
     await act(() => button("Saved reviews").click());
     await act(() => button("Compare").click());
     expect(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Feedback comment"]')!.value).toBe("Half-written note");
+  });
+
+  it("keeps feedback attached to its exact run pair and preserves the selected run after saving", async () => {
+    const comment = () => container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Feedback comment"]')!;
+    await act(() => button("Run new comparison").click());
+    await act(() => change(comment(), "About the original candidate"));
+    await act(() => button("Rerun candidate on this case").click());
+    expect(comment().value).toBe("");
+    await act(() => change(container.querySelector<HTMLSelectElement>('select[aria-label="Candidate run"]')!, "run-1"));
+    expect(comment().value).toBe("About the original candidate");
+    await act(() => button("Save feedback").click());
+    expect(reviewPosts().at(-1).runIds).toEqual(["run-0", "run-1"]);
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Candidate run"]')!.value).toBe("run-1");
+    await act(() => change(comment(), "Do not carry to another case"));
+    await act(() => button("Run new comparison").click());
+    expect(comment().value).toBe("");
+  });
+
+  it("keeps edits made while feedback is saving", async () => {
+    await act(() => button("Run new comparison").click());
+    const comment = () => container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Feedback comment"]')!;
+    await act(() => change(comment(), "First comment"));
+    const pending = deferred<Response>();
+    fetcher.mockImplementation((input, init) => init?.method === "POST" && String(input).startsWith("/api/dev/briefing-reviews") ? pending.promise : route(input, init));
+    await act(() => button("Save feedback").click());
+    await act(() => change(comment(), "New thought while saving"));
+    await act(() => pending.resolve(Response.json({})));
+    expect(comment().value).toBe("New thought while saving");
+  });
+
+  it("keeps an unsaved rerun visible beside its baseline without attaching feedback to an older run", async () => {
+    await act(() => button("Run new comparison").click());
+    server.save = false;
+    server.results = [ready("Unsaved revised candidate")];
+    await act(() => button("Rerun candidate on this case").click());
+    expect(output("A").textContent).toContain("Generated baseline");
+    expect(output("B").textContent).toContain("Unsaved revised candidate");
+    expect(container.textContent).toContain("Not saved.");
+    expect(container.querySelector('textarea[aria-label="Feedback comment"]')).toBeNull();
+  });
+
+  it("creates a new candidate when its rationale changes", async () => {
+    await act(() => button("Run new comparison").click());
+    const original = (server.posts[0]!.review as { candidates: Candidate[] }).candidates[1]!;
+    await act(() => change(container.querySelector<HTMLInputElement>('input[aria-label="Candidate rationale"]')!, "Clarify the observation"));
+    await act(() => button("Rerun candidate on this case").click());
+    const revised = (server.posts[1]!.review as { candidates: Candidate[] }).candidates[0]!;
+    expect(revised.id).not.toBe(original.id);
+    expect(revised.rationale).toBe("Clarify the observation");
   });
 
   it("reruns only the candidate on the open case and keeps the pinned baseline output", async () => {
@@ -395,6 +450,44 @@ describe("Daily Brief workbench: My account", () => {
     expect(container.textContent).not.toContain("PRIVATE_ACCOUNT_BEHAVIOR");
   });
 
+  it.each(["context_changed", "access_denied", "unauthenticated"])("clears previous private results when a new request reports %s", async (error) => {
+    await selectAccount();
+    await act(() => button("Run new comparison").click());
+    await act(() => change(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Feedback comment"]')!, "PRIVATE_DRAFT"));
+    server.comparison = () => Response.json({ error }, { status: 403 });
+    await act(() => button("Run new comparison").click());
+    expect(output("B").textContent).not.toContain("Generated candidate");
+    expect(container.textContent).not.toMatch(/PRIVATE_DRAFT|PRIVATE_ACCOUNT_BEHAVIOR|FACTS_IN_INSPECTOR/);
+  });
+
+  it.each(["Save feedback", "Write review packet", "Check for proposals", "Saved reviews"])("clears private results after %s loses authorization", async (action) => {
+    await selectAccount();
+    await act(() => button("Run new comparison").click());
+    await act(() => change(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Feedback comment"]')!, "PRIVATE_DRAFT"));
+    await act(() => change(container.querySelector<HTMLInputElement>('input[aria-label="Candidate name"]')!, "PRIVATE_NAME"));
+    fetcher.mockImplementation((input, init) => String(input).startsWith("/api/dev/briefing-reviews")
+      ? Promise.resolve(Response.json({ error: "unauthenticated" }, { status: 401 })) : route(input, init));
+    await act(() => button(action).click());
+    expect(container.textContent).not.toMatch(/Generated candidate|PRIVATE_ACCOUNT_BEHAVIOR|FACTS_IN_INSPECTOR/);
+    expect(container.querySelector('textarea[aria-label="Feedback comment"]')).toBeNull();
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Candidate name"]')?.value).not.toBe("PRIVATE_NAME");
+    expect(container.textContent).toContain("unauthenticated");
+  });
+
+  it("ignores an account refresh that arrives after a review authorization failure", async () => {
+    await selectAccount();
+    await act(() => button("Run new comparison").click());
+    const pending = deferred<Response>();
+    server.account = () => pending.promise;
+    await act(() => window.dispatchEvent(new Event("focus")));
+    fetcher.mockImplementation((input, init) => String(input).startsWith("/api/dev/briefing-reviews")
+      ? Promise.resolve(Response.json({ error: "unauthenticated" }, { status: 401 })) : route(input, init));
+    await act(() => button("Write review packet").click());
+    await act(() => pending.resolve(Response.json(accountMetadata())));
+    expect(container.textContent).not.toMatch(/Generated candidate|PRIVATE_ACCOUNT_BEHAVIOR|FACTS_IN_INSPECTOR/);
+    expect(button("Run new comparison").disabled).toBe(true);
+  });
+
   it("aborts a pending account comparison on mode change and ignores its late response", async () => {
     const pending = deferred<Response>();
     server.comparison = () => pending.promise;
@@ -405,6 +498,28 @@ describe("Daily Brief workbench: My account", () => {
     await act(() => pending.resolve(Response.json({ results: [ready("PRIVATE_LATE"), ready("PRIVATE_LATE")] })));
     expect(container.textContent).not.toContain("PRIVATE_LATE");
     expect(container.textContent).not.toContain("PRIVATE_ACCOUNT_BEHAVIOR");
+  });
+
+  it.each(["case", "list"] as const)("ignores late saved-account %s reads after changing source", async (kind) => {
+    await selectAccount();
+    await act(() => button("Run new comparison").click());
+    await act(() => button("Saved reviews").click());
+    const pending = deferred<Response>();
+    let response!: Response;
+    fetcher.mockImplementation(async (input, init) => {
+      if (String(input).startsWith("/api/dev/briefing-reviews?source=account")) {
+        response = await route(input, init);
+        return pending.promise;
+      }
+      return route(input, init);
+    });
+    await act(() => button(kind === "case" ? "Open" : "Refresh list").click());
+    server.cases.clear();
+    await act(() => change(container.querySelector<HTMLSelectElement>('select[aria-label="Context source"]')!, "synthetic"));
+    await act(() => pending.resolve(response));
+    if (kind === "list") expect(container.textContent).not.toContain("2 runs");
+    await act(() => button("Compare").click());
+    expect(output("B").textContent).not.toContain("Generated candidate");
   });
 });
 

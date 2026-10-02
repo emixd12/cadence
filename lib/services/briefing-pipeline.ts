@@ -16,6 +16,8 @@ export const BRIEFING_PIPELINE_VERSION = "3.0";
 /** Analysis inputs the caller authorized and read. Absent sources leave selected lanes unavailable. */
 export type BriefingAnalysisInput = Readonly<{
   source: BriefingAnalysisSource | null;
+  /** Development retrospective evaluation may inspect retained rows without proving the original scheduled universe. */
+  cadenceComplete?: boolean;
   /** Content-free tip history; omitted by workbench and fixtures, which never record deliveries. */
   shown?: readonly Readonly<{ fingerprint: string; lastShownLocalDate: string }>[];
   fingerprintOf?: (finding: BriefingFinding) => string;
@@ -60,7 +62,7 @@ export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, no
   // A narrowed Behavior view omits fixed commitments and cannot establish availability.
   const plan = planBriefing({ context: plannerContext, now, configurationRevision,
     permittedWindows: windows,
-    fixedCommitmentsComplete: plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
+    fixedCommitmentsComplete: (analysisInput?.cadenceComplete ?? true) && plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
     alternatives: config.alternatives, allowedSuggestionTypes: config.allowedSuggestionTypes,
     movableOccurrences: plannerContext.cadence.occurrences.filter((item) => item.status === "unresolved" && config.planner.movableBehaviorRefs.includes(item.behaviorRef)).map((item) => ({
       occurrenceRef: item.ref,

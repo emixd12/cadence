@@ -97,11 +97,11 @@ export function reviewBriefingReading(input: Readonly<{
       if (phrase) repeated.push({ between: [segments[left]!.label, segments[right]!.label], phrase });
     }
   }
-  const titles = (input.behaviorTitles ?? []).map((title) => normalize(title));
-  const prose = normalize(segments.map((segment) => segment.text).join(" "));
+  const titleTokens = (input.behaviorTitles ?? []).map(tokens).filter((title) => title.length).sort((a, b) => b.length - a.length);
+  const proseTokens = tokens(segments.map((segment) => segment.text).join(" "));
+  const prose = removeTitleMatches(proseTokens, titleTokens).join(" ");
   const mechanicsTerms = BRIEFING_MECHANICS_TERMS.filter((term) =>
-    new RegExp(`(^|[^\\p{L}\\p{N}])${escape(term)}s?($|[^\\p{L}\\p{N}])`, "u").test(prose) &&
-    !titles.some((title) => title.includes(term)));
+    new RegExp(`(^|[^\\p{L}\\p{N}])${escape(term)}s?($|[^\\p{L}\\p{N}])`, "u").test(prose));
   return {
     visibleWords,
     target,
@@ -127,8 +127,20 @@ function tokens(value: string): string[] {
   return value.toLowerCase().normalize("NFKC").split(/[^\p{L}\p{N}']+/u).filter(Boolean);
 }
 
-function normalize(value: string): string {
-  return tokens(value).join(" ");
+/** Removes only complete normalized title phrases, preserving separate term uses. */
+function removeTitleMatches(prose: readonly string[], titles: readonly (readonly string[])[]): string[] {
+  const result: string[] = [];
+  for (let index = 0; index < prose.length;) {
+    const title = titles.find((candidate) => candidate.every((token, offset) => prose[index + offset] === token));
+    if (title) {
+      result.push("\u0000");
+      index += title.length;
+    } else {
+      result.push(prose[index]!);
+      index += 1;
+    }
+  }
+  return result;
 }
 
 function sharedPhrase(left: string, right: string, words: number): string | null {

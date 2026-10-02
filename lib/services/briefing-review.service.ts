@@ -4,6 +4,7 @@ import { BRIEFING_LANE_LABELS, BRIEFING_LANE_REASON_LABELS, BRIEFING_LANE_STATE_
 import type { BriefingAnalysisLaneId, BriefingAnalysisLaneState, BriefingAnalysisUnavailableReason } from "@cadence/core/types/briefing-analysis";
 import type { BriefingTipDecision } from "@cadence/core/resolvers/briefing-analysis.resolver";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
+import { visibleDailyBriefText } from "@cadence/core/services/daily-brief-presentation";
 import { briefingAccountRef } from "./briefing-account-context.service";
 import {
   benchPartition, BRIEFING_BENCH_RETENTION_DAYS, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
@@ -71,6 +72,11 @@ export async function writeBriefingReview(request: Request, store: BriefingBench
       case "feedback": return { feedback: await saveFeedback(store, partition, caseId, value) };
       case "disposition": return { disposition: await saveDisposition(store, partition, caseId, value) };
       case "packet": return writeReviewPacket(store, partition, caseId);
+      case "sequence_report": {
+        if (!Array.isArray(value.caseIds) || !value.caseIds.length || value.caseIds.length > 14 ||
+            !value.caseIds.every(isBenchId) || new Set(value.caseIds).size !== value.caseIds.length || value.caseIds[0] !== caseId) invalid();
+        return writeSequenceReport(store, partition, value.caseIds as string[]);
+      }
       case "delete": await store.deleteCase(partition, caseId); return { deleted: caseId };
       default: throw new DailyBriefError("invalid_request");
     }
@@ -84,8 +90,7 @@ const optionalText = (value: unknown, max: number): string | null => {
 };
 
 export function visibleBriefingText(briefing: DailyBriefing | undefined): string {
-  if (!briefing) return "";
-  return [briefing.text, ...(briefing.suggestions ?? []).map((item) => item.text), briefing.tip?.text, briefing.tip?.basis, briefing.tip?.limitation].filter(Boolean).join("\n");
+  return briefing ? visibleDailyBriefText(briefing) : "";
 }
 
 async function saveFeedback(store: BriefingBenchStore, partition: BenchPartition, caseId: string, value: Record<string, unknown>): Promise<BenchFeedback> {
@@ -175,8 +180,9 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
     "",
     "## Case",
     "",
-    `- Source: ${record.source.mode === "synthetic" ? `synthetic fixture ${record.source.fixtureId} (${record.source.fixtureVersion}); analysis ${record.source.analysisFixtureId ?? "none"}` : "captured account snapshot"}`,
+    `- Source: ${record.source.mode === "synthetic" ? `synthetic fixture ${record.source.fixtureId} (${record.source.fixtureVersion}); analysis ${record.source.analysisFixtureId ?? "none"}` : "saved account context"}`,
     `- Evidence type: ${record.evidenceType}`,
+    ...(record.history ? ["- Historical source coverage:", "```json", JSON.stringify(record.history, null, 2), "```"] : []),
     `- Logical clock: ${record.capturedAt} (${record.timezone}), local date ${record.localDate}`,
     `- Exact rerun: ${record.source.mode === "synthetic" || record.inputs ? "available" : "not available (Review only)"}`,
     "",
@@ -210,11 +216,9 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
         ...(run.briefing.suggestions ?? []).map((item, index) => ({ label: `suggestion ${index + 1}`, text: item.text })),
         ...(run.briefing.tip ? [{ label: "tip", text: run.briefing.tip.text }] : []),
       ] });
-      lines.push(`- Reading: ${review.visibleWords} words in model text and evidence lines, ${review.position} the target (the Compare view also counts option, travel and status lines)${review.repeated.length ? `; repeated: ${review.repeated.map((item) => `${item.between.join(" / ")} "${item.phrase}"`).join("; ")}` : ""}${review.mechanicsTerms.length ? `; internal terms: ${review.mechanicsTerms.join(", ")}` : ""}`,
-        "", "Overview:", "", ...quote(run.briefing.text));
-      for (const [index, suggestion] of (run.briefing.suggestions ?? []).entries()) lines.push("", `Suggestion ${index + 1}:`, "", ...quote(suggestion.text));
-      if (run.briefing.tip) lines.push("", `Pattern tip (${BRIEFING_LANE_LABELS[run.briefing.tip.laneId as BriefingAnalysisLaneId] ?? run.briefing.tip.laneId}):`, "", ...quote(run.briefing.tip.text), "",
-        `Evidence line (deterministic): ${run.briefing.tip.basis}${run.briefing.tip.limitation ? ` ${run.briefing.tip.limitation}` : ""}`);
+      lines.push(`- Reading: ${review.visibleWords} visible words in the workbench bubble, ${review.position} the target${review.repeated.length ? `; repeated: ${review.repeated.map((item) => `${item.between.join(" / ")} "${item.phrase}"`).join("; ")}` : ""}${review.mechanicsTerms.length ? `; internal terms: ${review.mechanicsTerms.join(", ")}` : ""}`,
+        "", "Rendered brief (including supporting lines):", "", ...quote(visibleBriefingText(run.briefing)));
+      if (run.briefing.tip) lines.push("", `Observation lane: ${BRIEFING_LANE_LABELS[run.briefing.tip.laneId as BriefingAnalysisLaneId] ?? run.briefing.tip.laneId}. Evidence and limitation are deterministic.`);
     }
     const analysis = (run.inspector && typeof run.inspector === "object" ? (run.inspector as { analysis?: InspectorAnalysis }).analysis : null) ?? null;
     const lanes = (analysis?.result?.lanes ?? []).filter((lane) => lane.state !== "not_selected");
@@ -246,4 +250,55 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
 
 function quote(text: string): string[] {
   return text.split("\n").map((line) => `> ${line}`);
+}
+
+/** Local report preserves complete text and exact feedback; it never grades or promotes a candidate. */
+export async function writeSequenceReport(store: BriefingBenchStore, partition: BenchPartition, caseIds: readonly string[]) {
+  const cases = (await Promise.all(caseIds.map(id => store.readCase(partition, id))))
+    .sort((a, b) => a.case.localDate.localeCompare(b.case.localDate) || a.case.id.localeCompare(b.case.id));
+  const judgments = { prefer_a: 0, prefer_b: 0, both_work: 0, neither_works: 0, unreviewed: 0 };
+  const themes = new Map<string, Set<string>>();
+  let words = 0, ready = 0, failed = 0, cancelled = 0;
+  const lines = ['# Consecutive-day briefing review', '',
+    `${cases.length} cases. Reading counts include supporting lines. Retries and diagnostics remain separate attempts.`,
+    'Owner judgments apply to exact run pairs. Factual, privacy and delivery failures remain release blockers.',
+    'Lane previews do not establish complete Daily Brief quality. No promotion or acceptance is inferred.', ''];
+  for (const detail of cases) {
+    const record = detail.case;
+    lines.push(`## ${record.localDate} · ${record.evidenceType} · ${record.id}`, '',
+      `Clock: ${record.capturedAt} (${record.timezone}).`,
+      ...(record.history ? ['Coverage:', '```json', JSON.stringify(record.history, null, 2), '```'] : ['Coverage: original case capture; no reconstructed history claim.']), '');
+    if (!detail.feedback.length) judgments.unreviewed++;
+    for (const feedback of detail.feedback) if (feedback.preference) judgments[feedback.preference]++;
+    for (const run of detail.runs) {
+      const candidate = detail.candidates.find(item => item.id === run.candidateId);
+      lines.push(`### ${candidate?.role ?? 'unknown'} · ${candidate?.label ?? run.candidateId} · run ${run.id}`, '',
+        `State: ${run.state}; validation: ${run.validation}${run.error ? `; error: ${run.error}` : ''}.`,
+        `Attempt: ${run.attemptId}; model: ${run.model}; prompt: ${run.promptRevision}; pipeline: ${run.pipelineVersion}; configuration: ${run.configurationRevision}.`,
+        ...(run.evaluation ? [`Evaluation: ${JSON.stringify(run.evaluation)}`] : []));
+      if (run.state === 'ready' && run.briefing) {
+        ready++;
+        const text = visibleBriefingText(run.briefing);
+        const reading = reviewBriefingReading({ visibleText: text, behaviorTitles: record.behaviorTitles.map(item => item.title), segments: [] });
+        words += reading.visibleWords;
+        lines.push(`Visible words: ${reading.visibleWords}.`, '', ...quote(text), '');
+        if (run.briefing.tip) {
+          const theme = run.briefing.tip.laneId;
+          const dates = themes.get(theme) ?? new Set<string>(); dates.add(record.localDate); themes.set(theme, dates);
+        }
+      } else if (run.state === 'cancelled') cancelled++;
+      else failed++;
+    }
+    lines.push('### Exact feedback and unresolved concerns', '');
+    if (!detail.feedback.length) lines.push('Owner review pending.', '');
+    for (const feedback of detail.feedback) lines.push(`Runs ${feedback.runIds.join(' / ')}: ${feedback.preference ?? 'no preference'}`, '', ...quote(feedback.comment),
+      ...(feedback.quote ? ['', `Quoted from ${feedback.quote.runId}:`, ...quote(feedback.quote.text)] : []),
+      ...(feedback.replacement ? ['', 'Replacement:', ...quote(feedback.replacement)] : []), '');
+  }
+  lines.splice(6, 0, `Ready attempts: ${ready}; failed/withheld: ${failed}; cancelled: ${cancelled}; total visible words across all attempts: ${words}.`,
+    `Exact feedback counts (not independent case votes): ${JSON.stringify(judgments)}.`,
+    `Repeated observation lanes (theme signal, not a semantic repetition verdict): ${[...themes].filter(([, days]) => days.size > 1).map(([lane, days]) => `${BRIEFING_LANE_LABELS[lane as BriefingAnalysisLaneId] ?? lane}: ${days.size} days`).join('; ') || 'none in retained outputs'}.`,
+    'Tokens and monetary cost: unavailable. Review missing inputs, rejected outputs, and owner concerns before any acceptance.', '');
+  const file = await store.writeText(partition, caseIds[0]!, 'sequence-report.md', `${lines.join('\n')}\n`);
+  return { path: path.relative(process.cwd(), file) };
 }

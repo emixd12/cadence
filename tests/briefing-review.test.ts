@@ -27,6 +27,14 @@ describe("briefing reading review", () => {
     expect(reviewBriefingReading({ visibleText: "", segments, behaviorTitles: ["Baseline stretch"] }).mechanicsTerms).toEqual(["planner", "move option"]);
   });
 
+  it("exempts whole title mentions without masking the same term elsewhere or partial title matches", () => {
+    const review = reviewBriefingReading({ visibleText: "", behaviorTitles: ["Baseline stretch"], segments: [
+      { label: "overview", text: "The Baseline—stretch is at noon. The baseline target is unclear." },
+      { label: "tip", text: "Baseline stretching may need a different time." },
+    ] });
+    expect(review.mechanicsTerms).toEqual(["baseline"]);
+  });
+
   it("labels every analysis lane in plain language", () => {
     expect(Object.keys(BRIEFING_LANE_LABELS).sort()).toEqual([...BRIEFING_ANALYSIS_LANE_IDS].sort());
   });
