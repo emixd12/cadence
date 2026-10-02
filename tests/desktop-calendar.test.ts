@@ -115,6 +115,9 @@ describe("desktop Calendar transport", () => {
     expect(parseDesktopCalendarCallback(calendar, { accountId: "account-a", state: "opaque", createdAt: 1_000 }, "account-a", 2_000)).toBe("connected");
     expect(parseDesktopCalendarCallback(calendar.replace("result=connected", "result=same_account_required"), { accountId: "account-a", state: "opaque", createdAt: 1_000 }, "account-a", 2_000)).toBe("same_account_required");
     expect(() => parseDesktopCalendarCallback(calendar, { accountId: "account-b", state: "opaque", createdAt: 1_000 }, "account-a", 2_000)).toThrow("invalid");
+    expect(() => parseDesktopCalendarCallback(calendar, { accountId: "account-a", state: "different", createdAt: 1_000 }, "account-a", 2_000)).toThrow("invalid");
+    expect(() => parseDesktopCalendarCallback(calendar, { accountId: "account-a", state: "opaque", createdAt: 1_000 }, "account-a", 301_001)).toThrow("invalid");
+    expect(() => parseDesktopCalendarCallback(calendar, { accountId: "account-a", state: "opaque", createdAt: 1_000 }, "account-a", 999)).toThrow("invalid");
   });
 
   it("clears pending Calendar state and the native cache during account cleanup", async () => {
@@ -126,7 +129,19 @@ describe("desktop Calendar transport", () => {
     ]));
   });
 
-  it("stores one pending desktop attempt, opens HTTPS, then refreshes connection state", async () => {
+  it.each([
+    [{ accountId: "account-a", state: "opaque" }, "state=opaque&result=connected"],
+    [{ accountId: "account-a", state: null, createdAt: 1_000 }, "result=connected"],
+  ])("rejects malformed persisted Calendar state before reading the broker", async (pending, query) => {
+    const broker = { connection: vi.fn() };
+    const io = { get: vi.fn(async () => JSON.stringify(pending)), set: vi.fn(), remove: vi.fn(async () => undefined), open: vi.fn() };
+    const flow = new DesktopCalendarConnection(broker as unknown as DesktopCalendarBroker, io);
+    await expect(flow.complete(`cadence://calendar/callback?${query}`, "account-a", 2_000)).rejects.toThrow("invalid");
+    expect(io.remove).toHaveBeenCalledWith("pending-calendar-state");
+    expect(broker.connection).not.toHaveBeenCalled();
+  });
+
+  it("preserves pending state across restart and rejects replay, cancellation, and browser failure", async () => {
     const secrets = new Map<string, string>();
     const connection = { accountId: "account-a", status: "connected", generation: 2, selectionRevision: 4,
       preferences: { selectedCalendarIds: ["primary"], hiddenCalendarIds: [], visible: true, showAllDay: true } } as const;
@@ -138,8 +153,17 @@ describe("desktop Calendar transport", () => {
     const pending = JSON.parse(secrets.get("pending-calendar-state") ?? "null") as { state: string; createdAt: number };
     expect(pending.state).toMatch(/^[a-zA-Z0-9_-]{43}$/);
     expect(io.open).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\//));
-    await expect(flow.complete(`cadence://calendar/callback?state=${pending.state}&result=connected`, "account-a", pending.createdAt + 1_000))
+    const callback = `cadence://calendar/callback?state=${pending.state}&result=connected`;
+    const restarted = new DesktopCalendarConnection(broker as unknown as DesktopCalendarBroker, io);
+    await expect(restarted.complete(callback, "account-a", pending.createdAt + 1_000))
       .resolves.toEqual({ result: "connected", connection });
+    expect(secrets.has("pending-calendar-state")).toBe(false);
+    await expect(restarted.complete(callback, "account-a")).rejects.toThrow("already used or cancelled");
+    await flow.begin("account-a");
+    await flow.cancel();
+    await expect(restarted.complete(callback, "account-a")).rejects.toThrow("already used or cancelled");
+    io.open.mockRejectedValueOnce(new Error("browser unavailable"));
+    await expect(flow.begin("account-a")).rejects.toThrow("browser unavailable");
     expect(secrets.has("pending-calendar-state")).toBe(false);
     expect(broker.connection).toHaveBeenCalledOnce();
   });

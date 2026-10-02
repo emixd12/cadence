@@ -21,7 +21,7 @@ export const writeSnapshot = (value: string, forceRollback: boolean) =>
   invoke<Snapshot>("spike_write", { value, forceRollback });
 export const readNativeEvents = () => invoke<NativeEvent[]>("native_events");
 export const notifications = (request: {
-  operation: "status" | "requestPermission" | "pending" | "delivered" | "schedule" | "cancel";
+  operation: "status" | "requestPermission" | "pending" | "delivered" | "schedule" | "cancel" | "cancelPending";
   reminders?: Reminder[];
   ids?: string[];
 }) => invoke<NotificationResult>("native_notifications", { request });
@@ -54,6 +54,6 @@ export async function cancelProbes() {
   const [{ pending = [] }, { delivered = [] }] = await Promise.all([
     notifications({ operation: "pending" }), notifications({ operation: "delivered" }),
   ]);
-  const ids = [...new Set([...pending, ...delivered].map(({ id }) => id))];
+  const ids = [...new Set([...pending, ...delivered].map(({ id }) => id).filter((id) => id.startsWith("cadence-spike.")))];
   return notifications({ operation: "cancel", ids });
 }

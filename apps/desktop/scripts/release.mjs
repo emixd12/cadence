@@ -35,10 +35,14 @@ function configurationErrors() {
 }
 function preflight({ readiness = false, build = false } = {}) {
   const errors = configurationErrors();
-  if (!preview) errors.push(...validateSigningEnvironment(process.env));
+  if (!preview) errors.push(...validateSigningEnvironment(process.env, base));
   else if (build) errors.push(...validatePreviewBuildEnvironment(process.env));
   if (process.platform !== "darwin" || process.arch !== "arm64") errors.push("The initial release must build on an Apple Silicon Mac.");
   if (!preview) {
+    const profile = process.env.CADENCE_APPLE_PROVISIONING_PROFILE;
+    if (!profile || !path.isAbsolute(profile) || !fs.existsSync(profile) || !fs.statSync(profile).isFile()) {
+      errors.push("CADENCE_APPLE_PROVISIONING_PROFILE must name an existing absolute Developer ID provisioning-profile path.");
+    }
     try {
       const identities = capture("security", ["find-identity", "-v", "-p", "codesigning"]);
       if (!process.env.APPLE_SIGNING_IDENTITY || !identities.includes(`"${process.env.APPLE_SIGNING_IDENTITY}"`)) errors.push("The configured Developer ID Application identity is not valid in the local keychain.");
@@ -58,7 +62,7 @@ function exactlyOne(directory, suffix) {
   if (entries.length !== 1) throw new Error(`Expected exactly one ${suffix} artifact in ${directory}.`);
   return path.join(directory, entries[0]);
 }
-function verify(bundleDirectory) {
+function verify(bundleDirectory, frontendPublicConfiguration) {
   const errors = configurationErrors();
   if (!preview && !process.env.APPLE_SIGNING_IDENTITY?.startsWith("Developer ID Application:")) errors.push("APPLE_SIGNING_IDENTITY is required to verify the expected signing authority.");
   if (errors.length) throw new Error(errors.join("\n"));
@@ -72,9 +76,11 @@ function verify(bundleDirectory) {
   const executableName = value("CFBundleExecutable");
   if (!/^[A-Za-z0-9_.-]+$/.test(executableName) || [".", ".."].includes(executableName)) throw new Error("The app executable name is invalid.");
   const executable = path.join(app, "Contents", "MacOS", executableName);
-  if (preview && !fs.readFileSync(executable).includes(Buffer.from("app.cadence.desktop.auth.legacy-qa"))) {
+  const legacyKeychain = fs.readFileSync(executable).includes(Buffer.from("app.cadence.desktop.auth.legacy-qa"));
+  if (preview && !legacyKeychain) {
     throw new Error("The ad hoc preview must use the legacy macOS login Keychain path.");
   }
+  if (!preview && legacyKeychain) throw new Error("The production app must not use the legacy macOS login Keychain path.");
   if (value("LSMinimumSystemVersion") !== "14.0") throw new Error("The app does not declare macOS 14.0 minimum.");
   const signing = spawnSync("codesign", ["--display", "--verbose=4", app], { env: verificationEnvironment, encoding: "utf8" });
   if (signing.status !== 0 || !/flags=0x[0-9a-f]+\([^)]*\bruntime\b[^)]*\)/i.test(signing.stderr)
@@ -100,6 +106,7 @@ function verify(bundleDirectory) {
   // Inspect every archive entry without extracting archive-controlled paths or following links.
   run("python3", [path.join(desktop, "scripts", "verify-updater-archive.py"), archive, app]);
   return { milestone: preview ? "unnotarized preview" : "production candidate", identifier: RELEASE_IDENTIFIER, version, target: RELEASE_TARGET, checkedAt: new Date().toISOString(),
+    frontendPublicConfiguration: frontendPublicConfiguration ?? "not verified by this command",
     checks: ["strict codesign", "hardened runtime", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "read-only DMG contents match app", "updater signature", "updater archive contents match app",
       ...(preview ? ["ad hoc app signature", "legacy macOS login Keychain"] : ["Developer ID authority", "Gatekeeper", "stapled notarization"])],
     artifacts: [dmg, archive, signatureFile].map((file) => ({ file, sha256: createHash("sha256").update(fs.readFileSync(file)).digest("hex") })),
@@ -153,7 +160,7 @@ function prunePreviewApps(keepVersion) {
   process.stdout.write(`Removed ${removals.length} verified redundant preview apps; retained archives and ${keepVersion}.\n`);
 }
 
-function stagePreview(bundleDirectory, directory) {
+function stagePreview(bundleDirectory, directory, frontendPublicConfiguration) {
   const destination = path.join(directory, "bundle");
   if (fs.existsSync(destination)) throw new Error("This preview version already has staged artifacts. Use a new version; existing evidence was not replaced.");
   const temporary = fs.mkdtempSync(path.join(directory, ".candidate-"));
@@ -167,7 +174,7 @@ function stagePreview(bundleDirectory, directory) {
     }
     const dmg = exactlyOne(path.join(bundleDirectory, "dmg"), ".dmg");
     fs.copyFileSync(dmg, path.join(bundle, "dmg", path.basename(dmg)));
-    const report = verify(bundle);
+    const report = verify(bundle, frontendPublicConfiguration);
     fs.renameSync(bundle, destination);
     report.artifacts = report.artifacts.map((artifact) => ({ ...artifact, file: path.join(destination, path.relative(bundle, artifact.file)) }));
     writeReport(report, directory);
@@ -188,13 +195,19 @@ function containsBytes(directory, value) {
   });
 }
 
-function verifyBuiltPublicAuth(env) {
+function verifyBuiltPublicConfiguration(env) {
   const url = env.VITE_SUPABASE_URL.trim();
   const key = (env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || env.VITE_SUPABASE_ANON_KEY.trim());
   const dist = path.join(desktop, "dist");
   if (!containsBytes(dist, url) || !containsBytes(dist, key)) {
     throw new Error("The freshly built desktop frontend omits its reviewed public Supabase configuration.");
   }
+  if (!preview && !containsBytes(dist, env.VITE_CALENDAR_BROKER_ORIGIN.trim())) {
+    throw new Error("The freshly built desktop frontend omits VITE_CALENDAR_BROKER_ORIGIN required for production Calendar, Daily Brief, and Travel.");
+  }
+  return { source: "fresh frontend before Tauri build", present: ["VITE_SUPABASE_URL",
+    env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ? "VITE_SUPABASE_PUBLISHABLE_KEY" : "VITE_SUPABASE_ANON_KEY",
+    ...(!preview ? ["VITE_CALENDAR_BROKER_ORIGIN"] : [])] };
 }
 
 function buildCandidate() {
@@ -206,12 +219,26 @@ function buildCandidate() {
   fs.writeFileSync(config, `${JSON.stringify(overlay, null, 2)}\n`);
   const buildEnvironment = preview ? createPreviewBuildEnvironment(process.env) : createReleaseBuildEnvironment(process.env);
   run("npm", ["run", "build"], desktop, buildEnvironment);
-  verifyBuiltPublicAuth(buildEnvironment);
+  const frontendPublicConfiguration = verifyBuiltPublicConfiguration(buildEnvironment);
   run("npm", ["exec", "--", "tauri", "build", "--ci", "--target", RELEASE_TARGET, "--config", config], desktop,
     buildEnvironment);
   const bundle = path.join(native, "target", RELEASE_TARGET, "release", "bundle");
-  if (preview) stagePreview(bundle, directory);
-  else writeReport(verify(bundle), directory);
+  if (preview) stagePreview(bundle, directory, frontendPublicConfiguration);
+  else {
+    // Tauri notarizes and staples the app before creating and signing its DMG.
+    const dmg = exactlyOne(path.join(bundle, "dmg"), ".dmg");
+    const credentials = process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID
+      ? ["--apple-id", process.env.APPLE_ID, "--password", process.env.APPLE_PASSWORD, "--team-id", process.env.APPLE_TEAM_ID]
+      : ["--key", process.env.APPLE_API_KEY_PATH, "--key-id", process.env.APPLE_API_KEY, "--issuer", process.env.APPLE_API_ISSUER];
+    let status;
+    try {
+      // Capture credential-bearing subprocess output; never relay it or parser errors to logs.
+      status = JSON.parse(capture("xcrun", ["notarytool", "submit", dmg, ...credentials, "--wait", "--output-format", "json"]))?.status;
+    } catch { throw new Error("The DMG notarization submission failed or returned invalid JSON."); }
+    if (status !== "Accepted") throw new Error("Apple did not accept the DMG notarization submission.");
+    run("xcrun", ["stapler", "staple", dmg]);
+    writeReport(verify(bundle, frontendPublicConfiguration), directory);
+  }
 }
 
 try {

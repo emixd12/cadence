@@ -20,8 +20,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://*.supabase.co https://cadence-blush-three.vercel.app; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'",
-      "devCsp": "default-src 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:4321 http://127.0.0.1:4322 http://127.0.0.1:4323 http://127.0.0.1:4324 http://127.0.0.1:4325 http://127.0.0.1:4326 http://127.0.0.1:4327 http://127.0.0.1:4328 http://127.0.0.1:4329 http://127.0.0.1:4330 ws://127.0.0.1:4321 ws://127.0.0.1:4322 ws://127.0.0.1:4323 ws://127.0.0.1:4324 ws://127.0.0.1:4325 ws://127.0.0.1:4326 ws://127.0.0.1:4327 ws://127.0.0.1:4328 ws://127.0.0.1:4329 ws://127.0.0.1:4330 https://cadence-blush-three.vercel.app; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost https://*.supabase.co https://cadence-blush-three.vercel.app https://app.cadence-me.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'",
+      "devCsp": "default-src 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:4321 http://127.0.0.1:4322 http://127.0.0.1:4323 http://127.0.0.1:4324 http://127.0.0.1:4325 http://127.0.0.1:4326 http://127.0.0.1:4327 http://127.0.0.1:4328 http://127.0.0.1:4329 http://127.0.0.1:4330 ws://127.0.0.1:4321 ws://127.0.0.1:4322 ws://127.0.0.1:4323 ws://127.0.0.1:4324 ws://127.0.0.1:4325 ws://127.0.0.1:4326 ws://127.0.0.1:4327 ws://127.0.0.1:4328 ws://127.0.0.1:4329 ws://127.0.0.1:4330 https://cadence-blush-three.vercel.app https://app.cadence-me.com; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
     }
   },
   "bundle": {

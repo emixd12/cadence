@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.application-identifier</key>
+  <string>HK26VT477G.app.cadence.desktop</string>
+  <key>com.apple.developer.team-identifier</key>
+  <string>HK26VT477G</string>
+  <key>keychain-access-groups</key>
+  <array>
+    <string>HK26VT477G.app.cadence.desktop</string>
+  </array>
+</dict>
+</plist>
