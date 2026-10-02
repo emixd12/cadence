@@ -24,10 +24,15 @@ test("native probes validate input and replace stable IDs", async () => {
   expect(invoke.mock.calls[1][1]).toEqual(invoke.mock.calls[0][1]);
 });
 
-test("cancellation includes delivered-only IDs, deduplicates overlaps, and preserves read failures", async () => {
+test("cancellation includes only probe IDs, deduplicates overlaps, and preserves read failures", async () => {
   for (const [pending, delivered, ids] of [
     [["cadence-spike.1", "cadence-spike.2"], ["cadence-spike.2", "cadence-spike.3"], ["cadence-spike.1", "cadence-spike.2", "cadence-spike.3"]],
     [[], ["cadence-spike.delivered-only"], ["cadence-spike.delivered-only"]],
+    [["cadence.local.00000000-0000-4000-a000-000000000010", "cadence-spike.1"],
+      ["cadence-spike.1", "cadence-spike.delivered-only", "cadence.local.00000000-0000-4000-a000-000000000020"],
+      ["cadence-spike.1", "cadence-spike.delivered-only"]],
+    [["cadence.local.00000000-0000-4000-a000-000000000010"],
+      ["cadence.local.00000000-0000-4000-a000-000000000020"], []],
     [[], [], []],
   ]) {
     invoke.mockReset();

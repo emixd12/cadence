@@ -124,19 +124,23 @@ async function reconcile(now: Temporal.Instant): Promise<LocalReminderResult> {
   // Keep already delivered reminders for unresolved active Occurrences, even after their fire time.
   // Resolution, archival, or deletion retires those Notification Center entries too.
   const retainedDeliveredIds = new Set(occurrences.filter((row) => row.status === "unresolved" && reminderBehaviorIds.has(row.behavior_id)).map(({ id }) => `cadence.local.${id}`));
-  const obsoleteIds = new Set([
+  const obsoletePendingIds = new Set([
     ...state.reminders.filter((row) => row.status === "cancelled").map((row) => row.request_id),
     ...(pending ?? []).filter(({ id }) => owned(id) && (!allowed || !desiredIds.has(id))).map(({ id }) => id),
+  ]);
+  const obsoleteDeliveredIds = new Set([
+    ...state.reminders.filter((row) => row.status === "cancelled" && (!allowed || !retainedDeliveredIds.has(row.request_id))).map((row) => row.request_id),
     ...delivered.filter(({ id }) => owned(id) && (!allowed || !retainedDeliveredIds.has(id))).map(({ id }) => id),
   ]);
   try {
-    await cancel([...obsoleteIds]);
+    await cancel([...obsoletePendingIds], "cancelPending");
+    await cancel([...obsoleteDeliveredIds]);
     if (allowed && !failure) {
       // Keep matching requests in place. Replace only changed or absent requests.
       const before = assessNativeReminderCoverage({ ...context, pending });
       const missing = new Set(before.missingIds);
       await schedule(requests.filter(({ id }) => missing.has(id)));
-      let readback = await readSettledReminderState(context, obsoleteIds);
+      let readback = await readSettledReminderState(context, obsoletePendingIds, obsoleteDeliveredIds);
       pending = readback.pending;
       const first = assessNativeReminderCoverage({ ...context, pending });
       const retainedCount = new Set(pending.filter(({ id }) => desiredIds.has(id)).map(({ id }) => id)).size;
@@ -146,20 +150,22 @@ async function reconcile(now: Temporal.Instant): Promise<LocalReminderResult> {
         const nearest = selectNativeReminderRequests({ ...context, capacity: retainedCount });
         const nearestIds = new Set(nearest.map(({ id }) => id));
         const fartherIds = pending.filter(({ id }) => owned(id) && !nearestIds.has(id)).map(({ id }) => id);
-        await cancel(fartherIds);
-        for (const id of fartherIds) obsoleteIds.add(id);
+        await cancel(fartherIds, "cancelPending");
+        for (const id of fartherIds) obsoletePendingIds.add(id);
         const missingIds = new Set(first.missingIds);
         await schedule(nearest.filter(({ id }) => missingIds.has(id)));
-        readback = await readSettledReminderState(context, obsoleteIds);
+        readback = await readSettledReminderState(context, obsoletePendingIds, obsoleteDeliveredIds);
         pending = readback.pending;
       }
       delivered = readback.delivered;
     } else {
-      const readback = await readSettledReminderState(context, obsoleteIds, false);
+      const readback = await readSettledReminderState(context, obsoletePendingIds, obsoleteDeliveredIds, false);
       pending = readback.pending;
       delivered = readback.delivered;
     }
-    if ([...pending, ...delivered].some(({ id }) => obsoleteIds.has(id))) throw new Error("macOS retained a cancelled reminder. Reconcile again.");
+    if (pending.some(({ id }) => obsoletePendingIds.has(id)) || delivered.some(({ id }) => obsoleteDeliveredIds.has(id))) {
+      throw new Error("macOS retained a cancelled reminder. Reconcile again.");
+    }
   } catch (error) { failure = message(error); }
   const reason = failure ?? (!allowed ? "Notification permission is not enabled." : null);
   const coverage = assessNativeReminderCoverage({ ...context, pending: reason ? null : pending });
@@ -214,7 +220,7 @@ function requirePending(result: Awaited<ReturnType<typeof notifications>>) {
   if (!result.pending) throw new Error("Pending reminder readback is unavailable.");
   return result.pending;
 }
-async function readSettledReminderState(context: Omit<Parameters<typeof assessNativeReminderCoverage>[0], "pending">, obsoleteIds: Set<string>, verifyCoverage = true) {
+async function readSettledReminderState(context: Omit<Parameters<typeof assessNativeReminderCoverage>[0], "pending">, obsoletePendingIds: Set<string>, obsoleteDeliveredIds: Set<string>, verifyCoverage = true) {
   let pending: NativeReminderPendingRequest[] = [];
   let delivered: DeliveredReminder[] = [];
   let previous: string | undefined;
@@ -230,14 +236,14 @@ async function readSettledReminderState(context: Omit<Parameters<typeof assessNa
     const fingerprint = JSON.stringify(pending.filter(({ id }) => owned(id)).map(({ id, fireAt, title, body }) => [id, fireAt, title, body]).sort(([left], [right]) => left!.localeCompare(right!)));
     stable = fingerprint === previous;
     previous = fingerprint;
-    const cancelled = ![...pending, ...delivered].some(({ id }) => obsoleteIds.has(id));
+    const cancelled = !pending.some(({ id }) => obsoletePendingIds.has(id)) && !delivered.some(({ id }) => obsoleteDeliveredIds.has(id));
     if (cancelled && (!verifyCoverage || assessNativeReminderCoverage({ ...context, pending }).status === "complete")) break;
   }
   return { pending, delivered, stable };
 }
-async function cancel(ids: string[]) {
+async function cancel(ids: string[], operation: "cancel" | "cancelPending" = "cancel") {
   for (let index = 0; index < ids.length; index += 512) {
-    await notifications({ operation: "cancel", ids: ids.slice(index, index + 512) });
+    await notifications({ operation, ids: ids.slice(index, index + 512) });
   }
 }
 async function schedule(requests: NativeReminderRequest[]) {
