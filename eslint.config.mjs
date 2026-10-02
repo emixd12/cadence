@@ -7,6 +7,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   globalIgnores([
     ".agents/**",
+    ".local/**",
     ".astro/**",
     "**/.astro/**",
     ".next/**",

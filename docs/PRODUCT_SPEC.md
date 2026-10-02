@@ -680,6 +680,21 @@ labeled as calculated, withdrawn at expiry, and never passed to the model.
 Ticket 174 verifies useful wording, supported timing and reliable delivery on web
 and linked desktop. Native mobile and marketing implementation remain out of scope.
 
+### Owner evaluation target (Ticket 184)
+
+The September 30 criteria define candidate evaluation, not current production acceptance.
+Daily Brief should provide actionable adherence analysis and day planning from
+available authorized evidence, with a general one-minute cap on the complete read.
+Quiet days prioritize supported longitudinal insights. Prefer varied lanes across
+days; persistent high-impact patterns may warrant repeated advice. Keep wording
+concise and precise. A future reading-length setting remains unimplemented.
+
+Evaluation uses named coverage profiles with retained revisions and separate run
+iterations. The initial `daily-brief-balanced@1` has six tuning cases, ten reserved
+cases and one seven-day sequence. See the owner packet and existing workbench QA
+record for exact cases, criteria and iteration state. Existing consent, evidence,
+read-only and production-promotion boundaries still apply.
+
 ### Internal recipe workbench (Tickets 151–158)
 
 The owner requested tickets for an internal control surface to tune tone, scope,

@@ -1012,9 +1012,11 @@ Ticket 140 is complete. Ticket 141 remains in progress until Google's decision
 covers the actual client/scopes and post-approval web/native smoke checks pass.
 Owner Privacy approval, technical acceptance, and provider approval remain distinct.
 Emiliano Bache Rodriguez monitors info@identityscaffolding.com. Task heartbeat
-`cadence-google-review-follow-up` checks Verification Center daily at 09:00 local,
-notifies only for meaningful changes or required participation, and does not read
-or monitor that inbox. Private reviewer correspondence must stay out of git.
+`cadence-google-review-follow-up` previously checked Verification Center daily at
+09:00 local. The owner requested disabling it on September 28 after Google approval;
+the app confirmed `PAUSED`. It did not read or monitor that inbox. Ticket 141's
+one-time post-approval web/native smoke checks remain outstanding. Private reviewer
+correspondence must stay out of git.
 
 Final documentation checks passed: `agents:check`, `interactions:check`,
 `resolvers:check`, and `git diff --check`. No new runtime change required another
@@ -1094,6 +1096,14 @@ private content. No alternate route was used to bypass that rejection. The exist
 September 26 provider evidence above is preserved; this automation obtained no new
 provider decision and changed no configuration, scopes, callbacks, or rollout gates.
 
+September 27 and 28 scheduled follow-ups: Computer Use again reported the Identity
+Scaffolding Chrome session unavailable; the browser inventory contained no matching
+profile. Today's provider status is not verified. The recorded September 26 check
+remains the latest provider evidence. The existing request to open the signed-in
+Chrome profile remains outstanding. No configuration, scopes, callbacks, or rollout
+gates changed. No inbox was read and no correspondence was sent. Ticket 141 remains
+in progress pending post-approval smoke checks. `git diff --check` passed.
+
 Data Access lists `calendar.events.readonly` with **This scope is verified**.
 The unchanged non-sensitive declarations are `calendar.calendarlist.readonly`
 and `openid`. The restricted-scope list is empty. Clients lists one web client,
@@ -1113,3 +1123,84 @@ post-approval release work; this read-only provider check deploys nothing.
 
 Verification for this evidence-only update: `git diff --check` passed. Runtime
 code did not change, so runtime tests and builds were not rerun.
+
+## Production Calendar pending-state audit — September 27, 2026
+
+The source audit found and corrected malformed persisted-state acceptance.
+Installed production Calendar acceptance remains unverified by this audit.
+This section preserves all earlier provider and installed acceptance records.
+
+`DesktopCalendarConnection` stores `accountId`, a random state, and `createdAt`
+in the fixed `pending-calendar-state` entry before requesting the broker URL.
+The native adapter uses the Data Protection Keychain for production builds.
+It disables synchronization and uses `AfterFirstUnlockThisDeviceOnly`.
+The Rust allowlist admits this key; `auth.m` required no change.
+
+`complete()` removes pending state before validation and a broker connection read.
+Cancellation, browser-open failure, Calendar disconnect, and account cleanup remove
+the entry. Account cleanup also clears the separate disposable Calendar cache.
+Same-account restart can complete an unfinished attempt only within five minutes.
+The callback requires the current Cadence account and the saved random state.
+Sequential replay cannot reuse consumed or cancelled pending state.
+
+Two synthetic regressions failed before the correction. A missing `createdAt`
+bypassed both age comparisons. A null state matched an absent callback state.
+The shared parser now requires nonnull pending data, nonempty string state,
+and a finite numeric timestamp. Both regressions reject before broker access.
+Both regressions also verify pending-state removal. No Google token or source
+event crosses this parser; the server still owns consent and credentials.
+
+Source references: `apps/desktop/src/calendar/google-calendar.ts`,
+`apps/desktop/src/account/auth.ts`, `apps/desktop/src-tauri/src/auth.rs`, and
+`apps/desktop/src-tauri/native/auth.m`. Regression and lifecycle evidence lives
+in `tests/desktop-calendar.test.ts`. Hook/account evidence lives in
+`tests/desktop-calendar-hook.dom.test.tsx`, `tests/desktop-auth.test.tsx`, and
+`tests/desktop-auth-upgrade.test.ts`.
+
+### Installed acceptance matrix
+
+Only the parent agent controls the installed app and browser during acceptance.
+These actions remain pending until an installed result records the exact candidate.
+Preserve the protected database, rollback app, and current Calendar selection first.
+Record labels, counts, presence booleans, and integrity comparisons only.
+Keep account identifiers, Calendar labels, URLs, states, and credentials outside git.
+
+| Native path and action | Required observable evidence |
+|---|---|
+| Settings → Google Calendar → Refresh Calendar | Connected status, selected-calendar count, successful refresh, and Calendar markers. |
+| Settings → Google Calendar → Connect Google Calendar; cancel Google consent in the browser | Return callback, disconnected status, and no pending state or newly cached events. |
+| Start consent; quit and reopen Cadence; complete consent within five minutes | Same-account connection, selected list, consumed pending state, and unchanged tracking fingerprints. |
+| Repeat a consumed callback through the native handler | Rejection without another accepted callback, changed account, or cache mutation. Never record callback URLs. |
+| Finish an expired attempt after five minutes | Rejection and cleared pending state; a fresh connect remains available. |
+| Settings → Google Calendar → Disconnect Google Calendar | Disconnected status, zero cached Calendar markers, cleared pending state, and factual revocation outcome. |
+| Settings → Account → disconnect while keeping the local copy | Local mode, empty local Calendar cache, removed pending state, and preserved tracking fingerprints. Global Calendar connection remains separate. |
+| Reconnect the original account and restore the original Calendar selection | Current account data, current Calendar refresh, matching tracking fingerprints, SQLite integrity, and foreign-key checks. |
+
+The connected panel exposes Save, Refresh, and Disconnect. Connect appears only
+when disconnected or reconnection is required. The panel has no native Calendar
+Cancel button; cancellation uses the browser's consent flow or account cleanup.
+
+Candidate `0.1.1-rc.1` can establish legitimate production Keychain lifecycle
+evidence. A read-only comparison confirms its source lacks this parser correction.
+The correction requires a later reviewed build for final distribution acceptance.
+Synthetic tests do not prove installed Keychain persistence or callback delivery.
+
+### Verification and remaining gates
+
+Node `24.19.0` ran four focused test files: 34 passed.
+Coverage includes malformed records, state/account mismatch, expiry, future time,
+instance restart, sequential replay, cancellation, browser failure, and account cleanup.
+Focused ESLint, desktop TypeScript, `agents:check`, `interactions:check`, and
+`resolvers:check` passed. Full repository checks belong to the parent task's final
+verification. No native rebuild, provider call, live Keychain/SQLite operation,
+or UI control ran during this source audit.
+
+The latest recorded Google decision remains the September 26 approval evidence.
+This audit obtained no fresh provider status. Google sensitive-scope approval
+does not close post-approval web/native smoke checks, Ticket 137's controlled
+provider-failure/Workspace and installed fixture cases, or Ticket 115's Apple gates.
+The September 27 signed-in browser-session blocker remains recorded above.
+
+Platform impact: desktop owns this parser correction. Web consent and broker
+behavior require no source change. Marketing needs no new capability claim.
+Future native mobile remains deferred under the existing shared Calendar contract.

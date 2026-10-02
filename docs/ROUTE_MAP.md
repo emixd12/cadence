@@ -225,3 +225,15 @@ settings revision, earliest expiry, and endpoint-free travel evidence. The servi
 rechecks settings, Behavior and Occurrence revisions, and Calendar connection and
 event revisions before and after provider work. It makes no tracking, Calendar, Behavior, Occurrence, or
 Daily Brief mutation.
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.

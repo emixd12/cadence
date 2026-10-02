@@ -1,5 +1,5 @@
 {
-  "version": "1.5",
+  "version": "1.6",
   "scope": "Briefing workbench",
   "terms": [
     {
@@ -2398,7 +2398,8 @@
       ],
       "relatedIds": [
         "workbench.result.ready",
-        "workbench.result.error"
+        "workbench.result.error",
+        "workbench.result.cancelled"
       ]
     },
     {
@@ -2560,11 +2561,11 @@
       "id": "workbench.comparison-budget",
       "label": "Comparison budget",
       "category": "Workbench",
-      "definition": "A comparison runs up to two sequential attempts. Both modes share one process-local limit: six comparison starts per server hour and one in flight. Restarting development resets it.",
+      "definition": "All workbench tabs share a process-local provider-call budget: 100 dispatched calls per rolling hour by default, with at most two provider calls active. Failed, timed-out and dispatched cancelled calls count. Undispatched reservations are released. Production admission stays separate.",
       "contracts": [
         {
-          "path": "lib/services/briefing-workbench.service.ts",
-          "symbol": "runBriefingComparison"
+          "path": "lib/services/briefing-bench-budget.ts",
+          "symbol": "createBriefingBenchBudget"
         }
       ],
       "relatedIds": [
@@ -3012,7 +3013,7 @@
       "id": "workbench.error.comparison-limit",
       "label": "comparison_limit",
       "category": "Workbench",
-      "definition": "The shared hourly comparison budget is exhausted. Synthetic requests report this code; account requests use rate_limited.",
+      "definition": "The sequence budget or shared provider-call budget cannot reserve the planned calls. No rejected reservation dispatches a model call. Ordinary account comparisons report rate_limited.",
       "contracts": [
         {
           "path": "lib/services/briefing-workbench.service.ts",
@@ -4526,6 +4527,98 @@
       ],
       "relatedIds": [
         "workbench.error"
+      ]
+    },
+    {
+      "id": "workbench.result.cancelled",
+      "label": "Cancelled attempt",
+      "category": "Workbench",
+      "definition": "Cancellation stopped an attempt before a validated result was retained. Earlier successful outputs and their feedback remain available; already dispatched calls still count.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-workbench.service.ts",
+          "symbol": "runBriefingComparison"
+        }
+      ],
+      "relatedIds": [
+        "workbench.result",
+        "workbench.comparison-budget"
+      ]
+    },
+    {
+      "id": "workbench.evidence.captured",
+      "label": "Captured evidence",
+      "category": "Workbench",
+      "definition": "Inputs retained during an actual authorized capture. Replay uses that captured clock with current authorization.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-bench-store.ts",
+          "symbol": "BenchCase"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.saved"
+      ]
+    },
+    {
+      "id": "workbench.evidence.retrospective",
+      "label": "Retrospective evidence",
+      "category": "Workbench",
+      "definition": "Current retained records evaluated at a past logical clock. Later changes and missing history prevent an as-of reconstruction.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-bench-store.ts",
+          "symbol": "BenchCase"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.saved"
+      ]
+    },
+    {
+      "id": "workbench.evidence.reconstructed",
+      "label": "Reconstructed evidence",
+      "category": "Workbench",
+      "definition": "Reserved for a verified as-of history with effective, recorded and ingestion cutoffs. Current history exploration never emits this label.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-bench-store.ts",
+          "symbol": "BenchCase"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.saved"
+      ]
+    },
+    {
+      "id": "workbench.evidence.synthetic",
+      "label": "Synthetic evidence",
+      "category": "Workbench",
+      "definition": "Authored fixture inputs shifted to an explicit evaluation clock. These inputs do not describe an account or past provider history.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-bench-store.ts",
+          "symbol": "BenchCase"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.saved"
+      ]
+    },
+    {
+      "id": "workbench.fixture.overnight",
+      "label": "overnight fixture",
+      "category": "Workbench",
+      "definition": "A synthetic Calendar interval begins at 23:00 on the target date and ends at 02:00 the next local day. The planner must preserve the midnight boundary.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-fixtures.ts",
+          "symbol": "briefingFixture"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.synthetic",
+        "planner.day-evidence"
       ]
     }
   ]

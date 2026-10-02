@@ -482,3 +482,14 @@ Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
 
 No component, API route, provider adapter or prompt computes rates, fits or travel
 intervals. These tickets add no connector registry, new connector or agent runtime.
+
+### Historical workbench evaluation (Tickets 182–183)
+
+`lib/services/briefing-history.service.ts` composes existing authenticated repositories,
+`projectAdvisorCadenceSource`, `resolveBehaviorDurationSources`, and the existing
+briefing pipeline for explicitly Retrospective evaluation. Synthetic fixtures shift
+calendar dates through Temporal. It does not infer as-of status/Note state or bypass
+production snapshot restrictions. `briefing-sequence.service.ts` uses the pipeline
+for no-model selection and delegates validated generation to the comparison service.
+Components render coverage and decisions; they do not calculate domain findings.
+Focused history, sequence, budget and Days tests own these adapters.

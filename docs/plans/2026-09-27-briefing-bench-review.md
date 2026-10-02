@@ -1,6 +1,11 @@
 # Briefing bench: audit and revised proposal
 
-Prepared September 27, 2026. Status: proposal for review, not an implementation instruction.
+Prepared September 27, 2026. This document preserves the audited proposal.
+Execution status: Tickets 175–177 implement Phases 0–2. The September 28 review
+filed Phases 3–5 as Tickets 182–184. Ticket 185 owns the separate stored-brief
+decision. `docs/TICKETS.md` and `STATUS.md` govern current scope and progress.
+The September 30 criteria in `2026-09-28-briefing-owner-review.md` supersede this
+proposal's 45-second target and quiet-day/repetition guidance for Ticket 184.
 
 **Recommendation:** Build the visual comparison and prose-feedback loop before expanding historical replay.
 

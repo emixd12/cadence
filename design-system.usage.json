@@ -1306,10 +1306,18 @@
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
+    },
+    {
+      "componentId": "module.daily-brief-bubble",
+      "file": "tests/daily-brief-bubble-presentation.test.tsx",
+      "line": 66,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
     }
   ],
   "summary": {
-    "productUsages": 154,
+    "productUsages": 164,
     "benchPreviews": 0
   }
 }

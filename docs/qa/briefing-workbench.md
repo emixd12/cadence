@@ -650,8 +650,9 @@ for Behaviors outside the configured scope. The word-limit instruction names tip
 Source: `docs/plans/2026-09-27-briefing-bench-review.md`, Phases 0–2. The owner
 authorized full account capture for local reviews (Decision 2026-09-27).
 
-### Editorial target
+### Original editorial target
 
+The September 30 owner criteria below supersede this earlier target for Ticket 184.
 Review the complete rendered brief, not individual fields.
 
 - The opening explains what matters today, beyond the visible Timeline.
@@ -725,5 +726,171 @@ cancellations. A failed write shows "Not saved" and keeps the visible result.
 ### Remaining gates
 
 - Owner review of real account comparisons through this workflow.
-- Plan Phases 3–5 (historical days, sequence and lane-preview batches with call
-  budgets, promotion) are not ticketed or implemented.
+- Plan Phases 3–4 are implemented under Tickets 182–183 below. Phase 5 remains owner-gated under Ticket 184.
+- Ticket 185 records the separate stored-brief product decision; it does not authorize implementation.
+
+### Review corrections — September 28, 2026
+
+The owner requested a review of Tickets 175–177 and fixes before filing the remaining
+plan. Six new DOM regressions reproduced lost rerun output, feedback attached to the
+wrong pair, edits lost during saving, reused candidate metadata, and stale case/list
+responses. Those regressions now pass. Additional checks cover unchanged timing
+metadata with changed output text and collapsed configuration controls.
+
+- Draft comments belong to a case and exact A/B run pair. Changing B or opening a
+  different case cannot reuse a comment accidentally. Saving preserves the selected
+  older run and any edits made while the request was pending.
+- Source/account changes and authorization failures clear private drafts and fence
+  late reads or writes. An unsaved candidate rerun stays visible beside its baseline; feedback cannot silently
+  attach to the previous saved output. Configuration starts collapsed.
+- Current access checks run before each saved-account dispatch and before ready
+  output is stored. New account captures also recheck before storage. Revocation or
+  context changes stop subsequent dispatches and retain only withheld failure metadata.
+  Calendar replay also matches current connection/selection revisions to the captured
+  connector. Missing capture metadata refuses replay; renewed consent cannot authorize
+  a case captured from a different Calendar selection.
+- Every case read or write enforces the 30-day expiry. Access removes expired files;
+  this local tool has no cleanup worker while closed. Non-missing storage failures
+  surface as failures instead of silently returning an empty feedback list.
+- Reusing a candidate ID requires identical configuration and lineage metadata.
+  Configuration proposals pass the existing configuration parser before listing.
+- Mechanics warnings exempt only complete Behavior-title occurrences, while flagging
+  the same mechanics word elsewhere. This remains a wording diagnostic, not semantic
+  proof; a one-word title can still be ambiguous.
+- Shared presentation helpers align quote validation with overview, suggestions,
+  option, source, tip/evidence, generated-time and warning text. Times now use en-US
+  formatting in the briefing timezone on web and linked desktop. Bubble geometry,
+  evidence and production freshness remain unchanged. The workbench has no travel
+  input; this review does not add travel capture.
+
+Tickets 182–184 cover historical days, sequence/lane review and owner-reviewed
+promotion. Ticket 185 owns the separate stored-brief decision. Actual advice quality
+still needs owner review; contract tests do not establish useful model prose.
+
+Verification on Node 24.19.0: agents, interactions, resolvers, core portability,
+design-system, lint, TypeScript, desktop typecheck/build and web build pass. The
+full suite passes 2,467 tests with 29 skips using two workers. The initial run had
+one desktop release-test timeout under default concurrency; its 46 tests passed
+separately. The workbench has 40 passing DOM tests, including review authorization
+failures and late account refresh. Calendar replay and multi-source quotation
+regressions also pass in the full suite.
+
+Concurrent release work created a copied checkout under `.local`. Tests, lint and
+TypeScript now exclude that local artifact directory. Verification restarted after
+the copied tests entered one run; no release artifact was modified.
+
+Browser QA used a dedicated `127.0.0.1:4321` session with the model key disabled.
+At 1440 px, A and B each measured 608 px and shared their vertical start. At 390 px,
+each measured 358 px and stacked in order. Both widths had no horizontal overflow.
+Configuration starts closed; keyboard Tab moves from Candidate name to Candidate
+rationale. The static long-text bubble wraps, and an explicit run shows
+`not_configured`. No account data or provider generation was used. Saved-result and
+feedback behavior used DOM/service tests with synthetic records. Installed desktop
+and actual model wording were not re-evaluated in this review.
+
+Inventory/usage scans retain the existing catalog and bench exclusions; the new
+presentation test adds one usage. Unrelated discovered mappings remain outside this
+fix. The first independent review returned `fix-first`: Calendar replay lacked its
+connection/selection checks, copied source links lacked matching text separators,
+and review authorization failures left private previews visible. All three now have
+corrections and regression coverage. A late account refresh also cannot restore the
+cleared account labels. A fresh independent read-only review returned `ship` with no
+actionable findings. That reviewer inspected the final corrections and ticket coverage;
+automated and browser verification evidence came from the parent runs recorded above.
+
+
+### Tickets 182–185 — September 28, 2026
+
+Tickets 182–183 implement historical and consecutive-day review. Tickets 184–185
+have a prepared owner packet at `docs/plans/2026-09-28-briefing-owner-review.md`.
+No owner criteria, quality acceptance, production promotion or stored-brief decision
+is inferred. No private account read or actual model generation ran in this task.
+
+Historical evidence:
+
+- `briefing-history.service.ts` supplies guarded development GET/POST routes. It uses
+  existing authenticated repositories and the shared pipeline, without migrations.
+  Defaults are 14 prior days and 07:00 in an explicit timezone; targets cap at 90 days.
+- Retained account state is Retrospective, including later imports, corrections and
+  late creation. Reconstructed remains unavailable. Live time fences authorization,
+  cancellation and 30-day local retention. Evaluation uses the selected clock.
+- Missing dates and targets above 200 occurrences cannot save. Existing reads paginate
+  and fail above 100,000 rows. Original completion counts, elapsed history and past
+  timezone state stay unknown; historical Notes and reminders are omitted.
+- Retained analysis applies existing 10,000/20,000/2,000 row caps. Calendar reads use
+  separate current consent and bounded 31-day chunks. Per-day coverage cannot exceed
+  the provider's actual range. Past Calendar does not enable historical pattern analysis.
+- The pipeline's restrictive historical coverage flag prevents free-time claims from
+  incomplete historical Cadence schedules. Production defaults preserve existing behavior.
+
+Sequence evidence:
+
+- `briefing-sequence.service.ts` plans before generation, derives diagnostic lanes from
+  contracts, validates one case per date, and maintains separate A/B tip history.
+  Simulation assumes selected tips were delivered; generation retains successful tips.
+- `briefing-bench-budget.ts` shares reservations and two provider permits across tabs.
+  Queued calls recheck consent after obtaining a permit. Timeout keeps a permit until
+  the actual provider settles. Cancellation releases undispatched reservations.
+- Failed, rejected, partial and cancelled attempts remain reviewable. Storage failures
+  keep text visible as Not saved. Sequence reports include exact text, reading burden,
+  repeated lane signals, exact feedback counts and failures without grading quality.
+- Tests cover chronology/cooldown, stable fingerprints, empty warm-up, budget/concurrency,
+  timeout, retry, cancellation, storage failure, revocation, partial output, historical
+  gaps, DST/lookback edges, compatibility and per-case feedback drafts.
+
+Browser QA used a dedicated `127.0.0.1:4321` Codex session and synthetic data only.
+The no-model grid showed 14 days. Saving September 14 and 15 produced two selected
+cases. Planning showed four daily-brief calls. Diagnostic planning showed zero calls
+for configurations without eligible lanes and disabled generation. The local report
+was written successfully. Exact feedback prose survived Compare → Days navigation.
+At 1440 px, A/B measured 608 px each and aligned vertically. At 390 px, they measured
+358 px and stacked A above B. Neither viewport overflowed horizontally. Keyboard Tab
+moved from Days to Saved reviews with a visible focus ring. Browser error logs were empty.
+Cancellation/provider behavior used mocked service and DOM checks, not live calls.
+
+Implementation files: `app/design-system/BriefingDays.tsx`, `DailyBriefBench.tsx`,
+`BriefingReview.tsx`; the history/sequence routes; history/sequence/budget services;
+workbench/review/store/pipeline services and the existing Calendar service. Governance,
+route, date/time, design and glossary docs use the existing interaction exclusions.
+No public interaction, desktop surface or marketing claim was added.
+
+Verification on Node 24: the final full suite passed 2,519 tests with 29 existing
+opt-in skips (`npm run test -- --maxWorkers=2 --testTimeout=30000`). Default-timeout
+runs hit existing desktop subprocess checks under load. The final run retains two
+workers and a 30-second test timeout, matching the recorded release-check allowance.
+The initial sandboxed run could not bind local fake-provider/Unix sockets; final
+acceptance allowed those local sockets. Core portability, design-system governance,
+desktop typecheck/build, lint, web TypeScript and web build pass. No migration ran.
+The final shared-source and overnight regressions are included in that suite.
+Independent review found an invalid fixture checksum that omitted its frozen copy.
+The corrected packet now matches all 18 current sources, frozen copies and manifest
+entries. A fresh review then found stale cancellation/report failures clearing newer
+drafts, and saving another day leaving the previous selection plan executable.
+Lifecycle guards and plan invalidation correct both defects. Three DOM regressions
+failed before the correction and pass afterward. After final verification, a fresh
+independent read-only review returned `ship` with no actionable findings. The reviewer
+checked the corrections, source freeze and recorded test evidence. Private-account
+acceptance, model quality, owner decisions, promotion, rollback and release remain open.
+The local workbench returned HTTP 200 after restarting on `127.0.0.1:4321`.
+
+
+### Ticket 184 criteria and coverage profile — September 30, 2026
+
+The owner accepted actionable adherence analysis and day planning from available,
+authorized evidence. The full brief should generally fit a one-minute read with
+concise, precise wording. Quiet days prioritize supported longitudinal insights.
+Vary analysis lanes across days; justified reminders about persistent high-impact
+patterns remain useful. Rewording alone does not establish a different insight.
+The accepted criteria and exact profile definition are in
+`docs/plans/2026-09-28-briefing-owner-review.md`.
+
+| Profile | Iteration | Coverage | Evaluation state | Outcome |
+|---|---|---|---|---|
+| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Pending; no new model runs | No candidate accepted |
+
+Future records identify profile revision and iteration separately. Keep exact
+candidate/baseline versions, source freeze, local report references, reading burden,
+repeat rationale and failures with each iteration. Retain prior rows and profile
+revisions. Do not count seven days as seven independent sequence-quality votes.
+This update records criteria and starts the existing workbench; it does not change
+runtime prompts, presets, cooldowns or the production reading policy.

@@ -8291,8 +8291,8 @@ foreign-key checks. The running process started at 00:26:20, after the decision;
 the reopened native UI retained Completed before cleanup. Network disconnection
 was owner-confirmed, not independently observed. Evidence:
 `docs/qa/2026-08-30-desktop-lifecycle-release.md#offline-launch-and-persistence-passed`.
-Ticket 113's preview milestone later completed. Ticket 115 owns deferred Apple-
-trusted distribution requirements.
+Ticket 113's preview milestone later completed. Ticket 115 owns Apple-trusted
+distribution requirements and is in progress.
 
 Acceptance criteria:
 
@@ -8463,12 +8463,24 @@ Only synthetic local data was used. No deployment or hosted data operation ran.
 
 ## Ticket 115: Apple-trusted macOS distribution acceptance
 
-Current state (2026-08-31): deferred. The owner cannot currently access the
-Apple Developer Program or an Apple Silicon Mac running macOS 14. Ticket 113's
-completed unnotarized preview and updater acceptance do not satisfy this ticket.
+Current state (2026-09-27): in progress. The owner authorized every execution step.
+The owner's account page confirms Apple Developer Program membership. The Developer
+ID identity and matching profile are installed; Apple accepted the notarization
+credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
+artifact verification pass; installed acceptance remains open. The owner deferred macOS 14 runtime acceptance without changing
+the declared and compiled minimum. Ticket 113's completed preview does not
+satisfy this ticket. See
+`docs/plans/2026-09-27-apple-developer-unblocked-work.md` for ordered work and
+linked production Keychain, Calendar, and location acceptance.
 
-Dependencies: completed Tickets 107–114, Apple Developer Program access, and a
-suitable macOS 14 Apple Silicon test system.
+September 28 continuation: Tickets 178–181 split the remaining acceptance and
+publication work into executable milestones. Ticket 115 remains the umbrella and
+stays in progress. rc.3 app/DMG notarization, native test-account login and restart,
+Calendar selection/refresh/disconnection, copied-primary launch preservation, and
+closed-app reminder delivery now pass. See `docs/qa/2026-09-27-apple-distribution.md`
+for candidate-specific evidence. Ticket 165 retains location/navigation ownership.
+
+Dependencies: completed Tickets 107–114 and Apple Developer Program access.
 
 Acceptance criteria:
 
@@ -8480,8 +8492,9 @@ Acceptance criteria:
 - Verify stapled notarization for both the app and DMG.
 - Download the notarized DMG, retain quarantine, and pass Gatekeeper installation
   and launch without disabling Gatekeeper or removing quarantine.
-- Execute the production artifact and acceptance matrix on Apple Silicon running
-  macOS 14. A declared or compiled minimum alone does not establish compatibility.
+- Execute the production artifact and acceptance matrix on the current Apple
+  Silicon host. Record the candidate's exact tested macOS version and build.
+  A declared or compiled minimum alone does not establish compatibility.
 - Keep `node apps/desktop/scripts/release.mjs check` and artifact verification
   strict. Do not add a preview bypass or weaken Apple validation.
 - Do not claim notarized or generally available distribution before every item
@@ -8512,10 +8525,16 @@ Platform impact:
 | Marketing | Do not claim notarized or generally available distribution until Ticket 115 passes |
 | Future mobile | Not applicable: macOS distribution does not implement mobile distribution |
 
-Deferred blockers: Apple Developer Program access, Developer ID Application
-certificate/signing identity, notarization credentials, and an Apple Silicon
-Mac running macOS 14. Do not purchase, enroll, generate credentials, notarize,
-publish, or change the existing preview release while this ticket is deferred.
+Membership, Developer ID identity, provisioning, and credential setup are resolved.
+The signed native Keychain probe and final artifact verification pass. Initial
+installed production authentication passes on rc.3; its remaining lifecycle gates
+are in Ticket 178. Quarantined download launch passes on rc.2, not yet on the final
+publication artifact. Tickets 180–181 retain upgrade and final-download acceptance.
+macOS 14 runtime testing is deferred and does not block Ticket 115. Do not
+claim macOS 14 compatibility or support for an untested newer macOS version.
+The September 27 follow-up authorizes plan execution, including credential setup,
+notarization, installed acceptance, and publication after the required gates pass.
+Preserve tool-required credential handoffs and all production acceptance requirements.
 
 ---
 
@@ -8921,7 +8940,7 @@ data preservation, configured-state, and secret acceptance.
 Prove the schema-changing account-sync release through the real updater and a
 multi-client acceptance matrix before making availability claims.
 
-Dependencies: Tickets 117–121. Ticket 115 remains independent and deferred;
+Dependencies: Tickets 117–121. Ticket 115 remains independent and in progress;
 this ticket does not weaken Apple-trusted distribution gates.
 
 Acceptance criteria:
@@ -8944,7 +8963,7 @@ Acceptance criteria:
   owner authorization and through the documented workflows.
 - Update public and marketing copy only after the product matrix passes. State
   eventual synchronization and offline/closed-app limits plainly. Do not claim
-  notarization or general availability while Ticket 115 remains deferred.
+  notarization or general availability while Ticket 115 remains incomplete.
 - Record immutable versions, hashes, updater feed, test systems, backup path,
   hosted migration boundary, and remaining limitations in QA evidence.
 
@@ -11853,16 +11872,17 @@ preserved, and unchanged status/schedule/dismissal flows.
 
 ## Ticket 165: Travel provider and cross-platform release acceptance
 
-Status: in progress; two installed-macOS gates remain. Repository, local database,
+Status: in progress; native device location remains open. Repository, local database,
 public-landmark, deployed-web and private-account acceptance pass (PRs #58–#65,
 September 22–23). Installed macOS passed cold start, account sync, restart
 preservation and a hosted route request on preview.45. Open: native device location
-(Core Location on the owner's Mac silently refuses the ad hoc and self-signed
-Cadence builds as new clients while serving already-authorized Chrome; a machine-level
-condition and an Apple-trusted signing requirement both remain open until a second Mac
-or a Developer ID build under Ticket 115 discriminates them) and native
-navigation handoff (opening a route destination in the selected maps app from the
-installed app is not yet verified). Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.
+(first-Mac rc.2/rc.3 timeout and absent first permission prompt remain unresolved).
+September 29: clean second-Mac rc.3 acquired a current position after the owner
+manually enabled Cadence in Location Services. Initial prompt did not appear.
+Manual grant/retry and foreground acquisition pass; automatic prompting does not. Signed rc.3
+Google Maps search handoff passed September 28: the timed test Calendar event
+opened Central Park in Chrome. Search has no transport mode; directions remain
+unverified. Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.
 Filed September 21, 2026. Reviews begin alongside Tickets 162–164; release follows them.
 
 Goal: establish provider-use, disclosure and runtime evidence for the accepted travel feature.
@@ -11916,13 +11936,23 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | `docs/qa/travel-release.md` records synthetic, hosted runtime and private-account acceptance; Daily Brief stays independent. |
-| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45; native device location and navigation handoff remain open. |
+| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45; native device location remains open; signed Google Maps search handoff passed September 28. |
 | Marketing | `components/settings/LegalContent.tsx` and `docs/user-guide/travel.md` disclose the disabled rollout; public claims need deployed evidence. |
 | Future mobile | Not applicable to native release: native app remains deferred. Mobile-web evidence belongs to web acceptance. |
 
 Verification: required repository checks and applicable platform builds; reviewed
 provider/disclosure evidence; separately authorized live tests; spend/rollback checks.
 Filing this ticket does not create credentials, deploy, read location or transmit private data.
+
+September 28 remaining work: reproduce the signed location request on a second Mac
+or an owner-arranged isolated macOS account. Do not reset TCC or treat the dedicated
+Google test identity as OS isolation. Record permission, denial, timeout and success
+separately without coordinate logs; fix only a demonstrated defect. For navigation,
+use an authorized located Calendar event with a visible Search or Directions action
+and verify its destination/mode in the selected Maps app. A located local Behavior
+without a navigation action is not handoff evidence. Preserve the saved-location
+fallback and record results in `docs/qa/travel-release.md`. Coordinate installed
+access with Tickets 178–181; this remains travel acceptance, not Apple review.
 
 ## Ticket 166: Travel refresh quota, failure messages and device-location onboarding
 
@@ -12623,9 +12653,8 @@ Scope and acceptance:
   Feedback and proposals never become production rules; promotion stays a reviewed
   repository change.
 
-Not in scope (plan Phases 3–5, not yet ticketed): historical day selection and
-reconstruction, sequence and lane-preview batches with call budgets, and candidate
-promotion. Stored daily briefs remain a separate product proposal.
+Remaining plan work: Tickets 182–184 own historical days, sequence and lane-preview
+batches, and promotion. Ticket 185 owns the separate stored-brief product decision.
 
 Implementation references: `lib/services/briefing-review.service.ts`,
 `lib/services/briefing-workbench.service.ts`, `lib/services/daily-brief-consumer.ts`,
@@ -12642,3 +12671,488 @@ Platform impact:
 
 Verification: packet, proposal validation, disposition, same-case rerun, account rerun
 authorization and refusal tests; all required checks.
+
+
+
+## Remaining Apple-trusted release work: Tickets 178–181
+
+Filed September 28, 2026. These tickets decompose Ticket 115; they add no product
+features or new execution authority. Existing completed evidence remains valid only
+for its tested candidate and scenario. Reuse retained rc.3 unless a demonstrated
+defect or the release version requires a new immutable candidate. macOS 14 runtime
+acceptance remains owner-deferred and does not block Ticket 115.
+
+Tickets 178 and 179 can prepare independently. Only one operator may control the
+installed app; serialize live tests and protect the entire primary working directory
+and rollback app. Ticket 180 follows account-transition acceptance. Ticket 181 follows
+178–180 and reconciles the separately owned travel gates in 165. Use existing QA
+records, `interaction-registry.json`, and `docs/DESKTOP_PARITY.md`; do not create a
+second acceptance inventory. Filing these tickets performs no release or live test.
+
+## Ticket 178: Signed account and Calendar lifecycle acceptance
+
+Status: in progress September 28. The dedicated test Calendar contains a
+timed public-landmark fixture with no guests or notifications. The owner selected
+Chrome and confirmed the test account is signed in. Native lifecycle execution
+resumed with isolated data. Notification-independent account checks now pass:
+actual Chrome callback cancellation, Calendar pending-state restart/cleanup,
+timed event rendering, wrong-account rejection, same-account reconnection and
+restart persistence. Classified data preservation passed independent review.
+September 29: the owner passed clean second-Mac offline creation/status/Note,
+restart persistence and reconnection. Chrome showed exactly one matching Behavior
+and matching Completed status and Note. Session renewal and explicit replay/expiry
+remain open.
+Original preview.45, the complete primary directory and reminders were restored.
+Dependencies: Ticket 115's retained notarized candidate; existing
+account-sync and Calendar contracts in Tickets 118–122 and 137.
+
+Goal: prove that the signed app retains account data through reconnection, offline
+use, session renewal, and interrupted Calendar authorization.
+
+Scope and acceptance:
+
+- Carry forward rc.3 login, quit/relaunch persistence, Calendar selection/refresh,
+  disconnection, and sign-out evidence. Do not repeat passed checks without a change
+  that invalidates them.
+- Test preview-to-signed same-account reconnection using protected copied data.
+  Verify stable profile, Notes, statuses, histories, timers, pending writes, cursors,
+  and baselines. A missing production Keychain session must not discard linked data
+  or turn it into an unrelated import. Verify another account cannot take ownership.
+- Verify offline launch and a synthetic offline write, restart, reconnection and
+  synchronization without duplication. Observe session renewal and revoked-session
+  recovery; do not substitute unit mocks for installed lifecycle evidence.
+- Verify Google login cancel/replay handling and the actual browser callback path.
+  Use the owner's selected Chrome browser for test-account login; record any native
+  system-browser limitation explicitly rather than claiming direct handoff passed.
+- Exercise Calendar authorization cancel, app restart while pending, callback
+  replay/expiry, and production Keychain pending-state cleanup. Verify an authorized
+  timed test event renders; an empty calendar range is insufficient evidence.
+- Restore the original app/data and primary reminders after isolated acceptance.
+  Keep credentials out of SQLite, exports, logs and QA notes. Fix only demonstrated
+  defects, then rerun the affected installed checks on the replacement candidate.
+
+References: `docs/qa/2026-09-27-apple-distribution.md`,
+`docs/qa/2026-08-31-desktop-authentication.md`,
+`docs/qa/2026-09-01-desktop-account-sync-release-acceptance.md`,
+`docs/qa/google-calendar-capabilities.md`, `scripts/desktop-release-acceptance.mjs`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing hosted Auth/Calendar services supply test sessions; no web feature change. |
+| Desktop | Installed account/Calendar acceptance under the QA records above. |
+| Marketing | Not applicable: no public claims change; Ticket 181 owns release copy. |
+| Future mobile | Not applicable: native mobile remains deferred. |
+
+Verification: dated installed outcomes with candidate hash, OS/build and cleanup;
+focused auth/Calendar/upgrade regressions for any fix, plus required repository checks.
+Unobserved refresh, replay or offline cases remain open.
+
+## Ticket 179: Signed notification activation and sleep/wake acceptance
+
+Status: complete September 28 on signed rc.3. Notification Center click launched
+Cadence and expanded the exact 15:00 Occurrence. Actual sleep/wake passed with
+process continuity and reconciliation before focus. Permission revocation/recovery,
+truthful limited coverage and synthetic request cleanup passed. Original preview.45,
+the entire primary directory and original settings were restored. Primary OS
+readback verified 96 retained of 433 eligible with the shorter horizon disclosed.
+The owner did not see the initial banner; Notification Center activation is proven.
+Dependency: Ticket 115's retained notarized candidate.
+
+Goal: prove that notification clicks reach the correct Occurrence and real system
+wake renews the reminder schedule accurately.
+
+Scope and acceptance:
+
+- Carry forward rc.3 closed-app delivery and archived-Behavior cancellation evidence.
+  Delivery alone does not establish activation or correct-Occurrence targeting.
+- Schedule a harmless synthetic Occurrence in isolated QA data. Verify its exact
+  OS request, quit Cadence, then click the delivered notification before manually
+  launching Cadence. Verify launch and the correct Occurrence. Coordinate the owner
+  click when Notification Center is unavailable to computer-use tools.
+- Keep Cadence running through owner-coordinated system sleep/wake. Record actual
+  power-event times and process continuity. Inspect reconciliation before focus or
+  manual Refresh can mask a failed wake handler; then verify Settings OS readback.
+- Verify denied/revoked notification permission behavior and truthful limited
+  coverage. A shorter disclosed horizon may pass; inaccurate coverage fails.
+- Archive/cancel only synthetic requests, verify cleanup, and restore primary
+  reminders. Do not run a capacity probe against daily-use requests or consume
+  Product's activation event buffer from a parallel probe.
+
+References: `docs/qa/2026-09-27-apple-distribution.md`,
+`docs/qa/travel-release.md` signed native test procedure, `docs/DESKTOP_BUILD.md`,
+`apps/desktop/src/native-coverage-probe.ts`, `apps/desktop/src/native-spike.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: browser push and email reminders are unchanged. |
+| Desktop | Existing native reminder lifecycle and Occurrence activation; references above. |
+| Marketing | Not applicable: Ticket 181 owns evidence-backed release claims. |
+| Future mobile | Not applicable: native mobile reminders remain deferred. |
+
+Verification: real quit/click and system sleep/wake evidence, OS readback, cleanup,
+and focused lifecycle regressions plus required checks if implementation changes.
+
+## Ticket 180: Real preview-to-signed updater acceptance
+
+Status: complete September 29, 2026. The real ad hoc preview.46→signed rc.3
+updater passed discovery, Install, separate Restart, safe same-account reconnection
+and strict domain preservation. Signed preview.47→rc.4 additionally passed observable
+partial-download failure, Retry, Install and separate Restart on macOS 27.0 build
+26A428 (arm64). All 30 tables pass strict same-schema preservation; three pending
+outbox rows retain every value. Seven reminder identifiers and fire times survive
+the real signed-build updater unchanged. Wrong-signature, tampered-archive and
+unavailable-download cases failed safely in the earlier controlled stages.
+
+Historical source withdrawal confirmed and resolved cross-build capacity competition
+in the protected migration test. Preview.46 subsequently had zero pending requests;
+no unperformed withdrawal is credited. The pending-only cleanup fix passes regression
+review and installed rc.4 checks: closed-app delivery survives reconciliation and
+unverified pending cleanup; resolving the synthetic Occurrence retires only its
+notification. Original delivered history remains intact.
+
+Both new app/DMG candidates pass notarization and all 12 artifact checks. Required
+repository checks, 2,521 default tests, 110 native tests and 20 SQLite contracts pass;
+29 opt-in cases remain skipped. Schema remains 17, so no migration was manufactured.
+The exact original preview.45 app and complete primary data are restored and verified.
+Account data is current, automatic downloads are enabled, and native readback is
+100/434 with no temporary signed requests. All 56 delivered identifiers protected
+at the final test checkpoint remain. The QA feed is restored byte-for-byte to rc.3;
+the public desktop-preview feed never changed. No owner action remains for Ticket 180.
+Evidence: `docs/qa/2026-09-27-apple-distribution.md`, especially the final acceptance
+matrix and protected `acceptance-0.1.1-rc.4/installed-updater-20260929` receipts.
+Final artifact publication remains Ticket 181; broader account lifecycle remains 178.
+
+Dependencies:
+Ticket 178's account-transition evidence and the existing signing/updater keys.
+
+Goal: prove that the actual updater installs a trusted release, preserves data,
+and recovers safely from download or signature failure.
+
+Scope and acceptance:
+
+- The last inspected public feed advertises preview.24, older than preview.45 and
+  rc.3. Prepare a reviewed controlled HTTPS feed and version-compatible signed target
+  through the existing release workflow. Do not replace the public feed merely to
+  make a test discoverable, bypass version comparison, or weaken signature checks.
+- Protect a consistent database snapshot, the complete working directory, and the
+  original app. Exercise the real installed updater from the chosen supported source
+  version; archive extraction/manual replacement is not updater acceptance.
+- Verify update discovery, user-controlled installation and separate restart, then
+  compare profile/content/history, pending outbox/cursors/baselines and reminder
+  reconciliation. Prove safe same-account reconnection if the Keychain path changes.
+- Verify tampered archive/wrong signature rejection and unavailable/interrupted
+  download recovery on controlled assets. The original app/data must remain usable.
+- Record source/target versions, hashes, feed provenance, exact OS/build, preservation
+  report and rollback. Exercise a real migration only if the chosen release changes
+  schema; do not manufacture a schema change for this ticket.
+
+References: `docs/DESKTOP_RELEASE.md`, `apps/desktop/scripts/release.mjs`,
+`scripts/desktop-release-acceptance.mjs`, `tests/desktop-release-signature.test.ts`,
+`docs/qa/2026-09-27-apple-distribution.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable to app behavior; controlled HTTPS artifact hosting only. |
+| Desktop | Existing updater/release workflow and preservation checker above. |
+| Marketing | Not applicable: public download/feed promotion belongs to Ticket 181. |
+| Future mobile | Not applicable: this is the macOS updater. |
+
+Verification: actual updater discovery/install/restart, failure paths, strict artifact
+and crypto checks, database comparison and restoration. Apply required checks to fixes.
+
+## Ticket 181: Final signed-release acceptance and publication
+
+Status: verification in progress September 28; publication remains gated.
+All 76 current migrations replayed cleanly in a separate local project. The real
+authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
+were removed, loopback bindings verified, and the isolated stack stopped while
+preserving existing volumes. The RLS smoke fixture now includes location-aware
+configuration history; no product schema changed. See the existing Apple QA record.
+Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
+Maps-handoff outcomes separately; no location-success claim while that gate is open.
+
+Goal: publish only the exact signed artifact whose installation, runtime, update,
+and rollback evidence is complete and whose limitations are accurately disclosed.
+
+Scope and acceptance:
+
+- Select the final immutable version/source revision and exclude unrelated working
+  changes. If code, configuration or version changes require rebuilding, repeat
+  signing, app/DMG notarization, stapling and affected installed checks. Reuse valid
+  evidence deliberately; rc.2 quarantined launch does not prove a different artifact.
+- Download the final DMG through a browser, retain quarantine, and verify normal
+  installation/Gatekeeper launch without Open Anyway or quarantine removal. Record
+  whether the test uses protected current-account data or a genuinely fresh macOS
+  user. Do not claim OS isolation from a different Google account.
+- Complete strict repository/native/parity/crypto checks from the existing execution
+  plan. Replay the current migrations and real adapter contracts in an isolated local
+  Supabase environment; preserve existing volumes. The retained 74-migration result
+  does not prove clean replay of the current schema. Never substitute hosted data.
+- Reconcile every required gate against existing QA records and interaction evidence.
+  Keep macOS 14 testing deferred without claiming compatibility. Record unresolved
+  optional-feature limitations and their owning tickets; do not silently waive a
+  required distribution gate or claim notarization fixes location.
+- Prepare exact release notes, asset hashes, feed change, download/marketing copy,
+  rollback and supported/tested OS statements. Apply the existing publication
+  authorization only after its gates pass; filing this ticket does not publish it.
+- Publish the reviewed packet through the existing workflow, verify public HTTPS
+  downloads/signatures/feed and normal installed behavior, then close Ticket 115
+  with the matching evidence. Keep completed preview tickets closed.
+
+References: `docs/DESKTOP_RELEASE.md`, `docs/DESKTOP_PARITY.md`,
+`docs/plans/2026-09-27-apple-developer-unblocked-work.md`,
+`docs/qa/2026-09-27-apple-distribution.md`, `docs/SUPABASE_WORKFLOW.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing public download/user-guide surfaces only; no hosted tracking behavior change. |
+| Desktop | Final signed artifact and publication acceptance through the release workflow. |
+| Marketing | Update existing `apps/marketing` download claims only after matching release evidence. |
+| Future mobile | Not applicable: no native mobile release or compatibility claim. |
+
+Verification: all execution-plan release checks, exact-artifact quarantine/runtime
+evidence, clean local adapter contracts, reviewed publication packet and post-publication
+download/feed checks. Record remaining failures instead of marking the release complete.
+
+## Ticket 182: Explore historical days with explicit evidence limits
+
+Status: implemented September 28, 2026. Source and synthetic verification are recorded
+in `docs/qa/briefing-workbench.md`; live private-account acceptance remains owner-run. Phase 3 of
+`docs/plans/2026-09-27-briefing-bench-review.md`. Dependencies: Tickets 175–177.
+
+Goal: find useful comparison cases without presenting today's records as facts known
+on a past morning. Use Ticket 184's current owner-approved editorial criteria as
+the review target.
+
+Scope and acceptance:
+
+- Add a day/range selector and no-model analysis grid to the existing workbench.
+  Default to 14 days; bound the target range at 90 days where coverage permits.
+  Show one selected day's text and evidence at a time. Keep Compare first, A pinned,
+  and exact prose feedback attached to its runs. Use Behavior titles and plain labels.
+- Distinguish Captured, Reconstructed, and Retrospective cases in selection, saved
+  records, packets and reports. Label limits per source. Unknown history stays unknown;
+  it must not silently become Unresolved, zero duration, or an empty Calendar.
+- Define a selected logical clock (including any proposed 07:00 default) and timezone.
+  Specify inclusive/exclusive cutoffs, stable event ordering, revision chains, and
+  effective, recorded and ingestion times. Apply the rules to the target day and its
+  lookback. Imported/backfilled records and later corrections cannot leak into an
+  earlier reconstructed snapshot.
+- Inspect retained evidence before promising reconstruction. Document limitations for
+  schedule changes, deleted/archived Behaviors, late-created Occurrences, elapsed
+  durations, timezone changes, Notes and reminder status. Omit unsupported sources or
+  label the case Retrospective. Current Note text is not historical Note state.
+- Keep optional past Calendar reads separate and currently authorized. A fetched past
+  day is Retrospective unless an actual retained capture establishes its history.
+  It does not enable the historical Calendar-pattern lane by itself.
+- Support the lookback needed for each target day; a 90-day target range with a 90-day
+  lookback can need roughly 180 days of records. Disclose pagination, caps and gaps.
+  Do not label a truncated sample complete.
+- Use live time for authentication, expiry, cancellation and current source access.
+  Use replay time only for evaluation. Preserve production freshness and admission.
+  Recheck owner, consent, Calendar selection/connection and retained Behavior access
+  before transmission. Keep production tip history untouched.
+- Reuse the existing case store and pipeline. Extend their schema only as needed;
+  preserve old cases as readable or explicitly Review only. New database access must
+  retain authenticated ownership and RLS. A loopback route does not secure an exposed
+  hosted RPC. Any schema change needs a new migration and the existing workflow.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`lib/services/briefing-workbench.service.ts`, `lib/services/briefing-bench-store.ts`,
+`lib/services/briefing-account-context.service.ts`, `lib/db/advisor-analysis.repo.ts`,
+`packages/core/src/resolvers/briefing-analysis.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only historical selectors and evaluation adapters; reuse the workbench exclusion in `interaction-registry.json` and existing design-system catalog. |
+| Desktop | No new desktop surface. Shared source/core changes require desktop typecheck, build and relevant adapter tests. |
+| Marketing | Not applicable: development evaluation adds no public product claim. |
+| Future mobile | Verify responsive web selection and comparison at 390 px; native mobile remains deferred. |
+
+Verification: hand-counted historical fixtures for late ingestion, imports, revisions,
+deleted records, source gaps, DST/midnight and lookback edges; no-model selection,
+authorization and retention tests; saved-case compatibility; all required checks.
+Record actual coverage rather than claiming exact historical mornings generally.
+
+## Ticket 183: Review consecutive days and diagnostic lane previews
+
+Status: implemented September 28, 2026. Source, mocked-provider and browser
+verification are recorded in `docs/qa/briefing-workbench.md`. Model prose quality
+and live private-account acceptance remain owner-run. Phase 4 of the briefing-bench plan.
+Dependencies: Tickets 176–177 and 182.
+
+Goal: let the owner compare accumulated reading burden and repetitive advice across
+days, then diagnose the responsible lane without losing the complete daily brief.
+
+Scope and acceptance:
+
+- Add a Days view for a small chronological comparison sequence. Compare remains the
+  default. Keep A/B aligned on the same case and clock, with saved results and prose
+  feedback per pair. Preserve drafts when moving between days and views.
+- Keep Generate daily brief separate from Preview each lane. Lane previews may bypass
+  ranking or cooldown only with an explicit diagnostic label. Never bypass evidence
+  sufficiency, source consent, grounding, output validation or current authorization.
+  Derive eligible lanes from contracts; do not hardcode an eight-lane count.
+- Run a no-model chronological selection simulation before generation. Initialize
+  stable fingerprints, warm-up history and spacing explicitly. Label its assumption
+  that selected tips were delivered. Model runs track only retained, successful tips
+  in isolated evaluation history. Neither path writes production tip history.
+- Reserve a configurable provider-call budget before dispatch. Start with the proposed
+  100-call ceiling and at most two concurrent calls across workbench tabs, subject to
+  the existing provider limits. Replace conflicting comparison-count limits explicitly;
+  keep production admissions separate. Show the planned call count before starting.
+- Count every dispatched call, including failures, retries and dispatched cancellation.
+  Undispatched cancellation releases its reservation. Cancellation stops queued work,
+  keeps completed outputs and their feedback, and does not promise a provider refund.
+  Count calls separately from tokens or monetary cost; report unavailable usage honestly.
+- Save partial, cancelled, rejected and failed runs. A storage failure keeps output
+  visible as Not saved. Retry creates a new attempt and cannot overwrite reviewed text.
+- Produce a short local review report with per-day outputs, reading burden, repeated
+  themes, preferences, failures and unresolved concerns. Preserve Captured,
+  Reconstructed and Retrospective distinctions. Lane-level success is not daily-brief
+  quality acceptance. No automatic promotion or embedded agent chat.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`app/design-system/BriefingReview.tsx`, `lib/services/briefing-workbench.service.ts`,
+`lib/services/briefing-bench-store.ts`, `lib/services/briefing-review.service.ts`,
+`packages/core/src/resolvers/briefing-analysis.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only Days and diagnostic views; update existing registry exclusions and bench evidence. |
+| Desktop | Not applicable: no native batch-generation surface; shared logic changes still require portability checks. |
+| Marketing | Not applicable: evaluation tooling has no public surface. |
+| Future mobile | Stack A above B and verify keyboard, day navigation and cancellation at 390 px; native mobile remains deferred. |
+
+Verification: exact call accounting under concurrency, timeout, retry, cancellation
+and storage failure; chronological cooldown/retained-tip fixtures; consent revocation
+between jobs; partial-result and draft retention; all required checks and browser QA.
+
+## Ticket 184: Evaluate and promote an owner-reviewed briefing candidate
+
+Status: evaluation criteria and initial coverage accepted September 30, 2026.
+The criteria and versioned profile `daily-brief-balanced@1` live in
+`docs/plans/2026-09-28-briefing-owner-review.md`. Coverage is six tuning cases,
+ten reserved cases and one seven-day sequence. Evaluation iteration 1 has not run;
+quality acceptance, promotion and rollback execution remain open. Phase 5 of the
+briefing-bench plan.
+Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
+174; do not duplicate or silently close their outstanding gates.
+
+Goal: improve daily understanding through the owner's comparison and prose feedback,
+then promote one evidenced candidate through an ordinary repository change.
+
+Scope and acceptance:
+
+- Curate ordinary, quiet, conflict, overnight, missing-input and repetitive-pattern
+  cases. Group coverage into named profiles with immutable revisions and separately
+  numbered evaluation iterations. Preserve their definitions, lineage and results.
+  Reserve held-out cases before tuning. Keep authorized private cases in the
+  local store; record only non-private identifiers and decisions in repository QA.
+- Freeze the evaluation set, clock, input coverage and baseline. Record recoverable
+  prompt/reference/configuration versions, model identity and source revision. Show
+  differences for prompt, resolver, pipeline and presentation changes, not only tone
+  settings. Version changes must not silently rewrite existing cases or reviewed runs.
+- Turn exact feedback into bounded proposals using Ticket 177. Rerun the same cases
+  and review complete rendered text. Ask what matters today, and what was unclear,
+  repetitive or unnecessary. Include consecutive-day review for fatigue.
+- Record wins, ties, losses, withheld/failed outputs and unresolved concerns, with
+  evidence type and sample size. A schema pass, word-count target or attractive single
+  generation is insufficient. Factual, privacy and delivery failures are release
+  blockers; never average them into a favorable quality score.
+- Before evaluation, record the owner's acceptance criteria for this candidate.
+  Require an explicit owner acceptance of the resulting comparisons, including quiet
+  days without tips. An absent response is not acceptance. Model-weight training is
+  outside this ticket; prompt/configuration/rule tuning remains the current approach.
+- Promote only through a reviewed repository change to the existing preset/policy
+  mechanism. Record the candidate, baseline, relevant versions, release commit and
+  rollback. Keep authorized deployment and hosted/installed acceptance as distinct
+  release steps. Preserve consent, admission, dismissal and tracking records.
+- Demonstrate rollback to the prior approved configuration. Verify that rollback
+  stops newly enabled optional transmissions without deleting Behavior history.
+
+Implementation references: `packages/core/src/data/briefing-presets.json`,
+`lib/services/daily-brief-consumer.ts`, `lib/services/briefing-pipeline.ts`,
+`docs/qa/briefing-workbench.md`, `docs/qa/in-app-daily-brief.md`,
+`docs/qa/travel-release.md`, `interaction-registry.json`, `design-system.manifest.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing hosted Daily Brief and 390 px acceptance; update existing QA and interaction evidence for changed behavior. |
+| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. |
+| Marketing | No automatic copy change. Review existing claims only if the accepted production behavior changes them. |
+| Future mobile | Responsive web acceptance only; native mobile remains deferred. |
+
+Verification: all required checks plus core/design-system/desktop checks where affected;
+owner-reviewed outputs, ordinary-use and consecutive-day evidence; authorized rollout
+and rollback records. Leave unexecuted acceptance gates open.
+
+## Ticket 185: Decide the stored Daily Brief product contract
+
+Status: proposal prepared; awaiting recorded owner decisions September 28, 2026.
+See `docs/plans/2026-09-28-briefing-owner-review.md`. Separate product track from the
+briefing-bench plan. It authorizes proposal preparation only. Implementation and
+deployment remain gated on the owner's recorded product decisions.
+Dependencies: existing Daily Brief contracts (Tickets 146–148, 155) and the findings
+in `docs/plans/2026-09-27-briefing-bench-review.md`.
+
+Goal: decide whether reopening a stored brief improves the daily experience without
+presenting expired timing advice as current.
+
+Scope and acceptance:
+
+- Present concrete first-open, reopen, refresh, expired-advice and disabled states
+  using the existing bubble and interaction registry. Keep this decision independent
+  from bench replay and local review storage.
+- Resolve the attachment's proposed 07:00 cutoff, first-open generation and day key
+  across timezone changes. Explain that first open still waits for generation;
+  storage only accelerates later opens unless a separate generation policy is approved.
+- Resolve whether reopening shows the first brief or latest valid refresh. Evaluate
+  the plan's recommendation of the latest valid revision without a history browser.
+  Preserve current withdrawal of expired timing claims until the owner approves an
+  explicit replacement. A displayed timestamp alone does not establish freshness.
+- Specify account/day generation claims for concurrent devices, idempotency, partial
+  failures and refresh. Existing per-installation admission does not prove account/day
+  uniqueness. Keep content retention separate from timing validity.
+- Resolve retention and disclosure. If a two-day retention promise is accepted, require
+  scheduled deletion for inactive accounts, not deletion on the next opening alone.
+  Specify disablement, account deletion, revoked optional-source access, pending-write
+  races and retrieval authorization. Keep authenticated ownership and RLS.
+- Record accepted decisions and update governing product, privacy, data and route
+  contracts before implementation. File the resulting implementation/release tickets
+  with migration, type, cleanup and lifecycle tests. Use new migrations; never rewrite
+  applied migrations to remove the former storage policy.
+- If the owner declines stored briefs, close this proposal with that decision. The
+  bench comparison and tuning workflow remains independently useful.
+
+Implementation references for the proposal: `lib/services/daily-brief.service.ts`,
+`lib/db/daily-brief.repo.ts`, `components/briefing/DailyBriefLauncher.tsx`,
+`components/briefing/DailyBriefBubble.tsx`, `docs/PRODUCT_SPEC.md`, `docs/DATA_MODEL.md`,
+`docs/UI_SPEC.md`, `docs/INTERACTION_REGISTRY.md`, `docs/ROUTE_MAP.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Proposal for hosted storage and reopening; implementation requires follow-up tickets after the decision. |
+| Desktop | Proposal must cover linked-account cross-device claims and offline/unsynced behavior; local-mode AI remains outside scope. |
+| Marketing | Review published privacy wording if storage is accepted; file copy follow-up before release. |
+| Future mobile | Include responsive web reopening states and reusable service contract; native mobile implementation remains deferred. |
+
+Verification: review concrete examples and a lifecycle matrix covering concurrent
+devices, refresh, expiry, timezone change, disablement, revocation and deletion.
+Decision completion is not implementation, migration, deployment or release acceptance.

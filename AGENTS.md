@@ -33,8 +33,10 @@ surface for the BehaviorLog Bundle standard:
 
 Public-product surfaces are scoped in `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`.
 The Astro marketing site is implemented as a sibling app. Tauri desktop and
-shared-package work is implemented under Tickets 107–114. Ticket 115 defers
-Apple-trusted distribution acceptance. Tickets 116–122 plan optional Google
+shared-package work is implemented under Tickets 107–114. Ticket 115 owns
+Apple-trusted distribution acceptance and is in progress. macOS 14 runtime
+testing is owner-deferred; the compiled minimum does not establish compatibility.
+Tickets 116–122 plan optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
