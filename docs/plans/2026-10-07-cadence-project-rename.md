@@ -12,6 +12,22 @@
 
 ---
 
+## October 7 execution amendments
+
+The owner approved retaining `habit-tracking-app` as an old-path compatibility
+symlink after moving the physical directory to `cadence`. Codex's display-name
+edit retained the same project ID and chats. The symlink keeps existing source
+bindings operational; removing it is gated on verified consumer migration.
+This replaces the pre-move requirement to reassociate every old chat path.
+Use an authorized atomic directory/link swap, verify the same inode and files,
+repair worktrees, and retain an executable reverse swap. Never use the link to
+bypass filesystem permissions or claim that old path references disappeared.
+
+The release base is the already-deployed app commit `9eda5c0`, not older `main`.
+The migration patch must preserve its ten deployed commits. Marketing content is
+unchanged between those bases. Record and verify production source metadata and
+reconcile default-branch history before staging/promotion or scheduled publication.
+
 ## 1. Scope and fixed decisions
 
 | Item | Current | Target / decision |

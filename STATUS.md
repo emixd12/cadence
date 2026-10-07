@@ -2,16 +2,17 @@
 
 ## Ticket 186: Cadence project and repository rename — October 7, 2026
 
-Execution is in progress under `docs/plans/2026-10-07-cadence-project-rename.md`.
-The owner authorized the plan and exact historical-URL preservation through a
-separate archive site. The complete main/linked-worktree backup passed 2,529
-file comparisons and a sample restore. All 37 public snapshots and their
-76 public files validated and have a byte-hash manifest.
-The history compatibility patch is isolated on `codex/project-rename` from
-`origin/main`; 39 focused Trust tests pass. Local-folder cutover remains gated
-on supported Codex project/chat reassociation: Computer Use denied Codex access,
-and exposed app tools do not provide project relocation. The public archive repository is deployed and its staging URL passes HTTP/content
-checks. No folder or existing repository has been renamed. See `docs/qa/cadence-project-rename.md` for progress.
+Execution remains in progress. The owner renamed the Codex display name to
+`cadence`; project ID and chats remain intact. The owner approved an old-path
+compatibility symlink for the physical folder move. The physical folder is now `cadence`; the old path is a compatibility symlink.
+All 2,532 file comparisons and three worktree checks passed. GitHub remains
+unchanged. Codex Source folders must use the new physical path for sandbox access.
+The isolated migration patch now preserves the deployed app commit `9eda5c0`.
+All required local checks pass against its intended publication history:
+2,332 tests passed, 29 existing gated tests skipped; all three builds pass.
+Existing updater archive signatures pass. Production source metadata, Codex source-folder reassociation, remote cutover
+and end-to-end acceptance remain open. See
+`docs/qa/cadence-project-rename.md` and the implementation plan.
 
 ## Function
 

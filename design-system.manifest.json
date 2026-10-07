@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-08-04T06:48:47Z",
-  "root": "/Users/emi/Coding Projects/habit-tracking-app",
+  "root": "/Users/emi/Coding Projects/cadence",
   "components": [
     {
       "id": "composite.behavior-form",
