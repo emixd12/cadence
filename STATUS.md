@@ -1,5 +1,18 @@
 # Implementation Status
 
+## Ticket 186: Cadence project and repository rename — October 7, 2026
+
+Execution is in progress under `docs/plans/2026-10-07-cadence-project-rename.md`.
+The owner authorized the plan and exact historical-URL preservation through a
+separate archive site. The complete main/linked-worktree backup passed 2,529
+file comparisons and a sample restore. All 37 public snapshots and their
+76 public files validated and have a byte-hash manifest.
+The history compatibility patch is isolated on `codex/project-rename` from
+`origin/main`; 39 focused Trust tests pass. Local-folder cutover remains gated
+on supported Codex project/chat reassociation: Computer Use denied Codex access,
+and exposed app tools do not provide project relocation. The public archive repository is deployed and its staging URL passes HTTP/content
+checks. No folder or existing repository has been renamed. See `docs/qa/cadence-project-rename.md` for progress.
+
 ## Function
 
 `STATUS.md` is the current-state ledger for this repository. Future agents should read it immediately after `AGENTS.md` and before selecting work from `docs/TICKETS.md`.
