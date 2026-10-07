@@ -297,7 +297,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Source license and other rights",
         paragraphs: [
-          "Owner-controlled source code, repository documentation, and synthetic sample content are available under the MIT license in the public repository at github.com/emixd12/habit-tracking-app. The repository license governs only material within its stated scope.",
+          "Owner-controlled source code, repository documentation, and synthetic sample content are available under the MIT license in the public repository at github.com/emixd12/cadence. The repository license governs only material within its stated scope.",
           "The hosted service, production credentials, Cadence names and logos, site content outside the repository license, tracked binary assets excluded by the repository license notice, and user-owned data are governed separately. The MIT license grants no trademark right or right to access the hosted service.",
         ],
       },
@@ -360,7 +360,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Public source and license",
         paragraphs: [
-          "Cadence source code is public at github.com/emixd12/habit-tracking-app under the repository's MIT license.",
+          "Cadence source code is public at github.com/emixd12/cadence under the repository's MIT license.",
           "The public source lets anyone inspect the implementation. It does not independently verify a hosted deployment.",
         ],
       },

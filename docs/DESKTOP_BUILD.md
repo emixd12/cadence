@@ -1,5 +1,12 @@
 # Desktop Build
 
+Ticket 186 prepares the source repository name `emixd12/cadence` and preview feed
+`https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
+Cutover remains gated by `docs/qa/cadence-project-rename.md`. Installed clients
+retain their original endpoints through verified GitHub redirects. Historical
+release observations below retain their original names and URLs.
+
+
 The owner activated the local-first macOS track on 2026-08-30. Tickets 107–114
 are complete. Ticket 115 separately owns deferred Apple-trusted distribution.
 Tickets 116–122 plan optional Google account linking and offline-capable

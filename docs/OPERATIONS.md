@@ -1057,7 +1057,7 @@ credentials, and provider tokens remain server-only.
 ## Public repository publication
 
 Ticket 100 uses the canonical repository at
-`https://github.com/emixd12/habit-tracking-app`. Every GitHub and production
+`https://github.com/emixd12/cadence`. Every GitHub and production
 mutation needs explicit owner approval for that exact action.
 
 Use this order:

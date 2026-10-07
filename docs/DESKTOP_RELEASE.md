@@ -1,5 +1,12 @@
 # Desktop release
 
+Ticket 186 prepares the source repository name `emixd12/cadence` and preview feed
+`https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
+Cutover remains gated by `docs/qa/cadence-project-rename.md`. Installed clients
+retain their original endpoints through verified GitHub redirects. Historical
+release observations below retain their original names and URLs.
+
+
 Ticket 113 completed the unnotarized Apple Silicon preview and updater-
 acceptance milestone on 2026-08-31. The preview uses ad hoc Apple code signing
 and a persistent Tauri updater signing key. It does not claim Developer ID
