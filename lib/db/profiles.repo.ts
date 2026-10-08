@@ -21,25 +21,6 @@ export async function getProfileSettings(
   return data ?? null;
 }
 
-export async function updateProfileTimezone(
-  supabase: AppSupabaseClient,
-  userId: string,
-  timezone: string,
-): Promise<ProfileSettings | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ timezone })
-    .eq("id", userId)
-    .select("email, timezone")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data ?? null;
-}
-
 export async function listProfileOccurrenceSyncTargets(
   supabase: AppSupabaseClient,
   options: { limit: number },

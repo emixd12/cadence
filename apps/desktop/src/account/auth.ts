@@ -1,5 +1,5 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 declare global {
@@ -243,5 +243,3 @@ export function accountStateFromSession(session: Session | null): DesktopAccount
   const name = [metadata?.full_name, metadata?.name].find((value) => typeof value === "string" && value.trim());
   return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null } : { status: "local" };
 }
-
-export function desktopAuthAvailable(): boolean { return isTauri() && readDesktopAuthConfig() !== null; }

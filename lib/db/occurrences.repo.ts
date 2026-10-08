@@ -133,34 +133,6 @@ export async function listOccurrencesBetweenLocalDates(
   );
 }
 
-export async function listOccurrencesThroughLocalDate(
-  supabase: AppSupabaseClient,
-  userId: string,
-  endLocalDate: string,
-): Promise<Occurrence[]> {
-  return measurePerformanceSpan(
-    {
-      span: "db.list_occurrences_through_local_date",
-      counts: (occurrences) => ({ occurrences: occurrences.length }),
-    },
-    async () => {
-      const { data, error } = await supabase
-        .from("occurrences")
-        .select("*")
-        .eq("user_id", userId)
-        .lte("local_date", endLocalDate)
-        .order("local_date", { ascending: true })
-        .order("scheduled_for", { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      return data ?? [];
-    },
-  );
-}
-
 export async function listUserOccurrences(
   supabase: AppSupabaseClient,
   userId: string,
@@ -267,27 +239,6 @@ export async function createOccurrenceForImport(
   }
 
   return data;
-}
-
-export async function createMissingOccurrences(
-  supabase: AppSupabaseClient,
-  occurrences: NewOccurrence[],
-): Promise<void> {
-  if (occurrences.length === 0) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from("occurrences")
-    .upsert(occurrences, {
-      onConflict:
-        "behavior_id,local_date,schedule_start_time,schedule_range_identity",
-      ignoreDuplicates: true,
-    });
-
-  if (error) {
-    throw error;
-  }
 }
 
 export async function applyOccurrenceGenerationPlan(
@@ -451,34 +402,6 @@ export async function updateOccurrenceNoteIfEmpty(
   });
 }
 
-export async function updateUnresolvedOccurrenceScheduleById(
-  supabase: AppSupabaseClient,
-  input: {
-    userId: string;
-    occurrenceId: string;
-    occurrence: Pick<
-      OccurrenceUpdate,
-      | "behavior_schedule_slot_id"
-      | "schedule_kind"
-      | "schedule_preset"
-      | "schedule_start_time"
-      | "schedule_end_time"
-      | "local_date"
-    >;
-  },
-): Promise<void> {
-  const { error } = await supabase
-    .from("occurrences")
-    .update(input.occurrence)
-    .eq("user_id", input.userId)
-    .eq("id", input.occurrenceId)
-    .eq("status", "unresolved");
-
-  if (error) {
-    throw error;
-  }
-}
-
 function isEmptyOccurrenceNote(note: string | null): boolean {
   return (note?.trim() ?? "").length === 0;
 }
@@ -505,25 +428,4 @@ function resolveScheduleRangeIdentity(
 
 function readInteger(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) ? value : 0;
-}
-
-export async function deleteUnresolvedOccurrencesById(
-  supabase: AppSupabaseClient,
-  userId: string,
-  occurrenceIds: string[],
-): Promise<void> {
-  if (occurrenceIds.length === 0) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from("occurrences")
-    .delete()
-    .eq("user_id", userId)
-    .eq("status", "unresolved")
-    .in("id", occurrenceIds);
-
-  if (error) {
-    throw error;
-  }
 }
