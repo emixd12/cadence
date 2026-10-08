@@ -23,7 +23,7 @@ sprawl.
 The web app supports independent users with Google auth. Tickets 107–114
 implement local-first macOS tracking with one local profile and no login.
 Ticket 115 defers Apple-trusted desktop distribution acceptance.
-Tickets 116–122 plan optional use of the same Google account with offline-
+Tickets 116–122 implement optional use of the same Google account with offline-
 capable desktop synchronization. Tickets 146–148 implement an in-app read-only daily
 briefing in the Timeline horse's text bubble. Billing, native mobile, general AI
 chat/coaching, and audio speech remain future scope.

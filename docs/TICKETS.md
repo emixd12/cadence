@@ -12104,7 +12104,7 @@ The owner clarified that routing includes both travel timing and fitting Behavio
 around Calendar events. Occasional adherence tips should use defined analysis lanes
 inspired by `packages/core/src/export-prompts.ts`.
 
-Source of truth: `docs/PRODUCT_SPEC.md#planned-advisor-improvements-tickets-168174`,
+Source of truth: `docs/PRODUCT_SPEC.md#advisor-improvements-tickets-168174`,
 `docs/plans/first-external-consumer.md`, and the September 26 decision in
 `docs/DECISIONS.md`. These tickets extend the existing Daily Brief recipe, shared
 horse bubble, server pipeline and workbench. They add no general chat, autonomous

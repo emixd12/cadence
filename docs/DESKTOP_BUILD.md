@@ -2,7 +2,7 @@
 
 The owner activated the local-first macOS track on 2026-08-30. Tickets 107–114
 are complete. Ticket 115 separately owns Apple-trusted distribution and is in progress.
-Tickets 116–122 plan optional Google account linking and offline-capable
+Tickets 116–122 implement optional Google account linking and offline-capable
 synchronization. This document replaces the earlier unscheduled proposal.
 `STATUS.md` records implementation and verification.
 

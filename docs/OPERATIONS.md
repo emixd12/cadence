@@ -1338,7 +1338,7 @@ setting.
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115
-owns Apple-trusted distribution acceptance and is in progress. Tickets 116–122 plan optional
+owns Apple-trusted distribution acceptance and is in progress. Tickets 116–122 implement optional
 desktop account synchronization. Preserve unrelated working-tree edits and both
 current deployments. Next.js stays at the repository root.
 
