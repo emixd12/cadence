@@ -219,3 +219,53 @@ root. Next.js started on the first available allowed port, 127.0.0.1:4324;
 the browser rendered the sign-in page and its existing navigation. No account
 sign-in or data mutation occurred. Codex Source folders still reports the old
 path while the owner completes the requested supported settings edit.
+
+## Codex source-folder reassociation
+
+The owner saved the physical `cadence` folder through Edit project and removed
+the old source-folder entry. App readback confirms the same project ID
+`local-7b732c2eb477d9f46eabb9aa15a2c30b`, label `cadence`, and physical path
+`/Users/emi/Coding Projects/cadence`.
+
+This existing chat still supplies the old symlink as a sandbox writable root.
+A normal shell operation fails before process creation, even with its working
+directory set to the new physical path. Explicitly approved new-root access
+passes a disposable-file write/read/delete check and confirms the original
+Popmelt store ID. No sandbox policy or app database was edited. A fresh Codex
+session must verify normal sandbox access before calling chat migration complete.
+GitHub remains unchanged while that local acceptance gate is open.
+
+## October 8 continuation: provider readback
+
+A Claude Code session at the physical `cadence` root passed `pwd -P`, Git
+toplevel and disposable write/read/delete checks without sandbox overrides.
+The Codex fresh-session check remains open; this result does not close it.
+
+The Vercel CLI login now authenticates. Read-only API readback closes the
+production source-metadata gate:
+
+| Project | Production deployment | Source | Commit | Domain |
+| --- | --- | --- | --- | --- |
+| `cadence` (`prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs`) | `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n` | CLI, actor `codex` | `meta.sourceCommit` `9eda5c039bbf1c6e306a40a2a720f8d0cb02c43a` | `app.cadence-me.com` |
+| `cadence-marketing` (`prj_BLlsxoaz1wSvWuK7xcZLLkHglQcR`) | `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR` | Git, repo ID `1261353608`, `main` | `5e7ebdeb67082ebae12b41713507b027bdf726c8` | `cadence-me.com` |
+
+Both projects link GitHub repository ID `1261353608` (`emixd12/habit-tracking-app`)
+with production branch `main`. The app has one production-scoped
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` variable; its value was not read.
+No provider setting, alias or deployment changed.
+
+### Pre-existing Trust publication failure
+
+The scheduled Trust workflow is `active`. Every scheduled run since September 27
+failed in `collect` with `ENOENT: no such file or directory, open 'snapshot.json'`.
+The last success ran September 26. All six inspected runs used `5e7ebde`.
+The latest published snapshot still pairs `dpl_EySiseVj858i81TyfRuYjz8qY6pt`
+with `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`. The app has since served `9eda5c0`.
+Root cause is not verified; the source/deployment mismatch is the leading
+assumption. This failure predates the rename and is not a rename regression.
+It also means no evidence writer added files: the public index still holds 37
+entries, matching the archive. Task 8 must reconcile `main` with `9eda5c0` and
+collect fresh evidence; Task 6 still requires pausing the workflow before cutover.
+
+A Dependabot branch (`86f5eb9`, devalue 5.9.4) produced preview builds on both
+Vercel projects October 8. Production aliases did not change.
