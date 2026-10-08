@@ -56,6 +56,54 @@ Supabase and AgentMail are dev dependencies. The Sequenzy command downloads
 the exact reviewed CLI version through npm's isolated execution cache, so it
 requires npm registry access when that version is not already cached.
 
+### Search Console agent CLI
+
+Use the existing `gcloud` identity `info@identityscaffolding.com` to impersonate
+`polyak-agent@polyak-precious--1726112956978.iam.gserviceaccount.com`.
+The CLI targets only `sc-domain:cadence-me.com`. It captures short-lived tokens
+in memory and preserves existing ADC credentials and global CLI configuration.
+No service-account key or additional OAuth client is required.
+
+Cloud IAM impersonation and Search Console property access are separate.
+Scoped token minting and the Search Console API succeeded on 2026-10-07;
+the service account did not yet have Cadence property access.
+The owner must grant this service account **Full** user access in Search Console
+before the commands can operate on Cadence. Confirm the grant with `verify`.
+
+```bash
+npm run search-console -- verify
+npm run search-console -- sitemaps
+npm run search-console -- inspect --url http://cadence-me.com/
+npm run search-console -- inspect --url https://cadence-me.com/
+npm run search-console -- query --start 2026-10-01 --end 2026-10-07 --dimensions page,query
+```
+
+Read commands request `https://www.googleapis.com/auth/webmasters.readonly`.
+The following writes request `https://www.googleapis.com/auth/webmasters`.
+Run a write only after a specific operator instruction names that action and
+sitemap URL. Access authorization alone does not authorize sitemap changes.
+
+```bash
+npm run search-console -- submit-sitemap --sitemap https://cadence-me.com/sitemap.xml
+npm run search-console -- delete-sitemap --sitemap https://cadence-me.com/sitemap.xml
+```
+
+Deletion removes the sitemap submission, not website files or search results.
+Inspection returns Google's indexed state, not a live crawl. The API cannot
+enumerate Page indexing exclusions or request indexing for ordinary HTML pages.
+Use the Search Console report or an authorized export for excluded examples.
+Performance queries return at most 25,000 rows per invocation and do not paginate.
+Before the property grant, `verify` returned HTTP 404 on 2026-10-07.
+HTTP 403 or 404 requires checking property access, token scope, API enablement, and quota;
+never print tokens to diagnose it. See Google's [authorization guide](https://developers.google.com/webmaster-tools/v1/how-tos/authorizing).
+The October 7 alert evidence is in `docs/qa/2026-10-07-search-console-indexing.md`.
+
+CLI verification on 2026-10-07: agents, interactions, resolvers, lint, typecheck,
+and build passed. `npm run test -- --maxWorkers=2 --testTimeout=30000` passed
+2,523 tests; 29 skipped. The sandbox blocked existing socket tests and font
+downloads; authorized reruns passed. Both requested token scopes reached
+`sites.list` with HTTP 200 and no Cadence entry. No sitemap write was executed.
+
 ## Standard verification
 
 ### Day-progress review bench (Ticket 132)
