@@ -13156,3 +13156,30 @@ Platform impact:
 Verification: review concrete examples and a lifecycle matrix covering concurrent
 devices, refresh, expiry, timezone change, disablement, revocation and deletion.
 Decision completion is not implementation, migration, deployment or release acceptance.
+
+
+## Ticket 186: Rename Cadence project folder and GitHub repository
+
+Status: in progress October 7, 2026; local and remote cutovers remain gated.
+Owner authorization: execute `docs/plans/2026-10-07-cadence-project-rename.md`,
+including the selected archive site preserving exact historical evidence URLs.
+
+Goal: rename the existing local folder and GitHub repository to `cadence`
+without losing work, history, deployment identities, or installed-client access.
+
+Acceptance: execute the plan's backup, relocation, archive, updater, deployment,
+and rollback gates. Preserve local Supabase identity, hosted account identities,
+production domains, desktop bundle identity, keys, and data. Keep unrelated
+uncommitted work intact. Retain all immutable evidence URLs and bytes. Record
+required checks and scheduled-publication continuity before completion.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Trust history/feed and source URLs; see the plan's exact files and existing interaction registry. |
+| Desktop | Release URL constants and legacy native updater compatibility; preserve installed app identity. |
+| Marketing | Source/download targets in `apps/marketing/src/data/site.ts`; preserve selected release assets. |
+| Future mobile | Not applicable: no mobile implementation or identifiers change. |
+
+Execution evidence: `docs/qa/cadence-project-rename.md`.
