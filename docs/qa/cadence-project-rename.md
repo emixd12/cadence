@@ -396,3 +396,10 @@ was accepted. GitHub Apps bind repositories by ID.
 - Vercel: both projects still report slug `habit-tracking-app` with repository
   ID `1261353608` and unchanged production deployments. A Git-triggered build
   probe follows below.
+- Vercel Git probe: pushing evidence commit `ac3573a` to `codex/project-rename`
+  created READY previews on both projects (app `dpl_9STSuVXac3PmNDdXb677Vu3wAgpb`,
+  marketing `dpl_4fSi2Vp6yGhXN7fNVChZDj8rGEty`) with `githubRepo` `cadence` and
+  repository ID `1261353608`. Both project links now report slug `cadence`.
+  No reconnection was needed. Production targets and custom domains are unchanged.
+
+Task 7 is complete except native updater acceptance. Early rollback was not triggered.
