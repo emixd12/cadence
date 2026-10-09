@@ -403,3 +403,56 @@ was accepted. GitHub Apps bind repositories by ID.
   No reconnection was needed. Production targets and custom domains are unchanged.
 
 Task 7 is complete except native updater acceptance. Early rollback was not triggered.
+
+## Task 8: promotion and new evidence root (October 9 UTC)
+
+- Owner selected promotion through `main`. PR #92
+  (https://github.com/emixd12/cadence/pull/92) passed all 10 checks, including
+  `verify` and CodeQL. Codex review was skipped for usage limits, CodeRabbit by
+  repository policy. Merged with a merge commit at `2026-10-09T01:18:01Z`:
+  `3575aa4f4239cce7d5914f4474b50b9b41c1938b`. `main` now contains the deployed
+  `9eda5c0` history, so it is no longer behind production.
+- Git production builds: app `dpl_4dkuiJXfjhJ6WWmcJn2GMf5ey9Mo`, marketing
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`, both READY at `3575aa4`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` (production, env ID
+  `vGVn8afMCddubMpC`) changed from `dpl_E3pfJW9H5aqC4t3FdqzE9wK2hsJL` to
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`. `vercel redeploy` produced app
+  `dpl_C7b2gbGmkJ6GsyeRpoYa5sbksKsh` (Git source `3575aa4`, repo ID `1261353608`).
+- Current aliases: `app.cadence-me.com` → `dpl_C7b2gbGmkJ6GsyeRpoYa5sbksKsh`;
+  `cadence-me.com` → `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`.
+- Smoke: `/login`, `/trust` and `/api/public/trust-evidence` return 200;
+  marketing returns 200 and links only to `github.com/emixd12/cadence`.
+- `TRUST_PAGES_ORIGIN` is `https://emixd12.github.io/cadence/` at repository,
+  `public-trust-preview` and `public-trust-production` scope. No other scope sets it.
+- Trust workflow restored to its previous `active` state. The renamed project
+  site had already moved the existing artifact to `/cadence/trust/` with all 37
+  entries, so no seed workflow or empty-history initialization was used.
+- Two production publications from `main` (`run_rls=false`):
+  runs `37869476564` and `37869800329`. Both collected and published; each then
+  failed the existing post-publication adverse-evidence gate. The index holds
+  39 entries: 37 legacy URLs (byte-identical to the archive) and 2 new
+  `/cadence/trust/` snapshots with readable details.
+- Live app Trust feed: `live`. Source-to-deployment provenance, code scanning,
+  artifact integrity and both route comparisons pass. Dependency and secret
+  scanning are `unavailable`; RLS smoke is `not_run` by design.
+
+### Pre-existing hosted migration drift (not a rename regression)
+
+`hosted_migration_boundary` fails truthfully. `main` ends at
+`20260926170000`. Branch `codex/fix-daily-brief-cpu-retries` (commit `89b1ace`,
+September 27) records an authorized hosted deployment of
+`20260927173716_fix_daily_brief_nonretryable_conflicts.sql`. That branch is not in
+`main` or any production deployment. Resolving it needs a separate reviewed merge.
+The local `supabase migration list --linked` attempt was killed without output;
+hosted state was inferred from the branch record and the collector result.
+
+### Remaining
+
+- Native updater acceptance through the Tauri client (curl chains, hashes and
+  signatures pass).
+- Observe the next scheduled Trust run (cron `17 7 * * *`) for history retention.
+- Task 9 authenticated/manual acceptance and Task 10 residual-reference
+  classification.
+- Propagate `main` into ongoing development branches without disturbing their
+  uncommitted work. Keep the old-path symlink until dependent tools are verified.
+- Both Codex automations remain PAUSED and unchanged.
