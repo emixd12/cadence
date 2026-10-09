@@ -10,21 +10,25 @@ In progress; local and remote cutovers are done.
 - GitHub: `emixd12/habit-tracking-app` is now `emixd12/cadence` (same ID
   `1261353608`); settings, refs and releases are unchanged and old links redirect.
   All 76 legacy Trust evidence files serve identical bytes from `emixd12.github.io`.
-- Production: PR #92 merged `main` with the already-deployed `9eda5c0` history at
-  `3575aa4`. App `dpl_C7b2gbGmkJ6GsyeRpoYa5sbksKsh` and marketing
-  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw` serve the production domains.
+- Production: PR #92 merged `main` with the already-deployed `9eda5c0` history.
+  After PR #94 (`610e938`), app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` and marketing
+  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw` serve the production domains.
 - Trust: publishes from `https://emixd12.github.io/cadence/` with 37 legacy plus
-  two new snapshots. Provenance passes again. `hosted_migration_boundary` fails
+  new snapshots. Provenance passes again. `hosted_migration_boundary` fails
   because unmerged branch `codex/fix-daily-brief-cpu-retries` applied hosted
   migration `20260927173716`; this predates the rename.
 - Updater: feeds, archives and signatures pass through old and new URLs.
 
-Popmelt was removed on October 9 after the move changed its path-derived project ID.
+Popmelt was removed on October 9 (PR #94) after the move changed its path-derived
+project ID; its data is archived in the private rename backup.
 
-Open: native updater acceptance, the next scheduled Trust run, Task 9 manual
-acceptance, Task 10 residual-reference classification, and propagating `main`
-into ongoing branches. Evidence: `docs/qa/cadence-project-rename.md`; plan:
-`docs/plans/2026-10-07-cadence-project-rename.md`.
+Task 9 acceptance passed (production screens, local Supabase data, builds from the
+new folder). Task 10 classified every remaining old-name reference; current docs now
+record the completed rename. After each `main` merge, update the app's
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app (`docs/VERCEL_WORKFLOW.md`).
+
+Open: native updater acceptance and the next scheduled Trust run. Evidence:
+`docs/qa/cadence-project-rename.md`; plan: `docs/plans/2026-10-07-cadence-project-rename.md`.
 
 ## Function
 

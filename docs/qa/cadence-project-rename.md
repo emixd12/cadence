@@ -457,6 +457,83 @@ hosted state was inferred from the branch record and the collector result.
   uncommitted work. Keep the old-path symlink until dependent tools are verified.
 - Both Codex automations remain PAUSED and unchanged.
 
+### PR #93 merge and app redeploy (October 9 UTC)
+
+- PR #93 passed all 10 checks and merged at `2026-10-09T03:36:44Z` as
+  `2f539985bbdc4017b9b6235be9437758719e5b29`.
+- Both projects rebuilt production from Git at `2f53998`: app
+  `dpl_4FkGgNtwvwhDV3eSkB3kCXxda2nc`, marketing `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw` to `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`.
+  `vercel redeploy` produced app `dpl_DZZMLto9c7zzDNmcwfJYYKMbDJLA`
+  (Git source `2f53998`, repo ID `1261353608`).
+- `app.cadence-me.com` → `dpl_DZZMLto9c7zzDNmcwfJYYKMbDJLA`; `cadence-me.com` →
+  `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`. `/login`, `/trust` and marketing return 200.
+- This note exists only in the local checkout; committing it would trigger
+  another production rebuild and marketing-ID update.
+
+## Task 9: acceptance (October 9 UTC)
+
+### Repository checks
+
+No non-documentation file changed between `f0315be` (full Task 9 command set:
+2,332 tests passed, 29 gated skips, all builds and governance checks) and `main`
+at `2f53998`. PR #92 and #93 `verify` and CodeQL passed on GitHub. From the
+physical root, `marketing:build` and `desktop:build` pass; Cargo reports workspace
+root and target under `/Users/emi/Coding Projects/cadence`.
+
+### Hosted
+
+- Unauthenticated: `/timeline`, `/behaviors`, `/export`, `/settings` and
+  `/analytics` redirect to `/login?next=…`; `/login` and `/trust` return 200.
+  Marketing `/`, `/about`, `/faq` and `/docs` return 200. The marketing DMG link
+  uses `emixd12/cadence` and downloads the baseline 7,677,808 bytes.
+- Authenticated (existing Chrome session on the test account, read-only; no
+  clicks on actions): Timeline, Behaviors, Export & Import, Settings and Trust
+  render. Settings shows timezone, notifications and Calendar sections. No data
+  changed, and no email was sent.
+- No Supabase Auth, OAuth, Calendar broker, push or reminder configuration was
+  changed by this ticket; production domains are unchanged.
+
+### Local Supabase
+
+`supabase/config.toml` keeps `project_id = "habit-tracking-app"`. Volumes
+`supabase_db_habit-tracking-app` (created 2026-09-22) and
+`supabase_storage_habit-tracking-app` remain. Containers had stopped 11 days
+before the move; none uses a bind mount. Starting only the existing DB container
+showed 2 auth users, 2 profiles, 5 behaviors and 527 occurrences, with 74 local
+migrations through `20260922200000` (the local stack never received the two
+September 26 migrations). The container was stopped again; no reset occurred.
+
+Pre-existing tooling defect: `npm run supabase` is killed with exit 137. The
+npm-published `@supabase/cli-darwin-arm64@2.105.0` binary fails `codesign -v`
+("invalid signature"). Its SHA-256 matches the lockfile tarball and the pre-move
+backups, and the backup copy fails identically. This is not a rename regression.
+Homebrew `supabase` 2.109.1 exists but was not used.
+
+### Popmelt: rename regression (blocks acceptance)
+
+Popmelt 0.16.0 derives its project ID as the first 12 hex digits of SHA-256 of
+`realpath(projectRoot)`. The old path yields `7b732c2eb477` (the existing store
+and Imprint ID); the physical path yields `e6626f30d7e3`. Because Popmelt
+resolves symlinks, the compatibility link does not preserve the old ID. The
+bridge started at the move (pid 49776) logged "Imprint manifest does not match
+this project." Only the October 1 bridge (pid 81775) still holds the old ID in
+memory. `store.json` keeps `store-7b732c2eb477`. `POPMELT_PROJECT_ID` is an
+output, not a supported override. No Popmelt file or process was changed.
+
+### Desktop
+
+The installed app (`0.1.1-preview.45`) embeds the old feed URL; feed, archive
+and signature chains pass through redirects (Task 7). Native Tauri-client
+acceptance remains open. The installed app and its data were not touched.
+
+### Open
+
+- Popmelt Imprint continuity (decision required).
+- Native updater acceptance; next scheduled Trust run.
+- Task 10 residual-reference classification.
+
 ## Popmelt removal (October 9)
 
 Task 9 found that Popmelt 0.16.0 derives its project ID from SHA-256 of
@@ -476,3 +553,67 @@ Imprint. The owner chose to remove Popmelt instead of migrating it.
 - Local state is handled outside Git: the `.popmelt/` data is archived in the
   private rename backup, Popmelt processes are stopped, and the global Codex
   plugin is disabled.
+- Local cleanup done: stopped 9 Popmelt processes (2 bridges, 7 Codex MCP
+  helpers); moved `.popmelt/` (17 MB) to
+  `.cadence-rename-backup-20261007/popmelt-archive-20261009`; set Codex plugin
+  `popmelt-core@personal` to `enabled = false` after saving the prior config as
+  `codex-config-before-popmelt-disable.toml` in the same backup. PR #94 removes the code.
+
+### PR #94 merge and app redeploy (October 9 UTC)
+
+- PR #94 passed all 10 checks and merged at `2026-10-09T04:18:46Z` as
+  `610e9384cf2e886502a2b9b5b6c997e97ab1436c`.
+- Git production builds at `610e938`: app `dpl_9VQUfcoAnub9P5qvTsAcD8jy9EZN`,
+  marketing `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm` to `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`.
+  `vercel redeploy` produced app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` (Git source
+  `610e938`, repo ID `1261353608`). A transient local network drop interrupted
+  the CLI's progress polling; API readback confirmed READY afterwards.
+- `app.cadence-me.com` → `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV`; `cadence-me.com` →
+  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`. `/login`, `/trust`, the Trust API, marketing
+  `/` and `/about` return 200. Neither served page references Popmelt.
+
+## Task 10: residual-reference classification (October 9)
+
+Final tracked-file search on `main` after `610e938` plus this change: every
+remaining `habit-tracking-app` match is classified below. No active dependency
+remains unexplained.
+
+| Category | Files | Reason kept |
+| --- | --- | --- |
+| Infrastructure identity | `supabase/config.toml` (`project_id`), `tests/sql/ticket-165-travel-budget-smoke.sql` (container name) | The local Supabase project ID, Docker labels and volumes are preserved by design. |
+| Tool-managed name | `.codex/environments/environment.toml` (`name`) | Codex generates this file; change it only through Codex settings. Not a path dependency. |
+| Archive compatibility | `scripts/download-public-trust-history.mjs` | Accepts the exact legacy evidence prefix only for the `/cadence/` root. |
+| Regression fixtures | `tests/fixtures/public-trust-*`, `tests/public-trust-*.test.ts` | Explicit legacy-URL cases for history retention and rejection. |
+| Historical records | `STATUS.md` ledger entries, `docs/qa/*`, `docs/plans/*`, completed tickets in `docs/TICKETS.md`, the Ticket 100 completion boundary in `docs/PUBLIC_REPOSITORY_RELEASE.md`, the completed desktop milestone in `docs/DESKTOP_RELEASE.md`/`docs/DESKTOP_BUILD.md`, the Ticket 106 decision in `docs/DECISIONS.md` | Dated observations; superseded where needed by new dated text instead of rewrites. |
+
+Updated as current references in this change:
+
+- `docs/DESKTOP_BUILD.md`, `docs/DESKTOP_RELEASE.md`: the opening note now
+  records the completed rename and old-feed redirect behavior.
+- `docs/PUBLIC_REPOSITORY_RELEASE.md`: the Ticket 186 section records completion.
+- `docs/DECISIONS.md`: new 2026-10-08 entry supersedes the Ticket 106 source URL
+  and forbids reusing the old name.
+- `docs/VERCEL_WORKFLOW.md`: step 5 records the required post-merge
+  marketing-ID update and app redeploy.
+- `docs/TICKETS.md`: Ticket 186 status reflects completed cutovers.
+
+The old absolute path appears only in the rename plan. The working branch
+`claude/tickets-169-173-advisor-analysis` received the same rename through the
+October 9 merge; its branch-only QA-feed reference was updated then.
+
+### Retention and cleanup criteria (nothing deleted)
+
+- Keep `emixd12/emixd12.github.io` indefinitely; it serves the legacy evidence URLs.
+- Never create a repository named `habit-tracking-app`.
+- Keep the `/Users/emi/Coding Projects/habit-tracking-app` symlink until no
+  running tool or saved configuration uses that path. Known remaining users:
+  open Codex chats with the old sandbox root and the generated Codex environment.
+- Keep `/Users/emi/Coding Projects/.cadence-rename-backup-20261007` (mode 0700,
+  including the Popmelt archive and pre-change Codex config) until native
+  updater acceptance and one successful scheduled Trust run are recorded; then
+  the owner decides on deletion.
+- Disposable after Ticket 186 closes: `/private/tmp/cadence-rename-release`
+  worktree (remove with `git worktree remove`), `/private/tmp/cadence-rename-20261007`
+  logs and baselines, and the session scratch clone used for staging.
