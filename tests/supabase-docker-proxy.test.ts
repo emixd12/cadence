@@ -29,8 +29,8 @@ function job(image: string, command: string[], env: string[]) {
   return { Image: image, Cmd: command, Env: env, Labels: { ...labels }, HostConfig: { NetworkMode: "cadence-local" } };
 }
 const jobs = [
-  job("public.ecr.aws/supabase/gotrue:v2.189.0", ["gotrue", "migrate"], [`GOTRUE_DB_DATABASE_URL=postgresql://supabase_auth_admin:private@${DB}:5432/postgres`]),
-  job("public.ecr.aws/supabase/storage-api:v1.60.4", ["node", "dist/scripts/migrate-call.js"], [`DATABASE_URL=postgresql://supabase_storage_admin:private@${DB}:5432/postgres`]),
+  job("public.ecr.aws/supabase/gotrue:v2.189.0", ["gotrue", "migrate"], [`GOTRUE_DB_DATABASE_URL=postgresql://supabase_auth_admin:synthetic-fixture-password@${DB}:5432/postgres`]),
+  job("public.ecr.aws/supabase/storage-api:v1.60.4", ["node", "dist/scripts/migrate-call.js"], [`DATABASE_URL=postgresql://supabase_storage_admin:synthetic-fixture-password@${DB}:5432/postgres`]),
   job("public.ecr.aws/supabase/realtime:v2.103.2", ["/app/bin/realtime", "eval", '{:ok, _} = Application.ensure_all_started(:realtime)\n{:ok, _} = Realtime.Tenants.health_check("realtime-dev")'], [`DB_HOST=${DB}`, "DB_PORT=5432", "DB_NAME=postgres"]),
 ];
 
