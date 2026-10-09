@@ -1,4 +1,3 @@
-import { popmelt } from "@popmelt.com/core/astro";
 import { defineConfig } from "astro/config";
 
 const site =
@@ -7,7 +6,6 @@ const site =
 export default defineConfig({
   site,
   output: "static",
-  integrations: [popmelt()],
   // Keep this workspace independent from the web app's root Tailwind pipeline.
   vite: {
     css: {

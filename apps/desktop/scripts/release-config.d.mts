@@ -1,8 +1,8 @@
 export const RELEASE_IDENTIFIER: "app.cadence.desktop";
 export const RELEASE_NAME: "Cadence";
 export const RELEASE_TARGET: "aarch64-apple-darwin";
-export const PREVIEW_ENDPOINT: "https://github.com/emixd12/habit-tracking-app/releases/download/desktop-preview/latest.json";
-export const UPDATER_QA_ENDPOINT: "https://github.com/emixd12/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json";
+export const PREVIEW_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json";
+export const UPDATER_QA_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json";
 export function createReleaseBuildEnvironment(env: Record<string, string | undefined>): Record<string, string | undefined>;
 export function createPreviewBuildEnvironment(env: Record<string, string | undefined>): Record<string, string | undefined>;
 export type ReleaseOverlay = {

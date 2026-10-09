@@ -66,7 +66,7 @@ if(tool==='npm') {
     environment = { NODE_ENV: process.env.NODE_ENV, ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("APPLE_") && !key.startsWith("TAURI_") && !key.startsWith("CADENCE_UPDATER_") && !key.startsWith("VITE_"))) };
     Object.assign(environment, { PATH: `${path.join(directory, "bin")}:${process.env.PATH}`, TEST_COMMAND_LOG: log,
       CADENCE_APPLE_PROVISIONING_PROFILE: path.join(directory, "Cadence.provisionprofile"),
-      CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/habit-tracking-app/releases/download/desktop-preview/latest.json",
+      CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json",
       CADENCE_UPDATER_PUBLIC_KEY: Buffer.from("untrusted comment: test public key\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\n").toString("base64") });
     writeFileSync(environment.CADENCE_APPLE_PROVISIONING_PROFILE!, "synthetic profile");
   });

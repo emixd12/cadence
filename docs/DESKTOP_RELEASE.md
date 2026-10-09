@@ -1,5 +1,12 @@
 # Desktop release
 
+Ticket 186 prepares the source repository name `emixd12/cadence` and preview feed
+`https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
+Cutover remains gated by `docs/qa/cadence-project-rename.md`. Installed clients
+retain their original endpoints through verified GitHub redirects. Historical
+release observations below retain their original names and URLs.
+
+
 Ticket 113 completed the unnotarized Apple Silicon preview and updater-
 acceptance milestone on 2026-08-31. The preview uses ad hoc Apple code signing
 and a persistent Tauri updater signing key. It does not claim Developer ID
@@ -144,7 +151,7 @@ The packet discloses uncommitted build inputs and
 the mismatch with the proposed baseline tag's automatic source archive.
 
 September 28 controlled updater preparation adds one exact QA feed to preview
-validation: `https://github.com/emixd12/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json`.
+validation: `https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json`.
 The local `0.1.1-preview.46` source uses that endpoint, ad hoc signing, legacy
 Keychain storage, and the existing persistent updater key. Its intended target is
 the unchanged notarized rc.3. The staged packet lives under ignored

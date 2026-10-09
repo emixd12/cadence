@@ -1,8 +1,8 @@
 export const RELEASE_IDENTIFIER = "app.cadence.desktop";
 export const RELEASE_NAME = "Cadence";
 export const RELEASE_TARGET = "aarch64-apple-darwin";
-export const PREVIEW_ENDPOINT = "https://github.com/emixd12/habit-tracking-app/releases/download/desktop-preview/latest.json";
-export const UPDATER_QA_ENDPOINT = "https://github.com/emixd12/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json";
+export const PREVIEW_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json";
+export const UPDATER_QA_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json";
 
 export function createReleaseBuildEnvironment(env) {
   const buildEnvironment = { ...env, CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false" };
@@ -41,7 +41,7 @@ export function validatePreviewConfiguration(base, overlay) {
     errors.push("An explicit preview SemVer such as 0.1.1-preview.1 is required.");
   }
   if (overlay.bundle?.macOS?.signingIdentity !== "-") errors.push("Preview builds require ad hoc signing.");
-  if (![PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT].includes(overlay.plugins?.updater?.endpoints?.[0])) errors.push("Preview builds must use the dedicated preview feed or reviewed updater QA feed in emixd12/habit-tracking-app.");
+  if (![PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT].includes(overlay.plugins?.updater?.endpoints?.[0])) errors.push("Preview builds must use the dedicated preview feed or reviewed updater QA feed in emixd12/cadence.");
   return errors;
 }
 

@@ -269,3 +269,307 @@ collect fresh evidence; Task 6 still requires pausing the workflow before cutove
 
 A Dependabot branch (`86f5eb9`, devalue 5.9.4) produced preview builds on both
 Vercel projects October 8. Production aliases did not change.
+
+## October 8 continuation: Task 6 (owner selected Task 6 only)
+
+- Trust workflow `public-trust-evidence.yml` (ID `343427146`): previous state
+  `active`; now `disabled_manually`. No run was in progress. Restore it in Task 8.
+- Committed `2631e62` locally and pushed `codex/project-rename` to
+  `emixd12/habit-tracking-app`. It contains `9eda5c0` and 14 commits beyond
+  `origin/main`. No pull request was opened; `main` is unchanged.
+- The push triggered Git preview builds on both existing projects. Both are
+  READY at `2631e62`: app `dpl_FCm15afuv4nCDuLpkuXFLVpX5GKJ`, marketing
+  `dpl_2xxB1HXcu9tW5WA5ohWtcxQxMS1e`. These use Preview configuration. They are
+  not the production-configured stages that Task 6 requires.
+- GitHub name-dependent surfaces: zero deploy keys, zero repository hooks and
+  zero rulesets. OIDC uses the default subject (`repo:emixd12/habit-tracking-app`).
+  Only `deploy-pages` requests `id-token: write`; no external cloud trust policy
+  uses it. GitHub App installations are not listed: the `gh` token returned HTTP
+  403 for that endpoint. Check them in the settings page before Task 7.
+
+### Blocked: production-configured staging
+
+The Claude Code permission classifier denied
+`vercel deploy --prod --skip-domain` from a clean clone of `2631e62`. That command
+assigns no domain, but the classifier treats it as a production deploy. No retry
+or alternative path was attempted. The production-configured marketing and app
+stages, and their `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` pairing, remain open.
+
+Open provenance question for staging: `public-trust-evidence.service.ts` reads
+`VERCEL_GIT_COMMIT_SHA`. The current production app came from a CLI upload with
+`gitSource` null. Whether CLI deployments populate that variable is unverified.
+The leading assumption is that this mismatch causes the scheduled Trust failures.
+
+### Production-configured staging (owner allowed the deploy, October 8)
+
+- Marketing stage: `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`, target `production`,
+  READY, no domain assigned. Built by CLI from a clean clone of `2631e62`
+  (zero working-tree changes; the `.env.local` pulled by `vercel link` was deleted
+  before upload). Metadata records `githubCommitSha` and `sourceCommit`
+  `2631e62b6408d07544f6b4db1799df355b186432`, repo `emixd12/habit-tracking-app`.
+  `cadence-me.com` still resolves to `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`.
+- CLI deployments from a Git checkout carry `githubCommitSha` metadata. Whether
+  the runtime `VERCEL_GIT_COMMIT_SHA` is populated remains unverified.
+- App stage: blocked. The permission classifier denied the app deploy command
+  (`--prod --skip-domain` with per-deployment
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID=dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52` via
+  `-e` and `-b`). No retry occurred. The project-level production setting was
+  not changed.
+
+### App stage (owner allowed the deploy, October 8)
+
+- App stage: `dpl_obMzi5XVoyPmeR329MduaxV8f2MS`, target `production`, READY,
+  built by CLI from the same clean clone of `2631e62`. Metadata records
+  `githubCommitSha` and `sourceCommit` `2631e62b6408d07544f6b4db1799df355b186432`.
+  Per-deployment `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` (runtime and build) is
+  `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`. The project-level production value was not changed.
+- Custom domains are unchanged: `app.cadence-me.com` resolves to
+  `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n`; `cadence-me.com` resolves to
+  `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`. Both projects' production targets are unchanged.
+- Side effect: `--skip-domain` still moved the team-scoped `vercel.app` aliases.
+  `cadence-emis-projects-4c886aeb.vercel.app` now resolves to the app stage, and
+  `cadence-marketing-emis-projects-4c886aeb.vercel.app` to the marketing stage.
+  Vercel SSO protection covers both (HTTP 302 to `vercel.com/sso-api`).
+  `cadence-marketing-two.vercel.app` and the `git-main` alias did not move.
+  `docs/VERCEL_WORKFLOW.md` lists the app alias as a secondary production alias.
+  Restore with `vercel alias set` to `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n` and
+  `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR` if required.
+- `vercel curl` with an existing automation bypass read `/api/public/trust-evidence`
+  on the app stage. It reports `feed_state` `unavailable`: the staged code reads
+  `https://emixd12.github.io/cadence/trust/latest.json`, which does not exist before
+  Task 7. This is the expected, truthful pre-rename state. The response does not
+  expose the runtime source commit, so `VERCEL_GIT_COMMIT_SHA` remains unverified.
+  The project's bypass-secret count stayed at three.
+
+### Alias restoration and Task 7 preflight (October 8)
+
+- Owner approved restoring the moved team aliases. `vercel alias set` returned
+  success; readback: `cadence-emis-projects-4c886aeb.vercel.app` →
+  `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n`, `cadence-marketing-emis-projects-4c886aeb.vercel.app`
+  → `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`. Custom domains remain unchanged.
+- `emixd12/cadence` still returns HTTP 404. Archive repository ID `1409433554`
+  remains at `a0419f47ce3cc73eeb97af1d3d910a3bbcb66588`.
+- With the Trust workflow paused, all 76 archived `habit-tracking-app/` files match
+  the live old-site bytes (SHA-256, zero mismatches, zero fetch failures).
+  No archive refresh is needed.
+- GitHub App inventory: the Chrome session was not signed in to GitHub, and the
+  `gh` token cannot list installations. Apps observed posting checks or statuses on
+  three recent commits: Vercel, Supabase, CodeRabbit, Cursor, Claude, GitHub Actions
+  and GitHub Advanced Security. The settings-page inventory remains unverified.
+- Security settings to recheck after rename: Dependabot security updates,
+  secret scanning and push protection enabled; non-provider patterns and validity
+  checks disabled.
+- Codex gate: on October 8 the owner confirmed that new Codex sessions run at the
+  physical `cadence` root. This closes the fresh-session sandbox check by owner attestation.
+
+## Task 7: GitHub repository rename (October 8)
+
+Preconditions closed first: owner confirmed fresh Codex sessions; the owner's
+screenshot of installed GitHub Apps lists ChatGPT Codex Connector, Claude,
+coderabbitai, Cursor, Google Labs Jules, Linear, Render, Supabase and Vercel.
+coderabbitai, Cursor and Vercel show pending permission-update requests; none
+was accepted. GitHub Apps bind repositories by ID.
+
+- Renamed at `2026-10-08T20:56:29Z` with `gh repo rename`. Readback:
+  `emixd12/cadence`, ID `1261353608`, public, default `main`, unarchived.
+- Settings snapshot diff (pre/post): only name and URL fields changed. Refs (142),
+  releases and asset IDs/sizes, repository and environment variables, secret
+  names, environments, branch protection, Actions permissions, workflow states
+  and security settings are identical. Pages `html_url` is now
+  `https://emixd12.github.io/cadence/`.
+- Legacy evidence: GitHub Pages' CDN ignores query strings and briefly served
+  cached project-site copies. After cache expiry, all 76 legacy
+  `habit-tracking-app/` URLs returned HTTP 200 with matching SHA-256 bytes, every
+  one with the archive's October 7 `last-modified`. The old project root
+  returns 404. `/cadence/trust/` serves the moved project site (37 entries).
+- Old-name redirects: repository, issues, commit, blob, raw and releases pages
+  resolve; `git ls-remote` on the old URL returns `5e7ebde`.
+- Main checkout remote is now `git@github.com:emixd12/cadence.git`; both linked
+  worktrees share it and have no worktree-specific URL override.
+- Updater: both feeds, both update archives and the preview.19 DMG download
+  through old and new URLs with baseline SHA-256 values (10/10). Both archive
+  signatures verify with the repository Minisign verifier and the public key
+  embedded in the installed `/Applications/Cadence.app` (`0.1.1-preview.45`,
+  key ID `A305E094044E04A`). That app's feed URL uses the old repository path.
+  Native updater redirect acceptance (Tauri HTTP client) remains open; the curl
+  chain is not a substitute. The installed app was not changed.
+- Vercel: both projects still report slug `habit-tracking-app` with repository
+  ID `1261353608` and unchanged production deployments. A Git-triggered build
+  probe follows below.
+- Vercel Git probe: pushing evidence commit `ac3573a` to `codex/project-rename`
+  created READY previews on both projects (app `dpl_9STSuVXac3PmNDdXb677Vu3wAgpb`,
+  marketing `dpl_4fSi2Vp6yGhXN7fNVChZDj8rGEty`) with `githubRepo` `cadence` and
+  repository ID `1261353608`. Both project links now report slug `cadence`.
+  No reconnection was needed. Production targets and custom domains are unchanged.
+
+Task 7 is complete except native updater acceptance. Early rollback was not triggered.
+
+## Task 8: promotion and new evidence root (October 9 UTC)
+
+- Owner selected promotion through `main`. PR #92
+  (https://github.com/emixd12/cadence/pull/92) passed all 10 checks, including
+  `verify` and CodeQL. Codex review was skipped for usage limits, CodeRabbit by
+  repository policy. Merged with a merge commit at `2026-10-09T01:18:01Z`:
+  `3575aa4f4239cce7d5914f4474b50b9b41c1938b`. `main` now contains the deployed
+  `9eda5c0` history, so it is no longer behind production.
+- Git production builds: app `dpl_4dkuiJXfjhJ6WWmcJn2GMf5ey9Mo`, marketing
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`, both READY at `3575aa4`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` (production, env ID
+  `vGVn8afMCddubMpC`) changed from `dpl_E3pfJW9H5aqC4t3FdqzE9wK2hsJL` to
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`. `vercel redeploy` produced app
+  `dpl_C7b2gbGmkJ6GsyeRpoYa5sbksKsh` (Git source `3575aa4`, repo ID `1261353608`).
+- Current aliases: `app.cadence-me.com` → `dpl_C7b2gbGmkJ6GsyeRpoYa5sbksKsh`;
+  `cadence-me.com` → `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw`.
+- Smoke: `/login`, `/trust` and `/api/public/trust-evidence` return 200;
+  marketing returns 200 and links only to `github.com/emixd12/cadence`.
+- `TRUST_PAGES_ORIGIN` is `https://emixd12.github.io/cadence/` at repository,
+  `public-trust-preview` and `public-trust-production` scope. No other scope sets it.
+- Trust workflow restored to its previous `active` state. The renamed project
+  site had already moved the existing artifact to `/cadence/trust/` with all 37
+  entries, so no seed workflow or empty-history initialization was used.
+- Two production publications from `main` (`run_rls=false`):
+  runs `37869476564` and `37869800329`. Both collected and published; each then
+  failed the existing post-publication adverse-evidence gate. The index holds
+  39 entries: 37 legacy URLs (byte-identical to the archive) and 2 new
+  `/cadence/trust/` snapshots with readable details.
+- Live app Trust feed: `live`. Source-to-deployment provenance, code scanning,
+  artifact integrity and both route comparisons pass. Dependency and secret
+  scanning are `unavailable`; RLS smoke is `not_run` by design.
+
+### Pre-existing hosted migration drift (not a rename regression)
+
+`hosted_migration_boundary` fails truthfully. `main` ends at
+`20260926170000`. Branch `codex/fix-daily-brief-cpu-retries` (commit `89b1ace`,
+September 27) records an authorized hosted deployment of
+`20260927173716_fix_daily_brief_nonretryable_conflicts.sql`. That branch is not in
+`main` or any production deployment. Resolving it needs a separate reviewed merge.
+The local `supabase migration list --linked` attempt was killed without output;
+hosted state was inferred from the branch record and the collector result.
+
+### Remaining
+
+- Native updater acceptance through the Tauri client (curl chains, hashes and
+  signatures pass).
+- Observe the next scheduled Trust run (cron `17 7 * * *`) for history retention.
+- Task 9 authenticated/manual acceptance and Task 10 residual-reference
+  classification.
+- Propagate `main` into ongoing development branches without disturbing their
+  uncommitted work. Keep the old-path symlink until dependent tools are verified.
+- Both Codex automations remain PAUSED and unchanged.
+
+### PR #93 merge and app redeploy (October 9 UTC)
+
+- PR #93 passed all 10 checks and merged at `2026-10-09T03:36:44Z` as
+  `2f539985bbdc4017b9b6235be9437758719e5b29`.
+- Both projects rebuilt production from Git at `2f53998`: app
+  `dpl_4FkGgNtwvwhDV3eSkB3kCXxda2nc`, marketing `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_5YScAALgQMdfZRsyLLFUPmTvTvtw` to `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`.
+  `vercel redeploy` produced app `dpl_DZZMLto9c7zzDNmcwfJYYKMbDJLA`
+  (Git source `2f53998`, repo ID `1261353608`).
+- `app.cadence-me.com` → `dpl_DZZMLto9c7zzDNmcwfJYYKMbDJLA`; `cadence-me.com` →
+  `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm`. `/login`, `/trust` and marketing return 200.
+- This note exists only in the local checkout; committing it would trigger
+  another production rebuild and marketing-ID update.
+
+## Task 9: acceptance (October 9 UTC)
+
+### Repository checks
+
+No non-documentation file changed between `f0315be` (full Task 9 command set:
+2,332 tests passed, 29 gated skips, all builds and governance checks) and `main`
+at `2f53998`. PR #92 and #93 `verify` and CodeQL passed on GitHub. From the
+physical root, `marketing:build` and `desktop:build` pass; Cargo reports workspace
+root and target under `/Users/emi/Coding Projects/cadence`.
+
+### Hosted
+
+- Unauthenticated: `/timeline`, `/behaviors`, `/export`, `/settings` and
+  `/analytics` redirect to `/login?next=…`; `/login` and `/trust` return 200.
+  Marketing `/`, `/about`, `/faq` and `/docs` return 200. The marketing DMG link
+  uses `emixd12/cadence` and downloads the baseline 7,677,808 bytes.
+- Authenticated (existing Chrome session on the test account, read-only; no
+  clicks on actions): Timeline, Behaviors, Export & Import, Settings and Trust
+  render. Settings shows timezone, notifications and Calendar sections. No data
+  changed, and no email was sent.
+- No Supabase Auth, OAuth, Calendar broker, push or reminder configuration was
+  changed by this ticket; production domains are unchanged.
+
+### Local Supabase
+
+`supabase/config.toml` keeps `project_id = "habit-tracking-app"`. Volumes
+`supabase_db_habit-tracking-app` (created 2026-09-22) and
+`supabase_storage_habit-tracking-app` remain. Containers had stopped 11 days
+before the move; none uses a bind mount. Starting only the existing DB container
+showed 2 auth users, 2 profiles, 5 behaviors and 527 occurrences, with 74 local
+migrations through `20260922200000` (the local stack never received the two
+September 26 migrations). The container was stopped again; no reset occurred.
+
+Pre-existing tooling defect: `npm run supabase` is killed with exit 137. The
+npm-published `@supabase/cli-darwin-arm64@2.105.0` binary fails `codesign -v`
+("invalid signature"). Its SHA-256 matches the lockfile tarball and the pre-move
+backups, and the backup copy fails identically. This is not a rename regression.
+Homebrew `supabase` 2.109.1 exists but was not used.
+
+### Popmelt: rename regression (blocks acceptance)
+
+Popmelt 0.16.0 derives its project ID as the first 12 hex digits of SHA-256 of
+`realpath(projectRoot)`. The old path yields `7b732c2eb477` (the existing store
+and Imprint ID); the physical path yields `e6626f30d7e3`. Because Popmelt
+resolves symlinks, the compatibility link does not preserve the old ID. The
+bridge started at the move (pid 49776) logged "Imprint manifest does not match
+this project." Only the October 1 bridge (pid 81775) still holds the old ID in
+memory. `store.json` keeps `store-7b732c2eb477`. `POPMELT_PROJECT_ID` is an
+output, not a supported override. No Popmelt file or process was changed.
+
+### Desktop
+
+The installed app (`0.1.1-preview.45`) embeds the old feed URL; feed, archive
+and signature chains pass through redirects (Task 7). Native Tauri-client
+acceptance remains open. The installed app and its data were not touched.
+
+### Open
+
+- Popmelt Imprint continuity (decision required).
+- Native updater acceptance; next scheduled Trust run.
+- Task 10 residual-reference classification.
+
+## Popmelt removal (October 9)
+
+Task 9 found that Popmelt 0.16.0 derives its project ID from SHA-256 of
+`realpath(projectRoot)`. After the move, every new Popmelt process computed
+`e6626f30d7e3` instead of the existing `7b732c2eb477` and could not load the
+Imprint. The owner chose to remove Popmelt instead of migrating it.
+
+- Code: removed `PopmeltProvider` (deleted `app/providers.tsx`; the root layout
+  renders children directly), `withPopmelt` from `next.config.ts`, the Astro
+  integration, the `popmelt wrap` dev wrapper and both `@popmelt.com/core`
+  dependencies. `.gitignore` keeps `.popmelt/` so older checkouts cannot commit
+  private Popmelt data.
+- Verification (Node 22.22.3): `agents:check`, `interactions:check`,
+  `resolvers:check`, `lint`, `typecheck`, `design-system:check`, `core:check`,
+  `marketing:build`, `marketing:check`, `build`, `desktop:typecheck` and
+  `desktop:build` pass. Tests: 2,332 passed, 29 existing gated skips.
+- Local state is handled outside Git: the `.popmelt/` data is archived in the
+  private rename backup, Popmelt processes are stopped, and the global Codex
+  plugin is disabled.
+- Local cleanup done: stopped 9 Popmelt processes (2 bridges, 7 Codex MCP
+  helpers); moved `.popmelt/` (17 MB) to
+  `.cadence-rename-backup-20261007/popmelt-archive-20261009`; set Codex plugin
+  `popmelt-core@personal` to `enabled = false` after saving the prior config as
+  `codex-config-before-popmelt-disable.toml` in the same backup. PR #94 removes the code.
+
+### PR #94 merge and app redeploy (October 9 UTC)
+
+- PR #94 passed all 10 checks and merged at `2026-10-09T04:18:46Z` as
+  `610e9384cf2e886502a2b9b5b6c997e97ab1436c`.
+- Git production builds at `610e938`: app `dpl_9VQUfcoAnub9P5qvTsAcD8jy9EZN`,
+  marketing `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`.
+- App `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_JBSq13x2UACqVGVKxVC1sUeLmGNm` to `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`.
+  `vercel redeploy` produced app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` (Git source
+  `610e938`, repo ID `1261353608`). A transient local network drop interrupted
+  the CLI's progress polling; API readback confirmed READY afterwards.
+- `app.cadence-me.com` → `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV`; `cadence-me.com` →
+  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`. `/login`, `/trust`, the Trust API, marketing
+  `/` and `/about` return 200. Neither served page references Popmelt.
