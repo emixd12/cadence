@@ -19,6 +19,8 @@ In progress; local and remote cutovers are done.
   migration `20260927173716`; this predates the rename.
 - Updater: feeds, archives and signatures pass through old and new URLs.
 
+Popmelt was removed on October 9 after the move changed its path-derived project ID.
+
 Open: native updater acceptance, the next scheduled Trust run, Task 9 manual
 acceptance, Task 10 residual-reference classification, and propagating `main`
 into ongoing branches. Evidence: `docs/qa/cadence-project-rename.md`; plan:

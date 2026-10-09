@@ -456,3 +456,23 @@ hosted state was inferred from the branch record and the collector result.
 - Propagate `main` into ongoing development branches without disturbing their
   uncommitted work. Keep the old-path symlink until dependent tools are verified.
 - Both Codex automations remain PAUSED and unchanged.
+
+## Popmelt removal (October 9)
+
+Task 9 found that Popmelt 0.16.0 derives its project ID from SHA-256 of
+`realpath(projectRoot)`. After the move, every new Popmelt process computed
+`e6626f30d7e3` instead of the existing `7b732c2eb477` and could not load the
+Imprint. The owner chose to remove Popmelt instead of migrating it.
+
+- Code: removed `PopmeltProvider` (deleted `app/providers.tsx`; the root layout
+  renders children directly), `withPopmelt` from `next.config.ts`, the Astro
+  integration, the `popmelt wrap` dev wrapper and both `@popmelt.com/core`
+  dependencies. `.gitignore` keeps `.popmelt/` so older checkouts cannot commit
+  private Popmelt data.
+- Verification (Node 22.22.3): `agents:check`, `interactions:check`,
+  `resolvers:check`, `lint`, `typecheck`, `design-system:check`, `core:check`,
+  `marketing:build`, `marketing:check`, `build`, `desktop:typecheck` and
+  `desktop:build` pass. Tests: 2,332 passed, 29 existing gated skips.
+- Local state is handled outside Git: the `.popmelt/` data is archived in the
+  private rename backup, Popmelt processes are stopped, and the global Codex
+  plugin is disabled.
