@@ -617,3 +617,54 @@ October 9 merge; its branch-only QA-feed reference was updated then.
 - Disposable after Ticket 186 closes: `/private/tmp/cadence-rename-release`
   worktree (remove with `git worktree remove`), `/private/tmp/cadence-rename-20261007`
   logs and baselines, and the session scratch clone used for staging.
+
+## Native updater acceptance (October 9)
+
+Harness: a throwaway Rust binary outside the repository, built against the app's
+own `Cargo.lock` (`tauri` 2.11.5, `tauri-plugin-updater` 2.10.1, `reqwest`
+0.13.4). It creates a Tauri mock app, configures the updater with the public key
+embedded in the installed `/Applications/Cadence.app` (key ID
+`A305E094044E04A`), points `executable_path` at a fake `.app` in the scratch
+directory, forces `version_comparator` to offer the feed version, then calls the
+plugin's own `check()` and `download()`. `download()` verifies the Minisign
+signature before returning bytes. `install()` is never called.
+
+| Feed URL | Version | Bytes | SHA-256 matches baseline | Signature |
+| --- | --- | --- | --- | --- |
+| `…/habit-tracking-app/releases/download/desktop-preview/latest.json` (installed app's endpoint) | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/cadence/releases/download/desktop-preview/latest.json` | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+| `…/cadence/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+
+Both feeds still advertise download URLs under the old repository name; the
+plugin's HTTP client followed GitHub's redirects for feed and archive.
+
+Negative control: a freshly generated, unrelated Minisign public key made
+`download()` fail with `Minisign(UnexpectedKeyId)`. The temporary key was deleted.
+
+The installed app's file-tree SHA-256 was identical before and after
+(`8bf6c05925112b0e…`). No update was installed, no app data was touched, and no
+release or feed changed. The installed app (`0.1.1-preview.45`) is newer than
+both feeds, so its own check reports no update; the forced comparator exercised
+the download path. Native updater acceptance passes.
+
+## Scheduled Trust run and closure (October 9)
+
+Scheduled run `37943471227` started 2026-10-09T14:20:45Z on `main` at
+`74c8d4f`. Both `collect` and `publish` succeeded; no adverse-evidence gate
+fired. Snapshot:
+`https://emixd12.github.io/cadence/trust/37943471227/dpl_J3LeAsvAZBFAU34FQPrQ29ZszpBR/dpl_9iPg2pJGY6ZyP7mbcLNtppAzjqNL/20261009T142157Z-74c8d4f833b7.json`.
+
+- History: the index holds 40 entries, 37 legacy URLs plus 3 `/cadence/trust/`
+  snapshots. All 37 legacy snapshots and their details files match the archive
+  bytes (SHA-256, zero mismatches). All new snapshots and details are reachable.
+- Checks: source-to-deployment provenance, code scanning, public artifact
+  integrity, both live route comparisons and `hosted_migration_boundary`
+  (`20260927173716`, after PR #100) pass. Dependency and secret scanning remain
+  `unavailable` for token-scope reasons; the RLS smoke is `not_run` by design.
+- The live app Trust feed reports the same states.
+
+Every plan gate is closed. Ticket 186 is complete. Retention and cleanup
+criteria in the Task 10 section remain in force: keep the archive site, never
+reuse `habit-tracking-app`, keep the old-path symlink while tools use it, and
+keep the private backup until the owner decides to delete it.
