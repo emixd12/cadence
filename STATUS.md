@@ -143,6 +143,46 @@ This task changes documentation only. Verification: `agents:check`,
 `interactions:check`, `resolvers:check` and `git diff --check` pass. Runtime tests,
 builds, provider requests and deployments were not run for this ticket-filing task.
 
+## Supabase CPU alert production fix — September 27, 2026
+
+The owner authorized immediate remediation. Supabase applied migration
+`20260927173716_fix_daily_brief_nonretryable_conflicts` at 13:37 New York time.
+Readback confirms exactly three error-code changes and preserved function
+bodies, owners and grants. PostgREST sessions are idle; an 80.7-second observation
+recorded 53 commits, zero rollbacks, and no active Daily Brief sessions. No
+restart, compute resize, account-data or consent change was needed. CPU percentage
+was not directly measured. Calendar disclosure must still be renewed deliberately
+in Settings if the owner wants to resume Calendar-inclusive briefs.
+
+The fix branch records the already-applied PR #82/#83 migrations byte-for-byte,
+their related public RPC types, and the new migration's actual provider-assigned
+version. Hosted statements match all three files. Application PR integration
+and full Docker/Supabase replay remain separate work. Detailed evidence:
+`docs/qa/2026-09-27-supabase-cpu.md`.
+
+October 9, 2026: the fix branch merged into `main`. The repository migration boundary
+(`20260927173716`) now matches hosted history, which Trust's
+`hosted_migration_boundary` check compares. Function source in the September 26
+migrations still raises `40001`; any future redefinition must use `55000`.
+
+## Supabase CPU alert initial investigation — September 27, 2026
+
+Investigation found a continuing Daily Brief `40001` retry storm: 8,638,404
+Calendar-disclosure errors on September 25 and 359,874 in a September 27 hour.
+The prepared migration replaces three application-conflict error codes with
+`55000`, preserving consent, grants and admission behavior. Existing adapters
+already return `context_changed` / HTTP 409. It preserves both main and the newer
+hosted writer definitions. Web and linked desktop share the fix; local-only
+desktop and marketing are unaffected; native mobile remains deferred.
+
+Repository checks, production build and 2,211 tests pass (40 skipped). A local PGlite SQL regression
+fails before the migration and passes afterward for both writer versions,
+including privilege preservation and rejected-write rollback. Full Supabase
+replay is blocked by denied Docker socket access. Hosted rollout remains open:
+production has PR #82/#83 migrations absent from main, which must be reconciled
+before the new migration deploys. No hosted mutation or CPU recovery is claimed.
+Evidence, SQL smoke and owner actions: `docs/qa/2026-09-27-supabase-cpu.md`.
+
 ## Security alert triage — September 26, 2026
 
 After PR #80 merged, CodeQL rescanned `main` and reports zero open
