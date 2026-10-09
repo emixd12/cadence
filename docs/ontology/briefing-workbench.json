@@ -1,5 +1,5 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "scope": "Briefing workbench",
   "terms": [
     {
@@ -631,7 +631,7 @@
       "id": "config.length.maxWords",
       "label": "Maximum words",
       "category": "Configuration",
-      "definition": "Sets the combined word cap for main text and suggestion text. The setting accepts 40 through 120; generated output may be shorter than 40 words.",
+      "definition": "Sets the combined word cap for main text, suggestion text and any pattern tip. Version 1.3 configurations accept 40 through 180; earlier versions accept up to 120. Generated output may be shorter than 40 words.",
       "contracts": [
         {
           "path": "packages/core/src/services/briefing-config.ts",
@@ -4052,6 +4052,378 @@
       "relatedIds": [
         "planner.day-evidence",
         "planner.rejection.duration-unknown"
+      ]
+    },
+    {
+      "id": "config.analysis",
+      "label": "Analysis lanes",
+      "category": "Configuration",
+      "definition": "Groups lane selection, the one-tip ceiling and the tip cooldown. Configurations before 1.3 select no lanes. Selection never grants a source; optional lanes also need account disclosure.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-config.ts",
+          "symbol": "BriefingAnalysisConfig"
+        }
+      ],
+      "relatedIds": [
+        "config.analysis.lanes",
+        "config.analysis.maxTips",
+        "config.analysis.cooldownDays",
+        "analysis.lane"
+      ]
+    },
+    {
+      "id": "config.analysis.lanes",
+      "label": "Selected lanes",
+      "category": "Configuration",
+      "definition": "Lists analysis lanes, by export prompt ID, that may produce findings. Order is normalized, so equivalent selections share a configuration revision.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-config.ts",
+          "symbol": "BriefingAnalysisConfig"
+        }
+      ],
+      "relatedIds": [
+        "config.analysis",
+        "analysis.lane"
+      ]
+    },
+    {
+      "id": "config.analysis.maxTips",
+      "label": "Tip ceiling",
+      "category": "Configuration",
+      "definition": "Allows at most one pattern tip per brief when set to 1. A ceiling, not a quota: many briefs carry no tip.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-config.ts",
+          "symbol": "BriefingAnalysisConfig"
+        }
+      ],
+      "relatedIds": [
+        "config.analysis",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "config.analysis.cooldownDays",
+      "label": "Tip cooldown",
+      "category": "Configuration",
+      "definition": "Local days, 7 through 30, before the same tip fingerprint may appear again. A tip shown today may reappear today after a retry or refresh.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-config.ts",
+          "symbol": "BriefingAnalysisConfig"
+        }
+      ],
+      "relatedIds": [
+        "config.analysis",
+        "analysis.tip-fingerprint"
+      ]
+    },
+    {
+      "id": "analysis.lane",
+      "label": "Analysis lane",
+      "category": "Analysis",
+      "definition": "A fixed contract that states its question, required inputs, lookback, sufficiency rule, permitted proposals and unavailable-input behavior. Missing, capped or undisclosed inputs make the lane unavailable.",
+      "contracts": [
+        {
+          "path": "packages/core/src/resolvers/briefing-analysis.resolver.ts",
+          "symbol": "BRIEFING_ANALYSIS_LANES"
+        }
+      ],
+      "relatedIds": [
+        "config.analysis.lanes",
+        "analysis.finding",
+        "analysis.optional-source"
+      ]
+    },
+    {
+      "id": "analysis.finding",
+      "label": "Analysis finding",
+      "category": "Analysis",
+      "definition": "A calculated result with named counts and denominators, coverage, scope, a passed sufficiency rule, materiality, limitations, relevance to today and a proposed adjustment. The model explains findings; it never calculates them.",
+      "contracts": [
+        {
+          "path": "packages/core/src/resolvers/briefing-analysis.resolver.ts",
+          "symbol": "resolveBriefingAnalysis"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "analysis.tip",
+      "label": "Pattern tip",
+      "category": "Analysis",
+      "definition": "At most one finding offered to the model for an optional tip. It must bear on today and pass cooldown and spacing. Cadence shows a deterministic evidence line beside the model's wording.",
+      "contracts": [
+        {
+          "path": "packages/core/src/resolvers/briefing-analysis.resolver.ts",
+          "symbol": "selectBriefingTip"
+        }
+      ],
+      "relatedIds": [
+        "analysis.finding",
+        "analysis.tip-fingerprint",
+        "config.analysis.maxTips"
+      ]
+    },
+    {
+      "id": "analysis.tip-fingerprint",
+      "label": "Tip fingerprint",
+      "category": "Analysis",
+      "definition": "A one-way server hash of lane, Behavior, subject and evidence band. Only completed in-app attempts record it, with its adjacent bands and a last-shown date; workbench runs never do. Evidence two or more bands away yields a fingerprint outside the cooldown.",
+      "contracts": [
+        {
+          "path": "packages/core/src/resolvers/briefing-analysis.resolver.ts",
+          "symbol": "selectBriefingTip"
+        }
+      ],
+      "relatedIds": [
+        "analysis.tip",
+        "config.analysis.cooldownDays"
+      ]
+    },
+    {
+      "id": "analysis.optional-source",
+      "label": "Optional analysis source",
+      "category": "Analysis",
+      "definition": "Reminder delivery history and Notes on Not Completed occurrences. Each needs its own revocable Settings disclosure; the database refuses them otherwise, and existing enablement never includes them.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-analysis.ts",
+          "symbol": "BriefingAnalysisOptionalSource"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "config.analysis"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.none",
+      "label": "Analysis scenario: none",
+      "category": "Workbench",
+      "definition": "No analysis source: every selected lane reports unavailable. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.no-issue",
+      "label": "Analysis scenario: no_issue",
+      "category": "Workbench",
+      "definition": "Steady Completed history with same-day marks; lanes find nothing and no tip is offered. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.weekday-dip",
+      "label": "Analysis scenario: weekday_dip",
+      "category": "Workbench",
+      "definition": "Sundays, today's weekday, mostly Not Completed; the weekday lane finds a relevant dip. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.marking-offset",
+      "label": "Analysis scenario: marking_offset",
+      "category": "Workbench",
+      "definition": "Completed marks recorded hours after the scheduled slot on the same day. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.heavy-load",
+      "label": "Analysis scenario: heavy_load",
+      "category": "Workbench",
+      "definition": "Alternate same-weekday days carry five extra Behaviors that finish less often. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.decision-debt",
+      "label": "Analysis scenario: decision_debt",
+      "category": "Workbench",
+      "definition": "Prior-day Unresolved occurrences accumulate for one Behavior. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.late-logging",
+      "label": "Analysis scenario: late_logging",
+      "category": "Workbench",
+      "definition": "Most decisions are recorded the next morning. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.corrections",
+      "label": "Analysis scenario: corrections",
+      "category": "Workbench",
+      "definition": "Several recorded decisions are corrected the same evening. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.reminder-association",
+      "label": "Analysis scenario: reminder_association",
+      "category": "Workbench",
+      "definition": "One schedule period with reminders off, then on through a reminder-only revision. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.note-obstacles",
+      "label": "Analysis scenario: note_obstacles",
+      "category": "Workbench",
+      "definition": "Notes on Not Completed occurrences, including a prompt-injection Note. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.small-sample",
+      "label": "Analysis scenario: small_sample",
+      "category": "Workbench",
+      "definition": "Too few Sundays in the current period to support a weekday finding. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.all-unresolved",
+      "label": "Analysis scenario: all_unresolved",
+      "category": "Workbench",
+      "definition": "Every prior day Unresolved; decision debt without completion rates. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.changed-schedule",
+      "label": "Analysis scenario: changed_schedule",
+      "category": "Workbench",
+      "definition": "Sunday dips only before a schedule change; the current period shows none. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
+      ]
+    },
+    {
+      "id": "workbench.analysis-fixture.capped",
+      "label": "Analysis scenario: capped",
+      "category": "Workbench",
+      "definition": "History reported as capped; every selected lane is unavailable. Synthetic; pairs with any day-context fixture.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-analysis-fixtures.ts",
+          "symbol": "briefingAnalysisFixture"
+        }
+      ],
+      "relatedIds": [
+        "analysis.lane",
+        "analysis.tip"
       ]
     }
   ]

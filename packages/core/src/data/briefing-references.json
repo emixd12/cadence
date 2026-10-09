@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-20.1",
+  "version": "2026-10-07.1",
   "references": [
     {
       "id": "nice-ph49-planning",
@@ -16,9 +16,9 @@
     },
     {
       "id": "cadence-manual-truth",
-      "revision": "1",
+      "revision": "2",
       "title": "Cadence: manual truth",
-      "url": "https://github.com/emixd12/habit-tracking-app/blob/main/docs/PRODUCT_SPEC.md",
+      "url": "https://github.com/emixd12/cadence/blob/main/docs/PRODUCT_SPEC.md",
       "publishedAt": null,
       "reviewedAt": "2026-09-20",
       "kind": "editorial_guidance",

@@ -105,6 +105,20 @@ describe("performance timing", () => {
     expect(serialized).not.toContain("person@example.com");
   });
 
+  it("adds only short machine error codes", async () => {
+    process.env.CADENCE_PERF_LOG = "1";
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    await expect(measurePerformanceSpan({ span: "service.coded" }, async () => {
+      throw Object.assign(new Error("Private"), { code: "rate_limited" });
+    })).rejects.toThrow();
+    await expect(measurePerformanceSpan({ span: "service.uncoded" }, async () => {
+      throw Object.assign(new Error("Private"), { code: "Private note for person@example.com" });
+    })).rejects.toThrow();
+    const [coded, uncoded] = consoleInfo.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+    expect(coded).toMatchObject({ error_code: "rate_limited" });
+    expect(uncoded).not.toHaveProperty("error_code");
+  });
+
   it("redacts uuid-shaped route and span segments", async () => {
     process.env.CADENCE_PERF_LOG = "1";
     const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});

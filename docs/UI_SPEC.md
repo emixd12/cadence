@@ -1037,6 +1037,31 @@ The inspector explains exclusions, duration selection and sample coverage; the
 horse bubble omits routine connector/history diagnostics. The shared bubble keeps
 read-only suggestions, source links, expiry, dismissal and accessible status text.
 
+### Daily Brief recovery, tips and travel (Tickets 168–174)
+
+The shared horse bubble keeps its states: loading, ready and a notice with one
+labeled retry. Notices name the outcome plainly: still being prepared, request
+limit (retry disabled until the server's wait passes), took too long, offline, sign
+in again, changed while prepared, retry limit reached, did not finish loading,
+already started but not shown here, timing expired ("Get a fresh brief") and Timeline
+changed ("Refresh brief"). Close stays a 44px control in every state.
+
+A ready brief may add two quiet sections below the text, separated by a hairline:
+"Pattern tip" (the model's tip plus a muted deterministic evidence line and one
+limitation) and "Travel" (up to four calculated lines: travel-created Behavior
+overlaps, departures, the return or an unknown-return note, then a muted "Calculated
+by Cadence … Not written by the model." line). A hypothetical option that overlaps
+travel adds "This time overlaps planned travel." No new buttons; no apply action.
+
+Settings adds two checkboxes below Calendar timing, each with an exact disclosure
+paragraph, shown only when the server's recipe uses the source (or in development):
+"Include reminder delivery history" and "Include Notes on Not Completed occurrences".
+
+The workbench adds an Analysis scenario select, an Analysis lanes fieldset per
+configuration (lane checkboxes with their questions, "Allow one pattern tip", and
+"Tip cooldown days"), and an Analysis summary beside each result listing lane states,
+reasons and tip-selection decisions. Maximum words accepts up to 180 for 1.3 configs.
+
 ## Historical completion times workbench control
 
 The Recipe inputs fieldset includes an independent native checkbox named

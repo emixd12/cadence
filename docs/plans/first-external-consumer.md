@@ -5,6 +5,31 @@ The filename remains stable for existing links. The authoritative decision is
 [the in-app correction](../DECISIONS.md#2026-09-20-cadence-daily-brief-belongs-inside-cadence).
 Tickets 146–148 now implement an in-app experience, not a separate consumer.
 
+## Planned advisor extension — September 26, 2026
+
+The owner approved filing Tickets 168–174 after reporting unreliable loading and
+overly terse advice. Their requested scope includes travel timing and fitting
+Behaviors around Calendar events, plus occasional adherence tips from structured
+analysis inspired by the export prompt library. Implementation has not started.
+
+The current invocation, input and prose contracts below describe the existing
+release. Tickets 168–174 own their next revision: recover failed or undelivered
+requests without losing dismissal or quotas; add bounded, source-specific findings;
+permit minimal historical evidence to explain useful tips; and suppress repetition.
+Routine ledger recaps remain excluded. Extending Daily Brief needs no second recipe,
+general chatbot, new provider or autonomous execution.
+
+Reuse existing travel calculations and the shared planner for all timing. Preserve
+the current exclusion of travel from model input until provider-use clearance and
+revised disclosure pass. Deterministic, attributed travel guidance beside the brief
+is the supported fallback. Optional Notes and reminder/history sources require
+explicitly defined fields and disclosure; this plan does not turn them on.
+
+`docs/PRODUCT_SPEC.md#planned-advisor-improvements-tickets-168174` owns the planned
+product boundary. `docs/TICKETS.md` owns the sequence, dependencies, platform impact
+and acceptance. Existing workbench/QA records remain canonical. Ticket 168 can ship
+independently; Ticket 174 carries forward open briefing gates without erasing them.
+
 ## Accepted experience
 
 1. On the first app opening of the local day, Cadence presents a daily briefing
@@ -25,6 +50,14 @@ with same-day dismissal preserved through navigation and reopening. Failed attem
 allow an explicit retry; they do not create an automatic retry loop. Account/date
 changes reset the presentation scope. Ticket 148 verifies this policy alongside
 server deduplication and limits; no cross-device dismissal synchronization is implied.
+
+Ticket 168 separates the automatic start, delivery and dismissal. The browser
+records whether ready text reached it, never the text itself. A page-session
+memory lets a remounted Timeline reattach to the in-flight attempt or fresh
+result. An abandoned, failed or server-completed-but-undelivered attempt shows
+a recovery notice with an explicit retry. The server admits one automatic start
+plus three deliberate retries per installation, day and disclosure revision.
+A Timeline change or expiry withdraws delivered text and offers a refresh.
 
 ## Authority and provider boundary
 

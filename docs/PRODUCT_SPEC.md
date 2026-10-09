@@ -567,8 +567,8 @@ UI must not depend on provider SDK types. No generic agent framework is required
 
 The shared authorized context retains manual statuses and bounded completion
 counts. The Daily Brief recipe filters resolved work internally and independently
-selects model inputs. Completion input selection does not permit completion or
-adherence recaps. Raw status-update times are not actual finish times. Notes,
+selects model inputs. The current policy does not permit completion or adherence
+recaps. Raw status-update times are not actual finish times. Notes,
 account identifiers, Calendar rich text, provider IDs and credentials stay excluded.
 Partial or stale Calendar coverage cannot prove free time. Missing duration cannot
 prove that an activity fits. The private inspector retains source diagnostics.
@@ -644,6 +644,41 @@ local-only AI is deferred. Marketing gains no new claim. Native mobile remains
 deferred. Synthetic access to the selected model passed with the approved existing
 key. Hosted deployment, real-data acceptance and installed desktop checks remain
 open. Provider retention is disclosed separately from Cadence's no-content-storage policy.
+
+### Advisor improvements (Tickets 168–174)
+
+The owner approved this direction on September 26, 2026. Tickets 168–173 are
+implemented in source; Ticket 174 release evidence is in progress. The existing
+Daily Brief recipe and horse bubble remain the delivery surface.
+
+Ticket 168 makes loading recoverable. An attempted request is not proof that the
+user received advice. Navigation reattaches to the same attempt; interrupted,
+failed or undelivered attempts offer an explicit, bounded retry. Dismissal stays
+separate, and changed or expired timing is withdrawn with a refresh option.
+
+Tickets 169–172 add nine analysis lanes named after export prompts: weekday/slot
+dips, marking-time offsets, schedule load (compared within weekdays), historical
+Calendar context (reported unavailable), decision debt, late or batched decision
+recording, corrections, reminder associations and Note obstacles. Each lane states
+its inputs, lookback, sufficiency rule, limitations and permitted proposal.
+Unresolved remains missing decision data. Correlations are described, never causes.
+Marks describe logging time, not performance time.
+
+Ticket 173 lets a configuration offer at most one pattern tip per brief, only when a
+finding bears on today and passes a cooldown and one-day spacing. Cadence shows a
+deterministic evidence line beside the model's wording. Routine ledger recaps and
+generic coaching remain excluded. Configurations before 1.3, including the current
+production default, select no lanes; the `advisor-analysis` candidate preset awaits
+reviewed promotion.
+
+Reminder history and Notes on Not Completed occurrences each need their own
+revocable Settings disclosure; the database refuses them otherwise. Travel-to-model
+projection stays disabled until its provider-use and disclosure gates pass. Ticket 170
+instead shows travel guidance calculated from existing evidence beside the brief,
+labeled as calculated, withdrawn at expiry, and never passed to the model.
+
+Ticket 174 verifies useful wording, supported timing and reliable delivery on web
+and linked desktop. Native mobile and marketing implementation remain out of scope.
 
 ### Internal recipe workbench (Tickets 151–158)
 

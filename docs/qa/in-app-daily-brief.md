@@ -21,6 +21,8 @@ are separate gates; this record does not claim production activation.
 - A 60-second attempt contains read/model phases capped at 30 seconds each.
   Admission permits one active generation per account and six starts/minute.
   Installation/day state suppresses completed duplicates; failures need explicit retry.
+  Ticket 168: an explicit retry can also replace a completed-but-undelivered
+  attempt, capped at one automatic start plus three retries per installation/day.
 - Only private operational metadata is written. No prompt or generated text is
   persisted. Up to eight latest installation attempts remain until replacement,
   disablement or account deletion. Provider retention remains separate.
@@ -67,6 +69,45 @@ OpenAI's [model documentation](https://developers.openai.com/api/docs/models/gpt
 confirms the selected model interface. Its [data controls](https://developers.openai.com/api/docs/guides/your-data)
 distinguish application storage from abuse-monitoring and prompt-cache retention.
 Cadence does not promise zero provider retention.
+
+## Ticket 168 recovery — September 26, 2026
+
+Source inspection found four loss paths. Regression tests reproduce each one
+against the previous launcher; 18 of the new cases fail there and pass now.
+
+- The launcher was keyed by Timeline facts. Marking an occurrence while loading
+  remounted it, aborted the request, and the daily `attempted` marker blocked any
+  new request. The launcher now receives the facts as `sourceKey` and stays mounted.
+- Navigation away from Timeline discarded the attempt. A page-session memory per
+  client now keeps the in-flight attempt and fresh result for same-account remounts.
+- The server marked a finished generation `completed`, so a retry after an
+  undelivered result returned `already_attempted`. Migration
+  `20260926150000_daily_brief_bounded_recovery.sql` admits up to three deliberate
+  retries per installation, day and disclosure revision, including after completion.
+- The web client had no deadline, and the desktop deadline disappeared when a
+  caller signal was supplied. Preference reads, installation lock, session lookup,
+  request and body decoding now have composed client deadlines (15 s, 5 s, 75 s).
+
+Browser markers now record `attempted`, `delivered`, `dismissed` and a bounded
+`pendingUntil` claim for parallel tabs. They hold no generated text. Markers
+written before this change count as delivered, so no stale recovery notice appears.
+
+Outcomes are distinct: pending, rate limit (retry disabled until the server wait
+passes), timeout, offline, sign-in, changed context, retry limit, interrupted,
+undelivered, expired and outdated. Server phase spans (`daily_brief.preferences`,
+`admission`, `context`, `model`, `finish`, `request`) record duration and error
+code only, when `CADENCE_PERF_LOG=1`.
+
+Verification: focused Daily Brief suites pass (77 tests). A port-less local
+Postgres 17 container (`supabase/postgres:17.6.1.159`) applied the original and
+new migrations over auth/profile/Calendar stubs. A rollback-free smoke script
+confirmed: automatic admission; `pending` while leased; `already_attempted` for a
+repeated automatic start; three retries admitted after completion; `retry_exhausted`
+on the fifth admission; four rate-limit entries; an independent second owner; and
+denied direct table reads. The container was removed. A full `supabase db reset`
+did not run (see the loopback-binding note in `docs/SUPABASE_WORKFLOW.md`).
+Hosted migration, deployed-web and installed-desktop recovery checks remain open
+under Ticket 174.
 
 ## Remaining release evidence
 

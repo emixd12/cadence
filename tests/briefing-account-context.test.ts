@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => ({
   contexts: vi.fn(),
   opaque: vi.fn(),
   calendar: vi.fn(),
+  analysis: vi.fn(),
+  analysisRevision: vi.fn(),
+}));
+vi.mock("@/lib/db/advisor-analysis.repo", async (original) => ({
+  ...await original<typeof import("@/lib/db/advisor-analysis.repo")>(),
+  readAdvisorAnalysisSnapshot: mocks.analysis,
+  readAdvisorAnalysisRevision: mocks.analysisRevision,
 }));
 
 vi.mock("@/lib/db/daily-brief.repo", () => ({
@@ -34,6 +41,8 @@ import {
 } from "@/lib/services/briefing-account-context.service";
 
 const preferences = {
+  includeReminderHistory: false,
+  includeNotes: false,
   enabled: true,
   includeCalendar: false,
   revision: 3,
@@ -164,5 +173,70 @@ describe("account briefing context", () => {
     });
     instant = Temporal.Instant.from(fixture.expiresAt);
     await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_expired" });
+  });
+});
+
+describe("analysis source reads (Ticket 169)", () => {
+  const snapshot = (overrides: Record<string, unknown> = {}) => ({
+    timezone: fixture.timezone, observedAt: "2026-11-01T12:00:00Z", revision: "analysis-raw",
+    occurrences: [{ id: "occ-1", behaviorId: "behavior-1", localDate: "2026-10-30", scheduledFor: "2026-10-30T16:30:00Z",
+      scheduleKind: "exact", scheduleStartTime: "12:30:00", scheduleEndTime: null, status: "not_completed", statusMarkedAt: null, configurationEventId: null }],
+    statusEvents: [], configurationEvents: [
+      { id: "cfg-1", behaviorId: "behavior-1", eventKind: "baseline", effectiveAt: "2026-08-15T00:00:00Z", effectiveLocalDate: "2026-08-15", changedFields: ["schedule_graph"], source: "system", reasonCode: "history_capture_started", browserReminderEnabled: true, emailReminderEnabled: false },
+      { id: "cfg-2", behaviorId: "behavior-1", eventKind: "revision", effectiveAt: "2026-09-01T00:00:00Z", effectiveLocalDate: "2026-09-01", changedFields: ["browser_reminder_enabled"], source: "manual", reasonCode: "edit", browserReminderEnabled: false, emailReminderEnabled: false },
+      { id: "cfg-3", behaviorId: "behavior-1", eventKind: "revision", effectiveAt: "2026-09-10T00:00:00Z", effectiveLocalDate: "2026-09-10", changedFields: ["schedule_graph"], source: "manual", reasonCode: "edit", browserReminderEnabled: false, emailReminderEnabled: false },
+    ],
+    reminders: "not_requested", notes: "not_requested", ...overrides,
+  });
+  beforeEach(() => {
+    mocks.analysis.mockResolvedValue(snapshot());
+    mocks.analysisRevision.mockResolvedValue("analysis-raw");
+  });
+
+  it("reads nothing without selected lanes and never requests undisclosed optional sources", async () => {
+    const plain = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+    expect(plain.analysisSource).toBeNull();
+    expect(mocks.analysis).not.toHaveBeenCalled();
+    const requested = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: true, includeNotes: true } });
+    expect(mocks.analysis).toHaveBeenCalledWith(caller.client, expect.objectContaining({ includeReminders: false, includeNotes: false, behaviorIds: ["behavior-1"], historyStartLocalDate: "2026-08-03" }));
+    expect(requested.analysisSource).toMatchObject({ reminders: { state: "not_requested" }, notes: { state: "not_requested" }, completeness: "complete" });
+  });
+
+  it("requests disclosed sources and projects opaque, schedule-segmented records", async () => {
+    mocks.preferences.mockResolvedValue({ ...preferences, includeReminderHistory: true, includeNotes: true });
+    mocks.analysis.mockResolvedValue(snapshot({ reminders: [], notes: [{ occurrenceId: "occ-1", behaviorId: "behavior-1", localDate: "2026-10-30", text: "  Rain  " }] }));
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: true, includeNotes: true } });
+    expect(mocks.analysis).toHaveBeenCalledWith(caller.client, expect.objectContaining({ includeReminders: true, includeNotes: true }));
+    const source = prepared.analysisSource!;
+    expect(source.occurrences[0]).toMatchObject({ ref: "occurrence_occ-1", behaviorRef: "behavior_behavior-1", startTime: "12:30" });
+    expect(source.configurationPeriods).toEqual({ state: "available", records: [
+      expect.objectContaining({ ref: "configuration_cfg-1", startsSchedulePeriod: false }),
+      expect.objectContaining({ ref: "configuration_cfg-2", startsSchedulePeriod: false }),
+      expect.objectContaining({ ref: "configuration_cfg-3", startsSchedulePeriod: true }),
+    ] });
+    expect(source.notes).toEqual({ state: "available", records: [{ ref: "note_occ-1", occurrenceRef: "occurrence_occ-1", behaviorRef: "behavior_behavior-1", localDate: "2026-10-30", text: "Rain" }] });
+    expect(JSON.stringify(source)).not.toMatch(/"occ-1"|"behavior-1"|"cfg-/);
+  });
+
+  it("marks capped sources and fences the analysis revision before delivery", async () => {
+    mocks.analysis.mockResolvedValue(snapshot({ statusEvents: Array.from({ length: 20_001 }, (_, index) => ({ id: `e${index}`, occurrenceId: "occ-1", previousStatus: null, status: "completed", semantics: "explicit_user_mark", recordedAt: "2026-10-30T17:00:00Z", revisesEventId: null })) }));
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } });
+    expect(prepared.analysisSource?.statusEvents).toEqual({ state: "capped" });
+    await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+    mocks.analysisRevision.mockResolvedValue("analysis-changed");
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+
+  it("rejects a timezone race and derives stable per-owner tip fingerprints", async () => {
+    mocks.analysis.mockResolvedValueOnce(snapshot({ timezone: "Europe/Paris" }));
+    await expect(prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } }))
+      .rejects.toMatchObject({ code: "context_changed" });
+    const finding = { laneId: "decision-debt", behaviorRef: "behavior_behavior-1", key: "unresolved", evidenceBand: "share:4" } as never;
+    const first = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } });
+    const second = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } });
+    expect(first.tipFingerprint(finding)).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.tipFingerprint(finding)).toBe(second.tipFingerprint(finding));
+    const other = await prepareAccountBriefingContexts({ ...caller, user: { id: "owner-2" } } as CalendarCaller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } });
+    expect(other.tipFingerprint(finding)).not.toBe(first.tipFingerprint(finding));
   });
 });

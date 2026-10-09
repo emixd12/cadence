@@ -108,7 +108,7 @@ const termIdsFor = (prefix: string, values: readonly string[]) =>
 
 describe("briefing workbench ontology", () => {
   it("has stable terms, valid relationships, and traceable source symbols", () => {
-    expect(ontology).toMatchObject({ version: "1.4", scope: "Briefing workbench" });
+    expect(ontology).toMatchObject({ version: "1.5", scope: "Briefing workbench" });
     expect(ontology.terms.length).toBeGreaterThan(0);
     expect(ids.size).toBe(ontology.terms.length);
 
@@ -146,7 +146,7 @@ describe("briefing workbench ontology", () => {
         "config.context.duration.includeHistoricalAverage", "config.context.duration.includeConfiguredDefault",
         "config.context.duration.preference", "config.context.duration.fallback", "config.referenceIds", "config.planner.bufferMinutes",
         "config.planner.preference", "config.planner.movableBehaviorRefs", "config.planner.permittedWindows.startMinute",
-        "config.planner.permittedWindows.endMinute",
+        "config.planner.permittedWindows.endMinute", "config.analysis.lanes", "config.analysis.maxTips", "config.analysis.cooldownDays",
       ].includes(id)).sort(),
     );
 

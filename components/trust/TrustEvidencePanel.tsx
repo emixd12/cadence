@@ -90,7 +90,7 @@ export function TrustEvidencePanel({ evidence }: { evidence: PublicTrustView }) 
           <div className="mt-4 flex flex-wrap gap-4 text-sm">
             <a className="product-action product-action-secondary" href={evidence.snapshot.url} rel="noreferrer">Immutable snapshot</a>
             <a className="product-action product-action-secondary" href={evidence.snapshot.workflow_url} rel="noreferrer">Verification workflow</a>
-            <a className="product-action product-action-secondary" href="https://github.com/emixd12/habit-tracking-app" rel="noreferrer">Public source and MIT license</a>
+            <a className="product-action product-action-secondary" href="https://github.com/emixd12/cadence" rel="noreferrer">Public source and MIT license</a>
           </div>
         </section>
       ) : null}

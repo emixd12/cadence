@@ -35,6 +35,13 @@ describe("in-app briefing routes", () => {
     expect(oversized.status).toBe(400);
     expect(mocks.update).not.toHaveBeenCalled();
   });
+  it("returns retry limits as 429 without retry timing", async () => {
+    const { DailyBriefError } = await import("@/lib/services/daily-brief-consumer");
+    mocks.generate.mockRejectedValue(new DailyBriefError("retry_exhausted"));
+    const result = await POST(new Request("https://cadence.example/api/advisor/brief", { method: "POST", body: "{}" }));
+    expect(result.status).toBe(429);
+    expect(await result.json()).toEqual({ error: "retry_exhausted" });
+  });
   it("allows only fixed native preflight origins", () => {
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "https://attacker.invalid" } })).status).toBe(403);
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "tauri://localhost" } })).status).toBe(204);

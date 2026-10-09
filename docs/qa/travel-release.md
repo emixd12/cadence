@@ -459,3 +459,21 @@ this, a view cached before a settings save stayed visible until it expired.
 Settings changes, revoked location permission and going offline still cancel as
 before. DOM tests cover the hidden, pre-commit and unmount cases. Installed
 desktop re-acceptance remains open with the other Ticket 166 and 167 gates.
+
+## Travel beside the Daily Brief (Ticket 170) — September 26, 2026
+
+Model projection of travel stays disabled. Instead, the shared Timeline projects its
+existing travel evidence with `packages/core/src/services/brief-travel-guidance.ts` and
+publishes it to the horse bubble for the same local day. The bubble lists up to four
+calculated lines — travel-created overlaps with Unresolved Behaviors, the next
+departures, the return or an unknown-return note — plus "Calculated by Cadence from
+travel estimates as of … Not written by the model." A hypothetical brief option that
+overlaps travel occupancy is labeled. Expired or stale estimates withdraw the section.
+
+No extra route request, quota use, source-change rule or refresh policy changed.
+Travel refresh never regenerates the brief or resets its dismissal. Missing base
+suppresses only the return line; unknown travel is never treated as free.
+`tests/brief-travel-guidance.test.ts` covers full trips, missing base, expiry, stale
+legs, every mode and option overlap; `tests/briefing-analysis-pipeline.test.ts`
+asserts travel is absent from model input. Native location and navigation gates
+remain under Ticket 165; deployed and installed acceptance remain under Ticket 174.

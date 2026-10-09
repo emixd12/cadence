@@ -134,7 +134,7 @@ export function TimelineScreen({
             </picture>
           </div>
           <div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10">
-            <DailyBriefLauncher key={timelineBriefKey(timeline)} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
+            <DailyBriefLauncher sourceKey={timelineBriefKey(timeline)} client={dailyBriefClient} desktop sessionKey={dailyBriefSessionKey} />
           </div>
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">

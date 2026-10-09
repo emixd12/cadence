@@ -1087,6 +1087,13 @@ session or a Claude in Chrome connection in the Identity Scaffolding profile
 remains the way to repeat this check; the local gcloud CLI is signed in as
 info@identityscaffolding.com for every API-backed operation.
 
+The September 26 scheduled follow-up found that record but could not independently
+repeat it. The Identity Scaffolding Chrome session remained unavailable. Automatic
+approval review blocked selecting Claude Desktop because it could expose unrelated
+private content. No alternate route was used to bypass that rejection. The existing
+September 26 provider evidence above is preserved; this automation obtained no new
+provider decision and changed no configuration, scopes, callbacks, or rollout gates.
+
 Data Access lists `calendar.events.readonly` with **This scope is verified**.
 The unchanged non-sensitive declarations are `calendar.calendarlist.readonly`
 and `openid`. The restricted-scope list is empty. Clients lists one web client,

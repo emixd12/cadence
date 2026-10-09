@@ -12062,3 +12062,470 @@ link states, stale display, and geocode reuse bounds; DOM test for the status li
 link; required repository checks; owner re-acceptance on web and installed desktop with
 provider call counts read from Cloud Monitoring before and after.
 Filing this ticket changes no runtime behavior.
+
+---
+
+## Advisor recovery and useful recommendations: Tickets 168–174
+
+Filed September 26, 2026 after the owner approved the advisor analysis and requested
+implementation tickets. Implementation began the same day; each ticket's status line
+records what shipped in source and which release gates remain open.
+The owner clarified that routing includes both travel timing and fitting Behaviors
+around Calendar events. Occasional adherence tips should use defined analysis lanes
+inspired by `packages/core/src/export-prompts.ts`.
+
+Source of truth: `docs/PRODUCT_SPEC.md#planned-advisor-improvements-tickets-168174`,
+`docs/plans/first-external-consumer.md`, and the September 26 decision in
+`docs/DECISIONS.md`. These tickets extend the existing Daily Brief recipe, shared
+horse bubble, server pipeline and workbench. They add no general chat, autonomous
+writes, new connector, second model provider or agent framework.
+
+| Ticket | Delivery slice | Dependencies |
+|---|---|---|
+| 168 | Bounded loading and recoverable presentation | Existing Tickets 147–148 implementation |
+| 169 | Analysis evidence contract and bounded source projection | Existing Tickets 146, 156–157 implementation |
+| 170 | Travel timing and Behavior scheduling | 169; existing 159 and 162–167 implementation; provider/model-use gates below |
+| 171 | Timing, load and Calendar-context patterns | 169; use 170 for concrete timing recommendations |
+| 172 | Recurring obstacles and decision-recording patterns | 169; separate source disclosure before optional inputs |
+| 173 | Useful prose and occasional, nonrepeating tips | 169–172; 168 for delivery and suppression accounting |
+| 174 | Workbench evaluation and staged release acceptance | Review starts alongside 168–173; acceptance follows each delivered slice |
+
+Ticket 168 can ship independently. Ticket 174 carries forward the open checks from
+Tickets 147–148, 155 and 161; it does not mark them complete or erase dated evidence.
+Ticket 165 retains native travel and provider-use acceptance. Model transmission of
+travel evidence remains disabled until its specific clearance and disclosure pass.
+Deterministic travel presentation can proceed under the existing reviewed boundary.
+
+Every implementation uses existing `INT-BRIEF-001` through `INT-BRIEF-005`, relevant
+`INT-TRAVEL-*` intents, and `module.daily-brief-bubble` in the design-system catalog.
+Update those inventories when behavior actually changes, not when filing tickets.
+Use impeccable and design-system-bench before UI edits. Update the existing QA records,
+glossary, user guidance and platform evidence; do not create a parallel inventory.
+
+### Shared verification for Tickets 168–174
+
+Begin each code slice with a regression or evidence fixture that fails for the
+intended behavior. Run its focused checks, then all seven required commands from
+`AGENTS.md`. Shared core changes also require `npm run core:check`; reusable UI
+requires `npm run design-system:check`, desktop typecheck/build, and desktop/390px
+browser QA on the first available loopback port in 4321–4330. Schema changes require
+tracked migrations, updated data-model/types, clean local replay and owner-isolation
+checks. No runtime or schema change follows from filing this sequence.
+
+Preserve existing live-test instructions: private workbench comparisons remain
+owner-clicked. Ticket filing grants no new provider spending, private-data transmission,
+hosted migration, deployment or native release authority. Record existing authorization
+when exercising those gates; do not substitute synthetic checks for live acceptance.
+
+## Ticket 168: Recoverable Daily Brief loading and presentation
+
+Status: implemented in source September 26, 2026; hosted migration, deployed-web and
+installed-desktop recovery evidence remain open under Ticket 174. Filed September 26, 2026.
+Dependencies: existing Tickets 147–148 implementation; release evidence in Ticket 174.
+
+Goal: make every enabled advisor request reach a visible result or actionable failure,
+without navigation silently consuming the user's opportunity to receive advice.
+
+Scope and acceptance:
+
+- Reproduce the reported failures before assigning a live root cause. Source inspection
+  found a daily attempted marker written before success, Timeline-key remounts, silent
+  preference failures, and missing effective client deadlines. Preserve these as
+  hypotheses until regression evidence establishes the affected paths.
+- Bound preferences, installation-ID acquisition, authentication, request and response
+  decoding. Compose caller cancellation with the deadline on web and desktop; supplying
+  a signal must not disable timeout. Preserve the server's 60-second attempt and
+  30-second phase limits. Test the full client deadline with unresolved promises.
+- Separate request progress, successful delivery and dismissal. Reuse one in-flight
+  attempt and fresh result across same-account page-session remounts. A changed status,
+  timer, route or focus must not leave a stuck loader or silently remove recovery.
+  Revalidate changed source facts before reusing any result.
+- Keep one automatic daily start, server deduplication and existing rate limits.
+  Make failed, abandoned and server-completed-but-undelivered attempts recoverable
+  through deliberate bounded retry. Never equate server completion with presentation.
+  Do not clear quota/admission records or toggle consent to force another request.
+- Preserve same-day dismissal and account/date isolation. Do not reopen dismissed
+  output. Keep fresh text in memory only. On expiry, withdraw current timing claims
+  and retain an honest recovery/expiry state without automatic regeneration.
+- Distinguish pending, timeout, offline, authentication, stale context and rate-limit
+  outcomes. Honor retry timing and return available recovery guidance. Diagnostics
+  may record phase, duration and error code, never prompt, account facts or output.
+- Update admission/retention documentation if recovery needs persistent state changes.
+  Keep tracking usable throughout; no chat screen, polling loop or background helper.
+
+Implementation references: `components/briefing/DailyBriefLauncher.tsx`,
+`components/briefing/DailyBriefBubble.tsx`, `lib/ui/daily-brief.ts`,
+`apps/desktop/src/daily-brief.ts`, `lib/services/daily-brief.service.ts`,
+`lib/services/daily-brief-request.ts`, `lib/db/daily-brief.repo.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared launcher/client and existing Timeline bubble above; update `INT-BRIEF-001/002/003` when implemented. |
+| Desktop | Same launcher plus `apps/desktop/src/daily-brief.ts`; verify navigation, restart, linked-session expiry and offline tracking in 174. |
+| Marketing | Not applicable: recovery changes no public capability claim. |
+| Future mobile | Mobile web uses the shared launcher; native implementation remains deferred. |
+
+Verification: `npm run test -- tests/daily-brief-lifecycle.dom.test.tsx tests/daily-brief-ui.dom.test.tsx tests/desktop-daily-brief.test.ts tests/daily-brief.service.test.ts tests/daily-brief-route.test.ts`.
+Cover remount during generation, stalled requests, dropped delivery, expiry, retry,
+parallel tabs, account/consent changes and unchanged dismissal. Apply shared checks.
+
+## Ticket 169: Advisor analysis evidence contract and bounded history
+
+Status: implemented in source September 26, 2026; hosted migration and real-account
+evidence remain open under Ticket 174. Filed September 26, 2026.
+Dependencies: existing Tickets 146, 156–157 implementation. Enables Tickets 170–173.
+
+Goal: supply small, validated findings to the advisor through explicit analysis lanes.
+
+Scope and acceptance:
+
+- Define a fixed set of lane contracts inside the existing recipe/configuration
+  boundary. Reuse export prompt IDs where purposes match. Each lane declares its
+  question, required inputs, local-date window, sample threshold, permitted suggestions
+  and unsupported-input behavior. Future connectors can satisfy these contracts;
+  this ticket implements no connector registry, new connector or arbitrary prompt tool.
+- Give findings opaque evidence/source references, scope, counts/denominators where
+  relevant, coverage, observation/revision/expiry and explicit limitations. Keep
+  confidence tied to stated sufficiency rules, not a model-invented probability.
+- Extend the owner-scoped snapshot/revision projection for the lanes in 171–172:
+  historical local dates and schedule slots, relevant definition/configuration periods,
+  decision chronology and optional reminder/Note inputs. Keep optional sensitive
+  sources excluded until 172 implements their disclosure. Read no export/page entry
+  point with occurrence-generation or archive side effects.
+- Preserve the 90-complete-local-day maximum and existing count/byte/deadline ceilings.
+  Apply selected windows before aggregation. Incomplete, capped or absent inputs yield
+  unavailable findings, never biased totals. Fence every newly read source revision.
+- Reuse status/analytics and completion-timing semantics. Unresolved is missing decision
+  data, excluded from adherence failures. Recorded marks are not actual finish times.
+  Segment meaningful schedule/definition changes; do not split schedule periods for
+  reminder-only or category-only revisions.
+- Separate internal source records from selected model findings. Excluded inputs and
+  unsupported claims must stay absent from prompts and private-inspector projections.
+  Configuration selection cannot grant access. Extend exact validators and version
+  fences; document old-config and old-snapshot compatibility.
+- Register actual pure analysis owners and paired tests in `docs/AGENT_RESOLVERS.md`.
+  Repositories own reads, services own authorization and composition, core owns
+  calculations, and the model explains supported findings.
+
+Implementation references: `packages/core/src/types/advisor-day-context.ts`,
+`packages/core/src/types/briefing-config.ts`, `packages/core/src/services/briefing-config.ts`,
+`packages/core/src/services/advisor-day-context.ts`, `lib/db/advisor-context.repo.ts`,
+`lib/services/advisor-day-context.service.ts`, `lib/services/briefing-pipeline.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Extend the existing snapshot, core projection and hosted pipeline above; 174 verifies exclusions and migrations. |
+| Desktop | Shared server findings use synchronized account data; no local-only upload or new sync mechanism. |
+| Marketing | Not applicable: internal contracts do not establish a public feature. |
+| Future mobile | Reusable core contracts only; no native client implementation. |
+
+Verification: `npm run test -- tests/advisor-day-context.test.ts tests/advisor-day-context.service.test.ts tests/briefing-config.test.ts tests/briefing-pipeline.test.ts tests/briefing-account-context.test.ts`.
+Add tests for lane validation, insufficient/capped history, window filtering, source
+revision races, two-owner isolation and excluded-field absence. Apply shared checks.
+
+## Ticket 170: Calendar travel timing and Behavior scheduling advice
+
+Status: deterministic display implemented in source September 26, 2026. Model
+projection of travel remains disabled pending provider-use clearance and revised
+disclosure; native and live gates stay with Tickets 165 and 174. Filed September 26, 2026.
+Dependencies: 169 and existing 159, 162–167 implementation. Coordinate with 165 and 174.
+
+Goal: explain departure, onward travel and return constraints alongside feasible
+Behavior opportunities in the existing advisor presentation.
+
+Scope and acceptance:
+
+- Reuse the travel resolver's validated legs, occupancy, collisions, mode, freshness
+  and provenance. Join owner-matched Calendar and Behavior evidence without trusting
+  client-authored routes or invoking extra paid routing merely to generate prose.
+  Preserve travel quota, source-change and manual-refresh policy from 166–167.
+- Use travel-expanded occupancy when checking Behavior fits, including return where
+  known. Unknown legs cannot become zero travel. Missing base suppresses final-return
+  advice only; preserve known outbound/onward evidence and current-origin precedence.
+- Keep Calendar events fixed. Distinguish a supported gap from permission to move an
+  exact Behavior. Generate hypothetical moves only within explicit flexibility and
+  permitted windows; calculate all intervals in core, never in the language model.
+- Resolve provider-use clearance and revised model-data disclosure before enabling
+  timing-only model projection. Raw locations, coordinates, place IDs and provider
+  responses remain excluded. Current routing clearance alone does not permit this.
+- If model projection remains unapproved, present attributed deterministic travel and
+  compatible fit guidance beside the generated brief under the existing display
+  boundary. Keep travel-derived facts and recommendations out of model input. Clearly
+  distinguish calculated guidance from generated text; do not fabricate a model result.
+- Withdraw or label changed/expired timing consistently. Travel refresh must not
+  silently regenerate the brief or reset its dismissal. Preserve suggestions-only
+  behavior and the existing navigation handoff; add no event-editing or Apply control.
+
+Implementation references: `packages/core/src/resolvers/travel.resolver.ts`,
+`packages/core/src/resolvers/briefing-plan.resolver.ts`,
+`lib/services/travel-route-refresh.service.ts`, `lib/services/briefing-pipeline.ts`,
+`components/briefing/DailyBriefBubble.tsx`, `docs/qa/travel-release.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Extend existing core evidence and shared bubble; reuse `INT-TRAVEL-*` and `module.daily-brief-bubble`. |
+| Desktop | Consume the same evidence through the linked client; native location/navigation gates remain in 165, briefing acceptance in 174. |
+| Marketing | Not applicable: public routing/advisor claims await separately reviewed release evidence. |
+| Future mobile | Mobile web shares the evidence and presentation; native routing remains deferred. |
+
+Verification: `npm run test -- tests/travel.resolver.test.ts tests/briefing-plan.resolver.test.ts tests/briefing-pipeline.test.ts tests/daily-brief-consumer.test.ts`.
+Cover full trips, missing base/legs, late arrivals, stale evidence, each existing mode,
+source/disclosure changes, no extra routing call, fixed schedules and model exclusion
+when clearance is absent. Apply shared checks and keep live provider gates explicit.
+
+## Ticket 171: Adherence timing, load and Calendar-context analysis
+
+Status: implemented in source September 26, 2026. The historical Calendar lane
+reports unavailable; no historical Calendar read was added. Filed September 26, 2026.
+Dependencies: 169; concrete timing suggestions also require 170's feasibility checks.
+
+Goal: identify repeatable adherence difficulties and suggest one supported scheduling
+or workload experiment without confusing correlation with cause.
+
+Scope and acceptance:
+
+- Implement lanes inspired by `weekday-time-dips`, `realistic-timing`, `schedule-load`
+  and `cross-source-context`. Use current manual outcomes and captured schedule periods,
+  account local dates/timezone, and clearly stated lookbacks.
+- Compare eligible weekday/slot outcomes with a comparable baseline. Report resolved
+  denominators and Unresolved coverage separately. Define and test minimum samples,
+  repeatability and material-difference thresholds before a finding becomes eligible.
+- Relate scheduled daily load to resolved outcomes while controlling descriptive
+  comparisons for weekday and changed schedules. Do not infer a fixed personal capacity
+  from a few observations or recommend deleting a Behavior automatically.
+- Preserve timing semantics. Marking patterns support statements about logging time,
+  not actual performance. Use effective performance times only when their source
+  contract supports that meaning; otherwise leave actual-time analysis unavailable.
+- Use current Calendar constraints to contextualize today's suggestion. Historical
+  Calendar associations require bounded authorized coverage for the compared dates.
+  Implement that read through the existing connector if selected; otherwise report the
+  historical lane unavailable. Today's agenda cannot explain past adherence failures.
+- Produce structured findings with supporting evidence, limitations and a proposed
+  experiment. Any concrete new time must pass the deterministic planner. No generic
+  coaching, diagnosis, causal claim, streak scoring or status change.
+
+Implementation references: `packages/core/src/resolvers/analytics.resolver.ts`,
+`packages/core/src/resolvers/completion-timing.resolver.ts`,
+`packages/core/src/resolvers/briefing-plan.resolver.ts`,
+`lib/services/advisor-day-context.service.ts`, `lib/services/google-calendar.service.ts`,
+`lib/services/briefing-pipeline.ts`, `packages/core/src/export-prompts.ts`.
+Proposed shared lane owner: `packages/core/src/resolvers/briefing-analysis.resolver.ts`,
+paired with `tests/briefing-analysis.resolver.test.ts`; reuse it in 172.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared core analysis and server projection above; 173 presents findings and 174 evaluates usefulness. |
+| Desktop | Same hosted findings for synchronized records; no independent native analytics rules. |
+| Marketing | Not applicable: no outcome-improvement claim follows from descriptive analysis. |
+| Future mobile | Reuse pure findings contracts; native UI remains deferred. |
+
+Verification: add runnable fixtures for each lane to `tests/briefing-analysis.resolver.test.ts`;
+extend `tests/briefing-pipeline.test.ts` and `tests/briefing-fixtures.test.ts`.
+Cover small/unequal samples, all-Unresolved periods, corrections, schedule changes,
+DST/local weekdays, absent historical Calendar and confounded load patterns.
+Expected findings must derive from hand-checked data, not the implementation. Apply shared checks.
+
+## Ticket 172: Recurring obstacles and decision-recording analysis
+
+Status: implemented in source September 26, 2026; hosted migration and real-account
+evidence remain open under Ticket 174. Filed September 26, 2026.
+Dependencies: 169. Optional sources need their implemented disclosure before model use.
+
+Goal: suggest specific ways to reduce recurring obstacles or make decisions easier
+to record, using the relevant export-prompt analysis lanes.
+
+Scope and acceptance:
+
+- Implement `decision-debt`, `logging-chronology` and `correction-patterns` from bounded
+  history. Resolve revision chains before comparisons. Describe batching and correction
+  patterns without treating recorded timestamps as performance times or Unresolved as failure.
+- Implement `reminder-effectiveness` using delivered reminder records, with outcome
+  and decision-recording rates separated by channel and comparable schedule period.
+  Missing delivery coverage is unknown, not proof that no reminder arrived. Treat
+  differences as associations; do not send reminders or change reminder preferences.
+- Add optional `notes-failure-themes` from nonempty Notes attached to Not Completed
+  occurrences. State exactly what Note content reaches the model and obtain revocable
+  source-specific disclosure before submission; existing enablement cannot silently
+  include Notes. No full-export upload or automatic access to unrelated Notes.
+- Bound and validate any semantic theme extraction. Retain source references and
+  calculate supporting counts from validated members. Reject unsupported themes,
+  sensitive extrapolations and embedded instructions. Minimize quoted private text
+  in the displayed tip; do not persist model prompts or generated theme history.
+- Keep lanes independently available. A declined or missing optional source must not
+  block day planning or other supported findings. Missing data must never invite the
+  model to invent a reason. Add only the necessary controls to existing Settings and
+  recipe workbench; distinguish input permission from internal configuration.
+- Use findings to propose one concrete adjustment, such as a simpler decision moment
+  or addressing a repeated obstacle. Do not implement Note shortcuts here; Tickets
+  126–128 own that separate behavior. Update disclosures and retention contracts with
+  any new source or operational metadata.
+
+Implementation references: `lib/db/advisor-context.repo.ts`, `lib/db/notes.repo.ts`,
+`lib/db/reminderDeliveries.repo.ts`, `lib/services/advisor-day-context.service.ts`,
+`packages/core/src/resolvers/status.resolver.ts`, `packages/core/src/export-prompts.ts`,
+`components/briefing/DailyBriefSettingsPanel.tsx`, `app/design-system/DailyBriefBench.tsx`.
+Reuse 171's proposed `packages/core/src/resolvers/briefing-analysis.resolver.ts`
+and paired `tests/briefing-analysis.resolver.test.ts` for pure evidence calculations.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Bounded source projections and shared Settings/workbench above; update `INT-BRIEF-004` and disclosures at implementation. |
+| Desktop | Same linked-account controls and hosted evidence; unsynced/local-only Notes remain excluded. |
+| Marketing | No promotional change; canonical privacy/data-use copy changes only with the implemented optional source disclosure. |
+| Future mobile | Mobile web receives accessible shared controls; native controls remain deferred. |
+
+Verification: add paired lane fixtures and extend `tests/briefing-account-context.test.ts`,
+`tests/briefing-config.test.ts`, `tests/daily-brief-ui.dom.test.tsx` and consumer tests.
+Cover missing/disabled Notes, prompt injection, repeated themes, partial reminder logs,
+revision chains, batching, source revocation and zero source writes. Apply shared checks.
+
+## Ticket 173: Actionable Daily Brief prose and occasional tips
+
+Status: implemented in source September 26, 2026 behind the `advisor-analysis`
+candidate preset. The production default is unchanged until reviewed promotion
+under Ticket 174. Filed September 26, 2026.
+Dependencies: 169–172 for evidence; 168 for reliable delivery. Evaluate through 174.
+
+Goal: explain what matters today, what to consider doing, and why, with occasional
+adherence tips that earn their place through relevant evidence.
+
+Scope and acceptance:
+
+- Extend the existing Daily Brief recipe and version its policy/configuration. Prefer
+  two or three distinct, supported planning points and at most one pattern tip; these
+  are ceilings, not quotas. Calibrate the combined word budget in the workbench.
+  Empty evidence should stay short; supported advice must not collapse into a neutral
+  sentence merely because the old default excluded its inputs.
+- Rank timing conflicts, departures and feasible opportunities ahead of historical
+  nudges. Each recommendation needs a practical action and a short evidence-based
+  reason. Allow the minimal historical comparison needed to explain a tip, while
+  retaining the ban on routine ledger recaps, diagnostics and generic encouragement.
+- Select a pattern tip only when sample sufficiency, relevance and materiality pass.
+  Suppress repeated tips with a documented cooldown and stable finding identity;
+  changed evidence may justify a new tip. Evaluate these rules over multiple days,
+  not only isolated prompts. Do not require a tip on every opening.
+- Use only bounded, account-scoped delivery metadata for repetition control, such as
+  finding fingerprint and last-shown date. Define retention and disable/delete cleanup
+  before persistence; keep generated text and private source content out of storage.
+  Failed, cancelled and workbench-only generations must not consume a tip's delivery.
+- Bind every recommendation to supplied findings, source references and any required
+  planner option. The model explains evidence; it cannot calculate new route times,
+  fabricate correlations, recommend resolved work or claim to apply a change.
+- Extend existing workbench controls/inspectors for lane eligibility, selection and
+  suppression. Compare configurations over the same frozen facts. Preserve explicit
+  Run comparison and reviewed repository promotion; no customer prompt editor.
+- Keep the existing responsive horse bubble, clear route provenance, keyboard dismissal
+  and polite announcements. Update current UI/user-flow contracts and actual interaction
+  evidence when this behavior ships. No chat, scoring system or autonomous action.
+
+Implementation references: `lib/services/daily-brief-consumer.ts`,
+`lib/services/briefing-pipeline.ts`, `packages/core/src/data/briefing-presets.json`,
+`packages/core/src/types/daily-brief.ts`, `lib/db/daily-brief.repo.ts`,
+`components/briefing/DailyBriefBubble.tsx`, `app/design-system/DailyBriefBench.tsx`,
+`docs/ontology/briefing-workbench.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing recipe, workbench and bubble above; reuse briefing intents and design catalog. |
+| Desktop | Same hosted selection/prose and shared bubble; 174 verifies linked/offline and installed behavior. |
+| Marketing | Not applicable: no automated public claim or advice publication. |
+| Future mobile | Responsive web presentation is in scope; native implementation remains deferred. |
+
+Verification: `npm run test -- tests/daily-brief-consumer.test.ts tests/briefing-pipeline.test.ts tests/briefing-workbench.test.ts tests/briefing-workbench-account.test.ts tests/briefing-workbench.dom.test.tsx tests/briefing-ontology.test.ts`.
+Add multi-day selection/cooldown and delivery-failure tests, reference validation,
+no-tip and meaningful-tip cases, word-budget compatibility and rollout fencing.
+Human wording review remains required under 174. Apply shared checks.
+
+## Ticket 174: Advisor workbench evaluation and staged release acceptance
+
+Status: in progress September 26, 2026. Deterministic fixtures, workbench controls
+and synthetic evidence are recorded; owner-clicked comparisons, hosted, deployed-web
+and installed-desktop acceptance remain open. Filed September 26, 2026.
+Dependencies: review begins alongside 168–173; release acceptance follows delivered slices.
+Carry forward open evidence from 147–148, 155 and 161; coordinate travel gates with 165.
+
+Goal: demonstrate reliable delivery and useful, supported recommendations on web
+and installed linked desktop before promoting each advisor change.
+
+Scope and acceptance:
+
+- Extend `docs/qa/briefing-workbench.md` and existing fixtures with frozen cases for
+  every lane, routing/fit combinations, absent sources, small samples, changed
+  schedules, all-Unresolved days, repeated tips, prompt injection and no-issue days.
+  Show findings and selection reasons beside candidate outputs in the existing bench.
+- Separate deterministic correctness, model wording and live reliability evidence.
+  Review whether every tip has an actionable adjustment and sufficient support,
+  whether routing and Behavior fits agree, and whether brevity preserves useful
+  reasoning. A schema pass or authored sample is not a model-quality pass.
+- Verify 168 with stalled preference/model/body reads, navigation during generation,
+  server success without delivery, refresh, expiry, manual retry, parallel tabs,
+  revoked consent and account changes. Record latency by phase and result code without
+  private content. Demonstrate bounded loading and recovery on actual release targets.
+- Preserve owner-clicked private comparisons, frozen-snapshot comparisons, memory-only
+  private output and allowance separation. Record authorized synthetic-provider,
+  owner-account, deployed-web and installed-desktop evidence separately.
+- Release 168 independently when its checks pass. Promote later evidence/prose changes
+  through the existing reviewed preset/policy mechanism. Preserve existing consent,
+  quota and dismissal records; do not force regeneration to demonstrate a rollout.
+- Verify optional-source controls, actual model payload exclusions and travel's
+  deterministic-display fallback. Unapproved travel projection must remain absent.
+  Record native location/navigation limitations under 165 without calling them fixed.
+- Record exact configuration/policy/runtime versions, rollout and rollback. Rollback
+  must preserve tracking and connector records and stop new optional transmissions.
+  Close earlier release gates only with matching evidence; leave unexecuted gates open.
+
+Implementation/evidence references: `lib/services/briefing-fixtures.ts`,
+`app/design-system/DailyBriefBench.tsx`, `docs/qa/briefing-workbench.md`,
+`docs/qa/in-app-daily-brief.md`, `docs/qa/travel-release.md`,
+`interaction-registry.json`, `design-system.manifest.json`, `docs/DESKTOP_PARITY.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing workbench plus hosted Timeline and 390px acceptance; update the existing briefing QA records. |
+| Desktop | Installed linked-account, restart, unsynced and offline acceptance via `apps/desktop/src/daily-brief.ts` and shared bubble. |
+| Marketing | Not applicable: this ticket records evidence; publishing new claims requires separately scoped copy work. |
+| Future mobile | Mobile-web acceptance only; native release remains deferred. |
+
+Verification: all shared checks, the expanded deterministic/DOM fixture suites,
+reviewed live outputs under existing authority, hosted and installed acceptance,
+and rollback. Record actual pass/fail results, remaining gates and reviewer findings.
+
+## Ticket 186: Rename Cadence project folder and GitHub repository
+
+Status: in progress October 7, 2026; local and remote cutovers remain gated.
+Owner authorization: execute `docs/plans/2026-10-07-cadence-project-rename.md`,
+including the selected archive site preserving exact historical evidence URLs.
+
+Goal: rename the existing local folder and GitHub repository to `cadence`
+without losing work, history, deployment identities, or installed-client access.
+
+Acceptance: execute the plan's backup, relocation, archive, updater, deployment,
+and rollback gates. Preserve local Supabase identity, hosted account identities,
+production domains, desktop bundle identity, keys, and data. Keep unrelated
+uncommitted work intact. Retain all immutable evidence URLs and bytes. Record
+required checks and scheduled-publication continuity before completion.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Trust history/feed and source URLs; see the plan's exact files and existing interaction registry. |
+| Desktop | Release URL constants and legacy native updater compatibility; preserve installed app identity. |
+| Marketing | Source/download targets in `apps/marketing/src/data/site.ts`; preserve selected release assets. |
+| Future mobile | Not applicable: no mobile implementation or identifiers change. |
+
+Execution evidence: `docs/qa/cadence-project-rename.md`.

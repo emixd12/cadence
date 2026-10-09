@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-09-20",
+  "updated": "2026-09-26",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -774,9 +774,9 @@
     {
       "path": "app/design-system/DailyBriefBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 77,
+      "interaction_marker_count": 86,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Excluded from product interaction counts."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Excluded from product interaction counts."
     },
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
@@ -791,7 +791,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 5,
+      "interaction_marker_count": 9,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -12120,8 +12120,8 @@
         }
       ],
       "availability": "Available only when the first-party feature is enabled and the hosted service is available; linked desktop also needs connectivity.",
-      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current.",
-      "failure_result": "Keeps Timeline usable and shows a nonblocking retry state after a failed request or pending generation.",
+      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result.",
+      "failure_result": "Keeps Timeline usable. Bounded client deadlines end stalled reads. Timeout, offline, sign-in, changed-context, rate-limit, pending and interrupted outcomes show distinct nonblocking notices with an explicit retry where one can help. A Timeline change or expiry withdraws delivered text and offers a refresh.",
       "effects": [
         "network_request",
         "database_read",
@@ -12139,9 +12139,11 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/daily-brief-ui.dom.test.tsx"
+          "tests/daily-brief-ui.dom.test.tsx",
+          "tests/daily-brief-lifecycle.dom.test.tsx",
+          "tests/desktop-daily-brief.test.ts"
         ],
-        "notes": "DOM coverage verifies one automatic request, pending retry, and focus revalidation."
+        "notes": "DOM coverage verifies one automatic request, remount reattachment, source-change withdrawal, parallel-tab claims, client deadlines, pending retry, and focus revalidation."
       },
       "platforms": {
         "web": {
@@ -12151,7 +12153,8 @@
             "components/briefing/DailyBriefLauncher.tsx#DailyBriefLauncher"
           ],
           "evidence": [
-            "tests/daily-brief-ui.dom.test.tsx"
+            "tests/daily-brief-ui.dom.test.tsx",
+            "tests/daily-brief-lifecycle.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -12161,7 +12164,8 @@
             "apps/desktop/src/timeline-screen.tsx#TimelineScreen"
           ],
           "evidence": [
-            "tests/daily-brief-ui.dom.test.tsx"
+            "tests/daily-brief-ui.dom.test.tsx",
+            "tests/daily-brief-lifecycle.dom.test.tsx"
           ],
           "reason": "The linked desktop Timeline uses the existing authenticated hosted client."
         },
@@ -12204,7 +12208,7 @@
         }
       ],
       "availability": "Visible while the Daily Brief bubble is loading, ready, or failed.",
-      "success_result": "Hides the bubble and prevents an in-flight result from reopening it.",
+      "success_result": "Hides the bubble and prevents an in-flight or remembered result from reopening it after remount, delivery, or another tab's update.",
       "failure_result": "Does not alter Behaviors, Occurrences, Notes, or Calendar records.",
       "effects": [
         "local_preference",
@@ -12219,9 +12223,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/daily-brief-ui.dom.test.tsx"
+          "tests/daily-brief-ui.dom.test.tsx",
+          "tests/daily-brief-lifecycle.dom.test.tsx"
         ],
-        "notes": "DOM coverage verifies the 44px control and ignored in-flight result."
+        "notes": "DOM coverage verifies the 44px control, ignored in-flight result, and dismissal preserved across remount."
       },
       "platforms": {
         "web": {
@@ -12259,7 +12264,7 @@
     },
     {
       "id": "INT-BRIEF-003",
-      "name": "Retry a failed Daily Brief",
+      "name": "Retry or refresh the Daily Brief",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12276,16 +12281,28 @@
       "journeys": [
         "J07"
       ],
-      "intent": "Deliberately retry a failed Daily Brief request without polling.",
+      "intent": "Deliberately retry a failed, interrupted, undelivered, expired or outdated Daily Brief without polling.",
       "triggers": [
         {
           "kind": "activate",
           "control": "Try again"
+        },
+        {
+          "kind": "activate",
+          "control": "Refresh brief"
+        },
+        {
+          "kind": "activate",
+          "control": "Get a fresh brief"
+        },
+        {
+          "kind": "activate",
+          "control": "Get a current brief"
         }
       ],
-      "availability": "Visible after a Daily Brief request fails or returns pending, and before dismissal.",
-      "success_result": "Requests one retry and displays a ready result when the server returns one.",
-      "failure_result": "Keeps retry available when generation is pending or fails, without automatic retries or tracking writes.",
+      "availability": "Visible after a failed, pending, interrupted or undelivered request, after expiry, or after Timeline facts change, and before dismissal. Disabled until a server-provided wait passes. Absent after sign-in loss, disablement, or the daily retry limit.",
+      "success_result": "Requests one retry and displays a ready result when the server returns one. The server admits at most three deliberate retries per installation, local day and disclosure revision.",
+      "failure_result": "Keeps retry available when generation is pending or fails, without automatic retries or tracking writes. Reports the daily retry limit without clearing quota or admission records.",
       "effects": [
         "network_request",
         "database_read",
@@ -12303,9 +12320,12 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/daily-brief-ui.dom.test.tsx"
+          "tests/daily-brief-ui.dom.test.tsx",
+          "tests/daily-brief-lifecycle.dom.test.tsx",
+          "tests/daily-brief.service.test.ts",
+          "tests/daily-brief-migration-recovery.test.ts"
         ],
-        "notes": "DOM coverage verifies retry occurs only after explicit activation."
+        "notes": "DOM coverage verifies retry only after explicit activation, retry timing, refresh after source change and recovery after reload; service and migration coverage verify the bounded retry allowance."
       },
       "platforms": {
         "web": {
@@ -12315,7 +12335,8 @@
             "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
           ],
           "evidence": [
-            "tests/daily-brief-ui.dom.test.tsx"
+            "tests/daily-brief-ui.dom.test.tsx",
+            "tests/daily-brief-lifecycle.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -12325,7 +12346,8 @@
             "apps/desktop/src/timeline-screen.tsx#TimelineScreen"
           ],
           "evidence": [
-            "tests/daily-brief-ui.dom.test.tsx"
+            "tests/daily-brief-ui.dom.test.tsx",
+            "tests/daily-brief-lifecycle.dom.test.tsx"
           ],
           "reason": "The desktop screen renders the shared retry control."
         },
@@ -12360,15 +12382,23 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing is included.",
+      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing, reminder delivery history, and Notes on Not Completed occurrences may inform it.",
       "triggers": [
         {
           "kind": "change",
           "control": "Enable Daily Brief or Include selected Google Calendar timing"
+        },
+        {
+          "kind": "change",
+          "control": "Include reminder delivery history"
+        },
+        {
+          "kind": "change",
+          "control": "Include Notes on Not Completed occurrences"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account.",
-      "success_result": "Saves the exact two preference fields and withdraws any current Daily Brief presentation.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -12385,9 +12415,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/daily-brief-ui.dom.test.tsx"
+          "tests/daily-brief-ui.dom.test.tsx",
+          "tests/daily-brief.service.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields and the retention disclosure link."
+        "notes": "DOM coverage verifies exact preference fields, the optional-source disclosures and revocation on disable; service coverage verifies two- and four-field saves."
       },
       "platforms": {
         "web": {

@@ -283,6 +283,7 @@ pure owner with paired tests; current runtime owners are listed below.
 |---|---|---|---|---|---|---|
 | Day-progress layout | `packages/core/src/resolvers/day-progress.resolver.ts` | Synthetic design bench, shared Timeline UI, web/desktop services, and resolver tests | UI calculating independent dot/span mappings, changing actual times for collision spacing, fixed 24-hour local days | `docs/UI_SPEC.md`, `docs/DATETIME_STRATEGY.md` | `tests/day-progress.resolver.test.ts` | Geometry and injected instants only; no DOM, clocks, providers, or writes |
 | Duration and external context | `packages/core/src/resolvers/timeline-context.resolver.ts` | Shared Timeline assembly, owner-scoped web/desktop services, synthetic fixtures, and resolver tests | Averaging sessions instead of Occurrences, treating unknown as zero, running samples, automatic decisions or schedule writes | `docs/PRODUCT_SPEC.md` | `tests/timeline-context.resolver.test.ts` | Positive stopped Completed totals, optional default duration, explicit unknown/freshness, half-open timed overlaps |
+| Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
 | Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and timing-only model projection |
 
 - `packages/core/src/resolvers/timeline.resolver.ts` retains day selection,
@@ -446,3 +447,38 @@ must not recompute timing patterns. Paired tests:
 `tests/completion-timing.resolver.test.ts`, `tests/briefing-completion-timing.test.ts`.
 The strict context validator checks summary scope, counts, ranges and provenance;
 `projectBriefingContext` removes deselected Behavior and timing facts.
+
+## Advisor analysis ownership (Tickets 168–174)
+
+Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
+
+- Ticket 168: `components/briefing/DailyBriefLauncher.tsx` and
+  `lib/ui/daily-brief-session.ts` own presentation state and page-session reuse;
+  `lib/ui/daily-brief.ts` owns bounded transport for web and desktop.
+  `daily-brief.repo.ts` keeps admission ownership; presentation markers cannot
+  override server quotas or disclosure fences.
+- Ticket 169: `lib/db/advisor-analysis.repo.ts` reads the revision-fenced analysis
+  snapshot. `lib/services/briefing-analysis-source.ts` projects it into opaque lane
+  records; `briefing-account-context.service.ts` composes the read, disclosure
+  gating, revision fence and tip fingerprints. Configuration selection never grants
+  a source; the database enforces optional-source disclosure.
+- Tickets 171–172: `packages/core/src/resolvers/briefing-analysis.resolver.ts` owns
+  lane contracts, finding calculations and `selectBriefingTip`, paired with
+  `tests/briefing-analysis.resolver.test.ts`. Allowed caller:
+  `lib/services/briefing-pipeline.ts` (and the workbench through it).
+  `packages/core/src/services/briefing-analysis.ts` owns the model projection of the
+  one selected finding and the deterministic evidence line.
+- Ticket 170: `packages/core/src/services/brief-travel-guidance.ts` projects existing
+  `travel.resolver.ts` evidence for display beside the brief, paired with
+  `tests/brief-travel-guidance.test.ts`. It never routes or estimates. Travel stays
+  out of model input; the model never recomputes intervals.
+- Ticket 173: `briefing-pipeline.ts` selects findings; `daily-brief-consumer.ts`
+  validates the tip and drops quoted or unsupported Note themes;
+  `daily-brief.service.ts` records a tip only after a completed, current attempt.
+  Workbench runs never read or record tip history.
+- Ticket 174: `lib/services/briefing-analysis-fixtures.ts` supplies synthetic
+  scenarios. Neither snapshot capture nor analysis calls Timeline/export
+  maintenance or mutates source records.
+
+No component, API route, provider adapter or prompt computes rates, fits or travel
+intervals. These tickets add no connector registry, new connector or agent runtime.

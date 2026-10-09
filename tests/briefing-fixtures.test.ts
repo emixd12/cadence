@@ -168,3 +168,46 @@ function prepare(id: (typeof BRIEFING_FIXTURE_IDS)[number]) {
   const context = briefingFixture(id, config);
   return prepareBriefing(context, config, context.capturedAt);
 }
+
+describe("analysis evaluation fixtures (Ticket 174)", async () => {
+  const { BRIEFING_ANALYSIS_FIXTURE_IDS, briefingAnalysisFixture } = await import("@/lib/services/briefing-analysis-fixtures");
+  const { parseBriefingConfig } = await import("@cadence/core/services/briefing-config");
+  const { BRIEFING_ANALYSIS_LANE_IDS } = await import("@cadence/core/types/briefing-analysis");
+  const all = parseBriefingConfig({ ...DEFAULT_BRIEFING_CONFIG, length: { maxWords: 150 }, analysis: { lanes: [...BRIEFING_ANALYSIS_LANE_IDS], maxTips: 1, cooldownDays: 14 } });
+  const expected: Record<string, { finding: string[]; tip: string | null; context?: "sparse" | "dense" }> = {
+    none: { finding: [], tip: null },
+    no_issue: { finding: [], tip: null },
+    weekday_dip: { finding: ["weekday-time-dips"], tip: "weekday-time-dips" },
+    marking_offset: { finding: ["realistic-timing"], tip: "realistic-timing" },
+    heavy_load: { finding: ["schedule-load"], tip: "schedule-load", context: "dense" },
+    decision_debt: { finding: ["decision-debt"], tip: "decision-debt" },
+    late_logging: { finding: ["logging-chronology"], tip: "logging-chronology" },
+    corrections: { finding: ["correction-patterns"], tip: "correction-patterns" },
+    reminder_association: { finding: ["reminder-effectiveness"], tip: "reminder-effectiveness" },
+    note_obstacles: { finding: ["notes-failure-themes"], tip: "notes-failure-themes" },
+    small_sample: { finding: [], tip: null },
+    all_unresolved: { finding: ["decision-debt"], tip: "decision-debt" },
+    changed_schedule: { finding: [], tip: null },
+    capped: { finding: [], tip: null },
+  };
+
+  it("covers every scenario with hand-described lane outcomes and a relevant tip", () => {
+    expect(Object.keys(expected).sort()).toEqual([...BRIEFING_ANALYSIS_FIXTURE_IDS].sort());
+    for (const id of BRIEFING_ANALYSIS_FIXTURE_IDS) {
+      const context = briefingFixture(expected[id]!.context ?? "sparse", all);
+      const prepared = prepareBriefing(context, all, context.capturedAt, { source: briefingAnalysisFixture(id, context) });
+      const lanes = prepared.analysis!.result.lanes;
+      expect(lanes.filter((lane) => lane.state === "finding").map((lane) => lane.laneId), id).toEqual(expected[id]!.finding);
+      expect(prepared.analysis!.tip?.laneId ?? null, id).toBe(expected[id]!.tip);
+      expect(lanes.find((lane) => lane.laneId === "cross-source-context")?.state, id).toBe("unavailable");
+      if (id === "capped") expect(lanes.every((lane) => lane.reason === "source_capped" || lane.laneId === "cross-source-context")).toBe(true);
+      if (id === "none") expect(lanes.every((lane) => lane.state === "unavailable")).toBe(true);
+    }
+  });
+
+  it("keeps undisclosed optional sources unavailable in scenarios that do not provide them", () => {
+    const context = briefingFixture("sparse", all);
+    const lanes = prepareBriefing(context, all, context.capturedAt, { source: briefingAnalysisFixture("weekday_dip", context) }).analysis!.result.lanes;
+    expect(lanes.filter((lane) => lane.reason === "source_not_permitted").map((lane) => lane.laneId)).toEqual(["reminder-effectiveness", "notes-failure-themes"]);
+  });
+});

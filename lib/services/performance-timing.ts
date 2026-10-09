@@ -18,6 +18,7 @@ type PerformanceTimingEvent = {
   status: PerformanceTimingStatus;
   counts?: Record<string, number>;
   error_name?: string;
+  error_code?: string;
 };
 
 type CountResolver<T> =
@@ -114,6 +115,7 @@ export async function measurePerformanceSpan<T>(
       duration_ms: roundDuration(performance.now() - start),
       status: "error",
       error_name: safeErrorName(error),
+      ...safeErrorCode(error),
     });
 
     throw error;
@@ -193,6 +195,12 @@ function isSensitiveCountKey(key: string): boolean {
 
 function roundDuration(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+/** Only short machine codes such as `timeout`; never messages or provider bodies. */
+function safeErrorCode(error: unknown): { error_code?: string } {
+  const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[a-z][a-z0-9_]{0,39}$/.test(code) ? { error_code: code } : {};
 }
 
 function safeErrorName(error: unknown): string {

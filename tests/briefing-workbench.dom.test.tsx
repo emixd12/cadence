@@ -86,7 +86,7 @@ describe("Daily Brief workbench", () => {
 
   it("renders withheld failures alongside valid bubbles and exposes inspector versions", async () => {
     const body = comparison();
-    const inspector = { recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "2.2", configurationRevision: "reviewed-config" };
+    const inspector = { recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "3.0", configurationRevision: "reviewed-config" };
     fetcher.mockResolvedValue(Response.json({ ...body, results: [
       { state: "error", error: "advisor_unavailable", validation: "withheld", latencyMs: 1, inspector },
       { ...body.results[1], inspector },
@@ -160,7 +160,7 @@ describe("Daily Brief workbench", () => {
     expect(localStorage.length).toBe(1);
     expect(localStorage.key(0)).toBe("cadence.briefing-workbench.config.v1");
     const stored = localStorage.getItem("cadence.briefing-workbench.config.v1")!;
-    expect(JSON.parse(stored)).toMatchObject({ version: "1.2", recipe: { id: "daily_brief", version: "1.0" }, scope: { historyDays: 90 } });
+    expect(JSON.parse(stored)).toMatchObject({ version: "1.3", recipe: { id: "daily_brief", version: "1.0" }, scope: { historyDays: 90 } });
     expect(stored).not.toMatch(/MODEL_OUTPUT|FACTS_STAY|REVIEW_NOTES|snapshotId|accountRef/);
   });
 
@@ -298,12 +298,12 @@ it('keeps context controls independent, marks finish times unavailable, and with
 it('migrates legacy saved drafts and rejects unsupported recipe imports without running a comparison', async () => {
   const { DEFAULT_BRIEFING_CONFIG } = await import('@cadence/core/services/briefing-config');
   const legacy = { ...DEFAULT_BRIEFING_CONFIG, version: '1.0' } as Record<string, unknown>;
-  delete legacy.recipe; delete legacy.context;
+  delete legacy.recipe; delete legacy.context; delete legacy.analysis;
   localStorage.setItem('cadence.briefing-workbench.config.v1', JSON.stringify(legacy));
   await act(() => button('Load saved draft').click());
   await act(() => button('Edit JSON').click());
   const editor = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Configuration JSON editor"]')!;
-  expect(JSON.parse(editor.value)).toMatchObject({ version: '1.2', recipe: { id: 'daily_brief', version: '1.0' } });
+  expect(JSON.parse(editor.value)).toMatchObject({ version: '1.3', recipe: { id: 'daily_brief', version: '1.0' } });
   await act(() => change(editor, JSON.stringify({ ...DEFAULT_BRIEFING_CONFIG, recipe: { id: 'other_recipe', version: '1.0' } })));
   await act(() => button('Load into configuration 1').click());
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('Invalid configuration JSON');

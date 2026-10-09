@@ -1,5 +1,27 @@
 # Implementation Status
 
+## Ticket 186: Cadence project and repository rename — October 7, 2026
+
+Execution remains in progress. The owner renamed the Codex display name to
+`cadence`; project ID and chats remain intact. The owner approved an old-path
+compatibility symlink for the physical folder move. The physical folder is now `cadence`; the old path is a compatibility symlink.
+All 2,532 file comparisons and three worktree checks passed. Codex Source folders now uses the physical path under the same project ID.
+This existing chat still retains its old sandbox root; session refresh remains required.
+The isolated migration patch now preserves the deployed app commit `9eda5c0`.
+All required local checks pass against its intended publication history:
+2,332 tests passed, 29 existing gated tests skipped; all three builds pass.
+Existing updater archive signatures pass. October 8: Vercel readback confirms the
+production app runs `9eda5c0` and marketing runs `5e7ebde`, both linked to repository
+ID `1261353608`. Scheduled Trust runs have failed since September 27; this predates
+the rename. Task 6 started: the Trust workflow is paused, `codex/project-rename` is
+pushed, and production-configured stages are READY without custom domains: app
+`dpl_obMzi5XVoyPmeR329MduaxV8f2MS`, marketing `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`.
+The owner confirmed fresh Codex sessions work at the new root. October 8: GitHub
+repository renamed to `emixd12/cadence` (same ID `1261353608`); all 76 legacy
+evidence URLs serve identical bytes from the archive; updater feeds and signatures pass.
+Native updater acceptance, Task 8 promotion/publication and end-to-end acceptance remain open. See
+`docs/qa/cadence-project-rename.md` and the implementation plan.
+
 ## Function
 
 `STATUS.md` is the current-state ledger for this repository. Future agents should read it immediately after `AGENTS.md` and before selecting work from `docs/TICKETS.md`.
@@ -19,6 +41,99 @@ Its job is to answer:
 - `docs/TICKETS.md` for ticket scope and acceptance criteria.
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
+
+## Tickets 169–174 advisor analysis, tips and travel — September 26, 2026
+
+Tickets 169–173 are implemented in source; Ticket 174 is in progress. The production
+default brief selects no analysis lanes, so deployed behavior changes only through the
+recovery work (168), the local-time labels, and policy 3.0's output field.
+
+- 169: `read_advisor_analysis_snapshot` (migration `20260926170000`) returns bounded,
+  owner-filtered history, status events, configuration events and optional reminder
+  deliveries and Notes. The database refuses undisclosed optional sources. The account
+  context projects opaque records and fences the analysis revision before delivery.
+  Configuration 1.3 adds `analysis` (lanes, one-tip ceiling, 7–30 day cooldown).
+- 171–172: `briefing-analysis.resolver.ts` implements nine lanes with stated thresholds.
+  Load compares within weekdays; periods split only at schedule, timezone or active
+  changes; historical Calendar reports unavailable.
+- 173: one relevant finding may become a tip, subject to cooldown and one-day spacing.
+  The bubble shows the model's tip with a deterministic evidence line. Quoted or thinly
+  cited Note themes are dropped. Only completed, current attempts record the content-
+  free tip fingerprint (`daily_brief_tip_deliveries`).
+- 170: the bubble shows travel lines projected from existing Timeline travel evidence.
+  Travel stays out of model input.
+- 172 Settings: reminder-history and Note disclosures with exact wording, offered when
+  the server's recipe uses them or in development. Disabling Daily Brief revokes both.
+- 174: 14 synthetic analysis scenarios, workbench lane controls and an analysis
+  summary. Five synthetic model comparisons found and fixed a pre-existing UTC time
+  defect and jargon in tips.
+
+Verification and remaining gates: `docs/qa/briefing-workbench.md`,
+`docs/qa/travel-release.md`. A port-less local Postgres container applied all three new
+migrations; SQL smoke checks confirmed disclosure refusal, owner isolation, revision
+matching, older-client revocation, lease-bound tip records and deletion on disable. A
+full `supabase db reset` did not run. Hosted migrations, owner-clicked account
+comparisons, promotion of `advisor-analysis`, deployed-web and installed-desktop
+acceptance remain open.
+
+## Ticket 168 recoverable Daily Brief loading — September 26, 2026
+
+Implemented in source. Regression tests reproduce four loss paths against the
+previous launcher (18 new cases fail there): a Timeline-keyed remount aborted the
+request and the daily marker blocked another; navigation discarded the attempt;
+a server-completed but undelivered result could not be retried; and web had no
+client deadline while desktop lost its deadline when a signal was passed.
+
+- The launcher now takes Timeline facts as `sourceKey` and stays mounted. A
+  page-session memory per client (`lib/ui/daily-brief-session.ts`) reattaches
+  remounts to the in-flight attempt or fresh result. Changed facts or expiry
+  withdraw delivered text and offer an explicit refresh.
+- Composed client deadlines bound preferences (15 s), the installation lock (5 s),
+  session lookup, request and body decoding (75 s) on web and desktop.
+- Markers record `attempted`, `delivered`, `dismissed` and a bounded `pendingUntil`
+  claim for parallel tabs. Old markers count as delivered. No text is stored.
+- Migration `20260926150000_daily_brief_bounded_recovery.sql` adds
+  `daily_brief_runs.admissions`: one automatic start plus three deliberate retries
+  per installation, day and disclosure revision, including after completion.
+  The fifth returns `retry_exhausted` (HTTP 429). Quotas and records are not cleared.
+- Distinct notices cover pending, rate limit (retry disabled until the wait passes),
+  timeout, offline, sign-in, changed context, retry limit, interrupted, undelivered,
+  expired and outdated. Server phase spans log duration and error code only.
+
+Verification: agents, interactions, resolvers, lint (zero warnings), typecheck,
+full tests (2,247 passed, 29 skipped), web build, core, design-system, desktop
+typecheck and desktop build pass. A port-less local Postgres container applied both
+migrations over stubs and a smoke script confirmed admission, pending, retry-after-
+completion, `retry_exhausted`, owner isolation and denied table reads; a full
+`supabase db reset` did not run. Bench recovery states pass at desktop and 390px on
+`http://127.0.0.1:4321` without overflow. Hosted migration, deployed-web and
+installed-desktop recovery remain open under Ticket 174. Evidence:
+`docs/qa/in-app-daily-brief.md`.
+
+## Advisor implementation tickets filed — September 26, 2026
+
+Tickets 168–174 are planned; implementation has not started. The owner approved
+ticketing reliable recovery, travel timing and Behavior scheduling, structured
+adherence analysis, occasional actionable tips, and workbench/release evaluation.
+
+- 168: bounded loading, delivery recovery and retry across navigation.
+- 169: explicit analysis lanes and bounded, authorized evidence projection.
+- 170: travel timing and Behavior fits using existing deterministic evidence.
+- 171: adherence timing, schedule load and Calendar-context patterns.
+- 172: recurring obstacles, reminders and decision-recording patterns.
+- 173: useful prose, occasional tips and repetition suppression.
+- 174: frozen-fact workbench evaluation and staged web/desktop acceptance.
+
+`docs/TICKETS.md` records dependencies, platform impact, source paths and acceptance.
+The product spec, existing briefing plan, resolver ownership and decision log record
+the planned boundary. Ticket 168 can ship independently. Existing Tickets 147–148,
+155, 161 and 165 retain their unverified release gates. Travel model projection and
+optional private sources remain gated; no consent or runtime configuration changed.
+
+The loading diagnosis remains based on source inspection, not a new live reproduction.
+This task changes documentation only. Verification: `agents:check`,
+`interactions:check`, `resolvers:check` and `git diff --check` pass. Runtime tests,
+builds, provider requests and deployments were not run for this ticket-filing task.
 
 ## Security alert triage — September 26, 2026
 
@@ -875,6 +990,10 @@ info@identityscaffolding.com, and the Verification Center for
 verified and shown to users; data access remains verified; no reviewer request
 appears; the three declared scopes are unchanged. Post-approval smoke checks
 remain outstanding. Ticket 141 and rollout gates remain unchanged.
+September 26 scheduled follow-up could not independently repeat that pane check:
+the Identity Scaffolding Chrome session is unavailable, and automatic approval
+review blocked broad Claude inspection. The recorded September 26 result above
+is preserved; this automation obtained no new provider decision.
 Unrelated working-tree changes were excluded from the isolated releases.
 
 Ticket 138: Cloudflare's initially empty `cadence-me.com` zone now has two

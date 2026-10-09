@@ -1,3 +1,4 @@
+import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, briefingAnalysisFixture, type BriefingAnalysisFixtureId } from "./briefing-analysis-fixtures";
 import { Temporal } from "@js-temporal/polyfill";
 import { BriefingConfigValidationError, parseBriefingConfig } from "@cadence/core/services/briefing-config";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
@@ -49,9 +50,11 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
   try {
     const value = await raceBriefAbort(readComparisonBody(request), signal);
     const accountMode = value?.mode === "account";
+    const keys = value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value).sort().join() : "";
     if (!value || typeof value !== "object" || Array.isArray(value) ||
-        Object.keys(value).sort().join() !== (accountMode ? "accountRef,configs,mode,preferenceRevision" : "configs,fixtureId") ||
+        (accountMode ? keys !== "accountRef,configs,mode,preferenceRevision" : keys !== "configs,fixtureId" && keys !== "analysisFixtureId,configs,fixtureId") ||
         (!accountMode && !BRIEFING_FIXTURE_IDS.includes(value.fixtureId)) ||
+        (!accountMode && value.analysisFixtureId !== undefined && !BRIEFING_ANALYSIS_FIXTURE_IDS.includes(value.analysisFixtureId)) ||
         (accountMode && (typeof value.accountRef !== "string" || value.accountRef.length > 128 || !Number.isSafeInteger(value.preferenceRevision) || value.preferenceRevision < 0)) ||
         !Array.isArray(value.configs) || value.configs.length !== 2) throw new DailyBriefError("invalid_request");
     const configs = value.configs.map(parseBriefingConfig) as BriefingConfig[];
@@ -71,6 +74,10 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           historyDays: configs.map(config => config.scope.historyDays), includeCalendar: configs.some(config => config.scope.includeCalendar), signal, preferences,
           includeRecordedElapsedDurations: configs.some(config => config.context.includeRecordedElapsedDurations),
           includeHistoricalCompletionTimes: configs.some(config => config.context.includeHistoricalCompletionTimes),
+          ...(configs.some(config => config.analysis.lanes.length) ? { analysis: {
+            includeReminders: configs.some(config => config.analysis.lanes.includes("reminder-effectiveness")),
+            includeNotes: configs.some(config => config.analysis.lanes.includes("notes-failure-themes")),
+          } } : {}),
         }), signal) : null;
         const contexts = account?.contexts ?? configs.map(config => briefingFixture(value.fixtureId as BriefingFixtureId, config));
         const effectiveConfigs = account ? configs.map(config => accountConfig(config, account.configurationRefs, account.preferences.includeCalendar)) : configs;
@@ -80,11 +87,13 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           signal.throwIfAborted();
           if (account) await raceBriefAbort(account.assertCurrent(), signal);
           const context = contexts[index], captured = Temporal.Instant.from(context.capturedAt);
-          const prepared = prepareBriefing(context, config, context.capturedAt);
+          // Workbench runs never read or record tip history, so comparisons share the same frozen facts.
+          const analysis = { source: account ? account.analysisSource : value.analysisFixtureId ? briefingAnalysisFixture(value.analysisFixtureId as BriefingAnalysisFixtureId, context) : null };
+          const prepared = prepareBriefing(context, config, context.capturedAt, analysis);
           const start = Date.now();
           try {
             const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(25_000)]);
-            const briefing = await generateDailyBrief(context, { config, signal: modelSignal,
+            const briefing = await generateDailyBrief(context, { config, signal: modelSignal, analysis,
               planningNow: context.capturedAt, now: account ? () => Temporal.Now.instant() : () => captured,
               generate: generate ?? ((input) => generateOpenAIDailyBrief(input, { apiKey: process.env.OPENAI_API_KEY! })) });
             results.push({ state: "ready", briefing, inspector: prepared, latencyMs: Date.now() - start, validation: "passed" });
@@ -101,6 +110,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         return { mode: accountMode ? "account" : "synthetic", accountRef: caller ? briefingAccountRef(caller.user.id) : null,
           preferenceRevision: preferences?.revision ?? null, capturedAt: contexts[0].capturedAt, expiresAt: contexts[0].expiresAt,
           fixtureId: accountMode ? null : value.fixtureId, fixtureVersion: accountMode ? null : BRIEFING_FIXTURE_VERSION,
+          analysisFixtureId: accountMode ? null : value.analysisFixtureId ?? null, analysisFixtureVersion: accountMode ? null : BRIEFING_ANALYSIS_FIXTURE_VERSION,
           model: DAILY_BRIEF_MODEL, usage: "unavailable", results };
       } finally { inFlight = false; }
     };

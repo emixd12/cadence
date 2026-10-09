@@ -220,6 +220,7 @@ export type AdvisorDayContextV1 = Readonly<{
 }>;
 
 export type AdvisorOpaqueRef = (
-  kind: "account" | "snapshot" | "behavior" | "occurrence" | "calendar" | "event" | "instance" | "series" | "revision",
+  kind: "account" | "snapshot" | "behavior" | "occurrence" | "calendar" | "event" | "instance" | "series" | "revision"
+    | "configuration" | "status_event" | "note" | "analysis_revision",
   value: string,
 ) => string;

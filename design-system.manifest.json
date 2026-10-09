@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-08-04T06:48:47Z",
-  "root": "/Users/emi/Coding Projects/habit-tracking-app",
+  "root": "/Users/emi/Coding Projects/cadence",
   "components": [
     {
       "id": "composite.behavior-form",
@@ -478,7 +478,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench."
+      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench."
     },
     {
       "id": "module.daily-brief-settings-panel",

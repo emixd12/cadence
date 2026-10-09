@@ -15,6 +15,8 @@ import {
   type BriefingTone,
 } from "../types/briefing-config";
 import type { AdvisorDayContextV1 } from "../types/advisor-day-context";
+import { BRIEFING_ANALYSIS_LANE_IDS, type BriefingAnalysisLaneId } from "../types/briefing-analysis";
+import type { BriefingAnalysisConfig } from "../types/briefing-config";
 import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
 import { validateAdvisorDayContext } from "./advisor-day-context";
 
@@ -34,9 +36,12 @@ export class BriefingConfigValidationError extends Error {
 export function parseBriefingConfig(value: unknown): BriefingConfig {
   const supplied = record(value, "configuration");
   const legacy = supplied.version === LEGACY_BRIEFING_CONFIG_VERSION && !("recipe" in supplied) && !("context" in supplied);
+  const current = supplied.version === BRIEFING_CONFIG_VERSION;
   exactKeys(supplied, legacy
     ? ["version", "tone", "directness", "encouragement", "length", "priorities", "allowedSuggestionTypes", "alternatives", "scope", "referenceIds", "planner"]
-    : ["version", "recipe", "tone", "directness", "encouragement", "length", "priorities", "allowedSuggestionTypes", "alternatives", "scope", "context", "referenceIds", "planner"], "configuration");
+    : ["version", "recipe", "tone", "directness", "encouragement", "length", "priorities", "allowedSuggestionTypes", "alternatives", "scope", "context", ...(current ? ["analysis"] : []), "referenceIds", "planner"], "configuration");
+  // Configurations before 1.3 select no analysis lanes, preserving their behavior.
+  const analysisValue = current ? supplied.analysis : { lanes: [], maxTips: 0, cooldownDays: 14 };
   const previous = supplied.version === "1.1";
   if (previous) {
     const oldContext = record(supplied.context, "configuration.context");
@@ -56,7 +61,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
       includeRecordedElapsedDurations: (supplied.context as Record<string, unknown>).includeRecordedElapsedDurations,
       duration: (supplied.context as Record<string, unknown>).duration,
     },
-  } : supplied;
+  } : supplied.version === "1.2" ? { ...supplied, version: BRIEFING_CONFIG_VERSION } : supplied;
   if (config.version !== BRIEFING_CONFIG_VERSION) fail("configuration.version is unsupported.");
   const recipe = record(config.recipe, "configuration.recipe");
   exactKeys(recipe, ["id", "version"], "configuration.recipe");
@@ -69,7 +74,9 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
 
   const length = record(config.length, "configuration.length");
   exactKeys(length, ["maxWords"], "configuration.length");
-  const maxWords = integer(length.maxWords, "configuration.length.maxWords", 40, 120);
+  const analysis = parseAnalysis(analysisValue);
+  // Findings need room for an action and its reason; 1.3 raises the ceiling for calibration.
+  const maxWords = integer(length.maxWords, "configuration.length.maxWords", 40, current ? 180 : 120);
 
   const priorities = uniqueEnums(config.priorities, PRIORITIES, "configuration.priorities", 1, PRIORITIES.length);
   const allowedSuggestionTypes = uniqueEnums(config.allowedSuggestionTypes, SUGGESTION_TYPES, "configuration.allowedSuggestionTypes", 1, SUGGESTION_TYPES.length);
@@ -108,9 +115,21 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
     alternatives,
     scope: { behaviorRefs, historyDays, includeCalendar: scope.includeCalendar },
     context,
+    analysis,
     referenceIds,
     planner: { bufferMinutes, preference: planner.preference, movableBehaviorRefs, permittedWindows },
   };
+}
+
+function parseAnalysis(value: unknown): BriefingAnalysisConfig {
+  const analysis = record(value, "configuration.analysis");
+  exactKeys(analysis, ["lanes", "maxTips", "cooldownDays"], "configuration.analysis");
+  const lanes = uniqueEnums<BriefingAnalysisLaneId>(analysis.lanes, BRIEFING_ANALYSIS_LANE_IDS, "configuration.analysis.lanes", 0, BRIEFING_ANALYSIS_LANE_IDS.length);
+  if (analysis.maxTips !== 0 && analysis.maxTips !== 1) fail("configuration.analysis.maxTips must be 0 or 1.");
+  if (analysis.maxTips === 1 && lanes.length === 0) fail("configuration.analysis.maxTips needs at least one selected lane.");
+  const cooldownDays = integer(analysis.cooldownDays, "configuration.analysis.cooldownDays", 7, 30);
+  // Keep a stable lane order so equivalent selections share a configuration revision.
+  return { lanes: BRIEFING_ANALYSIS_LANE_IDS.filter((id) => lanes.includes(id)), maxTips: analysis.maxTips, cooldownDays };
 }
 
 export function serializeBriefingConfig(value: unknown): string {

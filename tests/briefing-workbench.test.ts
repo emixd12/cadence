@@ -60,7 +60,7 @@ describe("briefing workbench boundary", () => {
     expect(body).toMatchObject({ mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, usage: "unavailable" });
     for (const [index, result] of body.results.entries()) {
       expect(result).toMatchObject({ state: "ready", validation: "passed", inspector: {
-        recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "2.2", pipelineVersion: "2.2",
+        recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "3.0", pipelineVersion: "3.0",
       } });
       expect(result.inspector.facts).toEqual(payloads[index].context);
       expect(result.briefing.versions).toEqual({
@@ -273,4 +273,20 @@ it("keeps disabled inputs absent in both model serialization and the private ins
   expect(inspector.plan.options).toEqual([]);
   expect(body.results[0].briefing.versions.recipe).toBe('daily_brief@1.0');
   expect(inspector.contextControls.historicalCompletionTimes.reason).toBe('not_requested');
+});
+
+it("runs synthetic analysis scenarios over frozen facts without tip history", async () => {
+  const runBriefingComparison = await loadService();
+  const { BRIEFING_PRESETS } = await import("@cadence/core/services/briefing-config");
+  const candidate = BRIEFING_PRESETS.find((preset) => preset.id === "advisor-analysis")!.config;
+  const generate = vi.fn<DailyBriefGenerator>(async () => ({ text: "Walk at 12:30.", occurrenceRefs: [], suggestions: [], tip: null }));
+  const post = (body: unknown) => request(body);
+  const response = await runBriefingComparison(post({ fixtureId: "sparse", analysisFixtureId: "weekday_dip", configs: [candidate, candidate] }), generate);
+  const body = await response.json();
+  expect(response.status, JSON.stringify(body)).toBe(200);
+  expect(body).toMatchObject({ analysisFixtureId: "weekday_dip" });
+  expect(body.results[0].inspector.analysis.selection.tipId).toBe(body.results[1].inspector.analysis.selection.tipId);
+  expect(JSON.parse(generate.mock.calls[0]![0].facts).analysis.tip.laneId).toBe("weekday-time-dips");
+  const invalid = await runBriefingComparison(post({ fixtureId: "sparse", analysisFixtureId: "invented", configs: [candidate, candidate] }), generate);
+  expect(invalid.status).toBe(400);
 });
