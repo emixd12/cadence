@@ -269,3 +269,130 @@ collect fresh evidence; Task 6 still requires pausing the workflow before cutove
 
 A Dependabot branch (`86f5eb9`, devalue 5.9.4) produced preview builds on both
 Vercel projects October 8. Production aliases did not change.
+
+## October 8 continuation: Task 6 (owner selected Task 6 only)
+
+- Trust workflow `public-trust-evidence.yml` (ID `343427146`): previous state
+  `active`; now `disabled_manually`. No run was in progress. Restore it in Task 8.
+- Committed `2631e62` locally and pushed `codex/project-rename` to
+  `emixd12/habit-tracking-app`. It contains `9eda5c0` and 14 commits beyond
+  `origin/main`. No pull request was opened; `main` is unchanged.
+- The push triggered Git preview builds on both existing projects. Both are
+  READY at `2631e62`: app `dpl_FCm15afuv4nCDuLpkuXFLVpX5GKJ`, marketing
+  `dpl_2xxB1HXcu9tW5WA5ohWtcxQxMS1e`. These use Preview configuration. They are
+  not the production-configured stages that Task 6 requires.
+- GitHub name-dependent surfaces: zero deploy keys, zero repository hooks and
+  zero rulesets. OIDC uses the default subject (`repo:emixd12/habit-tracking-app`).
+  Only `deploy-pages` requests `id-token: write`; no external cloud trust policy
+  uses it. GitHub App installations are not listed: the `gh` token returned HTTP
+  403 for that endpoint. Check them in the settings page before Task 7.
+
+### Blocked: production-configured staging
+
+The Claude Code permission classifier denied
+`vercel deploy --prod --skip-domain` from a clean clone of `2631e62`. That command
+assigns no domain, but the classifier treats it as a production deploy. No retry
+or alternative path was attempted. The production-configured marketing and app
+stages, and their `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` pairing, remain open.
+
+Open provenance question for staging: `public-trust-evidence.service.ts` reads
+`VERCEL_GIT_COMMIT_SHA`. The current production app came from a CLI upload with
+`gitSource` null. Whether CLI deployments populate that variable is unverified.
+The leading assumption is that this mismatch causes the scheduled Trust failures.
+
+### Production-configured staging (owner allowed the deploy, October 8)
+
+- Marketing stage: `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`, target `production`,
+  READY, no domain assigned. Built by CLI from a clean clone of `2631e62`
+  (zero working-tree changes; the `.env.local` pulled by `vercel link` was deleted
+  before upload). Metadata records `githubCommitSha` and `sourceCommit`
+  `2631e62b6408d07544f6b4db1799df355b186432`, repo `emixd12/habit-tracking-app`.
+  `cadence-me.com` still resolves to `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`.
+- CLI deployments from a Git checkout carry `githubCommitSha` metadata. Whether
+  the runtime `VERCEL_GIT_COMMIT_SHA` is populated remains unverified.
+- App stage: blocked. The permission classifier denied the app deploy command
+  (`--prod --skip-domain` with per-deployment
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID=dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52` via
+  `-e` and `-b`). No retry occurred. The project-level production setting was
+  not changed.
+
+### App stage (owner allowed the deploy, October 8)
+
+- App stage: `dpl_obMzi5XVoyPmeR329MduaxV8f2MS`, target `production`, READY,
+  built by CLI from the same clean clone of `2631e62`. Metadata records
+  `githubCommitSha` and `sourceCommit` `2631e62b6408d07544f6b4db1799df355b186432`.
+  Per-deployment `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` (runtime and build) is
+  `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`. The project-level production value was not changed.
+- Custom domains are unchanged: `app.cadence-me.com` resolves to
+  `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n`; `cadence-me.com` resolves to
+  `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`. Both projects' production targets are unchanged.
+- Side effect: `--skip-domain` still moved the team-scoped `vercel.app` aliases.
+  `cadence-emis-projects-4c886aeb.vercel.app` now resolves to the app stage, and
+  `cadence-marketing-emis-projects-4c886aeb.vercel.app` to the marketing stage.
+  Vercel SSO protection covers both (HTTP 302 to `vercel.com/sso-api`).
+  `cadence-marketing-two.vercel.app` and the `git-main` alias did not move.
+  `docs/VERCEL_WORKFLOW.md` lists the app alias as a secondary production alias.
+  Restore with `vercel alias set` to `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n` and
+  `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR` if required.
+- `vercel curl` with an existing automation bypass read `/api/public/trust-evidence`
+  on the app stage. It reports `feed_state` `unavailable`: the staged code reads
+  `https://emixd12.github.io/cadence/trust/latest.json`, which does not exist before
+  Task 7. This is the expected, truthful pre-rename state. The response does not
+  expose the runtime source commit, so `VERCEL_GIT_COMMIT_SHA` remains unverified.
+  The project's bypass-secret count stayed at three.
+
+### Alias restoration and Task 7 preflight (October 8)
+
+- Owner approved restoring the moved team aliases. `vercel alias set` returned
+  success; readback: `cadence-emis-projects-4c886aeb.vercel.app` →
+  `dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n`, `cadence-marketing-emis-projects-4c886aeb.vercel.app`
+  → `dpl_HfvZ63AiK3qinAKFNPzQgKAKy4vR`. Custom domains remain unchanged.
+- `emixd12/cadence` still returns HTTP 404. Archive repository ID `1409433554`
+  remains at `a0419f47ce3cc73eeb97af1d3d910a3bbcb66588`.
+- With the Trust workflow paused, all 76 archived `habit-tracking-app/` files match
+  the live old-site bytes (SHA-256, zero mismatches, zero fetch failures).
+  No archive refresh is needed.
+- GitHub App inventory: the Chrome session was not signed in to GitHub, and the
+  `gh` token cannot list installations. Apps observed posting checks or statuses on
+  three recent commits: Vercel, Supabase, CodeRabbit, Cursor, Claude, GitHub Actions
+  and GitHub Advanced Security. The settings-page inventory remains unverified.
+- Security settings to recheck after rename: Dependabot security updates,
+  secret scanning and push protection enabled; non-provider patterns and validity
+  checks disabled.
+- Codex gate: on October 8 the owner confirmed that new Codex sessions run at the
+  physical `cadence` root. This closes the fresh-session sandbox check by owner attestation.
+
+## Task 7: GitHub repository rename (October 8)
+
+Preconditions closed first: owner confirmed fresh Codex sessions; the owner's
+screenshot of installed GitHub Apps lists ChatGPT Codex Connector, Claude,
+coderabbitai, Cursor, Google Labs Jules, Linear, Render, Supabase and Vercel.
+coderabbitai, Cursor and Vercel show pending permission-update requests; none
+was accepted. GitHub Apps bind repositories by ID.
+
+- Renamed at `2026-10-08T20:56:29Z` with `gh repo rename`. Readback:
+  `emixd12/cadence`, ID `1261353608`, public, default `main`, unarchived.
+- Settings snapshot diff (pre/post): only name and URL fields changed. Refs (142),
+  releases and asset IDs/sizes, repository and environment variables, secret
+  names, environments, branch protection, Actions permissions, workflow states
+  and security settings are identical. Pages `html_url` is now
+  `https://emixd12.github.io/cadence/`.
+- Legacy evidence: GitHub Pages' CDN ignores query strings and briefly served
+  cached project-site copies. After cache expiry, all 76 legacy
+  `habit-tracking-app/` URLs returned HTTP 200 with matching SHA-256 bytes, every
+  one with the archive's October 7 `last-modified`. The old project root
+  returns 404. `/cadence/trust/` serves the moved project site (37 entries).
+- Old-name redirects: repository, issues, commit, blob, raw and releases pages
+  resolve; `git ls-remote` on the old URL returns `5e7ebde`.
+- Main checkout remote is now `git@github.com:emixd12/cadence.git`; both linked
+  worktrees share it and have no worktree-specific URL override.
+- Updater: both feeds, both update archives and the preview.19 DMG download
+  through old and new URLs with baseline SHA-256 values (10/10). Both archive
+  signatures verify with the repository Minisign verifier and the public key
+  embedded in the installed `/Applications/Cadence.app` (`0.1.1-preview.45`,
+  key ID `A305E094044E04A`). That app's feed URL uses the old repository path.
+  Native updater redirect acceptance (Tauri HTTP client) remains open; the curl
+  chain is not a substitute. The installed app was not changed.
+- Vercel: both projects still report slug `habit-tracking-app` with repository
+  ID `1261353608` and unchanged production deployments. A Git-triggered build
+  probe follows below.

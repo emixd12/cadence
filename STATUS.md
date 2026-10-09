@@ -5,8 +5,7 @@
 Execution remains in progress. The owner renamed the Codex display name to
 `cadence`; project ID and chats remain intact. The owner approved an old-path
 compatibility symlink for the physical folder move. The physical folder is now `cadence`; the old path is a compatibility symlink.
-All 2,532 file comparisons and three worktree checks passed. GitHub remains
-unchanged. Codex Source folders now uses the physical path under the same project ID.
+All 2,532 file comparisons and three worktree checks passed. Codex Source folders now uses the physical path under the same project ID.
 This existing chat still retains its old sandbox root; session refresh remains required.
 The isolated migration patch now preserves the deployed app commit `9eda5c0`.
 All required local checks pass against its intended publication history:
@@ -14,8 +13,13 @@ All required local checks pass against its intended publication history:
 Existing updater archive signatures pass. October 8: Vercel readback confirms the
 production app runs `9eda5c0` and marketing runs `5e7ebde`, both linked to repository
 ID `1261353608`. Scheduled Trust runs have failed since September 27; this predates
-the rename. Refreshed Codex sandbox access, remote cutover and end-to-end acceptance
-remain open. See
+the rename. Task 6 started: the Trust workflow is paused, `codex/project-rename` is
+pushed, and production-configured stages are READY without custom domains: app
+`dpl_obMzi5XVoyPmeR329MduaxV8f2MS`, marketing `dpl_F4fjwDVXwqAZYh5hLhaXkUoevp52`.
+The owner confirmed fresh Codex sessions work at the new root. October 8: GitHub
+repository renamed to `emixd12/cadence` (same ID `1261353608`); all 76 legacy
+evidence URLs serve identical bytes from the archive; updater feeds and signatures pass.
+Native updater acceptance, Task 8 promotion/publication and end-to-end acceptance remain open. See
 `docs/qa/cadence-project-rename.md` and the implementation plan.
 
 ## Function
