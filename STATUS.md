@@ -1,34 +1,33 @@
 # Implementation Status
 
-## Ticket 186: Cadence project and repository rename — October 7–9, 2026
+## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 
-In progress; local and remote cutovers are done.
+Completed. The local folder and GitHub repository are renamed to `cadence`
+without losing work, history, deployment identities or installed-client access.
 
 - Local: the physical folder is `/Users/emi/Coding Projects/cadence`; the old path
-  is a compatibility symlink. Codex uses the new root under the same project ID;
-  the owner confirmed fresh sessions work. Both Codex automations remain PAUSED.
-- GitHub: `emixd12/habit-tracking-app` is now `emixd12/cadence` (same ID
-  `1261353608`); settings, refs and releases are unchanged and old links redirect.
-  All 76 legacy Trust evidence files serve identical bytes from `emixd12.github.io`.
-- Production: PR #92 merged `main` with the already-deployed `9eda5c0` history.
-  After PR #94 (`610e938`), app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` and marketing
-  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw` serve the production domains.
-- Trust: publishes from `https://emixd12.github.io/cadence/` with 37 legacy plus
-  new snapshots. Provenance passes again. `hosted_migration_boundary` fails
-  because unmerged branch `codex/fix-daily-brief-cpu-retries` applied hosted
-  migration `20260927173716`; this predates the rename.
-- Updater: feeds, archives and signatures pass through old and new URLs.
+  remains a compatibility symlink while open tools still use it. Codex uses the new
+  root under the same project ID. Both Codex automations remain PAUSED.
+- GitHub: `emixd12/cadence` keeps repository ID `1261353608`, settings, refs and
+  releases; old links redirect. Never create a repository named `habit-tracking-app`.
+- Evidence: all 76 legacy Trust files serve identical bytes from `emixd12.github.io`;
+  new evidence publishes under `https://emixd12.github.io/cadence/trust/`. Scheduled
+  run `37943471227` (October 9) kept all 37 legacy entries and passed provenance and
+  `hosted_migration_boundary`.
+- Production: after PR #100 (`74c8d4f`), app `dpl_J3LeAsvAZBFAU34FQPrQ29ZszpBR` and
+  marketing `dpl_9iPg2pJGY6ZyP7mbcLNtppAzjqNL` serve the production domains. After
+  each `main` merge, update the app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and
+  redeploy the app (`docs/VERCEL_WORKFLOW.md`).
+- Desktop: the real `tauri-plugin-updater` 2.10.1 check and download verify
+  signatures through old and new feed URLs; installed clients keep working.
+- Popmelt was removed (PR #94) after the move changed its path-derived project ID;
+  its data is archived in the private rename backup.
+- Retention: keep the archive site and old-path symlink as described; the private
+  backup `/Users/emi/Coding Projects/.cadence-rename-backup-20261007` stays until the
+  owner deletes it.
 
-Popmelt was removed on October 9 (PR #94) after the move changed its path-derived
-project ID; its data is archived in the private rename backup.
-
-Task 9 acceptance passed (production screens, local Supabase data, builds from the
-new folder). Task 10 classified every remaining old-name reference; current docs now
-record the completed rename. After each `main` merge, update the app's
-`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app (`docs/VERCEL_WORKFLOW.md`).
-
-Open: native updater acceptance and the next scheduled Trust run. Evidence:
-`docs/qa/cadence-project-rename.md`; plan: `docs/plans/2026-10-07-cadence-project-rename.md`.
+Evidence: `docs/qa/cadence-project-rename.md`; plan:
+`docs/plans/2026-10-07-cadence-project-rename.md`.
 
 ## Function
 
