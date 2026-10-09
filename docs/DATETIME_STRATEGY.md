@@ -173,3 +173,36 @@ Thus 23:50, 00:05 and 00:10 cluster around midnight rather than noon. Quantize t
 minutes. Report counts, delayed-mark count, range, and exclusions. Insufficient,
 dispersed, capped or unavailable evidence has no typical time. Missing, invalid,
 future, out-of-window, non-Completed and duplicate records never become samples.
+
+## Development historical briefing evaluation (Ticket 182)
+
+A selected local day and explicit IANA timezone define the evaluation clock. The
+workbench defaults to 07:00; this does not change the product day boundary or enable
+scheduled generation. Temporal resolves skipped times forward and repeated times
+to the earlier instant. The target interval is `[local midnight, next midnight)`;
+each lookback is `[target date - selected history days, target date)`. A 90-day
+target range plus a 90-day lookback can span 180 calendar days.
+
+Captured means actual retained context at its recorded capture clock. Synthetic
+means authored fixtures. Retrospective means current retained state for an earlier
+date, including later corrections. Reconstructed is reserved and never emitted by
+the present adapter. Missing rows do not establish Unresolved or a quiet day.
+
+A future Reconstructed implementation must prove effective time, recorded time,
+and ingestion time strictly before the selected clock for both target and lookback.
+Inclusive local-date selection does not make the instant cutoff inclusive. Records
+at the clock belong after it. Stable ordering must use `(effective_at, recorded_at,
+ingested_at, id)` and validate every revision link within the same owner/entity.
+A later correction cannot change an earlier snapshot. Missing links, ambiguous
+imports, backfilled recorded times without ingestion provenance, or deletion gaps
+must prevent a reconstruction claim for the affected source. Current projections
+lack enough provenance to satisfy this contract, so filtering recorded timestamps
+alone is explicitly insufficient.
+
+Retrospective rows sort by local date, scheduled instant and ID. Current titles,
+configured defaults and retained schedule snapshots are labeled current evidence.
+Past Note text, elapsed totals, original timezone and reminder status stay unknown
+when history cannot establish them. Optional past Calendar retrieval is a current
+read, not a retained history capture or permission for Calendar-pattern analysis.
+Live time gates authentication, permissions, provider tokens and cancellation;
+only planning and evaluation freshness use the saved clock. Production checks stay live.

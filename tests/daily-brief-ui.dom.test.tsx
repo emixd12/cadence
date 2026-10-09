@@ -93,16 +93,31 @@ describe("Daily Brief UI", () => {
     expect(container.querySelector('[role="status"]')?.className).toContain("[overflow-wrap:anywhere]");
   });
 
-  it("saves only the two Daily Brief settings and discloses the external model", async () => {
+  it("saves only the declared Daily Brief settings and discloses the external model", async () => {
     const adapter = client();
     await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Enable Daily Brief"));
     const controls = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    expect(controls).toHaveLength(2);
+    expect(container.textContent).not.toContain("Include Notes");
     await act(() => controls[1]!.click());
-    await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true }));
+    await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false }));
     expect(container.querySelector('a[href="https://developers.openai.com/api/docs/guides/your-data"]')).not.toBeNull();
     expect(container.textContent).toContain("cannot change tracking or Calendar records");
   });
+});
+
+it("offers optional sources with exact disclosures and revokes them when Daily Brief is turned off", async () => {
+  const offered = { ...settings, includeNotes: true, includeReminderHistory: true, optionalSources: { reminders: true, notes: true } };
+  const adapter = client({ preferences: vi.fn(async () => offered), updatePreferences: vi.fn(async (input) => ({ ...offered, ...input })) });
+  await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+  await vi.waitFor(() => expect(container.textContent).toContain("Include Notes on Not Completed occurrences"));
+  expect(container.textContent).toContain("up to 12 Notes, the first 280 characters of each");
+  expect(container.textContent).toContain("never reminder content");
+  const notes = [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((input) => input.getAttribute("aria-describedby") === "daily-brief-notes-disclosure")!;
+  expect(notes.checked).toBe(true);
+  await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!.click());
+  await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: false, includeCalendar: false, includeReminderHistory: false, includeNotes: false }));
 });
 
 it("renders suggestion provenance from trusted metadata without an apply action", async () => {
@@ -119,4 +134,36 @@ it("renders suggestion provenance from trusted metadata without an apply action"
   expect(link?.textContent).toContain("interpretation");
   expect(container.textContent).toContain("Review your priority.");
   expect([...container.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["Close"]);
+});
+
+it("shows a tip with its deterministic evidence and travel guidance labeled as calculated", async () => {
+  const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
+  await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
+    travel={{ localDate: settings.localDate, observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
+      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit" }, { kind: "return_unknown" }],
+      conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
+    briefing={{
+      text: "Dentist anchors the afternoon.", localDate: settings.localDate, timezone: settings.timezone,
+      generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [],
+      tip: { text: "Try recording the walk right after it.", laneId: "decision-debt", basis: "Walk: 6 of 15 past occurrences are still Unresolved; the oldest is 15 days old.", limitation: null },
+      suggestions: [{ text: "Consider moving the walk.", occurrenceRefs: [], referenceIds: [], optionId: "option-1", option: {
+        id: "option-1", occurrenceRef: "occurrence_1", intervals: { current: { startAt: "2026-09-20T18:45:00Z", endAt: "2026-09-20T19:15:00Z" }, proposed: { startAt: "2026-09-20T19:00:00Z", endAt: "2026-09-20T19:30:00Z" } },
+      } as never }],
+    }} />));
+  expect(container.textContent).toContain("Pattern tip");
+  expect(container.textContent).toContain("6 of 15 past occurrences are still Unresolved");
+  expect(container.textContent).toContain("Travel to Dentist overlaps Walk.");
+  expect(container.textContent).toContain("Leave by 2:30 PM for Dentist (transit).");
+  expect(container.textContent).toContain("Return time is unknown.");
+  expect(container.textContent).toContain("Not written by the model.");
+  expect(container.textContent).toContain("This time overlaps planned travel.");
+  expect([...container.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["Close"]);
+});
+
+it("omits travel from another day", async () => {
+  const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
+  await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
+    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
+    briefing={{ text: "Quiet day.", localDate: settings.localDate, timezone: settings.timezone, generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] }} />));
+  expect(container.textContent).not.toContain("Travel");
 });

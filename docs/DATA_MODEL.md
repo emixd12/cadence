@@ -1857,6 +1857,34 @@ returns `retry_exhausted`. The one-active-generation rule and six starts/minute
 still apply first; no quota or admission record is cleared. A new local day or
 disclosure revision starts at one. The column stores no prompt or generated text.
 
+Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
+
+- `daily_brief_preferences` adds `include_reminder_history` and `include_notes`
+  (default false; both require `enabled`). `save_daily_brief_preferences_v2` saves
+  all four controls. The original three-argument save now revokes both optional
+  sources, so an older client never keeps or grants them silently. Every save
+  bumps the revision, which fences in-flight briefs.
+- `read_advisor_analysis_snapshot(target_local_date, history_start_local_date,
+  selected_behavior_ids, include_reminders, include_notes, revision_only)` is a
+  public invoker wrapper over a private definer function. It requires the current
+  session, today's owner-local date and exactly 90 prior days, and filters every
+  table by the caller. It returns history occurrences (slot, status, latest mark,
+  configuration event), status events, configuration events (kind, effective time,
+  changed fields, reminder toggles), and optionally reminder deliveries and Notes.
+  Undisclosed optional sources return `not_permitted`; requested flags cannot
+  override disclosure. Notes come only from Not Completed occurrences, trimmed to
+  280 characters, at most 200 most recent. Row limits plus one signal a cap
+  (10,000 occurrences, 20,000 events, 2,000 configuration events, 10,000
+  deliveries). The payload's SHA-256 revision fences delivery; `revision_only`
+  returns only that hash.
+- `daily_brief_tip_deliveries` stores `(user_id, fingerprint, last_shown_local_date)`.
+  The fingerprint is a server SHA-256 of lane, Behavior, subject and evidence band;
+  no finding or generated text is stored. A shown tip records its own band and the
+  two adjacent bands, so evidence at a band edge stays in cooldown. `record_daily_brief_tip` writes only for
+  the caller's completed attempt with the same lease and preference revision within
+  two minutes of completion. Rows older than 30 days and beyond 64 per owner are
+  pruned. Disabling Daily Brief deletes them; account deletion cascades.
+
 Preferences start disabled. Saving controls increments their revision and clears
 attempts. Calendar disclosure records the current selected-calendar revisions;
 a changed connection/selection requires renewed disclosure. Disabling clears

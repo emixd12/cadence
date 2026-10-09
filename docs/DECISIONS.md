@@ -509,6 +509,18 @@ update must upgrade an older installed version through the real updater after a
 protected database backup. Do not create a disposable migration build or a
 separate migration ticket now.
 
+## macOS 14 runtime acceptance deferral
+
+Decision date: 2026-09-27. Ticket: 115.
+
+The owner deferred macOS 14 runtime acceptance. It no longer blocks Ticket 115.
+Keep the declared and compiled macOS 14 deployment target unchanged. Run the
+production acceptance matrix on the current Apple Silicon host and record the
+exact tested macOS version and build for each candidate. Do not claim macOS 14
+compatibility or support for untested newer versions. Developer ID signing,
+notarization, stapled app/DMG verification, quarantined downloaded-DMG
+Gatekeeper launch, production Keychain, and upgrade acceptance remain gates.
+
 ## Desktop native reminder horizon
 
 Decision date: 2026-08-30. Tickets: 108 and 112.
@@ -744,3 +756,76 @@ This authorizes filing the implementation scope, not executing it. No code,
 consent, provider configuration or deployed behavior changes. Optional sources
 and travel-to-model use retain their explicit disclosure/provider gates. Existing
 release evidence remains open where unverified; Ticket 174 coordinates it.
+
+## 2026-09-26: Implement advisor analysis behind a candidate preset
+
+Tickets 168–173 are implemented in source; Ticket 174 evaluation is in progress.
+Implementation decisions, recorded for owner review:
+
+- Recovery allows one automatic start plus three deliberate retries per installation,
+  local day and disclosure revision, including after server completion. A Timeline
+  change or expiry withdraws delivered text and offers a refresh instead of keeping
+  possibly outdated advice on screen.
+- Analysis lanes are deterministic and threshold-based. The model receives at most one
+  selected finding, never internal records. Reminder history and Notes need separate,
+  revocable disclosures, enforced in the database. Older clients' saves revoke them.
+- The production default selects no lanes. `advisor-analysis` is a candidate preset;
+  promotion is a reviewed repository change after owner wording review.
+- Travel stays out of model input. The bubble shows travel lines calculated from
+  existing evidence, labeled as not written by the model.
+- The model payload now carries deterministic local-time labels. Synthetic runs showed
+  that the model stated UTC instants as local times, a defect that predates these tickets.
+- Historical Calendar associations report unavailable; no historical Calendar read
+  was added.
+
+## 2026-09-27: Briefing workbench saves reviews locally, including account captures
+
+The owner asked to implement Phases 0–2 of the briefing-bench audit
+(`docs/plans/2026-09-27-briefing-bench-review.md`) as Tickets 175–177, and authorized
+full account capture for the development workbench.
+
+- The complete rendered brief is the review unit. The editorial target is a roughly
+  45-second read: one or two planning points and at most one supported observation.
+  80–120 visible words is a working range, not a validated formula.
+- The workbench saves cases, candidates, runs, prose feedback, agent proposals and
+  owner decisions under `.local/briefing-bench/`. This replaces the earlier rule that
+  private comparison output stays in memory and clears when the tab is hidden.
+  Account cases save the captured inputs once so they can be rerun exactly. Storage
+  is owner-partitioned, 0700/0600, expires after 30 days and supports deletion.
+  Expiry blocks reads and writes. Physical cleanup runs when the local workbench
+  accesses expired cases; no background deletion runs while the workbench is closed.
+  `.gitignore` only prevents commits; it is not access control.
+- A saved case reruns on its captured clock. Reruns still need current consent: same
+  owner, enabled briefing, captured sources still disclosed, and captured Behaviors
+  still active. A deleted or archived Behavior withdraws the case from reruns.
+- Feedback becomes a proposal through a Markdown packet read by an existing coding
+  agent. No agent framework or embedded chat is added. Proposals are validated and
+  displayed, never executed, and never become production rules; promotion stays a
+  reviewed repository change.
+- Model-weight training, historical reconstruction (Phase 3), batch and lane-preview
+  review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
+  are not implemented.
+
+
+## 2026-09-30: Daily Brief evaluation criteria and versioned coverage profiles
+
+The owner supplied Ticket 184's evaluation criteria before reviewing candidate outputs.
+
+- Useful briefs provide actionable adherence insights through behavioral analysis
+  and planning for the day's Behaviors and outside connector events. Use available
+  evidence within existing authorization, disclosure and evidence-quality limits.
+- The complete brief has a general one-minute reading cap. Prefer concise, precise
+  wording. This supersedes the earlier 45-second evaluation target. A configurable
+  reading length remains a possible future setting, not an implemented feature.
+- Quiet days prioritize supported longitudinal insights over day-management tips.
+- Prefer different analysis lanes across days, while revisiting persistent patterns
+  of high importance or impact when useful. Wording variation may help presentation;
+  it does not itself remove substantive repetition.
+- The initial coverage is six tuning cases, ten reserved evaluation cases and one
+  seven-day sequence. Name it `daily-brief-balanced@1`. Support distinct coverage
+  profiles and retain their revisions and evaluation iterations separately.
+
+`docs/plans/2026-09-28-briefing-owner-review.md` defines this first profile and its
+frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
+acceptance, promotion, deployment and stored-brief decisions remain separate.
+This is an evaluation direction; runtime policy and production presets are unchanged.

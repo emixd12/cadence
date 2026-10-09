@@ -336,3 +336,12 @@ Keep CodeQL, Dependabot, secret scanning, and push protection enabled. When an
 API cannot expose a safe aggregate, the snapshot records Unavailable. The
 workflow never publishes raw alerts, scanner matches, advisory notes,
 repository administration payloads, credentials, or production user data.
+
+## Ticket 186 rename preparation — October 7, 2026
+
+The owner authorized renaming the existing repository to `emixd12/cadence`.
+Repository ID `1261353608`, release assets, desktop identity, and production
+domains must remain unchanged. The user-site archive preserves historical
+Pages evidence. Neither rename has occurred. Follow
+`docs/plans/2026-10-07-cadence-project-rename.md` and its execution evidence in
+`docs/qa/cadence-project-rename.md`; historical acceptance above is unchanged.

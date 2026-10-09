@@ -28,7 +28,7 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if preference <> '{"enabled":false,"include_calendar":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null}'::jsonb then
+  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null}'::jsonb then
     raise exception 'Daily Brief defaults changed: %', preference;
   end if;
 
@@ -104,11 +104,11 @@ begin
 
   decision := public.begin_daily_brief(
     '14700000-0000-4000-8000-000000000101',
-    true,
+    false,
     1
   );
   if decision ->> 'state' <> 'already_attempted' then
-    raise exception 'Completed Daily Brief attempt was retried: %', decision;
+    raise exception 'Completed Daily Brief attempt retried automatically: %', decision;
   end if;
 
   if not public.finish_daily_brief(
@@ -145,6 +145,18 @@ begin
     1
   ) then
     raise exception 'Retried Daily Brief attempt did not finish.';
+  end if;
+
+  -- Completed but undelivered attempts can retry, within four admissions.
+  decision := public.begin_daily_brief('14700000-0000-4000-8000-000000000101', true, 1);
+  if decision ->> 'state' <> 'acquired' then
+    raise exception 'Fourth admission was denied: %', decision;
+  end if;
+  perform public.finish_daily_brief('14700000-0000-4000-8000-000000000101',
+    (decision ->> 'lease_token')::uuid, true, 1);
+  decision := public.begin_daily_brief('14700000-0000-4000-8000-000000000101', true, 1);
+  if decision ->> 'state' <> 'retry_exhausted' then
+    raise exception 'Fifth admission was allowed: %', decision;
   end if;
 
   begin
@@ -366,6 +378,50 @@ begin
     or has_function_privilege('anon', 'public.begin_daily_brief(uuid,boolean,bigint)', 'EXECUTE')
     or has_function_privilege('service_role', 'public.begin_daily_brief(uuid,boolean,bigint)', 'EXECUTE') then
     raise exception 'Daily Brief privileges are broader than intended.';
+  end if;
+end;
+$$;
+
+-- Optional disclosures, revision fencing and lease-bound tip metadata.
+do $$
+declare
+  payload jsonb;
+  revision jsonb;
+  decision jsonb;
+  today date := (statement_timestamp() at time zone 'America/New_York')::date;
+  installation uuid := '14700000-0000-4000-8000-000000000301';
+begin
+  payload := public.read_advisor_analysis_snapshot(today, today - 90, '{}'::uuid[], true, true, false);
+  if payload ->> 'notes' <> 'not_permitted' or payload ->> 'reminders' <> 'not_permitted' then
+    raise exception 'Undisclosed sources were allowed.';
+  end if;
+  perform public.save_daily_brief_preferences_v2(true, false, true, true, 0);
+  payload := public.read_advisor_analysis_snapshot(today, today - 90, '{}'::uuid[], true, true, false);
+  revision := public.read_advisor_analysis_snapshot(today, today - 90, '{}'::uuid[], true, true, true);
+  if payload -> 'notes' <> '[]'::jsonb or payload -> 'reminders' <> '[]'::jsonb
+    or payload ->> 'revision' <> revision ->> 'revision' then
+    raise exception 'Disclosed snapshot or revision failed.';
+  end if;
+  decision := public.begin_daily_brief(installation, false, 1);
+  if public.record_daily_brief_tip(installation, (decision ->> 'lease_token')::uuid, 1, repeat('a', 64)) then
+    raise exception 'Pending attempt recorded a tip.';
+  end if;
+  perform public.finish_daily_brief(installation, (decision ->> 'lease_token')::uuid, true, 1);
+  if not public.record_daily_brief_tip(installation, (decision ->> 'lease_token')::uuid, 1, repeat('a', 64))
+    or jsonb_array_length(public.read_daily_brief_tip_history()) <> 1 then
+    raise exception 'Completed attempt did not record its tip.';
+  end if;
+  payload := public.save_daily_brief_preferences(true, false, 1);
+  if (payload ->> 'include_notes')::boolean or (payload ->> 'include_reminder_history')::boolean then
+    raise exception 'Older client retained optional disclosure.';
+  end if;
+  perform public.save_daily_brief_preferences(false, false, 2);
+  if public.read_daily_brief_tip_history() <> '[]'::jsonb then
+    raise exception 'Disablement retained tip metadata.';
+  end if;
+  if has_table_privilege('authenticated', 'cadence_advisor_private.daily_brief_tip_deliveries', 'SELECT')
+    or has_function_privilege('anon', 'public.read_daily_brief_tip_history()', 'EXECUTE') then
+    raise exception 'Tip metadata privileges are too broad.';
   end if;
 end;
 $$;

@@ -45,18 +45,6 @@ export const getCurrentUserClaims =
     };
   });
 
-export async function requireCurrentUser(
-  message: string,
-): Promise<User> {
-  const { user, error } = await getCurrentUser();
-
-  if (error || !user) {
-    throw new Error(message);
-  }
-
-  return user;
-}
-
 export async function requireCurrentUserId(message: string): Promise<string> {
   const { userId, error } = await getCurrentUserClaims();
 

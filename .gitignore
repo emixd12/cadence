@@ -50,6 +50,9 @@ pnpm-debug.log*
 # Vercel local project link
 .vercel/
 
+# Local development review records (briefing workbench, Tickets 176–177)
+.local/
+
 # Claude Code local state (codex-bridge runs, launch config)
 .claude/
 .vercel

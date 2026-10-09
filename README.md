@@ -4,7 +4,7 @@ Cadence is a public, open-source personal behavior tracker for explicit decision
 
 Cadence generates scheduled Occurrences for recurring Behaviors. The user marks each Occurrence Completed or Not Completed. Unresolved remains separate and never becomes an automatic failure. Cadence is currently available without charge.
 
-Canonical source: <https://github.com/emixd12/habit-tracking-app>
+Canonical source: <https://github.com/emixd12/cadence>
 
 Future agents should treat the docs as source-of-truth and use `STATUS.md` to understand what has actually been implemented.
 

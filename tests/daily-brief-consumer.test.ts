@@ -121,7 +121,7 @@ it("invalidates pending output when selected source content changes", async () =
 it("binds the forward-looking recipe policy and keeps diagnostics out of delivered warnings", async () => {
   const generate = vi.fn().mockResolvedValue({ text: "No specific timing recommendation today.", occurrenceRefs: [], suggestions: [] });
   const result = await generateDailyBrief(context, { generate, now, signal: new AbortController().signal });
-  expect(result.versions).toMatchObject({ recipe: "daily_brief@1.0", policy: "2.2", pipeline: "2.2" });
+  expect(result.versions).toMatchObject({ recipe: "daily_brief@1.0", policy: "3.0", pipeline: "3.0" });
   expect(result.warnings).toEqual(["Suggestions only. No changes were applied."]);
   expect(DAILY_BRIEF_INSTRUCTIONS).toContain("Never recap Completed or Not Completed counts");
   expect(DAILY_BRIEF_INSTRUCTIONS).toContain("Unknown duration cannot prove an activity fits");
@@ -136,4 +136,18 @@ it("withholds model advice referencing completed work while retaining internal l
   await expect(generateDailyBrief(completed, { generate, now, signal: new AbortController().signal })).rejects.toMatchObject({ code: "advisor_unavailable" });
   expect(JSON.parse(generate.mock.calls[0][0].facts).context.cadence.occurrences).toEqual([]);
   expect(completed.cadence.occurrences[0].status).toBe("completed");
+});
+
+it("labels every UTC instant with its local time so the model never converts it", async () => {
+  const generate = vi.fn().mockResolvedValue(advice);
+  await generateDailyBrief(context, { generate, now, signal: new AbortController().signal });
+  const payload = JSON.parse(generate.mock.calls[0][0].facts);
+  // 2026-11-01 is the first day of standard time in New York (UTC−5).
+  expect(payload.clock.timezone).toBe("America/New_York");
+  expect(payload.clock.labels[context.cadence.occurrences[0].scheduledFor]).toBe("12:30 PM");
+  expect(payload.clock.labels["2026-11-01T12:00:00Z"]).toBe("7:00 AM");
+  expect(generate.mock.calls[0][0].instructions).toContain("use its entry in clock.labels");
+  // Postgres timestamptz JSON uses +00:00 rather than Z.
+  const { localTimeLabels } = await import("@/lib/services/daily-brief-consumer");
+  expect(localTimeLabels({ scheduledFor: "2026-11-01T17:30:00+00:00", other: "2026-11-01", text: "12:30" }, "America/New_York")).toEqual({ "2026-11-01T17:30:00+00:00": "12:30 PM" });
 });

@@ -15,6 +15,12 @@ A dismissed pending result cannot reopen the bubble. An explicit retry follows a
 failure without automatic retry loops. The once-per-local-day/install dismissal
 policy is defined in `plans/first-external-consumer.md`.
 
+Tips and travel (Tickets 170–173): a brief may carry at most one pattern tip when a
+calculated finding bears on today; Cadence shows the evidence line beside it. Tips
+repeat at most once per cooldown. Travel lines beside the brief come from existing
+travel evidence, disappear when it expires, and never regenerate the brief. Reminder
+history and Notes need their own Settings disclosure; turning Daily Brief off revokes both.
+
 Navigation during loading keeps the attempt; returning to Timeline shows its result.
 An interrupted, failed or undelivered attempt shows a recovery notice with an
 explicit retry, bounded per installation and day. Marking an occurrence after

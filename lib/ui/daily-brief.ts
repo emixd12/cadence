@@ -16,13 +16,20 @@ export function timelineBriefKey(timeline: TimelineView): string {
 export type DailyBriefClient = Readonly<{
   preferences: (signal?: AbortSignal) => Promise<DailyBriefSettings>;
   updatePreferences: (
-    input: Readonly<{ enabled: boolean; includeCalendar: boolean }>,
+    input: DailyBriefPreferenceInput,
     signal?: AbortSignal,
   ) => Promise<DailyBriefSettings>;
   requestBrief: (
     input: Readonly<{ installationId: string; retry: boolean }>,
     signal?: AbortSignal,
   ) => Promise<DailyBriefResponse>;
+}>;
+
+export type DailyBriefPreferenceInput = Readonly<{
+  enabled: boolean;
+  includeCalendar: boolean;
+  includeReminderHistory?: boolean;
+  includeNotes?: boolean;
 }>;
 
 export class DailyBriefRequestError extends Error {

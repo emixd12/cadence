@@ -469,6 +469,7 @@ async function archiveSmokeBehavior(client, behavior) {
   }));
   const previousConfiguration = {
     category_id: behavior.category_id,
+    location_text: behavior.location_text ?? null,
     schedule_graph: snapshotGraph,
     browser_reminder_enabled: behavior.browser_reminder_enabled,
     email_reminder_enabled: behavior.email_reminder_enabled,
@@ -484,6 +485,7 @@ async function archiveSmokeBehavior(client, behavior) {
         category_id: behavior.category_id,
         title: behavior.title,
         description: behavior.description,
+        location_text: behavior.location_text ?? null,
         recurrence_rule: behavior.recurrence_rule,
         scheduled_time: behavior.scheduled_time,
         timezone: behavior.timezone,
@@ -545,6 +547,7 @@ async function createSmokeBehavior(client, input) {
       category_id: input.categoryId,
       title: input.title,
       description: null,
+      location_text: null,
       recurrence_rule: {
         frequency: "daily",
         interval: 1,
@@ -577,6 +580,7 @@ async function createSmokeBehavior(client, input) {
         previous_configuration: null,
         next_configuration: {
           category_id: input.categoryId,
+          location_text: null,
           schedule_graph: scheduleGraph,
           browser_reminder_enabled: true,
           email_reminder_enabled: false,
@@ -586,6 +590,7 @@ async function createSmokeBehavior(client, input) {
         },
         changed_fields: [
           "category_id",
+          "location_text",
           "schedule_graph",
           "browser_reminder_enabled",
           "email_reminder_enabled",
@@ -1088,6 +1093,7 @@ async function assertBehaviorConfigurationEventIsolation(
 async function assertBehaviorConfigurationEventAppendOnly(input) {
   const previousConfiguration = {
     category_id: null,
+    location_text: null,
     schedule_graph: [],
     browser_reminder_enabled: true,
     email_reminder_enabled: false,
@@ -1692,6 +1698,7 @@ async function assertSettingsTimezoneTransaction(input) {
 function buildTimezoneConfigurationEventPlan(behavior, targetTimezone) {
   const previousConfiguration = {
     category_id: behavior.category_id,
+    location_text: behavior.location_text ?? null,
     schedule_graph: behavior.scheduleGraph.map((schedule) => ({
       recurrence_rule: schedule.recurrence_rule,
       sort_order: schedule.sort_order,

@@ -7,7 +7,8 @@ out of the forward feed and appear in **Needs decision**.
 ## Daily Brief
 
 When this Cadence server supports Daily Brief, enable it in **Settings**.
-Cadence sends today's Behavior schedule and bounded completion history to OpenAI.
+Cadence sends today's Behavior schedule and bounded completion history, including
+findings calculated from it, to OpenAI.
 **Include selected Google Calendar timing** separately enables Calendar timing.
 Notes, Calendar descriptions and credentials are excluded. Provider retention may apply.
 
@@ -19,6 +20,18 @@ Leaving Timeline while the brief loads does not lose it; it appears when you ret
 If loading was interrupted, the bubble says so and offers **Try again**. When
 Cadence gives a wait time, the button becomes available after it passes. Each
 installation gets up to three retries per day.
+
+When your Cadence server enables pattern tips, the brief occasionally includes a
+**Pattern tip** drawn from your own history, such as
+a weekday that tends to go unfinished. Cadence calculates the pattern and shows the
+counts under the tip; a pattern is not proof of a cause. The same tip does not return
+for about two weeks. When travel estimates are available, a **Travel** section lists
+departures, the return and any Behavior that travel crowds. Cadence calculates these
+lines from its travel estimates; the model does not write them.
+
+In **Settings**, you can separately allow reminder delivery history and Notes on Not
+Completed occurrences to inform tips, when your Cadence server uses them. Each option
+describes exactly what is sent. Turning Daily Brief off turns both off.
 
 The briefing can recommend changes but cannot apply them. Cadence stores no
 briefing history. When its timing expires, the bubble offers **Get a fresh brief**.

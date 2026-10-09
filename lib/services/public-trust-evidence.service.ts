@@ -10,7 +10,7 @@ import {
 } from "@/lib/resolvers/public-trust-evidence.resolver";
 
 const DEFAULT_FEED_URL =
-  "https://emixd12.github.io/habit-tracking-app/trust/latest.json";
+  "https://emixd12.github.io/cadence/trust/latest.json";
 const MAX_FEED_BYTES = 256_000;
 
 export const PUBLIC_TRUST_CHECK_LABELS = {

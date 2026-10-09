@@ -29,7 +29,8 @@ The final product posture is:
 The first public-product implementation steps are now present: the current
 authenticated web app has been hardened for many independent users, and the
 Astro marketing site exists as a sibling app. Tickets 107–114 implement the
-local-first macOS desktop track. Ticket 115 defers Apple-trusted distribution.
+local-first macOS desktop track. Ticket 115 now owns Apple-trusted distribution
+acceptance and is in progress.
 Tickets 116–122 implement optional Google account linking and offline-capable
 desktop synchronization. Tickets 146–148 implement the in-app read-only daily briefing
 in the existing horse bubble on web and linked desktop, using server-side model
@@ -64,7 +65,7 @@ Preferred sequencing:
 4. Extract `packages/ui` as tokens and primitives first, not full product
    components.
 5. Maintain the completed desktop track under Tickets 107–114 and 116–122;
-   keep Ticket 115 and mobile deferred.
+   complete Ticket 115's Apple-trusted release gates separately. Keep mobile deferred.
 
 Use npm workspaces first unless build orchestration becomes painful. Turborepo
 may be added later if caching and multi-app task orchestration become
@@ -264,7 +265,7 @@ the completion attestation live in `docs/OPERATIONS.md`.
 ## Marketing content and legal contract
 
 Cadence's public source is
-`https://github.com/emixd12/habit-tracking-app` under the repository MIT
+`https://github.com/emixd12/cadence` under the repository MIT
 license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
@@ -349,9 +350,12 @@ IDs so an older Passed result cannot describe a newer release.
 
 `docs/DESKTOP_BUILD.md` records completed Tickets 107–114. Desktop targets
 Apple Silicon with macOS 14 as its declared minimum, using Tauri v2, Vite,
-React, and SQLite. Ticket 115 defers actual macOS 14 compatibility and Apple-
-trusted distribution. Tracking works without login or network under one stable
-local profile. Tickets 116–122 add optional use of the existing Google account;
+React, and SQLite. The owner deferred macOS 14 runtime acceptance; the declared
+and compiled minimum does not establish compatibility. Ticket 115 now owns
+Apple-trusted distribution and installed acceptance on the current Apple Silicon
+host. Record each candidate's exact tested macOS version and build. Tracking
+works without login or network under one stable local profile. Tickets 116–122
+add optional use of the existing Google account;
 SQLite remains the offline working copy. `docs/DESKTOP_PARITY.md` records the
 current tracking baseline and verification state.
 
@@ -371,7 +375,7 @@ preview milestone within Ticket 113. Preserve Cadence, `app.cadence.desktop`,
 and existing local data. Apple enrollment, Developer ID signing, notarization,
 and final-release acceptance remain deferred; they do not block preview work.
 Prepare artifacts and a dedicated HTTPS preview feed locally for the existing
-`emixd12/habit-tracking-app` repository. Candidate-building checks must not depend
+`emixd12/cadence` repository. Candidate-building checks must not depend
 on updater evidence that requires those candidates. Final production checks
 remain strict, and updater signing remains distinct from Apple signing.
 
@@ -394,7 +398,7 @@ RLS. SQLite stays authoritative for the device working copy and keeps atomic
 domain mutation, tombstone, and outbox writes. Credentials and device-specific
 notification state do not enter the synchronized account snapshot. Ticket 122
 accepted the current account-sync preview. Marketing must still identify it as
-an unnotarized preview while Ticket 115 remains deferred.
+an unnotarized preview while Ticket 115 remains incomplete.
 
 ## Pricing and future AI
 

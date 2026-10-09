@@ -29,6 +29,8 @@ describe("Daily Brief repository", () => {
       revision: 3,
       calendarConnectionGeneration: 7,
       calendarSelectionRevision: 11,
+      includeReminderHistory: false,
+      includeNotes: false,
     });
     expect(rpc).toHaveBeenCalledWith("read_daily_brief_preferences");
     expect(abortSignal).toHaveBeenCalledWith(signal);
@@ -38,12 +40,14 @@ describe("Daily Brief repository", () => {
     const rpc = vi.fn().mockResolvedValue({ data: preferences, error: null });
     await saveDailyBriefPreferences(
       { rpc } as never,
-      { enabled: true, includeCalendar: true },
+      { enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: true },
       2,
     );
-    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences", {
+    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences_v2", {
       p_enabled: true,
       p_include_calendar: true,
+      p_include_reminder_history: false,
+      p_include_notes: true,
       p_expected_revision: 2,
     });
   });

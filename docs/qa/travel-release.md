@@ -459,3 +459,126 @@ this, a view cached before a settings save stayed visible until it expired.
 Settings changes, revoked location permission and going offline still cancel as
 before. DOM tests cover the hidden, pre-commit and unmount cases. Installed
 desktop re-acceptance remains open with the other Ticket 166 and 167 gates.
+
+## Travel beside the Daily Brief (Ticket 170) — September 26, 2026
+
+Model projection of travel stays disabled. Instead, the shared Timeline projects its
+existing travel evidence with `packages/core/src/services/brief-travel-guidance.ts` and
+publishes it to the horse bubble for the same local day. The bubble lists up to four
+calculated lines — travel-created overlaps with Unresolved Behaviors, the next
+departures, the return or an unknown-return note — plus "Calculated by Cadence from
+travel estimates as of … Not written by the model." A hypothetical brief option that
+overlaps travel occupancy is labeled. Expired or stale estimates withdraw the section.
+
+No extra route request, quota use, source-change rule or refresh policy changed.
+Travel refresh never regenerates the brief or resets its dismissal. Missing base
+suppresses only the return line; unknown travel is never treated as free.
+`tests/brief-travel-guidance.test.ts` covers full trips, missing base, expiry, stale
+legs, every mode and option overlap; `tests/briefing-analysis-pipeline.test.ts`
+asserts travel is absent from model input. Native location and navigation gates
+remain under Ticket 165; deployed and installed acceptance remain under Ticket 174.
+
+## Signed native acceptance preparation — September 27, 2026
+
+Candidate `0.1.1-rc.1` passes Apple artifact checks. Signed native runtime acceptance remains unverified.
+The parent owns installed-app control. This preparation read source and ran synthetic tests only.
+It did not query device position, change permission settings, schedule notifications, or modify tracking data.
+
+Bundled Node `24.19.0` passed 88 tests across ten focused files:
+`foreground-location.dom`, `travel-navigation`, `travel-settings.dom`,
+`native-reminder.resolver`, `desktop-native-spike`, `desktop-native-coverage-probe`,
+`desktop-local-day`, `desktop-notification-activation`, `desktop-reminder-repair`,
+and `desktop-retry.dom`. These checks use simulated native boundaries.
+Earlier actual delivery, activation, OS-limit and sleep/wake evidence remains in
+`2026-08-30-desktop-native-boundary.md` and `2026-08-30-desktop-lifecycle-release.md`.
+It does not establish signed-identity acceptance on macOS 27.0 (`26A428`).
+
+Installed checks, after protected installation and account acceptance:
+
+1. Activate Cadence and open Settings. Record the device-permission line without coordinates.
+   A not-determined native permission returns `prompt` without requesting authorization.
+   Click **Check device location permission**. Record prompt appearance, response, state and diagnostic reason.
+   The native adapter stops after twelve seconds. Its reasons distinguish `inactive`, `services_off`,
+   `status_1`/`status_2`, Core Location errors and `timeout`.
+   An available result must also pass the shared sixty-second freshness and hundred-meter accuracy bounds.
+   Preserve coordinates in memory only. The Settings check does not save or send the sample.
+   Denial/revocation and success require separate observed outcomes; do not infer either from signing.
+   If the signed app still times out, keep the second-Mac/new-client test open. Do not reset TCC.
+2. Open an authorized located Calendar event in Timeline. Click its visible navigation link.
+   Confirm the destination and selected mode in the actual external Maps surface.
+   The installed path calls `auth_open_url`, then `NSWorkspace.openURL`.
+   It uses source-authored location text, never provider route content.
+   Record whether the link says Search or Directions. Directions require a current matching route leg.
+   Apple Maps cycling links disclose that the user must choose cycling there.
+3. Record notification permission and product coverage in Settings. Request permission only through the visible action.
+   Record the retained count, eligible count, target, verified horizon and last readback time.
+   Limited coverage must show the first unverified reminder. Successful scheduling alone proves no delivery.
+4. For a data-preserving delivery smoke, use one unique `cadence-spike.signed-rc1.<suffix>` request.
+   Submit harmless title/body content and a future instant through the existing `native_notifications` bridge.
+   Read back that exact ID and fire time before quitting. Quit before it fires.
+   Observe delivery, then click the notification without launching Cadence first.
+   Verify Cadence opens and preserve activation evidence before event draining.
+   `cadence-spike.*` proves native launch, not product Occurrence targeting.
+   Product targeting needs its separate existing synthetic-Occurrence evidence.
+   Cancel only this exact ID; verify it disappears from both pending and delivered readback.
+5. Keep Cadence running across owner-coordinated system sleep and wake.
+   Record power-log sleep/wake times and the process start time.
+   Before focusing Cadence or selecting Refresh, inspect the persisted coverage readback and reconciliation receipts.
+   Confirm automatic renewal after wake, then inspect Settings and its accurate OS-readback horizon.
+   A focus/resume event alone does not prove system wake.
+
+Probe constraints: `main.tsx` exposes an operator-only `?bench=native`, without a product menu or test-send control.
+The direct bridge requires a supported installed WebView context. A separate probe cannot substitute for installed launch evidence.
+Do not drain `native_events` beside Product; its read clears the shared buffer and can consume activation/delivery evidence.
+Do not run the capacity probe against the daily-use notification schedule; synthetic requests can evict product requests.
+
+The audit found that `cancelProbes()` included product `cadence.local.*` IDs.
+The source fix limits cleanup to `cadence-spike.*`. Capacity probes now reject product
+pending IDs or unavailable readback before scheduling either batch. Both regressions
+failed before the fix; six focused tests, lint, resolver checks, and diff checks pass.
+The readback guard cannot lock concurrent product scheduling; use the exclusive native
+bench and keep capacity probes away from the daily-use schedule. Candidate rc.1 predates
+this fix; replacement-candidate acceptance remains required.
+
+### September 27 Developer ID location result
+
+The parent installed notarized `0.1.1-rc.2` through the browser-downloaded,
+quarantined DMG and normal Gatekeeper Open confirmation. In the fresh local
+working directory, Settings showed `Device location: not yet allowed`. The
+foreground Check device location permission action finished after the native
+twelve-second deadline with `Diagnostic: timeout`; no permission prompt was
+observed. The installed Info.plist includes both `NSLocationUsageDescription`
+and `NSLocationWhenInUseUsageDescription`. Apple documents foreground use and
+the usage keys in [requesting location authorization](https://developer.apple.com/documentation/CoreLocation/requesting-authorization-to-use-location-services).
+
+Developer ID signing alone does not resolve this host's permission-prompt issue.
+This result does not establish its cause. No permission database reset, global
+location change, coordinate logging, or provider routing occurred. A second
+Mac or isolated macOS-user test remains needed to distinguish host state from
+an app defect. The existing saved-location fallback remains available.
+
+
+### September 28 signed Google Maps handoff
+
+Notarized rc.3 rendered the dedicated test Calendar's timed public-landmark event.
+Its visible Search in Google Maps action opened Chrome at Central Park, New York.
+The installed executable SHA-256 is
+`89171f8fe538714d1de72da2855678aaa4f990a644ea8eff0becab44094ec8c2`.
+Evidence: `/private/tmp/cadence-calendar-render-20260928.png` and
+`/private/tmp/cadence-maps-search-20260928.png`. Search has no transport mode; no
+directions or device-location success is claimed. Proactive routing remained off.
+Ticket 165's navigation search handoff gate passes. Native location remains open
+pending the second Mac or isolated macOS account. See the Apple distribution QA
+record for candidate provenance and protected primary-data restoration.
+
+
+### September 29 — signed rc.3 second-Mac location check
+
+On a clean Cadence installation on an M2 Pro MacBook Pro running macOS 26.7,
+the owner reported no initial permission prompt. Settings showed “not yet allowed”;
+macOS Location Services listed Cadence with its switch off. Enabling that switch
+and retrying produced Allowed and a current position available. The app stated
+that the check did not save or send the position. Coordinates were not collected;
+proactive travel stayed off. This passes manual grant/retry and foreground location
+acquisition. It does not establish automatic first-prompt behavior or resolve the
+first Mac's timeout. The exact rc.3 candidate was unchanged.

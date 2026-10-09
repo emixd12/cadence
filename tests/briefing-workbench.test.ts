@@ -31,7 +31,7 @@ async function loadService() {
 }
 
 beforeEach(() => {
-  vi.resetModules();
+  vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget"));
   vi.stubEnv("NODE_ENV", "development");
 });
 
@@ -60,7 +60,7 @@ describe("briefing workbench boundary", () => {
     expect(body).toMatchObject({ mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, usage: "unavailable" });
     for (const [index, result] of body.results.entries()) {
       expect(result).toMatchObject({ state: "ready", validation: "passed", inspector: {
-        recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "2.2", pipelineVersion: "2.2",
+        recipe: { id: "daily_brief", version: "1.0" }, policyVersion: "3.0", pipelineVersion: "3.0",
       } });
       expect(result.inspector.facts).toEqual(payloads[index].context);
       expect(result.briefing.versions).toEqual({
@@ -217,19 +217,20 @@ describe("briefing workbench boundary", () => {
     expect(accountRead).not.toHaveBeenCalled();
   });
 
-  it("bounds comparisons and exposes only sanitized generation failures", async () => {
+  it("reserves the configured provider-call cap and sanitizes generation failures", async () => {
+    vi.stubEnv("CADENCE_BRIEFING_BENCH_CALL_LIMIT", "5");
     const run = await loadService();
     const generate = vi.fn<DailyBriefGenerator>().mockRejectedValue(new Error("provider-secret-detail"));
-    for (let count = 0; count < 6; count += 1) {
+    for (let count = 0; count < 2; count += 1) {
       const response = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
       expect(response.status).toBe(200);
       expect(JSON.stringify(await response.json())).not.toContain("provider-secret-detail");
     }
-    expect(generate).toHaveBeenCalledTimes(12);
+    expect(generate).toHaveBeenCalledTimes(4);
     const blocked = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toEqual({ error: "comparison_limit" });
-    expect(generate).toHaveBeenCalledTimes(12);
+    expect(generate).toHaveBeenCalledTimes(4);
   });
 
   it("cancels an in-flight comparison without returning late output or error details", async () => {
@@ -242,8 +243,12 @@ describe("briefing workbench boundary", () => {
     await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
     controller.abort();
     const response = await pending;
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "invalid_or_cancelled_request" });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.results.map((result: { state: string }) => result.state)).toEqual(["cancelled", "cancelled"]);
+    expect(body.dispatchedCalls).toBe(1);
+    expect(body.budget.reserved).toBe(0);
+    expect(JSON.stringify(body)).not.toContain("late-provider-secret");
     expect(generate).toHaveBeenCalledOnce();
   });
 });
@@ -273,4 +278,20 @@ it("keeps disabled inputs absent in both model serialization and the private ins
   expect(inspector.plan.options).toEqual([]);
   expect(body.results[0].briefing.versions.recipe).toBe('daily_brief@1.0');
   expect(inspector.contextControls.historicalCompletionTimes.reason).toBe('not_requested');
+});
+
+it("runs synthetic analysis scenarios over frozen facts without tip history", async () => {
+  const runBriefingComparison = await loadService();
+  const { BRIEFING_PRESETS } = await import("@cadence/core/services/briefing-config");
+  const candidate = BRIEFING_PRESETS.find((preset) => preset.id === "advisor-analysis")!.config;
+  const generate = vi.fn<DailyBriefGenerator>(async () => ({ text: "Walk at 12:30.", occurrenceRefs: [], suggestions: [], tip: null }));
+  const post = (body: unknown) => request(body);
+  const response = await runBriefingComparison(post({ fixtureId: "sparse", analysisFixtureId: "weekday_dip", configs: [candidate, candidate] }), generate);
+  const body = await response.json();
+  expect(response.status, JSON.stringify(body)).toBe(200);
+  expect(body).toMatchObject({ analysisFixtureId: "weekday_dip" });
+  expect(body.results[0].inspector.analysis.selection.tipId).toBe(body.results[1].inspector.analysis.selection.tipId);
+  expect(JSON.parse(generate.mock.calls[0]![0].facts).analysis.tip.laneId).toBe("weekday-time-dips");
+  const invalid = await runBriefingComparison(post({ fixtureId: "sparse", analysisFixtureId: "invented", configs: [candidate, candidate] }), generate);
+  expect(invalid.status).toBe(400);
 });

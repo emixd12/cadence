@@ -8,7 +8,6 @@ import {
   resolveBehaviorLogImportMergePreview,
   resolveBehaviorLogImportPreview,
   type ResolveBehaviorLogImportMergePreviewInput,
-  type ResolveBehaviorLogImportPreviewInput,
 } from "@/lib/resolvers/behaviorlog-import.resolver";
 import {
   getBehaviorLogImportRunById,
@@ -113,38 +112,10 @@ export function previewBehaviorLogImportFromZip(input: {
   });
 }
 
-export function previewBehaviorLogMergeImportFromZip(input: {
-  zip: BehaviorLogZipInput;
-  existing?: BehaviorLogExistingRecords;
-  supportedSchemaVersions?: readonly string[];
-  convertNativeRemindersToBrowser?: boolean;
-}): BehaviorLogImportMergePreviewResult {
-  return resolveBehaviorLogImportMergePreview({
-    files: parseBehaviorLogZipFiles(input.zip),
-    existing: input.existing,
-    supportedSchemaVersions: input.supportedSchemaVersions,
-    convertNativeRemindersToBrowser: input.convertNativeRemindersToBrowser,
-  });
-}
-
-export function previewBehaviorLogImportFromFiles(
-  input: ResolveBehaviorLogImportPreviewInput,
-): BehaviorLogImportPreview {
-  return resolveBehaviorLogImportPreview(input);
-}
-
 export function previewBehaviorLogMergeImportFromFiles(
   input: ResolveBehaviorLogImportMergePreviewInput,
 ): BehaviorLogImportMergePreviewResult {
   return resolveBehaviorLogImportMergePreview(input);
-}
-
-export async function getBehaviorLogImportPageData(): Promise<BehaviorLogImportPageData> {
-  const supabase = await createClient();
-  const userId = await requireUserId(supabase);
-  const recentRuns = await readCachedBehaviorLogImportRuns(supabase, userId, 8);
-
-  return createBehaviorLogImportPageDataFromRuns(recentRuns);
 }
 
 export async function listCurrentUserBehaviorLogImportRuns(

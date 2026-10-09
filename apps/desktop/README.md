@@ -4,7 +4,7 @@ The default entry opens local tracking. Timeline, Behaviors, Export & Import,
 and Settings use SQLite services. Export includes all five formats, validated
 BehaviorLog merge, and confirmed destructive restore.
 Tracking parity and Ticket 113's unnotarized preview/updater acceptance are
-complete. Ticket 115 owns deferred Apple-trusted distribution acceptance.
+complete. Ticket 115 owns Apple-trusted distribution acceptance and is in progress.
 
 The `?bench=native` entry retains the separate Ticket 108 Tauri, SQLite, and
 UserNotifications operator bench. It is not a tracking or parity fixture.
@@ -33,14 +33,15 @@ the bundle identity and resources for macOS notification tests. It provides
 no Developer ID, notarization, Gatekeeper, or updater assurance. Do not use
 the local signing config for final release builds. The owner-authorized ad hoc
 preview has separate completed evidence in `docs/DESKTOP_RELEASE.md`. macOS 14
-is the declared minimum; actual compatibility remains a Ticket 115 blocker.
+is the declared and compiled minimum. Its runtime acceptance is deferred, so
+the minimum does not establish compatibility.
 
 The final application identifier is `app.cadence.desktop`. On first launch,
 the app can adopt the earlier `app.cadence.desktop-spike/cadence.sqlite3`
 database without removing or overwriting it. The native bench keeps its
 synthetic values in a separate `native-boundary-spike.sqlite3` file within the
 application-data directory. Never use that bench file as a Behavior database.
-The app does not read web accounts.
+The native bench does not read web accounts.
 
 ## Native acceptance procedure
 
@@ -63,16 +64,16 @@ The app does not read web accounts.
    delivery, not visible presentation or activation; an empty list is inconclusive.
    Cancel test notifications and read back empty pending and delivered lists.
    Repeat cancellation. Rescheduling the same IDs must replace, not duplicate them.
-6. Observe wake/resume and restart behavior. Verify macOS 14 separately; the
-   development host's newer OS cannot establish the minimum-version gate.
+6. Observe wake/resume and restart behavior. Record the exact tested macOS
+   version and build. macOS 14 runtime verification is deferred.
 
 Cancel every pending and delivered test notification before ending an authorized notification
 test. Capacity tests must never use short delays or be left unattended. No
 permission request or notification is sent automatically on launch.
 
-`npm run desktop:parity:check` intentionally fails until the real tracking
-implementation and interaction evidence exist. Developer bench references
-cannot satisfy that gate. Current native evidence is recorded in
+`npm run desktop:parity:check` verifies tracking implementation and required
+interaction evidence. Developer bench references cannot satisfy that gate.
+Native boundary evidence is recorded in
 `docs/qa/2026-08-30-desktop-native-boundary.md`.
 
 ## Shared tracking runtime

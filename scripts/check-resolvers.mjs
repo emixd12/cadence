@@ -46,6 +46,7 @@ function walk(relativePath) {
 const resolverRegistry = [
   { domain: "historical completion timing", resolver: "packages/core/src/resolvers/completion-timing.resolver.ts", test: "tests/completion-timing.resolver.test.ts", source: "docs/DATETIME_STRATEGY.md" },
   { domain: "briefing planner", resolver: "packages/core/src/resolvers/briefing-plan.resolver.ts", test: "tests/briefing-plan.resolver.test.ts", source: "docs/TICKETS.md" },
+  { domain: "briefing analysis lanes", resolver: "packages/core/src/resolvers/briefing-analysis.resolver.ts", test: "tests/briefing-analysis.resolver.test.ts", source: "docs/TICKETS.md" },
   {
     domain: "day-progress layout",
     resolver: "packages/core/src/resolvers/day-progress.resolver.ts",

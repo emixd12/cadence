@@ -22,6 +22,7 @@ import {
   type DailyBriefAttempt,
   type DailyBriefOutcome,
 } from "@/lib/ui/daily-brief-session";
+import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 
 type DailyBriefLauncherProps = Readonly<{
@@ -45,6 +46,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   const resolvedClient = useMemo(() => client === undefined ? defaultWebDailyBriefClient() : client, [client]);
   const [view, setView] = useState<View>(HIDDEN);
   const [viewSession, setViewSession] = useState(sessionKey);
+  const travel = useBriefTravel();
   const settingsRef = useRef<DailyBriefSettings | null>(null);
   const sourceKeyRef = useRef(sourceKey);
   const epoch = useRef(0);
@@ -244,7 +246,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
   if (view.kind === "loading") return <DailyBriefBubble state="loading" onDismiss={onDismiss} />;
   // Delivered text reflects the facts it was prepared from; changed Timeline facts withdraw it.
   const shown = view.kind === "ready" && view.attempt.sourceKey !== sourceKey ? staleNotice() : view;
-  if (shown.kind === "ready") return <DailyBriefBubble state="ready" briefing={shown.briefing} onDismiss={onDismiss} />;
+  if (shown.kind === "ready") return <DailyBriefBubble state="ready" briefing={shown.briefing} travel={travel} onDismiss={onDismiss} />;
   if (shown.kind !== "notice") return null;
   return (
     <DailyBriefBubble

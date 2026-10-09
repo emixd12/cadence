@@ -2008,7 +2008,7 @@ const trustEvidenceFixture: PublicTrustView = {
     application_deployment_url: "https://cadence-blush-three.vercel.app",
     marketing_deployment_id: "dpl_marketing",
     marketing_deployment_url: "https://cadence-marketing-two.vercel.app",
-    workflow_url: "https://github.com/emixd12/habit-tracking-app/actions/runs/123456789",
+    workflow_url: "https://github.com/emixd12/cadence/actions/runs/123456789",
     built_at: "2026-08-27T04:35:10Z",
     verified_at: "2026-08-27T04:41:10Z",
     freshness_deadline: "2026-08-28T04:41:10Z",

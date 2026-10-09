@@ -22,7 +22,8 @@ describe("briefing configuration", () => {
       expect(preset.config.planner.movableBehaviorRefs).toEqual([]);
     }
     expect(DEFAULT_BRIEFING_CONFIG).toMatchObject({
-      version: "1.2",
+      version: "1.3",
+      analysis: { lanes: [], maxTips: 0, cooldownDays: 14 },
       recipe: { id: "daily_brief", version: "1.0" },
       tone: "calm",
       directness: "balanced",
@@ -40,8 +41,10 @@ describe("briefing configuration", () => {
     legacy.version = "1.0";
     delete legacy.recipe;
     delete legacy.context;
+    delete legacy.analysis;
     expect(parseBriefingConfig(legacy)).toMatchObject({
-      version: "1.2",
+      version: "1.3",
+      analysis: { lanes: [], maxTips: 0 },
       recipe: { id: "daily_brief", version: "1.0" },
       context: {
         includeCompletionHistory: true,
@@ -58,7 +61,11 @@ describe("briefing configuration", () => {
     ["unsupported version", (config: Record<string, unknown>) => { config.version = "2.0"; }],
     ["incompatible recipe", (config: Record<string, unknown>) => { (config.recipe as Record<string, unknown>).id = "other"; }],
     ["invalid tone", (config: Record<string, unknown>) => { config.tone = "accusatory"; }],
-    ["word limit", (config: Record<string, unknown>) => { (config.length as Record<string, unknown>).maxWords = 121; }],
+    ["word limit", (config: Record<string, unknown>) => { (config.length as Record<string, unknown>).maxWords = 181; }],
+    ["unknown analysis lane", (config: Record<string, unknown>) => { config.analysis = { lanes: ["mood-forecast"], maxTips: 1, cooldownDays: 14 }; }],
+    ["tip without lanes", (config: Record<string, unknown>) => { config.analysis = { lanes: [], maxTips: 1, cooldownDays: 14 }; }],
+    ["short cooldown", (config: Record<string, unknown>) => { config.analysis = { lanes: ["decision-debt"], maxTips: 1, cooldownDays: 3 }; }],
+    ["extra analysis field", (config: Record<string, unknown>) => { config.analysis = { lanes: [], maxTips: 0, cooldownDays: 14, prompt: "x" }; }],
     ["history lower bound", (config: Record<string, unknown>) => { (config.scope as Record<string, unknown>).historyDays = 0; }],
     ["history upper bound", (config: Record<string, unknown>) => { (config.scope as Record<string, unknown>).historyDays = 91; }],
     ["reference count", (config: Record<string, unknown>) => { config.referenceIds = ["a", "b", "c", "d", "e"]; }],
@@ -172,7 +179,18 @@ describe("briefing configuration", () => {
 it('migrates 1.1 unsupported finish-time requests without enabling historical timing', () => {
   const current = copy(DEFAULT_BRIEFING_CONFIG);
   const rest = { includeCompletionHistory: current.context.includeCompletionHistory, includeRecordedElapsedDurations: current.context.includeRecordedElapsedDurations, duration: current.context.duration };
-  const old = { ...current, version: '1.1', context: { ...rest, includeCompletionTimestamps: true } };
-  expect(parseBriefingConfig(old)).toMatchObject({ version: '1.2', context: { includeHistoricalCompletionTimes: false } });
+  const withoutAnalysis: Record<string, unknown> = { ...current };
+  delete withoutAnalysis.analysis;
+  const old = { ...withoutAnalysis, version: '1.1', context: { ...rest, includeCompletionTimestamps: true } };
+  expect(parseBriefingConfig(old)).toMatchObject({ version: '1.3', context: { includeHistoricalCompletionTimes: false }, analysis: { lanes: [] } });
   expect(() => parseBriefingConfig({ ...old, context: { ...old.context, extra: true } })).toThrow();
+});
+
+it("upgrades 1.2 configurations without selecting analysis lanes and orders lanes stably", () => {
+  const previous: Record<string, unknown> = copy(DEFAULT_BRIEFING_CONFIG);
+  delete previous.analysis;
+  expect(parseBriefingConfig({ ...previous, version: "1.2" })).toEqual(DEFAULT_BRIEFING_CONFIG);
+  expect(() => parseBriefingConfig({ ...previous, version: "1.2", length: { maxWords: 150 } })).toThrow();
+  const selected = parseBriefingConfig({ ...copy(DEFAULT_BRIEFING_CONFIG), analysis: { lanes: ["decision-debt", "weekday-time-dips"], maxTips: 1, cooldownDays: 14 } });
+  expect(selected.analysis.lanes).toEqual(["weekday-time-dips", "decision-debt"]);
 });

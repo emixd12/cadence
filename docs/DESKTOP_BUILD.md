@@ -1,8 +1,15 @@
 # Desktop Build
 
+Ticket 186 prepares the source repository name `emixd12/cadence` and preview feed
+`https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
+Cutover remains gated by `docs/qa/cadence-project-rename.md`. Installed clients
+retain their original endpoints through verified GitHub redirects. Historical
+release observations below retain their original names and URLs.
+
+
 The owner activated the local-first macOS track on 2026-08-30. Tickets 107–114
-are complete. Ticket 115 separately owns deferred Apple-trusted distribution.
-Tickets 116–122 plan optional Google account linking and offline-capable
+are complete. Ticket 115 separately owns Apple-trusted distribution and is in progress.
+Tickets 116–122 implement optional Google account linking and offline-capable
 synchronization. This document replaces the earlier unscheduled proposal.
 `STATUS.md` records implementation and verification.
 
@@ -12,17 +19,18 @@ Build tracking parity with the current web application using Tauri v2, Vite,
 React, and SQLite. Local mode requires no login or network. Optional account
 mode keeps SQLite as the offline working copy. Target Apple Silicon first, with
 macOS 14 as the declared minimum. Runtime compatibility is verified only on
-tested systems; macOS 14 execution remains unverified. Preserve the existing
-web deployment and Astro marketing site. Mobile implementation remains deferred.
+tested systems; macOS 14 execution is deferred and remains unverified. Preserve
+the existing web deployment and Astro marketing site. Mobile remains deferred.
 
 Use one stable local profile. The default timezone remains America/New_York,
 with local timezone selection. Seed the current default categories: Medical,
 Grooming, Fitness, Food / Drink, Home, Measurements, Admin, and Other.
 
 Tracking parity and Ticket 113's ad hoc, unnotarized preview/updater acceptance
-are complete. Apple Developer Program access, Developer ID signing, notarization,
-and Apple Silicon macOS 14 acceptance remain deferred under Ticket 115, not
-passed. Tickets 116–122 add optional account synchronization. Exclude Intel
+are complete. Candidate `0.1.1-rc.1` passes Developer ID signing, notarization, and
+strict artifact checks. Installed acceptance remains open under Ticket 115. The owner deferred macOS 14
+runtime acceptance on September 27 without changing the declared or compiled minimum.
+Tickets 116–122 add optional account synchronization. Exclude Intel
 releases, desktop email delivery, duplicated public/legal pages, billing, AI
 integrations, and closed-app background synchronization. Keep imported email
 configuration as data without sending.
@@ -403,7 +411,7 @@ waive native activation proof before broad refactoring. See
 | Tracking parity | 111 | Four screens and all current tracking/portability interactions pass offline and WKWebView QA |
 | Native reminders | 112 | Nearest-first reconciliation, verified OS-limited coverage, visible horizon, and lifecycle evidence pass |
 | Preview and updater acceptance | 113 | Authorized ad hoc preview, public feed, failure paths, explicit update/restart, and data preservation pass |
-| Apple-trusted distribution | 115 | Deferred until Developer Program access, Developer ID, notarization, stapled artifacts, quarantined-DMG Gatekeeper, and Apple Silicon macOS 14 acceptance are available |
+| Apple-trusted distribution | 115 | In progress; requires Developer ID, notarization, stapled artifacts, quarantined-DMG Gatekeeper, and acceptance on the current Apple Silicon host |
 | Account-sync contract | 116 | Product, data, security, offline, and merge boundaries agree before runtime work |
 | Local database controls | 117 | Exact path, Finder reveal, consistent backup, and protected local-only restore pass native QA |
 | Desktop authentication | 118 | System-browser PKCE, deep link, Keychain storage, and one-account session pass |
@@ -468,17 +476,24 @@ Required evidence includes:
 - Ticket 113 updater signatures, local-data-preserving upgrades, and bundled-
   asset redistribution rights;
 - Ticket 115 Developer ID signing, notarization, stapled app/DMG validation,
-  quarantined notarized-DMG Gatekeeper acceptance, and Apple Silicon macOS 14.
+  quarantined notarized-DMG Gatekeeper acceptance, and candidate acceptance
+  on the current Apple Silicon host with its exact macOS version recorded.
 
-Ticket 115 owns the deferred Developer ID signed and notarized `.app` and `.dmg`
+Ticket 115 owns acceptance of the Developer ID signed and notarized `.app` and `.dmg`
 artifacts. Tauri requires [signed updater artifacts](https://v2.tauri.app/plugin/updater/).
 Local commands, signing requirements, and installed-upgrade evidence live in
 [`DESKTOP_RELEASE.md`](DESKTOP_RELEASE.md).
 
-Apple access and credentials remain unavailable, and the current host does not
-run macOS 14. Keep Ticket 115 deferred. Public production publication remains an
-explicit owner-authorized action; do not publish or change providers as a side
-effect.
+Apple membership is available as of September 27, 2026. The Developer ID identity
+and matching provisioning profile are installed. Apple accepted the notarization
+credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
+artifact verification pass; installed acceptance remains open.
+The current host runs macOS 27.0 on Apple Silicon. macOS 14 runtime acceptance
+is deferred and does not block Ticket 115. Do not claim support for macOS 14
+or another untested macOS version from the compiled minimum.
+Ticket 115 is now in progress under the owner-authorized
+[September 27 plan](plans/2026-09-27-apple-developer-unblocked-work.md).
+Public production publication remains an explicit owner-authorized action.
 
 ## Note shortcuts (Tickets 126–128)
 
@@ -532,10 +547,15 @@ The shared `components/timeline/DayProgressTimeline.tsx` renders the production
 forward timeline. Existing desktop callbacks retain status, Note, timing, and
 notification activation behavior. Pure core resolvers own geometry and estimates.
 
-Optional `VITE_CALENDAR_BROKER_ORIGIN` selects the HTTPS Cadence connector.
-The production and development CSP allow the exact deployed broker origin,
-`https://cadence-blush-three.vercel.app`. Changing the broker requires a matching
-reviewed CSP change; do not widen this allowance to arbitrary HTTPS hosts.
+`VITE_CALENDAR_BROKER_ORIGIN` selects the HTTPS Cadence connector shared by Calendar,
+Daily Brief, and Travel. It remains optional for preview and local builds.
+Production `check` and `build` require it. `build` verifies its presence in fresh frontend output.
+Use `https://app.cadence-me.com` for the current production service.
+The production and development CSP allow that exact origin and retain
+`https://cadence-blush-three.vercel.app` for installed compatibility.
+Production preflight rejects origins without an exact reviewed `connect-src` entry.
+Changing the broker requires a matching reviewed CSP change; do not widen this
+allowance to arbitrary HTTPS hosts. Frontend presence does not prove installed acceptance.
 Desktop authenticates using the existing Supabase session in Keychain. A separate
 short-lived `pending-calendar-state` Keychain entry correlates consent callbacks.
 Google credentials remain on the server. The separate disposable event cache is

@@ -105,5 +105,71 @@
         ]
       }
     }
+  },
+  {
+    "id": "advisor-analysis",
+    "label": "Advisor analysis (candidate, Tickets 169–173)",
+    "config": {
+      "version": "1.3",
+      "recipe": { "id": "daily_brief", "version": "1.0" },
+      "tone": "calm",
+      "directness": "balanced",
+      "encouragement": "moderate",
+      "length": {
+        "maxWords": 150
+      },
+      "priorities": [
+        "schedule_fit",
+        "today_status",
+        "needs_decision",
+        "completion_history"
+      ],
+      "allowedSuggestionTypes": [
+        "recap",
+        "priority",
+        "schedule"
+      ],
+      "alternatives": 1,
+      "scope": {
+        "behaviorRefs": "all",
+        "historyDays": 90,
+        "includeCalendar": true
+      },
+      "context": {
+        "includeCompletionHistory": false,
+        "includeHistoricalCompletionTimes": false,
+        "includeRecordedElapsedDurations": false,
+        "duration": {
+          "includeHistoricalAverage": true,
+          "includeConfiguredDefault": true,
+          "preference": "configured_default",
+          "fallback": "other_enabled_source"
+        }
+      },
+      "analysis": {
+        "lanes": [
+          "weekday-time-dips",
+          "realistic-timing",
+          "schedule-load",
+          "decision-debt",
+          "logging-chronology",
+          "correction-patterns"
+        ],
+        "maxTips": 1,
+        "cooldownDays": 14
+      },
+      "referenceIds": [],
+      "planner": {
+        "bufferMinutes": 10,
+        "preference": "least_change",
+        "movableBehaviorRefs": [],
+        "permittedWindows": [
+          {
+            "startMinute": 0,
+            "endMinute": 1440
+          }
+        ]
+      }
+    }
   }
 ]

@@ -608,9 +608,9 @@ names and enough synthetic choices to exercise scrolling.
 `/design-system?preview=briefing-workbench` uses neutral bench controls and the real
 horse bubble. Two columns stack on narrow screens. Voice, scope, reference, and
 planner fieldsets use labeled native controls. Runs require an explicit action;
-editing configuration cancels and discards results. Inspectors expose effective
+editing configuration preserves reviewed output and marks changed drafts. Inspectors expose effective
 facts, omissions, planner constraints/rejections and versions. Draft storage and
-exports contain configuration only. Review notes and generated output stay in memory.
+exports contain configuration only. Local cases retain captured inputs, outputs and exact feedback for 30 days, with expiry enforced on access.
 The Context source selector defaults to Synthetic. My account shows current access,
 sign-in/Settings links, an access refresh action and authorized Behavior checkboxes.
 Run comparison requires enabled briefing access. Calendar controls reflect separate
@@ -627,6 +627,12 @@ IDs, owning symbols and related terms. Document previews wrap and scroll within
 the bench, with copyable file paths, VS Code links, downloads and original sources.
 These controls use the existing neutral bench styles and never generate a comparison.
 
+
+Tickets 182–183 add Days beside Compare and Saved reviews. Native date/time controls
+open a no-model evidence grid. One selected day shows source limits; A/B retain
+complete text below. Sequence planning displays the provider-call count before
+generation. Diagnostic lane previews remain labeled and separate. Cancel preserves
+completed results; storage failures show Not saved. Mobile stacks A above B.
 
 ## Recipe-scoped briefing workbench
 

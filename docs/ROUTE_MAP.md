@@ -194,6 +194,14 @@ Production returns 404. GET uses existing sign-in and returns current briefing
 access plus authorized Behavior labels only; it never captures context or generates.
 POST accepts either a known fixture ID plus two validated configurations, or exact
 fields `mode: "account"`, `accountRef`, `preferenceRevision` and two configurations.
+Tickets 176–177 add an optional `review` object (case ID and candidate records) that
+saves the case and every run locally, and `mode: "saved"` with `accountRef` (or null)
+to rerun one or two configurations on a saved case's frozen inputs.
+`GET/POST /api/dev/briefing-reviews` call `briefing-review.service.ts` with the same
+guard. GET lists or opens saved cases (`source=synthetic|account`, optional `caseId`)
+and never returns captured account inputs. POST saves feedback and proposal
+decisions, writes a review packet, or deletes a case. Account sources require sign-in
+and use the owner's partition.
 The expected account reference is a mismatch guard, never an owner selector.
 Account mode authenticates through the existing first-party request boundary and
 uses revocable briefing/Calendar consent. One capture supplies both history windows.
@@ -217,3 +225,15 @@ settings revision, earliest expiry, and endpoint-free travel evidence. The servi
 rechecks settings, Behavior and Occurrence revisions, and Calendar connection and
 event revisions before and after provider work. It makes no tracking, Calendar, Behavior, Occurrence, or
 Daily Brief mutation.
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.

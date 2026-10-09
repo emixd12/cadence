@@ -23,7 +23,7 @@ sprawl.
 The web app supports independent users with Google auth. Tickets 107–114
 implement local-first macOS tracking with one local profile and no login.
 Ticket 115 defers Apple-trusted desktop distribution acceptance.
-Tickets 116–122 plan optional use of the same Google account with offline-
+Tickets 116–122 implement optional use of the same Google account with offline-
 capable desktop synchronization. Tickets 146–148 implement an in-app read-only daily
 briefing in the Timeline horse's text bubble. Billing, native mobile, general AI
 chat/coaching, and audio speech remain future scope.
@@ -645,40 +645,55 @@ deferred. Synthetic access to the selected model passed with the approved existi
 key. Hosted deployment, real-data acceptance and installed desktop checks remain
 open. Provider retention is disclosed separately from Cadence's no-content-storage policy.
 
-### Planned advisor improvements (Tickets 168–174)
+### Advisor improvements (Tickets 168–174)
 
-The owner approved ticketing this direction on September 26, 2026. Implementation
-is pending. The advisor should prioritize both travel/departure timing and fitting
-Behaviors around Calendar events, with occasional evidence-backed adherence tips.
-The existing Daily Brief recipe and horse bubble remain the delivery surface.
+The owner approved this direction on September 26, 2026. Tickets 168–173 are
+implemented in source; Ticket 174 release evidence is in progress. The existing
+Daily Brief recipe and horse bubble remain the delivery surface.
 
-Ticket 168 repairs bounded loading, delivery recovery and retry across navigation.
-An attempted request is not proof that the user received advice. Dismissal remains
-separate, and stale timing cannot remain presented as current.
+Ticket 168 makes loading recoverable. An attempted request is not proof that the
+user received advice. Navigation reattaches to the same attempt; interrupted,
+failed or undelivered attempts offer an explicit, bounded retry. Dismissal stays
+separate, and changed or expired timing is withdrawn with a refresh option.
 
-Tickets 169–172 define analysis lanes from the export prompt library: weekday/slot
-dips, realistic timing, schedule load, Calendar context, recurring Note obstacles,
-reminder associations and decision-recording patterns. Each lane declares required
-sources, lookback, sample sufficiency, provenance, limitations and allowed advice.
-Unresolved remains missing decision data. Correlations do not establish causes.
-Current-day Calendar facts cannot establish historical Calendar associations.
+Tickets 169–172 add nine analysis lanes named after export prompts: weekday/slot
+dips, marking-time offsets, schedule load (compared within weekdays), historical
+Calendar context (reported unavailable), decision debt, late or batched decision
+recording, corrections, reminder associations and Note obstacles. Each lane states
+its inputs, lookback, sufficiency rule, limitations and permitted proposal.
+Unresolved remains missing decision data. Correlations are described, never causes.
+Marks describe logging time, not performance time.
 
-Ticket 173 permits a short historical comparison when it explains a concrete tip;
-routine ledger recaps and generic coaching remain excluded. Tips are occasional,
-relevant and subject to repetition suppression. Future connectors may supply facts
-to these lanes; adding connectors is outside this sequence.
+Ticket 173 lets a configuration offer at most one pattern tip per brief, only when a
+finding bears on today and passes a cooldown and one-day spacing. Cadence shows a
+deterministic evidence line beside the model's wording. Routine ledger recaps and
+generic coaching remain excluded. Configurations before 1.3, including the current
+production default, select no lanes; the `advisor-analysis` candidate preset awaits
+reviewed promotion.
 
-Optional Note/reminder/history inputs require explicit field selection and appropriate
-model-data disclosure before use. Existing enablement grants no new source access.
-Travel-to-model projection requires its separate provider-use and disclosure gates.
-Until those pass, use the reviewed deterministic travel-display boundary alongside
-the brief. No source changes, automatic schedule moves or model tools are authorized.
+Reminder history and Notes on Not Completed occurrences each need their own
+revocable Settings disclosure; the database refuses them otherwise. Travel-to-model
+projection stays disabled until its provider-use and disclosure gates pass. Ticket 170
+instead shows travel guidance calculated from existing evidence beside the brief,
+labeled as calculated, withdrawn at expiry, and never passed to the model.
 
 Ticket 174 verifies useful wording, supported timing and reliable delivery on web
-and linked desktop. It preserves existing live/private/native release gates. Native
-mobile and marketing implementation remain out of scope. The detailed sequence and
-acceptance criteria live in `docs/TICKETS.md`; current behavior remains as documented
-above until those tickets ship.
+and linked desktop. Native mobile and marketing implementation remain out of scope.
+
+### Owner evaluation target (Ticket 184)
+
+The September 30 criteria define candidate evaluation, not current production acceptance.
+Daily Brief should provide actionable adherence analysis and day planning from
+available authorized evidence, with a general one-minute cap on the complete read.
+Quiet days prioritize supported longitudinal insights. Prefer varied lanes across
+days; persistent high-impact patterns may warrant repeated advice. Keep wording
+concise and precise. A future reading-length setting remains unimplemented.
+
+Evaluation uses named coverage profiles with retained revisions and separate run
+iterations. The initial `daily-brief-balanced@1` has six tuning cases, ten reserved
+cases and one seven-day sequence. See the owner packet and existing workbench QA
+record for exact cases, criteria and iteration state. Existing consent, evidence,
+read-only and production-promotion boundaries still apply.
 
 ### Internal recipe workbench (Tickets 151–158)
 

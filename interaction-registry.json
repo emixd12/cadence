@@ -774,9 +774,16 @@
     {
       "path": "app/design-system/DailyBriefBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 77,
+      "interaction_marker_count": 97,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Excluded from product interaction counts."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175–177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182–183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated."
+    },
+    {
+      "path": "app/design-system/BriefingReview.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 36,
+      "interaction_ids": [],
+      "reason": "Development-only Daily Brief review components for Tickets 175–177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Excluded from product interaction counts."
     },
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
@@ -791,7 +798,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 5,
+      "interaction_marker_count": 9,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -811,6 +818,13 @@
         "INT-TRAVEL-001",
         "INT-TRAVEL-002"
       ]
+    },
+    {
+      "path": "app/design-system/BriefingDays.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 40,
+      "interaction_ids": [],
+      "reason": "Development-only historical exploration and chronological review under Tickets 182–183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
     }
   ],
   "interactions": [
@@ -12382,15 +12396,23 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing is included.",
+      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing, reminder delivery history, and Notes on Not Completed occurrences may inform it.",
       "triggers": [
         {
           "kind": "change",
           "control": "Enable Daily Brief or Include selected Google Calendar timing"
+        },
+        {
+          "kind": "change",
+          "control": "Include reminder delivery history"
+        },
+        {
+          "kind": "change",
+          "control": "Include Notes on Not Completed occurrences"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account.",
-      "success_result": "Saves the exact two preference fields and withdraws any current Daily Brief presentation.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -12407,9 +12429,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/daily-brief-ui.dom.test.tsx"
+          "tests/daily-brief-ui.dom.test.tsx",
+          "tests/daily-brief.service.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields and the retention disclosure link."
+        "notes": "DOM coverage verifies exact preference fields, the optional-source disclosures and revocation on disable; service coverage verifies two- and four-field saves."
       },
       "platforms": {
         "web": {

@@ -5,8 +5,9 @@ import type {
   AdvisorHistoricalCompletionTimes,
   AdvisorDuration,
 } from "./advisor-day-context";
+import type { BriefingAnalysisLaneId } from "./briefing-analysis";
 
-export const BRIEFING_CONFIG_VERSION = "1.2" as const;
+export const BRIEFING_CONFIG_VERSION = "1.3" as const;
 export const LEGACY_BRIEFING_CONFIG_VERSION = "1.0" as const;
 export const DAILY_BRIEF_RECIPE = Object.freeze({ id: "daily_brief", version: "1.0" } as const);
 
@@ -29,6 +30,18 @@ export type BriefingContextConfig = Readonly<{
   }>;
 }>;
 
+/**
+ * Analysis lane selection (Tickets 169–173). Selecting a lane never grants its
+ * source: optional reminder and Note lanes also need the account's disclosure.
+ */
+export type BriefingAnalysisConfig = Readonly<{
+  lanes: readonly BriefingAnalysisLaneId[];
+  /** A ceiling, not a quota: at most one pattern tip per brief. */
+  maxTips: 0 | 1;
+  /** Local days before the same finding fingerprint may appear again. */
+  cooldownDays: number;
+}>;
+
 export type BriefingConfigV1 = Readonly<{
   version: typeof BRIEFING_CONFIG_VERSION;
   recipe: typeof DAILY_BRIEF_RECIPE;
@@ -45,6 +58,7 @@ export type BriefingConfigV1 = Readonly<{
     includeCalendar: boolean;
   }>;
   context: BriefingContextConfig;
+  analysis: BriefingAnalysisConfig;
   referenceIds: readonly string[];
   planner: Readonly<{
     bufferMinutes: number;
