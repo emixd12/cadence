@@ -765,3 +765,14 @@ Implementation decisions, recorded for owner review:
   that the model stated UTC instants as local times, a defect that predates these tickets.
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
+
+## 2026-10-08: Rename the repository to emixd12/cadence
+
+Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,
+history, releases and settings. This supersedes the source URL in "Marketing
+content, retention, and legal publication": Cadence's public MIT source is
+`https://github.com/emixd12/cadence`. The name `habit-tracking-app` must stay
+unused so GitHub keeps redirecting old links and installed desktop update feeds.
+Historical Trust evidence stays at its original Pages URLs through the
+`emixd12.github.io` archive. The local Supabase project ID `habit-tracking-app`,
+package names, desktop identity and production domains are unchanged.

@@ -1,10 +1,13 @@
 # Desktop Build
 
-Ticket 186 prepares the source repository name `emixd12/cadence` and preview feed
+Since October 8, 2026 (Ticket 186), the source repository is `emixd12/cadence`
+(same repository ID) and the preview feed is
 `https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json`.
-Cutover remains gated by `docs/qa/cadence-project-rename.md`. Installed clients
-retain their original endpoints through verified GitHub redirects. Historical
-release observations below retain their original names and URLs.
+Installed clients keep their original `habit-tracking-app` endpoints; GitHub
+redirects them, and feed, archive and signature checks pass through the old URLs.
+Do not create a repository named `habit-tracking-app`: that would end the redirects.
+Historical release observations below retain their original names and URLs.
+Evidence: `docs/qa/cadence-project-rename.md`.
 
 
 The owner activated the local-first macOS track on 2026-08-30. Tickets 107–114

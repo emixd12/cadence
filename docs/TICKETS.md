@@ -12506,7 +12506,8 @@ and rollback. Record actual pass/fail results, remaining gates and reviewer find
 
 ## Ticket 186: Rename Cadence project folder and GitHub repository
 
-Status: in progress October 7, 2026; local and remote cutovers remain gated.
+Status: in progress. Local (October 7) and GitHub (October 8, 2026) cutovers are complete;
+native updater acceptance and the scheduled Trust run remain open.
 Owner authorization: execute `docs/plans/2026-10-07-cadence-project-rename.md`,
 including the selected archive site preserving exact historical evidence URLs.
 
