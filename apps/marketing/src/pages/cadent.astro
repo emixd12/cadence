@@ -24,13 +24,13 @@
     <figure class="slot" style="--ar: 2 / 3" data-label="02 Top-down, mid-roll"><img src="/cadent/images/e02.jpg" alt="Cadent from above, mid-roll across a pale floor." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" style="--ar: 9 / 16" data-label="03 Person with Cadent"><img src="/cadent/images/e03.jpg" alt="A person holding Cadent close, cropped at the shoulders." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" style="--ar: 4 / 5" data-label="04 Two hands, blue-gray"><img src="/cadent/images/e04.jpg" alt="Two hands cradling Cadent against a blue-gray backdrop." loading="lazy" onerror="this.remove()"></figure>
-    <figure class="slot" style="--ar: 9 / 17" data-label="05 Video slot: arriving"><video src="/cadent/videos/v05_arrival.mp4" poster="/cadent/videos/v05_arrival.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Cadent rolling up to the viewer, its light on, and looking up."></video></figure>
+    <figure class="slot" style="--ar: 9 / 17" data-label="05 Video slot: arriving"><video src="/cadent/videos/v05_arrival.mp4" poster="/cadent/videos/v05_arrival.jpg" muted loop playsinline preload="metadata" aria-label="Cadent rolling up to the viewer, its light on, and looking up."></video></figure>
     <p class="after-slot">Cadent is a sphere about 12 cm across. Its two hemispheres turn as wheels. They are plain bead-blasted aluminum, a matte finish that hides wear from the floor. There are no visible fasteners. A polished stainless band runs between the hemispheres, recessed below their surface. It never touches the floor. It turns on its own, independent of the wheels, to aim the camera. The band carries three things: a sapphire-covered camera that recognizes you, a slot for the line of light, and one row of speaker and microphone holes on each side of the light.</p>
     <figure class="slot" style="--ar: 4 / 5" data-label="06 Cutaway of internals"><img src="/cadent/images/e06.jpg" alt="A cutaway of Cadent&#x27;s internals, colored by part." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" data-width="full" style="--ar: 4 / 3" data-label="07 CAD screen: form variants"><img src="/cadent/images/e07.jpg" alt="A CAD window showing a grid of form variants." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" style="--ar: 4 / 5" data-label="08 Printed prototype on a desk"><img src="/cadent/images/e08.jpg" alt="An early printed prototype rolling across a desk." loading="lazy" onerror="this.remove()"></figure>
-    <figure class="slot" style="--ar: 9 / 16" data-label="09 Video slot: front, light on"><video src="/cadent/videos/v09_front.mp4" poster="/cadent/videos/v09_front.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Cadent from the front, its light line on."></video></figure>
-    <figure class="slot" data-width="full" style="--ar: 4 / 5" data-label="10 Video slot: turntable"><video src="/cadent/videos/v10_turntable.mp4" poster="/cadent/videos/v10_turntable.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Cadent turning on a turntable."></video></figure>
+    <figure class="slot" style="--ar: 9 / 16" data-label="09 Video slot: front, light on"><video src="/cadent/videos/v09_front.mp4" poster="/cadent/videos/v09_front.jpg" muted loop playsinline preload="metadata" aria-label="Cadent from the front, its light line on."></video></figure>
+    <figure class="slot" data-width="full" style="--ar: 4 / 5" data-label="10 Video slot: turntable"><video src="/cadent/videos/v10_turntable.mp4" poster="/cadent/videos/v10_turntable.jpg" muted loop playsinline preload="metadata" aria-label="Cadent turning on a turntable."></video></figure>
     <figure class="slot" data-width="full" style="--ar: 5 / 4" data-label="11 Band close-up, dark studio"><img src="/cadent/images/e11.jpg" alt="The polished band, close up, in a dark studio." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" style="--ar: 2 / 3" data-label="12 Studio portrait, front"><img src="/cadent/images/e12.jpg" alt="Cadent from the front, in the studio." loading="lazy" onerror="this.remove()"></figure>
     <figure class="slot" style="--ar: 2 / 3" data-label="13 Studio close-up, three-quarter"><img src="/cadent/images/e13.jpg" alt="Cadent at three-quarter view, close up." loading="lazy" onerror="this.remove()"></figure>
@@ -67,5 +67,13 @@
       </div>
     </div>
   </main>
+  <script is:inline>
+    // Play the looping videos only when the visitor allows motion; otherwise the posters stay as stills.
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const videos = document.querySelectorAll("video");
+    const syncMotion = () => videos.forEach((video) => (reducedMotion.matches ? video.pause() : video.play().catch(() => {})));
+    syncMotion();
+    reducedMotion.addEventListener("change", syncMotion);
+  </script>
 </body>
 </html>
