@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-09-26",
+  "updated": "2026-10-11",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -34,7 +34,8 @@
         "/standard",
         "/docs",
         "/examples",
-        "/about"
+        "/about",
+        "/cadent"
       ]
     },
     {
@@ -380,6 +381,14 @@
       "interaction_ids": [
         "INT-MKT-007",
         "INT-MKT-008"
+      ]
+    },
+    {
+      "path": "apps/marketing/src/pages/cadent.astro",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-MKT-011"
       ]
     },
     {
@@ -2379,7 +2388,8 @@
         "/",
         "/docs",
         "/examples",
-        "/about"
+        "/about",
+        "/cadent"
       ],
       "journeys": [
         "J01",
@@ -2389,7 +2399,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "See how it works, read docs, inspect examples, or related content link"
+          "control": "See how it works, read docs, inspect examples, related content link, or the Cadent page's back-to-top button and Cadence link"
         }
       ],
       "availability": "Available where a marketing page supplies contextual related links.",
@@ -2404,7 +2414,8 @@
       "implementation": [
         "apps/marketing/src/pages/index.astro",
         "apps/marketing/src/pages/docs.astro",
-        "apps/marketing/src/pages/examples.astro"
+        "apps/marketing/src/pages/examples.astro",
+        "apps/marketing/src/pages/cadent.astro"
       ],
       "test_coverage": {
         "level": "manual",
@@ -2428,7 +2439,8 @@
           "implementation": [
             "apps/marketing/src/pages/index.astro",
             "apps/marketing/src/pages/docs.astro",
-            "apps/marketing/src/pages/examples.astro"
+            "apps/marketing/src/pages/examples.astro",
+            "apps/marketing/src/pages/cadent.astro"
           ],
           "evidence": []
         },
