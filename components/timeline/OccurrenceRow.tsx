@@ -191,7 +191,7 @@ export function OccurrenceRow({
 
           <div
             id={detailsId}
-            className="timeline-occurrence-details mt-0 gap-2 px-3 pt-0 text-sm leading-6 text-muted-readable sm:px-4 sm:pb-2"
+            className="timeline-occurrence-details mt-0 gap-2 px-3 pb-3 pt-0 text-sm leading-6 text-muted-readable sm:px-4 sm:pb-4"
           >
             <DetailItem
               label="Description"
