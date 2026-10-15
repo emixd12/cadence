@@ -177,7 +177,7 @@ export function OccurrenceNoteForm({
 
       <div
         className={[
-          "flex flex-col gap-2 sm:flex-row sm:items-start",
+          "flex flex-col gap-2 sm:flex-row sm:items-baseline",
           compact ? "items-start" : null,
         ]
           .filter(Boolean)
@@ -221,8 +221,10 @@ function ActionMessage({ state }: Readonly<{ state: OccurrenceActionState }>) {
   return (
     <p
       className={[
-        "border-t border-line pt-2 text-sm leading-6",
-        state.status === "success" ? "text-foreground" : "text-accent",
+        "text-sm leading-6",
+        state.status === "success"
+          ? "text-[color:var(--timeline-detail-strong,var(--foreground))]"
+          : "text-[color:var(--timeline-detail-error,var(--accent))]",
       ].join(" ")}
       role={state.status === "error" ? "alert" : "status"}
     >
