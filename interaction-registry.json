@@ -785,7 +785,7 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 8,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
@@ -11439,7 +11439,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11459,7 +11460,7 @@
           "control": "Connect Google Calendar"
         }
       ],
-      "availability": "Explicit action is available after Cadence sign-in and provider configuration.",
+      "availability": "Explicit action is available after Cadence sign-in and provider configuration. Each purpose requires its own configured client and same-account grant.",
       "success_result": "Opens provider consent; same-account verification installs sealed server credentials.",
       "failure_result": "Consent denial, wrong-account selection, and expired state leave Cadence data unchanged. Wrong-account recovery links to Google Account connections and discloses project-wide revocation; Cadence never revokes automatically.",
       "effects": [
@@ -11475,9 +11476,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11502,7 +11504,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11514,7 +11516,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-002",
@@ -11522,7 +11536,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11542,8 +11557,8 @@
           "control": "Save Calendar settings"
         }
       ],
-      "availability": "A configured connected account can edit its Calendar preferences.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts.",
+      "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. Agent mode saves a separate selection and omits Timeline visibility controls.",
       "failure_result": "Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
@@ -11557,9 +11572,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11584,7 +11600,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11596,7 +11612,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-003",
@@ -11604,7 +11632,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11624,8 +11653,8 @@
           "control": "Refresh Calendar"
         }
       ],
-      "availability": "Connected accounts can refresh calendar discovery, including without selected calendars.",
-      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state.",
+      "availability": "Connected accounts can refresh calendar discovery, including without selected calendars. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state. Agent mode refreshes calendar discovery only; event reads remain behind Daily Brief authorization.",
       "failure_result": "A failed or incomplete read preserves the last complete stale snapshot.",
       "effects": [
         "network_request",
@@ -11639,9 +11668,11 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-client.test.tsx"
+          "tests/google-calendar-client.test.tsx",
+          "tests/google-calendar-agent.test.ts",
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11666,7 +11697,7 @@
             "tests/google-calendar-client.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11678,7 +11709,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-004",
@@ -11686,7 +11729,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11699,15 +11743,15 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Remove the account-wide grant and clear external context.",
+      "intent": "Remove the selected Calendar grant across devices for this account.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Disconnect Google Calendar everywhere"
+          "control": "Disconnect Google Calendar"
         }
       ],
-      "availability": "Available for an existing connection; the UI explains other-device effects.",
-      "success_result": "Fences reads, deletes credentials, attempts provider revocation, and clears local cache.",
+      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Fences reads for the selected purpose, deletes its credentials, and attempts provider revocation. Standard disconnect clears the Timeline cache; agent disconnect invalidates agent reads only.",
       "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted.",
       "effects": [
         "database_delete",
@@ -11721,9 +11765,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11748,7 +11793,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11760,7 +11805,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-005",
@@ -12464,7 +12521,7 @@
       "triggers": [
         {
           "kind": "change",
-          "control": "Enable Daily Brief or Include selected Google Calendar timing"
+          "control": "Enable Daily Brief or Include calendars selected in Google Calendar for Daily Brief"
         },
         {
           "kind": "change",
@@ -12475,8 +12532,8 @@
           "control": "Include Notes on Not Completed occurrences"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources. Calendar disclosure binds the agent grant generation and selection revision.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",

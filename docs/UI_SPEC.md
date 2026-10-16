@@ -1089,3 +1089,11 @@ Disconnect has an app-specific accessible name and announces success or failure.
 A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
+
+## Daily Brief Calendar connection (Ticket 187)
+
+Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.
+Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
+Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
+Explain that model sharing requires the separate Daily Brief control after connection and selection.
+The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.

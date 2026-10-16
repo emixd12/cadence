@@ -178,3 +178,11 @@ it('captures requested historical timing once and excludes it independently from
   expect(mocks.begin).not.toHaveBeenCalled();
   expect(mocks.finish).not.toHaveBeenCalled();
 });
+
+
+it('refuses rerunning Calendar-derived cases captured before agent grant separation', async () => {
+  const { assertSavedCaseAuthorized } = await import('@/lib/services/briefing-workbench.service');
+  const saved = { source: { mode: 'account', accountRef: 'account_owner' }, capture: { includeCalendar: true } };
+  await expect(assertSavedCaseAuthorized(caller as Parameters<typeof assertSavedCaseAuthorized>[0], preferences as Parameters<typeof assertSavedCaseAuthorized>[1],
+    saved as Parameters<typeof assertSavedCaseAuthorized>[2], new AbortController().signal)).rejects.toThrow('review_only');
+});

@@ -548,3 +548,12 @@ the route awaits settlement on every authenticated exit. Tests:
 `tests/oauth-maintenance.local-integration.test.ts`,
 `tests/oauth-integration.repo.test.ts`, `tests/occurrence-sync-route.test.ts`, and
 `tests/sql/ticket-232-oauth-maintenance-smoke.sql`.
+
+## Agent Calendar authorization (Ticket 187)
+
+`google-calendar.service.ts` selects the explicit grant purpose before credential access.
+Advisor day context, account briefing context and private history use only the agent grant.
+`google-calendar.repo.ts` owns purpose-specific RLS tables and server-only credential RPCs.
+The provider parser and pure Calendar resolvers remain shared. No resolver handles OAuth or secrets.
+Pending range requests include grant purpose and client identity. Agent errors never use standard credentials.
+Saved account cases containing Calendar inputs require an agent capture marker plus current owner, disclosure and connection fences before rerun.

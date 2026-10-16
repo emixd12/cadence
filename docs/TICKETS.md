@@ -13235,6 +13235,38 @@ Platform impact:
 
 Execution evidence: `docs/qa/cadence-project-rename.md`.
 
+## Ticket 187: Isolate agentic Calendar access
+
+Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
+Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
+Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+
+Implement Branch B of `docs/plans/2026-10-12-google-agentic-oauth-review.md`.
+The implementation uses a separate agent Calendar grant and Google project.
+It keeps ordinary Calendar display and Google sign-in on their existing clients.
+It does not add MCP, broaden scopes, or grant model tools.
+
+Acceptance: isolate OAuth attempts, encrypted grants, refresh, reads, caches,
+Daily Brief disclosure, private comparisons, history, saved inputs, and revocation.
+Missing agent configuration or consent must never fall back to standard credentials.
+Prior Calendar disclosure must require renewal for the agent grant.
+Run repository checks, local SQL ownership/race tests, and web/desktop UI tests.
+Provider classification, live configuration, hosted deployment, and installed
+acceptance remain separate rollout gates.
+Release scope includes correcting public no-AI disclosures and proving a cutover
+barrier across older production-backed readers. New-project verification and
+fresh user consent must precede public Calendar-to-AI availability.
+
+Platform impact:
+- Web: Calendar services, callback/API routes, and existing Settings controls.
+- Desktop: hosted broker and agent consent controls; preserve offline tracking/cache.
+- Marketing: verify homepage/legal links and accurate claims against updated app
+  legal content; no public availability claim before provider and release acceptance.
+- Future mobile: document the shared grant distinction; implementation remains deferred.
+
+Use the existing interaction registry and design-system catalog for affected controls.
+This ticket supersedes the single Calendar-grant assumption in the Daily Brief plan.
+
 ## Ticket 212: Home address and usual travel in first-run onboarding
 
 Status: filed October 17, 2026 from owner direction during the travel review; planned,

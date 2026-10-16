@@ -37,7 +37,7 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
     throw new DailyBriefError("invalid_request");
   }
   if (value.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
-  if (value.includeCalendar && (await getCalendarConnection(caller)).status !== "connected") throw new DailyBriefError("calendar_unavailable");
+  if (value.includeCalendar && (await getCalendarConnection(caller, "agent")).status !== "connected") throw new DailyBriefError("calendar_unavailable");
   const current = await readDailyBriefPreferences(caller.client);
   await saveDailyBriefPreferences(caller.client, {
     enabled: value.enabled, includeCalendar: value.includeCalendar,

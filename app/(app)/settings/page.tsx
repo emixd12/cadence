@@ -73,6 +73,7 @@ async function SettingsContent() {
 
       <TravelSettingsPanel />
 
+      <WebGoogleCalendarPanel timezone={settings.timezone} agent />
       <DailyBriefSettingsPanel />
 
       <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />

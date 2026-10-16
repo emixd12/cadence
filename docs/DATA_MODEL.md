@@ -2253,3 +2253,19 @@ Verification: `tests/integration-write.test.ts` and opt-in
 checks, concurrency, exact replay, rollback, ownership, and web/desktop row
 compatibility. Use only an isolated loopback database and the local integration
 test environment documented in `docs/SUPABASE_WORKFLOW.md`.
+
+## Agent Calendar grant (Ticket 187)
+
+Migration `20261012213059_separate_agent_calendar_grant.sql` adds independent owner-scoped
+`google_calendar_agent_connections` and `google_calendar_agent_preferences` tables.
+Connections add `oauth_client_id`; generation, attempt hash, status and selection revision mirror the standard grant.
+The `cadence_calendar_agent_private` schema stores sealed credentials and five-minute, client-bound attempts.
+Owner RLS and column grants match standard Calendar. Only the server credential repository can call `calendar_agent_*` RPCs.
+Every owner row cascades on Auth deletion. Agent credentials and attempts never enter exports, synchronization or desktop backups.
+
+Agent AES-GCM associated data includes its OAuth client ID and agent namespace in addition to owner, subject and generation.
+Standard ciphertext retains its existing format. Tokens and selections are never copied between grants.
+Daily Brief SQL admission, completion and preference fences now reference the agent tables.
+The migration clears existing Calendar disclosure, increments its preference revision, and removes affected outstanding brief attempts.
+Behavior-only preferences and attempts remain unchanged. Fresh agent consent and model disclosure are required.
+`tests/sql/google-calendar-agent-contract.sql` verifies grant isolation, RLS, replay and disconnect boundaries.

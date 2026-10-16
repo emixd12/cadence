@@ -320,6 +320,20 @@ Six-leg and before/after performance remain unmeasured. Native current-device
 position and Apple-trusted distribution retain Tickets 115/165 gates.
 See `docs/qa/travel-release.md` for evidence and measurement limits.
 
+## Ticket 187: Isolate agentic Calendar access — October 12, 2026
+
+In progress: source implemented and locally verified; release acceptance remains open.
+Daily Brief and private workbench reads now require a separate agent grant.
+Standard Calendar grants and sign-in remain unchanged. The migration withdraws
+prior Calendar disclosure and requires fresh consent. Agent setup requires a
+separate Google project to isolate revocation. Independent review, provider
+classification/configuration, hosted deployment, and installed acceptance remain open.
+Evidence and remaining gates: `docs/qa/2026-10-12-agentic-calendar.md`.
+Plan: `docs/plans/2026-10-12-google-agentic-oauth-review.md`.
+Cloud rollout scope: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+Planning found a public no-AI disclosure conflict and an unproven cutover barrier.
+Both are required release gates. No provider or deployment changes occurred during planning.
+
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 
 Completed. The local folder and GitHub repository are renamed to `cadence`

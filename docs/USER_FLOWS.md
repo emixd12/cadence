@@ -920,3 +920,11 @@ A request ID alone cannot approve access. A changed signed-in account rejects an
 old consent form. Expired, consumed, or invalid requests require a new client
 connection. A failed Disconnect remains visible with a reload/retry instruction.
 No hosted actions or live Google-provider acceptance follow from local tests.
+
+## Connect Calendar for Daily Brief (Ticket 187)
+
+Open Settings → Google Calendar for Daily Brief → Connect Google Calendar.
+Approve read-only consent using the same Google account as Cadence. Select calendars and save.
+Enable Daily Brief, then enable its Calendar control. Calendar selection changes require renewed disclosure.
+Desktop completes consent in the system browser and receives a purpose-bound callback.
+Disconnect affects that purpose across the account's devices. Timeline consent and sign-in remain separate.

@@ -22,10 +22,10 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 477,
+      "line": 507,
       "route": null,
       "usageKind": "render",
-      "confidence": "manual"
+      "confidence": "exact"
     },
     {
       "componentId": "navigation.primary-app-nav",
@@ -742,7 +742,7 @@
     {
       "componentId": "module.google-calendar-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 501,
+      "line": 505,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -750,7 +750,7 @@
     {
       "componentId": "module.google-calendar-panel",
       "file": "components/settings/WebGoogleCalendarPanel.tsx",
-      "line": 12,
+      "line": 13,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1327,6 +1327,30 @@
       "componentId": "module.daily-brief-bubble",
       "file": "tests/daily-brief-bubble-presentation.test.tsx",
       "line": 66,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.google-calendar-panel",
+      "file": "apps/desktop/src/product.tsx",
+      "line": 507,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.google-calendar-panel",
+      "file": "tests/google-calendar-panel.dom.test.tsx",
+      "line": 245,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.daily-brief-settings-panel",
+      "file": "tests/daily-brief-ui.dom.test.tsx",
+      "line": 113,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"

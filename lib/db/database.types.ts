@@ -540,6 +540,68 @@ export type Database = {
         }
         Relationships: []
       }
+      google_calendar_agent_connections: {
+        Row: {
+          attempt_hash: string | null
+          generation: number
+          google_subject: string
+          oauth_client_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempt_hash?: string | null
+          generation?: number
+          google_subject: string
+          oauth_client_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempt_hash?: string | null
+          generation?: number
+          google_subject?: string
+          oauth_client_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_calendar_agent_preferences: {
+        Row: {
+          hidden_calendar_ids: string[]
+          selected_calendar_ids: string[]
+          selection_revision: number
+          show_all_day: boolean
+          user_id: string
+          visible: boolean
+        }
+        Insert: {
+          hidden_calendar_ids?: string[]
+          selected_calendar_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id: string
+          visible?: boolean
+        }
+        Update: {
+          hidden_calendar_ids?: string[]
+          selected_calendar_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_agent_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "google_calendar_agent_connections"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       google_calendar_connections: {
         Row: {
           attempt_hash: string | null
@@ -1460,6 +1522,51 @@ export type Database = {
       }
       bind_behaviorlog_restore_apply_payload: {
         Args: { restore_payload: Json }
+        Returns: string
+      }
+      calendar_agent_begin_attempt: {
+        Args: {
+          client_nonce: string
+          expected_client_id: string
+          expected_generation: number
+          expected_subject: string
+          owner_id: string
+          return_target: string
+          state_digest: string
+          verifier_ciphertext: string
+        }
+        Returns: number
+      }
+      calendar_agent_consume_attempt: {
+        Args: { state_digest: string }
+        Returns: Json
+      }
+      calendar_agent_disconnect: {
+        Args: {
+          expected_generation: number
+          expected_subject: string
+          next_status: string
+          owner_id: string
+        }
+        Returns: string
+      }
+      calendar_agent_install_credential: {
+        Args: {
+          expected_client_id: string
+          expected_generation: number
+          expected_state_hash: string
+          expected_subject: string
+          owner_id: string
+          token_ciphertext: string
+        }
+        Returns: boolean
+      }
+      calendar_agent_read_credential: {
+        Args: {
+          expected_generation: number
+          expected_subject: string
+          owner_id: string
+        }
         Returns: string
       }
       calendar_begin_attempt: {

@@ -839,3 +839,11 @@ model. Selected summaries and exclusions appear in the inspector. Completion
 recaps and routine diagnostic prose remain prohibited. A marking pattern cannot
 prove availability or override Calendar evidence, duration or planner constraints.
 Consent, explicit comparison runs, read-only authority and duration controls remain.
+
+## Separate Calendar consent for Daily Brief (Ticket 187)
+
+Timeline Calendar and Daily Brief Calendar use independent read-only Google grants and selections.
+Settings exposes **Google Calendar for Daily Brief** before the Daily Brief disclosure controls.
+Connecting this grant does not enable model sharing. The user must enable Calendar separately in Daily Brief settings.
+Missing agent configuration or denied agent consent cannot authorize use of the Timeline grant.
+Web and linked desktop share this contract. Marketing has no authenticated consent control; native mobile remains deferred.

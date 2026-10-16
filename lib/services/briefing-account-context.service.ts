@@ -69,7 +69,7 @@ export async function prepareAccountBriefingContexts(
     signal.throwIfAborted();
     let calendar: AdvisorAuthorizationFence["calendar"] = null;
     if (preferences.includeCalendar) {
-      const connection = await getCalendarConnection(caller);
+      const connection = await getCalendarConnection(caller, "agent");
       signal.throwIfAborted();
       if (connection.status !== "connected" || connection.generation !== preferences.calendarConnectionGeneration ||
           connection.selectionRevision !== preferences.calendarSelectionRevision) {

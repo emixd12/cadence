@@ -492,7 +492,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Settings enablement and optional Calendar-context disclosure; the bench uses a fixture client only."
+      "notes": "Settings enablement and optional Calendar-context disclosure from the separate agent grant; the bench uses a fixture client only."
     },
     {
       "id": "module.google-calendar-panel",
@@ -506,7 +506,7 @@
       "benchAnchor": "design-system#ds-module-google-calendar-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Tickets 133\u2013137; synthetic bench never contacts a provider."
+      "notes": "Tickets 133\u2013137 and 187; shared standard/agent consent panel. Agent mode has its own selection and omits Timeline display controls. Synthetic bench covers connected, disconnected, reconnect and unconfigured states without provider calls."
     },
     {
       "id": "composite.external-event-details",
