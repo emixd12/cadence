@@ -573,3 +573,33 @@ Imprint. The owner chose to remove Popmelt instead of migrating it.
 - `app.cadence-me.com` → `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV`; `cadence-me.com` →
   `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`. `/login`, `/trust`, the Trust API, marketing
   `/` and `/about` return 200. Neither served page references Popmelt.
+
+## Native updater acceptance (October 9)
+
+Harness: a throwaway Rust binary outside the repository, built against the app's
+own `Cargo.lock` (`tauri` 2.11.5, `tauri-plugin-updater` 2.10.1, `reqwest`
+0.13.4). It creates a Tauri mock app, configures the updater with the public key
+embedded in the installed `/Applications/Cadence.app` (key ID
+`A305E094044E04A`), points `executable_path` at a fake `.app` in the scratch
+directory, forces `version_comparator` to offer the feed version, then calls the
+plugin's own `check()` and `download()`. `download()` verifies the Minisign
+signature before returning bytes. `install()` is never called.
+
+| Feed URL | Version | Bytes | SHA-256 matches baseline | Signature |
+| --- | --- | --- | --- | --- |
+| `…/habit-tracking-app/releases/download/desktop-preview/latest.json` (installed app's endpoint) | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/cadence/releases/download/desktop-preview/latest.json` | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+| `…/cadence/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+
+Both feeds still advertise download URLs under the old repository name; the
+plugin's HTTP client followed GitHub's redirects for feed and archive.
+
+Negative control: a freshly generated, unrelated Minisign public key made
+`download()` fail with `Minisign(UnexpectedKeyId)`. The temporary key was deleted.
+
+The installed app's file-tree SHA-256 was identical before and after
+(`8bf6c05925112b0e…`). No update was installed, no app data was touched, and no
+release or feed changed. The installed app (`0.1.1-preview.45`) is newer than
+both feeds, so its own check reports no update; the forced comparator exercised
+the download path. Native updater acceptance passes.

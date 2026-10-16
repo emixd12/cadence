@@ -25,8 +25,11 @@ In progress; local and remote cutovers are done.
   project ID; its data is archived in the private rename backup.
 - `main` was merged into `claude/tickets-169-173-advisor-analysis` on October 9.
 
-Open: native updater acceptance, the next scheduled Trust run and Task 10
-residual-reference classification. Evidence: `docs/qa/cadence-project-rename.md`;
+Task 10 (PR #99) classified every remaining old-name reference. Native updater
+acceptance passed October 9: the real `tauri-plugin-updater` 2.10.1 check and
+download verify signatures through old and new feed URLs; nothing was installed.
+
+Open: the next scheduled Trust run. Evidence: `docs/qa/cadence-project-rename.md`;
 plan: `docs/plans/2026-10-07-cadence-project-rename.md`.
 
 ## Function
