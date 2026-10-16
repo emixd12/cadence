@@ -209,7 +209,8 @@
           "includeHistoricalAverage": true,
           "includeConfiguredDefault": true,
           "preference": "configured_default",
-          "fallback": "other_enabled_source"
+          "fallback": "other_enabled_source",
+          "includeDescriptionEstimate": true
         }
       },
       "analysis": {

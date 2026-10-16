@@ -61,6 +61,8 @@ export type BenchCaseCapture = Readonly<{
   remindersDisclosed: boolean;
   includeNotes: boolean;
   notesDisclosed: boolean;
+  /** Ticket 188: the owner confirmed the workbench-only description disclosure for this capture. */
+  descriptionsDisclosed?: "workbench_owner_confirmed";
 }>;
 
 export type BenchCaseInputs = Readonly<{
@@ -69,6 +71,8 @@ export type BenchCaseInputs = Readonly<{
   analysisSource: BriefingAnalysisSource | null;
   /** Workbench Behavior refs mapped to this capture's opaque refs. */
   configurationRefs: Readonly<Record<string, string>>;
+  /** Ticket 188: captured Behavior descriptions by opaque behaviorRef, when disclosed. */
+  descriptions?: Readonly<Record<string, string>>;
 }>;
 
 export type BenchHistoryCoverage = Readonly<{
@@ -207,6 +211,23 @@ export type BenchCaseDetail = Readonly<{
   proposals: readonly BenchProposal[];
   invalidProposals: readonly string[];
   dispositions: readonly BenchDisposition[];
+  estimateReviews: readonly BenchEstimateReview[];
+}>;
+
+/** Ticket 188: the owner's record of a description estimate, kept for later tuning. */
+export type BenchEstimateReview = Readonly<{
+  schemaVersion: typeof BRIEFING_BENCH_SCHEMA_VERSION;
+  kind: "estimate_review";
+  id: string;
+  caseId: string;
+  runId: string;
+  createdAt: string;
+  behaviorRef: string;
+  estimatedMinutes: number | null;
+  basis: "stated" | "inferred" | null;
+  /** The owner's typical length; null when they only comment. */
+  actualMinutes: number | null;
+  comment: string;
 }>;
 
 export type BenchCaseSummary = Readonly<{
@@ -221,7 +242,7 @@ export type BenchCaseSummary = Readonly<{
   proposals: number;
 }>;
 
-type JsonlKind = "candidates" | "runs" | "feedback" | "dispositions";
+type JsonlKind = "candidates" | "runs" | "feedback" | "dispositions" | "estimate_reviews";
 
 export function defaultBriefingBenchRoot(): string {
   return path.join(process.cwd(), ".local", "briefing-bench", `v${BRIEFING_BENCH_SCHEMA_VERSION}`);
@@ -284,6 +305,7 @@ export function createBriefingBenchStore(root: string = defaultBriefingBenchRoot
       proposals,
       invalidProposals,
       dispositions: await readJsonl<BenchDisposition>(path.join(dir, "dispositions.jsonl")),
+      estimateReviews: await readJsonl<BenchEstimateReview>(path.join(dir, "estimate_reviews.jsonl")),
     };
   }
 

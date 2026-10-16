@@ -8,9 +8,9 @@ import { visibleDailyBriefText } from "@cadence/core/services/daily-brief-presen
 import { briefingAccountRef } from "./briefing-account-context.service";
 import {
   benchPartition, BRIEFING_BENCH_RETENTION_DAYS, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
-  type BenchCaseDetail, type BenchDisposition, type BenchFeedback, type BenchPartition, type BenchPreference, type BenchRun, type BriefingBenchStore,
+  type BenchCaseDetail, type BenchDisposition, type BenchEstimateReview, type BenchFeedback, type BenchPartition, type BenchPreference, type BenchRun, type BriefingBenchStore,
 } from "./briefing-bench-store";
-import { DailyBriefError, raceBriefAbort } from "./daily-brief-consumer";
+import { DailyBriefError, raceBriefAbort, type DurationEstimateReport } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { guard, json, readComparisonBody } from "./briefing-workbench.service";
 import type { CalendarCaller } from "./google-calendar.service";
@@ -71,6 +71,7 @@ export async function writeBriefingReview(request: Request, store: BriefingBench
     switch (value.action) {
       case "feedback": return { feedback: await saveFeedback(store, partition, caseId, value) };
       case "disposition": return { disposition: await saveDisposition(store, partition, caseId, value) };
+      case "estimate_review": return { estimateReview: await saveEstimateReview(store, partition, caseId, value) };
       case "packet": return writeReviewPacket(store, partition, caseId);
       case "sequence_report": {
         if (!Array.isArray(value.caseIds) || !value.caseIds.length || value.caseIds.length > 14 ||
@@ -131,6 +132,33 @@ async function saveDisposition(store: BriefingBenchStore, partition: BenchPartit
     proposalId: value.proposalId as string, createdAt: new Date().toISOString(), decision: value.decision as BenchDisposition["decision"], comment };
   await store.append(partition, caseId, "dispositions", record);
   return record;
+}
+
+/** Ticket 188: records the owner's typical length beside a run's description estimate. */
+async function saveEstimateReview(store: BriefingBenchStore, partition: BenchPartition, caseId: string, value: Record<string, unknown>): Promise<BenchEstimateReview> {
+  if (Object.keys(value).sort().join() !== "action,actualMinutes,behaviorRef,caseId,comment,runId,source") invalid();
+  const detail = await store.readCase(partition, caseId);
+  const run = detail.runs.find((item) => item.id === value.runId) ?? invalid();
+  const report = runEstimates(run.inspector);
+  if (!report || typeof value.behaviorRef !== "string" || !report.items.some((item) => item.behaviorRef === value.behaviorRef)) invalid();
+  const actual = value.actualMinutes;
+  if (actual !== null && !(Number.isInteger(actual) && (actual as number) >= 1 && (actual as number) <= 480)) invalid();
+  const comment = optionalText(value.comment, 1000) ?? "";
+  if (actual === null && !comment) invalid();
+  const estimate = report.estimates.find((item) => item.behaviorRef === value.behaviorRef) ?? null;
+  const record: BenchEstimateReview = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "estimate_review", id: randomUUID(), caseId,
+    runId: run.id, createdAt: new Date().toISOString(), behaviorRef: value.behaviorRef, estimatedMinutes: estimate?.minutes ?? null,
+    basis: estimate?.basis ?? null, actualMinutes: actual as number | null, comment };
+  await store.append(partition, caseId, "estimate_reviews", record);
+  return record;
+}
+
+/** The estimate report a run's inspector carries, when the run requested one. */
+export function runEstimates(inspector: unknown): DurationEstimateReport | null {
+  const report = inspector && typeof inspector === "object" ? (inspector as { durationEstimates?: unknown }).durationEstimates : null;
+  if (!report || typeof report !== "object") return null;
+  const value = report as DurationEstimateReport;
+  return Array.isArray(value.items) && Array.isArray(value.estimates) ? value : null;
 }
 
 function invalid(): never { throw new DailyBriefError("invalid_request"); }
@@ -241,6 +269,15 @@ export async function writeReviewPacket(store: BriefingBenchStore, partition: Be
     for (const proposal of detail.proposals) {
       const decisions = detail.dispositions.filter((item) => item.proposalId === proposal.id);
       lines.push(`- \`${proposal.id}\` (${proposal.owner}): ${proposal.interpretedProblem}${decisions.length ? ` — ${decisions.map((item) => `${item.decision.replaceAll("_", " ")}${item.comment ? `: ${item.comment}` : ""}`).join("; ")}` : " — not reviewed"}`);
+    }
+    lines.push("");
+  }
+  if (detail.estimateReviews.length) {
+    // Ticket 188: owner lengths beside each estimate, for tuning the estimate step.
+    lines.push("## Duration estimate reviews", "", "| Run | Behavior | Estimate | Basis | Owner's typical length | Comment |", "|---|---|---|---|---|---|");
+    for (const item of detail.estimateReviews) {
+      const title = runEstimates(detail.runs.find((run) => run.id === item.runId)?.inspector)?.items.find((entry) => entry.behaviorRef === item.behaviorRef)?.title ?? item.behaviorRef;
+      lines.push(`| \`${item.runId}\` | ${title.replaceAll("|", "/")} | ${item.estimatedMinutes ?? "none"} | ${item.basis ?? "—"} | ${item.actualMinutes ?? "—"} | ${item.comment.replaceAll("|", "/").replaceAll("\n", " ")} |`);
     }
     lines.push("");
   }

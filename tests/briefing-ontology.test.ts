@@ -144,6 +144,7 @@ describe("briefing workbench ontology", () => {
         "config.scope.historyDays", "config.scope.includeCalendar", "config.context.includeCompletionHistory",
         "config.context.includeHistoricalCompletionTimes", "config.context.includeRecordedElapsedDurations",
         "config.context.duration.includeHistoricalAverage", "config.context.duration.includeConfiguredDefault",
+        "config.context.duration.includeDescriptionEstimate",
         "config.context.duration.preference", "config.context.duration.fallback", "config.referenceIds", "config.planner.bufferMinutes",
         "config.planner.preference", "config.planner.movableBehaviorRefs", "config.planner.permittedWindows.startMinute",
         "config.planner.permittedWindows.endMinute", "config.analysis.lanes", "config.analysis.maxTips", "config.analysis.cooldownDays",

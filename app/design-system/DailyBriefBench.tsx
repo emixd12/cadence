@@ -23,7 +23,7 @@ import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { BriefingWorkbenchGuide } from "./BriefingWorkbenchGuide";
-import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type FeedbackDraft, type ViewRun } from "./BriefingReview";
+import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type EstimateReviewInput, type FeedbackDraft, type ViewRun } from "./BriefingReview";
 import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchProposal } from "@/lib/services/briefing-bench-store";
 
@@ -43,6 +43,11 @@ const RECIPE_V11_BENCH_BRIEFING: DailyBriefing = {
     basis: "Walk: usually marked Completed around 7:30 PM for its 12:30 PM time (30 times).", limitation: "Marks show when you logged a decision, not when you did it.", category: "logging" },
   versions: { configuration: "bench", references: "bench", planner: "1.1", pipeline: "3.0", recipe: "daily_brief@1.1", policy: "3.0" },
 };
+
+/** Ticket 188: whether a configuration may send descriptions for duration estimates. */
+function estimatesDurations(config: BriefingConfig): boolean {
+  return config.recipe.version === "1.1" && config.context.duration.includeDescriptionEstimate === true;
+}
 
 export function DailyBriefBubbleBench() {
   return <div className="bg-background"><div className="aspect-[1423/367] w-full overflow-hidden bg-background sm:aspect-[2041/239]"><picture className="block h-full w-full"><source media="(max-width: 639px)" srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png" /><img src="/brand/cadence-timeline-horse-lines-dots-clear-background.png" width={2041} height={239} alt="" aria-hidden="true" className="block h-full w-full object-fill" /></picture></div><div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={{
@@ -86,6 +91,8 @@ function savedRuns(detail: CaseDetail, role: 'baseline' | 'candidate'): ViewRun[
  * never activate the hosted preset.
  */
 export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: string }) {
+  // Ticket 188: owner confirmation for sending Behavior descriptions, per page session only.
+  const [descriptionsConfirmed, setDescriptionsConfirmed] = useState(false);
   const [view, setView] = useState<'compare' | 'days' | 'saved'>('compare');
   const [configs, setConfigs] = useState<BriefingConfig[]>([DEFAULT_BRIEFING_CONFIG, BRIEFING_PRESETS[1]?.config ?? DEFAULT_BRIEFING_CONFIG]);
   const [sides, setSides] = useState<[Side, Side]>([
@@ -234,7 +241,8 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     pendingCase.current = caseId;
     try {
       const body = kind !== 'new' ? { mode: 'saved', accountRef, configs: runConfigs, review }
-        : mode === 'account' ? { mode, configs: runConfigs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review }
+        : mode === 'account' ? { mode, configs: runConfigs, accountRef: account!.settings.accountRef, preferenceRevision: account!.settings.revision, review,
+          ...(descriptionsConfirmed && runConfigs.some(estimatesDurations) ? { descriptionsConfirmed: true } : {}) }
           : { fixtureId, configs: runConfigs, ...(analysisFixtureId === 'none' ? {} : { analysisFixtureId }), review };
       const response = await fetch("/api/dev/briefing-comparison", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body), signal: controller.signal, cache: "no-store", credentials: 'same-origin' });
@@ -312,6 +320,10 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
     } catch (failure) { if (version === generation.current) { clearAccountFailure(failure); setError(`Feedback not saved. ${failure instanceof Error ? failure.message : 'review_unavailable'}`); } }
     finally { if (version === generation.current) setSavingFeedback(false); }
   }
+  function saveEstimateReview(input: EstimateReviewInput) {
+    void caseAction({ action: 'estimate_review', runId: input.runId, behaviorRef: input.behaviorRef, actualMinutes: input.actualMinutes, comment: input.comment });
+  }
+
   async function caseAction(body: Record<string, unknown>, after?: (value: Record<string, unknown>) => void) {
     if (!detail) return;
     const version = generation.current;
@@ -392,6 +404,10 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
           <label className="flex min-h-11 items-center gap-2"><input aria-label={`${label} ${index + 1}`} type="checkbox" checked={config.context.duration[field]} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, [field]: event.target.checked } } })} />{label}</label>
           <a className="inline-flex min-h-11 items-center text-sm underline" href={`#briefing-term-config.context.duration.${field}`}>Definition</a>
         </div>)}
+        {config.recipe.version === "1.1" ? <div className="flex flex-wrap items-center gap-x-3">
+          <label className="flex min-h-11 items-center gap-2"><input aria-label={`Description estimate ${index + 1}`} type="checkbox" checked={config.context.duration.includeDescriptionEstimate === true} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, includeDescriptionEstimate: event.target.checked } } })} />Estimate from description when nothing is recorded</label>
+          <a className="inline-flex min-h-11 items-center text-sm underline" href="#briefing-term-config.context.duration.includeDescriptionEstimate">Definition</a>
+        </div> : null}
         <label className="grid gap-1">Preferred duration source<select aria-label={`Preferred duration source ${index + 1}`} className="min-h-11 w-full border p-2" value={config.context.duration.preference} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, preference: event.target.value as 'configured_default' | 'historical_average' } } })}><option value="configured_default">Configured default</option><option value="historical_average">Historical average</option></select></label>
         <label className="grid gap-1">If preferred source is unavailable<select aria-label={`Duration fallback ${index + 1}`} className="min-h-11 w-full border p-2" value={config.context.duration.fallback} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, fallback: event.target.value as 'other_enabled_source' | 'none' } } })}><option value="other_enabled_source">Use the other enabled source</option><option value="none">Keep duration unknown</option></select></label>
         <p className="text-sm">Historical averages need three eligible Completed Occurrences in the preceding 90 complete local days. Unknown duration cannot prove a fit. <a className="underline" href="#briefing-term-config.context.duration.fallback">Selection and fallback</a></p>
@@ -449,6 +465,8 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         <p>{account.travelSpend ? `Travel usage for ${account.travelSpend.localMonth.slice(0, 7)}: US$${(account.travelSpend.reservedMicrodollars / 1_000_000).toFixed(3)} reserved at list price (US$5 monthly limit).` : 'Travel usage is unavailable.'}</p>
         {!account.settings.available ? <p>Model generation is not configured on this server.</p> : null}
         <p>{account.settings.includeCalendar ? 'Calendar model-data permission is enabled. Each configuration can exclude it.' : 'Calendar model-data permission is off. Calendar will be excluded.'}</p>
+        {configs.some(estimatesDurations) ? <label className="flex min-h-11 items-start gap-2 py-2"><input type="checkbox" className="mt-1" checked={descriptionsConfirmed} onChange={(event) => setDescriptionsConfirmed(event.target.checked)} />
+          <span>For this workbench only: send the descriptions of Behaviors with no known duration to OpenAI, so it can estimate their length. This adds one model call per estimating configuration. Descriptions are saved with the case on this computer. Daily Brief Settings do not change.</span></label> : null}
       </>}
       <a className="inline-flex min-h-11 items-center underline" href="/settings">Open briefing settings</a>
       <button type="button" className="ml-4 min-h-11 underline" onClick={() => { invalidate(true); setFeedbackDrafts({}); setCases([]); setAccessVersion(value => value + 1); }}>Refresh account access</button>
@@ -470,8 +488,8 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
       {notice ? <p role="status">{notice}</p> : null}
       {error ? <p role="alert">Comparison unavailable: {error}</p> : null}
       <div ref={columns} className="grid gap-8 lg:grid-cols-2">
-        <ReadingColumn side="A" title="Baseline" run={runA} draftChanged={!!runA?.config && JSON.stringify(runA.config) !== JSON.stringify(configs[0])} />
-        <ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={!!runB?.config && JSON.stringify(runB.config) !== JSON.stringify(configs[1])} />
+        <ReadingColumn side="A" title="Baseline" run={runA} draftChanged={!!runA?.config && JSON.stringify(runA.config) !== JSON.stringify(configs[0])} onEstimateReview={detail ? saveEstimateReview : undefined} />
+        <ReadingColumn side="B" title="Candidate" run={runB} runs={candidateRuns} onSelectRun={setSelectedRunId} draftChanged={!!runB?.config && JSON.stringify(runB.config) !== JSON.stringify(configs[1])} onEstimateReview={detail ? saveEstimateReview : undefined} />
       </div>
       <RunDifferences a={runA} b={runB} />
       {detail && !unsaved ? <FeedbackForm draft={feedback} onChange={setFeedback} onQuote={quoteSelection} onSave={() => void saveFeedback()} disabled={!runA && !runB} saving={savingFeedback} />

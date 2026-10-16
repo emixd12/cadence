@@ -721,6 +721,13 @@ Behavior still Unresolved at generation movable by default, within that day, for
 suggestions only. No movability setting is added. The Behavior's schedule is unchanged.
 The brief mentions a different time only as a suggestion backed by a planner option.
 Recipe 1.0, used by the production default, keeps explicit movability.
+Ticket 188 adds a third duration source for recipe 1.1 configurations that opt in. When
+neither the default duration nor tracked sessions are known, one separate model call
+estimates whole minutes (1–480) from the Behavior's title and description. Cadence
+validates the reply, labels the result `description_estimate`, and lets the deterministic
+planner use it. A failed estimate leaves the duration unknown. Descriptions reach the model
+only after disclosure: production Settings disclosure is pending; the private workbench
+uses a page-session owner confirmation. Recorded sources always take precedence.
 No travel-time inference enters the briefing before travel release acceptance.
 The model explains valid options; voice controls
 cannot override scheduling constraints, data disclosure or read-only boundaries.

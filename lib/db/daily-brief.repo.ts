@@ -166,6 +166,27 @@ export async function listDailyBriefBehaviorIds(
   return (data ?? []).map(({ id }) => id);
 }
 
+/** Ticket 188: owner-scoped descriptions for active Behaviors. Callers must check disclosure first. */
+export async function listDailyBriefBehaviorDescriptions(
+  client: AppSupabaseClient,
+  userId: string,
+  behaviorIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  if (!behaviorIds.length) return {};
+  const request = client
+    .from("behaviors")
+    .select("id, description")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .in("id", [...behaviorIds])
+    .not("description", "is", null)
+    .limit(101);
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  return Object.fromEntries((data ?? []).flatMap(({ id, description }) => description?.trim() ? [[id, description]] : []));
+}
+
 /** Private workbench labels only; never sent to a model by this read. */
 export async function listBriefingWorkbenchBehaviors(client: AppSupabaseClient, userId: string) {
   const { data, error } = await client.from("behaviors").select("id,title")

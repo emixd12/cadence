@@ -111,13 +111,15 @@ function ReadingReview({ run, text }: { run: ViewRun; text: string }) {
   </div>;
 }
 
-export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChanged }: {
+export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChanged, onEstimateReview }: {
   side: "A" | "B";
   title: string;
   run: ViewRun | null;
   runs?: readonly ViewRun[];
   onSelectRun?: (id: string) => void;
   draftChanged: boolean;
+  /** Ticket 188: saves the owner's typical length for one estimated Behavior; absent for unsaved runs. */
+  onEstimateReview?: (input: EstimateReviewInput) => void;
 }) {
   const [visibleText, setVisibleText] = useState("");
   // The wrapper remounts per run (keyed below), so this measures each rendered output once.
@@ -137,6 +139,7 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
           : <DailyBriefBubble state={run.state === "ready" ? "ready" : "error"} briefing={run.briefing} message={run.error} onDismiss={() => undefined} />}
       </div>
       <ReadingReview run={run} text={visibleText} />
+      <DurationEstimates run={run} onSave={onEstimateReview} />
       <details><summary className="min-h-11 cursor-pointer py-2">Evidence and selection</summary><AnalysisSummary inspector={run.inspector} /></details>
       <details><summary className="min-h-11 cursor-pointer py-2">Inputs, duration sources, versions and planner inspector</summary>
         <p className="text-sm">Input decisions show exclusions, source selection and sample coverage. Excluded raw values stay absent. Catalog ID validity does not prove support.</p>
@@ -144,6 +147,49 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
       </details>
     </>}
   </section>;
+}
+
+export type EstimateReviewInput = Readonly<{ runId: string; behaviorRef: string; actualMinutes: number | null; comment: string }>;
+
+type EstimateReport = Readonly<{
+  state: "not_requested" | "none_needed" | "ready" | "failed";
+  items: readonly Readonly<{ behaviorRef: string; title: string; description: string }>[];
+  estimates: readonly Readonly<{ behaviorRef: string; minutes: number | null; basis: "stated" | "inferred" }>[];
+}>;
+
+const ESTIMATE_STATE_LABELS: Record<EstimateReport["state"], string> = {
+  not_requested: "Not requested.",
+  none_needed: "Every Behavior already had a recorded duration or no description.",
+  ready: "Estimated from descriptions.",
+  failed: "The estimate call failed; durations stayed unknown.",
+};
+
+/** Ticket 188 review surface: each description, its estimate, and the owner's typical length. */
+function DurationEstimates({ run, onSave }: { run: ViewRun; onSave?: (input: EstimateReviewInput) => void }) {
+  const report = run.inspector && typeof run.inspector === "object" ? (run.inspector as { durationEstimates?: EstimateReport }).durationEstimates : undefined;
+  const [drafts, setDrafts] = useState<Record<string, { minutes: string; comment: string }>>({});
+  if (!report || report.state === "not_requested") return null;
+  return <details><summary className="min-h-11 cursor-pointer py-2">Duration estimates from descriptions</summary>
+    <p className="text-sm">{ESTIMATE_STATE_LABELS[report.state]} Estimates are lower priority than default durations and tracked sessions.</p>
+    <ul className="space-y-3 text-sm">{report.items.map((item) => {
+      const estimate = report.estimates.find((entry) => entry.behaviorRef === item.behaviorRef);
+      const draft = drafts[item.behaviorRef] ?? { minutes: "", comment: "" };
+      const minutes = draft.minutes.trim() ? Number(draft.minutes) : null;
+      const valid = (minutes === null || (Number.isInteger(minutes) && minutes >= 1 && minutes <= 480)) && (minutes !== null || !!draft.comment.trim());
+      return <li key={item.behaviorRef} className="space-y-1 border-t pt-2">
+        <p><strong>{item.title}</strong> · {estimate?.minutes ? `about ${estimate.minutes} min (${estimate.basis})` : "no estimate"}</p>
+        <p className="whitespace-pre-wrap break-words text-muted-readable">{item.description}</p>
+        {onSave && run.id ? <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1">Your typical minutes<input aria-label={`Typical minutes for ${item.title}`} inputMode="numeric" className="min-h-11 w-28 border p-2" value={draft.minutes}
+            onChange={(event) => setDrafts({ ...drafts, [item.behaviorRef]: { ...draft, minutes: event.target.value } })} /></label>
+          <label className="grid min-w-0 flex-1 gap-1">Comment (optional)<input aria-label={`Estimate comment for ${item.title}`} className="min-h-11 w-full border p-2" value={draft.comment}
+            onChange={(event) => setDrafts({ ...drafts, [item.behaviorRef]: { ...draft, comment: event.target.value } })} /></label>
+          <button type="button" disabled={!valid} className="min-h-11 border px-3 disabled:opacity-50"
+            onClick={() => { onSave({ runId: run.id!, behaviorRef: item.behaviorRef, actualMinutes: minutes, comment: draft.comment.trim() }); setDrafts({ ...drafts, [item.behaviorRef]: { minutes: "", comment: "" } }); }}>Save</button>
+        </div> : null}
+      </li>;
+    })}</ul>
+  </details>;
 }
 
 export function RunDifferences({ a, b }: { a: ViewRun | null; b: ViewRun | null }) {
