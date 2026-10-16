@@ -50,6 +50,12 @@ type InspectorAnalysis = {
 } | null;
 
 /** Behavior titles by opaque ref, read from the facts the run used. */
+/** The run's configured word cap, so each side's reading target matches its own preset. */
+function configuredMaxWords(inspector: unknown): number | undefined {
+  const value = inspector && typeof inspector === "object" ? (inspector as { config?: { length?: { maxWords?: unknown } } }).config?.length?.maxWords : undefined;
+  return typeof value === "number" ? value : undefined;
+}
+
 export function behaviorTitles(inspector: unknown): Map<string, string> {
   const facts = inspector && typeof inspector === "object" ? (inspector as { facts?: { cadence?: { occurrences?: { behaviorRef?: string; title?: string }[] } } }).facts : null;
   return new Map((facts?.cadence?.occurrences ?? []).flatMap((item) => item.behaviorRef && item.title ? [[item.behaviorRef, item.title] as const] : []));
@@ -91,6 +97,7 @@ function ReadingReview({ run, text }: { run: ViewRun; text: string }) {
   const review = reviewBriefingReading({
     visibleText: text,
     behaviorTitles: [...behaviorTitles(run.inspector).values()],
+    maxWords: configuredMaxWords(run.inspector),
     segments: [
       { label: "overview", text: run.briefing.text },
       ...(run.briefing.suggestions ?? []).map((item, index) => ({ label: `suggestion ${index + 1}`, text: item.text })),
@@ -98,7 +105,7 @@ function ReadingReview({ run, text }: { run: ViewRun; text: string }) {
     ],
   });
   return <div className="space-y-1 text-sm" aria-label="Reading review">
-    <p>{review.visibleWords} visible words · target {review.target.minWords}–{review.target.maxWords}{review.position === "within" ? "" : review.position === "above" ? " · longer than target" : " · shorter than target"}</p>
+    <p>{review.visibleWords} visible words · {review.target.minWords ? `target ${review.target.minWords}–${review.target.maxWords}` : `cap ${review.target.maxWords}`}{review.position === "within" ? "" : review.position === "above" ? " · longer than target" : " · shorter than target"}</p>
     {review.repeated.map((item) => <p key={item.between.join()}>Repeats “{item.phrase}” in {item.between[0]} and {item.between[1]}.</p>)}
     {review.mechanicsTerms.length ? <p>Internal terms: {review.mechanicsTerms.join(", ")}.</p> : null}
   </div>;

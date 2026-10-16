@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { overlapsTravelSpans, type BriefTravelGuidance, type BriefTravelGuidanceItem } from "@cadence/core/services/brief-travel-guidance";
-import { briefingOptionText, briefingReferenceLabel, briefingTipEvidence, formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
+import { briefingOptionText, briefingReferenceLabel, briefingTipEvidence, briefingTipLabel, formatBriefingTime, isPlainBriefing } from "@cadence/core/services/daily-brief-presentation";
 
 type DailyBriefBubbleProps = Readonly<{
   state: "loading" | "ready" | "error";
@@ -47,17 +47,18 @@ export function DailyBriefBubble({
             {briefing.suggestions?.length ? <ul aria-label="Suggestions only" className="mt-2 space-y-2 text-sm leading-6">
               {briefing.suggestions.map((suggestion, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">
                 <p>{suggestion.text}</p>
-                {suggestion.option ? <p className="text-xs text-muted-readable">{briefingOptionText(suggestion.option, briefing.timezone, !!travelToday && overlapsTravelSpans(suggestion.option.intervals.proposed, travelToday.occupiedSpans))}</p> : null}
+                {suggestion.option ? <p className="text-xs text-muted-readable">{briefingOptionText(suggestion.option, briefing.timezone, !!travelToday && overlapsTravelSpans(suggestion.option.intervals.proposed, travelToday.occupiedSpans), isPlainBriefing(briefing))}</p> : null}
                 {suggestion.referenceIds.length ? <p className="text-xs">Sources: {suggestion.referenceIds.map((id) => {
                   const source = briefing.references?.find((source) => source.id === id);
                   return source ? <Fragment key={id}><a href={source.url} target="_blank" rel="noreferrer" className="mr-2 underline">{briefingReferenceLabel(source)}</a>{" "}</Fragment> : null;
                 })}</p> : null}
               </li>)}
             </ul> : null}
-            {briefing.tip ? <div className="mt-3 border-t border-line pt-2">
-              <p className="text-xs font-bold text-muted-readable">Pattern tip</p>
+            {briefing.tip ? <div className="mt-3 border-t border-line pt-2" data-tip-category={briefing.tip.category ?? "pattern"}>
+              <p className="text-xs font-bold text-muted-readable">{briefingTipLabel(briefing.tip)}</p>
               <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{briefing.tip.text}</p>
-              <p className="text-xs leading-5 text-muted-readable">{briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation)}</p>
+              {/* Recipe 1.1 nests the evidence under its tip so it reads as support, not a separate item. */}
+              <p className={`text-xs leading-5 text-muted-readable ${isPlainBriefing(briefing) ? "mt-1 border-l border-line pl-3" : ""}`}>{briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation)}</p>
             </div> : null}
             {travelToday?.items.length ? <div className="mt-3 border-t border-line pt-2">
               <p className="text-xs font-bold text-muted-readable">Travel</p>

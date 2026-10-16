@@ -923,7 +923,7 @@ The accepted criteria and exact profile definition are in
 
 | Profile | Iteration | Coverage | Evaluation state | Outcome |
 |---|---|---|---|---|
-| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Pending; no new model runs | No candidate accepted |
+| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Freeze refreshed October 16 at `575a48d`; no model runs yet | No candidate accepted |
 
 Future records identify profile revision and iteration separately. Keep exact
 candidate/baseline versions, source freeze, local report references, reading burden,
@@ -931,3 +931,27 @@ repeat rationale and failures with each iteration. Retain prior rows and profile
 revisions. Do not count seven days as seven independent sequence-quality votes.
 This update records criteria and starts the existing workbench; it does not change
 runtime prompts, presets, cooldowns or the production reading policy.
+
+### Ticket 184 iteration 1 — tuning pass 1, October 16, 2026
+
+Profile `daily-brief-balanced@1`, iteration 1, source `575a48d` (freeze
+`ticket184-iter1-20261016`). A `cadence-default`, B `advisor-analysis`, model
+`gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`. The local server ran on
+Node 22.22.3 at `127.0.0.1:4323` because Node 24 is not installed and Docker holds 4321.
+T1–T6 ran once each: 12 calls, 12 passed, none withheld. Held-out H1–H10 and S1 were not run.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| T1 | Neither | Remove "no scheduled change" statements; suggest or stay silent. |
+| T2 | No explicit pick; prefers B's sections | Too technical in both; nest tip evidence; drop causal disclaimer. |
+| T3 | B | Repetition. |
+| T4 | B (best) | Future one-click rescheduling logged in `docs/FUTURE_UPDATES.md`. |
+| T5 | B (best overall) | Give logging-habit tips distinct formatting. |
+| T6 | Neither | Do not mention the absence of conflicts. |
+
+Exact comments are stored as feedback records in the local synthetic cases.
+Eight proposals (P0–P7) for candidate 2 are stored beside them and pass the workbench validator.
+Not proposed for candidate 2: duration estimates from Behavior descriptions conflict with
+the current duration contract (`docs/PRODUCT_SPEC.md`) and need a separate decision.
+Suggesting a refresh after a brief's times pass belongs with Ticket 185's expiry choices.
+No candidate is accepted. No prompt, preset or production behavior changed.

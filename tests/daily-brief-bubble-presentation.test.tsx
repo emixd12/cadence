@@ -88,4 +88,20 @@ describe("Daily Brief visible text and quote validation", () => {
     const packet = await readFile(path.join(root, "synthetic", caseId, "review-packet.md"), "utf8");
     for (const quote of quotes) expect(packet).toContain(`> ${quote}`);
   });
+
+  it("renders recipe 1.1 briefs with plain option text, a Logging tip label and nested evidence", () => {
+    const plain: DailyBriefing = { ...briefing, versions: { configuration: "c", references: "r", planner: "p", pipeline: "x", recipe: "daily_brief@1.1" },
+      tip: { ...briefing.tip!, category: "logging" } };
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={plain} onDismiss={() => undefined} />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Suggested time: 12:00 PM–12:30 PM.");
+    expect(text).not.toContain("Hypothetical option");
+    const tip = container.querySelector('[data-tip-category="logging"]')!;
+    expect(tip.querySelector("p")?.textContent).toBe("Logging tip");
+    expect(tip.lastElementChild?.className).toContain("border-l");
+    const legacy = document.createElement("div");
+    legacy.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined} />);
+    expect(legacy.querySelector('[data-tip-category="pattern"] p')?.textContent).toBe("Pattern tip");
+  });
 });

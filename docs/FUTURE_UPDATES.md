@@ -47,6 +47,10 @@ Still deferred:
   preview, explicit human approval, stale-context checks, conflict handling,
   idempotency, audit history, revocation, and atomic apply behavior. Read and
   execution grants remain separate.
+  Owner request (Ticket 184 review, October 16, 2026): when a brief offers a
+  supported time, let the user move that day's Behavior to it with one action
+  after a confirmation step. Start with Cadence Behaviors for the current day.
+  Moving external Calendar events comes later and needs a Calendar write grant.
 - An external advisor transport. The in-app briefing needs no delegated
   consumer or generic connector framework. The remote MCP server is no longer
   deferred; see "MCP server follow-ups" below.

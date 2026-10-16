@@ -320,6 +320,17 @@ Six-leg and before/after performance remain unmeasured. Native current-device
 position and Apple-trusted distribution retain Tickets 115/165 gates.
 See `docs/qa/travel-release.md` for evidence and measurement limits.
 
+## Ticket 184 candidate 2 and Ticket 188 — October 16, 2026
+
+In progress. Iteration 1 tuning pass 1 ran T1–T6 (12 calls, all passed). The owner
+preferred B in T3–T5 and neither in T1 and T6. Feedback and eight proposals are stored
+in the local bench cases; non-private IDs are in `docs/qa/briefing-workbench.md`.
+Candidate 2 is recipe `daily_brief@1.1` in preset `advisor-analysis-2`. It adds default
+same-day movability for unresolved Behaviors, plain wording, quiet-day and repetition
+rules, Logging tip labels and nested evidence. Recipe 1.0 presets and the production
+default are unchanged. Ticket 188 (description duration estimates) is filed and in progress.
+Held-out cases, the seven-day sequence, owner acceptance and promotion remain open.
+
 ## Ticket 187: Isolate agentic Calendar access — October 12, 2026
 
 In progress: source implemented and locally verified; release acceptance remains open.

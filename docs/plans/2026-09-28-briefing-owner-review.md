@@ -280,10 +280,19 @@ its `manifest.json` records SHA-256 digests. Keep that copy when changing candid
   base context — `tests/fixtures/advisor-day-context.valid.json`:
   `531993b1880c28ef8bc7bacabff83f38e23394fd4ca39c7ed136a32ae24057b7`.
 
-The September 30 criteria above govern evaluation of this profile. The source
-freeze remains the September 28 preparation snapshot. Check it against the selected
-candidate before running; keep the original recoverable copy. Criteria acceptance
-does not accept outputs, promote a candidate, or authorize deployment.
+The September 30 criteria above govern evaluation of this profile. Check the freeze
+against the selected candidate before running; keep the original recoverable copy.
+Criteria acceptance does not accept outputs, promote a candidate, or authorize deployment.
+
+**Iteration 1 freeze — October 16, 2026.** Iteration 1 uses source commit
+`575a48dcda94d90a100df26906a7700d77e57e08`. The recoverable copy is
+`.local/briefing-bench/freezes/ticket184-iter1-20261016/`, with predecessor
+`ticket184-20260928`. Seventeen of the eighteen frozen files are unchanged.
+The reference catalog moved from `2026-09-20.1` to `2026-10-07.1`:
+`3b4cdaece03dc808a979958d3034bdfb4ce25f49c94a39d64853bd9711810fe8`.
+The Ticket 186 rename changed only one reference URL and its revision number.
+Cases, criteria, clock and input coverage are unchanged, so the profile stays at revision 1.
+The commit also contains Ticket 187's separate agent Calendar grant. Synthetic cases do not read live Calendar.
 
 ### Proposed review and release record
 

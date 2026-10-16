@@ -174,7 +174,7 @@ describe("Daily Brief workbench: Compare", () => {
     expect(review.candidates.map((item) => [item.role, item.label])).toEqual([["baseline", "Baseline"], ["candidate", "Candidate"]]);
     expect(fetcher.mock.calls.some(([url]) => String(url) === `/api/dev/briefing-reviews?source=synthetic&caseId=${review.caseId}`)).toBe(true);
     expect(output("A").textContent).toContain("Generated baseline");
-    expect(output("A").querySelector('[aria-label="Reading review"]')?.textContent).toMatch(/\d+ visible words · target 80–120/);
+    expect(output("A").querySelector('[aria-label="Reading review"]')?.textContent).toMatch(/\d+ visible words · cap 120/);
     expect(container.textContent).toContain("saved");
   });
 

@@ -716,6 +716,11 @@ Source references, assumptions and freshness accompany the evidence. The model
 explains ranked findings; it never calculates intervals. Detailed rejections remain
 in the inspector. A fit observation does not grant permission to move an exact
 schedule; hypothetical move options still require explicit movability.
+Recipe 1.1 (Ticket 184 candidate, owner decision October 16, 2026) makes every
+Behavior still Unresolved at generation movable by default, within that day, for
+suggestions only. No movability setting is added. The Behavior's schedule is unchanged.
+The brief mentions a different time only as a suggestion backed by a planner option.
+Recipe 1.0, used by the production default, keeps explicit movability.
 No travel-time inference enters the briefing before travel release acceptance.
 The model explains valid options; voice controls
 cannot override scheduling constraints, data disclosure or read-only boundaries.

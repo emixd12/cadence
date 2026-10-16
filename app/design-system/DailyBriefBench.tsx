@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import { DAILY_BRIEF_POLICY_VERSION, type DailyBriefing, type DailyBriefSettings } from "@cadence/core/types/daily-brief";
+import type { BriefingPlanOption } from "@cadence/core/types/briefing-plan";
 import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG, parseBriefingConfig } from "@cadence/core/services/briefing-config";
 import { BRIEFING_REFERENCES } from "@cadence/core/services/briefing-references";
 import { BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "@/lib/services/briefing-fixtures";
@@ -32,11 +33,22 @@ const client: DailyBriefClient = {
   requestBrief: async () => ({ state: "already_attempted" }),
 };
 
+/** Static recipe 1.1 state: plain suggested time and a Logging tip with nested evidence. Not model output. */
+const RECIPE_V11_BENCH_BRIEFING: DailyBriefing = {
+  text: "Walk overlaps your noon meeting.", localDate: "2026-09-20", timezone: "America/New_York",
+  generatedAt: "2026-09-20T11:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: ["Suggestions only. No changes were applied."],
+  suggestions: [{ text: "Move Walk to the morning so it clears your meeting.", occurrenceRefs: [], referenceIds: [], optionId: "bench-option",
+    option: { intervals: { proposed: { startAt: "2026-09-20T11:00:00Z", endAt: "2026-09-20T11:20:00Z" } } } as BriefingPlanOption }],
+  tip: { text: "Walk marks tend to come in the evening. Logging it right after can keep the record closer to when you did it.", laneId: "realistic-timing",
+    basis: "Walk: usually marked Completed around 7:30 PM for its 12:30 PM time (30 times).", limitation: "Marks show when you logged a decision, not when you did it.", category: "logging" },
+  versions: { configuration: "bench", references: "bench", planner: "1.1", pipeline: "3.0", recipe: "daily_brief@1.1", policy: "3.0" },
+};
+
 export function DailyBriefBubbleBench() {
   return <div className="bg-background"><div className="aspect-[1423/367] w-full overflow-hidden bg-background sm:aspect-[2041/239]"><picture className="block h-full w-full"><source media="(max-width: 639px)" srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png" /><img src="/brand/cadence-timeline-horse-lines-dots-clear-background.png" width={2041} height={239} alt="" aria-hidden="true" className="block h-full w-full object-fill" /></picture></div><div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={{
     text: `Your midday walk overlaps a fixed commitment. ${"schedule".repeat(260)}`, localDate: "2026-09-20", timezone: "America/New_York",
     generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
-  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
+  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
 }
 
 export function DailyBriefSettingsBench() {
@@ -419,7 +431,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
   return <main className="mx-auto min-h-dvh max-w-7xl space-y-6 px-4 py-8 text-neutral-950" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
     <header className="space-y-2"><a href="/design-system" className="underline">Design system</a><h1 className="text-2xl">Briefing workbench</h1>
       <p><a className="underline" href="#briefing-term-config.recipe">Recipe: Daily Brief</a> · {configs[0].recipe.version} · Policy {DAILY_BRIEF_POLICY_VERSION}</p>
-      <p>Read two Daily Briefs side by side and say which works. Aim for a 45-second read: one or two planning points, and at most one observation when the evidence supports it.</p>
+      <p>Read two Daily Briefs side by side and say which works. Aim for about a one-minute read or less: one or two planning points, and at most one observation when the evidence supports it.</p>
       <p className="text-sm">Up to two provider calls at once across workbench tabs. Default budget: 100 calls per server hour. Comparisons do not use the daily briefing allowance. Saving a draft never activates it.</p>
     </header>
     <nav aria-label="Workbench views" className="flex gap-4 border-b">

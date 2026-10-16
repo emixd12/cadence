@@ -1052,6 +1052,11 @@ limitation) and "Travel" (up to four calculated lines: travel-created Behavior
 overlaps, departures, the return or an unknown-return note, then a muted "Calculated
 by Cadence … Not written by the model." line). A hypothetical option that overlaps
 travel adds "This time overlaps planned travel." No new buttons; no apply action.
+Recipe 1.1 briefs (Ticket 184 candidate) show options as "Suggested time: 7:00 AM–7:20 AM."
+Tips from logging lanes (late logging, marking times, decisions with no record,
+corrections) use the label "Logging tip"; others keep "Pattern tip". The evidence line
+sits indented under its tip behind a hairline left border. Recipe 1.1 omits the
+"A pattern, not proof of a cause." limitation; the model still never claims a cause.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):

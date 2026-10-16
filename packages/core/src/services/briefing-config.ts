@@ -2,6 +2,7 @@ import rawPresets from "../data/briefing-presets.json";
 import {
   BRIEFING_CONFIG_VERSION,
   DAILY_BRIEF_RECIPE,
+  DAILY_BRIEF_RECIPE_V1_1,
   LEGACY_BRIEFING_CONFIG_VERSION,
   type BriefingConfig,
   type BriefingContextConfig,
@@ -65,7 +66,9 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
   if (config.version !== BRIEFING_CONFIG_VERSION) fail("configuration.version is unsupported.");
   const recipe = record(config.recipe, "configuration.recipe");
   exactKeys(recipe, ["id", "version"], "configuration.recipe");
-  if (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version) {
+  // Recipe 1.1 needs the 1.3 fields; older configurations keep recipe 1.0.
+  const recipeV11 = current && recipe.id === DAILY_BRIEF_RECIPE_V1_1.id && recipe.version === DAILY_BRIEF_RECIPE_V1_1.version;
+  if (!recipeV11 && (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version)) {
     fail("configuration.recipe is incompatible with this configuration.");
   }
   const tone = oneOf(config.tone, TONES, "configuration.tone");
@@ -105,7 +108,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
 
   return {
     version: BRIEFING_CONFIG_VERSION,
-    recipe: DAILY_BRIEF_RECIPE,
+    recipe: recipeV11 ? DAILY_BRIEF_RECIPE_V1_1 : DAILY_BRIEF_RECIPE,
     tone,
     directness,
     encouragement,
