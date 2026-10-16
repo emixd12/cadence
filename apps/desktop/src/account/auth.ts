@@ -222,6 +222,7 @@ export async function clearDesktopCalendarClientState(
 ): Promise<void> {
   await Promise.all([
     call("auth_secret_remove", { name: "pending-calendar-state" }),
+    call("auth_secret_remove", { name: "pending-calendar-agent-state" }),
     call("calendar_cache_clear"),
   ]);
 }

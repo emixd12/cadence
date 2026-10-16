@@ -69,6 +69,7 @@ async function SettingsContent() {
 
       <TravelSettingsPanel />
 
+      <WebGoogleCalendarPanel timezone={settings.timezone} agent />
       <DailyBriefSettingsPanel />
 
       <CategoryPanel {...categorySettings} action={changeCategoryAction} />

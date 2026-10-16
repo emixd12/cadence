@@ -322,3 +322,19 @@ function calendarError(error: unknown): string {
   if (!(error instanceof CalendarClientError)) return "provider_unavailable";
   return error.code;
 }
+
+/** Agent Settings never read or populate the ordinary Timeline event cache. */
+export const webAgentGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
+  getConnection: () => request<CalendarConnectionView>("/api/google-calendar/connection?purpose=agent"),
+  async beginConnect() {
+    const result = await request<{ url: string }>("/api/google-calendar/connection?purpose=agent", { method: "POST", body: JSON.stringify({ target: "web" }) });
+    window.location.assign(result.url);
+  },
+  async listCalendars() { return (await request<{ calendars: CalendarListEntry[] }>("/api/google-calendar/calendars?purpose=agent")).calendars; },
+  savePreferences: (preferences) => request<CalendarConnectionView>("/api/google-calendar/calendars?purpose=agent", { method: "PUT", body: JSON.stringify(preferences) }),
+  async disconnect() {
+    const { revocationFailed, ...view } = await request<CalendarConnectionView & { revocationFailed: boolean }>("/api/google-calendar/connection?purpose=agent", { method: "DELETE" });
+    return { view, revocationFailed };
+  },
+  async refreshEvents() { throw new CalendarClientError("permission_denied"); },
+};

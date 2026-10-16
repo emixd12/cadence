@@ -7,7 +7,7 @@ vi.mock("@/lib/db/google-calendar.repo", () => ({ readCalendarConnection: mocks.
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.preference }));
 vi.mock("@/lib/services/google-calendar-provider", async importOriginal => ({ ...await importOriginal<object>(), readGoogleCalendarCalendars: mocks.calendars, readGoogleCalendarEvents: mocks.events }));
 const user = { id: "owner", identities: [{ provider: "google", identity_data: { sub: "subject" } }] } as unknown as User;
-const connection = { userId: "owner", googleSubject: "subject", status: "connected", generation: 3, selectionRevision: 4,
+const connection = { grantPurpose: "agent", oauthClientId: "agent-client", userId: "owner", googleSubject: "subject", status: "connected", generation: 3, selectionRevision: 4,
   preferences: { selectedCalendarIds: ["work"], hiddenCalendarIds: [], visible: true, showAllDay: true } } as const;
 const preference = { enabled: true, includeCalendar: true, revision: 5, calendarConnectionGeneration: 3, calendarSelectionRevision: 4 };
 const caller = { user, client: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone: "America/New_York" }, error: null }) }) }) }) } } as unknown as CalendarCaller;
@@ -16,8 +16,10 @@ beforeEach(() => {
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client"); vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "secret");
   vi.stubEnv("GOOGLE_CALENDAR_CALLBACK_URL", "https://cadence.example/auth/google-calendar/callback"); vi.stubEnv("GOOGLE_CALENDAR_LEGACY_CALLBACK_URL", "");
   vi.stubEnv("GOOGLE_CALENDAR_ENCRYPTION_KEY", Buffer.alloc(32, 8).toString("base64")); vi.stubEnv("GOOGLE_CALENDAR_KEY_ID", "v1");
+  vi.stubEnv("GOOGLE_CALENDAR_PROJECT_ID", "standard-project"); vi.stubEnv("GOOGLE_CALENDAR_AGENT_PROJECT_ID", "agent-project");
+  vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_ID", "agent-client"); vi.stubEnv("GOOGLE_CALENDAR_AGENT_CLIENT_SECRET", "agent-secret");
   mocks.connection.mockResolvedValue(connection); mocks.preference.mockResolvedValue(preference);
-  mocks.credential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig()!, "refresh", { ...connection, purpose: "refresh" }));
+  mocks.credential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig(process.env, undefined, "agent")!, "refresh", { ...connection, purpose: "refresh" }));
   mocks.calendars.mockResolvedValue([{ id: "work", name: "Work", timezone: "America/New_York", primary: true, selected: true, accessRole: "owner" }]);
   mocks.events.mockResolvedValue({ ok: true, snapshot: {} });
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));

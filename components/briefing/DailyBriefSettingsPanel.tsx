@@ -43,7 +43,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       localStorage.setItem("cadence.daily-brief.settings-revision.v1", `${updated.accountRef}:${updated.revision}`);
       window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: updated }));
     }).catch((failure: unknown) => {
-      setError(failure instanceof DailyBriefRequestError ? "Cadence could not save Daily Brief settings." : "Daily Brief settings are unavailable.");
+      setError(failure instanceof DailyBriefRequestError ? failure.code === "calendar_unavailable" ? "Connect Google Calendar for Daily Brief and select calendars before enabling Calendar here." : "Cadence could not save Daily Brief settings." : "Daily Brief settings are unavailable.");
     }).finally(() => setSaving(false));
   };
 
@@ -56,7 +56,7 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
         </label>
         <label className="flex min-h-11 items-center gap-3">
           <input type="checkbox" checked={settings.includeCalendar} disabled={!settings.enabled || saving} onChange={(event) => save({ includeCalendar: event.target.checked })} />
-          <span>Include selected Google Calendar timing</span>
+          <span>Include calendars selected in Google Calendar for Daily Brief</span>
         </label>
         {settings.optionalSources?.reminders ? <div>
           <label className="flex min-h-11 items-center gap-3">

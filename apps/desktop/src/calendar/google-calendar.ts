@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ExternalEventSnapshotV1 } from "@cadence/core/types/external-event";
-import type { CalendarConnectionView, CalendarListEntry, CalendarPreferences } from "@/lib/types/google-calendar";
+import type { CalendarConnectionView, CalendarListEntry, CalendarPreferences, CalendarPurpose } from "@/lib/types/google-calendar";
 import type { CalendarCacheRequest } from "./cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DesktopCalendarCoordinator } from "./coordinator";
@@ -8,9 +8,8 @@ import { DesktopCalendarCoordinator } from "./coordinator";
 declare global { interface ImportMetaEnv { readonly VITE_CALENDAR_BROKER_ORIGIN?: string; } }
 
 export const DESKTOP_CALENDAR_CALLBACK = "cadence://calendar/callback";
-const PENDING_KEY = "pending-calendar-state";
 const MAX_CALLBACK_AGE_MS = 5 * 60_000;
-type PendingCalendarConnection = Readonly<{ accountId: string; state: string; createdAt: number }>;
+type PendingCalendarConnection = Readonly<{ grantPurpose?: CalendarPurpose; accountId: string; state: string; createdAt: number }>;
 
 export function readDesktopCalendarBrokerOrigin(value = import.meta.env.VITE_CALENDAR_BROKER_ORIGIN): string | null {
   if (!value?.trim()) return null;
@@ -30,6 +29,7 @@ export class DesktopCalendarBroker {
     private readonly origin: string,
     private readonly accessToken: () => Promise<string | null>,
     private readonly fetcher: typeof fetch = fetch,
+    readonly grantPurpose: CalendarPurpose = "standard",
   ) {
     if (!readDesktopCalendarBrokerOrigin(origin)) throw new Error("Calendar broker origin must use HTTPS.");
     this.origin = origin.replace(/\/$/, "");
@@ -51,11 +51,13 @@ export class DesktopCalendarBroker {
     return this.request("/api/google-calendar/calendars", { method: "PUT", body: JSON.stringify(preferences) });
   }
   events(request: CalendarCacheRequest): Promise<ExternalEventSnapshotV1> {
+    if (this.grantPurpose === "agent") return Promise.reject(new CalendarBrokerError("permission_denied", 403));
     const query = new URLSearchParams({ start: request.startLocalDate, end: request.endLocalDate });
     return this.request(`/api/google-calendar/events?${query}`);
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    if (this.grantPurpose === "agent") path += `${path.includes("?") ? "&" : "?"}purpose=agent`;
     const token = await this.accessToken();
     if (!token) throw new CalendarBrokerError("unauthenticated", 401);
     let response: Response;
@@ -73,8 +75,8 @@ export class DesktopCalendarBroker {
   }
 }
 
-export function createDesktopCalendarBroker(client: SupabaseClient, origin = readDesktopCalendarBrokerOrigin()): DesktopCalendarBroker | null {
-  return origin ? new DesktopCalendarBroker(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null) : null;
+export function createDesktopCalendarBroker(client: SupabaseClient, origin = readDesktopCalendarBrokerOrigin(), grantPurpose: CalendarPurpose = "standard"): DesktopCalendarBroker | null {
+  return origin ? new DesktopCalendarBroker(origin, async () => (await client.auth.getSession()).data.session?.access_token ?? null, fetch, grantPurpose) : null;
 }
 
 export type CalendarEventRange = Readonly<{ startLocalDate: string; endLocalDate: string }>;
@@ -150,28 +152,30 @@ const native: CalendarConnectionNative = {
 export class DesktopCalendarConnection {
   constructor(private readonly broker: DesktopCalendarBroker, private readonly io: CalendarConnectionNative = native) {}
 
+  private get pendingKey() { return this.broker.grantPurpose === "agent" ? "pending-calendar-agent-state" : "pending-calendar-state"; }
+
   async begin(accountId: string): Promise<void> {
     const state = randomState();
-    const pending: PendingCalendarConnection = { accountId, state, createdAt: Date.now() };
-    await this.io.set(PENDING_KEY, JSON.stringify(pending));
+    const pending: PendingCalendarConnection = { ...(this.broker.grantPurpose === "agent" ? { grantPurpose: "agent" } : {}), accountId, state, createdAt: Date.now() };
+    await this.io.set(this.pendingKey, JSON.stringify(pending));
     try {
       const { url } = await this.broker.connect(state);
       await this.io.open(url);
-    } catch (error) { await this.io.remove(PENDING_KEY); throw error; }
+    } catch (error) { await this.io.remove(this.pendingKey); throw error; }
   }
 
   async complete(value: string, accountId: string, now = Date.now()): Promise<{ result: "connected" | "cancelled" | "error" | "same_account_required"; connection: CalendarConnectionView } | null> {
-    if (!isDesktopCalendarCallback(value)) return null;
-    const stored = await this.io.get(PENDING_KEY);
+    if (!isDesktopCalendarCallback(value) || (new URL(value).searchParams.get("purpose") ?? "standard") !== this.broker.grantPurpose) return null;
+    const stored = await this.io.get(this.pendingKey);
     if (!stored) throw new Error("This Calendar connection callback was already used or cancelled.");
-    await this.io.remove(PENDING_KEY);
+    await this.io.remove(this.pendingKey);
     let pending: PendingCalendarConnection;
     try { pending = JSON.parse(stored) as PendingCalendarConnection; } catch { throw new Error("The pending Calendar connection is invalid."); }
     const result = parseDesktopCalendarCallback(value, pending, accountId, now);
     return { result, connection: await this.broker.connection() };
   }
 
-  cancel(): Promise<void> { return this.io.remove(PENDING_KEY); }
+  cancel(): Promise<void> { return this.io.remove(this.pendingKey); }
 }
 
 export function isDesktopCalendarCallback(value: string): boolean {
@@ -184,6 +188,7 @@ export function parseDesktopCalendarCallback(value: string, pending: PendingCale
   if (!isDesktopCalendarCallback(value) || !pending || pending.accountId !== accountId
     || typeof pending.state !== "string" || !pending.state || !Number.isFinite(pending.createdAt)
     || now < pending.createdAt || now - pending.createdAt > MAX_CALLBACK_AGE_MS
+    || (url.searchParams.get("purpose") ?? "standard") !== (pending.grantPurpose ?? "standard")
     || url.searchParams.get("state") !== pending.state) throw new Error("Cadence rejected an invalid Calendar connection callback.");
   const result = url.searchParams.get("result");
   if (result !== "connected" && result !== "cancelled" && result !== "error" && result !== "same_account_required") throw new Error("Cadence rejected an invalid Calendar connection result.");
@@ -199,4 +204,15 @@ export function randomState(): string {
 
 export function openCalendarSourceUrl(url: string): Promise<void> {
   return invoke("auth_open_url", { url });
+}
+
+/** Agent Settings share consent transport, never the native Timeline cache. */
+export class DesktopAgentCalendarPanelCoordinator {
+  constructor(private readonly broker: DesktopCalendarBroker, private readonly flow: DesktopCalendarConnection) {}
+  getConnection() { return this.broker.connection(); }
+  listCalendars() { return this.broker.calendars(); }
+  savePreferences(preferences: CalendarPreferences) { return this.broker.updatePreferences(preferences); }
+  async beginConnect() { await this.flow.begin((await this.broker.connection()).accountId); }
+  async disconnect() { await this.flow.cancel(); return this.broker.disconnect(); }
+  async refreshEvents(): Promise<ExternalEventSnapshotV1> { throw new CalendarBrokerError("permission_denied", 403); }
 }

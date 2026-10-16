@@ -130,6 +130,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           source: account ? { mode: "account", accountRef: ownerRef!, preferenceRevision: preferences!.revision }
             : { mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
           capture: account ? {
+            calendarGrantPurpose: "agent",
             historyDays: [...new Set(configs.map(config => config.scope.historyDays))],
             includeCalendar: configs.some(config => config.scope.includeCalendar) && account.preferences.includeCalendar,
             calendarDisclosed: account.preferences.includeCalendar,
@@ -327,7 +328,8 @@ export async function assertSavedCaseAuthorized(caller: CalendarCaller, preferen
       (saved.capture.includeReminders && !current.includeReminderHistory) ||
       (saved.capture.includeNotes && !current.includeNotes)) throw new DailyBriefError("access_denied");
   if (saved.capture.includeCalendar) {
-    const connection = await getCalendarConnection(caller);
+    if (saved.capture.calendarGrantPurpose !== "agent") throw new DailyBriefError("review_only");
+    const connection = await getCalendarConnection(caller, "agent");
     if (connection.status !== "connected" || connection.generation !== current.calendarConnectionGeneration ||
         connection.selectionRevision !== current.calendarSelectionRevision) throw new DailyBriefError("access_denied");
     const contexts = saved.inputs?.contexts;

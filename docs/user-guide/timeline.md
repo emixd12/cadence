@@ -338,3 +338,14 @@ occurrences in the previous 90 local days. Insufficient history shows unknown.
 Running timers remain separate activity signals. Possible overlap is advisory;
 unknown, incomplete, or stale Calendar data cannot establish availability. All-day
 events do not create timed-overlap warnings.
+
+## Calendar for Daily Brief
+
+Daily Brief uses a separate Calendar connection from the Timeline.
+In Settings, open **Google Calendar for Daily Brief** and connect the Google account you use for Cadence.
+Choose calendars and save. Then enable **Include calendars selected in Google Calendar for Daily Brief** under **Daily Brief**.
+Connecting Calendar alone does not enable sharing with OpenAI.
+
+If you previously included Timeline Calendar in Daily Brief, connect this separate grant and enable Calendar again after the update.
+Disconnecting this connection stops Daily Brief Calendar reads across your devices. Your Timeline Calendar connection remains separate.
+If this connection is not configured, you can still use Timeline Calendar and behavior-only Daily Brief when those features are available.

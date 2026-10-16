@@ -504,7 +504,7 @@ export function Product() {
         accountControls={completeAccountControls}
         calendarControls={calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} />
           : <section className="py-4"><h2 className="text-xl">Google Calendar</h2><p className="mt-3 text-sm text-muted-readable">{calendar.label}</p></section>}
-        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
+        dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}

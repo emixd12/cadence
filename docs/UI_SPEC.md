@@ -1070,3 +1070,11 @@ History days scopes its samples. Existing spacing, typography, surfaces and
 responsive columns remain. The inspector shows selected summary counts, ranges,
 mark-time semantics and exclusions; deselection removes timing facts. Actual
 finish capture remains unsupported and no generation occurs when toggling.
+
+## Daily Brief Calendar connection (Ticket 187)
+
+Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.
+Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
+Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
+Explain that model sharing requires the separate Daily Brief control after connection and selection.
+The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.

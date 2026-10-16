@@ -664,3 +664,10 @@ availability. Live provider and installed native acceptance remain separate.
 The briefing workbench reuses its native checkbox/Definition-link row for
 Historical completion times. The control replaces the disabled timestamp row;
 geometry, spacing, typography, square borders and responsive columns are unchanged.
+
+## Agent Calendar settings — Ticket 187
+
+Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief grant.
+Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
+It omits Timeline display controls and explains the separate model-data disclosure.
+`CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.

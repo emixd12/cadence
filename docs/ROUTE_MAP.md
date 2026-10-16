@@ -237,3 +237,12 @@ loopback/same-origin guard and authenticated account partitions. A past Calendar
 read uses a separate development adapter with live authorization. No new hosted RPC,
 production route, migration or production tip-history write is introduced.
 `POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
+
+## Calendar purpose routing (Ticket 187)
+
+`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
+Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
+`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
+The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
+Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
+Desktop Keychain entries isolate pending standard and agent consent.
