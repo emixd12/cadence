@@ -8,6 +8,29 @@ export async function generateOpenAIDailyBrief(
   input: Parameters<DailyBriefGenerator>[0],
   options: Readonly<{ apiKey: string; fetch?: typeof fetch }>,
 ): Promise<unknown> {
+  return requestStructured(input, options, "cadence_daily_brief", DAILY_BRIEF_SCHEMA);
+}
+
+/** Ticket 188 estimate step: same transport and limits, separate strict schema. */
+export async function generateOpenAIDurationEstimates(
+  input: Parameters<DailyBriefGenerator>[0],
+  options: Readonly<{ apiKey: string; fetch?: typeof fetch }>,
+): Promise<unknown> {
+  return requestStructured(input, options, "cadence_duration_estimates", DURATION_ESTIMATE_SCHEMA);
+}
+
+const DURATION_ESTIMATE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
+  estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis"], properties: {
+    behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] },
+  } } },
+} } as const;
+
+async function requestStructured(
+  input: Parameters<DailyBriefGenerator>[0],
+  options: Readonly<{ apiKey: string; fetch?: typeof fetch }>,
+  name: string,
+  schema: unknown,
+): Promise<unknown> {
   if (!options.apiKey) throw new DailyBriefError("not_configured");
   const response = await (options.fetch ?? fetch)("https://api.openai.com/v1/responses", {
     method: "POST", redirect: "error", cache: "no-store", signal: input.signal,
@@ -16,19 +39,7 @@ export async function generateOpenAIDailyBrief(
       model: DAILY_BRIEF_MODEL, store: false, background: false, tools: [], tool_choice: "none",
       reasoning: { effort: "low" }, max_output_tokens: 2_000,
       instructions: input.instructions, input: input.facts,
-      text: { format: { type: "json_schema", name: "cadence_daily_brief", strict: true,
-        schema: { type: "object", additionalProperties: false, required: ["text", "occurrenceRefs", "suggestions", "tip"], properties: {
-          text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
-          suggestions: { type: "array", items: { type: "object", additionalProperties: false,
-            required: ["text", "occurrenceRefs", "referenceIds", "optionId"], properties: {
-              text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
-              referenceIds: { type: "array", items: { type: "string" } }, optionId: { type: ["string", "null"] },
-            } } },
-          tip: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["findingId", "text", "noteRefs"], properties: {
-            findingId: { type: "string" }, text: { type: "string" }, noteRefs: { type: "array", items: { type: "string" } },
-          } }] },
-        } },
-      } },
+      text: { format: { type: "json_schema", name, strict: true, schema } },
     }),
   });
   if (!response.ok) {
@@ -68,3 +79,15 @@ export async function generateOpenAIDailyBrief(
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
+
+const DAILY_BRIEF_SCHEMA = { type: "object", additionalProperties: false, required: ["text", "occurrenceRefs", "suggestions", "tip"], properties: {
+  text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
+  suggestions: { type: "array", items: { type: "object", additionalProperties: false,
+    required: ["text", "occurrenceRefs", "referenceIds", "optionId"], properties: {
+      text: { type: "string" }, occurrenceRefs: { type: "array", items: { type: "string" } },
+      referenceIds: { type: "array", items: { type: "string" } }, optionId: { type: ["string", "null"] },
+    } } },
+  tip: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["findingId", "text", "noteRefs"], properties: {
+    findingId: { type: "string" }, text: { type: "string" }, noteRefs: { type: "array", items: { type: "string" } },
+  } }] },
+} } as const;

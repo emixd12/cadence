@@ -176,6 +176,32 @@ it('captures requested historical timing once and excludes it independently from
   expect(mocks.finish).not.toHaveBeenCalled();
 });
 
+it('sends descriptions only after workbench confirmation and only for estimating configurations', async () => {
+  const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
+  const { BRIEFING_PRESETS } = await import('@cadence/core/services/briefing-config');
+  const candidate = structuredClone(BRIEFING_PRESETS.find((item) => item.id === 'advisor-analysis-2')!.config);
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences,
+    contexts: input.historyDays.map((days: number) => briefingFixture('missing_duration', config(days))),
+    configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current,
+    analysisSource: null, descriptions: input.descriptions ? { behavior_fixture: 'About a 25 minute walk.' } : null }));
+  const generate = vi.fn(async () => ({ ...output, tip: null }));
+  const estimate = vi.fn(async () => ({ estimates: [{ behaviorRef: 'behavior_fixture', minutes: 25, basis: 'stated' }] }));
+
+  expect((await runBriefingComparison(request({ configs: [config(), candidate], descriptionsConfirmed: false }), generate, undefined, { estimate })).status).toBe(400);
+  expect((await runBriefingComparison(request({ configs: [config(), candidate] }), generate, undefined, { estimate })).status).toBe(200);
+  expect(mocks.capture.mock.calls.at(-1)![1]).not.toHaveProperty('descriptions');
+  expect(estimate).not.toHaveBeenCalled();
+
+  const response = await runBriefingComparison(request({ configs: [config(), candidate], descriptionsConfirmed: true }), generate, undefined, { estimate });
+  const body = await response.json();
+  expect(response.status).toBe(200);
+  expect(mocks.capture.mock.calls.at(-1)![1].descriptions).toEqual({ ownerConfirmed: true });
+  expect(estimate).toHaveBeenCalledOnce();
+  expect(body.results[0].inspector).not.toHaveProperty('durationEstimates.items.0');
+  expect(body.results[1].inspector.durationEstimates).toMatchObject({ state: 'ready', estimates: [{ behaviorRef: 'behavior_fixture', minutes: 25 }] });
+  expect(body.dispatchedCalls).toBe(3);
+});
+
 
 it('refuses rerunning Calendar-derived cases captured before agent grant separation', async () => {
   const { assertSavedCaseAuthorized } = await import('@/lib/services/briefing-workbench.service');

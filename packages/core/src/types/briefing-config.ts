@@ -33,6 +33,11 @@ export type BriefingContextConfig = Readonly<{
     includeConfiguredDefault: boolean;
     preference: BriefingDurationSource;
     fallback: "other_enabled_source" | "none";
+    /**
+     * Recipe 1.1 only (Ticket 188): use a description estimate when no enabled
+     * source is known. Absent on recipe 1.0, which keeps its serialization.
+     */
+    includeDescriptionEstimate?: boolean;
   }>;
 }>;
 
@@ -143,7 +148,7 @@ export type BriefingContextControls = Readonly<{
     historicalAverage: Readonly<{ requested: boolean }>;
     selections: readonly Readonly<{
       behaviorRef: string;
-      source: BriefingDurationSource | null;
+      source: BriefingDurationSource | "description_estimate" | null;
       sampleCount: number;
       reason: "disabled" | "insufficient_samples" | "history_limit_exceeded" | "unavailable" | null;
     }>[];
