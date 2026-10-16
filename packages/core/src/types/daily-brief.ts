@@ -14,8 +14,11 @@ export type DailyBriefing = Readonly<{
   warnings: readonly string[];
   suggestions?: readonly Readonly<{ text: string; occurrenceRefs: readonly string[]; referenceIds: readonly string[]; optionId: string | null; option?: BriefingPlanOption }>[];
   references?: readonly BriefingReference[];
-  /** Optional pattern tip (Ticket 173). `basis` and `limitation` are deterministic, not model text. */
-  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null }>;
+  /**
+   * Optional pattern tip (Ticket 173). `basis`, `limitation` and `category` are
+   * deterministic, not model text. Recipe 1.1 sets `category`; absent means a pattern tip.
+   */
+  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null; category?: "pattern" | "logging" }>;
   versions?: Readonly<{ configuration: string; references: string; planner: string; pipeline: string; recipe?: string; policy?: string }>;
 }>;
 

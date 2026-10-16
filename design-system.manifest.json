@@ -478,7 +478,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench."
+      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Recipe 1.1 (Ticket 184 candidate) shows plain Suggested time lines and a Logging or Pattern tip label with evidence indented under the tip. Configuration comparison: /design-system?preview=briefing-workbench."
     },
     {
       "id": "module.daily-brief-settings-panel",

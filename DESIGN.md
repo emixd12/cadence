@@ -671,3 +671,9 @@ Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief gr
 Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
 It omits Timeline display controls and explains the separate model-data disclosure.
 `CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.
+
+## Daily Brief recipe 1.1 bubble — Ticket 184
+
+Recipe 1.1 briefs keep the bubble's sections and tokens. Option lines read "Suggested time".
+Logging-lane tips use the "Logging tip" label. The evidence line sits under the tip with a
+1px `border-line` left border and 12px indent. `DailyBriefBubbleBench` shows this state.

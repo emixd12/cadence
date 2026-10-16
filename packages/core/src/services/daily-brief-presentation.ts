@@ -8,8 +8,20 @@ export function formatBriefingTime(value: string, timezone: string): string {
   return Number.isNaN(date.getTime()) ? "recently" : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone });
 }
 
-export function briefingOptionText(option: BriefingPlanOption, timezone: string, overlapsTravel = false): string {
-  return `Hypothetical option: ${formatBriefingTime(option.intervals.proposed.startAt, timezone)}–${formatBriefingTime(option.intervals.proposed.endAt, timezone)} (${timezone}). No change applied.${overlapsTravel ? " This time overlaps planned travel." : ""}`;
+export function briefingOptionText(option: BriefingPlanOption, timezone: string, overlapsTravel = false, plain = false): string {
+  const range = `${formatBriefingTime(option.intervals.proposed.startAt, timezone)}–${formatBriefingTime(option.intervals.proposed.endAt, timezone)}`;
+  // The bubble's closing warning already says nothing was applied.
+  const lead = plain ? `Suggested time: ${range}.` : `Hypothetical option: ${range} (${timezone}). No change applied.`;
+  return `${lead}${overlapsTravel ? " This time overlaps planned travel." : ""}`;
+}
+
+/** Recipe 1.1 briefs use plain option text and tip labels. */
+export function isPlainBriefing(briefing: Pick<DailyBriefing, "versions">): boolean {
+  return briefing.versions?.recipe === "daily_brief@1.1";
+}
+
+export function briefingTipLabel(tip: NonNullable<DailyBriefing["tip"]>): string {
+  return tip.category === "logging" ? "Logging tip" : "Pattern tip";
 }
 
 export function briefingReferenceLabels(references: readonly BriefingReference[] | undefined, referenceIds: readonly string[]): string[] {
@@ -32,11 +44,11 @@ export function visibleDailyBriefText(briefing: DailyBriefing): string {
   const parts = ["Daily Brief", briefing.text];
   for (const suggestion of briefing.suggestions ?? []) {
     parts.push(suggestion.text);
-    if (suggestion.option) parts.push(briefingOptionText(suggestion.option, briefing.timezone));
+    if (suggestion.option) parts.push(briefingOptionText(suggestion.option, briefing.timezone, false, isPlainBriefing(briefing)));
     const sources = briefingReferenceLabels(briefing.references, suggestion.referenceIds);
     if (sources.length) parts.push(`Sources: ${sources.join(" ")}`);
   }
-  if (briefing.tip) parts.push("Pattern tip", briefing.tip.text, briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation));
+  if (briefing.tip) parts.push(briefingTipLabel(briefing.tip), briefing.tip.text, briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation));
   parts.push(`Generated ${formatBriefingTime(briefing.generatedAt, briefing.timezone)}.`);
   if (briefing.warnings.length) parts.push(briefing.warnings.join(" "));
   return parts.join("\n");

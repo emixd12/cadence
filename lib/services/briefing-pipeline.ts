@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import { parseBriefingConfig, DEFAULT_BRIEFING_CONFIG, scopeBriefingContext, projectBriefingContext } from "@cadence/core/services/briefing-config";
 import { selectBriefingReferences } from "@cadence/core/services/briefing-references";
-import { BRIEFING_PLAN_VERSION } from "@cadence/core/types/briefing-plan";
+import { BRIEFING_PLAN_LIMITS, BRIEFING_PLAN_VERSION } from "@cadence/core/types/briefing-plan";
+import { DAILY_BRIEF_RECIPE_V1_1 } from "@cadence/core/types/briefing-config";
 import { planBriefing } from "@cadence/core/resolvers/briefing-plan.resolver";
 import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
 import { BRIEFING_ANALYSIS_VERSION, type BriefingAnalysisResult, type BriefingAnalysisSource, type BriefingFinding } from "@cadence/core/types/briefing-analysis";
@@ -64,12 +65,25 @@ export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, no
     permittedWindows: windows,
     fixedCommitmentsComplete: (analysisInput?.cadenceComplete ?? true) && plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
     alternatives: config.alternatives, allowedSuggestionTypes: config.allowedSuggestionTypes,
-    movableOccurrences: plannerContext.cadence.occurrences.filter((item) => item.status === "unresolved" && config.planner.movableBehaviorRefs.includes(item.behaviorRef)).map((item) => ({
+    movableOccurrences: movableOccurrences(config, plannerContext).map((item) => ({
       occurrenceRef: item.ref,
       permittedWindows: windows,
     })), policy: config.planner });
   const analysis = config.analysis.lanes.length ? prepareAnalysis(config, context, analysisInput) : null;
   return { config, configurationRevision, facts, contextControls, references, plan, analysis, pipelineVersion: BRIEFING_PIPELINE_VERSION, recipe: config.recipe, policyVersion: DAILY_BRIEF_POLICY_VERSION };
+}
+
+/**
+ * Recipe 1.0 moves only explicitly listed Behaviors. Recipe 1.1 treats every
+ * Behavior still unresolved at generation as movable within today, for suggestions
+ * only; the Behavior's schedule never changes. The earliest occurrences fit the planner limit.
+ */
+export function movableOccurrences(config: BriefingConfig, context: AdvisorDayContextV1): AdvisorDayContextV1["cadence"]["occurrences"] {
+  const unresolved = context.cadence.occurrences.filter((item) => item.status === "unresolved");
+  if (config.recipe.version !== DAILY_BRIEF_RECIPE_V1_1.version) return unresolved.filter((item) => config.planner.movableBehaviorRefs.includes(item.behaviorRef));
+  return [...unresolved]
+    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.scheduledFor), Temporal.Instant.from(right.scheduledFor)) || left.ref.localeCompare(right.ref))
+    .slice(0, BRIEFING_PLAN_LIMITS.movableOccurrences);
 }
 
 function prepareAnalysis(config: BriefingConfig, context: AdvisorDayContextV1, input: BriefingAnalysisInput | undefined): PreparedBriefingAnalysis {

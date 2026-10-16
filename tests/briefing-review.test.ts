@@ -4,11 +4,13 @@ import { DEFAULT_BRIEFING_CONFIG } from "@cadence/core/services/briefing-config"
 import { BRIEFING_LANE_LABELS, countBriefingWords, diffBriefingConfigs, reviewBriefingReading } from "@cadence/core/services/briefing-review";
 
 describe("briefing reading review", () => {
-  it("counts every visible word and places it against the 80–120 working range", () => {
+  it("counts every visible word against the configured cap, with no minimum", () => {
     const words = (count: number) => Array.from({ length: count }, (_, index) => `word${index}`).join(" ");
-    expect(reviewBriefingReading({ visibleText: words(79), segments: [] })).toMatchObject({ visibleWords: 79, position: "below" });
+    expect(reviewBriefingReading({ visibleText: words(20), segments: [] })).toMatchObject({ visibleWords: 20, position: "within", target: { minWords: 0, maxWords: 120 } });
     expect(reviewBriefingReading({ visibleText: words(120), segments: [] })).toMatchObject({ visibleWords: 120, position: "within" });
     expect(reviewBriefingReading({ visibleText: words(121), segments: [] }).position).toBe("above");
+    expect(reviewBriefingReading({ visibleText: words(150), segments: [], maxWords: 150 })).toMatchObject({ position: "within", target: { maxWords: 150 } });
+    expect(reviewBriefingReading({ visibleText: words(151), segments: [], maxWords: 150 }).position).toBe("above");
     expect(countBriefingWords("  one\ntwo   three ")).toBe(3);
   });
 

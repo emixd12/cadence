@@ -13045,9 +13045,11 @@ between jobs; partial-result and draft retention; all required checks and browse
 Status: evaluation criteria and initial coverage accepted September 30, 2026.
 The criteria and versioned profile `daily-brief-balanced@1` live in
 `docs/plans/2026-09-28-briefing-owner-review.md`. Coverage is six tuning cases,
-ten reserved cases and one seven-day sequence. Evaluation iteration 1 has not run;
-quality acceptance, promotion and rollback execution remain open. Phase 5 of the
-briefing-bench plan.
+ten reserved cases and one seven-day sequence. Iteration 1 tuning pass 1 ran October 16,
+2026 (T1–T6, 12 calls). Owner feedback produced candidate 2: recipe `daily_brief@1.1`
+in preset `advisor-analysis-2`, with Behavior-description duration estimates under
+Ticket 188. Held-out cases, quality acceptance, promotion and rollback execution remain
+open. Phase 5 of the briefing-bench plan.
 Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
 174; do not duplicate or silently close their outstanding gates.
 
@@ -13215,3 +13217,38 @@ Platform impact:
 
 Use the existing interaction registry and design-system catalog for affected controls.
 This ticket supersedes the single Calendar-grant assumption in the Daily Brief plan.
+
+## Ticket 188: Estimate Behavior durations from descriptions
+
+Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
+Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate
+estimate step; add a review surface for iterating on the mechanism; update privacy
+disclosures.
+
+Goal: when a Behavior has no default duration and too few tracked sessions, estimate
+its length from its title and description so the planner can check fits and suggest times.
+
+Scope and acceptance:
+
+- Only recipe `daily_brief@1.1` configurations that select description estimates use them.
+  Descriptions reach the model only after the account discloses them in Daily Brief
+  Settings. The private workbench may use an owner-confirmed, local-only disclosure.
+- One bounded model call returns, per eligible Behavior, whole minutes (1–480) or null,
+  and whether the description states the length or the model inferred it. Cadence
+  validates refs and bounds and discards anything else. Descriptions are untrusted text.
+- Estimates are a third duration source, `description_estimate`, below the Behavior's
+  default and tracked-session averages. The deterministic planner checks fits; the model
+  never calculates intervals. Evidence labels the estimate's source.
+- The estimate call counts against the workbench budget and production limits.
+  A failed estimate call leaves durations unknown; it never fails the brief.
+- The workbench shows each description, estimate and basis. The owner can record the
+  real typical length; records stay in the local bench store for later tuning.
+- Production disclosure needs a migration, Settings control, legal/privacy text and
+  `docs/DATA_MODEL.md`. Hosted deployment follows Ticket 187's migration order.
+
+Platform impact:
+- Web: Daily Brief Settings disclosure, hosted generation and privacy content.
+- Desktop: linked desktop shares hosted generation and the Settings panel; no local
+  description transmission in account-free mode.
+- Marketing: review privacy and AI claims before release; no copy change before acceptance.
+- Future mobile: not applicable; native mobile remains deferred.

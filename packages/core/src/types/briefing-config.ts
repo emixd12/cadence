@@ -10,6 +10,12 @@ import type { BriefingAnalysisLaneId } from "./briefing-analysis";
 export const BRIEFING_CONFIG_VERSION = "1.3" as const;
 export const LEGACY_BRIEFING_CONFIG_VERSION = "1.0" as const;
 export const DAILY_BRIEF_RECIPE = Object.freeze({ id: "daily_brief", version: "1.0" } as const);
+/**
+ * Ticket 184 candidate recipe. It changes prompt and presentation rules and makes
+ * today's unresolved Behaviors movable for suggestions. Only 1.3 configurations may select it.
+ */
+export const DAILY_BRIEF_RECIPE_V1_1 = Object.freeze({ id: "daily_brief", version: "1.1" } as const);
+export type DailyBriefRecipe = typeof DAILY_BRIEF_RECIPE | typeof DAILY_BRIEF_RECIPE_V1_1;
 
 export type BriefingTone = "calm" | "warm" | "matter_of_fact";
 export type BriefingDirectness = "gentle" | "balanced" | "direct";
@@ -44,7 +50,7 @@ export type BriefingAnalysisConfig = Readonly<{
 
 export type BriefingConfigV1 = Readonly<{
   version: typeof BRIEFING_CONFIG_VERSION;
-  recipe: typeof DAILY_BRIEF_RECIPE;
+  recipe: DailyBriefRecipe;
   tone: BriefingTone;
   directness: BriefingDirectness;
   encouragement: BriefingEncouragement;
