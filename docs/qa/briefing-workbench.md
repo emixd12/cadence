@@ -955,3 +955,13 @@ Not proposed for candidate 2: duration estimates from Behavior descriptions conf
 the current duration contract (`docs/PRODUCT_SPEC.md`) and need a separate decision.
 Suggesting a refresh after a brief's times pass belongs with Ticket 185's expiry choices.
 No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 2 (candidate 2), October 16, 2026
+
+Source `600f423`. Rerun candidate on each saved T1–T6 case with `advisor-analysis-2`
+(recipe `daily_brief@1.1`, label "Candidate 2", parent = the pass 1 candidate).
+6 calls, 6 passed. Synthetic fixtures carry no descriptions, so no estimate calls ran.
+Agent observations, pending owner review: T1–T3 now give one concrete suggested time;
+T6 says "Nothing is left on today's schedule."; T4 and T5 still say "buffer"; T4 still
+mentions an opening it does not suggest; the T5 realistic-timing tip mixes scheduling
+and logging advice; T2 calls a recorded 20-minute length "approximate".
