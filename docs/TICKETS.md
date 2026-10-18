@@ -13698,8 +13698,8 @@ Platform impact:
 
 ## Ticket 221: Shared calendar-source and recorded-activity contracts
 
-Status: implemented locally on October 18, 2026; independent verification
-pending. Artifacts and enforced rules are listed in
+Status: implemented and independently approved at `41c4e2c` on October 18,
+2026. Artifacts and enforced rules are listed in
 `docs/EXTERNAL_EVENT_CONTRACT.md` under "Connector expansion contracts". The
 new AdvisorDayContext `1.1` entry points exist but no runtime caller uses them
 until Ticket 226.
@@ -13732,7 +13732,15 @@ Platform impact:
 
 ## Ticket 222: Secure lifecycle for new connectors
 
-Status: not started.
+Status: hosted lifecycle implemented locally on October 18, 2026; independent
+verification pending. Migration `20261018230000_connector_lifecycle.sql`,
+`lib/types/connectors.ts`, `lib/db/connectors.repo.ts`,
+`lib/services/connector-credentials.ts`, and `lib/services/connector-request.ts`
+own it; `docs/DATA_MODEL.md` records the schema. No provider network call,
+route, UI, or consent was added. Desktop per-source caches do not exist yet;
+Ticket 225 creates them outside `cadence.sqlite3` with the cleanup below.
+Provider revocation instructions are returned as stable keys for Ticket 225 to
+render.
 
 Goal: give each new source owner-bound sealed credentials, generations,
 disconnect, account-switch, and account-deletion cleanup.

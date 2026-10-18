@@ -1521,6 +1521,12 @@ Server environment names: `GOOGLE_CALENDAR_CLIENT_ID`,
 configured HTTPS `/auth/google-calendar/callback` path. Desktop uses only public
 `VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets.
 
+Hevy, Outlook, and iCloud credentials (Ticket 222) use a separate server-only
+keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
+`CONNECTOR_CREDENTIAL_KEY_ID`, and optional `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS`.
+Never reuse the Google key. Missing configuration reports `not_configured`. The
+same rotation rules below apply.
+
 For key rotation, retain old decrypt keys while credentials use those key IDs.
 New consent seals with the current key. Remove an old key only after every
 connection using it reconnects or disconnects. Missing keys fail closed and

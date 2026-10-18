@@ -14,12 +14,23 @@ The integrated baseline `d7af234` was independently approved.
   `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
   `docs/FUTURE_UPDATES.md`. No runtime code, migration, or provider configuration
   changed.
-- Ticket 221 is implemented locally and awaits independent verification. It
+- Ticket 221 is independently approved at `41c4e2c`. It
   adds the Outlook/iCloud calendar schema `1.1.0`, the separate Hevy
   recorded-activity contract, and AdvisorDayContext `1.1` validators and
   projections in `packages/core`. Google `1.0.0` validators, fixtures, routes,
   and runtime callers are unchanged. No provider adapter, route, migration,
-  consent, or UI changed. Tickets 222–228 are not started.
+  consent, or UI changed.
+- Ticket 222 is implemented locally and awaits independent verification. Migration
+  `20261018230000_connector_lifecycle.sql` adds one owner-bound connection per
+  provider for Hevy, Outlook, and iCloud, RLS owner metadata, sealed credentials
+  and Outlook attempts in `cadence_calendar_private`, and service-role-only
+  compare-and-swap RPCs. A separate `CONNECTOR_CREDENTIAL_*` keyring seals
+  credentials bound to owner, provider, identity digest, generation, and purpose.
+  Disconnect fences one provider; Auth deletion cascades all connector state.
+  Google storage and wire behavior are unchanged. Evidence is source, synthetic
+  fixtures, and a disposable CLI-pinned local Supabase replay. No provider call,
+  route, UI, consent, desktop cache, hosted migration, or deployment exists.
+  Tickets 223–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

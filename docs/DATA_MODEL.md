@@ -1828,6 +1828,52 @@ never enter exports, sync snapshots, or desktop backups. Hosting infrastructure
 backups may retain sealed ciphertext under the existing provider retention policy.
 Local ownership/race verification: `tests/sql/google-calendar-contract.sql`.
 
+## Hevy, Outlook, and iCloud connector lifecycle (Ticket 222)
+
+Migration `20261018230000_connector_lifecycle.sql` adds owner metadata for the
+new hosted connectors. Google Calendar tables, functions, ciphertext, and
+same-subject rules are unchanged.
+
+- `connector_connections`: primary key `(user_id, provider)`, so each Cadence
+  account has at most one connection per provider. `provider` is `hevy`,
+  `outlook_calendar`, or `icloud_calendar`. `account_digest` is a SHA-256 of the
+  provider-namespaced identity (Hevy `user/info` id, Outlook `tid` plus `sub`, or
+  the iCloud principal href); it is never an email address. `generation` advances
+  on every install, disconnect, and `reconnect_required` transition. `status` is
+  `connected`, `disconnected`, or `reconnect_required`. Authenticated owners
+  have column SELECT on everything except `attempt_hash`, and no write grants.
+- `connector_preferences`: owner SELECT and column UPDATE of
+  `selected_source_ids`, `hidden_source_ids`, `visible`, and `show_all_day`.
+  The existing `cadence_calendar_private.advance_selection()` trigger advances
+  `selection_revision` on every update. Hidden IDs must be a subset of selected
+  IDs; Hevy rows hold no selections.
+- `cadence_calendar_private.connector_credentials` holds one sealed credential
+  per owner and provider, keyed to the connection's identity and generation.
+  `cadence_calendar_private.connector_attempts` holds one five-minute Outlook
+  OAuth attempt per owner with a sealed PKCE verifier. Both enable RLS and deny
+  every client grant, including direct service-role table reads.
+
+Exact `connector_*` RPCs are executable only by `service_role`, use empty search
+paths, and take the owner from the authenticated caller or a consumed attempt.
+Install is a compare-and-swap on generation (and on the attempt hash for
+Outlook). A bound identity must disconnect before a different provider account
+connects; `reconnect_required` keeps the binding. Reads require owner, provider,
+identity digest, and generation to match a connected row. Refresh rotation
+replaces ciphertext only inside the live generation. Disconnect affects one
+provider: it advances the generation, releases the identity, and deletes that
+provider's credential, attempts, and selections. Every row cascades from its
+Auth owner, so failed Auth deletion preserves connections and successful
+deletion removes them. None of these providers documents app-side revocation.
+
+AES-256-GCM uses the separate `CONNECTOR_CREDENTIAL_*` keyring. Associated data
+binds the `cadence-connector-v1` tag, provider, purpose (`credential` or
+`verifier`), owner, identity digest, generation, and attempt hash. Credentials,
+raw provider responses, and source records stay out of exports, BehaviorLog,
+account synchronization, desktop SQLite, and user-created backups. Hosting
+infrastructure backups may retain sealed ciphertext under the existing provider
+retention policy. Local verification: `tests/sql/context-connectors-contract.sql`
+and `tests/connector-lifecycle.test.ts`.
+
 ## Advisor day-context reads (Ticket 146)
 
 Migration `20260919010100_add_advisor_cadence_snapshot.sql` adds owner-scoped
