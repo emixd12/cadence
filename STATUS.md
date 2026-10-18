@@ -4,8 +4,8 @@
 
 All three migrations deployed and read back. Production serves the approved
 Google Maps notices and routing implementation from focused release commit
-`b97ecd6` (PR #107). Owner QA reserved US$0.115 of US$0.50; Cloud Monitoring
-confirms seven geocodes and eight routes. Four two-leg samples measured server
+`f239e72` (PR #107). Owner QA reserved US$0.135 of US$0.50; Cloud Monitoring
+confirms seven geocodes and ten routes. Four two-leg samples measured server
 p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
 Web narrow-layout and Refresh travel checks pass. Production-based validation:
 2,370 tests passed, 31 skipped; required checks and both frontend builds pass.
@@ -15,7 +15,11 @@ and check duration history before reserving spend.
 Installed preview.47 passed artifact checks and preserves a private database
 backup plus preview.45 rollback. Launch waits for macOS Keychain approval of the
 existing session. Installed UI acceptance remains. The clean production deployment restores
-the existing logging configuration and records release commit `7db9e3c`. Tickets stay open until that acceptance completes. Apple distribution
+the existing logging configuration. Production deployment
+`dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` includes review fixes from `f239e72`.
+Preview.48 matches those fixes and passes artifact verification; it is not installed
+while preview.47 waits for Keychain approval. Tickets and PR #107 stay open until
+installed acceptance completes. Apple distribution
 and native position gates remain in Tickets 115/165. See
 `docs/qa/travel-release.md` for exact evidence and measurement limits.
 

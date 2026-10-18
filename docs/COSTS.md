@@ -280,3 +280,8 @@ geocodes and two routes. Calendar and saved-place records stayed unchanged.
 Four successful two-leg requests measured server p50 3.3562 s and nearest-rank
 p95 3.5984 s. Six-leg and multi-user loads were not measured. See
 `docs/qa/travel-release.md` for sample counts, dates and baseline limits.
+
+Final review-fix verification added two cached-place routes and zero geocodes.
+Total reserved spend is US$0.135; Cloud Monitoring confirms seven geocodes and ten
+routes, all 200. That final request completed in 4.159 s in the browser. Server
+sampling was off, so it is excluded from the server percentiles above.

@@ -733,3 +733,21 @@ A Calendar change during this bounded window can still consume reservations befo
 the final check rejects the trip. Eliminating that window would require another
 Calendar read and still could not make an external provider transaction atomic.
 No stale trip is delivered. The review's proposed third read was not adopted.
+
+### Final production readback
+
+Deployment `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` is READY and owns both production
+aliases. It contains review commit `f239e72c0f32a4e46721dfa4e4e5776ace6da404`.
+A final saved/Calendar-location request returned 200, two current attributed legs,
+29 Behavior source records and no provider place IDs. Browser duration: 4.159 s;
+server timing was not sampled. Total reserved QA spend: US$0.135 of US$0.50.
+Cloud Monitoring confirms seven geocodes and ten routes, all 200. Final Timeline
+status says Travel as of; the 390px viewport has no horizontal overflow. The
+bounded deployment log scan returned no error records.
+
+All required local checks and both frontend builds pass at the review commit:
+2,370 tests passed, 31 skipped. Preview.48 matches that source and passed all
+artifact checks. It remains staged under the ignored release directory; installed
+preview.47 still waits for the owner's Keychain password and Allow action.
+Tickets and PR #107 remain open for installed runtime acceptance. The final
+candidate still needs installation and runtime verification after that prompt.
