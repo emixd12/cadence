@@ -1,5 +1,26 @@
 # Implementation Status
 
+## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
+
+Owner direction (2026-10-18): Cadence ships one remote MCP server plus Claude and
+ChatGPT plugins, with full tracking-data read and scoped writes. Decisions and
+superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets:
+`docs/TICKETS.md`. Each ticket agent edits only its own line below.
+
+- Ticket 220 (MCP direction and integration brief): in progress, wave 1.
+- Ticket 221 (versioned MCP operation contract): in progress, wave 1.
+- Ticket 222 (OAuth and integration persistence): in progress, wave 1.
+- Ticket 223 (RLS-scoped request context for integrations): in progress, wave 1.
+- Ticket 224 (integration read operations): planned, wave 2.
+- Ticket 225 (integration write operations): planned, wave 2.
+- Ticket 226 (OAuth authorization server endpoints): planned, wave 2.
+- Ticket 227 (consent screen and Connected apps settings): planned, wave 3.
+- Ticket 228 (MCP endpoint): planned, wave 3.
+- Ticket 229 (developer documentation): planned, wave 4.
+- Ticket 230 (Claude and ChatGPT plugin packages): planned, wave 4.
+- Ticket 231 (privacy disclosure and directory submission packet): planned, wave 4.
+- Ticket 232 (staging deployment and live client acceptance): planned, wave 5, owner-gated.
+
 ## Tickets 213–214 completed — October 18, 2026
 
 All three migrations deployed and read back. Production serves the approved
