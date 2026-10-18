@@ -75,7 +75,7 @@ published slug is permanent. These fields follow the
 | Documentation | `https://cadence-me.com/developers` (Ticket 229) |
 | Privacy | `https://app.cadence-me.com/privacy` |
 | Terms | `https://app.cadence-me.com/terms` |
-| Support | `https://cadence-me.com/developers#support` (Ticket 229) |
+| Support | `https://github.com/emixd12/cadence/issues` (current package support URL) |
 | Support email | `privacy@identityscaffolding.com` (existing legal contact; owner confirms operational coverage) |
 | Sign-in | `https://app.cadence-me.com/login` |
 | MCP server | `https://app.cadence-me.com/mcp` |
@@ -98,6 +98,10 @@ draft above; reconcile owner-approved edits in the package before upload.
 These are intended production targets, not evidence that new routes are deployed.
 The owner must open each public URL without a session before submitting.
 Support needs a working HTTPS page; the email alone is not the ChatGPT support URL.
+GitHub issues are public: use the email for private account or privacy requests,
+and never post health data, credentials, or private records in an issue. Ticket
+229's planned `/developers#support` section can explain these two channels;
+align the package and this table if the owner chooses it as the listing target.
 Do not list an unpublished legal draft as the current policy.
 
 Reuse `apps/marketing/public/brand/cadence-logo-512.png` for the primary icon and
@@ -242,8 +246,8 @@ these draft additions make no claim of legal or directory approval.
 | Deletion / revocation? | Account deletion cascades live integration rows; Settings disconnect stops next request. No MCP deletion tool and no deletion of external-client copies. |
 
 **OpenAI eligibility is unresolved.** Its
-[plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines)
-prohibit processing protected health information (PHI). They also restrict
+[plugin guidelines, Privacy → Data collection](https://developers.openai.com/plugins/plugin-guidelines#data-collection)
+(checked October 18, 2026) prohibit processing protected health information (PHI). They also restrict
 regulated sensitive data unless necessary, adequately consented, and disclosed.
 Personal health information and regulated PHI are not interchangeable labels.
 Cadence's free-text records and unrestricted tracking reads cannot prove the
