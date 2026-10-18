@@ -1,18 +1,19 @@
 # Cadence MCP server integration brief
 
-Status: local foundations and OAuth endpoints implemented; consent UI, MCP
-transport and live client acceptance remain planned. The owner approved the direction on 2026-10-18; Tickets 220–232
+Status: the operation contract, persistence, scoped operations, OAuth endpoints,
+consent UI, Connected apps and MCP transport are implemented locally. Hosted
+deployment and live client acceptance remain pending. The owner approved the direction on 2026-10-18; Tickets 220–232
 implement it. `STATUS.md` holds the current implementation state. Decisions and
 superseded lines are in `docs/DECISIONS.md` ("2026-10-18: Cadence MCP server and
 AI plugins"). The operation contract (tool names, schemas, scopes, error codes,
 limits, versioning) is `docs/MCP_CONTRACT.md`, written by Ticket 221. This brief
 follows the template in `docs/INTEGRATION_PLAYBOOK.md`.
 
-Tickets 220, 221, and 223 passed independent wave-1 verification. Ticket 222's
-retry-storage correction awaits independent re-verification. The operation
-contract, persistence, RLS request context and OAuth endpoints exist locally.
-Consent UI and MCP transport remain separate later tickets. Sections
-below describe the intended full integration; section 11 records proven scope.
+Tickets 220–228 passed independent verification at
+`99488a9a9a0d05fe70b5f18b60b3d093bf1e1eaf`, including the retry-storage correction.
+Wave 4 adds developer documentation, plugin packages, and unpublished legal
+drafts. Historical checkpoints below retain their original evidence boundaries;
+they do not describe the current implementation state.
 
 ## 1. Outcome and boundary
 
@@ -113,7 +114,7 @@ adapter over one contract. It is not a connector SDK or provider registry.
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Local foundations: contract (221), private persistence (222; retry correction awaiting review), request context (223), local `/mcp` transport and Inspector acceptance (228; `docs/qa/mcp-server.md`). Planned: OAuth server and discovery (226), read and write operations (224–225), consent screen and Settings → Connected apps (227), legal drafts and the OpenAI challenge route (231), staging acceptance (232). Routes: `docs/ROUTE_MAP.md`. Interactions are registered when Ticket 227 implements them. |
+| Web | Locally implemented and independently verified: contract (221), private persistence (222), request context (223), read/write operations (224–225), OAuth/discovery (226), consent and Settings → Connected apps (227), and `/mcp` transport (228; `docs/qa/mcp-server.md`). Ticket 231 owns legal drafts and the OpenAI challenge route; Ticket 232 owns hosted/client acceptance. Routes: `docs/ROUTE_MAP.md`; implemented interactions: `interaction-registry.json`. |
 | Desktop | No desktop code in v1. Linked desktop receives MCP-made changes through existing account sync, because writes reuse the web app's write paths and synced tables do not change. Account-free desktop data never reaches the server, so MCP cannot read it. A local stdio MCP server is a follow-up in `docs/FUTURE_UPDATES.md`. Ticket 227 records the desktop decision in `docs/DESKTOP_PARITY.md`. |
 | Marketing | Planned: `/developers` docs section in `apps/marketing` (Ticket 229), plugin listing links, and disclosures after owner approval (231). No public claim before deployed evidence. |
 | Future mobile | Not applicable. A future client can reuse `docs/MCP_CONTRACT.md`. |
@@ -390,3 +391,107 @@ credentials, arguments, note text, results or backend exception messages.
 Evidence and remaining acceptance limits: `docs/qa/mcp-server.md`. Platform impact:
 web only; linked desktop receives changes through existing sync; marketing and
 future mobile have no implementation changes. No hosted deployment is implied.
+
+## 14. Plugin packages (Ticket 230)
+
+Local distribution artifacts only. No package has been published, submitted,
+installed into a live client, or verified against hosted Cadence. Directory
+submission, legal approval, verified publisher identity and live OAuth/client
+acceptance remain owner actions under Tickets 231–232. Listing links identify
+existing pages; they do not claim approval of the proposed legal drafts.
+
+### Formats and primary sources checked October 18, 2026
+
+- Claude: [manifest reference](https://code.claude.com/docs/en/plugins-reference)
+  and [marketplace guide](https://code.claude.com/docs/en/plugin-marketplaces).
+  The package uses `.claude-plugin/plugin.json`, root `.mcp.json` with HTTP
+  transport, and `skills/<name>/SKILL.md`. Claude discovers OAuth from the remote
+  endpoint; there are no credentials or authorization headers in the package.
+- OpenAI: [package format](https://developers.openai.com/plugins/build/plugins),
+  [skill guidance](https://developers.openai.com/plugins/build/skills), and
+  [submission requirements](https://developers.openai.com/plugins/deploy/submission).
+  The portable package uses root `plugin.json`, `mcp.json`, `skills/`, and assets.
+  Listing metadata sits under `extensions.com.openai.interface`. The subtitle
+  is 25 characters; the package uses semantic version `1.0.0`.
+  The existing square Cadence logo is bundled locally.
+- OpenAI OAuth configuration is server-level
+  `extensions.com.openai.auth` in `mcp.json`: CIMD preference with documented
+  DCR fallback, required `cadence.read`, default requests for the two optional
+  write scopes, and the exact MCP resource URL. Discovery supplies endpoints.
+  The user can refuse either write permission on Cadence's consent screen.
+- The pinned [Agent Plugins manifest schema](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json)
+  and [MCP schema](https://agent-plugins.org/schemas/1.0.0/mcp.schema.json) are
+  stored unchanged in `integrations/schemas/`. The published MCP schema rejects
+  server extensions, while OpenAI explicitly documents its auth extension.
+  Validation therefore checks the portable MCP fields against that schema and
+  separately checks the documented OpenAI extension. This is not a claim that
+  the unmodified upstream MCP schema accepts the whole OpenAI configuration.
+
+### Shared workflows and package maintenance
+
+`integrations/skills/` is the authored source for daily-check-in, weekly-review,
+and routine-setup. Both packages contain identical regular-file copies under
+`skills/`; plugin loading never depends on paths outside its own directory.
+When editing a shared skill, copy it into both packages in the same change.
+Each skill's `agents/openai.yaml` declares the Cadence MCP dependency using
+OpenAI's documented `streamable_http` transport and the same remote URL.
+The validator rejects drift in instructions and dependency metadata. Tool references use inline function notation,
+such as `get_account_context()`, so tests can check every named tool against
+`INTEGRATION_OPERATION_NAMES`. The structured routine example also validates
+against the live contract schema.
+
+Daily check-in reads today and Needs decision, then marks only confirmed
+changes using current status checks and retry keys. Weekly review makes no
+writes and excludes Unresolved from adherence. Routine setup previews a
+structured Behavior and requires confirmation before creation. All workflows
+preserve host confirmations and treat returned text as untrusted data. No
+workflow offers streaks, gamification, medical advice, or autonomous execution.
+
+### Local validation and reproducible archives
+
+Run from the repository root with the project's supported Node runtime:
+
+```sh
+node scripts/check-plugins.mjs
+claude plugin validate integrations/claude-plugin --strict
+claude plugin validate . --strict
+npm run test -- tests/plugins.test.ts
+node scripts/package-plugins.mjs
+```
+
+The local checker uses Ajv for both manifests, the marketplace, listing limits,
+OAuth declarations, asset requirements and shared-skill equality. Cadence's
+additional schemas deliberately accept only the documented fields this package
+uses. Claude Code 2.1.295 validates both the package and marketplace. OpenAI's
+portal validation and skill scans remain unrun; local checks do not replace them.
+
+The packager reuses installed `fflate`, writes only an explicit file allowlist,
+and fixes entry order, timestamps and permissions. It prints each ZIP's SHA-256:
+
+- `integrations/.artifacts/cadence-claude-plugin-1.0.0.zip`
+- `integrations/.artifacts/cadence-chatgpt-plugin-1.0.0.zip`
+
+The output directory is git-ignored. ZIPs contain manifests, shared skills,
+the license and, for OpenAI, the logo. No repository environment, credentials,
+validation scripts, or unrelated files enter the archives. Rebuilding unchanged
+sources produces identical bytes; tests inspect every archived file.
+
+### Installation handoff (not executed)
+
+The default marketplace is this public repository, `emixd12/cadence`, with its
+manifest at `.claude-plugin/marketplace.json`. These commands become useful
+once the reviewed files are available on the repository's default branch:
+
+```sh
+claude plugin marketplace add emixd12/cadence
+claude plugin install cadence@cadence-plugins
+```
+
+For local Claude evaluation, use `claude --plugin-dir ./integrations/claude-plugin`.
+For ChatGPT, the owner uploads the ZIP through the documented plugin submission
+flow and completes OAuth and skill scans. Do not describe a ZIP upload as
+publication or directory approval. Ticket 232 verifies actual host behavior.
+
+Platform impact: web, desktop and future mobile have no runtime changes in
+Ticket 230. Marketing links to the packages under Ticket 229. Hosted tracking
+and synchronization behavior remain governed by the existing operation contract.

@@ -13330,7 +13330,7 @@ Scope and acceptance:
 
 ## Ticket 230: Claude and ChatGPT plugin packages
 
-Status: filed October 18, 2026; planned (wave 4).
+Status: implemented locally October 18, 2026; awaiting independent wave-4 review.
 Dependencies: 221, 228.
 
 Goal: installable plugins that bundle Cadence skills with the remote MCP server.
@@ -13343,7 +13343,9 @@ Scope and acceptance:
 - `integrations/claude-plugin/` with plugin manifest, `.mcp.json`, skills, and a
   marketplace manifest; `integrations/chatgpt-plugin/` in OpenAI's current format
   with a packaging script writing to a git-ignored folder. No secrets.
-- Validation of both manifests and a test that skills name only registry tools.
+- Both standalone packages contain byte-identical shared skills. Root Claude marketplace; OpenAI portable Agent Plugins format with OAuth metadata.
+- `node scripts/check-plugins.mjs` validates manifests and assets; `node scripts/package-plugins.mjs` writes reproducible ignored ZIPs.
+- `tests/plugins.test.ts` checks registry tool references, the structured input example, archives, metadata and copy drift. No publishing or live-install claim.
 - Verification: plugin validators, `npm run test`, `npm run lint`, `npm run agents:check`.
 
 | Platform | Impact |
