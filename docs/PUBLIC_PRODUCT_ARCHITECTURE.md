@@ -33,8 +33,11 @@ local-first macOS desktop track. Ticket 115 defers Apple-trusted distribution.
 Tickets 116–122 implement optional Google account linking and offline-capable
 desktop synchronization. Tickets 146–148 implement the in-app read-only daily briefing
 in the existing horse bubble on web and linked desktop, using server-side model
-generation and existing sign-in. General AI chat/coaching, audio speech, billing,
-and native mobile remain future scope. Marketing claims require separate acceptance.
+generation and existing sign-in. Tickets 220–232 plan a remote MCP server with a
+Cadence-owned OAuth server, Claude and ChatGPT plugins, and a `/developers` docs
+section in `apps/marketing`; see `docs/MCP_INTEGRATION.md`. General AI
+chat/coaching, audio speech, billing, and native mobile remain future scope.
+Marketing claims require separate acceptance.
 
 ## Surface model
 
@@ -274,6 +277,11 @@ external AI service. Cadence does not send behavior data to an AI provider.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
 
+Tickets 220–232 plan disclosure to AI clients the user connects through MCP.
+That disclosure happens only at the user's direction, under the scopes the user
+approves. Privacy, Terms, and public copy change only after the owner approves
+the Ticket 231 drafts.
+
 The public legal entity is Identity Scaffolding LLC, a Wyoming limited
 liability company assumed authorized in New York. Its public address is 30 N
 Gould St Ste R, Sheridan, WY 82801. The minimum age is 18. New York law
@@ -413,6 +421,12 @@ operations docs.
 General AI coaching/chat and audio speech remain future scope. The September 20
 product-direction update scopes the in-app read-only horse briefing under
 Tickets 146–148. It does not enable autonomous execution or broader AI features.
+
+Tickets 220–232 let outside AI clients, such as Claude and ChatGPT, call scoped
+Cadence MCP tools at the user's direction. Cadence runs no AI for those calls and
+adds no server-side autonomous execution. The integration operations layer is
+one transport adapter over one contract (`docs/MCP_CONTRACT.md`), not a connector
+SDK or provider registry.
 
 ## Source documents affected
 

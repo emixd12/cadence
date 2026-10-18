@@ -47,8 +47,9 @@ Still deferred:
   preview, explicit human approval, stale-context checks, conflict handling,
   idempotency, audit history, revocation, and atomic apply behavior. Read and
   execution grants remain separate.
-- An external advisor/MCP transport. The in-app briefing needs no delegated
-  consumer, MCP server or generic connector framework.
+- An external advisor transport. The in-app briefing needs no delegated
+  consumer or generic connector framework. The remote MCP server is no longer
+  deferred; see "MCP server follow-ups" below.
 - Two-way Calendar sync and source-event editing.
 - Other connectors for Cadence Daily Brief. The day-context contract may support
   relevant authorized connectors, but only existing Google Calendar context is
@@ -105,7 +106,27 @@ Deferred agent-readability work:
   protocols.
 
 Do not add measurement providers, bot-management rules, MCP tools, or emerging
-agent-commerce protocols without a scoped ticket and privacy review.
+agent-commerce protocols without a scoped ticket and privacy review. Tickets
+220–232 are that scope for the Cadence MCP server, and Ticket 231 is its privacy
+review. MCP server cards remain deferred.
+
+## MCP server follow-ups
+
+The owner approved the remote MCP server and Claude and ChatGPT plugins on
+2026-10-18 (Tickets 220–232; `docs/DECISIONS.md`, `docs/MCP_INTEGRATION.md`).
+These related items stay deferred until separately scoped:
+
+- MCP Apps interactive widgets inside Claude or ChatGPT.
+- A REST API and webhook adapter over the same operation contract.
+- Facets sync. Tickets 220–232 add only foundations: client attribution,
+  retry-safe writes, external record links, and "changed since" reads.
+- A local stdio MCP server for account-free desktop data, which never reaches
+  the hosted server.
+- Per-event client provenance in synced status history and BehaviorLog exports.
+  In v1, hosted integration activity records which client made a write; synced
+  tables do not change.
+- MCP prompts and resources. V1 exposes tools only.
+- A production sign-in path for directory reviewers. It needs an owner decision.
 
 ## Paid shared account and speech features
 

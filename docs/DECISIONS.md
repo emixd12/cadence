@@ -580,6 +580,9 @@ Use MCP's schema/capability ideas without adding an MCP server or generic plugin
 framework. Dynamic rearranging, model invocation, and Calendar writes remain
 deferred. Ticket 137 verifies interface documentation alongside the combined release.
 
+Superseded in part on 2026-10-18: the "no MCP server" line no longer applies.
+See "2026-10-18: Cadence MCP server and AI plugins" below.
+
 ## 2026-09-18: Cadence Daily Brief selected as the first external consumer
 
 Historical decision: the September 20 correction below supersedes the external
@@ -776,3 +779,84 @@ unused so GitHub keeps redirecting old links and installed desktop update feeds.
 Historical Trust evidence stays at its original Pages URLs through the
 `emixd12.github.io` archive. The local Supabase project ID `habit-tracking-app`,
 package names, desktop identity and production domains are unchanged.
+
+## 2026-10-18: Cadence MCP server and AI plugins
+
+Decision date: 2026-10-18. Tickets: 220–232. Brief: `docs/MCP_INTEGRATION.md`.
+Operation contract: `docs/MCP_CONTRACT.md` (Ticket 221).
+
+The owner directed Cadence to ship one remote MCP server plus Claude and ChatGPT
+plugins. A connected AI client may read all of the user's tracking data and make a
+small set of scoped writes that the user confirms in that client. Wave 1 is
+Tickets 220–223.
+
+Owner decisions:
+
+1. **Sign-in model.** Cadence runs its own OAuth 2.1 authorization server. It
+   issues opaque access and refresh tokens. Tokens are bound to the MCP URL
+   (audience), stored only as hashes, and revocable at once. Refresh tokens
+   rotate, and reuse revokes the token family.
+2. **Write tools.** Occurrence status, Occurrence notes, create Behavior, edit
+   Behavior, and archive and restore a Behavior. No deletes. Categories,
+   settings, timezone, and the account stay unchanged through MCP.
+3. **Facets readiness.** Foundations only: client attribution, retry-safe
+   (idempotent) writes, external record links, and "changed since" reads. Facets
+   sync, a REST API, and webhooks are follow-ups in `docs/FUTURE_UPDATES.md`.
+4. **Developer docs.** A `/developers` section on cadence-me.com, inside
+   `apps/marketing`.
+
+Authorization rationale. Supabase's OAuth server was rejected. Its OAuth tokens
+are standard Supabase JWTs with `role: authenticated`. Existing RLS policies and
+authenticated RPCs would admit them for the same `sub`, and no documented control
+blocks the Supabase Auth user API. Revoking a grant also does not invalidate an
+issued JWT before `exp`. `docs/qa/advisor-auth-isolation.md` records these
+findings. Cadence-owned opaque tokens avoid all three problems: the token is
+useless outside `/mcp`, and every request checks the live grant. Server code then
+acts as the user through normal RLS with a short-lived internal token (Ticket
+223). The service role is limited to token-endpoint functions.
+
+Separate read and write grants. `cadence.read` is required. The write scopes
+`cadence.occurrences.write` and `cadence.behaviors.write` are separate grants. The
+user can switch either off on the consent screen. A read grant never authorizes a
+write, as `docs/INTEGRATION_PLAYBOOK.md` requires.
+
+Facets boundary. Cadence tracks Completed and Not Completed adherence for
+routines that may be created elsewhere, such as in Facets. Doses, amounts,
+refills, inventory, and medication metadata stay outside Cadence. The
+"Medication tracking" decision above is unchanged.
+
+AI scope. Outside AI clients may call scoped Cadence tools at the user's
+direction. Cadence still ships no general AI coaching or chat and no server-side
+autonomous execution. The in-app Daily Brief stays read-only (Tickets 146–148).
+
+Conflicts this decision resolves:
+
+- "2026-09-16: Day-progress UI accepted" said to use MCP's ideas "without adding
+  an MCP server." That line is superseded. The external-event contract is
+  unchanged.
+- `docs/FUTURE_UPDATES.md` deferred the MCP transport and required "a scoped
+  ticket and privacy review" before MCP tools. Tickets 220–232 are that ticket
+  set, and Ticket 231 is the privacy review. The deferral is removed.
+- `docs/qa/advisor-auth-isolation.md` says a custom OAuth or opaque-token
+  framework "would violate the ticket's stated constraint." That constraint
+  belonged to Ticket 147. This decision adopts a Cadence-owned OAuth server for
+  MCP. The QA record stays as dated history, and the advisor endpoint stays
+  fail-closed.
+- `AGENTS.md` listed "General AI coaching/chat and autonomous execution" as out
+  of scope. It now states that outside clients calling scoped tools at the user's
+  direction are in scope.
+- `AGENTS.md` says Cadence is "not a medical dosing app." That stays true. The
+  Facets foundations are adherence-only.
+- `docs/INTEGRATION_PLAYBOOK.md` allows no connector SDK or provider registry
+  before a second accepted integration. The integration operations layer is one
+  transport adapter over one contract. It is not a registry or SDK.
+
+Platform impact: web hosts the OAuth server, consent screen, Connected apps, and
+MCP endpoint. Desktop gets no code in v1; linked desktop sees MCP-made changes
+through existing sync, and account-free desktop data is unreachable. Marketing
+hosts developer docs and listing disclosures. Future mobile is not applicable;
+a later client can reuse the contract.
+
+This decision authorizes the tickets. It authorizes no hosted migration push,
+signing-key import, deployment, legal publication, or directory submission. Those
+remain owner-only actions.

@@ -220,3 +220,35 @@ event revisions before and after provider work. It makes no tracking, Calendar, 
 Daily Brief mutation. A generated brief requests day scope once through the shared
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
+
+## MCP server and OAuth authorization server (Tickets 220–232, planned)
+
+These routes are planned, not implemented. `docs/MCP_INTEGRATION.md` owns the
+boundary and `docs/MCP_CONTRACT.md` (Ticket 221) owns the operation contract.
+The planned MCP URL is `https://app.cadence-me.com/mcp`, and the planned OAuth
+issuer is `https://app.cadence-me.com` (assumptions pending owner confirmation).
+All routes honor one server-only kill switch (Ticket 226). Tokens never appear in
+URLs or logs. Protocol responses use `Cache-Control: no-store`.
+
+| Route | Methods | Owner ticket | Purpose |
+|---|---|---:|---|
+| `/mcp` | POST (Streamable HTTP) | 228 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only. |
+| `/.well-known/oauth-protected-resource` | GET | 226 | RFC 9728 protected-resource metadata. |
+| `/.well-known/oauth-protected-resource/mcp` | GET | 226 | RFC 9728 metadata for the `/mcp` resource; `resource` equals the exact MCP URL. |
+| `/.well-known/oauth-authorization-server` | GET | 226 | RFC 8414 authorization-server metadata (PKCE S256, public clients, CIMD, `iss` in responses). |
+| `/oauth/authorize` | GET, POST | 226, 227 | Validates the authorization request, then shows the signed-in consent screen (Ticket 227). Read is required; each write scope can be switched off. |
+| `/oauth/token` | POST | 226 | Authorization-code exchange with PKCE and refresh-token rotation with reuse detection. |
+| `/oauth/register` | POST | 226 | RFC 7591 dynamic client registration for public clients; rate-limited. |
+| `/oauth/revoke` | POST | 226 | RFC 7009 token revocation. |
+| `/.well-known/openai-apps-challenge` | GET | 231 | Plain-text OpenAI domain-verification token from a server-only variable; 404 when unset. |
+| `/settings` → Connected apps | page section | 227 | Lists grants with permissions, connected date, last use, and recent activity; Disconnect revokes the grant and its tokens at once. Adds no navigation route. |
+
+Planned marketing routes (Ticket 229): a `/developers` section in `apps/marketing`
+with an overview, quickstarts, concepts, authentication and permissions, one
+reference page per tool (`/developers/tools/*`), errors, limits, idempotency and
+concurrency, data and privacy, building integrations, plugins, versioning, and
+troubleshooting. Each page gets a Markdown mirror and route-manifest entry.
+
+`proxy.ts` must add `/oauth/:path*` for cookie refresh on the consent screen
+(Ticket 227). `/mcp`, `/oauth/token`, `/oauth/register`, `/oauth/revoke`, and the
+`.well-known` routes use no cookie session.

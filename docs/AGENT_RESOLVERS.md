@@ -494,3 +494,30 @@ Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
 
 No component, API route, provider adapter or prompt computes rates, fits or travel
 intervals. These tickets add no connector registry, new connector or agent runtime.
+
+## Integration operations ownership (Tickets 220–232)
+
+Planned, not implemented. This section registers one new allowed-caller category,
+**integration operations**, for the remote MCP server (`docs/MCP_INTEGRATION.md`).
+
+| Layer | Planned location | May call | Must not |
+|---|---|---|---|
+| Operation contract | `packages/core/src/integration/` (Ticket 221) | Nothing outside core | Read the network, database, environment, or clock |
+| Request context | `lib/integrations/request-context.ts` (Ticket 223) | Supabase client factory with a short-lived internal user token | Use the service role for user data |
+| Integration operations | `lib/integrations/operations/read/` and `write/` (Tickets 224–225) | Existing services and core services through injected-client functions | Query tables directly, duplicate resolver rules, or call another transport |
+| MCP transport | `app/mcp/route.ts`, `lib/mcp/` (Ticket 228) | Token verification, request context, integration operations | Call services, repositories, or resolvers directly |
+| OAuth endpoints | `/oauth/*`, `.well-known` (Ticket 226) | OAuth repositories and token-endpoint functions | Read or write tracking data |
+
+Integration operations are allowed callers of the same services that pages,
+server actions, and API routes call: timeline, analytics, Behavior, Occurrence
+status, Occurrence note, and occurrence-freshness services. They receive
+`now` and the timezone through the request context. They reuse
+`applyOccurrenceStatusTransition`, `updateOccurrenceNote`, and core
+`createBehavior`, `updateBehavior`, and `setBehaviorActive`, so MCP writes
+produce the same rows and status history as the web app.
+
+Forbidden bypasses: no recurrence, Needs decision, adherence, or status logic in
+`lib/mcp/` or `lib/integrations/`; no service-role reads of user data; no handler
+that skips the scope check. This is one transport adapter over one contract, not a
+connector SDK or provider registry. `npm run resolvers:check` still applies to every
+new module. Required tests are named in Tickets 221–228 in `docs/TICKETS.md`.
