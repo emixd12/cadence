@@ -86,6 +86,9 @@ describe("Graph request boundary", () => {
     expect(url.searchParams.get("endDateTime")).toBe("2026-11-05T00:00:00-05:00");
     expect(url.searchParams.get("$top")).toBe("1000");
     expect(url.searchParams.get("$select")).not.toMatch(/body|attendees|organizer|location|onlineMeeting/);
+    // Graph documents that lastModifiedDateTime does not support $select on calendarView.
+    expect(url.searchParams.get("$select")!.split(",")).not.toContain("lastModifiedDateTime");
+    expect(url.searchParams.get("$select")!.split(",")).toContain("changeKey");
   });
 
   it("sends only GET requests with immutable IDs and no outlook.timezone header", async () => {
@@ -295,11 +298,50 @@ describe("pagination and failures", () => {
     const calendars = [CAL, { id: "calendar-2", name: "Work", isDefault: false }, { id: "calendar-3", name: "Team", isDefault: false }];
     const h = harness([page([]), json({}, 503), page([]), page([])], { stepMs: 9_000 });
     const result = await readOutlookCalendarEvents(input(h, { calendars, range: { ...RANGE, selectedCalendarIds: calendars.map((calendar) => calendar.id) } }));
-    // 9 s + 9 s (503) + backoff, then a retry at 18.25 s finishes at 27.25 s; calendar-3 never starts.
+    // 9 s + 9 s (503) + backoff; the retry starts at 18.25 s and completes at 27.25 s,
+    // after the deadline, so its page is discarded and calendar-3 never starts.
     expect(h.calls).toHaveLength(3);
     if (result.ok) throw new Error("expected timeout");
-    expect(result.error).toMatchObject({ code: "timeout", calendarId: "calendar-3" });
-    expect(result.partialSnapshot.coverage.map((item) => [item.calendarId, item.paginationComplete])).toEqual([["calendar-1", true], ["calendar-2", true], ["calendar-3", false]]);
+    expect(result.error).toMatchObject({ code: "timeout", calendarId: "calendar-2" });
+    expect(result.partialSnapshot.coverage.map((item) => [item.calendarId, item.paginationComplete])).toEqual([["calendar-1", true], ["calendar-2", false]]);
+    expect(result.partialSnapshot.completeness).toBe("incomplete");
+  });
+
+  it("ends an unresponsive fetch, a stalled body, and a late response as timeout", async () => {
+    const started = Date.now();
+    const unresponsive = await readOutlookCalendarEvents({ ...input(harness([])), now: Date.now, deadlineAt: Date.now() + 50,
+      fetch: () => new Promise<Response>(() => undefined) });
+    expect(unresponsive.ok ? null : unresponsive.error.code).toBe("timeout");
+    const stalled = await readOutlookCalendarEvents({ ...input(harness([])), now: Date.now, deadlineAt: Date.now() + 50,
+      fetch: async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("{\"value\":[")); } }), { status: 200 }) });
+    expect(stalled.ok ? null : stalled.error.code).toBe("timeout");
+    expect(Date.now() - started).toBeLessThan(2_000);
+    // The response arrives after the absolute deadline (the clock moves 26 s during the call): discarded, never complete.
+    const late = harness([page([timed("a", "2026-11-01T14:00:00", "2026-11-01T15:00:00")])], { stepMs: 26_000 });
+    const lateResult = await readOutlookCalendarEvents(input(late));
+    if (lateResult.ok) throw new Error("late page must not be accepted");
+    expect(lateResult.error.code).toBe("timeout");
+    expect(lateResult.partialSnapshot.events).toEqual([]);
+  });
+
+  it("matches raw and encoded forms of the same calendar ID in next links, and nothing else", async () => {
+    const calendar = { id: "AAMkAD=", name: "Personal", isDefault: true };
+    const range = { ...RANGE, selectedCalendarIds: [calendar.id] };
+    expect(outlookCalendarViewUrl(calendar.id, range).pathname).toBe("/v1.0/me/calendars/AAMkAD%3D/calendarView");
+    for (const link of ["https://graph.microsoft.com/v1.0/me/calendars/AAMkAD=/calendarView?$skip=10", "https://graph.microsoft.com/v1.0/me/calendars/AAMkAD%3D/calendarview?$skip=10"]) {
+      const h = harness([page([], link), page([])]);
+      const result = await readOutlookCalendarEvents(input(h, { calendars: [calendar], range }));
+      expect(result.ok).toBe(true);
+      expect(h.calls).toHaveLength(2);
+    }
+    for (const link of ["https://graph.microsoft.com/v1.0/me/calendars/AAMkAD/calendarView?$skip=10", "https://graph.microsoft.com/v1.0/me/calendars/aamkad%3D/calendarView?$skip=10",
+      "https://graph.microsoft.com/v1.0/me/calendars/%2e%2e/calendarView", "https://graph.microsoft.com/v1.0/me/calendars/%E0%A4%A/calendarView",
+      "https://evil.example/v1.0/me/calendars/AAMkAD=/calendarView"]) {
+      const h = harness([page([], link)]);
+      const result = await readOutlookCalendarEvents(input(h, { calendars: [calendar], range }));
+      expect(result.ok ? null : result.error.code).toBe("malformed_provider_response");
+      expect(h.calls).toHaveLength(1);
+    }
   });
 
   it("times out an exhausted deadline before any request and on a network failure at the deadline", async () => {

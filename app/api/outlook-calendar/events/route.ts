@@ -5,5 +5,6 @@ import { connectorPreflight, runConnectorRequest } from "@/lib/services/connecto
 export const OPTIONS = connectorPreflight;
 export function GET(request: Request) {
   const url = new URL(request.url);
-  return runConnectorRequest(request, (caller) => getOutlookCalendarEvents(caller, url.searchParams.get("start") ?? "", url.searchParams.get("end") ?? ""));
+  return runConnectorRequest(request, (caller) => getOutlookCalendarEvents(caller, url.searchParams.get("start") ?? "", url.searchParams.get("end") ?? "",
+    { signal: request.signal }));
 }

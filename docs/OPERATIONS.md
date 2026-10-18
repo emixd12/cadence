@@ -1530,10 +1530,22 @@ same rotation rules below apply.
 Outlook Calendar (Ticket 224) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
 Entra application GUID), `OUTLOOK_CALENDAR_CLIENT_SECRET`, and
 `OUTLOOK_CALENDAR_CALLBACK_URL` (exact HTTPS `/auth/outlook-calendar/callback`,
-on the same host as the web session). Register one multitenant app that also
-accepts personal accounts. Configure only the delegated `Calendars.ReadBasic`
-permission; the token check refuses any other Graph permission, including
-`User.Read`. Status reports `not_configured` until both these values and the
+on the same host as the web session).
+
+App registration steps (owner-run, not authorized in local work):
+
+1. Register one multitenant app that also accepts personal Microsoft accounts
+   (authority `common`), with the exact web redirect URI above.
+2. Under API permissions, keep only the delegated Microsoft Graph
+   `Calendars.ReadBasic` permission. Remove the default `User.Read` that the portal
+   adds to new registrations. Add no application permissions and no
+   `Calendars.Read`, `profile`, or `email`.
+3. Create a client secret and store it only in the server environment.
+
+The token check refuses any present Graph permission other than
+`Calendars.ReadBasic`, so a leftover `User.Read` makes every connect fail as
+`consent_denied`. An omitted `scope` in the token response is accepted because
+Microsoft documents that it then covers the requested scopes. Status reports `not_configured` until both these values and the
 connector keyring are present. Disconnect deletes Cadence's sealed refresh token
 only. Microsoft documents no app-side revocation for these scopes, so Settings
 must send users to their Microsoft account or My Apps permissions page. Publisher

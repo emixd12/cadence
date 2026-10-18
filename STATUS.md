@@ -42,6 +42,12 @@ The integrated baseline `d7af234` was independently approved.
   is source and synthetic fixtures only. No app registration, live personal or
   work/school account, publisher verification, UI, desktop client, or Daily
   Brief consent exists.
+  Review corrections (verifier findings on `56d8ddf`): every Graph and token
+  fetch plus body read runs inside `runProviderCallWithTimeout`, so unresponsive,
+  stalled, and late responses end as `timeout`; an omitted token `scope` is
+  accepted per Microsoft's documentation; next links compare the decoded calendar
+  ID; `lastModifiedDateTime` is no longer requested through `$select`; read routes
+  forward `request.signal`; app registration must carry only `Calendars.ReadBasic`.
 - Ticket 223 (Hevy) is implemented in source (`abf9938`) and awaits independent
   verification. Key intake is verified by `user/info` (non-Pro →
   `permission_denied`; a refused key → `reconnect_required`). A fixed GET

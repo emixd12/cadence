@@ -187,6 +187,8 @@ async function withOutlookAccess<T>(caller: ConnectorCaller, deadlineAt: number,
       }
       throw error;
     }
+    // A refresh that completes after the absolute deadline is discarded before use or rotation.
+    if (clock() >= deadlineAt) throw new ConnectorError("timeout");
     if (tokens.refreshToken && tokens.refreshToken !== credential.refreshToken) {
       await rotateConnectorCredential(connection, { provider: PROVIDER, refreshToken: tokens.refreshToken });
     }

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "@/lib/services/provider-call-timeout";
 import { ConnectorError } from "@/lib/types/connectors";
 
 // Ticket 224 Microsoft identity platform client for Outlook Calendar.
@@ -87,9 +88,10 @@ export function outlookConsentFailure(error: string | null, description: string 
 export type OutlookIdentity = Readonly<{ tenantId: string; subject: string }>;
 export type OutlookTokens = Readonly<{ accessToken: string; refreshToken: string | null; identity: OutlookIdentity | null }>;
 
-async function readBoundedText(response: Response, limit: number): Promise<string> {
+async function readBoundedText(response: Response, limit: number, signal: AbortSignal): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return "";
+  signal.addEventListener("abort", () => { void reader.cancel().catch(() => undefined); }, { once: true });
   const chunks: Uint8Array[] = []; let bytes = 0;
   for (;;) {
     const { done, value } = await reader.read();
@@ -101,7 +103,13 @@ async function readBoundedText(response: Response, limit: number): Promise<strin
   return Buffer.concat(chunks).toString("utf8");
 }
 
+/**
+ * Microsoft's v2 token response `scope` is optional; when omitted, the token is
+ * for the scopes requested on the initial leg (Cadence requests only
+ * Calendars.ReadBasic). A present value is checked strictly.
+ */
 function grantedScopesOk(value: unknown): boolean {
+  if (value === undefined) return true;
   if (typeof value !== "string" || value.length > 4096) return false;
   const scopes = value.split(" ").filter(Boolean).map((scope) => scope.toLowerCase().replace(/^https:\/\/graph\.microsoft\.com\//, ""));
   // Exactly one Graph permission, Calendars.ReadBasic. Broader grants (for example
@@ -136,23 +144,33 @@ export function validateOutlookIdToken(idToken: unknown, config: OutlookOAuthCon
   return { tenantId: issuer[1]!, subject: claims.sub };
 }
 
+const TOKEN_ATTEMPT_MS = 10_000;
 async function tokenRequest(config: OutlookOAuthConfig, fields: Record<string, string>, options: { fetch?: OutlookFetch; signal?: AbortSignal }): Promise<Record<string, unknown>> {
-  let response: Response;
+  // One bounded attempt: the fetch and the bounded body read settle together on the
+  // caller's deadline signal (or 10 s), even if the fetch or stream ignores abort.
+  const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(TOKEN_ATTEMPT_MS)]) : AbortSignal.timeout(TOKEN_ATTEMPT_MS);
+  let status: number; let ok: boolean; let text: string;
   try {
-    response = await (options.fetch ?? fetch)(`${AUTHORITY}/token`, { method: "POST", cache: "no-store", redirect: "error",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-      signal: options.signal ?? AbortSignal.timeout(10_000),
-      body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, ...fields }) });
-  } catch { throw new ConnectorError(options.signal?.aborted ? "timeout" : "provider_unavailable"); }
+    ({ status, ok, text } = await runProviderCallWithTimeout(async (attemptSignal) => {
+      const response = await (options.fetch ?? fetch)(`${AUTHORITY}/token`, { method: "POST", cache: "no-store", redirect: "error",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, signal: attemptSignal,
+        body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, ...fields }) });
+      return { status: response.status, ok: response.ok, text: await readBoundedText(response, TOKEN_BODY_LIMIT, attemptSignal) };
+    }, { timeoutMs: TOKEN_ATTEMPT_MS, signal }));
+  } catch (error) {
+    if (error instanceof ProviderCallTimeoutError || signal.aborted) throw new ConnectorError("timeout");
+    if (error instanceof ConnectorError) throw error;
+    throw new ConnectorError("provider_unavailable");
+  }
   let body: unknown;
-  try { body = JSON.parse(await readBoundedText(response, TOKEN_BODY_LIMIT)); }
-  catch { throw new ConnectorError(response.status === 429 ? "rate_limited" : response.status >= 500 ? "provider_unavailable" : "malformed_provider_response"); }
+  try { body = JSON.parse(text); }
+  catch { throw new ConnectorError(status === 429 ? "rate_limited" : status >= 500 ? "provider_unavailable" : "malformed_provider_response"); }
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new ConnectorError("malformed_provider_response");
   const token = body as Record<string, unknown>;
-  if (!response.ok) {
+  if (!ok) {
     // Revoked, expired, or consent-withdrawn grants need a new consent.
     if (token.error === "invalid_grant" || token.error === "interaction_required" || token.error === "consent_required") throw new ConnectorError("reconnect_required");
-    if (response.status === 429) throw new ConnectorError("rate_limited");
+    if (status === 429) throw new ConnectorError("rate_limited");
     throw new ConnectorError("provider_unavailable");
   }
   if (typeof token.access_token !== "string" || !token.access_token || token.access_token.length > 16_384 ||

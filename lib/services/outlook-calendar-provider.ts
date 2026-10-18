@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { sanitizeGoogleCalendarText } from "@/lib/services/google-calendar-provider";
+import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "@/lib/services/provider-call-timeout";
 import { OUTLOOK_WINDOWS_ZONES } from "@/lib/services/outlook-calendar-windows-zones";
 import {
   externalEventNormalizedId,
@@ -42,7 +43,9 @@ export const OUTLOOK_READ_DEADLINE_MS = 25_000;
 const MAX_EVENT_PAGE_BYTES = 5_000_000;
 const MAX_CALENDAR_PAGE_BYTES = 1_000_000;
 const MAX_TEXT = 1_024;
-const EVENT_SELECT = "id,subject,isAllDay,isCancelled,showAs,type,seriesMasterId,originalStart,originalStartTimeZone,responseStatus,changeKey,lastModifiedDateTime,webLink,start,end";
+// Graph documents that lastModifiedDateTime does not support $select on calendarView,
+// so the revision normally comes from changeKey; a returned lastModifiedDateTime is still used.
+const EVENT_SELECT = "id,subject,isAllDay,isCancelled,showAs,type,seriesMasterId,originalStart,originalStartTimeZone,responseStatus,changeKey,webLink,start,end";
 /** Outlook on the web hosts that Graph returns in `webLink`. Any other host is dropped. */
 const WEB_LINK_HOSTS = new Set(["outlook.office365.com", "outlook.office.com", "outlook.live.com"]);
 const UNSUPPORTED_DETAILS = ["description", "location", "organizer", "attendees", "conference", "attachments"] as const;
@@ -104,11 +107,23 @@ export function outlookGraphUrlAllowed(value: string, kind: "calendars" | "calen
   return middle && !middle.includes("/") ? url : null;
 }
 
-async function readBoundedJson(response: Response, limit: number): Promise<unknown> {
+/**
+ * The decoded calendar ID in an allowed calendarView URL. Graph may return the
+ * segment raw (`AAMk=`) or encoded (`AAMk%3D`); both decode to the same ID.
+ * Malformed escapes return null.
+ */
+export function outlookCalendarIdFromViewUrl(url: URL): string | null {
+  const raw = url.pathname.slice(`${CALENDARS_PATH}/`.length, -"/calendarView".length);
+  try { return decodeURIComponent(raw); } catch { return null; }
+}
+
+async function readBoundedJson(response: Response, limit: number, signal: AbortSignal): Promise<unknown> {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > limit) throw new ItemError("too_large");
   const reader = response.body?.getReader();
   if (!reader) throw new ItemError("empty");
+  // Release a stalled stream once the attempt ends.
+  signal.addEventListener("abort", () => { void reader.cancel().catch(() => undefined); }, { once: true });
   const chunks: Uint8Array[] = []; let bytes = 0;
   for (;;) {
     const { done, value } = await reader.read();
@@ -150,37 +165,43 @@ async function graphGet(url: URL, options: OutlookGraphRequestOptions, calendarI
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? wait;
   const random = options.random ?? Math.random;
+  const timeout = (retryAfterSeconds: number | null = null) =>
+    new OutlookCalendarProviderError(failure("timeout", calendarId, true, retryAfterSeconds, "Outlook Calendar read deadline ended."));
   let last: ExternalEventFailure = failure("timeout", calendarId, true, null, "Outlook Calendar read deadline ended.");
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     const remaining = options.deadlineAt - now();
-    if (remaining <= 0 || options.signal?.aborted) throw new OutlookCalendarProviderError(failure("timeout", calendarId, true, last.retryAfterSeconds, "Outlook Calendar read deadline ended."));
-    const signal = AbortSignal.any([AbortSignal.timeout(Math.min(ATTEMPT_TIMEOUT_MS, remaining)), ...(options.signal ? [options.signal] : [])]);
-    let response: Response | null = null;
+    if (remaining <= 0 || options.signal?.aborted) throw timeout(last.retryAfterSeconds);
+    const attemptMs = Math.min(ATTEMPT_TIMEOUT_MS, remaining);
+    const signal = AbortSignal.any([AbortSignal.timeout(attemptMs), ...(options.signal ? [options.signal] : [])]);
+    let outcome: Readonly<{ ok: true; body: unknown }> | Readonly<{ ok: false; status: number; retryAfter: number | null }> | null = null;
     try {
-      response = await (options.fetch ?? fetch)(url, { method: "GET", cache: "no-store", redirect: "error", signal,
-        headers: { Authorization: `Bearer ${options.accessToken}`, Accept: "application/json", ...(prefer ? { Prefer: "IdType=\"ImmutableId\"" } : {}) } });
-    } catch {
-      last = failure(options.deadlineAt - now() <= 0 || signal.aborted ? "timeout" : "provider_unavailable", calendarId, true, null,
-        "Outlook Calendar request failed.");
+      // The fetch and the bounded body read share one attempt budget. The wrapper
+      // settles on abort even if a fetch implementation or body stream ignores it.
+      outcome = await runProviderCallWithTimeout(async (attemptSignal) => {
+        const response = await (options.fetch ?? fetch)(url, { method: "GET", cache: "no-store", redirect: "error", signal: attemptSignal,
+          headers: { Authorization: `Bearer ${options.accessToken}`, Accept: "application/json", ...(prefer ? { Prefer: "IdType=\"ImmutableId\"" } : {}) } });
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => undefined);
+          return { ok: false as const, status: response.status, retryAfter: retryAfter(response.headers.get("retry-after")) };
+        }
+        return { ok: true as const, body: await readBoundedJson(response, limit, attemptSignal) };
+      }, { timeoutMs: attemptMs, signal });
+    } catch (error) {
+      if (error instanceof ItemError && error.message === "too_large") throw new OutlookCalendarProviderError(failure("incomplete_pagination", calendarId, false, null, "Outlook Calendar response exceeded the size limit."));
+      if (error instanceof ProviderCallTimeoutError || signal.aborted) last = failure("timeout", calendarId, true, null, "Outlook Calendar request timed out.");
+      else if (error instanceof ItemError || error instanceof SyntaxError) throw new OutlookCalendarProviderError(failure("malformed_provider_response", calendarId, false, null, "Outlook Calendar returned invalid JSON."));
+      else last = failure("provider_unavailable", calendarId, true, null, "Outlook Calendar request failed.");
     }
-    if (response?.ok) {
-      try { return await readBoundedJson(response, limit); }
-      catch (error) {
-        if (error instanceof ItemError && error.message === "too_large") throw new OutlookCalendarProviderError(failure("incomplete_pagination", calendarId, false, null, "Outlook Calendar response exceeded the size limit."));
-        if (signal.aborted) throw new OutlookCalendarProviderError(failure("timeout", calendarId, true, null, "Outlook Calendar read deadline ended."));
-        throw new OutlookCalendarProviderError(failure("malformed_provider_response", calendarId, false, null, "Outlook Calendar returned invalid JSON."));
-      }
-    }
-    if (response) {
-      await response.body?.cancel().catch(() => undefined);
-      last = httpFailure(response.status, calendarId, retryAfter(response.headers.get("retry-after")));
-    }
+    // A response that completes after the absolute deadline is discarded.
+    if (now() >= options.deadlineAt) throw timeout(outcome && !outcome.ok ? outcome.retryAfter : null);
+    if (outcome?.ok) return outcome.body;
+    if (outcome) last = httpFailure(outcome.status, calendarId, outcome.retryAfter);
     if (!last.retryable || attempt === MAX_RETRIES) break;
     const delay = last.retryAfterSeconds !== null ? last.retryAfterSeconds * 1_000 + 1_000
       : Math.min(5_000, 250 * (2 ** attempt) + Math.floor(random() * 100));
     if (now() + delay >= options.deadlineAt) break;
     try { await sleep(last.retryAfterSeconds !== null ? last.retryAfterSeconds * 1_000 : delay, options.signal); }
-    catch { throw new OutlookCalendarProviderError(failure("timeout", calendarId, true, null, "Outlook Calendar read deadline ended.")); }
+    catch { throw timeout(); }
   }
   throw new OutlookCalendarProviderError(last);
 }
@@ -488,7 +509,7 @@ export async function readOutlookCalendarEvents(input: OutlookCalendarReadInput)
         if (!link) break;
         // Validate the provider-supplied destination before the bearer token is attached.
         url = outlookGraphUrlAllowed(link, "calendarView");
-        if (!url || url.pathname.toLowerCase() !== outlookCalendarViewUrl(calendar.id, input.range).pathname.toLowerCase()) {
+        if (!url || outlookCalendarIdFromViewUrl(url) !== calendar.id) {
           throw new OutlookCalendarProviderError(failure("malformed_provider_response", calendar.id, false, null, "Outlook Calendar returned a next page outside this calendar."));
         }
       }

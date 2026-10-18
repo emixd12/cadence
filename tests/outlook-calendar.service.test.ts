@@ -394,6 +394,23 @@ describe("reads, rotation, and fences", () => {
     expect(ms.calls.slice(before).map((call) => call.url.pathname)).toEqual(["/common/oauth2/v2.0/token", "/v1.0/me/calendars"]);
   });
 
+  it("ends an unresponsive refresh at the deadline and discards a refresh that completes late", async () => {
+    await connectAndSelect();
+    const original = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input, init) => new URL(input.toString()).hostname === "login.microsoftonline.com" ? new Promise<Response>(() => undefined) : original(input, init));
+    const started = Date.now();
+    await expect(getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", { ...options, deadlineMs: 50 })).rejects.toThrow("timeout");
+    expect(Date.now() - started).toBeLessThan(2_000);
+    fetcher.mockImplementation(original);
+    // The refresh returns a rotated token, but only after the 25 s deadline: no Graph call and no rotation.
+    ms.rotateTo = "refresh-late"; ms.stepMs = 26_000;
+    const before = ms.calls.length;
+    const sealed = db.credentials.get(key(OWNER, "outlook_calendar"))!.sealed_credential;
+    await expect(getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", options)).rejects.toThrow("timeout");
+    expect(ms.calls.slice(before).map((call) => call.url.hostname)).toEqual(["login.microsoftonline.com"]);
+    expect(db.credentials.get(key(OWNER, "outlook_calendar"))!.sealed_credential).toBe(sealed);
+  });
+
   it("saves only readable selections with an exact body", async () => {
     await connectWeb();
     const bad = [

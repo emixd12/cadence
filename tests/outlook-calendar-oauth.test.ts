@@ -141,10 +141,30 @@ describe("token endpoint", () => {
     ["Calendars.ReadBasic Calendars.Read openid", "consent_denied"],
     ["Calendars.ReadBasic User.Read openid", "consent_denied"],
     ["openid offline_access", "consent_denied"],
-    [undefined, "consent_denied"],
+    [null, "consent_denied"],
+    ["", "consent_denied"],
   ])("refuses granted scopes %s", async (scope, code) => {
     const fetch = vi.fn(async () => tokenResponse({ ...good, scope, id_token: idToken(claims(verifier)) }));
     await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch, nowSeconds: NOW })).rejects.toThrow(code);
+  });
+
+  it("treats an omitted scope as the requested scopes on connect and refresh (Microsoft v2 auth-code flow)", async () => {
+    const connect = vi.fn(async () => tokenResponse({ ...good, scope: undefined, id_token: idToken(claims(verifier)) }));
+    await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch: connect, nowSeconds: NOW }))
+      .resolves.toMatchObject({ refreshToken: "synthetic-refresh-1", identity: { subject: "pairwise-subject-1" } });
+    const refresh = vi.fn(async () => tokenResponse({ access_token: "synthetic-access", token_type: "Bearer" }));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: refresh })).resolves.toMatchObject({ accessToken: "synthetic-access", refreshToken: null });
+    const broadened = vi.fn(async () => tokenResponse({ access_token: "a", token_type: "Bearer", scope: "https://graph.microsoft.com/Calendars.ReadBasic https://graph.microsoft.com/User.Read" }));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: broadened })).rejects.toThrow("consent_denied");
+  });
+
+  it("ends an unresponsive or stalled token request as timeout at the caller's deadline", async () => {
+    const never = vi.fn(() => new Promise<Response>(() => undefined));
+    const started = Date.now();
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: never, signal: AbortSignal.timeout(50) })).rejects.toThrow("timeout");
+    const stalled = vi.fn(async () => new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("{\"access_token\":")); } }), { status: 200 }));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: stalled, signal: AbortSignal.timeout(50) })).rejects.toThrow("timeout");
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 
   it("requires a refresh token and a valid nonce on the code exchange", async () => {
