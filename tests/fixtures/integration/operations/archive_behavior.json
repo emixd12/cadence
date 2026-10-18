@@ -1,0 +1,163 @@
+{
+  "operation": "archive_behavior",
+  "valid_inputs": [
+    {
+      "name": "with note",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "archive_note": "Paused for travel.",
+        "expected_revision": "b1.7"
+      }
+    },
+    {
+      "name": "bare",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "archive note too long",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "archive_note": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+      },
+      "code": "invalid_input",
+      "path": "$.archive_note"
+    },
+    {
+      "name": "delete flag",
+      "value": {
+        "behavior_id": "00000001-1111-4111-8111-000000000001",
+        "delete": true
+      },
+      "code": "invalid_input",
+      "path": "$.delete"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "archived",
+      "value": {
+        "behavior": {
+          "id": "00000002-1111-4111-8111-000000000002",
+          "title": "Vitamin D",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": null,
+          "state": "archived",
+          "archived_at": "2026-10-01T14:00:00Z",
+          "auto_archived_at": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "daily",
+                "interval": 1
+              },
+              "recurrence_summary": "Daily",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "09:00",
+                  "end_time": null,
+                  "label": "9:00 AM"
+                }
+              ],
+              "time_summary": "9:00 AM"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [
+            {
+              "id": "00000009-1111-4111-8111-000000000009",
+              "archived_at": "2026-10-01T14:00:00Z",
+              "note": "Doctor said to stop.",
+              "updated_at": "2026-10-01T14:00:00Z"
+            }
+          ],
+          "external_ref": "facets:rec_42",
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        },
+        "changed": true
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "archive note shape",
+      "value": {
+        "behavior": {
+          "id": "00000002-1111-4111-8111-000000000002",
+          "title": "Vitamin D",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": null,
+          "state": "archived",
+          "archived_at": "2026-10-01T14:00:00Z",
+          "auto_archived_at": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "daily",
+                "interval": 1
+              },
+              "recurrence_summary": "Daily",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "09:00",
+                  "end_time": null,
+                  "label": "9:00 AM"
+                }
+              ],
+              "time_summary": "9:00 AM"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [
+            {
+              "id": "00000009-1111-4111-8111-000000000009",
+              "archived_at": "2026-10-01T14:00:00Z",
+              "note": 5,
+              "updated_at": "2026-10-01T14:00:00Z"
+            }
+          ],
+          "external_ref": "facets:rec_42",
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        },
+        "changed": true
+      },
+      "code": "internal_error",
+      "path": "$.behavior.archive_notes[0].note"
+    }
+  ]
+}
