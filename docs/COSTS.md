@@ -269,3 +269,14 @@ status, Note, focus and stationary position checks make no provider call. These
 are automated fixture counts, not production measurements. The private workbench
 shows the authenticated owner's month-to-date reserved list-price spend; no new
 paid call supports that readback.
+
+### Tickets 213–214 production measurements — October 18, 2026
+
+Owner QA reserved US$0.115 under the approved US$0.50 cap. Cloud Monitoring
+confirms seven geocodes and eight route calls, all 200. Initial Calendar text
+used five geocodes and no routes; two temporary street-address corrections used
+two geocodes and two routes. Each of three identical refreshes then used zero
+geocodes and two routes. Calendar and saved-place records stayed unchanged.
+Four successful two-leg requests measured server p50 3.3562 s and nearest-rank
+p95 3.5984 s. Six-leg and multi-user loads were not measured. See
+`docs/qa/travel-release.md` for sample counts, dates and baseline limits.

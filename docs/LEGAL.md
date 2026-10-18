@@ -50,7 +50,7 @@ Risk levels:
 | [L-009](#l-009-openweather-share-alike) | OpenWeather share-alike | resolved (moot) | none | 218, 219 |
 | [L-010](#l-010-tomorrowio-contract-terms) | Tomorrow.io contract terms | resolved (moot) | none | 218 |
 | [L-011](#l-011-weather-privacy-disclosure-and-attribution) | Weather privacy disclosure and attribution | open | medium | 218, 219 |
-| [L-012](#l-012-google-maps-notices-in-cadences-terms-and-privacy-content) | Google Maps notices in Cadence's terms and privacy content | open | medium until deployed | 213, 214, 165 |
+| [L-012](#l-012-google-maps-notices-in-cadences-terms-and-privacy-content) | Google Maps notices in Cadence's terms and privacy content | closed | low | 213, 214, 165 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -336,7 +336,8 @@ part of L-002.
 - **Owner decision, 2026-10-18:** "Approved. Keep the LegalContent.tsx draft as is."
   Both pages and the retention table carry the date October 18, 2026, which should
   match the deployment date.
-- **Status:** open until the approved text is deployed.
-- **Next action:** deploy the approved text with or before Tickets 213–214, then mark
+- **Status:** closed October 18, 2026. Production deployment
+  `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` serves the approved notices; live readback passed.
+- **Next action:** retain the verified notices with future releases; the deployment resolves
   this entry resolved. The Privacy statement that Cadence does not send behavior data
   to an AI provider is a separate conflict under Ticket 187.

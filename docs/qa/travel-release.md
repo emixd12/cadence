@@ -606,3 +606,102 @@ contract tests passed separately. Lint reported two existing warnings (the workb
 purity suppression and the unused `_omitted` fixture binding). Desktop bundling
 reported existing dependency `use client` directive warnings. No hosted migration,
 production deployment, Google Cloud change, paid route or model request ran.
+
+
+## October 18 production release and bounded owner QA
+
+The owner authorized the three migrations, production deployment, and Google Maps QA
+with saved and Calendar locations, capped at US$0.50. The release branch
+`codex/travel-monthly-budget-release` starts at production `9bf1194`, preserving
+the September CPU fix and excluding the advisor branch's unreleased changes.
+PR: https://github.com/emixd12/cadence/pull/107. Initial release commit: `b97ecd6`.
+
+All three migrations deployed to the existing linked project. Migration history
+reads back through `20261018051402`. Hosted-generated table and RPC definitions
+match the release types; only generator helper parentheses and hosted PostgREST
+version metadata differ. Both new spend ledgers and the place cache started empty.
+No old pilot counter was reset or removed.
+
+Production deployment `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` reached READY at
+05:28:14 UTC. Both `app.cadence-me.com` and the legacy Vercel alias serve it.
+The clean CLI upload contains the reviewed release worktree at `b97ecd6`;
+the CLI deployment omits Git metadata. Approved October 18 Privacy and Terms
+content is live, including Google Maps Platform, the Maps end-user terms link,
+place-ID storage, foreground reads, and retention disclosures. L-012 is closed.
+Login, Privacy and Terms return 200. Protected screens redirect unauthenticated
+requests; both travel APIs return 401.
+
+The sampling deployment overrides only `CADENCE_PERF_LOG=1`. Project environment
+values remain unchanged. A final deployment without that override must restore
+the existing project configuration after acceptance.
+
+### Provider and cost evidence
+
+QA used the signed-in owner's existing consent, saved base, selected Transit mode,
+and Calendar locations. Direct acceptance requests used `device: null`.
+The original Calendar strings contain clinic/room descriptions. Five initial
+lookups produced one resolved, two ambiguous and two unresolved results; Cadence
+correctly withheld routes. Temporary request-only corrections used the street-address
+portions of two existing Calendar locations. No Calendar or saved-place record changed.
+
+The first corrected refresh looked up two new strings and returned two current
+transit estimates, each attributed to Google Maps. Three repetitions used the
+place cache and made no geocoding calls. The observed durations were 2,338 and
+734 seconds; route data remained transient and outside model input.
+
+| Sample | New geocodes | Routes | Server refresh ms | Browser elapsed ms |
+|---|---:|---:|---:|---:|
+| Original Calendar text | 5 | 0 | 3806.4 | 4347 |
+| Street-address corrections | 2 | 2 | 3598.4 | 3802 |
+| Cached repeat 1 | 0 | 2 | 3480.4 | 3607 |
+| Cached repeat 2 | 0 | 2 | 3232.0 | 3415 |
+| Cached repeat 3 | 0 | 2 | 2972.9 | 3169 |
+
+Four successful two-leg samples: median server duration 3356.2 ms; nearest-rank
+p95 3598.4 ms. This passes the five-second target for this owner scenario.
+This small sample does not establish six-leg or multi-user load performance.
+The exhausted old pilot prevents a fresh successful before-change baseline;
+no retained successful baseline was available. Two operator probe errors
+(a future start date and an object instead of a revision string) failed before
+any reservation; they are excluded from latency statistics.
+
+Cloud Monitoring independently reports seven GeocodeAddress and eight ComputeRoutes
+calls, all HTTP 200, in the bounded window starting 05:27 UTC. The owner ledger
+reserves US$0.115: 7 × US$0.005 plus 8 × US$0.010. Transit stays conservatively
+reserved at Pro list price. This is reserved list-price usage, not an invoice.
+Provider quota readback remains 120/day and 30/minute for Geocoding v4 and Routes;
+no quota or billing configuration changed.
+
+Web Timeline at 390px has equal viewport and document widths. It shows
+`Travel as of` and Refresh travel. Manual refresh completes. Opening the current
+Timeline and manual refresh add no Google spend because all relevant locations
+are cached and no leg is due in the three-hour window. Existing browser location
+permission caused normal UI requests to include a device sample; no Google route
+call used it in this window. Direct route acceptance did not request location.
+
+### Release verification and desktop
+
+The production-based candidate passes 2,365 tests, with 31 skips. Agent,
+interaction, resolver, design-system, lint, web/desktop type checks, and both
+frontend builds pass. The two SQL contracts passed separately before rollout.
+GitHub verify and CodeQL pass.
+
+A matching local desktop candidate, `0.1.1-preview.47`, passed strict app signing,
+read-only DMG comparison, updater-signature verification and archive comparison.
+It is an ad hoc preview, not Apple-notarized distribution. Source: `b97ecd6`;
+artifact hashes are in its ignored `artifact-verification.json`.
+macOS 27's Rust proc-macro stripping issue initially prevented compilation;
+build-only `CARGO_PROFILE_RELEASE_STRIP=none`,
+`CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=none` and
+`CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=2` resolved it. No source change
+or security exception was required. Upstream:
+https://github.com/rust-lang/rust/issues/157750.
+
+The verified candidate replaced installed preview.45 after an online SQLite
+backup and retained app rollback under the private Cadence Release directory.
+The current host is Apple Silicon, macOS 27.0.1 (26A434). The process launches,
+but `SecItemCopyMatching` waits for macOS Keychain approval while reading the
+existing account session. Installed UI acceptance remains pending that owner
+action. Do not treat the frontend build or app process as runtime acceptance.
+No credential, private location, raw route response or database backup is
+included in this public evidence.

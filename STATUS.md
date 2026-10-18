@@ -1,27 +1,21 @@
 # Implementation Status
 
-## Tickets 213–214 implemented and locally verified — October 18, 2026
+## Tickets 213–214 deployed; desktop acceptance pending — October 18, 2026
 
-Completion pass adds whole-day Daily Brief routing, workbench spend readback,
-foreground movement checks, decision-based travel projection, budget renewal and
-late-cache-write consent fencing. Three migrations pass a clean local replay;
-concurrent reservation and local-midnight renewal tests pass. The full suite passes
-2,599 tests (31 skipped); both builds, both typechecks, lint and contract checks pass.
-Not deployed. Ticket 213 replaces the exhausted 40-refresh pilot with
-`reserve_travel_provider_spend`: every provider call reserves its list price under a
-US$5.00 owner-month ceiling and a US$10.00 daily circuit breaker. Refusals keep the
-last plan visible and name the renewal date. Ticket 214 stores place IDs per typed
-location, routes Timeline legs within three hours and day scope for a new brief,
-makes one call per leg, uses
-traffic-aware routing only near departure, skips same-place legs, fences sources
-twice instead of around every call, and stops refreshing on status or Note changes.
-A clean local reset applied all three migrations and the SQL smoke passed.
-The owner approved the matching privacy and terms text on October 18
-(`docs/LEGAL.md` L-012); it is uncommitted and undeployed.
-Open gates (`docs/qa/travel-release.md`): deploy that text, owner-authorized hosted
-migration and deployment, production p50/p95 and call counts, Google Cloud quota
-review, and installed-desktop re-acceptance.
+All three migrations deployed and read back. Production serves the approved
+Google Maps notices and routing implementation from focused release commit
+`b97ecd6` (PR #107). Owner QA reserved US$0.115 of US$0.50; Cloud Monitoring
+confirms seven geocodes and eight routes. Four two-leg samples measured server
+p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
+Web narrow-layout and Refresh travel checks pass. Production-based validation:
+2,365 tests passed, 31 skipped; required checks and both frontend builds pass.
 
+Installed preview.47 passed artifact checks and preserves a private database
+backup plus preview.45 rollback. Launch waits for macOS Keychain approval of the
+existing session. Installed UI acceptance and final sampling-override cleanup
+remain. Tickets stay open until that acceptance completes. Apple distribution
+and native position gates remain in Tickets 115/165. See
+`docs/qa/travel-release.md` for exact evidence and measurement limits.
 
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 
