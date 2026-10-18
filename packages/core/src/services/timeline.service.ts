@@ -19,6 +19,7 @@ export function resolvePersistedTimeline(input: {
   now: Temporal.Instant;
   timezone: string;
   futureDays?: number;
+  startLocalDate?: string;
   durationHistory?: { occurrences: OccurrenceRecord[]; timeSessions: TimeSession[] };
 }) {
   const activeBehaviorById = new Map(input.behaviors.filter((row) => row.active).map((row) => [row.id, row]));
@@ -31,7 +32,7 @@ export function resolvePersistedTimeline(input: {
   const occurrences = input.occurrences.map((row) => toTimelineOccurrenceInput(
     row, activeBehaviorById, sessionsByOccurrence.get(row.id) ?? [],
   )).filter((row): row is TimelineOccurrenceInput => row !== null);
-  const timeline = resolveTimeline({ occurrences, now: input.now, timezone: input.timezone, futureDays: input.futureDays });
+  const timeline = resolveTimeline({ occurrences, now: input.now, timezone: input.timezone, futureDays: input.futureDays, startLocalDate: input.startLocalDate });
   if (input.durationHistory || input.behaviors.some((behavior) => behavior.default_duration_minutes != null)) {
     const historySessions = new Map<string, TimeSession[]>();
     for (const session of (input.durationHistory?.timeSessions ?? [])) {
