@@ -58,7 +58,7 @@ Cadence deliberately has no streaks, badges, points, or guilt mechanics. Streaks
 
 Interfaces are no longer fixed: in the agentic era, an AI tool can read a personal history and build whatever View or coaching layer its owner prefers. Cadence therefore invests in the data backbone, a factual and portable Record, rather than a prescribed interface.
 
-Cadence provides prepared prompts, but it does not send behavior data to an AI provider. The user exports data and chooses any external AI service.
+Cadence provides exports and prepared prompts for services you choose. When enabled, Daily Brief separately sends selected tracking information to OpenAI; Calendar timing and other optional sources require separate choices. MCP lets a connected AI client read tracking records and make permitted changes you direct and confirm. Calendar data is never shared through MCP. Hosted MCP launch remains pending.
 
 ## Time Tracking
 
@@ -190,7 +190,7 @@ A Behavior can change over time. Cadence keeps its Schedule, Occurrences, Decisi
 
 Cadence is a single-player web app for Behavior creation, recurring Schedules, a timeline of Occurrences, explicit Decisions, notes, reminders, basic Adherence review, elapsed-time capture, and portable exports. It is not a social tracker, collaboration product, medical dosing app, payment system, or AI coach.
 
-Cadence provides prepared prompts, but the user exports data and chooses any external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides exports and prepared prompts for services you choose. When enabled, Daily Brief separately sends selected tracking information to OpenAI; Calendar timing and other optional sources require separate choices. MCP lets a connected AI client read tracking records and make permitted changes you direct and confirm. Calendar data is never shared through MCP. Hosted MCP launch remains pending.
 
 ## Cadence and BehaviorLog
 

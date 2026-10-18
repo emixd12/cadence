@@ -56,6 +56,18 @@ const exportSurfaces = [
 ];
 
 describe("public content contract", () => {
+  it("keeps AI disclosure consistent in marketing HTML owners and Markdown mirrors", () => {
+    const answer = faqItems.find(({ id }) => id === "use-external-ai")!.answer;
+    const aboutSource = readFileSync(resolve("apps/marketing/src/pages/about.astro"), "utf8");
+    for (const copy of [answer, home, about, buildFaqCopy(), aboutSource]) {
+      expect(copy).toContain(answer);
+      expect(copy).toContain("Daily Brief separately sends selected tracking information to OpenAI");
+      expect(copy).toContain("Calendar data is never shared through MCP");
+      expect(copy).toContain("Hosted MCP launch remains pending");
+      expect(copy).not.toContain("does not send behavior data to an AI provider");
+    }
+  });
+
   it("keeps vocabulary, statuses, and exports canonical", () => {
     const bannedPhrases = [
       "complete JSON snapshot",

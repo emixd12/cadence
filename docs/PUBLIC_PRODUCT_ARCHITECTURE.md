@@ -272,15 +272,21 @@ license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
 
-Cadence provides prepared prompts, but the user exports data and chooses any
-external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides exports and prepared prompts for services the user chooses.
+Opt-in Daily Brief separately discloses selected tracking information to OpenAI;
+Calendar timing and other optional sources require separate choices. Authorized
+MCP clients receive tracking records and may make scoped changes the user directs
+and confirms. Calendar data remains excluded from MCP.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
 
-Tickets 220–232 plan disclosure to AI clients the user connects through MCP.
-That disclosure happens only at the user's direction, under the scopes the user
-approves. Privacy, Terms, and public copy change only after the owner approves
-the Ticket 231 drafts.
+Ticket 232 implements owner-approved Privacy, Terms and matching marketing copy
+locally, including a separate Daily Brief disclosure. Hosted MCP launch and
+publication remain pending. Existing policy dates stay during local review;
+before separately authorized publication, set both dates and the retention
+caption to the actual publication date in America/New_York. Do not compute a
+new date on each page load. Removal of the unsupported provider-verification
+sentence does not verify inherited provider or legal facts.
 
 The public legal entity is Identity Scaffolding LLC, a Wyoming limited
 liability company assumed authorized in New York. Its public address is 30 N

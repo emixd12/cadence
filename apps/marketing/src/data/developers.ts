@@ -37,7 +37,7 @@ Cadence runs no autonomous agent through MCP. The outside client chooses tool ca
 
 Report reproducible technical problems in [Cadence GitHub issues](https://github.com/emixd12/cadence/issues). Include the tool name, stable error code and client version. Omit tokens, account identifiers, notes and other personal data.
 
-For private reports, email [privacy@identityscaffolding.com](mailto:privacy@identityscaffolding.com). The canonical [Privacy notice](https://app.cadence-me.com/privacy) and [Terms](https://app.cadence-me.com/terms) remain on the app site. Proposed MCP legal updates await owner approval.`,
+For private reports, email [privacy@identityscaffolding.com](mailto:privacy@identityscaffolding.com). The canonical [Privacy notice](https://app.cadence-me.com/privacy) and [Terms](https://app.cadence-me.com/terms) remain on the app site. MCP disclosure wording is approved for local implementation; publication and hosted launch remain pending.`,
   },
   {
     slug: "quickstarts", title: "Quickstarts", description: "Connect Claude, Claude Code, ChatGPT, MCP Inspector, and other clients to a configured Cadence MCP endpoint.",
@@ -256,7 +256,7 @@ ${reference.data}
 
 User-authored Behavior location text can be part of a Behavior definition. This is distinct from excluded device coordinates, route computations and travel settings. Tracking text may itself include sensitive information, including health-related notes. Read permission covers the included tracking data, not a per-Behavior selection.
 
-A connected client receives tool results and applies its own data handling policies. Cadence's MCP server does not run an AI model. These are technical implementation details; proposed MCP legal revisions remain unpublished pending owner approval.
+A connected client receives tool results and applies its own data handling policies. Cadence's MCP server does not run an AI model. MCP disclosure wording is approved for local implementation; publication and hosted launch remain pending.
 
 ## Activity and retention
 

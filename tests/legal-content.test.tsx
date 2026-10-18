@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { LegalPageContent } from "../components/settings/LegalContent";
+import { LEGAL_PAGES, LegalPageContent } from "../components/settings/LegalContent";
 import { TrustAndLegalPanel } from "../components/settings/SettingsPanels";
 
 vi.mock("../lib/marketing-site", () => ({
@@ -59,13 +59,47 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("privacy@identityscaffolding.com");
     expect(html).toContain("California disclosures");
     expect(html).toContain("only for people age 18 or older");
-    expect(html).toContain("does not send behavior data to an AI provider");
+    expect(html).not.toContain("does not send behavior data to an AI provider");
+    expect(html).not.toContain("Provider settings and published capabilities were verified");
     expect(html).toContain("Limited Use requirements");
     expect(html).toContain(
       'href="https://developers.google.com/terms/api-services-user-data-policy"',
     );
     expect(html).toContain("review of Calendar access is pending");
     expect(html).not.toContain("currently limited to Google OAuth test users");
+  });
+
+  it("separates connected-client permissions, retained copies, and Daily Brief consent", () => {
+    const privacy = JSON.stringify(LEGAL_PAGES.privacy);
+    const terms = JSON.stringify(LEGAL_PAGES.terms);
+    for (const copy of [privacy, terms]) {
+      expect(copy).toContain("Exports and connected AI clients");
+      expect(copy).toContain("Optional Daily Brief");
+      expect(copy).toContain("Calendar data");
+      expect(copy).toContain("never shared through MCP");
+      expect(copy).not.toContain("does not send behavior data to an AI provider");
+    }
+    for (const disclosure of [
+      "user-authored Behavior locations", "Read access is not limited to records you mention",
+      "MCP provides no delete operation", "the AI client controls its per-action confirmation",
+      "retrieve copies already received by the client", "Daily Brief consent does not authorize MCP access",
+      "up to 12 Notes, the first 280 characters of each", "never reminder content",
+      "does not promise zero provider retention",
+    ]) expect(privacy).toContain(disclosure);
+  });
+
+  it("distinguishes validity, physical cleanup, and shared registration retention", () => {
+    const privacy = JSON.stringify(LEGAL_PAGES.privacy);
+    for (const disclosure of [
+      "90-day policy", "24-hour validity", "it does not mean immediate physical deletion",
+      "Failed maintenance can extend storage", "no automatic deletion deadline",
+      "does not remove a shared client registration", "live account-owned integration records",
+    ]) expect(privacy).toContain(disclosure);
+    expect(LEGAL_PAGES.privacy.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.terms.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.trust.updated).toBe("August 27, 2026");
+    expect(LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.caption)
+      .toBe("Cadence retention periods as of October 18, 2026");
   });
 
   it("renders the approved Terms with the settled legal facts", () => {

@@ -234,3 +234,58 @@ changes only final route error containment, tests and related documentation.
 Unchanged core/design/marketing/plugin checks retain their earlier evidence;
 they were not rerun or newly attributed to guarded Node 24. Production bounds,
 legal approval and live-client acceptance remain unverified and separately gated.
+
+
+### Owner-approved legal copy — local acceptance
+
+Ticket 232 implements the complete owner-approved Privacy and Terms candidate,
+including the separately approved Daily Brief disclosure and matching marketing
+wording. The unsupported provider-verification sentence is removed. Existing
+Trust wording, unrelated provisions, processor disclosures, and retention rows
+remain unchanged. New retention wording describes expiry versus later physical
+cleanup and retained shared client registrations. Production scheduling and
+provider facts remain release-verification issues, not verified by this change.
+
+The shared owner is `components/settings/LegalContent.tsx`. Its public Privacy
+and Terms routes and Settings link panel continue using that owner. Existing
+marketing FAQ, About HTML, home/About Markdown, and developer-documentation
+status copy agree. `docs/PUBLIC_PRODUCT_ARCHITECTURE.md` now records this contract.
+No interaction, layout, token, route, data, or provider behavior changed.
+
+Both local legal dates and the retention caption remain October 18, 2026.
+Before separately authorized publication, set both dates and the retention
+caption to the actual publication date in America/New_York. Use one fixed
+reviewed date, never a dynamic daily date. Legal-copy approval does not authorize
+deployment, hosted tests, public activation, or directory submission. Publisher,
+reviewer, health-data policy, support and inherited provider-fact verification
+remain separate release gates. Release SHA remains unset.
+
+Platform impact follows the existing design-system and interaction inventories:
+web public legal pages consume the shared copy and Settings links remain intact;
+desktop has no direct LegalContent/TrustAndLegalPanel consumer in its source
+and its behavior remains unchanged;
+marketing uses its existing copy owners; future native mobile remains deferred.
+No parallel inventory or new UI fixture was needed.
+
+Local browser QA used loopback web port 4321 and marketing port 4323. Public
+Privacy/Terms, the real Settings legal panel in the existing fixture bench,
+expanded FAQ and About passed at 390×844 and 1440×900 with no document overflow.
+Privacy tables retain horizontal scrolling inside their containers. No browser
+console warnings/errors were captured on those pages. Authenticated account
+Settings and installed desktop were not exercised. The unchanged panel mapping
+and focused tests cover those consumers without account or provider operations.
+Screenshots, viewport readbacks and logs are retained in workspace artifacts
+under `.intent/artifacts/legal232/` and linked from the Ticket 232 handoff.
+
+Verification uses official Node 24.22.0 with an executable/major preload guard
+and per-test-file runtime assertions. The full suite passes with 2,814 tests and
+94 existing opt-in skips. Exact comparison with the approved note passes for
+both complete policies; preservation checks cover dates, Trust, renderer and
+all existing provider/retention rows. Required agents, interactions, resolvers,
+lint, typecheck and web build pass, as do design-system and marketing build/check
+(including all 16 generated developer tool references and agent-readable copy).
+Lint retains two pre-existing warnings in verifier artifact configs. Initial lint
+errors in temporary audit scripts were resolved by retaining those scripts as
+text artifacts. No project lint configuration or dependency changed. Browser
+servers and owned tabs were closed; unrelated tabs and port 4322 stayed untouched.
+No SQL reset or runtime/provider test was needed for this copy-only change.

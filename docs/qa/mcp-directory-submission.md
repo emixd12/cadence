@@ -8,7 +8,7 @@ or a production reviewer login. Ticket 232 owns hosted and live-client acceptanc
 
 | Gate | Current state | Owner action before submission |
 |---|---|---|
-| Legal text | Proposed text below; served Privacy and Terms unchanged | Approve text, effective date, and publication change |
+| Legal text | Complete owner-approved Privacy/Terms, separate Daily Brief disclosure, and matching marketing copy implemented locally under Ticket 232 | Independently review the local candidate; authorize publication separately and set the actual publication date in America/New_York |
 | Personal health data | Possible in user-authored Behaviors and notes | Confirm classification, lawful disclosure, and directory eligibility |
 | Reviewer sign-in | Google only; unattended reviewer access unverified | Choose and verify the reviewer-account plan below |
 | Retention | Local SQL implements expiry/purge; hosted maintenance unverified | Schedule and verify purge before publishing retention claims |
@@ -116,6 +116,11 @@ Cadence has no MCP App widget, so Claude's MCP App carousel requirement does not
 
 ## Unpublished Privacy draft
 
+Historical Ticket 231 draft below; superseded for local implementation by the
+complete owner-approved Ticket 232 candidate in `components/settings/LegalContent.tsx`.
+Publication remains unauthorized. See the local legal-copy acceptance record
+in `docs/qa/mcp-server.md`; do not publish this historical excerpt.
+
 Publication target: `app/(legal)/privacy/page.tsx`, whose text lives in
 `components/settings/LegalContent.tsx` under `LEGAL_PAGES.privacy` and also
 appears in Settings. **Do not edit the served component until owner approval.**
@@ -193,6 +198,9 @@ Brief disclosure before approving the complete policy. The current contact and
 operator details need owner confirmation, not a new legal-entity assumption.
 
 ## Unpublished Terms draft
+
+Historical excerpt, superseded by the complete owner-approved Ticket 232
+local candidate in `components/settings/LegalContent.tsx`.
 
 Publication target: `app/(legal)/terms/page.tsx`; content owner is
 `components/settings/LegalContent.tsx`, `LEGAL_PAGES.terms`.
