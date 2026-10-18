@@ -7,7 +7,7 @@ ChatGPT plugins, with full tracking-data read and scoped writes. Decisions and
 superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets:
 `docs/TICKETS.md`. Each ticket agent edits only its own line below.
 
-- Ticket 220 (MCP direction and integration brief): in progress, wave 1.
+- Ticket 220 (MCP direction and integration brief): docs complete October 18, 2026; awaiting wave-1 verification. Decisions, AGENTS.md scope, `docs/MCP_INTEGRATION.md`, planned routes, follow-ups, and Tickets 220–232 recorded.
 - Ticket 221 (versioned MCP operation contract): in progress, wave 1.
 - Ticket 222 (OAuth and integration persistence): in progress, wave 1.
 - Ticket 223 (RLS-scoped request context for integrations): in progress, wave 1.
