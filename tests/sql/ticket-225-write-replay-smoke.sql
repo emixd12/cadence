@@ -38,7 +38,11 @@ reset role;
 do $$ declare signature text; begin
   foreach signature in array array[
     'public.integration_lock_write(text,text,text)',
-    'public.integration_apply_write(text,text,text,text,jsonb,timestamptz,text)'
+    'public.integration_apply_write(text,text,text,text,jsonb,timestamptz,text)',
+    'cadence_private.integration_json_replace(json,text[],json)',
+    'cadence_private.integration_instant(text)',
+    'cadence_private.integration_write_source(jsonb,text)',
+    'cadence_private.integration_write_bindings(jsonb,text)'
   ] loop
     if has_function_privilege('anon', signature, 'execute') or has_function_privilege('service_role', signature, 'execute') then
       raise exception 'Write function privileges widened';
@@ -47,8 +51,25 @@ do $$ declare signature text; begin
   if (select prosecdef from pg_proc where oid = 'public.integration_apply_write(text,text,text,text,jsonb,timestamptz,text)'::regprocedure) then
     raise exception 'Product wrapper must preserve caller RLS';
   end if;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='cadence_private' and p.proname like 'integration\_%'
+      and (p.prosecdef or p.proconfig is distinct from array['search_path=""'])) then
+    raise exception 'Serialization helpers must be invokers with an empty search_path';
+  end if;
   if has_table_privilege('authenticated', 'public.behaviors', 'update') then
     raise exception 'Direct Behavior update privilege widened';
+  end if;
+end $$;
+set local role authenticated;
+do $$ declare value json; begin
+  value := cadence_private.integration_json_replace('{"n":1e+308,"nested":[{"id":"old","s":"a\\b\n"}]}'::json,
+    array['nested','0','id'], '"new"'::json);
+  if value::text <> '{"n":1e+308,"nested":[{"id":"new","s":"a\\b\n"}]}' then
+    raise exception 'Typed binding must preserve JS number and string encoding';
+  end if;
+  if cadence_private.integration_instant('2026-10-18T12:00:00.123400Z') <> '2026-10-18T12:00:00.1234Z'
+    or cadence_private.integration_instant('2026-10-18T12:00:00Z') <> '2026-10-18T12:00:00Z' then
+    raise exception 'Revision formatting must match Temporal';
   end if;
 end $$;
 rollback;

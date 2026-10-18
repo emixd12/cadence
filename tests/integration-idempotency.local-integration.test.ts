@@ -49,6 +49,17 @@ describe("contract output and idempotency storage boundaries", () => {
       expect(Buffer.byteLength(JSON.stringify(output))).toBeLessThanOrEqual(wireLimit);
     });
 
+    localIt(`stores the minimal Ticket 225 receipt for ${name}`, () => {
+      const receipt = { version: 2, output_json: JSON.stringify(output) };
+      const saved = completeAndReplay(operation, receipt);
+      expect(saved.result).toEqual(receipt);
+      expect(saved.bytes).toBeLessThanOrEqual(2 * Buffer.byteLength(receipt.output_json) + 100);
+      expect(saved.bytes).toBeLessThan(512 * 1024);
+      const replayed = JSON.parse((saved.result as typeof receipt).output_json);
+      expect(replayed).toEqual(output);
+      expect(validateOperationOutput(operation, replayed).ok).toBe(true);
+    });
+
     localIt(`completes and replays ${name} through the real RPCs`, () => {
       expect(validateOperationOutput(operation, output).ok).toBe(true);
       const saved = completeAndReplay(operation, output);

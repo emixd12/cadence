@@ -4,7 +4,6 @@ import type { Occurrence } from "@/lib/types/database";
 
 export type IntegrationWriteSnapshot = {
   version: 1;
-  rpc_result: Json;
   behavior: BehaviorWithCategory;
   occurrence: Occurrence | null;
   previous_status: Occurrence["status"] | null;
@@ -26,16 +25,31 @@ export function readIntegrationWriteSnapshot(value: unknown): IntegrationWriteSn
 export function createIntegrationWriteClient(
   supabase: AppSupabaseClient,
   input: { operation: string; key?: string; hash: string; asOf: string; externalRef?: string },
+  prepareOutput: (snapshot: IntegrationWriteSnapshot) => string,
 ) {
-  let snapshot: IntegrationWriteSnapshot | undefined;
-  async function execute(rpc: string, args: unknown) {
+  let receipt: unknown;
+  async function call(rpc: string, args: unknown) {
     const { data, error } = await supabase.rpc("integration_apply_write", {
       p_operation: input.operation, p_key: (input.key ?? null) as string, p_hash: input.hash,
       p_rpc: rpc, p_args: args as Json, p_as_of: input.asOf, p_external_ref: input.externalRef,
     });
-    if (error) throw error;
-    snapshot = readIntegrationWriteSnapshot(data);
-    return snapshot.rpc_result;
+    if (error) throw Object.assign(new Error(error.message), error);
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid write result");
+    return data;
+  }
+  async function execute(rpc: string, args: unknown) {
+    const preview = await call(rpc, args);
+    if (preview.receipt) {
+      receipt = preview.receipt;
+      throw new Error("Committed integration replay requires repair.");
+    }
+    const outputJson = prepareOutput(readIntegrationWriteSnapshot(preview.source));
+    const result = await call(rpc, { ...args as object, _integration_prepared: {
+      fingerprint: preview.fingerprint, output_json: outputJson,
+    } });
+    receipt = result.receipt;
+    if (!("rpc_result" in result)) throw new Error("Committed integration replay requires repair.");
+    return result.rpc_result;
   }
   const intercepted = new Set([
     "create_behavior_with_schedule_graph", "update_behavior_with_schedule_graph", "apply_occurrence_status_transition",
@@ -50,5 +64,5 @@ export function createIntegrationWriteClient(
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
-  return { client, execute, getSnapshot: () => snapshot };
+  return { client, execute, getReceipt: () => receipt };
 }

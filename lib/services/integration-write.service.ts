@@ -53,6 +53,12 @@ function outputFromSnapshot(name: WriteOperationName, snapshot: IntegrationWrite
   return name === "create_behavior" ? { behavior } : { behavior, changed: snapshot.changed };
 }
 
+function readWriteOutput(name: WriteOperationName, receipt: unknown): IntegrationOperationOutput<WriteOperationName> {
+  if (receipt && typeof receipt === "object" && "version" in receipt && receipt.version === 2 &&
+      "output_json" in receipt && typeof receipt.output_json === "string") return JSON.parse(receipt.output_json);
+  return outputFromSnapshot(name, readIntegrationWriteSnapshot(receipt));
+}
+
 async function performWrite<N extends WriteOperationName>(
   name: N, context: IntegrationContext, input: IntegrationOperationInput<N>,
   writer: ReturnType<typeof createIntegrationWriteClient>,
@@ -120,6 +126,7 @@ function mapError(error: unknown): IntegrationError {
     fieldErrors: Object.entries(error.fieldErrors).map(([path, message]) => ({ path: `$.${path}`, message })),
   });
   const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "";
+  if (message === "integration_output_limit_exceeded") return createIntegrationError("limit_exceeded", "The result is larger than 100000 bytes. Narrow the request and try again.");
   if (message === "integration_idempotency_key_reused") return createIntegrationError("idempotency_key_reused", "Use a new key for different input.");
   if (message === "integration_insufficient_scope") return createIntegrationError("insufficient_scope", "Reconnect Cadence and allow this write permission.");
   if (message === "integration_external_ref_conflict") return createIntegrationError("invalid_input", "This external reference already belongs to another Behavior.");
@@ -147,46 +154,54 @@ export async function executeIntegrationWrite<N extends WriteOperationName>(
     if (!validated.ok) throw new WriteError(validated.error);
     const input = validated.value;
     const requestHash = integrationWriteHash(name, input);
-    let snapshot: IntegrationWriteSnapshot | undefined;
+    let receipt: unknown;
     if (input.idempotency_key) {
       const key = { idempotencyKey: input.idempotency_key, requestHash };
       const result = await beginIdempotentWrite(context.supabase, { ...key, operation: name });
       if (result.state === "mismatch") fail("idempotency_key_reused", "Use a new key for different input.");
       if (result.state === "in_progress") fail("service_unavailable", "This write is still running. Retry with the same key shortly.");
       if (result.state === "replay") {
-        snapshot = readIntegrationWriteSnapshot(result.result);
+        receipt = result.result;
+        const replay = readWriteOutput(name, receipt);
         committed = true;
         recover = true;
         await recordIntegrationActivity(context.supabase, { operation: name,
-          targetIds: [snapshot.occurrence?.id ?? snapshot.behavior.id], outcome: "success", errorCode: null });
+          targetIds: ["occurrence" in replay ? replay.occurrence.id : replay.behavior.id], outcome: "success", errorCode: null });
       } else claim = key;
     }
-    if (!snapshot) {
+    if (!receipt) {
       const writer = createIntegrationWriteClient(context.supabase, {
         operation: name, key: input.idempotency_key, hash: requestHash, asOf: context.now.toISOString(),
         externalRef: "external_ref" in input ? input.external_ref : undefined,
+      }, snapshot => {
+        const projected = outputFromSnapshot(name, snapshot);
+        const checked = validateOperationOutput(name, projected);
+        // The transaction checks exact bytes after binding its generated UUIDs/revision clock.
+        if (!checked.ok && checked.error.code !== "limit_exceeded") throw new WriteError(checked.error);
+        return JSON.stringify(projected);
       });
       try { await performWrite(name, context, input, writer); }
-      catch (error) { if (!writer.getSnapshot()) throw error; recover = true; }
-      snapshot = writer.getSnapshot();
-      if (!snapshot) throw new Error("No committed integration receipt.");
+      catch (error) { if (!writer.getReceipt()) throw error; recover = true; }
+      receipt = writer.getReceipt();
+      if (!receipt) throw new Error("No committed integration receipt.");
       committed = true;
     }
+    const projected = readWriteOutput(name, receipt);
     if (recover) {
       if (name.includes("behavior")) {
         await syncBehaviorGraphForUser(context.supabase, context.userId,
           name === "create_behavior" ? "create" : name === "update_behavior" ? "update" : name === "archive_behavior" ? "archive" : "restore");
-      } else if (name === "set_occurrence_status" && snapshot.occurrence?.status === "unresolved") {
-        const current = await getOccurrenceById(context.supabase, context.userId, snapshot.occurrence.id);
+      } else if (name === "set_occurrence_status" && "occurrence" in projected && projected.occurrence.status === "unresolved") {
+        const current = await getOccurrenceById(context.supabase, context.userId, projected.occurrence.id);
         if (current?.status === "unresolved") await repairClearedDecisionReminderCoverage(context.supabase, context.userId, {
-          occurrence: current, timezone: snapshot.behavior.timezone, now: Temporal.Instant.from(context.now.toISOString()),
+          occurrence: current, timezone: projected.occurrence.timezone, now: Temporal.Instant.from(context.now.toISOString()),
         });
       }
     }
     invalidateBehaviorData(context.userId);
     revalidatePath("/timeline");
     if (name.includes("behavior") && name !== "create_behavior") revalidatePath("/behaviors");
-    const output = validateOperationOutput(name, outputFromSnapshot(name, snapshot));
+    const output = validateOperationOutput(name, projected);
     if (!output.ok) throw new WriteError(output.error);
     return { ok: true, value: output.value };
   } catch (error) {

@@ -2028,21 +2028,26 @@ and numeric exponent expansion. A 100,000-byte storage bound is therefore too
 small. Even 256 KiB can reject a contract-valid Behavior with many schedules
 whose recurrence intervals use large exponents.
 
-The 512 KiB storage bound covers the current write schemas: Occurrence outputs
-contain no numbers; Behavior outputs have two fixed unbounded integers and one
-per schedule. Each schedule requires more than 100 compact bytes, allowing fewer
-than 1,000 such integers per response. A finite JavaScript integer needs at most
-309 decimal characters. Even allowing another 100,000 bytes for separator
-whitespace and 309 bytes per integer gives less than 510,000 bytes, below 524,288.
-Revisit this bound if write schemas add other numeric arrays or the wire cap grows.
-Storage capacity does not replace contract validation before persistence.
+The 512 KiB bound remains unchanged. The original projected-JSON storage tests
+still cover JSONB numeric expansion and the independent 524,288/524,289-byte
+storage boundary. Ticket 225 now stores only `{version: 2, output_json: string}`,
+where `output_json` is the exact compact public response, capped at 100,000 UTF-8
+bytes inside the product transaction. It does not store raw rows or a second
+copy of the response. JSONB string escaping adds at most one byte per input byte
+(the JSON text contains no raw control characters), plus fewer than 100 fixed
+wrapper bytes. Thus every accepted response uses at most 200,100 bytes, below
+524,288, regardless of Unicode, escapes, schedule count or exponent-form numbers.
+Numbers remain inside the string and never expand into PostgreSQL numeric text.
+Revisit this proof if the receipt shape or wire cap changes. Existing version-1
+receipts remain readable for their original 24-hour window; new writes never
+produce them. Storage capacity does not replace precommit response validation.
 
-`tests/integration-idempotency.local-integration.test.ts` validates the same
-large outputs before real authenticated begin/complete/replay RPCs. It covers
-70,000-character notes, 99,999 and 100,000 wire bytes, Unicode and JSON escapes,
-numeric expansion, rejection at 100,001 wire bytes, and the separate storage
-boundary at 524,288/524,289 bytes. Set `CADENCE_LOCAL_SUPABASE_DB_URL` only to an
-isolated loopback database to enable the SQL cases; every case rolls back.
+`tests/integration-idempotency.local-integration.test.ts` validates both direct
+projected JSON and the minimal version-2 receipt through real authenticated
+begin/complete/replay RPCs. It covers long notes, exact wire limits, Unicode,
+escapes and large exponent-form numbers. Set `CADENCE_LOCAL_SUPABASE_DB_URL` only
+to an isolated loopback database; each SQL case rolls back. The write-handler
+live suite also proves 99,999/100,000-byte acceptance and 100,001-byte rollback.
 
 Deployment evidence: repository and workspace records report no hosted push of
 Ticket 222. Hosted state was not queried during this correction; no hosted action
@@ -2184,22 +2189,45 @@ adds columns to synced tables.
   `updated_at` check. Behavior reads share the existing configuration-writer
   advisory lock; no direct Behavior UPDATE privilege is added.
 
-The transaction stores a versioned committed snapshot in the existing replay
-record. It includes the product RPC result, Behavior graph, optional Occurrence,
-previous status, change flag, original clock and account timezone, and
-client-specific external reference. These internal fields never become tool output. Pure allowlist
-serializers produce the public contract output from the snapshot. Replays use
-that snapshot even after later edits, preserving microsecond revisions and the
-original derived day state. The existing 512 KiB storage bound applies; a
-snapshot exceeding it rolls back the product write. A pending claim may still
-expire after two minutes, but a product write and its completed receipt commit
-together, so reclaim cannot duplicate a completed write.
+Forward migration `20261018190000_validate_integration_write_results.sql`
+replaces the initial raw-snapshot receipt with a validated public response.
+The public RPC signature and caller-RLS boundary remain unchanged. Pure helper
+functions live in the unexposed `cadence_private` schema with pinned empty
+search paths and authenticated-only execution.
 
-External references attach within the create transaction. A conflicting link
-rolls back the Behavior, schedules, and events. Successful transactions record
-client attribution atomically; the handler records denied, invalid, failed,
-and replay attempts without note text or tokens. Interrupted-response retries
-also repair the normal occurrence/reminder graph and invalidate web caches.
+Preparation runs the existing product RPC in a PL/pgSQL exception block. A
+private SQLSTATE rolls back every product, event, reminder and link write while
+retaining the local response-source value. TypeScript runs the same public
+serializers and contract schema validator against that actual prospective row.
+No business rules move into SQL. This adds one RPC round trip and one rolled-back
+execution per new write; completed retries skip preparation.
+
+Commit reruns the same resolver plan under the existing row/advisory locks.
+It compares a SHA-256 fingerprint of the actual response-source data with the
+prepared fingerprint before persisting anything. All serializer inputs,
+including account timezone, derived-state clock, category and note text,
+participate. A concurrent change that affects the response returns `conflict`
+and rolls back the complete write. Only database-generated UUIDs and the root
+revision timestamp are excluded: fixed, typed output paths receive their actual
+committed values. Schedule metadata unused by serializers is omitted. UUIDs
+remain valid UUID strings; timestamps use the same UTC fractional formatting
+as Temporal. No user-authored field or derived label is patched.
+
+The JSON patch helper preserves JavaScript number/string encoding and object
+order. SQL measures the exact final compact UTF-8 text after scalar replacement;
+anything above 100,000 bytes raises `limit_exceeded` before commit. The schema
+validated by TypeScript therefore still applies to the committed response,
+including at the exact byte boundary. A defensive response check remains in the
+service, but it is no longer the write admission check.
+
+Only `{version: 2, output_json}` persists in the retry record. Identifiers and
+status needed for repair come from that output. The response retains its original
+revision, timezone and derived day state across later edits. External references,
+product rows, history, reminder cancellation, the receipt and successful activity
+commit together. Any conflict, output failure or receipt failure rolls them back.
+The handler releases its pending claim on rejection and records a failed attempt;
+a process interruption leaves only the normal expiring pending claim. Successful
+lost-response retries repair the usual occurrence/reminder work and web caches.
 
 Status writes keep `explicit_user_mark` / `explicit_user_correction`, confidence
 `high`, and use the already-supported `manual_text` capture method. The existing

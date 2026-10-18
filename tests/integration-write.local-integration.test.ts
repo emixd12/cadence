@@ -1,4 +1,5 @@
 import { integrationWriteHash } from "@/lib/services/integration-write.service";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -13,6 +14,7 @@ import { getBehaviorById } from "@/lib/db/behaviors.repo";
 import { getOccurrenceById } from "@/lib/db/occurrences.repo";
 import { createBehaviorForUser } from "@/lib/services/behavior.service";
 import { applyOccurrenceStatusTransition, updateOccurrenceNote } from "@/lib/services/occurrence.service";
+import { serializeIntegrationBehavior, serializeIntegrationOccurrence } from "@/lib/services/integration-read-serialization";
 import { integrationBehaviorInput } from "@/lib/services/integration-behavior-input";
 import { listOccurrenceStatusEventsByOccurrenceIds } from "@/lib/db/occurrenceStatusEvents.repo";
 import { validateOperationOutput, type IntegrationOperationInput } from "@cadence/core/integration";
@@ -154,7 +156,7 @@ localDescribe("integration writes on isolated local Supabase", () => {
     const input = { ...createInput, title: "Interrupted", idempotency_key: "interrupted-225" };
     const rpc = a.supabase.rpc.bind(a.supabase);
     const spy = vi.spyOn(a.supabase, "rpc").mockImplementation(((...args: Parameters<typeof rpc>) => {
-      if (args[0] !== "integration_apply_write") return rpc(...args);
+      if (args[0] !== "integration_apply_write" || !(args[1] as { p_args?: { _integration_prepared?: unknown } })?.p_args?._integration_prepared) return rpc(...args);
       return Promise.resolve(rpc(...args)).then(result => {
         expect(result.error).toBeNull();
         return { data: null, error: { message: "Simulated response loss" } };
@@ -231,6 +233,217 @@ localDescribe("integration writes on isolated local Supabase", () => {
     const activity = await listOAuthActivity(a.supabase, { limit: 100 });
     expect(activity.some(event => event.operation === "create_behavior" && event.outcome === "success")).toBe(true);
   });
+  async function outputFixture() {
+    const created = await writeOperationHandlers.create_behavior(a, createInput);
+    if (!created.ok) throw new Error("Output fixture failed");
+    const id = created.value.behavior.id;
+    const { data } = await a.supabase.from("occurrences").select("id").eq("behavior_id", id).order("scheduled_for").limit(1);
+    return { id, oid: data![0].id };
+  }
+
+  function seedHistory(id: string) {
+    const stamp = new Date().toISOString();
+    const history = Array.from({ length: 250 }, () => ({ id: randomUUID(), archived_at: stamp, updated_at: stamp, note: "a".repeat(2000) }));
+    fixtureSql(`update public.behaviors set archive_notes='${JSON.stringify(history)}'::jsonb where id='${id}';`);
+  }
+
+  function fixtureSql(sql: string): string {
+    const databaseUrl = process.env.CADENCE_LOCAL_SUPABASE_DB_URL!;
+    if (new URL(databaseUrl).hostname !== "127.0.0.1") throw new Error("Local fixture requires loopback");
+    return execFileSync("psql", [databaseUrl, "-XqAt", "-v", "ON_ERROR_STOP=1"], {
+      input: sql, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  }
+
+  function productFingerprint() {
+    const tables = ["public.behaviors", "public.behavior_schedules", "public.behavior_schedule_slots", "public.occurrences",
+      "public.occurrence_status_events", "public.behavior_definition_events", "public.behavior_configuration_events",
+      "public.reminder_deliveries", "public.occurrence_sync_state", "cadence_oauth_private.external_references",
+      "cadence_oauth_private.idempotency_records", "cadence_oauth_private.activity"];
+    return fixtureSql(tables.map(table => `select md5(coalesce(string_agg(to_jsonb(t)::text, '' order by to_jsonb(t)::text), ''))
+      from ${table} t where user_id='${a.userId}' ${table.endsWith('.activity') ? "and outcome='success'" : ""};`).join("\n"));
+  }
+
+  it.each([undefined, "over-output"])("rejects oversized status output without committing (%s)", async idempotency_key => {
+    const { oid } = await outputFixture();
+    expect((await a.supabase.from("occurrences").update({ note: "n".repeat(100000) }).eq("id", oid)).error).toBeNull();
+    const row = await getOccurrenceById(a.supabase, a.userId, oid);
+    const reminders = (await a.supabase.from("reminder_deliveries").select("*").eq("occurrence_id", oid)).data;
+    const input = { occurrence_id: oid, status: "completed" as const, ...(idempotency_key ? { idempotency_key } : {}) };
+    const successes = (await listOAuthActivity(a.supabase, { limit: 100 })).filter(event => event.outcome === "success").length;
+    const result = await writeOperationHandlers.set_occurrence_status(a, input);
+    expect(result).toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+    expect(await getOccurrenceById(a.supabase, a.userId, oid)).toEqual(row);
+    expect(await listOccurrenceStatusEventsByOccurrenceIds(a.supabase, a.userId, [oid])).toEqual([]);
+    expect((await a.supabase.from("reminder_deliveries").select("*").eq("occurrence_id", oid)).data).toEqual(reminders);
+    expect((await listOAuthActivity(a.supabase, { limit: 100 })).filter(event => event.outcome === "success")).toHaveLength(successes);
+    expect(await writeOperationHandlers.set_occurrence_status(a, input)).toEqual(result);
+    if (idempotency_key) expect(await beginIdempotentWrite(a.supabase, {
+      operation: "set_occurrence_status", idempotencyKey: idempotency_key, requestHash: integrationWriteHash("set_occurrence_status", input),
+    })).toMatchObject({ state: "started" });
+  });
+
+  it("replays a small Occurrence output despite unrelated large Behavior history", async () => {
+    const { id, oid } = await outputFixture();
+    seedHistory(id);
+    const input = { occurrence_id: oid, status: "completed" as const, idempotency_key: "large-history" };
+    const first = await writeOperationHandlers.set_occurrence_status(a, input);
+    expect(first.ok, JSON.stringify(first)).toBe(true);
+    expect(await writeOperationHandlers.set_occurrence_status(a, input)).toEqual(first);
+    expect(Buffer.byteLength(JSON.stringify(first))).toBeLessThan(1000);
+  });
+
+  it.each(["update_behavior", "archive_behavior", "restore_behavior"] as const)("rolls back oversized %s output and all related writes", async name => {
+    const { id } = await outputFixture();
+    if (name === "restore_behavior") expect(await writeOperationHandlers.archive_behavior(a, { behavior_id: id })).toMatchObject({ ok: true });
+    seedHistory(id);
+    const behavior = await getBehaviorById(a.supabase, a.userId, id);
+    const before = productFingerprint();
+    const input = { behavior_id: id, expected_revision: Temporal.Instant.from(behavior!.updated_at).toString(),
+      ...(name === "update_behavior" ? { title: "Changed" } : {}), idempotency_key: `oversized-${name}` };
+    expect(await writeOperationHandlers[name](a, input)).toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+    expect(productFingerprint()).toEqual(before);
+  });
+
+  it("rolls back a note write when its existing Behavior title exceeds the output cap", async () => {
+    const { id, oid } = await outputFixture();
+    fixtureSql(`update public.behaviors set title=repeat('b',100000) where id='${id}';`);
+    const before = productFingerprint();
+    expect(await writeOperationHandlers.update_occurrence_note(a, { occurrence_id: oid, note: "Changed", idempotency_key: "oversized-note" }))
+      .toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+    expect(productFingerprint()).toEqual(before);
+  });
+
+  it.each(Object.keys(writeOperationHandlers) as (keyof typeof writeOperationHandlers)[])("rejects schema-invalid prepared output before %s commits", async name => {
+    const { id, oid } = await outputFixture();
+    const behavior = await getBehaviorById(a.supabase, a.userId, id);
+    const inputs = {
+      create_behavior: { ...createInput, external_ref: `invalid-${name}`, idempotency_key: `invalid-${name}` },
+      update_behavior: { behavior_id: id, expected_revision: Temporal.Instant.from(behavior!.updated_at).toString(), title: "Changed" },
+      archive_behavior: { behavior_id: id }, restore_behavior: { behavior_id: id },
+      update_occurrence_note: { occurrence_id: oid, note: "Changed" },
+      set_occurrence_status: { occurrence_id: oid, status: "completed" },
+    };
+    const before = productFingerprint();
+    const rpc = a.supabase.rpc.bind(a.supabase);
+    const spy = vi.spyOn(a.supabase, "rpc").mockImplementation(((...args: Parameters<typeof rpc>) => {
+      if (args[0] !== "integration_apply_write") return rpc(...args);
+      return Promise.resolve(rpc(...args)).then(result => {
+        const preview = result.data as unknown as { source?: { behavior: { title: unknown } } };
+        if (preview?.source) preview.source.behavior.title = null;
+        return result;
+      }) as never;
+    }) as typeof a.supabase.rpc);
+    try { expect(await writeOperationHandlers[name](a, inputs[name])).toMatchObject({ ok: false, error: { code: "internal_error" } }); }
+    finally { spy.mockRestore(); }
+    expect(productFingerprint()).toEqual(before);
+  });
+
+  it("fences a concurrent note edit between status preparation and commit", async () => {
+    const { oid } = await outputFixture();
+    const rpc = a.supabase.rpc.bind(a.supabase);
+    let edited = false;
+    const spy = vi.spyOn(a.supabase, "rpc").mockImplementation(((...args: Parameters<typeof rpc>) => {
+      if (args[0] !== "integration_apply_write") return rpc(...args);
+      return Promise.resolve(rpc(...args)).then(async result => {
+        if (!edited && result.data && "source" in (result.data as object)) {
+          edited = true;
+          await updateOccurrenceNote(a.supabase, a.userId, { occurrenceId: oid, expectedNote: "", note: "Concurrent web note" });
+        }
+        return result;
+      }) as never;
+    }) as typeof a.supabase.rpc);
+    try {
+      expect(await writeOperationHandlers.set_occurrence_status(a, { occurrence_id: oid, status: "completed", idempotency_key: "prepare-race" }))
+        .toMatchObject({ ok: false, error: { code: "conflict" } });
+    } finally { spy.mockRestore(); }
+    expect(await getOccurrenceById(a.supabase, a.userId, oid)).toMatchObject({ status: "unresolved", note: "Concurrent web note" });
+    expect(await listOccurrenceStatusEventsByOccurrenceIds(a.supabase, a.userId, [oid])).toEqual([]);
+  });
+
+  it.each([99999, 100000, 100001])("enforces the exact %i compact UTF-8 byte boundary", async bytes => {
+    const { id, oid } = await outputFixture();
+    const behavior = await getBehaviorById(a.supabase, a.userId, id);
+    const row = (await getOccurrenceById(a.supabase, a.userId, oid))!;
+    const stamp = "2026-10-18T12:00:00.123456Z";
+    row.updated_at = stamp;
+    row.note = "é🐴\n\t\"\\'".repeat(1000);
+    const expected = { occurrence: serializeIntegrationOccurrence(row, behavior!, Temporal.Instant.from(a.now.toISOString()), "America/New_York"),
+      previous_status: "unresolved", changed: false };
+    const note = row.note + "x".repeat(bytes - Buffer.byteLength(JSON.stringify(expected)));
+    // Fix the fixture's clock so this tests the exact boundary rather than random microsecond width.
+    fixtureSql(`begin; alter table public.occurrences disable trigger set_occurrences_updated_at;
+      update public.occurrences set note='${note.replaceAll("'", "''")}', updated_at='${stamp}' where id='${oid}';
+      alter table public.occurrences enable trigger set_occurrences_updated_at; commit;`);
+    const input = { occurrence_id: oid, status: "unresolved" as const, idempotency_key: `boundary-${bytes}` };
+    const before = productFingerprint();
+    const rpc = a.supabase.rpc.bind(a.supabase);
+    const spy = bytes > 100000 ? vi.spyOn(a.supabase, "rpc").mockImplementation(((...args: Parameters<typeof rpc>) => {
+      if (args[0] !== "integration_apply_write") return rpc(...args);
+      return Promise.resolve(rpc(...args)).then(result => {
+        const preview = result.data as unknown as { source?: { occurrence: { updated_at: string } } };
+        // A shorter preview clock fits; binding the actual microsecond revision must still reject it.
+        if (preview?.source) preview.source.occurrence.updated_at = "2026-10-18T12:00:00Z";
+        return result;
+      }) as never;
+    }) as typeof a.supabase.rpc) : undefined;
+    let first;
+    try { first = await writeOperationHandlers.set_occurrence_status(a, input); }
+    finally { spy?.mockRestore(); }
+    if (bytes > 100000) {
+      expect(first).toMatchObject({ ok: false, error: { code: "limit_exceeded" } });
+      expect(productFingerprint()).toEqual(before);
+      return;
+    }
+    expect(first.ok, JSON.stringify(first)).toBe(true);
+    if (!first.ok) return;
+    expect(Buffer.byteLength(JSON.stringify(first.value))).toBe(bytes);
+    expect(await writeOperationHandlers.set_occurrence_status(a, input)).toEqual(first);
+    const stored = await beginIdempotentWrite(a.supabase, { operation: "set_occurrence_status", idempotencyKey: input.idempotency_key,
+      requestHash: integrationWriteHash("set_occurrence_status", input) });
+    expect(stored.state).toBe("replay");
+    if (stored.state === "replay") {
+      expect(Object.keys(stored.result as object).sort()).toEqual(["output_json", "version"]);
+      expect(Buffer.byteLength(JSON.stringify(stored.result))).toBeLessThanOrEqual(200100);
+    }
+  });
+
+  it("rolls back create, graph, history and external link when receipt storage fails", async () => {
+    const before = productFingerprint();
+    fixtureSql(`create function cadence_oauth_private.test_225_receipt_failure() returns trigger language plpgsql as $$
+      begin if new.idempotency_key='receipt-failure' and new.state='completed' then raise exception 'forced receipt failure'; end if; return new; end $$;
+      create trigger test_225_receipt_failure before update on cadence_oauth_private.idempotency_records
+      for each row execute function cadence_oauth_private.test_225_receipt_failure();`);
+    try {
+      expect(await writeOperationHandlers.create_behavior(a, { ...createInput, external_ref: "receipt-failure", idempotency_key: "receipt-failure" }))
+        .toMatchObject({ ok: false, error: { code: "internal_error" } });
+    } finally {
+      fixtureSql(`drop trigger test_225_receipt_failure on cadence_oauth_private.idempotency_records;
+        drop function cadence_oauth_private.test_225_receipt_failure();`);
+    }
+    expect(productFingerprint()).toEqual(before);
+  });
+
+  it("binds committed schedule ids and revisions to the same public projection as web rows", async () => {
+    const input: IntegrationOperationInput<"create_behavior"> = { ...createInput, idempotency_key: "bound-schedule-ids", schedules: [
+      { recurrence: { frequency: "weekly", interval: 2, days_of_week: ["monday", "friday"] },
+        time_entries: [{ kind: "range", preset: "evening" }, { kind: "exact", start_time: "09:00" }] },
+      { recurrence: { frequency: "monthly", interval: 1, day_of_month: 31 },
+        time_entries: [{ kind: "exact", start_time: "18:00" }, { kind: "range", start_time: "22:00", end_time: "01:00" }] },
+    ] };
+    const created = await writeOperationHandlers.create_behavior(a, input);
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const row = (await getBehaviorById(a.supabase, a.userId, created.value.behavior.id))!;
+    expect(created.value.behavior).toEqual(serializeIntegrationBehavior(row, null));
+    const updated = await writeOperationHandlers.update_behavior(a, { behavior_id: row.id, expected_revision: created.value.behavior.revision,
+      schedules: createInput.schedules, idempotency_key: "replace-schedule-ids" });
+    expect(updated.ok, JSON.stringify(updated)).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.value.behavior).toEqual(serializeIntegrationBehavior((await getBehaviorById(a.supabase, a.userId, row.id))!, null));
+    expect(await writeOperationHandlers.create_behavior(a, input)).toEqual(created);
+  });
+
   it("rechecks actual grant scope inside the atomic transaction", async () => {
     const consent = await approveOAuthConsent(b.supabase, { clientId, redirectUri: "https://client.example/callback",
       codeChallenge: "b".repeat(43), resource: "https://app.cadence-me.com/mcp", scopes: ["cadence.read"],
