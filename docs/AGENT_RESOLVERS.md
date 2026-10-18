@@ -371,6 +371,21 @@ service, repository/migration and model-adapter tests. UI clients render validat
 text, read-only suggestions and trusted source metadata.
 
 
+## Connector expansion ownership (Tickets 220–228)
+
+Planned October 18, 2026; not implemented. No new required resolver module is
+added. `packages/core` owns the extended event validator and the separate
+recorded-activity types, validation, and consumer projection. Provider adapters
+in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
+and field discard. Services own credentials, generations, and fences. Repositories
+in `lib/db` own owner-scoped persistence. UI renders validated results only.
+
+Recorded activity never feeds `status.resolver.ts`, `timeline.resolver.ts`
+Occurrence grouping, reminders, analytics, or exports. Calendar overlap cues keep
+using scheduled events only. Daily Brief reads new sources through the existing
+day-context service after their separate disclosure. Run `npm run resolvers:check`
+after each slice.
+
 ## Briefing configuration, references and planning (Tickets 151–155)
 
 Scope and acceptance remain in `docs/TICKETS.md`.

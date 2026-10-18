@@ -40,7 +40,8 @@ Tickets 116–122 implement optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
-in-app horse briefing. Mobile and broader workspace restructuring remain deferred.
+in-app horse briefing. Tickets 220–228 plan read-only Outlook Calendar, iCloud
+Calendar, and Hevy workout-timing connectors on web and linked desktop. Mobile and broader workspace restructuring remain deferred.
 
 ## Agent operating model
 
@@ -121,6 +122,8 @@ In scope:
 - Local-first macOS desktop tracking parity under Tickets 107–114
 - Optional desktop Google account linking and synchronization under Tickets 116–122
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
+- Read-only Outlook and iCloud Calendar context and Hevy workout timing under
+  Tickets 220–228, each with separate Daily Brief disclosure
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -134,8 +137,12 @@ Out of scope for v1:
 - Supply/refill inventory
 - General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
   the in-app read-only daily briefing in the horse bubble
-- Calendar sync and event editing, except the planned read-only Google Calendar
-  context in Tickets 132–137
+- Calendar sync and event editing, except read-only Google Calendar context in
+  Tickets 132–137 and planned read-only Outlook and iCloud Calendar context in
+  Tickets 220–228
+- Workout writes, coaching, exercise analysis, and automatic Behavior completion
+  from recorded activity
+- EventKit and local-only Mac calendar access
 - Payment/subscription infrastructure
 - Admin dashboards
 - PWA offline cache
@@ -469,6 +476,9 @@ Do not expand scope to solve speculative future requirements.
   service-role key or Google provider credential.
 - Keep desktop session secrets in Keychain, not SQLite, browser storage, logs,
   exports, or backups.
+- Keep connector credentials (Google and Outlook refresh tokens, iCloud
+  app-specific passwords, Hevy API keys) sealed in the hosted private schema.
+  Never send them to clients or store them on desktop.
 - Restrict hosted data to the authenticated user and local data to its stable profile.
 - Use RLS on all user-owned web tables.
 - Never commit `.env` files or secrets.

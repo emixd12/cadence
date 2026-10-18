@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Tickets 220–228 connector expansion — October 18, 2026
+
+The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
+timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
+this branch (`expansion-connectors`, based on `12ea89a`) must merge `main`
+before review.
+
+- Ticket 220 is documentation-complete; independent verification is pending.
+  It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
+  `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
+  `docs/FUTURE_UPDATES.md`. No runtime code, migration, or provider configuration
+  changed.
+- Tickets 221–228 are not started.
+- Evidence: public provider documentation read October 18, 2026 (documented
+  support only). No live-provider, installed, deployed, or public-approval
+  evidence exists.
+- Decision needed before Ticket 227 credential intake: the owner must accept
+  hosted custody of an iCloud app-specific password, which Apple does not
+  document as Calendar-only. Apple's "supported app" authorization has no public
+  developer documentation.
+- Live-access gates: Hevy Pro key, Microsoft app registration and test tenants,
+  and an Apple Account app-specific password. Public-approval gate: Microsoft
+  publisher verification. None blocks source or fixture work.
+
 ## Ticket 186: Cadence project and repository rename — October 7–9, 2026
 
 In progress; local and remote cutovers are done.

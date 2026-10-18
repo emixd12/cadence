@@ -50,11 +50,20 @@ Still deferred:
 - An external advisor/MCP transport. The in-app briefing needs no delegated
   consumer, MCP server or generic connector framework.
 - Two-way Calendar sync and source-event editing.
-- Other connectors for Cadence Daily Brief. The day-context contract may support
-  relevant authorized connectors, but only existing Google Calendar context is
-  in the initial plan. Focus Keeper capabilities remain unverified.
-- Different or multiple Google accounts for one Cadence account, and Calendar
-  connections in account-free desktop mode.
+- Connectors beyond Google Calendar and the Outlook, iCloud, and Hevy sources
+  planned in Tickets 220–228. Focus Keeper capabilities remain unverified.
+- Generic CalDAV coverage for providers such as Fastmail, Zoho, and Yahoo. Each
+  needs its own authentication research and ticket. Not implemented.
+- Read-only subscription-feed calendars, such as Proton shared links. Link
+  possession and freshness limits need disclosure. Not implemented.
+- EventKit access to local-only Mac calendars. It is a native permission, not a
+  web-capable connector, and is outside the approved iCloud path.
+- Apple Account "supported app" authorization for iCloud, if Apple publishes a
+  developer path. It could replace app-specific passwords.
+- Hevy early-stop pagination or change-feed reads, after Hevy documents workout
+  ordering or creation events.
+- Different or multiple accounts per provider for one Cadence account, and
+  connector access in account-free desktop mode.
 - New timezone controls and daylight-saving presentation refinements. Existing
   timezone and day-boundary correctness remains required for the planned feature.
 - Native mobile implementation, web offline caching, and closed-app helpers.

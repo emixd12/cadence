@@ -353,6 +353,170 @@ connection, clears desktop cache and pending state, restores the primary account
 and verifies SQLite integrity and owner rows. Private backups, recordings,
 tokens, account identifiers, and provider payloads stay outside git.
 
+## Worked briefs: connector expansion (Tickets 220–228)
+
+Status, October 18, 2026: Ticket 220 completed these briefs as documentation.
+No runtime code, provider configuration, private account read, or deployment has
+occurred. `docs/EXTERNAL_EVENT_CONTRACT.md` owns the planned wire contracts.
+`STATUS.md` owns current state.
+
+### Shared boundary
+
+- **User benefit:** One Settings connector library shows Google Calendar,
+  Outlook Calendar, iCloud Calendar, and Hevy workout timing. Timeline shows
+  selected scheduled events and recorded workouts as context. Daily Brief may
+  use each source only after its own disclosure.
+- **Data direction:** Provider → Cadence only. Write authority is `none` for
+  every provider.
+- **Account mapping:** The Supabase user ID owns every connection. New provider
+  identities bind to that Cadence account. They need not match the Google
+  sign-in identity. One linked account per provider. Existing Google
+  same-subject rules are unchanged.
+- **Source of truth:** Providers own source records. Hosted connection rows own
+  consent, identity binding, generation, and selection. A validated snapshot owns
+  one read. Desktop caches own only the last complete matching copy. Cadence
+  owns all tracking records.
+- **Onward disclosure:** Separate default-off Daily Brief disclosure per source.
+  The existing `includeCalendar` grant stays Google-only.
+- **Explicit exclusions:** Provider writes, invitation responses, automatic
+  Behavior completion, workout coaching, exercise analysis, Apple Health,
+  EventKit and local-only Mac calendars, multiple accounts per provider,
+  account-free desktop connectors, background polling, a generic connector
+  registry or SDK, new primary routes, and native mobile.
+
+| Platform | Impact |
+|---|---|
+| Web | Provider routes and services under Tickets 222–224 and 227; Settings library and Timeline under Ticket 225; Daily Brief under Ticket 226. |
+| Desktop | Linked-account mode only. Desktop calls hosted brokers with its Supabase session and never stores provider credentials. Per-source disposable caches stay outside `cadence.sqlite3` and user-created backups. No EventKit bridge. Local mode shows the library as requiring an account. |
+| Marketing | Ticket 228 updates provider availability, credential custody, retention, model disclosure, and pending-approval language. No connector runtime. |
+| Future mobile | Deferred. The validated hosted contracts remain reusable. No mobile permission, cache, or offline behavior is implied. |
+
+Shared lifecycle (Ticket 222): connect installs owner-bound AES-256-GCM sealed
+credentials in the existing private schema and increments the generation.
+Disconnect fences new reads, deletes credentials and caches, then performs any
+documented provider revocation. Account deletion captures cleanup, deletes the
+Auth user and cascading connection rows, and then attempts external revocation.
+Credentials, raw responses, and cached source records are excluded from exports,
+BehaviorLog, account synchronization, user-created backups, telemetry, and logs.
+Sealed ciphertext may remain in infrastructure backups for the documented
+seven-day window.
+
+### Provider research, October 18, 2026
+
+Each row is **documented support** from a public source read on October 18,
+2026. None is live-provider, deployed, or public-approval evidence.
+
+| Claim | Source |
+|---|---|
+| Hevy's public API is version `0.0.1`, available only to Hevy Pro users, may change or be abandoned, and uses an `api-key` header. | [Hevy OpenAPI initializer](https://api.hevyapp.com/docs/swagger-ui-init.js) |
+| `GET /v1/workouts` takes `page` (≥ 1) and `pageSize` (max 10) and returns `page`, `page_count`, and `workouts`. It has no date filter and documents no ordering. | Same |
+| `GET /v1/workouts/events?since=` returns updated/deleted events, newest first. Whether workout creation emits an `updated` event is not documented. | Same |
+| The workout schema has `id`, `title`, `routine_id`, `description`, `start_time`, `end_time`, `updated_at`, `created_at`, and `exercises`. It has no location or timezone field. | Same |
+| `GET /v1/user/info` returns `data.id`, `username`, `name`, `url`, units, and `is_pro`. | Same |
+| The same key can create and update workouts, routines, templates, folders, and body measurements. No read-only key scope is documented. No rate limit, 401, or 429 response is documented. Hevy asks hourly or daily pollers to avoid the exact top of the hour. | Same |
+| `calendarView` returns occurrences, exceptions, and single instances in a range. `Calendars.ReadBasic` is least privileged for work/school and personal accounts. `$top` is 1–1,000. Paging uses `@odata.nextLink`. Bounds use their own offsets; responses are UTC unless `Prefer: outlook.timezone` is sent. | [List calendarView](https://learn.microsoft.com/en-us/graph/api/calendar-list-calendarview?view=graph-rest-1.0), updated 2026-06-19 |
+| Listing calendars uses `Calendars.ReadBasic` as least privileged and returns `id`, `name`, `canEdit`, `owner`, and related flags. | [List calendars](https://learn.microsoft.com/en-us/graph/api/user-list-calendars?view=graph-rest-1.0), updated 2026-10-15 |
+| `Calendars.ReadBasic` excludes body, attachments, and extensions and needs no admin consent. | [Permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference), updated 2026-09-15 |
+| Event `id` changes on a move unless `Prefer: IdType="ImmutableId"` is sent. Events expose `isAllDay`, `isCancelled`, `showAs`, `type`, `seriesMasterId`, `originalStart`, `originalStartTimeZone`, `responseStatus`, `changeKey`, and `webLink`. | [Event resource](https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0), updated 2026-04-20 |
+| `sub` is an immutable per-application identifier. `tid` is the tenant; personal accounts use `9188040d-6c67-4c5b-b112-36a304b66dad`. `oid` requires the `profile` scope. Email and `preferred_username` are mutable and must not authorize. | [ID token claims](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference), updated 2026-06-15 |
+| Authority segments are `common`, `organizations`, `consumers`, or a tenant. PKCE is recommended for confidential clients. Refresh tokens need `offline_access`, have no fixed web lifetime, and may be replaced on redemption. | [Authorization code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow), updated 2026-06-15 |
+| Outlook allows 10,000 requests per 10 minutes and four concurrent requests per app and mailbox. | [Throttling limits](https://learn.microsoft.com/en-us/graph/throttling-limits), updated 2026-09-17 |
+| With risk-based step-up consent, users cannot consent to most newer multitenant apps from unverified publishers. Verification needs a verified Microsoft AI Cloud Partner Program account and a non-`onmicrosoft.com` publisher domain. | [Publisher verification](https://learn.microsoft.com/en-us/entra/identity-platform/publisher-verification-overview), updated 2026-06-15 |
+| Apple lets users authorize "supported" third-party apps for iCloud Mail, Calendar, and Contacts and revoke them under Account Data Sharing. It names no eligibility, registration, protocol, scopes, or token lifetime. | [Apple Support 121539](https://support.apple.com/en-us/121539), published 2025-10-07 |
+| Apps without that support can use an app-specific password. It needs two-factor authentication. Users may hold 25. Removing one signs that app out. Changing the Apple Account password revokes all of them. | [Apple Support 102654](https://support.apple.com/en-us/102654), published 2025-10-08 |
+| CalDAV discovery, `calendar-query`, `time-range`, and `expand` are standardized. | [RFC 4791](https://www.rfc-editor.org/rfc/rfc4791), [RFC 5397](https://www.rfc-editor.org/rfc/rfc5397), [RFC 6764](https://www.rfc-editor.org/rfc/rfc6764) |
+
+Research gaps, all **not verified**:
+
+- No Apple developer documentation for the Apple Account authorization flow was
+  found. Its eligibility and protocol remain unknown.
+- Apple publishes no iCloud CalDAV host in a primary source that was found.
+  `caldav.icloud.com` appears only in third-party guides.
+- Apple does not document whether an app-specific password is limited to one
+  service. Cadence treats it as an account credential for Mail, Contacts, and
+  Calendar.
+- No Microsoft primary source documents an API that lets a web app revoke its
+  own delegated grant. Third-party guides point users to Microsoft account
+  consent pages.
+- Hevy documents no key revocation operation, ordering for workout lists, or
+  rate limits.
+
+### Hevy workout timing (Ticket 223)
+
+| Item | Decision |
+|---|---|
+| Identity | `GET /v1/user/info` `data.id` binds the connection. Reconnect with another ID requires disconnect first. Username, name, and profile URL are not stored. |
+| Connect | The user pastes a Hevy API key into Settings on web or linked desktop. The hosted service validates it with `user/info`, rejects `is_pro = false` as `permission_denied`, seals it, and returns only connection state. The key is never echoed, logged, or stored on desktop. |
+| Allowed calls | Exactly `GET /v1/user/info`, `GET /v1/workouts/count`, and `GET /v1/workouts`. A fixed method/path allowlist and tests reject every other call. Cadence enforces read-only behavior because Hevy has no read-only key. |
+| Range | Today and up to 30 prior local dates in the profile timezone. |
+| Pagination | `pageSize=10`, pages 1 through `page_count`. Ceiling: 50 pages (500 workouts). Because ordering is undocumented, `complete` requires reading every page. An account with more than 500 workouts returns `incomplete_pagination`. An early-stop rule requires documented ordering or recorded live evidence and a contract revision. |
+| Fields | Workout ID, start, end, derived duration, and update revision. Everything else is discarded in the adapter. |
+| Missing values | Location and source timezone are `unsupported`. An invalid or reversed interval quarantines the item and makes coverage incomplete. |
+| Failures | 401/403 → `reconnect_required`; 404 user → `reconnect_required`; 429 if returned → `rate_limited`; 5xx and timeouts retry within the shared budget. Schema drift → `malformed_provider_response`. |
+| Refresh | Manual and existing foreground refresh only. No polling. |
+| Disconnect | Delete the sealed key and caches. Hevy documents no revocation call. Settings tells the user to remove or regenerate the key in Hevy's developer settings. |
+| Account deletion | The confirmation screen gives the same Hevy key instruction before deletion. Deletion removes the sealed key with the account. |
+| Model disclosure | Separate default-off Hevy disclosure. Only the activity projection reaches the model. |
+| Live-access gate | An owner-authorized Hevy Pro test account and key. Not available in this wave. |
+| Public-approval gate | None documented. Hevy terms review is not verified. |
+
+### Outlook Calendar (Ticket 224)
+
+| Item | Decision |
+|---|---|
+| Registration | One Microsoft Entra multitenant app that also accepts personal accounts (authority `common`), a server-held client secret or certificate, and exact web callback `/auth/outlook-calendar/callback`. Desktop uses the hosted broker with an opaque Keychain-correlated state, like Google. |
+| Scopes | `openid offline_access Calendars.ReadBasic`. `profile`, `email`, `User.Read`, `Calendars.Read`, and write scopes are not requested. `Calendars.Read` would expose body and attachments that Cadence does not need. |
+| Identity | Validated ID token `tid` plus `sub` (pairwise for Cadence's client ID). Reconnect must return the same pair or the callback fails as `wrong_account`. Email never identifies. |
+| Connect | Five-minute one-use state, PKCE `S256`, nonce, issuer validation per tenant, and exact granted-scope validation. Refresh-token rotation replaces the sealed credential atomically. |
+| Calendars | `GET /me/calendars`, paged by `@odata.nextLink`, at most 20 pages. |
+| Events | `GET /me/calendars/{id}/calendarView` with offset-bearing bounds, `$top=1000`, `Prefer: IdType="ImmutableId"`, and the timezone rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Calendars are read sequentially to stay under four concurrent requests. |
+| Missing values | Location, attendees, organizer, online meeting, and body are `unsupported` by scope or policy. Event state is `unknown` unless cancelled. |
+| Failures | `invalid_grant` or `interaction_required` → `reconnect_required`; 403 → `permission_denied`; 429/503 honor `Retry-After` within the budget. |
+| Disconnect | Delete the sealed refresh credential and caches. No documented app-side revocation call was found. Settings links users to Microsoft account or My Apps permission pages to remove Cadence. |
+| Account deletion | Same as disconnect after Auth deletion. No external revocation call. |
+| Model disclosure | Separate default-off Outlook disclosure using the Calendar consumer projection. |
+| Live-access gate | App registration, server secret, callback configuration, one personal Microsoft account, and one work/school tenant that permits user consent. Not available in this wave. |
+| Public-approval gate | Publisher verification before public release, separate from technical acceptance. Tenant consent policies remain per customer and may require an administrator. |
+
+### iCloud Calendar (Ticket 227)
+
+The user confirmed iCloud on web and desktop on October 18, 2026. A hosted
+server-side connector is the only path that reaches both surfaces. Apple's
+"supported app" authorization has no public developer documentation, so Cadence
+cannot implement it. The only path with Apple-documented user steps is an
+app-specific password used for CalDAV.
+
+| Item | Decision |
+|---|---|
+| Credential | Apple Account email plus a user-generated app-specific password, entered in Settings on web or linked desktop and sent once over HTTPS to the hosted service. The service seals both values. Desktop never stores them. The UI says this credential can reach iCloud Mail, Contacts, and Calendar, that Cadence reads only Calendar, and how to revoke it. |
+| Endpoint | `https://caldav.icloud.com` from third-party evidence only. Redirects are followed only to HTTPS hosts under `icloud.com`, at most three hops. |
+| Discovery | `PROPFIND` depth 0 for `DAV:current-user-principal`; `PROPFIND` on the principal for `CALDAV:calendar-home-set`; `PROPFIND` depth 1 on the home for `DAV:resourcetype`, `DAV:displayname`, `CALDAV:supported-calendar-component-set`, `CALDAV:calendar-timezone`, and `DAV:getetag`. Only collections supporting `VEVENT` are listed. |
+| Identity | The `current-user-principal` href binds the connection. Reconnect with a different principal requires disconnect first. The email is a login value, not an identity key. |
+| Events | `REPORT` `calendar-query` with a `VCALENDAR/VEVENT` comp-filter, a UTC `time-range`, and `calendar-data` with `expand` over the same range, plus `DAV:getetag`. |
+| Allowed methods | Only `PROPFIND` and `REPORT`. A method allowlist and tests reject `PUT`, `DELETE`, `MKCALENDAR`, `PROPPATCH`, `MOVE`, `COPY`, and `POST`. |
+| Bounds | 32 calendars, 31 days, 5 MB per response, and the shared retry budget. |
+| Missing values | Follow the iCloud mapping in `docs/EXTERNAL_EVENT_CONTRACT.md`. Unexpanded recurrence makes that calendar incomplete. |
+| Failures | 401 → `reconnect_required`; 403 → `permission_denied`; 429/503 → `rate_limited` or `provider_unavailable` with `Retry-After`; malformed XML → `malformed_provider_response`; 507 or truncation → `incomplete_pagination`. |
+| Disconnect | Delete the sealed credential and caches. No revocation API exists for this path. Settings tells the user to remove the app-specific password at account.apple.com under Sign-In and Security. |
+| Account deletion | The confirmation screen gives the same instruction before deletion. |
+| Model disclosure | Separate default-off iCloud disclosure using the Calendar consumer projection. |
+| Files | `lib/services/icloud-calendar-provider.ts`, `lib/services/icloud-calendar.service.ts`, `lib/services/icloud-calendar-request.ts`, `lib/db/icloud-calendar.repo.ts`, `app/api/icloud-calendar/{connection,calendars,events}/route.ts`, and `apps/desktop/src/calendar/icloud-calendar.ts`. |
+| Tests | `tests/icloud-calendar-provider.test.ts` with synthetic multistatus fixtures under `tests/fixtures/icloud-calendar/` covering discovery, timed, all-day, floating, `DURATION`, unspecified end, expanded and unexpanded recurrence, cancelled instances, `TRANSP`, 401, 403, 429 with `Retry-After`, 507, oversize, malformed XML, off-domain redirects, and the method allowlist. Lifecycle tests cover sealing, wrong principal, disconnect, account deletion, and export exclusion. |
+| Live-access gate | An owner-authorized Apple Account with two-factor authentication and an app-specific password. Not available in this wave. |
+| Public-approval gate | None for the app-specific-password path. Apple "supported app" eligibility is unknown and not pursued. |
+
+Decision before Ticket 227 starts: the owner must accept hosted custody of an
+app-specific password, which Apple does not document as Calendar-only. Until
+then, only the fixture-backed provider adapter and mapping may proceed. Credential
+intake, storage, and any live read wait for that decision.
+
+### Later coverage, not implemented
+
+Generic CalDAV for providers such as Fastmail, Zoho, and Yahoo, and read-only
+subscription feeds such as Proton shared links, are later coverage. Each needs
+its own provider authentication research, freshness disclosure, and ticket. They
+are listed in `docs/FUTURE_UPDATES.md`. No code, route, or claim exists for them.
+
 ## Proposed improvements
 
 These are proposals, not observed behavior or accepted scope:

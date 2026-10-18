@@ -295,6 +295,18 @@ native fixtures and multi-day resume remain open.
 The interaction registry records implemented controls separately from Ticket 137
 release acceptance. Marketing has no runtime change; native mobile remains deferred.
 
+## Connector expansion (Tickets 220–228)
+
+Planned October 18, 2026; not implemented. In linked-account mode, desktop uses
+the same Settings library and Timeline components and calls hosted Outlook,
+iCloud, and Hevy brokers with its Supabase session. Outlook consent uses the
+existing external-browser and opaque Keychain-state pattern. iCloud and Hevy
+credentials are posted once to the hosted service and never stored on the Mac.
+Per-source disposable caches stay outside `cadence.sqlite3` and user-created
+backups. Disconnect, sign-out, and account switching clear them. Local mode shows
+connectors as requiring a linked account. There is no EventKit bridge. Installed
+evidence is required separately under Ticket 228.
+
 ## Travel implementation — Tickets 162–165
 
 `apps/desktop/src/product.tsx` uses the shared Settings and Timeline travel

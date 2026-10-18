@@ -306,3 +306,116 @@ Tickets 146–148 plan the hosted read-only consumer service; account-free deskt
 stays unchanged and receives no native helper. Marketing documents only verified
 user-visible capabilities. Future native mobile and write execution remain deferred,
 with no implementation here.
+
+## Connector expansion contracts (Tickets 220–228)
+
+Status, October 18, 2026: this is the planned contract. Ticket 220 recorded these
+rules in documentation only. No runtime type, schema, adapter, route, or migration
+exists for Outlook, iCloud, or Hevy yet. Provider claims cite dated public
+documentation in `docs/INTEGRATION_PLAYBOOK.md`; live-provider and
+public-approval evidence is not verified.
+
+### Calendar sources beyond Google
+
+Outlook and iCloud calendars describe scheduled events. They reuse this
+`NormalizedExternalEvent` family because their meanings match: timed or all-day
+scheduled intervals, recurrence instances, cancellation, availability, and
+revisions. Ticket 221 owns the shared type change.
+
+| Rule | Requirement |
+|---|---|
+| Source literal | `ExternalEventSource` adds `outlook_calendar` and `icloud_calendar`. Google stays `google_calendar`. |
+| Adapter versions | `outlook-calendar-v1` and `icloud-calendar-v1`. Google stays `google-calendar-v1`. |
+| Wire version | Google responses keep exact schema `1.0.0` and their current bytes and routes. New sources use schema `1.1.0`, which adds only the new source and adapter literals. `1.1.0` snapshots are served only by new provider routes. A desktop client that accepts only `1.0.0` never receives them. |
+| Validator | Accepts `1.0.0` only with Google literals and `1.1.0` only with Outlook or iCloud literals. Every other version fails as `unsupported_schema_version`. |
+| Cache identity | Every cache or stored snapshot key includes source, account ID, connection generation, selected calendar IDs, and requested range. A snapshot from one source can never satisfy or clear another source's cache. |
+| Range | Same as Google: today through at most today + 30, inclusive, in the profile timezone. Provider end bound is the next local midnight after the inclusive end date. |
+| Bounds | At most 32 selected calendars per source and 20 pages per calendar where the provider paginates. At most two retries per request, with capped backoff and a bounded `Retry-After` of up to five minutes. |
+| Failures | Reuse the stable read error codes above. Do not add provider-specific codes. |
+| Writes | None. Provider adapters expose no create, update, delete, respond, or move operation. |
+
+Outlook mapping (Ticket 224) uses Microsoft Graph `calendarView`:
+
+| Normalized fact | Graph source and rule |
+|---|---|
+| Identity | Calendar `id`, event `id` requested with `Prefer: IdType="ImmutableId"`, `seriesMasterId`, and `originalStart` for instance identity. `iCalUId` is never the sole deduplication key. |
+| Timed interval | `start` and `end` (`dateTimeTimeZone`), normalized to UTC instants with the returned `timeZone`. Query bounds carry explicit offsets because Graph interprets `startDateTime`/`endDateTime` by their offset, or as UTC without one. |
+| All-day span | `isAllDay = true`. Graph documents all-day bounds as midnight in one timezone and returns UTC unless `Prefer: outlook.timezone` is sent. The adapter sends the profile timezone in that header, reads all-day dates from the returned values, and quarantines values that are not midnight. Graph's acceptance of each IANA profile timezone in that header is not verified; Ticket 224 fixtures and the live gate must prove the chosen form or a mapped Windows name. |
+| Source timezone | `originalStartTimeZone` when it maps to IANA; otherwise request fallback with `sourceTimezoneFallback` recorded. `tzone://Microsoft/Custom` is a fallback. |
+| State | `isCancelled = true` becomes a tombstone. Live events use `unknown` state because Graph has no confirmed/tentative event status. |
+| Availability | `showAs`: `free` → free; `busy` and `oof` → busy; `tentative`, `workingElsewhere`, and `unknown` → unknown. |
+| User response | `responseStatus.response`, mapped to the existing response vocabulary. |
+| Revision | `lastModifiedDateTime` and `changeKey`. |
+| Details | `subject` only, as bounded untrusted plaintext. `Calendars.ReadBasic` excludes body, attachments, and extensions. Location, attendees, organizer, and online-meeting data are not requested in the first slice and use `unsupported`. |
+| Source link | `webLink` is converted to the current Outlook on the web format documented by Microsoft and must be HTTPS. |
+| Pagination | `$top` of at most 1,000 per page. Completion requires a response without `@odata.nextLink`. |
+
+iCloud mapping (Ticket 227) uses CalDAV:
+
+| Normalized fact | CalDAV/iCalendar source and rule |
+|---|---|
+| Identity | Calendar collection href, `UID`, and `RECURRENCE-ID`. The normalized ID is derived from account, collection href, UID, and recurrence ID. |
+| Timed interval | `calendar-query` with `CALDAV:expand`, which RFC 4791 §9.6.5 defines as returning expanded instances in UTC. `DTEND` or `DURATION` defines the end. A `DATE-TIME` start with neither is `{ kind: "unknown", reason: "end_unspecified" }`. |
+| All-day span | `DTSTART;VALUE=DATE`. Missing end means one calendar date. |
+| Floating time | Interpret with the collection `calendar-timezone` when present; otherwise the profile timezone with the fallback recorded. |
+| Recurrence | If a returned `VEVENT` still contains `RRULE`, the server did not expand it. Mark that calendar's coverage incomplete and recurrence capability unsupported. The first slice performs no client-side RRULE expansion. |
+| State | `STATUS`: `CONFIRMED`, `TENTATIVE`, or absent → confirmed, tentative, or unknown. `CANCELLED` becomes a tombstone. |
+| Availability | `TRANSP`: `OPAQUE` → busy; `TRANSPARENT` → free; absent → unknown. |
+| User response | Not read in the first slice; null with `unsupported`. |
+| Revision | `DAV:getetag` and `LAST-MODIFIED`. |
+| Details | `SUMMARY` only, as bounded untrusted plaintext. Description, location, attendees, organizer, alarms, attachments, and URLs are not read in the first slice and use `unsupported`. |
+| Source link | None. Use `unsupported`. |
+| Pagination | CalDAV `calendar-query` has no page token. A `507` response or a truncated multistatus is `incomplete_pagination`. Response bodies are capped at 5 MB per calendar. |
+
+### Recorded activity snapshot (Hevy)
+
+A recorded workout is an actual past interval. It is not a scheduled event and
+never enters `NormalizedExternalEvent`, Calendar markers, Calendar selection, or
+overlap cues. Ticket 221 adds a separate `RecordedActivitySnapshotV1` beside the
+event snapshot in `packages/core`.
+
+| Field | Unit/null rule |
+|---|---|
+| `schemaVersion` | Exact `1.0.0` for the recorded-activity contract. It is versioned independently from the event snapshot. |
+| `adapterVersion` | `hevy-workouts-v1`. |
+| `source` | `hevy`. |
+| `accountId`, `connectionGeneration` | Same meanings as the event snapshot. |
+| `requestedRange` | Inclusive `startLocalDate`/`endLocalDate` plus IANA `timezone`. Default and maximum: today and up to 30 prior local dates. |
+| `fetchedAt` | UTC instant. |
+| `completeness` | `complete` only after every page is read. Otherwise `incomplete` with a stable failure. |
+| `coverage` | `pagesRead`, provider `pageCount`, `itemCount`, and `paginationComplete`. |
+| `activities[].id` | Opaque account-scoped ID derived from source and provider workout ID. |
+| `activities[].kind` | `workout`. |
+| `activities[].startAt` / `endAt` | UTC instants from Hevy `start_time`/`end_time`. End is exclusive and must be later than start; otherwise the item is quarantined and coverage is incomplete. |
+| `activities[].duration` | `{ kind: "known", seconds }`, derived by instant arithmetic. Never supplied independently. |
+| `activities[].localStartDate` | Profile-timezone date of `startAt`. A workout belongs to the range when its interval intersects the requested local days. |
+| `activities[].revision` | `providerUpdatedAt` from `updated_at`, or null with availability `unavailable`. |
+| `activities[].fieldAvailability` | `location: "unsupported"` and `sourceTimezone: "unsupported"`. Hevy's documented workout schema has no location or timezone field. Missing location is never inferred from Behavior locations, travel settings, or titles. |
+
+The adapter discards `title`, `description`, `routine_id`, `exercises`, sets,
+weights, reps, notes, and every other field before validation. They never cross
+the adapter boundary, enter caches, or reach a consumer.
+
+Recorded activity never completes, marks, or changes a Behavior, Occurrence,
+status, Note, reminder, or tracked time. A later feature that suggests a match
+needs its own ticket and explicit user action.
+
+### Separate Daily Brief disclosure
+
+Connection and display never grant Daily Brief disclosure. The existing
+`includeCalendar` preference keeps its current meaning: Google Calendar only.
+Ticket 226 adds one separate default-off disclosure per new source:
+Outlook Calendar, iCloud Calendar, and Hevy workout timing. Enabling one
+increments the disclosure revision. Validators keep accepting stored preference
+records written before these keys existed and treat missing keys as off.
+
+The consumer projection for Outlook and iCloud equals the Google projection
+above, with connector kind `outlook_calendar` or `icloud_calendar`. The activity
+projection contains only the opaque activity reference, start/end, duration,
+local start date, `location: unsupported`, adapter/schema versions, generation,
+coverage, fetched time, freshness, completeness, and failures. Titles, provider
+IDs, and credentials never enter model input.
+
+Disconnecting a source, disabling its disclosure, switching accounts, or
+changing its connection generation fences pending briefing delivery for that
+source.

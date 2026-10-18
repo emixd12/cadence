@@ -13183,3 +13183,282 @@ Platform impact:
 | Future mobile | Not applicable: no mobile implementation or identifiers change. |
 
 Execution evidence: `docs/qa/cadence-project-rename.md`.
+
+## Connector expansion: Tickets 220–228
+
+Filed October 18, 2026 after the owner approved the connector expansion plan and
+confirmed iCloud Calendar on web and desktop. `origin/main` already allocates
+Tickets 187–219 (travel and other work). This branch began before those
+tickets and must merge `main` before review. These numbers avoid that collision.
+
+Source of truth: the October 18 connector request, `AGENTS.md`,
+`docs/INTEGRATION_PLAYBOOK.md#worked-briefs-connector-expansion-tickets-220228`,
+and `docs/EXTERNAL_EVENT_CONTRACT.md#connector-expansion-contracts-tickets-220228`.
+These tickets add read-only Outlook Calendar, iCloud Calendar, and Hevy workout
+timing to the existing Settings library, Timeline, and Daily Brief bubble.
+They add no provider writes, automatic Behavior completion, general chat,
+workout coaching, exercise analysis, Apple Health, EventKit bridge, generic
+connector framework, background polling, new primary route, or mobile app.
+
+| Ticket | Delivery slice | Dependencies |
+|---|---|---|
+| 220 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
+| 221 | Shared calendar-source and recorded-activity contracts | 220 |
+| 222 | Secure lifecycle for new connectors | 221 |
+| 223 | Hevy workout timing connector | 222 |
+| 224 | Outlook Calendar connector | 222 |
+| 225 | Connector library and Timeline on web and desktop | 223, 224; 227 when ready |
+| 226 | Separately approved connector context in Daily Brief | 225 |
+| 227 | iCloud Calendar connector | 222; owner custody decision below |
+| 228 | Verification and disclosure reconciliation | 221–227 |
+
+Tickets 223 and 224 may run in parallel in separate provider files. Shared schema,
+registry, Settings, Timeline, and briefing files are edited serially.
+
+Release gates stay separate. **Live access** means an owner-authorized provider
+account or configuration exists for a bounded test. **Public approval** means a
+provider or platform approved Cadence's client. Missing live access does not
+block source or fixture work. Neither gate follows from filing these tickets.
+
+### Shared verification for Tickets 220–228
+
+Run all seven required commands from `AGENTS.md` for every code slice. Shared core
+changes also run `npm run core:check`. Reusable UI runs `npm run design-system:check`,
+desktop typecheck/build, and desktop and 390px browser QA on the first free
+loopback port in 4321–4330. Schema changes need tracked migrations, updated
+`docs/DATA_MODEL.md` and types, and replay on a verified disposable local
+database. Never reset a retained database. Use synthetic fixtures; do not print
+credentials or private provider records.
+
+## Ticket 220: Connector scope and provider contracts
+
+Status: documentation complete October 18, 2026; independent verification pending.
+
+Goal: record the approved scope, provider research, contracts, and gates before
+runtime work.
+
+Acceptance:
+
+- Integration briefs for Hevy, Outlook, and iCloud record identity binding,
+  fields, ranges, pagination, missing values, credentials, disconnect, account
+  deletion, model disclosure, and live-access and public-approval gates.
+- Every provider claim cites dated public documentation and is labeled
+  documented support only.
+- The event contract adds Outlook and iCloud mappings; a separate
+  recorded-activity contract covers Hevy.
+- CalDAV and subscription feeds are later coverage only.
+- `AGENTS.md`, the product spec, route map, resolver ownership, desktop parity,
+  future updates, and `STATUS.md` agree.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Documentation only; runtime follows in 221–227. |
+| Desktop | Documentation only; linked-account consumption follows in 222 and 225. |
+| Marketing | No public copy changes; Ticket 228 owns disclosure updates. |
+| Future mobile | Not applicable: no mobile contract or permission is added. |
+
+## Ticket 221: Shared calendar-source and recorded-activity contracts
+
+Status: not started.
+
+Goal: let validated contracts carry Outlook and iCloud events and Hevy workout
+timing without changing Google wire behavior.
+
+Acceptance:
+
+- `ExternalEventSource`, adapter versions, JSON Schema, and runtime validation
+  accept the new calendar sources only under schema `1.1.0`. Google stays exactly
+  `1.0.0`, with byte-equal fixtures.
+- `RecordedActivitySnapshotV1` types, schema, validation, and consumer projection
+  exist in `packages/core` with the fields in the contract.
+- Validators reject cross-source, cross-account, reversed-interval, and
+  unsupported-version input. Excluded Hevy fields cannot appear.
+- `packages/core/src/types/advisor-day-context.ts` accepts the new connector kinds
+  only behind separate disclosure flags (wired in 226).
+- Contract tests prove older desktop validators still accept current Google
+  responses.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Shared validators used by provider services and UI. |
+| Desktop | Same core package; desktop caches validate before replacement. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Shared contract remains reusable; no mobile code. |
+
+## Ticket 222: Secure lifecycle for new connectors
+
+Status: not started.
+
+Goal: give each new source owner-bound sealed credentials, generations,
+disconnect, account-switch, and account-deletion cleanup.
+
+Acceptance:
+
+- Additive migration for per-provider connection, identity, generation,
+  selection, and sealed credential rows with RLS. Credentials stay in the private
+  schema and never reach clients.
+- One linked account per provider. Reconnect with a different provider identity
+  requires disconnect first. Google rules and rows are unchanged.
+- Disconnect fences reads, deletes credentials and caches, and returns the
+  provider-specific revocation instruction.
+- `lib/services/account.service.ts` deletion captures cleanup for every provider.
+  Failed Auth deletion preserves connections.
+- Exports, BehaviorLog, account sync, user-created backups, telemetry, and logs
+  exclude credentials and source records; tests prove it.
+- Desktop per-source disposable caches stay outside `cadence.sqlite3` and clear on
+  disconnect, sign-out, and account switch.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Hosted schema, repositories, and services. |
+| Desktop | Cache files and coordinator cleanup for linked accounts; no credentials stored. |
+| Marketing | Not applicable until 228 updates privacy text. |
+| Future mobile | Deferred; would define its own cache and cleanup. |
+
+## Ticket 223: Hevy workout timing connector
+
+Status: not started.
+
+Goal: show recorded Hevy workout timing from today and up to 30 prior days.
+
+Acceptance: follow the Hevy brief exactly. Only the three allowlisted `GET` calls
+are possible. The API key is sealed server-side. Pagination reads every page up to
+50 pages and otherwise reports `incomplete_pagination`. The adapter discards all
+exercise, title, routine, and note data. Location stays unsupported. Fixtures
+cover non-Pro, revoked key, empty, populated, reversed interval, schema drift,
+over-ceiling, and retry exhaustion. No live Hevy account is used without owner
+authorization.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `lib/services/hevy-*.ts`, `lib/db/hevy.repo.ts`, and `app/api/hevy/*` routes. |
+| Desktop | Hosted broker only, through 225; key entry posts once to the server. |
+| Marketing | Disclosure in 228. |
+| Future mobile | Deferred. |
+
+## Ticket 224: Outlook Calendar connector
+
+Status: not started.
+
+Goal: show selected Outlook calendars with the same scheduled-event semantics as
+Google.
+
+Acceptance: follow the Outlook brief exactly. Scopes are `openid offline_access
+Calendars.ReadBasic`. Identity is `tid` plus `sub`. Reads use `calendarView`
+with immutable IDs and bounded paging. Fixtures cover personal and work/school
+tokens, wrong account, consent denial, cancelled and recurring instances,
+all-day timezone handling, throttling, and partial pages. Live tenant access and
+publisher verification remain separate gates.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `lib/services/outlook-calendar-*.ts`, `lib/db/outlook-calendar.repo.ts`, `app/api/outlook-calendar/*`, and `/auth/outlook-calendar/callback`. |
+| Desktop | `apps/desktop/src/calendar/outlook-calendar.ts` using the hosted broker and opaque Keychain state. |
+| Marketing | Disclosure in 228. |
+| Future mobile | Deferred. |
+
+## Ticket 225: Connector library and Timeline on web and desktop
+
+Status: not started.
+
+Goal: one Settings connector library and Timeline presentation for all sources.
+
+Acceptance:
+
+- Settings lists Google Calendar, Outlook Calendar, iCloud Calendar, and Hevy with
+  accurate not-configured, disconnected, connected, stale, incomplete, and error
+  states. One source failing leaves the others and tracking usable.
+- Timeline shows calendar events with existing Calendar presentation and source
+  labels. Recorded workouts use a distinct, non-Calendar presentation without
+  titles or exercise data and never change Occurrences.
+- Update `interaction-registry.json` and the design-system catalogs only for
+  implemented interactions. Use impeccable and design-system-bench.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Existing Settings and Timeline components. |
+| Desktop | Shared components; local mode shows connectors as requiring a linked account. |
+| Marketing | Not applicable until 228. |
+| Future mobile | Responsive web only; no native mobile. |
+
+## Ticket 226: Separately approved connector context in Daily Brief
+
+Status: not started.
+
+Goal: let Daily Brief use each new source only after its own disclosure.
+
+Acceptance: add default-off Outlook, iCloud, and Hevy disclosure preferences.
+`includeCalendar` stays Google-only. Older stored preferences validate with new
+keys treated as off. Each enablement changes the disclosure revision. Model input
+uses only the documented projections. Disconnect, disablement, account change,
+and generation change fence pending delivery. Missing or partial coverage never
+proves free time or workout absence.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `DailyBriefSettingsPanel`, preference validators, day-context service, and briefing pipeline. |
+| Desktop | Shared bubble and Settings in linked-account mode. |
+| Marketing | Model-data disclosure in 228. |
+| Future mobile | Deferred. |
+
+## Ticket 227: iCloud Calendar connector
+
+Status: not started. Credential intake waits for the owner custody decision.
+
+Goal: show selected iCloud calendars on web and linked desktop through a hosted
+CalDAV connector.
+
+Decision needed: Apple documents no developer path for its "supported app"
+authorization. The implementable path stores an Apple Account email and a
+user-generated app-specific password, sealed server-side. Apple does not document
+that password as Calendar-only. The owner must accept that custody before
+credential intake, storage, or live reads. Fixture-only adapter work may proceed.
+
+Acceptance: follow the iCloud brief exactly, including the pinned operations,
+`PROPFIND`/`REPORT` allowlist, bounds, file paths, and tests. Disconnect and
+account deletion tell the user to revoke the app-specific password. No EventKit
+or local Mac calendar access.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Files listed in the iCloud brief. |
+| Desktop | `apps/desktop/src/calendar/icloud-calendar.ts` through the hosted broker; no credential storage. |
+| Marketing | Disclosure in 228. |
+| Future mobile | Deferred. |
+
+## Ticket 228: Verification and disclosure reconciliation
+
+Status: not started.
+
+Goal: independently verify 221–227 and align public and in-app disclosures.
+
+Acceptance: re-run all required checks and the acceptance matrix in the
+integration playbook. Update Privacy, FAQ, user guide, and marketing provider
+claims with verified availability only. Record source, fixture, live-provider,
+installed-native, deployed, and public-approval evidence separately in
+`STATUS.md`. Live and approval gaps stay explicit.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | Verification and in-app disclosure text. |
+| Desktop | Linked-account verification; installed evidence only when a build is authorized. |
+| Marketing | `apps/marketing` copy for provider availability and privacy. |
+| Future mobile | Not applicable: no mobile surface. |

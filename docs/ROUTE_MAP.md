@@ -156,6 +156,28 @@ No route creates, changes, or deletes a provider event.
 the initiating cookie user. Desktop callbacks use a fixed result and opaque
 Keychain-correlated state, never credentials.
 
+## Planned connector routes (Tickets 222–227)
+
+Planned October 18, 2026; none is implemented. Each provider gets its own routes,
+mirroring the Google connector. No generic connector route or new primary screen
+is added. All responses are no-store, use the same session, same-origin, and
+Tauri-origin rules, and expose no provider write.
+
+| Route | Methods | Ticket | Purpose |
+|---|---|---:|---|
+| `/api/outlook-calendar/connection` | GET, POST, DELETE | 224 | Status, start consent, disconnect |
+| `/auth/outlook-calendar/callback` | GET | 224 | One-use state, PKCE, same `tid`/`sub` check, sealed install |
+| `/api/outlook-calendar/calendars` | GET, PUT | 224 | List readable calendars; save selection |
+| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/icloud-calendar/connection` | GET, POST, DELETE | 227 | Status, accept credential once, disconnect |
+| `/api/icloud-calendar/calendars` | GET, PUT | 227 | Discover `VEVENT` calendars; save selection |
+| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/hevy/connection` | GET, POST, DELETE | 223 | Status, accept API key once, disconnect |
+| `/api/hevy/workouts?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot; today and up to 30 prior days |
+
+Routes call provider services; services own credentials, provider I/O, and
+validation. Settings remains the only connector UI location.
+
 ## In-app briefing boundary (Tickets 145–148)
 
 Current code still has disabled `GET /api/advisor/day-context`: 401 without a
