@@ -1,8 +1,9 @@
 # MCP server local acceptance — Ticket 228
 
 Date: 2026-10-18. Starting foundation: `1cb5314d42d1e22e577d3b3685586a4ba924bd61`.
-Branch: `mcp-create`. No hosted actions or deployment. Inspector acceptance is
-pending the Ticket 227 local runtime handoff; this document does not claim it passed.
+Branch: `mcp-create`. Implementation commit `1bbdca5`; Inspector tested with
+Ticket 227 UI at `7019a80`. No hosted actions or deployment. Inspector OAuth and
+all 16 tool happy paths passed. The error-display limitation below remains.
 
 ## Runtime and isolation
 
@@ -53,11 +54,10 @@ npx vitest run tests/mcp-server.test.ts tests/mcp-operation.test.ts
 npx vitest run tests/mcp-server.local-integration.test.ts
 ```
 
-Initial evidence: focused 24 tests pass; local 12 tests pass; full suite 2,757
-passes and 91 skips before the final discovery regression. Lint,
-`interactions:check` and `resolvers:check` pass. `agents:check` initially detected
-Ticket 227 interaction-map entries still in progress. Final repository gates
-and Inspector evidence will be recorded below after the shared runtime handoff.
+Evidence: focused 24 tests pass; local 12 tests pass (rerun with SDK-client
+error assertions at 17:57 UTC); full suite 2,758 passes and 91 skips at 17:50 UTC.
+Lint, `agents:check`, `interactions:check`, `resolvers:check` and
+`typecheck` pass. Production build passes with `/mcp` emitted as a dynamic Node route.
 
 ## Protocol and client limits
 
@@ -74,3 +74,80 @@ tool remains deferred. [Official guidance](https://developers.openai.com/plugins
 
 No live Claude/ChatGPT connection, directory approval, hosted deployment or
 Node 24 execution is claimed. Those release checks remain separate.
+
+
+## MCP Inspector 2.11.0 — actual browser run
+
+17:52–17:57 UTC, 2026-10-18. Cadence `next dev` bound to `127.0.0.1:4321`;
+Inspector web at `127.0.0.1:4324`, sandbox/app listeners at 4325/4326, all loopback.
+4322 and 4323 were occupied when the ports were selected. Inspector was installed
+through npm exec, with no repository dependency. Private catalog/storage paths,
+`MCP_INSPECTOR_SECRET_STORE=memory`, `MCP_INSPECTOR_PERSIST_TOKENS=none`, and
+browser auto-open disabled kept test credentials out of the normal Inspector profile.
+The embedded workspace browser failed to mount; a dedicated Chrome session completed
+acceptance. No test auth bypass was added: the existing `CADENCE_ENABLE_TEST_LOGIN=1`
+route created disposable users against this task's isolated Supabase instance.
+
+Reproduction:
+
+1. Launch the local app with the isolated Supabase keys and signing JWK supplied
+   privately, the MCP kill switch enabled, and the exact local issuer.
+2. Launch Inspector with a private writable catalog containing a `streamable-http`
+   server at `/mcp`, `protocolEra: "auto"`, and explicit free ports from 4321–4330.
+3. Connect. Inspector discovers metadata, dynamically registers a native client,
+   and starts PKCE OAuth. Cadence preserves the pending consent through local
+   test login. Allow the requested read scope. Inspector completes authorization,
+   negotiates 2026-07-28, and lists 16 tools.
+4. In Inspector Server Settings → OAuth Settings, set scopes to `cadence.read
+   cadence.behaviors.write cadence.occurrences.write`. Clear stored OAuth state
+   (revoking the earlier token) and reconnect. Both write checkboxes appear on
+   Cadence's consent screen; allow them for the synthetic user.
+5. Execute account context, categories, Behaviors, Timeline, Behavior create/get,
+   Occurrence list/get/status/note, adherence, search/fetch, Behavior update,
+   archive and restore. Every call succeeds with structured output. Use the
+   returned IDs/revision and stable idempotency keys, not copied real records.
+6. Clear Inspector OAuth state and reconnect. Before approving, use the existing
+   local test-login route with the same pending-consent return path to create a
+   second user. Approve and verify its Behavior list is empty. Target the first
+   user's Behavior with get/archive: both server calls return `not_found`.
+   SQL activity confirms those exact errors and the first Behavior remains active.
+
+Screenshots are attached to the Ticket 228 task note and PR Context. Consent shows
+both write scopes; success shows the 16-tool catalog and restored synthetic Behavior.
+No OAuth token, authorization code or secret is included in those images.
+
+### Inspector-specific limitation
+
+Inspector 2.11.0's extra structured-output validator validates a present
+`structuredContent` against the success schema even when `isError: true`. Thus a
+valid `{error: {code: "not_found", ...}}` tool result appears as a local `-32602`
+"Invalid Parameters" error. Its bundled `sH` validator checks `isError` only
+when structured content is absent. Cadence's raw response and database activity
+retain `not_found`; the official SDK client's `callTool` correctly returns the
+tool error in both protocol modes. The live integration regression asserts this
+for cross-account get/archive after `tools/list` has cached the output schemas.
+This is a client display limitation, not a successful cross-account read/write.
+No success schema or operation contract was broadened to mask it.
+
+Inspector also reports nonblocking portability warnings for legal JSON Schema
+nullable type arrays (for example `["string", "null"]`). It reports no schema
+errors, and all happy paths succeed. Gemini/OpenAPI dialect support is outside
+this ticket. Live Claude/ChatGPT acceptance remains Ticket 232.
+
+
+## Final gates and cleanup
+
+All required repository gates pass: `npm run test` (2,758 passed, 91 skipped),
+`npm run lint`, `npm run typecheck` (including Next route type generation),
+`npm run build`, `npm run agents:check`, `npm run interactions:check`, and
+`npm run resolvers:check`. Focused transport/admission tests: 24 passed. Actual
+Supabase integration tests: 12 passed, including SDK `isError` handling in both
+protocol modes. Final changed-test lint and repository contract checks pass.
+Checks ran on 2026-10-18 at 17:47–17:59 UTC with Node 26.0.0; Node 24 remains
+unverified. No new schema migration was required.
+
+The dev server, Inspector, and private Docker proxy stopped. Supabase stopped
+with `--no-backup`. No `cadence-mcp-228` containers, volumes or network remain;
+no task listeners remain on 4321/4324–4326 or 56920–56929. Private signing keys,
+Inspector state, credential-bearing runtime/start logs and the proxy socket were
+removed. Browser test tabs closed. Owner and sibling databases were not touched.

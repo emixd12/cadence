@@ -13268,7 +13268,9 @@ Scope and acceptance:
 
 ## Ticket 228: MCP endpoint
 
-Status: implementing October 18, 2026 (wave 3); local transport tests pass, Inspector acceptance pending.
+Status: implemented locally October 18, 2026 (wave 3); awaiting independent review.
+Inspector OAuth and all 16 tool happy paths pass; its error-display limitation is
+recorded in `docs/qa/mcp-server.md`.
 Dependencies: 221–226.
 
 Goal: ship the remote MCP server at the planned `https://app.cadence-me.com/mcp`.

@@ -129,6 +129,10 @@ const sql = (statement: string) => execFileSync("psql", ["-X", "-qAt", "-v", "ON
       const response = await raw(b, name, args);
       expect(await response.json(), name).toMatchObject({ result: { isError: true, structuredContent: { error: { code: "not_found" } } } });
     }
+    for (const name of ["get_behavior", "archive_behavior"] as const) {
+      expect(await b.client.callTool({ name, arguments: { behavior_id: behaviorId } }))
+        .toMatchObject({ isError: true, structuredContent: { error: { code: "not_found" } } });
+    }
     const own = await call(b, "create_behavior", { title: "Second account", schedules: [{ recurrence: { frequency: "daily", interval: 1 }, time_entries: [{ kind: "exact", start_time: "09:00" }] }] });
     expect((await call(a, "list_behaviors")).behaviors.map(row => row.id)).not.toContain(own.behavior.id);
     expect((await call(a, "get_occurrence", { occurrence_id: occurrenceId })).occurrence).toMatchObject({ status: "completed", note: "Synthetic note" });
