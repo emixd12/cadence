@@ -98,6 +98,7 @@ Product and implementation docs:
 22. `/docs/DESKTOP_DATA_MODEL.md`
 23. `/docs/DESKTOP_PARITY.md`
 24. `/docs/INTEGRATION_PLAYBOOK.md`
+25. `/docs/COSTS.md` — update it in the same change as any new paid provider call
 
 ## Product constraints
 
