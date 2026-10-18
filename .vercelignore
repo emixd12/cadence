@@ -1,0 +1,14 @@
+# Local build, signing, acceptance, and linked-provider state never belong in web uploads.
+apps/desktop/.release/
+apps/desktop/dist/
+apps/desktop/signing/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/marketing/dist/
+supabase/.temp/
+.local/
+.claude/
+exports/
+*.tsbuildinfo
+.env*
+!.env.example

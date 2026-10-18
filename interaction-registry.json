@@ -785,7 +785,7 @@
       "classification": "excluded",
       "interaction_marker_count": 86,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Excluded from product interaction counts."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Excluded from product interaction counts. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls."
     },
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
@@ -12132,7 +12132,7 @@
         }
       ],
       "availability": "Available only when the first-party feature is enabled and the hosted service is available; linked desktop also needs connectivity.",
-      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result.",
+      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result. With travel consent and provider clearance, each generated brief requests whole-day travel once, within the eight-leg bound, for the calculated display only (Ticket 214).",
       "failure_result": "Keeps Timeline usable. Bounded client deadlines end stalled reads. Timeout, offline, sign-in, changed-context, rate-limit, pending and interrupted outcomes show distinct nonblocking notices with an explicit retry where one can help. A Timeline change or expiry withdraws delivered text and offers a refresh.",
       "effects": [
         "network_request",
@@ -12816,9 +12816,9 @@
           "control": "Refresh travel"
         }
       ],
-      "availability": "Timeline status line while travel is enabled and a view or a retryable failure message is shown; disabled while a request is in flight.",
+      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload.",
       "success_result": "Replaces the travel estimates and shows the observation time.",
-      "failure_result": "Shows the quota or unavailable message and preserves tracking data; offline desktop shows the unavailable message without a request.",
+      "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message. Tracking data is preserved; offline desktop shows the unavailable message without a request.",
       "effects": [
         "network_request",
         "ui_state"

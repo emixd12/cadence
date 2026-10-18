@@ -1,5 +1,31 @@
 # Implementation Status
 
+## Tickets 213–214 completed — October 18, 2026
+
+All three migrations deployed and read back. Production serves the approved
+Google Maps notices and routing implementation from focused release commit
+`f239e72` (PR #107). Owner QA reserved US$0.135 of US$0.50; Cloud Monitoring
+confirms seven geocodes and ten routes. Four two-leg samples measured server
+p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
+Web narrow-layout and Refresh travel checks pass. Review fixes withdraw cached
+guidance for reopened stops and changed durations, and check duration history
+before reserving spend.
+
+Installed preview.50 passes linked-account synchronization, selected-Calendar
+loading, foreground travel activation and Refresh travel. The shared planner
+safely reconciles independently generated untouched Occurrences with hosted
+identities. Native apply preserves the unique schedule constraint atomically.
+All 1,456 prior status events, 13 time sessions, 34 Notes and import records
+remain intact. The outbox is empty; SQLite integrity and foreign-key checks pass.
+No manual private database repair was applied.
+
+Validation: 2,378 TypeScript tests passed (31 skipped), 110 native tests passed;
+required checks and both frontend builds pass. Production deployment before the
+PR's main promotion is `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
+Six-leg and before/after performance remain unmeasured. Native current-device
+position and Apple-trusted distribution retain Tickets 115/165 gates.
+See `docs/qa/travel-release.md` for evidence and measurement limits.
+
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 
 Completed. The local folder and GitHub repository are renamed to `cadence`

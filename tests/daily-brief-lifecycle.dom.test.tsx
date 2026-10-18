@@ -361,3 +361,15 @@ it("cancels an in-flight attempt on sign-out", async () => {
   await act(() => root.render(<DailyBriefLauncher client={null} sessionKey="local" />));
   expect(signal?.aborted).toBe(true);
 });
+
+
+it("signals whole-day travel only after a brief is ready", async () => {
+  const listener = vi.fn();
+  window.addEventListener("cadence:brief-travel", listener);
+  try {
+    await act(() => root.render(<DailyBriefLauncher client={client("travel-owner")} travelAccountId="travel-owner" />));
+    expect(listener).toHaveBeenCalledOnce();
+    await act(() => window.dispatchEvent(new Event("focus")));
+    expect(listener).toHaveBeenCalledOnce();
+  } finally { window.removeEventListener("cadence:brief-travel", listener); }
+});
