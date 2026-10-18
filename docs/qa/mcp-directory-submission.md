@@ -348,13 +348,28 @@ approved account credentials. Do not put those credentials in plugin metadata.
    write scopes for the positive cases. Complete consent and return to Claude.
 3. Run P1–P5 above. Exercise all 16 tools, including `search` and `fetch` in P2.
    Confirm each write and inspect the result in the web Timeline or Behaviors.
-4. Repeat a confirmed write using the same idempotency key in Inspector. Check
-   that a stale revision yields `conflict`, without a second mutation. Use the
-   official SDK response to inspect structured tool errors; Inspector 2.11.0
-   can label them as successes (see `mcp-server.md`).
-5. Run N1–N3; reconnect read-only for N2 and disconnect that grant for N3.
+4. Prepare the retry checks in Inspector with the same account and client,
+   within the 24-hour retry window. Read a synthetic Occurrence with
+   `get_occurrence` and save its revision as R. Confirm an
+   `update_occurrence_note` call setting `Review first` with `expected_revision`
+   R and a fresh `idempotency_key` K. Save the exact input and successful result.
+   Read the new revision, then confirm another note change to `Review second`
+   using that revision and a different fresh key.
+5. **Replay:** repeat the exact saved input with key K, including revision R
+   and note `Review first`. Expect the original successful result, not a
+   conflict. Read the Occurrence again: its note must remain `Review second`.
+   Replaying the receipt must not repeat the mutation.
+6. **Key reuse rejection:** copy the saved input, retain key K, and change only
+   the note to `Review altered`. Expect `idempotency_key_reused`, not a conflict.
+   Read back the Occurrence and verify its note remains `Review second`.
+7. **Stale revision conflict:** copy the original saved input with stale
+   `expected_revision` R, but replace K with a NEW, unused key. Expect
+   `conflict`, with no mutation; readback must still show `Review second`.
+   Use the official SDK response to inspect structured tool errors; Inspector
+   2.11.0 can label them as successes (see `mcp-server.md`).
+8. Run N1–N3; reconnect read-only for N2 and disconnect that grant for N3.
    Verify Settings activity contains client/operation/outcome metadata, not notes.
-6. Repeat with the packaged Claude plugin once Ticket 230's package is installed.
+9. Repeat with the packaged Claude plugin once Ticket 230's package is installed.
    Use the developer documentation for install commands. Record each tool outcome,
    date, deployed SHA, client version and test account alias without secrets.
 
