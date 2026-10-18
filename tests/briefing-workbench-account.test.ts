@@ -4,7 +4,8 @@ import { DEFAULT_BRIEFING_CONFIG } from '@cadence/core/services/briefing-config'
 import { briefingFixture } from '@/lib/services/briefing-fixtures';
 import type { BriefingConfig } from '@cadence/core/types/briefing-config';
 
-const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), preferences: vi.fn(), settings: vi.fn(), labels: vi.fn(), capture: vi.fn(), current: vi.fn(), begin: vi.fn(), finish: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spend: vi.fn(), authenticate: vi.fn(), preferences: vi.fn(), settings: vi.fn(), labels: vi.fn(), capture: vi.fn(), current: vi.fn(), begin: vi.fn(), finish: vi.fn() }));
+vi.mock('@/lib/db/travelSpend.repo', () => ({ readTravelMonthSpend: mocks.spend }));
 vi.mock('@/lib/services/google-calendar-request', () => ({ authenticateCalendarRequest: mocks.authenticate,
   calendarResponse: (_request: Request, body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } }),
   calendarPreflight: vi.fn(), readCalendarRequestBody: vi.fn() }));
@@ -27,6 +28,7 @@ const output = { text: 'Review your supplied context.', occurrenceRefs: [], sugg
 
 beforeEach(() => {
   vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget")); vi.resetAllMocks(); vi.stubEnv('NODE_ENV', 'development');
+  mocks.spend.mockResolvedValue(125_000);
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-01T12:00:00Z'));
   mocks.authenticate.mockResolvedValue(caller); mocks.preferences.mockResolvedValue(preferences); mocks.settings.mockResolvedValue(settings);
   mocks.labels.mockResolvedValue([{ id: 'owned', title: 'Private Behavior' }]);
@@ -119,7 +121,8 @@ it('loads account labels without capture or generation and hides them when conse
   const { readBriefingWorkbenchAccount } = await import('@/lib/services/briefing-workbench.service');
   const read = () => readBriefingWorkbenchAccount(new Request(`${origin}/api/dev/briefing-comparison`, { headers: { 'sec-fetch-site': 'same-origin' } }));
   const response = await read(); expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ behaviors: [{ ref: 'behavior_owned', title: 'Private Behavior' }] });
+  expect(await response.json()).toMatchObject({ travelSpend: { localMonth: '2026-11-01', reservedMicrodollars: 125_000 }, behaviors: [{ ref: 'behavior_owned', title: 'Private Behavior' }] });
+  expect(mocks.spend).toHaveBeenCalledWith(caller.client, 'owner', '2026-11-01');
   expect(mocks.labels).toHaveBeenCalledWith(caller.client, 'owner'); expect(mocks.capture).not.toHaveBeenCalled();
   mocks.labels.mockClear(); mocks.settings.mockResolvedValue({ ...settings, enabled: false });
   expect(await (await read()).json()).toMatchObject({ behaviors: [] }); expect(mocks.labels).not.toHaveBeenCalled();

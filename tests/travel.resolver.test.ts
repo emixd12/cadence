@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveTravelAfterDecisions,
   resolveTravelCollisions,
   resolveTravelEvidence,
   resolveTravelPlan,
@@ -51,6 +52,23 @@ describe("resolveTravelPlan", () => {
     }]);
     expect(plan.legs.every((leg) => leg.id.length <= 128)).toBe(true);
     expect(JSON.stringify(plan)).not.toContain("saved_base");
+  });
+
+  it("skips travel between consecutive stops at the same place", () => {
+    const place = (ref: string, source: TravelEndpoint["source"]) => endpoint(ref, source, `${ref}-r1`, 0, { point: { kind: "place_id", placeId: "same-place" } });
+    const plan = resolveTravelPlan(planningInput({
+      base: endpoint("base", "saved_base", "base-r1", 9, { point: { kind: "place_id", placeId: "home" } }),
+      device: null,
+      commitments: [
+        commitment("event-gym", "2026-09-16T18:00:00Z", "2026-09-16T19:00:00Z", place("event-gym", "calendar")),
+        commitment("behavior-swim", "2026-09-16T19:00:00Z", "2026-09-16T19:30:00Z", place("behavior-swim", "behavior")),
+      ],
+    }));
+    expect(plan.legs.map((leg) => [leg.role, leg.originCommitmentRef, leg.destinationCommitmentRef])).toEqual([
+      ["outbound", null, "event-gym"],
+      ["return", "behavior-swim", null],
+    ]);
+    expect(plan.unknownLegs).toEqual([]);
   });
 
   it("uses a current device ahead of base and ignores a scheduled prediction", () => {
@@ -434,4 +452,40 @@ it("keeps a zero-duration route valid without creating an invalid Timeline span"
   expect(evidence.completeTrip).toBe(true);
   expect(evidence.segments.every((segment) => segment.startAt !== segment.endAt)).toBe(true);
   expect(evidence.segments.some((segment) => segment.kind === "commitment")).toBe(true);
+});
+
+
+it("recomputes occupancy after a decision without inventing replacement routes", () => {
+  const plan = resolveTravelPlan(planningInput());
+  const evidence = resolveTravelEvidence(evidenceInput(plan, plan.legs.map(leg => resultFor(leg,
+    estimate("2026-09-16T17:00:00Z", "2026-09-16T17:10:00Z", 600))), []));
+  const ref = plan.commitments[0]!.ref;
+  const updated = resolveTravelAfterDecisions(evidence, [{ id: ref, status: "completed" }])!;
+  expect(updated.legs.every(({ leg }) => leg.destinationCommitmentRef !== ref && leg.originCommitmentRef !== ref)).toBe(true);
+  expect(updated.segments.every(segment => !segment.sourceRefs.includes(ref))).toBe(true);
+  expect(updated.completeTrip).toBe(false);
+  expect(updated.finalAvailabilityAt).toBeNull();
+  expect(resolveTravelAfterDecisions(evidence, [])).toBe(evidence);
+  expect(evidence.legs.length).toBeGreaterThan(updated.legs.length);
+});
+
+
+it("withdraws a cached trip when a previously omitted occurrence becomes unresolved", () => {
+  const plan = resolveTravelPlan(planningInput());
+  const evidence = { ...resolveTravelEvidence(evidenceInput(plan, [], [])),
+    behaviorSources: [{ ref: "omitted", behaviorId: "behavior", unresolved: false }] };
+  expect(resolveTravelAfterDecisions(evidence, [{ id: "omitted", status: "unresolved" }])).toBeNull();
+});
+
+it("withdraws stale duration-dependent routes without invalidating range schedules or unchanged estimates", () => {
+  const plan = resolveTravelPlan(planningInput());
+  const evidence = { ...resolveTravelEvidence(evidenceInput(plan, [], [])),
+    behaviorSources: [{ ref: "exact", behaviorId: "behavior", unresolved: true, durationSeconds: 600 }] };
+  const duration = { kind: "known" as const, seconds: 600, durationLabel: "10 minutes", sampleCount: 3, lookbackDays: 90, provenance: "completed_stopped_occurrence_mean" as const };
+  const occurrences = [{ id: "exact", status: "unresolved" as const }];
+  expect(resolveTravelAfterDecisions(evidence, occurrences, { behavior: duration })).toBe(evidence);
+  expect(resolveTravelAfterDecisions(evidence, occurrences, { behavior: { ...duration, seconds: 1200 } })).toBeNull();
+  expect(resolveTravelAfterDecisions(evidence, occurrences)).toBeNull();
+  const range = { ...evidence, behaviorSources: [{ ref: "exact", behaviorId: "behavior", unresolved: true }] };
+  expect(resolveTravelAfterDecisions(range, occurrences)).toBe(range);
 });

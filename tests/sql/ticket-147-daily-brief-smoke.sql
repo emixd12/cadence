@@ -102,6 +102,8 @@ begin
     raise exception 'Successful Daily Brief attempt was not recorded.';
   end if;
 
+  -- Ticket 168 permits deliberate recovery after completion; automatic starts
+  -- must still remain suppressed on both the original and current schema.
   decision := public.begin_daily_brief(
     '14700000-0000-4000-8000-000000000101',
     false,
@@ -162,7 +164,7 @@ begin
   begin
     perform public.save_daily_brief_preferences(true, false, 0);
     raise exception 'Stale Daily Brief revision was accepted.';
-  exception when sqlstate '40001' then
+  exception when sqlstate '55000' then
     null;
   end;
 
@@ -220,7 +222,7 @@ begin
       3
     );
     raise exception 'Stale Calendar disclosure fence was accepted.';
-  exception when sqlstate '40001' then
+  exception when sqlstate '55000' then
     null;
   end;
   perform public.save_daily_brief_preferences(true, false, 3);

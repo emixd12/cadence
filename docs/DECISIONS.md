@@ -829,3 +829,15 @@ The owner supplied Ticket 184's evaluation criteria before reviewing candidate o
 frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
 acceptance, promotion, deployment and stored-brief decisions remain separate.
 This is an evaluation direction; runtime policy and production presets are unchanged.
+
+
+## 2026-10-08: Rename the repository to emixd12/cadence
+
+Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,
+history, releases and settings. This supersedes the source URL in "Marketing
+content, retention, and legal publication": Cadence's public MIT source is
+`https://github.com/emixd12/cadence`. The name `habit-tracking-app` must stay
+unused so GitHub keeps redirecting old links and installed desktop update feeds.
+Historical Trust evidence stays at its original Pages URLs through the
+`emixd12.github.io` archive. The local Supabase project ID `habit-tracking-app`,
+package names, desktop identity and production domains are unchanged.

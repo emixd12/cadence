@@ -4,10 +4,11 @@
 
 The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
 timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
-this branch (`expansion-connectors`, based on `12ea89a`) must merge `main`
-before review.
+this branch (`expansion-connectors`, based on `12ea89a`) merged `origin/main`
+at `041546e` locally on October 18, 2026, before Ticket 221 runtime work.
+Independent verification of the integrated baseline is pending.
 
-- Ticket 220 is documentation-complete; independent verification is pending.
+- Ticket 220 is documentation-complete and independently approved at `668a4cd`.
   It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
   `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
   `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
@@ -27,40 +28,67 @@ before review.
   Calendar. No public Apple developer documentation for "supported app"
   authorization was found on 2026-10-18. Ticket 227 local source work with
   synthetic credentials is approved.
-- Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds
-  without a request deadline. Its runtime is unchanged in this expansion.
+- Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds and
+  does not compare it with the remaining request deadline; a caller abort signal
+  still ends the wait. Its runtime is unchanged in this expansion.
 - Live-access gates: Hevy Pro key, Microsoft app registration and test tenants,
   and an Apple Account app-specific password. Public-approval gate: Microsoft
   publisher verification. None blocks source or fixture work.
 
-## Ticket 186: Cadence project and repository rename — October 7–9, 2026
+## Tickets 213–214 completed — October 18, 2026
 
-In progress; local and remote cutovers are done.
+All three migrations deployed and read back. Production serves the approved
+Google Maps notices and routing implementation from focused release commit
+`f239e72` (PR #107). Owner QA reserved US$0.135 of US$0.50; Cloud Monitoring
+confirms seven geocodes and ten routes. Four two-leg samples measured server
+p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
+Web narrow-layout and Refresh travel checks pass. Review fixes withdraw cached
+guidance for reopened stops and changed durations, and check duration history
+before reserving spend.
+
+Installed preview.50 passes linked-account synchronization, selected-Calendar
+loading, foreground travel activation and Refresh travel. The shared planner
+safely reconciles independently generated untouched Occurrences with hosted
+identities. Native apply preserves the unique schedule constraint atomically.
+All 1,456 prior status events, 13 time sessions, 34 Notes and import records
+remain intact. The outbox is empty; SQLite integrity and foreign-key checks pass.
+No manual private database repair was applied.
+
+Validation: 2,378 TypeScript tests passed (31 skipped), 110 native tests passed;
+required checks and both frontend builds pass. Production deployment before the
+PR's main promotion is `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
+Six-leg and before/after performance remain unmeasured. Native current-device
+position and Apple-trusted distribution retain Tickets 115/165 gates.
+See `docs/qa/travel-release.md` for evidence and measurement limits.
+
+## Ticket 186: Cadence project and repository rename — completed October 9, 2026
+
+Completed. The local folder and GitHub repository are renamed to `cadence`
+without losing work, history, deployment identities or installed-client access.
 
 - Local: the physical folder is `/Users/emi/Coding Projects/cadence`; the old path
-  is a compatibility symlink. Codex uses the new root under the same project ID;
-  the owner confirmed fresh sessions work. Both Codex automations remain PAUSED.
-- GitHub: `emixd12/habit-tracking-app` is now `emixd12/cadence` (same ID
-  `1261353608`); settings, refs and releases are unchanged and old links redirect.
-  All 76 legacy Trust evidence files serve identical bytes from `emixd12.github.io`.
-- Production: PR #92 merged `main` with the already-deployed `9eda5c0` history.
-  After PR #94 (`610e938`), app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` and marketing
-  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw` serve the production domains. Each merge to
-  `main` requires updating the app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and
-  redeploying the app.
-- Trust: publishes from `https://emixd12.github.io/cadence/` with 37 legacy plus
-  new snapshots. Provenance passes again. `hosted_migration_boundary` fails
-  because unmerged branch `codex/fix-daily-brief-cpu-retries` applied hosted
-  migration `20260927173716`; this predates the rename.
-- Updater: feeds, archives and signatures pass through old and new URLs.
-- Task 9: production screens, local Supabase data and builds from the new folder
-  pass. Popmelt was removed on October 9 after the move changed its path-derived
-  project ID; its data is archived in the private rename backup.
-- `main` was merged into `claude/tickets-169-173-advisor-analysis` on October 9.
+  remains a compatibility symlink while open tools still use it. Codex uses the new
+  root under the same project ID. Both Codex automations remain PAUSED.
+- GitHub: `emixd12/cadence` keeps repository ID `1261353608`, settings, refs and
+  releases; old links redirect. Never create a repository named `habit-tracking-app`.
+- Evidence: all 76 legacy Trust files serve identical bytes from `emixd12.github.io`;
+  new evidence publishes under `https://emixd12.github.io/cadence/trust/`. Scheduled
+  run `37943471227` (October 9) kept all 37 legacy entries and passed provenance and
+  `hosted_migration_boundary`.
+- Production: after PR #100 (`74c8d4f`), app `dpl_J3LeAsvAZBFAU34FQPrQ29ZszpBR` and
+  marketing `dpl_9iPg2pJGY6ZyP7mbcLNtppAzjqNL` serve the production domains. After
+  each `main` merge, update the app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and
+  redeploy the app (`docs/VERCEL_WORKFLOW.md`).
+- Desktop: the real `tauri-plugin-updater` 2.10.1 check and download verify
+  signatures through old and new feed URLs; installed clients keep working.
+- Popmelt was removed (PR #94) after the move changed its path-derived project ID;
+  its data is archived in the private rename backup.
+- Retention: keep the archive site and old-path symlink as described; the private
+  backup `/Users/emi/Coding Projects/.cadence-rename-backup-20261007` stays until the
+  owner deletes it.
 
-Open: native updater acceptance, the next scheduled Trust run and Task 10
-residual-reference classification. Evidence: `docs/qa/cadence-project-rename.md`;
-plan: `docs/plans/2026-10-07-cadence-project-rename.md`.
+Evidence: `docs/qa/cadence-project-rename.md`; plan:
+`docs/plans/2026-10-07-cadence-project-rename.md`.
 
 ## Function
 
@@ -466,6 +494,46 @@ The loading diagnosis remains based on source inspection, not a new live reprodu
 This task changes documentation only. Verification: `agents:check`,
 `interactions:check`, `resolvers:check` and `git diff --check` pass. Runtime tests,
 builds, provider requests and deployments were not run for this ticket-filing task.
+
+## Supabase CPU alert production fix — September 27, 2026
+
+The owner authorized immediate remediation. Supabase applied migration
+`20260927173716_fix_daily_brief_nonretryable_conflicts` at 13:37 New York time.
+Readback confirms exactly three error-code changes and preserved function
+bodies, owners and grants. PostgREST sessions are idle; an 80.7-second observation
+recorded 53 commits, zero rollbacks, and no active Daily Brief sessions. No
+restart, compute resize, account-data or consent change was needed. CPU percentage
+was not directly measured. Calendar disclosure must still be renewed deliberately
+in Settings if the owner wants to resume Calendar-inclusive briefs.
+
+The fix branch records the already-applied PR #82/#83 migrations byte-for-byte,
+their related public RPC types, and the new migration's actual provider-assigned
+version. Hosted statements match all three files. Application PR integration
+and full Docker/Supabase replay remain separate work. Detailed evidence:
+`docs/qa/2026-09-27-supabase-cpu.md`.
+
+October 9, 2026: the fix branch merged into `main`. The repository migration boundary
+(`20260927173716`) now matches hosted history, which Trust's
+`hosted_migration_boundary` check compares. Function source in the September 26
+migrations still raises `40001`; any future redefinition must use `55000`.
+
+## Supabase CPU alert initial investigation — September 27, 2026
+
+Investigation found a continuing Daily Brief `40001` retry storm: 8,638,404
+Calendar-disclosure errors on September 25 and 359,874 in a September 27 hour.
+The prepared migration replaces three application-conflict error codes with
+`55000`, preserving consent, grants and admission behavior. Existing adapters
+already return `context_changed` / HTTP 409. It preserves both main and the newer
+hosted writer definitions. Web and linked desktop share the fix; local-only
+desktop and marketing are unaffected; native mobile remains deferred.
+
+Repository checks, production build and 2,211 tests pass (40 skipped). A local PGlite SQL regression
+fails before the migration and passes afterward for both writer versions,
+including privilege preservation and rejected-write rollback. Full Supabase
+replay is blocked by denied Docker socket access. Hosted rollout remains open:
+production has PR #82/#83 migrations absent from main, which must be reconciled
+before the new migration deploys. No hosted mutation or CPU recovery is claimed.
+Evidence, SQL smoke and owner actions: `docs/qa/2026-09-27-supabase-cpu.md`.
 
 ## Security alert triage — September 26, 2026
 

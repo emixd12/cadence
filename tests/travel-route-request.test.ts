@@ -9,3 +9,13 @@ describe("travel route request", () => {
     expect(() => parseTravelRouteRefreshRequest({ startLocalDate: "2026-09-22", endLocalDate: "2026-09-22", device: { latitude: 91, longitude: 0, accuracyMeters: 1, sampledAt: "2026-09-22T00:00:00Z" } })).toThrow("sample");
   });
 });
+
+
+describe("travel route scope", () => {
+  const day = { startLocalDate: "2026-10-18", endLocalDate: "2026-10-18" };
+  it("defaults older clients to Timeline scope and validates whole-day requests", () => {
+    expect(parseTravelRouteRefreshRequest(day).scope).toBe("timeline");
+    expect(parseTravelRouteRefreshRequest({ ...day, scope: "day" }).scope).toBe("day");
+    expect(() => parseTravelRouteRefreshRequest({ ...day, scope: "unlimited" })).toThrow();
+  });
+});

@@ -22,11 +22,13 @@ import {
   type DailyBriefAttempt,
   type DailyBriefOutcome,
 } from "@/lib/ui/daily-brief-session";
+import { requestDailyBriefTravel } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 
 type DailyBriefLauncherProps = Readonly<{
   client?: DailyBriefClient | null;
+  travelAccountId?: string | null;
   desktop?: boolean;
   sessionKey?: string;
   /** Observed Timeline facts. A change withdraws a delivered brief instead of remounting the launcher. */
@@ -42,7 +44,7 @@ type View =
 const HIDDEN: View = { kind: "hidden" };
 const TRY_AGAIN = "Try again";
 
-export function DailyBriefLauncher({ client, desktop = false, sessionKey = "current", sourceKey = "" }: DailyBriefLauncherProps) {
+export function DailyBriefLauncher({ client, desktop = false, sessionKey = "current", sourceKey = "", travelAccountId = null }: DailyBriefLauncherProps) {
   const resolvedClient = useMemo(() => client === undefined ? defaultWebDailyBriefClient() : client, [client]);
   const [view, setView] = useState<View>(HIDDEN);
   const [viewSession, setViewSession] = useState(sessionKey);
@@ -90,6 +92,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       if (outcome.kind === "ready") {
         if (!(Date.parse(outcome.briefing.expiresAt) > Date.now())) { show(expiredNotice()); return; }
         if (attempt.sourceKey !== sourceKeyRef.current) { show(staleNotice()); return; }
+        if (travelAccountId) requestDailyBriefTravel(travelAccountId, outcome.briefing.localDate, outcome.briefing.generatedAt);
         mark(settings, { attempted: true, delivered: true });
         show({ kind: "ready", briefing: outcome.briefing, attempt });
         later(() => { if (isRememberedDailyBriefAttempt(briefClient, attempt)) show(expiredNotice()); }, Date.parse(outcome.briefing.expiresAt));
@@ -235,7 +238,7 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       window.removeEventListener("storage", onStorage);
       // The remembered attempt survives an unmount so a remount can reattach to it.
     };
-  }, [resolvedClient, desktop, sessionKey]);
+  }, [resolvedClient, desktop, sessionKey, travelAccountId]);
 
   useEffect(() => {
     sourceKeyRef.current = sourceKey;

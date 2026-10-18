@@ -742,3 +742,38 @@ describe("hosted travel canonicalization of configuration history (September 22,
     expect(() => plan(preTravel, preTravel, hosted)).toThrow("The account snapshot rewrites append-only history.");
   });
 });
+
+
+describe("independent occurrence generation", () => {
+  const generated = (id: string, extra: Record<string, Json> = {}): AccountSyncEntity => ({ kind: "occurrence", id, value: {
+    id, behavior_id: "b", local_date: "2026-10-18", schedule_start_time: "10:00:00", schedule_kind: "exact", schedule_end_time: null,
+    scheduled_for: "2026-10-18T14:00:00Z", status: "unresolved", note: null, ...extra,
+  } });
+  const base = snapshot([row("b", "Behavior")]);
+  it("retains the hosted identity and deletes only a newly generated, untouched local duplicate", () => {
+    const local = snapshot([row("b", "Behavior"), generated("local")]);
+    const hosted = snapshot([row("b", "Behavior"), generated("hosted", { schedule_start_time: "10:00:00.000000" })]);
+    const result = plan(base, local, hosted);
+    expect(result.hostedWrites).toEqual([]);
+    expect(result.localWrites).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "occurrence", id: "local", operation: "delete" }),
+      expect.objectContaining({ kind: "occurrence", id: "hosted", operation: "upsert" }),
+    ]));
+    expect(result.mergedEntities.filter(e => e.kind === "occurrence").map(e => e.id)).toEqual(["hosted"]);
+    expect(plan(hosted, hosted, hosted).localWrites).toEqual([]);
+  });
+  it.each<Record<string, Json>>([{ note: "keep" }, { status: "completed" }])("refuses to discard user data: %j", (extra) => {
+    expect(() => plan(base, snapshot([row("b", "Behavior"), generated("local", extra)]), snapshot([row("b", "Behavior"), generated("hosted")]))).toThrow("review is required");
+  });
+  it("preserves attached status history and does not guess which history to keep", () => {
+    expect(() => plan(base, snapshot([row("b", "Behavior"), generated("local"), { ...history("event", "local", null), value: { ...(history("event", "local", null).value as object), behavior_id: "b" } }]), snapshot([row("b", "Behavior"), generated("hosted")]))).toThrow();
+  });
+  it.each(["time_session", "reminder_delivery", "imported_intervention"] as const)("preserves a duplicate with an attached %s", (kind) => {
+    const attachment: AccountSyncEntity = { kind, id: "attachment", value: { id: "attachment", occurrence_id: "local", behavior_id: "b", status: "pending" } };
+    expect(() => plan(base, snapshot([row("b", "Behavior"), generated("local"), attachment]), snapshot([row("b", "Behavior"), generated("hosted")]))).toThrow("review is required");
+  });
+  it("keeps distinct overlapping exact and range schedule identities", () => {
+    const result = plan(base, snapshot([row("b", "Behavior"), generated("local", { schedule_kind: "range", schedule_end_time: "11:00:00" })]), snapshot([row("b", "Behavior"), generated("hosted")]));
+    expect(result.mergedEntities.filter(e => e.kind === "occurrence")).toHaveLength(2);
+  });
+});

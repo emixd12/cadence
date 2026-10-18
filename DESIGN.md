@@ -314,6 +314,12 @@ This system is flat by default. Depth is created with borders, spacing, surface 
 
 **The One-Line-Per-Boundary Rule.** Any boundary between two neighbors is drawn exactly once. Stacked page sections take a single divider between them (`divide-y` on the stack, or `border-t` on every section after the first), never per-section `border-y`, which doubles the line across the gap. A nested container never redraws its parent's boundary: a list inside a section uses inner `divide-y` only, with no outer border, and inline status text does not carry its own `border-t`.
 
+Occurrence Note feedback uses the existing Timeline strong/error text roles,
+with foreground/accent fallbacks outside a Timeline row. Both roles become
+white on Completed and Not Completed fills. Feedback has no divider and aligns
+with Save note on desktop. Expanded rows match bottom and horizontal insets:
+12px on mobile and 16px from the small breakpoint.
+
 **The Spacing Scale.** Vertical space encodes hierarchy on a fixed ladder, and parallel objects always share the same value:
 
 | Boundary | Space | Owner |
@@ -658,3 +664,10 @@ availability. Live provider and installed native acceptance remain separate.
 The briefing workbench reuses its native checkbox/Definition-link row for
 Historical completion times. The control replaces the disabled timestamp row;
 geometry, spacing, typography, square borders and responsive columns are unchanged.
+
+
+## Travel budget readback (Tickets 213–214)
+
+The private briefing workbench adds one text line to its existing account-access
+panel for the local month and reserved travel spend. It uses existing typography
+and wraps at 390px. No new control, token or Settings field is added.

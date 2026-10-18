@@ -1,4 +1,5 @@
 import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, briefingAnalysisFixture, type BriefingAnalysisFixtureId } from "./briefing-analysis-fixtures";
+import { readTravelMonthSpend } from "@/lib/db/travelSpend.repo";
 import { Temporal } from "@js-temporal/polyfill";
 import { BriefingConfigValidationError, parseBriefingConfig } from "@cadence/core/services/briefing-config";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
@@ -46,9 +47,13 @@ export async function readBriefingWorkbenchAccount(request: Request): Promise<Re
   return runDailyBriefRequest(request, async (caller) => {
     const settings = await getDailyBriefSettings(caller);
     const behaviors = settings.enabled ? await listBriefingWorkbenchBehaviors(caller.client, caller.user.id) : [];
+    const localMonth = Temporal.PlainDate.from(settings.localDate).with({ day: 1 }).toString();
+    const travelSpend = await readTravelMonthSpend(caller.client, caller.user.id, localMonth)
+      .then((reservedMicrodollars) => ({ localMonth, reservedMicrodollars }))
+      .catch(() => null);
     const current = await getDailyBriefSettings(caller);
     if (JSON.stringify(settings) !== JSON.stringify(current)) throw new DailyBriefError("context_changed");
-    return { settings, behaviors: behaviors.map(({ id, title }) => ({ ref: workbenchBehaviorRef(caller.user.id, id), title })) };
+    return { settings, travelSpend, behaviors: behaviors.map(({ id, title }) => ({ ref: workbenchBehaviorRef(caller.user.id, id), title })) };
   });
 }
 
