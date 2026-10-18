@@ -322,6 +322,18 @@ coordinates, place IDs and saved location text. Its optional model projection
 contains timing and collision facts only. Callers must keep that projection
 disabled until Ticket 165 clears provider/model use.
 
+`resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
+affected by manual decisions, preserves unaffected estimates, and withholds a
+complete-trip claim until routing refreshes. The shared Timeline calls it;
+`tests/travel.resolver.test.ts` covers removal and restoration without mutation.
+
+`packages/core/src/services/travel-refresh-policy.ts` (Tickets 213–214) owns the
+three-hour routing window, place-lookup reuse periods, typed-text normalization
+and the 500 m movement rule, paired with `tests/travel-refresh-policy.test.ts`.
+`lib/services/travel-route-refresh.service.ts` and `lib/ui/travel.ts` call it; they
+must not restate those rules. Provider SKU prices and the traffic-aware window stay
+in the provider adapter `lib/services/travel-provider.ts`.
+
 ## Day-progress production consumers (Tickets 133–136)
 
 `DayProgressTimeline` consumes the shared day-progress layout resolver and the

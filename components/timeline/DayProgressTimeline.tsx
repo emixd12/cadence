@@ -14,6 +14,7 @@ import {
   type CSSProperties,
 } from "react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
+import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
 import type {
@@ -124,8 +125,11 @@ export function DayProgressTimeline({
   const currentCorrections = useMemo(() => corrections.filter((correction) => events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, events]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections });
-  const travel = context?.travel ?? liveTravel.view?.evidence;
-  // Ticket 170: the Daily Brief bubble shows this deterministic projection; no extra route request.
+  const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
+  const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,
+    new Set(timeline.daySections.flatMap(section => section.occurrences.filter(occurrence => occurrence.status !== "unresolved").map(occurrence => occurrence.id))),
+  ) : routeEvidence, [routeEvidence, timeline.daySections]);
+  // The bubble projects current evidence; Ticket 214 requests the day when a brief is generated.
   const briefTravel = useMemo(() => {
     const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
     return projectBriefTravelGuidance({
@@ -558,7 +562,7 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
 export function TravelStatusLine({ status, message, timezone }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string }>) {
   const text = travelStatusText(status, message ?? null, timezone);
   if (!text) return null;
-  const showRefresh = !!status && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
+  const showRefresh = !!status && !status.resumesAt && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
   return (
     <p className={styles.calendarState} role="status">
       {text}
@@ -569,10 +573,14 @@ export function TravelStatusLine({ status, message, timezone }: Readonly<{ statu
 
 export function travelStatusText(status: TravelState | null, fallbackMessage: string | null, timezone: string): string | null {
   if (!status) return fallbackMessage;
+  const resumes = status.resumesAt
+    ? `Travel estimates resume on ${Temporal.Instant.from(status.resumesAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "long", day: "numeric" })}.`
+    : null;
+  const message = resumes ?? status.message;
   if (status.view?.evidence && status.observedAt) {
     const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
     const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
-    return status.message ? `${prefix} ${status.message}` : prefix;
+    return message ? `${prefix} ${message}` : prefix;
   }
-  return status.message;
+  return message;
 }

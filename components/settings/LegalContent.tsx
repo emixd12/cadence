@@ -38,7 +38,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
     title: "Privacy",
     summary:
       "Privacy policy for the Cadence marketing site and hosted personal behavior tracker.",
-    updated: "September 21, 2026",
+    updated: "October 18, 2026",
     sections: [
       {
         title: "Scope and operator",
@@ -83,9 +83,18 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Travel routing",
         paragraphs: [
-          "Travel routing is disabled in the current release. Cadence does not send locations to a routing provider while it is disabled. An explicit device-location permission check may read one foreground sample on this device and does not send that sample anywhere.",
-          "Before a future release can enable travel routing, Cadence must obtain separate routing consent. The feature would use a selected transport mode and a foreground current location only when permitted. An optional saved base would support final-return estimates. Cadence would send only route endpoints, selected mode, and route time to Google Maps. It would not send Calendar titles, notes, emails, account IDs, Calendar credentials, or raw Calendar payloads.",
-          "Cadence keeps current user-authored locations until the user edits or removes them. Behavior configuration history and existing backups can retain earlier locations. It would not store device samples, geocodes, or route responses in Cadence sync, exports, backups, analytics, or logs. Disabling routing would stop new requests and clear transient travel evidence. A routing provider may process requests under its own terms and retention policies.",
+          "Travel routing is optional and off by default. Turning it on requires separate routing consent in Travel settings. When it is on, Cadence estimates travel to and from Behaviors that have a location and selected Google Calendar events that have a location. It uses the selected transport mode, an optional saved base for the final return, and the device's current location when the user has granted location permission.",
+          "Cadence reads the device location only while Cadence is open in the foreground: during an explicit permission check, during a travel refresh, and once when the Timeline opens with a current estimate, to check whether the user has moved. Only the permission check and turning travel on can show the system location prompt. Cadence does not track location in the background and does not save device locations.",
+          "To estimate travel, Cadence sends Google Maps Platform the location text it has not looked up before, including the location text of selected Calendar events, the device location when used, place identifiers, the selected mode, and route times. Cadence does not send Calendar titles, notes, emails, account IDs, Calendar credentials, or raw Calendar payloads. These requests come from Cadence's servers, not the user's device. Google may use and retain request data, such as coordinates, to provide and improve its services under the Google Privacy Policy. Opening a Directions or Search in maps link takes the user directly to Google Maps or Apple Maps under that provider's terms.",
+          "Cadence keeps user-authored locations, such as Behavior locations and the saved base, until the user edits or removes them. Behavior configuration history and existing backups can retain earlier locations. To avoid repeat lookups, Cadence stores Google's place identifier for each looked-up location with the account, keyed by a one-way fingerprint of the typed text. It does not store that text, coordinates, or route results there.",
+          "Device locations and route estimates stay in temporary memory and are excluded from Cadence sync, exports, backups, analytics, and logs. Operational logs may record the number and duration of travel requests, never locations. Cadence records the monthly total of travel provider usage reserved for the account to enforce its monthly limit.",
+          "Turning travel off stops new requests, clears temporary travel estimates, and deletes the stored place identifiers. Removing device location permission stops location reads. Account deletion removes all travel records.",
+        ],
+        links: [
+          {
+            label: "Read the Google Privacy Policy",
+            href: "https://policies.google.com/privacy",
+          },
         ],
       },
       {
@@ -120,6 +129,11 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
               "Google account, authentication, selected-calendar, and readable event data",
             ],
             [
+              "Google Maps Platform",
+              "Optional travel routing and place lookups",
+              "Location text not looked up before, place identifiers, device location when used, transport mode, and route times",
+            ],
+            [
               "Browser push services",
               "Optional browser reminders",
               "Push endpoint and reminder delivery data",
@@ -144,7 +158,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
           "Provider settings and published capabilities were verified before this policy took effect.",
         ],
         table: {
-          caption: "Cadence retention periods as of August 31, 2026",
+          caption: "Cadence retention periods as of October 18, 2026",
           headers: ["Record", "Retention period", "Active control"],
           rows: [
             [
@@ -181,6 +195,21 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
               "Desktop Google Calendar cache",
               "Until replacement, Calendar disconnect, Cadence account disconnect or reconnect, or local app-data removal",
               "Separate local cache; excluded from Cadence exports, account synchronization, and user-created desktop backups",
+            ],
+            [
+              "Travel place identifiers",
+              "While travel stays on; a lookup older than 365 days is repeated when next needed",
+              "Turning travel off or deleting the account deletes them; Supabase daily backup remnants retain for no more than 7 days",
+            ],
+            [
+              "Travel usage totals",
+              "Monthly totals until account deletion",
+              "Used only to enforce the monthly travel limit; contain amounts and dates, never locations",
+            ],
+            [
+              "Device locations and route estimates",
+              "Memory for the current app session",
+              "Not saved to Cadence's database, synchronization, exports, or backups",
             ],
             [
               "Browser-push payloads",
@@ -241,7 +270,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
     title: "Terms",
     summary:
       "Terms for the hosted Cadence personal behavior tracker.",
-    updated: "September 21, 2026",
+    updated: "October 18, 2026",
     sections: [
       {
         title: "Acceptance and operator",
@@ -283,8 +312,20 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Travel routing limits",
         paragraphs: [
-          "Travel routing is disabled in the current release. If Cadence later enables it with separate consent, route estimates will be planning information only. They can be unavailable, late, incomplete, or wrong and do not promise a route, arrival time, transit connection, parking, accessibility, or safety.",
+          "Travel routing is optional and requires separate consent. Route estimates are planning information only. They can be unavailable, late, incomplete, or wrong and do not promise a route, arrival time, transit connection, parking, accessibility, or safety.",
           "A user must not rely on Cadence travel estimates for emergency response, safety-critical travel, medical care, legal deadlines, or navigation. The user remains responsible for choosing a route and checking current conditions.",
+          "Cadence limits travel estimates for each account every month. When an account reaches the limit, Cadence stops new estimates until the date it shows. Earlier estimates may stay visible and may be out of date. Cadence may change the limit.",
+          "Cadence travel features include Google Maps features and content. Use of Google Maps features and content is subject to the then-current Google Maps/Google Earth Additional Terms of Service and the Google Privacy Policy.",
+        ],
+        links: [
+          {
+            label: "Read the Google Maps/Google Earth Additional Terms of Service",
+            href: "https://maps.google.com/help/terms_maps/",
+          },
+          {
+            label: "Read the Google Privacy Policy",
+            href: "https://policies.google.com/privacy",
+          },
         ],
       },
       {

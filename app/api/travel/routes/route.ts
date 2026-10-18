@@ -2,6 +2,7 @@ import { calendarPreflight, authenticateCalendarRequest, calendarResponse, readC
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { assertTravelProviderReady, readTravelProviderConfig, TravelProviderError } from "@/lib/services/travel-provider";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
+import { withPerformanceRoute } from "@/lib/services/performance-timing";
 
 export const runtime = "nodejs";
 export const OPTIONS = calendarPreflight;
@@ -40,11 +41,12 @@ export async function POST(request: Request): Promise<Response> {
         expiresAt: null,
       }, 503);
     }
-    return calendarResponse(request, await refreshTravelRoutes(caller, await readCalendarRequestBody(request), config));
+    const body = await readCalendarRequestBody(request);
+    return calendarResponse(request, await withPerformanceRoute("/api/travel/routes", "travel.refresh", () => refreshTravelRoutes(caller, body, config)));
   } catch (error) {
     if (error instanceof TravelRoutingError) {
       const status = error.failure.code === "quota_exceeded" ? 429 : error.failure.code === "context_changed" ? 409 : 503;
-      return calendarResponse(request, { error: error.failure.code, retryAfterSeconds: error.failure.retryAfterSeconds }, status);
+      return calendarResponse(request, { error: error.failure.code, retryAfterSeconds: error.failure.retryAfterSeconds, resetsAt: error.failure.resetsAt ?? null }, status);
     }
     if (error instanceof TravelProviderError) return calendarResponse(request, { error: error.code }, 503);
     return calendarResponse(request, { error: authenticated ? "provider_unavailable" : "unauthenticated" }, authenticated ? 503 : 401);

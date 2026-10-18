@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesView } from "@/lib/ui/travel";
+import { requestDailyBriefTravel, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesView } from "@/lib/ui/travel";
 
 const settings = { enabled: true, mode: "walking" as const, baseLocationText: null, navigationPreference: "google_maps" as const,
   routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "revision" };
@@ -72,7 +72,7 @@ async function mount(routes: TravelClient["routes"]) {
     await act(() => root.unmount()); root = createRoot(host);
     await render(); await act(async () => vi.advanceTimersByTimeAsync(350));
   };
-  return { host, render, remount, unmount: async () => { await act(() => root.unmount()); host.remove(); } };
+  return { host, client, render, remount, unmount: async () => { await act(() => root.unmount()); host.remove(); } };
 }
 const focusAndWait = (ms = 350) => act(async () => { window.dispatchEvent(new Event("focus")); await vi.advanceTimersByTimeAsync(ms); });
 
@@ -159,13 +159,64 @@ it("keeps an expired view as stale evidence without requesting", async () => {
   } finally { await unmount(); }
 });
 
-it("shows the quota message for a 429", async () => {
+it("shows a paused message for a 429 without a renewal time", async () => {
   const error = await travelClientErrorFromResponse(new Response(JSON.stringify({ error: "quota_exceeded", retryAfterSeconds: 60 }), { status: 429 }));
-  expect(error).toMatchObject({ code: "quota_exceeded", retryAfterSeconds: 60 });
+  expect(error).toMatchObject({ code: "quota_exceeded", retryAfterSeconds: 60, resetsAt: null });
   const { host, unmount } = await mount(vi.fn(async () => { throw error; }));
   try {
-    expect(host.textContent).toBe("Today’s travel refresh limit is reached. Estimates return tomorrow.");
+    expect(host.textContent).toBe("Travel estimates are paused until the travel limit renews.");
+    expect(host.textContent).not.toContain("tomorrow");
   } finally { await unmount(); }
+});
+
+it("keeps the last plan, stops requests and carries the renewal time when the budget is used up", async () => {
+  const resetsAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
+  const error = await travelClientErrorFromResponse(new Response(JSON.stringify({ error: "quota_exceeded", retryAfterSeconds: 604_800, resetsAt }), { status: 429 }));
+  expect(error).toMatchObject({ code: "quota_exceeded", resetsAt });
+  const routes = vi.fn<TravelClient["routes"]>().mockResolvedValueOnce(view("account-a")).mockRejectedValue(error);
+  const { host, remount, unmount } = await mount(routes);
+  try {
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(host.textContent).toBe("account-a");
+    expect(latest()).toMatchObject({ resumesAt: resetsAt, stale: true, message: null });
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    await remount();
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(host.textContent).toBe("account-a");
+    expect(latest().resumesAt).toBe(resetsAt);
+  } finally { await unmount(); }
+});
+
+it("requests again on open only when the device moved beyond the threshold", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  const at = (latitude: number) => ({ state: "available" as const, latitude, longitude: -87.68, accuracyMeters: 10, sampledAt: Date.now() });
+  const readLocation = vi.fn(async () => at(42.0500));
+  const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
+  const client: TravelClient = { settings: { load: async () => settings, save: async () => settings }, configured: async () => true, readLocation, routes };
+  const host = document.createElement("div"); document.body.append(host);
+  let root = createRoot(host);
+  const open = async () => {
+    root = createRoot(host);
+    await act(() => root.render(<Probe client={client} accountId="account-a" />));
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+  };
+  try {
+    await open();
+    expect(routes).toHaveBeenCalledTimes(1);
+    expect(routes.mock.calls[0]![0].device).toMatchObject({ latitude: 42.05 });
+    await act(() => root.unmount());
+    readLocation.mockResolvedValue(at(42.0510)); // About 110 m: reuse the cached view.
+    await open();
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(() => root.unmount());
+    readLocation.mockResolvedValue(at(42.0700)); // About 2.2 km: the estimate is out of date.
+    await open();
+    expect(routes).toHaveBeenCalledTimes(2);
+  } finally { await act(() => root.unmount()); host.remove(); }
 });
 
 it("retries one context change and shows the view", async () => {
@@ -357,4 +408,95 @@ it("invalidates cached and in-flight travel when settings change while no Timeli
     expect(routes).toHaveBeenCalledTimes(3);
     expect(latest().pending).toBe(true);
   } finally { await act(() => root.unmount()); host.remove(); }
+});
+
+
+it("routes the day once per generated brief, without repeating on remount", async () => {
+  const routes = vi.fn(async () => view("account-a"));
+  const { remount, unmount } = await mount(routes);
+  try {
+    await act(async () => {
+      requestDailyBriefTravel("account-b", "2026-09-21", "generation-1");
+      requestDailyBriefTravel("account-a", "2026-09-22", "generation-1");
+      await vi.advanceTimersByTimeAsync(350);
+    });
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      requestDailyBriefTravel("account-a", "2026-09-21", "generation-1");
+      await vi.advanceTimersByTimeAsync(350);
+    });
+    expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
+    await act(() => requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"));
+    await remount();
+    expect(routes).toHaveBeenCalledTimes(2);
+  } finally { await unmount(); }
+});
+
+it("queues the day when a brief finishes during a Timeline request", async () => {
+  let resolve!: (value: TravelRoutesView) => void;
+  const routes = vi.fn().mockImplementationOnce(() => new Promise<TravelRoutesView>(done => { resolve = done; }))
+    .mockImplementation(async () => view("account-a"));
+  const { unmount } = await mount(routes);
+  try {
+    await act(() => requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"));
+    await act(async () => { resolve(view("account-a")); await vi.advanceTimersByTimeAsync(350); });
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
+  } finally { await unmount(); }
+});
+
+it("honors a budget refusal across source changes and unlocks manual refresh at renewal", async () => {
+  const routes = vi.fn().mockImplementationOnce(async () => view("account-a"))
+    .mockImplementationOnce(async () => { throw new TravelClientError("quota_exceeded", 60, new Date(Date.now() + 60_000).toISOString()); })
+    .mockImplementation(async () => view("account-a"));
+  const { render, unmount } = await mount(routes);
+  try {
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(latest().resumesAt).not.toBeNull();
+    await render("changed");
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(latest().view?.accountId).toBe("account-a");
+    expect(latest().stale).toBe(true);
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(latest().resumesAt).toBeNull();
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(routes).toHaveBeenCalledTimes(3);
+  } finally { await unmount(); }
+});
+
+
+it("checks foreground movement without refreshing stationary or background positions", async () => {
+  const routes = vi.fn(async () => view("account-a"));
+  const { client, unmount } = await mount(routes);
+  try {
+    const position = { state: "available" as const, latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: Date.now() };
+    const read = vi.fn(async () => position);
+    Object.assign(client, { readLocation: read });
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(routes).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(routes).toHaveBeenCalledTimes(2);
+    read.mockResolvedValue({ ...position, latitude: 40.01 });
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(routes).toHaveBeenCalledTimes(2);
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    await act(async () => vi.advanceTimersByTimeAsync(60_350));
+    expect(routes).toHaveBeenCalledTimes(3);
+  } finally { await unmount(); }
+});
+
+
+it("keeps the last same-day plan when changed inputs hit the budget limit", async () => {
+  const routes = vi.fn().mockImplementationOnce(async () => view("account-a"))
+    .mockImplementation(async () => { throw new TravelClientError("quota_exceeded", 60, new Date(Date.now() + 60_000).toISOString()); });
+  const { render, unmount } = await mount(routes);
+  try {
+    await render("changed");
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+    expect(latest().view?.accountId).toBe("account-a");
+    expect(latest().stale).toBe(true);
+    expect(latest().resumesAt).not.toBeNull();
+  } finally { await unmount(); }
 });

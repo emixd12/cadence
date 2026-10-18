@@ -41,7 +41,7 @@ describe("trust and legal UI content", () => {
   it("renders the approved Privacy policy with processor and retention tables", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="privacy" />);
 
-    expect(html).toContain("August 31, 2026");
+    expect(html).toContain("October 18, 2026");
     expect(html).not.toContain("draft");
     expect(html).not.toContain("not legally approved");
     expect(html).toContain("Cadence service providers and purposes");

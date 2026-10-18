@@ -1232,6 +1232,30 @@ export type Database = {
           },
         ]
       }
+      travel_place_cache: {
+        Row: {
+          looked_up_at: string
+          outcome: string
+          place_id: string | null
+          text_key: string
+          user_id: string
+        }
+        Insert: {
+          looked_up_at: string
+          outcome: string
+          place_id?: string | null
+          text_key: string
+          user_id: string
+        }
+        Update: {
+          looked_up_at?: string
+          outcome?: string
+          place_id?: string | null
+          text_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       travel_route_global_quota: {
         Row: {
           attempt_count: number
@@ -1314,6 +1338,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      travel_spend_global_day: {
+        Row: {
+          reserved_microdollars: number
+          updated_at: string
+          utc_date: string
+        }
+        Insert: {
+          reserved_microdollars?: number
+          updated_at?: string
+          utc_date: string
+        }
+        Update: {
+          reserved_microdollars?: number
+          updated_at?: string
+          utc_date?: string
+        }
+        Relationships: []
+      }
+      travel_spend_owner_month: {
+        Row: {
+          local_month: string
+          reserved_microdollars: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          local_month: string
+          reserved_microdollars?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          local_month?: string
+          reserved_microdollars?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -1608,6 +1671,14 @@ export type Database = {
       release_advisor_day_context_read: {
         Args: { p_client_id: string; p_lease_token: string }
         Returns: boolean
+      }
+      reserve_travel_provider_spend: {
+        Args: { requested_microdollars: number }
+        Returns: {
+          allowed: boolean
+          resets_at: string
+          retry_after_seconds: number
+        }[]
       }
       save_daily_brief_preferences: {
         Args: {

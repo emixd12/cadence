@@ -477,3 +477,132 @@ suppresses only the return line; unknown travel is never treated as free.
 legs, every mode and option overlap; `tests/briefing-analysis-pipeline.test.ts`
 asserts travel is absent from model input. Native location and navigation gates
 remain under Ticket 165; deployed and installed acceptance remain under Ticket 174.
+
+## Tickets 213–214: monthly budget and efficient refresh — October 18, 2026
+
+Implemented in source; not deployed. Hosted routing has refused every request
+since September 25 because the pilot's 40 lifetime refreshes were used.
+
+What changed:
+
+- `20261017150000_travel_monthly_budget.sql` adds `reserve_travel_provider_spend`.
+  Each provider call reserves its list price first: US$0.005 for a geocode or a
+  Routes Essentials call, US$0.010 for Routes Pro or transit. The owner ceiling is
+  US$5.00 per local month; a US$10.00 per UTC day circuit breaker covers all owners.
+  Refusals reserve nothing and return the renewal instant.
+- `20261017150100_travel_place_cache.sql` stores a text fingerprint and place ID per
+  looked-up location. Turning travel off deletes the rows through a trigger.
+- The refresh service looks up only places not stored, fences sources once before
+  the first paid call and once before returning, routes only legs leaving or
+  arriving within three hours, and runs lookups four at a time.
+- Driving uses one call per leg. Traffic-aware (Pro) routing applies only to legs
+  departing within about an hour; later legs use static Essentials routing.
+- The resolver skips legs between consecutive stops at the same place ID.
+- The client no longer refreshes on status, Note or duration-history changes. On a
+  Timeline open with a current view, one silent foreground read requests again only
+  after more than 500 m of movement beyond both accuracy radii.
+- When the budget is used up, the Timeline keeps the last plan as stale, says
+  "Travel estimates resume on {date}." and hides Refresh travel.
+
+Local evidence: a transaction applying both migrations and
+`tests/sql/ticket-213-travel-monthly-budget-smoke.sql` passed against the existing
+local schema and rolled back. A clean `db reset` through the reviewed Docker proxy
+then applied all migrations and the seed; the smoke passed again. The reset's final
+storage health request failed because the stale local API gateway container was
+not running; this is unrelated to the schema. The local database held only two
+`example.invalid` test accounts before the reset. Type generation was refused by
+the proxy's unnamed-container rule, which was not widened; information-schema
+readback matched the hand-written types. All published bindings stayed on
+`127.0.0.1`, and the Cadence containers were stopped afterward.
+
+Remaining gates, in order:
+
+1. Deploy the owner-approved privacy and terms text (approved October 18, 2026;
+   `docs/LEGAL.md` L-012) with or before Tickets 213–214. The draft in
+   `components/settings/LegalContent.tsx` adds Google's required Maps notice and links
+   to the Terms, names Google Maps Platform as a processor, and discloses place-ID
+   storage, foreground location reads and the monthly limit. Set the page and
+   retention-table dates to the deployment date if it is not October 18, 2026.
+2. Owner-authorized hosted `db push` of both migrations, then deployment.
+3. Owner web re-acceptance with `CADENCE_PERF_LOG=1`: record calls per refresh and
+   refresh p50/p95 from `travel.refresh`, `travel.place_lookups` and
+   `travel.route_legs`, and compare Cloud Monitoring geocode and Routes counts.
+4. Google Cloud quotas: Geocoding v4 reads 120/day and 30/minute. Place storage
+   reduces lookups, but more users will need higher quotas.
+5. Installed desktop re-acceptance inherits the hosted route.
+6. Whole-day Daily Brief routing is implemented in the completion pass below.
+
+
+### October 18 completion pass: local acceptance
+
+Tickets 213–214 remain open for release acceptance. Source implementation is complete.
+
+- The shared launcher requests day scope once per generated Daily Brief. The shared
+  travel hook queues it behind an active Timeline request, fences account/date,
+  deduplicates remounts, and retains consent, foreground and budget checks. The
+  day scope retains the existing eight-leg safety bound. No route value enters
+  model input. Web and desktop callers both pass the current linked account.
+- Foreground movement checks run every minute with existing permission only.
+  Stationary and background checks make no routing request. The threshold remains
+  more than 500 m beyond both accuracy radii.
+- Calendar title/etag-only changes do not refresh routes. Status/Note writes during
+  a request no longer discard its paid work. Core removes affected legs and
+  occupancy after a manual decision without inventing a replacement route. Returning
+  to Unresolved can reuse the original page-memory estimates.
+- Budget refusals apply across source changes, preserve the last same-day plan as
+  stale and unlock Refresh travel at the reset instant without a reload.
+- The private workbench's existing account-access read reports the local month and
+  reserved list-price spend. Failed readback says unavailable instead of zero.
+- `20261018051402_fence_travel_place_cache_consent.sql` prevents late lookup writes
+  from restoring place IDs after travel is disabled. Deploy this third migration
+  together with the two October 17 migrations.
+- Generated local TypeScript types match the new tables and RPC. No Google
+  coordinates are fetched or stored; routing uses place IDs directly.
+- Vitest, ESLint and TypeScript now exclude `.claude/**`, which contains an unrelated
+  nested checkout. Before this exclusion, that checkout ran stale tests against
+  this checkout's aliases and made lint inspect its generated bundles.
+
+A clean local reset through the reviewed Docker proxy returned zero after starting
+the pre-existing stopped Cadence gateway, REST and test-mail containers. It applied
+all migrations through `20261018051402` and the seed. Published bindings remained
+`127.0.0.1`. The SQL smoke passed after replay. The opt-in contract passed concurrent
+reservations at both ceilings and the October-to-November local-midnight boundary.
+The contract uses only synthetic accounts and rolls back its injected clock; final
+Auth-user count is zero. Reproduce it with:
+
+```sh
+CADENCE_TRAVEL_SQL_CONTRACT=1 npm run test -- tests/travel-budget.contract.test.ts
+psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -X -v ON_ERROR_STOP=1 -f tests/sql/ticket-213-travel-monthly-budget-smoke.sql
+```
+
+Operator readback, using an explicitly selected owner and a read-only session:
+
+```sql
+select local_month, reserved_microdollars,
+       reserved_microdollars / 1000000.0 as reserved_usd
+from public.travel_spend_owner_month
+where user_id = :'owner_id'::uuid
+order by local_month desc;
+```
+
+Browser QA used `127.0.0.1:4321`. A synthetic account response showed US$0.125 for
+October in the actual workbench account-access panel at 1280px and 390px. Neither
+viewport overflowed horizontally. The response interception and viewport override
+were removed. No account comparison or paid provider call ran. Authenticated
+Timeline, production provider p50/p95 and installed-desktop acceptance remain open.
+
+Release sequence: apply all three migrations, deploy the matching app and approved
+legal text, verify schema/application parity, then run bounded owner acceptance
+with performance timing enabled. Keep the feature's existing provider-clearance
+gate. The old production budget is exhausted, so a successful before-change latency
+baseline is not available from a fresh old-code request; retain any existing timing
+logs and label that limit explicitly. Do not substitute synthetic timing for production.
+
+
+Final checks: `agents:check`, `interactions:check`, `resolvers:check`, lint, web and
+desktop typecheck, `design-system:check`, web build, desktop build and `git diff
+--check` passed. The full suite passed 2,599 tests with 31 skips; the two opt-in SQL
+contract tests passed separately. Lint reported two existing warnings (the workbench
+purity suppression and the unused `_omitted` fixture binding). Desktop bundling
+reported existing dependency `use client` directive warnings. No hosted migration,
+production deployment, Google Cloud change, paid route or model request ran.

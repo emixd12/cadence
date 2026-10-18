@@ -1,5 +1,28 @@
 # Implementation Status
 
+## Tickets 213–214 implemented and locally verified — October 18, 2026
+
+Completion pass adds whole-day Daily Brief routing, workbench spend readback,
+foreground movement checks, decision-based travel projection, budget renewal and
+late-cache-write consent fencing. Three migrations pass a clean local replay;
+concurrent reservation and local-midnight renewal tests pass. The full suite passes
+2,599 tests (31 skipped); both builds, both typechecks, lint and contract checks pass.
+Not deployed. Ticket 213 replaces the exhausted 40-refresh pilot with
+`reserve_travel_provider_spend`: every provider call reserves its list price under a
+US$5.00 owner-month ceiling and a US$10.00 daily circuit breaker. Refusals keep the
+last plan visible and name the renewal date. Ticket 214 stores place IDs per typed
+location, routes Timeline legs within three hours and day scope for a new brief,
+makes one call per leg, uses
+traffic-aware routing only near departure, skips same-place legs, fences sources
+twice instead of around every call, and stops refreshing on status or Note changes.
+A clean local reset applied all three migrations and the SQL smoke passed.
+The owner approved the matching privacy and terms text on October 18
+(`docs/LEGAL.md` L-012); it is uncommitted and undeployed.
+Open gates (`docs/qa/travel-release.md`): deploy that text, owner-authorized hosted
+migration and deployment, production p50/p95 and call counts, Google Cloud quota
+review, and installed-desktop re-acceptance.
+
+
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 
 Completed. The local folder and GitHub repository are renamed to `cadence`

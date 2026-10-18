@@ -658,3 +658,10 @@ availability. Live provider and installed native acceptance remain separate.
 The briefing workbench reuses its native checkbox/Definition-link row for
 Historical completion times. The control replaces the disabled timestamp row;
 geometry, spacing, typography, square borders and responsive columns are unchanged.
+
+
+## Travel budget readback (Tickets 213–214)
+
+The private briefing workbench adds one text line to its existing account-access
+panel for the local month and reserved travel spend. It uses existing typography
+and wraps at 390px. No new control, token or Settings field is added.
