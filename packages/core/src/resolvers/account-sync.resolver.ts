@@ -69,7 +69,7 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
   historyBranches(baseline, local, hosted, input.firstHostedHydration === true, compatibleMarks);
   if (conflicts.length) return { localWrites: [], hostedWrites: [], conflicts: uniqueConflicts(conflicts), mergedEntities: [], fingerprints: { ...fingerprints, merged: null }, idempotencyKey: null };
   const retained = reconcileOccurrenceReminders(
-    retainReminderProcessingClaims(retainNoteShortcutExclusions(mergedEntities, exclusionSources(input.noteShortcutExclusionPolicy, baseline, local, hosted)), baseline, local, hosted),
+    retainReminderProcessingClaims(retainNoteShortcutExclusions(coalesceGeneratedOccurrences(mergedEntities, baseline, local, hosted), exclusionSources(input.noteShortcutExclusionPolicy, baseline, local, hosted)), baseline, local, hosted),
   );
   const merged = prepare({ entities: retained }), mergedRows = [...merged.values()].sort(compareEntity), mergedFingerprint = fingerprint(mergedRows);
   validateInputGraphs(false, merged);
@@ -125,6 +125,45 @@ export function resolveReviewedAccountSync(input: Readonly<{
   const fingerprints = { baseline: initial.fingerprints.baseline, local: initial.fingerprints.local, hosted: initial.fingerprints.hosted, merged: fingerprint(merged.values()) };
   return { ...resolved, mergedEntities, localWrites: writesBetween(actualLocal, merged), hostedWrites: writesBetween(actualHosted, merged), fingerprints,
     idempotencyKey: sha256(`${input.accountLinkId ?? "account-link"}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${fingerprints.merged}`) };
+}
+
+/** Independently generated, untouched local Occurrences reuse the hosted schedule identity. */
+function coalesceGeneratedOccurrences(rows: readonly AccountSyncEntity[], baseline: Map<string, AccountSyncEntity>, local: Map<string, AccountSyncEntity>, hosted: Map<string, AccountSyncEntity>): AccountSyncEntity[] {
+  const retained = new Set(rows.map(entityKey));
+  const hostedByIdentity = new Map([...hosted.values()].flatMap(entity => {
+    const identity = occurrenceScheduleIdentity(entity);
+    return identity && retained.has(entityKey(entity)) ? [[identity, entity.id] as const] : [];
+  }));
+  const protectedIds = protectedOccurrenceIds(baseline, local, hosted);
+  for (const graph of [baseline, local, hosted]) for (const entity of graph.values()) {
+    for (const [name, kind] of dependencies(entity)) {
+      const id = field(entity.value, name);
+      if (kind === "occurrence" && id) protectedIds.add(id);
+    }
+    if (entity.kind === "mapping" || entity.kind === "imported_note") {
+      const id = field(entity.value, entity.kind === "mapping" ? "local_id" : "target_local_id");
+      if (id) protectedIds.add(id);
+    }
+    if (entity.kind === "note_shortcut_state") for (const id of noteShortcutState(entity).excluded) protectedIds.add(id);
+  }
+  return rows.filter(entity => {
+    const identity = occurrenceScheduleIdentity(entity);
+    const hostedId = identity ? hostedByIdentity.get(identity) : undefined;
+    if (!hostedId || hostedId === entity.id) return true;
+    if (baseline.has(entityKey(entity)) || hosted.has(entityKey(entity)) || !local.has(entityKey(entity)) || protectedIds.has(entity.id)) {
+      throw new Error("Duplicate scheduled Occurrences contain existing data; review is required before synchronization.");
+    }
+    return false;
+  });
+}
+
+function occurrenceScheduleIdentity(entity: AccountSyncEntity): string | null {
+  if (entity.kind !== "occurrence") return null;
+  const behavior = field(entity.value, "behavior_id"), date = field(entity.value, "local_date");
+  const start = field(entity.value, "schedule_start_time"), kind = field(entity.value, "schedule_kind"), end = field(entity.value, "schedule_end_time");
+  if (!behavior || !date || !start || (kind !== "exact" && kind !== "range") || (kind === "range" && !end)) return null;
+  return JSON.stringify([behavior, Temporal.PlainDate.from(date).toString(), Temporal.PlainTime.from(start).toString(),
+    kind === "range" ? Temporal.PlainTime.from(end!).toString() : null]);
 }
 
 function exclusionSources(policy: NoteShortcutExclusionPolicy | undefined, baseline: Map<string, AccountSyncEntity>, local: Map<string, AccountSyncEntity>, hosted: Map<string, AccountSyncEntity>) {

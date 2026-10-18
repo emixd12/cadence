@@ -605,8 +605,13 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
     (
         if replacement {
             (write.operation == AccountSyncOperation::Upsert) as u8
+        } else if write.operation == AccountSyncOperation::Delete
+            && matches!(write.kind, AccountSyncEntityKind::Occurrence | AccountSyncEntityKind::ReminderDelivery)
+        {
+            // Validated disposable rows must leave their unique schedule slot before replacement.
+            0
         } else {
-            (write.operation == AccountSyncOperation::Delete) as u8
+            1 + (write.operation == AccountSyncOperation::Delete) as u8
         },
         rank,
     )
@@ -890,7 +895,7 @@ mod tests {
         };
         assert!(
             mutation_order(&delete(AccountSyncEntityKind::NoteShortcutState), false)
-                < mutation_order(&delete(AccountSyncEntityKind::Occurrence), false)
+                < mutation_order(&delete(AccountSyncEntityKind::Behavior), false)
         );
         assert!(
             mutation_order(&delete(AccountSyncEntityKind::Category), true)
@@ -2125,6 +2130,28 @@ mod tests {
                 .as_deref(),
             Some(parent_id)
         );
+    }
+
+    #[test]
+    fn account_sync_replaces_an_untouched_duplicate_schedule_identity() {
+        let (_directory, connection, profile, category) = database();
+        let behavior_id = "50000000-0000-4000-8000-000000000001";
+        let occurrence_id = "50000000-0000-4000-8000-000000000002";
+        connection.execute("INSERT INTO behaviors(id,user_id,category_id,title,description,recurrence_rule,scheduled_time,timezone,browser_reminder_enabled,email_reminder_enabled,reminder_offset_minutes,active,created_at,updated_at,archived_at,current_configuration_event_id) VALUES(?1,?2,?3,'Test',NULL,'{\"type\":\"daily\",\"interval\":1}','09:00:00','America/New_York',1,0,0,1,'2026-09-01T00:00:00Z','2026-09-01T00:00:00Z',NULL,NULL)", params![behavior_id,profile,category.id]).unwrap();
+        connection.execute("INSERT INTO occurrences(id,user_id,behavior_id,behavior_configuration_event_id,behavior_schedule_slot_id,scheduled_for,local_date,schedule_kind,schedule_preset,schedule_start_time,schedule_end_time,status,completed_at,status_marked_at,note,created_at,updated_at) VALUES(?1,?2,?3,NULL,NULL,'2026-09-01T13:00:00Z','2026-09-01','exact',NULL,'09:00:00',NULL,'unresolved',NULL,NULL,NULL,'2026-09-01T00:00:00Z','2026-09-01T00:00:00Z')", params![occurrence_id,profile,behavior_id]).unwrap();
+        let current = db::by_id::<Occurrence>(&connection, &profile, occurrence_id).unwrap();
+        let hosted_id = "50000000-0000-4000-8000-000000000099";
+        let mut hosted = normalized(&current).unwrap();
+        hosted["id"] = json!(hosted_id);
+        let writes = vec![
+            AccountSyncWrite { kind: AccountSyncEntityKind::Occurrence, id: hosted_id.into(),
+                operation: AccountSyncOperation::Upsert, expected: None, value: Some(hosted) },
+            AccountSyncWrite { kind: AccountSyncEntityKind::Occurrence, id: occurrence_id.into(),
+                operation: AccountSyncOperation::Delete, expected: Some(normalized(&current).unwrap()), value: None },
+        ];
+        apply(&connection, &profile, &writes).unwrap();
+        assert_eq!(connection.query_row("SELECT count(*) FROM occurrences", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
+        assert_eq!(db::by_id::<Occurrence>(&connection, &profile, hosted_id).unwrap().status, "unresolved");
     }
 
     #[test]

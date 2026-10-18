@@ -1,6 +1,6 @@
 # Implementation Status
 
-## Tickets 213–214 deployed; desktop acceptance pending — October 18, 2026
+## Tickets 213–214 deployed; desktop synchronization acceptance in progress — October 18, 2026
 
 All three migrations deployed and read back. Production serves the approved
 Google Maps notices and routing implementation from focused release commit
@@ -12,16 +12,15 @@ Web narrow-layout and Refresh travel checks pass. Production-based validation:
 Review fixes withdraw cached guidance for reopened stops and changed durations,
 and check duration history before reserving spend.
 
-Installed preview.47 passed artifact checks and preserves a private database
-backup plus preview.45 rollback. Launch waits for macOS Keychain approval of the
-existing session. Installed UI acceptance remains. The clean production deployment restores
-the existing logging configuration. Production deployment
-`dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` includes review fixes from `f239e72`.
-Preview.48 matches those fixes and passes artifact verification; it is not installed
-while preview.47 waits for Keychain approval. Tickets and PR #107 stay open until
-installed acceptance completes. Apple distribution
-and native position gates remain in Tickets 115/165. See
-`docs/qa/travel-release.md` for exact evidence and measurement limits.
+Owner Keychain approval is complete. Installed preview.49 loads the account and
+Calendar after correcting the local build helper's missing connector setting.
+Account sync exposed 229 freshly generated local duplicates of hosted schedule
+identities. The shared planner now retains hosted identities for only untouched,
+unreferenced local duplicates; native atomic apply frees the old unique slots.
+No private database repair was applied. The correction passes 2,378 TypeScript
+and 110 native tests. Final installed acceptance is in progress.
+Production remains `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
+See `docs/qa/travel-release.md` for evidence and measurement limits.
 
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 

@@ -751,3 +751,25 @@ artifact checks. It remains staged under the ignored release directory; installe
 preview.47 still waits for the owner's Keychain password and Allow action.
 Tickets and PR #107 remain open for installed runtime acceptance. The final
 candidate still needs installation and runtime verification after that prompt.
+
+### Installed acceptance follow-up
+
+Owner Keychain approval allowed preview.47 to open. Runtime inspection found the
+local build helper had omitted `VITE_CALENDAR_BROKER_ORIGIN`; preview.48 therefore
+was not installed. Preview.49 includes the existing production connector origin,
+passes artifact verification, and loads the linked account and selected Calendar
+in the installed app.
+
+Synchronization then exposed an existing account-sync defect: 229 freshly
+generated, untouched local Occurrences duplicated hosted schedule identities.
+All 229 have no Notes, decisions, time sessions, reminders or imported
+interventions. No private database repair was applied. A shared planner correction
+retains hosted identities for only new, unreferenced, unresolved duplicates.
+Native atomic apply frees their unique schedule slots before inserting hosted
+rows. Protected duplicates fail closed. The correction includes resolver and real
+SQLite regressions; 2,378 TypeScript tests and 110 native tests pass.
+
+Platform impact: desktop uses the shared planner and native transaction ordering;
+web tracking is unchanged and hosted data keeps its identities. Marketing is not
+applicable. Future mobile inherits the planner rule. Installed verification of
+the corrected candidate remains in progress.
