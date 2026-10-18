@@ -221,9 +221,10 @@ Daily Brief mutation. A generated brief requests day scope once through the shar
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
 
-## MCP server and OAuth authorization server (Tickets 220–232, planned)
+## MCP server and OAuth authorization server (Tickets 220–232)
 
-These routes are planned, not implemented. `docs/MCP_INTEGRATION.md` owns the
+OAuth (226) and MCP (228) routes are implemented locally; hosted acceptance
+remains Ticket 232. `docs/MCP_INTEGRATION.md` owns the
 boundary and `docs/MCP_CONTRACT.md` (Ticket 221) owns the operation contract.
 The planned MCP URL is `https://app.cadence-me.com/mcp`, and the planned OAuth
 issuer is `https://app.cadence-me.com` (assumptions pending owner confirmation).
@@ -232,7 +233,7 @@ URLs or logs. Protocol responses use `Cache-Control: no-store`.
 
 | Route | Methods | Owner ticket | Purpose |
 |---|---|---:|---|
-| `/mcp` | POST (Streamable HTTP) | 228 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only. |
+| `/mcp` | POST, OPTIONS; authenticated GET/DELETE return 405 | 228 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only. |
 | `/.well-known/oauth-protected-resource` | GET | 226 | RFC 9728 protected-resource metadata. |
 | `/.well-known/oauth-protected-resource/mcp` | GET | 226 | RFC 9728 metadata for the `/mcp` resource; `resource` equals the exact MCP URL. |
 | `/.well-known/oauth-authorization-server` | GET | 226 | RFC 8414 authorization-server metadata (PKCE S256, public clients, CIMD, `iss` in responses). |
@@ -272,3 +273,15 @@ remain Ticket 227. `getOAuthConsent` and `completeOAuthConsent` in
 `lib/services/oauth/consent.ts` take a signed-in user client and enforce browser
 binding; completion additionally requires a same-origin POST. Ticket 228 calls
 `verifyMcpAccessToken` before creating its RLS integration context.
+
+
+### Implemented MCP transport (Ticket 228)
+
+`app/mcp/route.ts` calls `lib/mcp/server.ts` on the Node runtime with a 60-second
+Vercel maximum. The official SDK handles stateless Streamable HTTP, discovery,
+version negotiation and JSON-RPC. No MCP session, subscriptions, prompts or
+resources persist. `OPTIONS` is credential-free browser preflight; every other
+request verifies a Cadence Bearer token before protocol handling. Cookie sessions
+never authorize MCP. Scope/rate admission calls the shared integration operation
+layer; user data remains RLS-scoped. Transport limits and verified protocol versions
+are recorded in `MCP_INTEGRATION.md` and `qa/mcp-server.md`.

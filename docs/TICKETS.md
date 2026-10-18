@@ -13268,7 +13268,7 @@ Scope and acceptance:
 
 ## Ticket 228: MCP endpoint
 
-Status: filed October 18, 2026; planned (wave 3).
+Status: implementing October 18, 2026 (wave 3); local transport tests pass, Inspector acceptance pending.
 Dependencies: 221–226.
 
 Goal: ship the remote MCP server at the planned `https://app.cadence-me.com/mcp`.
@@ -13276,12 +13276,15 @@ Goal: ship the remote MCP server at the planned `https://app.cadence-me.com/mcp`
 Scope and acceptance:
 
 - `app/mcp/route.ts` and `lib/mcp/`: stateless Streamable HTTP with
-  `@modelcontextprotocol/sdk`; protocol 2026-07-28 plus documented older versions;
+  pinned `@modelcontextprotocol/server@2.3.1` and dev-only
+  `@modelcontextprotocol/client@2.3.1`; protocol 2026-07-28 plus documented older versions;
   deterministic `tools/list`.
 - 401 with `resource_metadata` and `scope`; 403 `insufficient_scope`; ChatGPT
   `_meta["mcp/www_authenticate"]`; only tokens for this resource.
 - Tools from the Ticket 221 registry with schemas, annotations, and
   `securitySchemes`; `structuredContent` plus short text; stable tool errors.
+  Omit optional `openai/profile`: its strict identity-only schema conflicts with
+  the approved account-context schema. Preserve all 16 tools and schemas.
 - Pipeline: verify → context → scope → rate limit → handler → output validation →
   activity → monitoring. Honors the kill switch. Origin validation, body limit,
   timeouts, credential-free CORS.

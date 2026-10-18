@@ -197,3 +197,9 @@ export async function verifyMcpAccessToken(accessToken: string, requiredScopes: 
     channel: "mcp", scopes: verified.scopes,
   };
 }
+
+/** Admission uses only the private OAuth counter RPC, never tracking tables. */
+export async function consumeMcpRateLimit(grantId: string, access: "read" | "write") {
+  requireOAuthEnabled();
+  return repo.consumeOAuthRateLimit(tokenEndpointClient(), { action: access === "read" ? "mcp_read" : "mcp_write", grantId });
+}

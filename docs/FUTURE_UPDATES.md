@@ -126,6 +126,9 @@ These related items stay deferred until separately scoped:
   In v1, hosted integration activity records which client made a write; synced
   tables do not change.
 - MCP prompts and resources. V1 exposes tools only.
+- An OpenAI-compatible profile tool. The optional `openai/profile` marker
+  requires an identity-only output schema incompatible with `get_account_context`.
+  V1 connects without it; account labels and duplicate detection may be less reliable.
 - A production sign-in path for directory reviewers. It needs an owner decision.
 
 ## Paid shared account and speech features

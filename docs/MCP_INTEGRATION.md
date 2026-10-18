@@ -331,3 +331,62 @@ type still forbids HTTP redirects. The [ChatGPT CIMD](https://chatgpt.com/oauth/
 prefers `private_key_jwt` but lists `none` among supported alternatives. Cadence
 selects that public-client alternative; it does not claim private-key JWT support.
 Focused tests preserve both observed metadata shapes.
+
+
+## 13. MCP endpoint implementation (Ticket 228)
+
+Local implementation uses pinned `@modelcontextprotocol/server@2.3.1` at runtime
+and `@modelcontextprotocol/client@2.3.1` for development tests. The official stable
+v2 SDK split replaces the legacy `@modelcontextprotocol/sdk` package. Its
+`createMcpHandler` provides native 2026-07-28 and `legacy: "stateless"` support;
+Cadence does not emulate the protocol. Official references checked 2026-10-18:
+[SDK repository](https://github.com/modelcontextprotocol/typescript-sdk),
+[legacy support](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/serving/legacy-clients.md).
+
+Accepted versions: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05,
+and 2024-10-07. Tests negotiate each legacy version. Real authenticated tests
+exercise all 16 tools in modern auto-negotiation and legacy mode. SDK v2 clients
+must select `versionNegotiation: { mode: "auto" }` or explicitly pin 2026-07-28
+to exercise the modern path; their default remains legacy. The SDK's exported
+legacy `SUPPORTED_PROTOCOL_VERSIONS` list does not include its separate modern
+transport. Modern requests use the SDK's protocol metadata and method headers;
+legacy responses use SSE without sessions. GET and DELETE return authenticated
+405 responses. No resumption or unsolicited server messages are supported.
+
+`server/discover` exposes tool-only capabilities and bounded cross-tool guidance.
+`tools/list` follows the contract registry order, with private `ttlMs: 300000`
+cache hints. Every descriptor includes its title, description, annotations,
+input/output schema and OAuth scopes in both `securitySchemes` and `_meta` for
+client compatibility. Successful calls return validated `structuredContent` and
+short text. Stable tool errors carry actionable messages; authentication and
+scope errors also carry `_meta["mcp/www_authenticate"]`.
+
+The optional `_meta["openai/profile"]` marker is deliberately absent. OpenAI's
+strict identity-only schema conflicts with the approved `get_account_context`
+output. Connections work without it, but account labels and duplicate detection
+may be less reliable. A compatible profile tool is deferred in `FUTURE_UPDATES.md`.
+See [OpenAI multiple-account guidance](https://developers.openai.com/plugins/build/auth#support-multiple-accounts).
+
+Admission derives grant identity only from `verifyMcpAccessToken`. Scope checks
+precede durable per-grant limits (120 reads/minute, 30 writes/minute). The existing
+private OAuth client runs only the counter RPC; tracking operations use the
+RLS integration context. The read handlers validate output before activity;
+write handlers own precommit validation, atomic activity, and bounded retry
+receipts. The transport adds neither duplicate write activity nor a postcommit
+validation failure. Admission storage failures fail closed with a stable error.
+HTTP 401 includes protected-resource metadata and scope; missing write scopes
+return 403; exhausted grants return 429 with `Retry-After`.
+
+Origins are limited to the configured issuer, `https://claude.ai` and
+`https://chatgpt.com`. Development additionally permits localhost/127.0.0.1 HTTP
+ports 4321–4330 for Inspector. Requests without Origin remain valid. CORS permits
+Authorization and MCP headers without credentials. Body reads allow 65,536 bytes
+and two seconds; operation network requests share a 45-second abort deadline,
+within the route's 60-second maximum. OAuth verification retains its own bounded
+timeout. All routes honor `CADENCE_MCP_ENABLED`, default off. Monitoring emits only
+known operation names, status, stable error code and elapsed milliseconds; no
+credentials, arguments, note text, results or backend exception messages.
+
+Evidence and remaining acceptance limits: `docs/qa/mcp-server.md`. Platform impact:
+web only; linked desktop receives changes through existing sync; marketing and
+future mobile have no implementation changes. No hosted deployment is implied.
