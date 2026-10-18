@@ -1,14 +1,18 @@
 # Cadence MCP server integration brief
 
-Status: planned. The owner approved the direction on 2026-10-18; Tickets 220–232
+Status: local foundations implemented; endpoints and client acceptance remain
+planned. The owner approved the direction on 2026-10-18; Tickets 220–232
 implement it. `STATUS.md` holds the current implementation state. Decisions and
 superseded lines are in `docs/DECISIONS.md` ("2026-10-18: Cadence MCP server and
 AI plugins"). The operation contract (tool names, schemas, scopes, error codes,
 limits, versioning) is `docs/MCP_CONTRACT.md`, written by Ticket 221. This brief
 follows the template in `docs/INTEGRATION_PLAYBOOK.md`.
 
-Nothing in this brief is implemented yet. Every claim below carries an evidence
-label from the playbook. "Planned" means a ticket owns it and no evidence exists.
+Tickets 220, 221, and 223 passed independent wave-1 verification. Ticket 222's
+retry-storage correction awaits independent re-verification. The operation
+contract, persistence, and RLS request context exist locally. OAuth endpoints,
+operation handlers, consent UI, and MCP transport do not exist yet. Sections
+below describe the intended full integration; section 11 records proven scope.
 
 ## 1. Outcome and boundary
 
@@ -109,7 +113,7 @@ adapter over one contract. It is not a connector SDK or provider registry.
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Planned: OAuth server and discovery (Ticket 226), persistence (222), request context (223), read and write operations (224–225), consent screen and Settings → Connected apps (227), `/mcp` (228), legal drafts and the OpenAI challenge route (231), staging acceptance (232). Routes: `docs/ROUTE_MAP.md`. Interactions are registered when Ticket 227 implements them. |
+| Web | Local foundations: contract (221), private persistence (222; retry correction awaiting review), request context (223). Planned: OAuth server and discovery (226), read and write operations (224–225), consent screen and Settings → Connected apps (227), `/mcp` (228), legal drafts and the OpenAI challenge route (231), staging acceptance (232). Routes: `docs/ROUTE_MAP.md`. Interactions are registered when Ticket 227 implements them. |
 | Desktop | No desktop code in v1. Linked desktop receives MCP-made changes through existing account sync, because writes reuse the web app's write paths and synced tables do not change. Account-free desktop data never reaches the server, so MCP cannot read it. A local stdio MCP server is a follow-up in `docs/FUTURE_UPDATES.md`. Ticket 227 records the desktop decision in `docs/DESKTOP_PARITY.md`. |
 | Marketing | Planned: `/developers` docs section in `apps/marketing` (Ticket 229), plugin listing links, and disclosures after owner approval (231). No public claim before deployed evidence. |
 | Future mobile | Not applicable. A future client can reuse `docs/MCP_CONTRACT.md`. |
@@ -255,7 +259,7 @@ Inspector, plus a linked desktop that shows an MCP-made change after sync.
 Keep evidence classes separate, as the playbook requires. Later tickets append
 rows; do not rewrite earlier rows.
 
-| Evidence class | Current state (2026-10-18) |
+| Evidence class | Planning checkpoint (Ticket 220, 2026-10-18) |
 |---|---|
 | Documented support | Section 4. |
 | Source check | None yet. |
@@ -264,3 +268,11 @@ rows; do not rewrite earlier rows.
 | Live provider | None yet; Ticket 232. |
 | Deployed behavior | None yet; Ticket 232. |
 | Public approval | None yet; owner submissions after Ticket 231. |
+
+| Evidence class | Wave-1 checkpoint (2026-10-18) |
+|---|---|
+| Source check | Independent verification approved Tickets 220, 221, and 223 at `b13eeb3617ae780ce59fb4c4d13640f30a4041bf`. Contract: `packages/core/src/integration/`. Private persistence: `lib/db/oauth.repo.ts`, `lib/db/integration.repo.ts`, Ticket 222 migrations. User-scoped context: `lib/integrations/request-context.ts`. No HTTP integration endpoints yet. |
+| Fixture or contract check | `tests/integration-contract.test.ts` verifies 16 tools, schemas, exclusions, limits, and generated documentation. `tests/sql/ticket-222-oauth-persistence-smoke.sql` verifies OAuth lifecycle and isolation. `tests/integration-request-context.local-integration.test.ts` verifies minted tokens with two isolated users. |
+| Fixture or contract check | Ticket 222 correction: `tests/integration-idempotency.local-integration.test.ts` validates large outputs and exercises real begin/complete/replay RPCs, preserving long notes. A forward migration permits 512 KiB of JSONB text while the wire cap remains 100,000 bytes; rationale in `DATA_MODEL.md`. An isolated clean reset (82 migrations), SQL smoke, and 232 focused contract/repository/RLS tests passed. A 99,948-byte Behavior response occupies 297,181 JSONB text bytes, proving 256 KiB insufficient. Independent correction review remains pending. |
+| Fixture or contract check | The existing `smoke:rls` fixture fails before assertions with “Configuration event plan does not match behavior state.” The verifier reproduced it on base `041546ed573af042cf6a7fb4ed9ce832696ca539`; its creation snapshot omits `location_text`. This correction does not change that fixture. |
+| Deployed behavior | No hosted migration push or deployment is reported for Tickets 220–223. Hosted state was not queried during the correction. Signing-key import, staging, live clients, and deployment acceptance remain owner-gated in Ticket 232. Wave 2 remains on hold pending independent re-verification. |

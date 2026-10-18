@@ -1980,7 +1980,9 @@ public generated database types have no new columns or RPC arguments.
 
 Migration `20261018160000_add_oauth_integration_persistence.sql` adds the
 database objects for Cadence's OAuth authorization server and MCP integration
-bookkeeping. It changes no existing table.
+bookkeeping. It changes no existing product table. Forward migration
+`20261018164000_expand_integration_replay_capacity.sql` raises the private
+idempotency result bound without changing columns, RPC signatures, or grants.
 
 Platform impact: hosted web database only. Desktop: not applicable. No synced
 table changes, and these records never enter account-sync snapshots, desktop
@@ -2003,7 +2005,7 @@ only through the `SECURITY DEFINER` functions below. Each pins
 | `token_families` | One family per code exchange; absolute expiry; revoked time and reason | `user_id` cascade |
 | `tokens` | Access and refresh token SHA-256 hashes, type, family, grant, scopes, resource, expiry, refresh `rotated_at`, `revoked_at` | `user_id` cascade |
 | `activity` | Grant, client, operation name, up to 25 target UUIDs, outcome, error code, time. No free text or payloads | `user_id` cascade |
-| `idempotency_records` | User + client + key, operation, request hash, `pending` or `completed`, stored result (at most 64 KiB), 24-hour expiry | `user_id` cascade |
+| `idempotency_records` | User + client + key, operation, request hash, `pending` or `completed`, stored result (at most 512 KiB of `jsonb::text`), 24-hour expiry | `user_id` cascade |
 | `external_references` | User + client + entity type + entity id + external id (Facets foundations). Unique per user and client on both the external id and the entity. v1 supports `behavior` only and cascades from `behaviors` | `user_id` cascade |
 | `rate_limit_counters` | Fixed-window counters for `mcp_read` and `mcp_write` per grant, and `client_registration` per SHA-256 source hash | Grant cascade |
 
@@ -2015,6 +2017,38 @@ connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback.
 
 `launch_rate_limits` is not reused. It is keyed by account and requires a user,
 while client registration happens before sign-in and MCP limits apply per grant.
+
+### Retry result size
+
+The contract still caps outputs at 100,000 UTF-8 bytes of compact
+`JSON.stringify(value)`. Existing output notes remain untruncated; the
+2,000-code-point note limit applies only to MCP inputs. PostgreSQL measures
+storage with `octet_length(result::text)`, including JSONB separator whitespace
+and numeric exponent expansion. A 100,000-byte storage bound is therefore too
+small. Even 256 KiB can reject a contract-valid Behavior with many schedules
+whose recurrence intervals use large exponents.
+
+The 512 KiB storage bound covers the current write schemas: Occurrence outputs
+contain no numbers; Behavior outputs have two fixed unbounded integers and one
+per schedule. Each schedule requires more than 100 compact bytes, allowing fewer
+than 1,000 such integers per response. A finite JavaScript integer needs at most
+309 decimal characters. Even allowing another 100,000 bytes for separator
+whitespace and 309 bytes per integer gives less than 510,000 bytes, below 524,288.
+Revisit this bound if write schemas add other numeric arrays or the wire cap grows.
+Storage capacity does not replace contract validation before persistence.
+
+`tests/integration-idempotency.local-integration.test.ts` validates the same
+large outputs before real authenticated begin/complete/replay RPCs. It covers
+70,000-character notes, 99,999 and 100,000 wire bytes, Unicode and JSON escapes,
+numeric expansion, rejection at 100,001 wire bytes, and the separate storage
+boundary at 524,288/524,289 bytes. Set `CADENCE_LOCAL_SUPABASE_DB_URL` only to an
+isolated loopback database to enable the SQL cases; every case rolls back.
+
+Deployment evidence: repository and workspace records report no hosted push of
+Ticket 222. Hosted state was not queried during this correction; no hosted action
+was authorized. The forward migration supports both clean resets and databases
+that already applied the original migration. Regenerated public database types
+remain unchanged because this migration changes only a private check constraint.
 
 ### Lifetimes
 
