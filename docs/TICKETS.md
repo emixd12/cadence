@@ -13698,7 +13698,11 @@ Platform impact:
 
 ## Ticket 221: Shared calendar-source and recorded-activity contracts
 
-Status: not started.
+Status: implemented locally on October 18, 2026; independent verification
+pending. Artifacts and enforced rules are listed in
+`docs/EXTERNAL_EVENT_CONTRACT.md` under "Connector expansion contracts". The
+new AdvisorDayContext `1.1` entry points exist but no runtime caller uses them
+until Ticket 226.
 
 Goal: let validated contracts carry Outlook and iCloud events and Hevy workout
 timing without changing Google wire behavior.

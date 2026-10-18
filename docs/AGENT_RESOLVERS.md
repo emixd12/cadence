@@ -385,9 +385,16 @@ text, read-only suggestions and trusted source metadata.
 
 ## Connector expansion ownership (Tickets 220–228)
 
-Planned October 18, 2026; not implemented. No new required resolver module is
-added. `packages/core` owns the extended event validator and the separate
-recorded-activity types, validation, and consumer projection. Provider adapters
+Planned October 18, 2026. Ticket 221 implemented the shared contracts; provider
+adapters and later tickets are not implemented. No new required resolver module
+is added. `packages/core` owns the extended event validator
+(`services/external-event-validation.ts`) and the separate recorded-activity
+types, validation, and normalization (`types/recorded-activity.ts`,
+`services/recorded-activity-validation.ts`). The consumer projection is
+`projectAdvisorActivityConnector` in `services/advisor-day-context.ts`. These are
+pure functions with injected time; required tests are
+`tests/external-event-contract.test.ts`, `tests/recorded-activity-contract.test.ts`,
+and `tests/advisor-day-context.test.ts`. Provider adapters
 in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
 and field discard. Services own credentials, generations, and fences. Repositories
 in `lib/db` own owner-scoped persistence. UI renders validated results only.

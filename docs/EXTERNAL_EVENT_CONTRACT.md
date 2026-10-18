@@ -66,6 +66,8 @@ The bounded implementation slice owns these artifacts:
 | Google adapter/read helper | `lib/services/google-calendar-provider.ts`; safe field adaptation and bounded selected-calendar pagination |
 | Contract fixtures | `tests/fixtures/external-event-snapshot.valid.json` and `tests/fixtures/google-calendar/*.json` |
 | Contract tests | `tests/external-event-contract.test.ts` and `tests/google-calendar-provider.test.ts` |
+| Calendar `1.1.0` (Ticket 221) | `packages/core/src/external-event-1.1.schema.json` reuses the `1.0.0` definitions; `validateVersionedExternalEventSnapshot`, `projectVersionedExternalEventSchedulingFacts`, `externalEventNormalizedId`, and the snapshot scope-key helpers; fixtures `tests/fixtures/external-event-snapshot.{outlook,icloud}.valid.json` |
+| Recorded activity (Ticket 221) | `packages/core/src/types/recorded-activity.ts`, `packages/core/src/recorded-activity.schema.json`, `packages/core/src/services/recorded-activity-validation.ts`; fixture `tests/fixtures/recorded-activity-snapshot.valid.json`; tests `tests/recorded-activity-contract.test.ts` |
 
 `ExternalEventFieldAvailability` describes why a field has no usable value:
 `not_provided`, `restricted`, `provider_omitted`, `unsupported`, or `unknown`.
@@ -309,11 +311,31 @@ with no implementation here.
 
 ## Connector expansion contracts (Tickets 220–228)
 
-Status, October 18, 2026: this is the planned contract. Ticket 220 recorded these
-rules in documentation only. No runtime type, schema, adapter, route, or migration
-exists for Outlook, iCloud, or Hevy yet. Provider claims cite dated public
-documentation in `docs/INTEGRATION_PLAYBOOK.md`; live-provider and
-public-approval evidence is not verified.
+Status, October 18, 2026: Ticket 220 recorded these rules. Ticket 221 implemented
+the shared core types, JSON Schemas, runtime validators, projections, and
+synthetic fixtures listed in the artifact table above. No provider adapter, route,
+migration, consent, or Daily Brief assembly exists for Outlook, iCloud, or Hevy
+yet. Provider claims cite dated public documentation in
+`docs/INTEGRATION_PLAYBOOK.md`; live-provider and public-approval evidence is not
+verified.
+
+Ticket 221 entry points and enforced rules:
+
+- `validateExternalEventSnapshot` stays the exact Google `1.0.0` validator used by
+  existing routes and desktop caches. It rejects `1.1.0` with
+  `ExternalEventValidationError.code = "unsupported_schema_version"`.
+- `validateVersionedExternalEventSnapshot` accepts each source only with its pair
+  in `EXTERNAL_EVENT_SOURCE_VERSIONS`. Every event and tombstone must carry the
+  snapshot source. Outlook and iCloud `id` and `logicalInstanceId` values must
+  start with `<source>/` (`externalEventNormalizedId` builds them).
+- Outlook and iCloud events must keep description and location empty and
+  organizer, attendees, conference, and attachments null, each marked
+  `unsupported`. Outlook live events use `unknown` state. iCloud events have a
+  null source URL and null user response.
+- `externalEventSnapshotScopeKey` binds source, account, generation, range,
+  timezone, and selected calendars.
+- `projectVersionedExternalEventSchedulingFacts` returns the unchanged Google
+  projection for Google and adds `source` for `1.1.0`.
 
 ### Calendar sources beyond Google
 
@@ -398,6 +420,21 @@ event snapshot in `packages/core`.
 | `activities[].revision` | `providerUpdatedAt` from `updated_at`, or null with availability `unavailable`. |
 | `activities[].fieldAvailability` | `location: "unsupported"` and `sourceTimezone: "unsupported"`. Hevy's documented workout schema has no location or timezone field. Missing location is never inferred from Behavior locations, travel settings, or titles. |
 
+Ticket 221 contract details. The snapshot also carries `failures` (the stable read
+error codes; at least one when incomplete, none when complete). It has no stored
+freshness field: the consumer projection derives current or stale from the
+injected `now` and the five-minute day-context freshness window. Coverage counts
+and `pageCount` are null when the provider did not report them. `complete`
+additionally requires `itemCount` to equal both counts, so a removed duplicate
+that hid a skipped workout cannot pass. `normalizeRecordedWorkout` derives each
+activity from provider instants with explicit offsets and the injected fetch time.
+It quarantines a missing ID, malformed start or end, missing end, reversed or
+zero-length interval, end after fetch time, or malformed revision. The validator
+rejects the same intervals, unknown durations, wall-clock durations, and any
+extra field. Location and source timezone are always `unsupported`; an earlier
+draft's optional location and unknown-duration fields are not part of the
+contract.
+
 The adapter discards `title`, `description`, `routine_id`, `exercises`, sets,
 weights, reps, notes, and every other field before validation. They never cross
 the adapter boundary, enter caches, or reach a consumer.
@@ -428,7 +465,14 @@ connected, as `includeCalendar` does today.
 connector kinds changes its accepted values, so Ticket 221 adds version `1.1`.
 Validators accept `1.0` only with Google or no connectors and `1.1` with any
 known connector. Saved workbench records at `1.0` stay readable. Desktop does
-not consume this contract.
+not consume this contract. Ticket 221 adds `validateVersionedAdvisorDayContext`,
+`validateVersionedAdvisorDayContextRequest`,
+`projectVersionedAdvisorCalendarConnector`, and `projectAdvisorActivityConnector`
+in `packages/core/src/services/advisor-day-context.ts`. The existing `1.0`
+validators and projections are unchanged and remain the only runtime callers
+until Ticket 226 wires consent and assembly. In `1.1`, each source appears at
+most once, event refs are unique across connectors, and Outlook and iCloud refs
+are namespaced by source before hashing. Google refs are unchanged.
 
 The consumer projection for Outlook and iCloud equals the Google projection
 above, with connector kind `outlook_calendar` or `icloud_calendar`. The activity

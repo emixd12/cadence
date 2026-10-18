@@ -2,9 +2,14 @@ import type { NormalizedExternalEvent } from "../types/day-progress";
 import type {
   ExternalEventSchedulingFact,
   ExternalEventSchedulingProjection,
+  ExternalEventSchedulingProjectionV1_1,
   ExternalEventSnapshotV1,
+  VersionedExternalEventSnapshot,
 } from "../types/external-event";
-import { validateExternalEventSnapshot } from "./external-event-validation";
+import {
+  validateExternalEventSnapshot,
+  validateVersionedExternalEventSnapshot,
+} from "./external-event-validation";
 
 export function projectExternalEventSchedulingFacts(
   value: ExternalEventSnapshotV1 | unknown,
@@ -20,6 +25,31 @@ export function projectExternalEventSchedulingFacts(
     freshness: snapshot.freshness,
     coverage: snapshot.coverage,
     events,
+    tombstones: snapshot.tombstones,
+  };
+}
+
+/**
+ * Same scheduling facts for any calendar source. Google `1.0.0` input returns
+ * the unchanged Google projection; Outlook and iCloud `1.1.0` input also names
+ * its source so merged consumers cannot confuse namespaced identities.
+ */
+export function projectVersionedExternalEventSchedulingFacts(
+  value: VersionedExternalEventSnapshot | unknown,
+): ExternalEventSchedulingProjection | ExternalEventSchedulingProjectionV1_1 {
+  const snapshot = validateVersionedExternalEventSnapshot(value);
+  if (snapshot.source === "google_calendar") {
+    return projectExternalEventSchedulingFacts(snapshot);
+  }
+  return {
+    schemaVersion: snapshot.schemaVersion,
+    source: snapshot.source,
+    accountId: snapshot.accountId,
+    requestedRange: snapshot.requestedRange,
+    completeness: snapshot.completeness,
+    freshness: snapshot.freshness,
+    coverage: snapshot.coverage,
+    events: snapshot.events.map(projectExternalEventSchedulingEvent),
     tombstones: snapshot.tombstones,
   };
 }

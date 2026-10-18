@@ -6,7 +6,7 @@ The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
 timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
 this branch (`expansion-connectors`, based on `12ea89a`) merged `origin/main`
 at `041546e` locally on October 18, 2026, before Ticket 221 runtime work.
-Independent verification of the integrated baseline is pending.
+The integrated baseline `d7af234` was independently approved.
 
 - Ticket 220 is documentation-complete and independently approved at `668a4cd`.
   It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
@@ -14,7 +14,12 @@ Independent verification of the integrated baseline is pending.
   `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
   `docs/FUTURE_UPDATES.md`. No runtime code, migration, or provider configuration
   changed.
-- Tickets 221–228 are not started.
+- Ticket 221 is implemented locally and awaits independent verification. It
+  adds the Outlook/iCloud calendar schema `1.1.0`, the separate Hevy
+  recorded-activity contract, and AdvisorDayContext `1.1` validators and
+  projections in `packages/core`. Google `1.0.0` validators, fixtures, routes,
+  and runtime callers are unchanged. No provider adapter, route, migration,
+  consent, or UI changed. Tickets 222–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

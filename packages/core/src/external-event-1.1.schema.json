@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadence.local/schemas/external-event-snapshot-1.1.0.json",
+  "title": "Cadence external event snapshot 1.1.0 (Outlook and iCloud calendars)",
+  "description": "Adds only the Outlook and iCloud source and adapter literals. Google stays on schema 1.0.0. Shared definitions come from the 1.0.0 schema. Runtime validation additionally binds event and tombstone sources and namespaced identities to the snapshot source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "adapterVersion",
+    "accountId",
+    "connectionGeneration",
+    "source",
+    "requestedRange",
+    "fetchedAt",
+    "completeness",
+    "freshness",
+    "capabilities",
+    "coverage",
+    "failures",
+    "events",
+    "tombstones"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "source": { "const": "outlook_calendar" },
+        "adapterVersion": { "const": "outlook-calendar-v1" }
+      }
+    },
+    {
+      "properties": {
+        "source": { "const": "icloud_calendar" },
+        "adapterVersion": { "const": "icloud-calendar-v1" }
+      }
+    }
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.1.0" },
+    "adapterVersion": { "enum": ["outlook-calendar-v1", "icloud-calendar-v1"] },
+    "accountId": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+    "connectionGeneration": { "type": "integer", "minimum": 1 },
+    "source": { "$ref": "#/$defs/source" },
+    "requestedRange": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/requestedRange" },
+    "fetchedAt": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/instant" },
+    "completeness": { "enum": ["complete", "incomplete"] },
+    "freshness": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/freshness" },
+    "capabilities": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/capabilities" },
+    "coverage": {
+      "type": "array",
+      "items": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/coverage" },
+      "maxItems": 32
+    },
+    "failures": {
+      "type": "array",
+      "items": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/failure" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "tombstones": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tombstone" }
+    }
+  },
+  "$defs": {
+    "source": { "enum": ["outlook_calendar", "icloud_calendar"] },
+    "unsupported": { "const": "unsupported" },
+    "fieldAvailability": {
+      "allOf": [
+        { "$ref": "external-event-snapshot-1.0.0.json#/$defs/fieldAvailability" },
+        {
+          "type": "object",
+          "required": ["description", "location", "organizer", "attendees", "conference", "attachments"],
+          "properties": {
+            "description": { "$ref": "#/$defs/unsupported" },
+            "location": { "$ref": "#/$defs/unsupported" },
+            "organizer": { "$ref": "#/$defs/unsupported" },
+            "attendees": { "$ref": "#/$defs/unsupported" },
+            "conference": { "$ref": "#/$defs/unsupported" },
+            "attachments": { "$ref": "#/$defs/unsupported" }
+          }
+        }
+      ]
+    },
+    "eventBase": {
+      "type": "object",
+      "required": [
+        "id",
+        "providerEventId",
+        "logicalInstanceId",
+        "calendarId",
+        "source",
+        "calendarName",
+        "sourceTimezone",
+        "sourceTimezoneFallback",
+        "state",
+        "availability",
+        "currentUserResponse",
+        "revision",
+        "title",
+        "description",
+        "location",
+        "sourceUrl",
+        "fieldAvailability",
+        "detailCompleteness",
+        "organizer",
+        "attendees",
+        "attendeesOmitted",
+        "conference",
+        "recurrence",
+        "attachments"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(outlook_calendar|icloud_calendar)/" },
+        "providerEventId": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "logicalInstanceId": { "type": "string", "pattern": "^(outlook_calendar|icloud_calendar)/" },
+        "calendarId": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "source": { "$ref": "#/$defs/source" },
+        "calendarName": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "sourceTimezone": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "sourceTimezoneFallback": { "enum": ["none", "calendar", "request"] },
+        "state": { "enum": ["confirmed", "tentative", "unknown"] },
+        "availability": { "enum": ["busy", "free", "unknown"] },
+        "currentUserResponse": {
+          "type": ["string", "null"],
+          "enum": ["needs_action", "declined", "tentative", "accepted", "unknown", null]
+        },
+        "revision": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/revision" },
+        "title": { "type": "string" },
+        "description": { "const": "" },
+        "location": { "const": "" },
+        "sourceUrl": {
+          "oneOf": [
+            { "$ref": "external-event-snapshot-1.0.0.json#/$defs/httpsUrl" },
+            { "type": "null" }
+          ]
+        },
+        "fieldAvailability": { "$ref": "#/$defs/fieldAvailability" },
+        "detailCompleteness": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/detailCompleteness" },
+        "organizer": { "type": "null" },
+        "attendees": { "type": "null" },
+        "attendeesOmitted": { "const": false },
+        "conference": { "type": "null" },
+        "recurrence": {
+          "oneOf": [
+            { "$ref": "external-event-snapshot-1.0.0.json#/$defs/recurrence" },
+            { "type": "null" }
+          ]
+        },
+        "attachments": { "type": "null" }
+      }
+    },
+    "timedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        { "$ref": "external-event-snapshot-1.0.0.json#/$defs/timedEvent/allOf/1" }
+      ],
+      "unevaluatedProperties": false
+    },
+    "allDayEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        { "$ref": "external-event-snapshot-1.0.0.json#/$defs/allDayEvent/allOf/1" }
+      ],
+      "unevaluatedProperties": false
+    },
+    "event": {
+      "oneOf": [
+        { "$ref": "#/$defs/timedEvent" },
+        { "$ref": "#/$defs/allDayEvent" }
+      ]
+    },
+    "tombstone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "providerEventId", "logicalInstanceId", "calendarId", "source", "recurrence", "revision"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(outlook_calendar|icloud_calendar)/" },
+        "providerEventId": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "logicalInstanceId": { "type": "string", "pattern": "^(outlook_calendar|icloud_calendar)/" },
+        "calendarId": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/nonEmptyString" },
+        "source": { "$ref": "#/$defs/source" },
+        "recurrence": {
+          "oneOf": [
+            { "$ref": "external-event-snapshot-1.0.0.json#/$defs/recurrence" },
+            { "type": "null" }
+          ]
+        },
+        "revision": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/revision" }
+      }
+    }
+  }
+}

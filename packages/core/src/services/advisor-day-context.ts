@@ -2,9 +2,17 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import type { BehaviorDurationEstimate } from "../types/day-progress";
 import {
+  ADVISOR_CALENDAR_SOURCES,
+  ADVISOR_CONNECTOR_KINDS,
+  ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT,
   ADVISOR_DAY_CONTEXT_LIMITS,
   ADVISOR_DAY_CONTEXT_VERSION,
+  ADVISOR_DAY_CONTEXT_VERSION_1_1,
+  type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
+  type AdvisorCalendarConnectorV1_1,
+  type AdvisorDayContext,
+  type AdvisorDayContextRequest,
   type AdvisorCadenceSource,
   type AdvisorDayContextV1,
   type AdvisorDayContextRequestV1,
@@ -19,12 +27,25 @@ import type { OccurrenceStatus } from "../types/database";
 import type {
   ExternalEventFailure,
   ExternalEventSnapshotV1,
+  VersionedExternalEventSnapshot,
 } from "../types/external-event";
 import {
   EXTERNAL_EVENT_ADAPTER_VERSION,
   EXTERNAL_EVENT_SCHEMA_VERSION,
+  EXTERNAL_EVENT_SOURCE_VERSIONS,
 } from "../types/external-event";
-import { validateExternalEventSnapshot } from "./external-event-validation";
+import {
+  HEVY_WORKOUTS_ADAPTER_VERSION,
+  RECORDED_ACTIVITY_MAX_RANGE_DAYS,
+  RECORDED_ACTIVITY_SCHEMA_VERSION,
+  type RecordedActivityFailure,
+  type RecordedActivitySnapshotV1,
+} from "../types/recorded-activity";
+import {
+  validateExternalEventSnapshot,
+  validateVersionedExternalEventSnapshot,
+} from "./external-event-validation";
+import { validateRecordedActivitySnapshot } from "./recorded-activity-validation";
 
 type AdvisorCadenceOccurrenceInput = Readonly<{
   id: string;
@@ -68,6 +89,21 @@ export function validateAdvisorDayContextRequest(value: unknown): AdvisorDayCont
   const connectors = array(request.connectors, "request.connectors", 1);
   if (connectors.length === 1 && connectors[0] !== "google_calendar") fail("request.connectors is invalid.");
   return value as AdvisorDayContextRequestV1;
+}
+
+/** Accepts `1.0` (Google or no connectors) and `1.1` (unique known connector kinds). */
+export function validateVersionedAdvisorDayContextRequest(value: unknown): AdvisorDayContextRequest {
+  const request = record(value, "request");
+  if (request.version === ADVISOR_DAY_CONTEXT_VERSION) return validateAdvisorDayContextRequest(value);
+  exactKeys(request, ["version", "localDate", "connectors"], "request");
+  if (request.version !== ADVISOR_DAY_CONTEXT_VERSION_1_1) fail("request.version is unsupported.");
+  if (request.localDate !== null) plainDate(request.localDate, "request.localDate");
+  const connectors = array(request.connectors, "request.connectors", ADVISOR_CONNECTOR_KINDS.length);
+  if (connectors.some((kind) => !(ADVISOR_CONNECTOR_KINDS as readonly unknown[]).includes(kind))
+    || new Set(connectors).size !== connectors.length) {
+    fail("request.connectors is invalid.");
+  }
+  return value as AdvisorDayContextRequest;
 }
 
 export function projectAdvisorCadenceSource(input: Readonly<{
@@ -206,6 +242,31 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
   failure?: ExternalEventFailure | null;
 }>): AdvisorCalendarConnector {
   const snapshot = validateExternalEventSnapshot(input.snapshot);
+  return projectCalendarConnector(snapshot, input) as AdvisorCalendarConnector;
+}
+
+/**
+ * Any calendar source. Google output equals `projectAdvisorCalendarConnector`.
+ * Outlook and iCloud refs are namespaced by source so equal provider IDs in
+ * different sources never share a ref.
+ */
+export function projectVersionedAdvisorCalendarConnector(input: Readonly<{
+  snapshot: VersionedExternalEventSnapshot | unknown;
+  selectionRevision: number;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: ExternalEventFailure | null;
+}>): AdvisorCalendarConnectorV1_1 {
+  return projectCalendarConnector(validateVersionedExternalEventSnapshot(input.snapshot), input);
+}
+
+function projectCalendarConnector(snapshot: VersionedExternalEventSnapshot, input: Readonly<{
+  selectionRevision: number;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: ExternalEventFailure | null;
+}>): AdvisorCalendarConnectorV1_1 {
+  const scoped = (value: string) => snapshot.source === "google_calendar" ? value : `${snapshot.source}\0${value}`;
   if (snapshot.requestedRange.selectedCalendarIds.length > ADVISOR_DAY_CONTEXT_LIMITS.calendars) {
     throw new AdvisorDayContextValidationError("Advisor Calendar limit exceeded.", "context_limit_exceeded");
   }
@@ -215,10 +276,10 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
 
   const complete = snapshot.completeness === "complete" && snapshot.freshness.state === "current";
   const events = complete ? snapshot.events.map((event) => ({
-    ref: input.makeOpaqueRef("event", `${event.calendarId}\0${event.providerEventId}`),
-    calendarRef: input.makeOpaqueRef("calendar", event.calendarId),
-    logicalInstanceRef: input.makeOpaqueRef("instance", `${event.calendarId}\0${event.logicalInstanceId}`),
-    revision: input.makeOpaqueRef("revision", JSON.stringify(event.revision)),
+    ref: input.makeOpaqueRef("event", scoped(`${event.calendarId}\0${event.providerEventId}`)),
+    calendarRef: input.makeOpaqueRef("calendar", scoped(event.calendarId)),
+    logicalInstanceRef: input.makeOpaqueRef("instance", scoped(`${event.calendarId}\0${event.logicalInstanceId}`)),
+    revision: input.makeOpaqueRef("revision", scoped(JSON.stringify(event.revision))),
     interval: event.kind === "timed"
       ? { kind: "timed" as const, startAt: event.startAt, endAt: event.endAt, duration: event.duration }
       : { kind: "all_day" as const, startLocalDate: event.startLocalDate, endLocalDate: event.endLocalDate, duration: event.duration },
@@ -228,7 +289,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
     availability: event.availability,
     currentUserResponse: event.currentUserResponse,
     recurrence: event.recurrence ? {
-      seriesRef: input.makeOpaqueRef("series", `${event.calendarId}\0${event.recurrence.seriesId}`),
+      seriesRef: input.makeOpaqueRef("series", scoped(`${event.calendarId}\0${event.recurrence.seriesId}`)),
       originalStart: event.recurrence.originalStart,
     } : null,
   })) : [];
@@ -244,7 +305,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
   }
 
   return {
-    source: "google_calendar",
+    source: snapshot.source,
     state,
     complete,
     fetchedAt,
@@ -253,7 +314,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
     schemaVersion: snapshot.schemaVersion,
     adapterVersion: snapshot.adapterVersion,
     coverage: snapshot.coverage.map((coverage) => ({
-      calendarRef: input.makeOpaqueRef("calendar", coverage.calendarId),
+      calendarRef: input.makeOpaqueRef("calendar", scoped(coverage.calendarId)),
       startLocalDate: coverage.startLocalDate,
       endLocalDate: coverage.endLocalDate,
       paginationComplete: coverage.paginationComplete,
@@ -291,10 +352,71 @@ export function projectUnavailableAdvisorCalendar(input: Readonly<{
   };
 }
 
+/**
+ * Recorded workout timing only. Titles, provider IDs, and every discarded Hevy
+ * field never reach this projection. Incomplete or stale reads expose no
+ * activities. `now` is injected.
+ */
+export function projectAdvisorActivityConnector(input: Readonly<{
+  snapshot: RecordedActivitySnapshotV1 | unknown;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: RecordedActivityFailure | null;
+}>): AdvisorActivityConnector {
+  const snapshot = validateRecordedActivitySnapshot(input.snapshot, { now: input.now });
+  if (snapshot.activities.length > ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT) {
+    throw new AdvisorDayContextValidationError("Advisor activity limit exceeded.", "context_limit_exceeded");
+  }
+  const fetchedAt = Temporal.Instant.from(snapshot.fetchedAt);
+  const fresh = Temporal.Instant.compare(input.now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) <= 0;
+  const state = snapshot.completeness !== "complete" ? "incomplete" : fresh ? "current" : "stale";
+  const complete = state === "current";
+  const failure = input.failure ?? snapshot.failures[0] ?? null;
+  return {
+    source: "hevy",
+    state,
+    complete,
+    fetchedAt: snapshot.fetchedAt,
+    connectionGeneration: snapshot.connectionGeneration,
+    schemaVersion: snapshot.schemaVersion,
+    adapterVersion: snapshot.adapterVersion,
+    coverage: {
+      startLocalDate: snapshot.requestedRange.startLocalDate,
+      endLocalDate: snapshot.requestedRange.endLocalDate,
+      paginationComplete: snapshot.coverage.paginationComplete,
+    },
+    failure: failure ? {
+      code: sourceFailureCode(failure.code),
+      retryable: failure.retryable,
+      retryAfterSeconds: failure.retryAfterSeconds,
+    } : null,
+    activities: complete ? snapshot.activities.map((activity) => ({
+      ref: input.makeOpaqueRef("activity", activity.id),
+      startAt: activity.startAt,
+      endAt: activity.endAt,
+      duration: activity.duration,
+      localStartDate: activity.localStartDate,
+      location: "unsupported" as const,
+    })) : [],
+  };
+}
+
 export function validateAdvisorDayContext(value: unknown): AdvisorDayContextV1 {
+  return validateContext(value, "1.0_only") as AdvisorDayContextV1;
+}
+
+/** Accepts stored `1.0` (Google-only) and `1.1` (any known connector kind). */
+export function validateVersionedAdvisorDayContext(value: unknown): AdvisorDayContext {
+  return validateContext(value, "versioned");
+}
+
+function validateContext(value: unknown, mode: "1.0_only" | "versioned"): AdvisorDayContext {
   const root = record(value, "context");
   exactKeys(root, ["version", "snapshotId", "accountRef", "localDate", "timezone", "dayStartAt", "dayEndAt", "capturedAt", "expiresAt", "status", "authority", "grantGeneration", "cadence", "connectors"], "context");
-  if (root.version !== ADVISOR_DAY_CONTEXT_VERSION) fail("context.version is unsupported.");
+  const version = root.version;
+  if (version !== ADVISOR_DAY_CONTEXT_VERSION && (mode === "1.0_only" || version !== ADVISOR_DAY_CONTEXT_VERSION_1_1)) {
+    fail("context.version is unsupported.");
+  }
   nonempty(root.snapshotId, "context.snapshotId");
   nonempty(root.accountRef, "context.accountRef");
   plainDate(root.localDate, "context.localDate");
@@ -349,16 +471,31 @@ export function validateAdvisorDayContext(value: unknown): AdvisorDayContextV1 {
     });
   }
 
-  const connectors = array(root.connectors, "context.connectors", 1);
-  if (connectors.length !== 1) fail("context.connectors must contain the Google Calendar source state.");
-  connectors.forEach((connector, index) => validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt));
+  const eventRefs = new Set<string>();
+  let connectors: unknown[];
+  if (version === ADVISOR_DAY_CONTEXT_VERSION) {
+    connectors = array(root.connectors, "context.connectors", 1);
+    if (connectors.length !== 1) fail("context.connectors must contain the Google Calendar source state.");
+    connectors.forEach((connector, index) => validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt, ["google_calendar"], eventRefs));
+  } else {
+    connectors = array(root.connectors, "context.connectors", ADVISOR_CONNECTOR_KINDS.length);
+    const sources = connectors.map((connector, index) => record(connector, `connector[${index}]`).source);
+    if (connectors.length === 0 || new Set(sources).size !== sources.length) fail("context.connectors must list each source at most once.");
+    connectors.forEach((connector, index) => {
+      if (record(connector, `connector[${index}]`).source === "hevy") {
+        validateActivityConnector(connector, index, root.localDate as string, root.timezone as string, capturedAt, expiresAt);
+      } else {
+        validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt, ADVISOR_CALENDAR_SOURCES, eventRefs);
+      }
+    });
+  }
   if (root.status === "complete" && connectors.some((connector) => {
     const row = record(connector, "connector");
     return row.state !== "not_requested" && row.complete !== true;
   })) {
     fail("Complete context cannot contain an incomplete connector.");
   }
-  return value as AdvisorDayContextV1;
+  return value as AdvisorDayContext;
 }
 
 function validateHistoricalCompletionTimes(value: unknown, historyValue: unknown, zone: string, refs: Set<string>): void {
@@ -503,23 +640,32 @@ function validateDuration(value: unknown): void {
   if (duration.lookbackDays !== 90) fail("duration.lookbackDays is invalid.");
 }
 
-function validateConnector(value: unknown, index: number, localDate: string, capturedAt: Temporal.Instant, expiresAt: Temporal.Instant): void {
+function validateConnector(
+  value: unknown,
+  index: number,
+  localDate: string,
+  capturedAt: Temporal.Instant,
+  expiresAt: Temporal.Instant,
+  allowedSources: readonly string[],
+  eventRefs: Set<string>,
+): void {
   const connector = record(value, `connector[${index}]`);
   if (connector.state === "not_requested") {
     exactKeys(connector, ["source", "state"], `connector[${index}]`);
-    if (connector.source !== "google_calendar") fail("connector.source is invalid.");
+    if (!allowedSources.includes(connector.source as string)) fail("connector.source is invalid.");
     return;
   }
   exactKeys(connector, ["source", "state", "complete", "fetchedAt", "connectionGeneration", "selectionRevision", "schemaVersion", "adapterVersion", "coverage", "failure", "events"], `connector[${index}]`);
-  if (connector.source !== "google_calendar") fail("connector.source is invalid.");
+  if (!allowedSources.includes(connector.source as string)) fail("connector.source is invalid.");
+  const versions = EXTERNAL_EVENT_SOURCE_VERSIONS[connector.source as keyof typeof EXTERNAL_EVENT_SOURCE_VERSIONS];
   if (!(["current", "unavailable", "incomplete", "stale"] as unknown[]).includes(connector.state)) fail("connector.state is invalid.");
   if (typeof connector.complete !== "boolean") fail("connector.complete is invalid.");
   const fetchedAt = connector.fetchedAt === null ? null : instant(connector.fetchedAt, "connector.fetchedAt");
   if (fetchedAt && (Temporal.Instant.compare(fetchedAt, capturedAt) > 0 || Temporal.Instant.compare(expiresAt, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) > 0)) fail("connector.fetchedAt bounds are invalid.");
   integer(connector.connectionGeneration, "connector.connectionGeneration", 0);
   integer(connector.selectionRevision, "connector.selectionRevision", 0);
-  if (connector.schemaVersion !== EXTERNAL_EVENT_SCHEMA_VERSION) fail("connector.schemaVersion is unsupported.");
-  if (connector.adapterVersion !== EXTERNAL_EVENT_ADAPTER_VERSION) fail("connector.adapterVersion is unsupported.");
+  if (connector.schemaVersion !== versions.schemaVersion) fail("connector.schemaVersion is unsupported.");
+  if (connector.adapterVersion !== versions.adapterVersion) fail("connector.adapterVersion is unsupported.");
   const coverage = array(connector.coverage, "connector.coverage", ADVISOR_DAY_CONTEXT_LIMITS.calendars);
   const calendarRefs = new Set<string>();
   coverage.forEach((item, itemIndex) => {
@@ -535,21 +681,79 @@ function validateConnector(value: unknown, index: number, localDate: string, cap
   });
   const events = array(connector.events, "connector.events", ADVISOR_DAY_CONTEXT_LIMITS.externalEvents);
   if (!connector.complete && events.length > 0) fail("Incomplete connector cannot expose events.");
-  const eventRefs = new Set<string>();
   events.forEach((event) => {
     validateEvent(event, calendarRefs);
     const ref = record(event, "event").ref as string;
     if (eventRefs.has(ref)) fail("Event refs must be unique.");
     eventRefs.add(ref);
   });
-  if (connector.failure !== null) {
-    const failure = record(connector.failure, "connector.failure");
-    exactKeys(failure, ["code", "retryable", "retryAfterSeconds"], "connector.failure");
-    validateSourceFailureCode(failure.code);
-    if (typeof failure.retryable !== "boolean") fail("connector.failure.retryable is invalid.");
-    if (failure.retryAfterSeconds !== null) integer(failure.retryAfterSeconds, "connector.failure.retryAfterSeconds", 0);
-  }
+  validateConnectorFailure(connector.failure);
   if (connector.complete !== (connector.state === "current") || (connector.complete && (connector.failure !== null || fetchedAt === null || coverage.some((item) => record(item, "coverage").paginationComplete !== true)))) {
+    fail("Connector completeness fields disagree.");
+  }
+  if (!connector.complete && connector.failure === null && (connector.state === "unavailable" || connector.state === "incomplete")) fail("Unavailable or incomplete connector requires a failure.");
+}
+
+function validateConnectorFailure(value: unknown): void {
+  if (value === null) return;
+  const failure = record(value, "connector.failure");
+  exactKeys(failure, ["code", "retryable", "retryAfterSeconds"], "connector.failure");
+  validateSourceFailureCode(failure.code);
+  if (typeof failure.retryable !== "boolean") fail("connector.failure.retryable is invalid.");
+  if (failure.retryAfterSeconds !== null) integer(failure.retryAfterSeconds, "connector.failure.retryAfterSeconds", 0);
+}
+
+function validateActivityConnector(value: unknown, index: number, localDate: string, zone: string, capturedAt: Temporal.Instant, expiresAt: Temporal.Instant): void {
+  const connector = record(value, `connector[${index}]`);
+  if (connector.state === "not_requested") {
+    exactKeys(connector, ["source", "state"], `connector[${index}]`);
+    return;
+  }
+  exactKeys(connector, ["source", "state", "complete", "fetchedAt", "connectionGeneration", "schemaVersion", "adapterVersion", "coverage", "failure", "activities"], `connector[${index}]`);
+  if (!(["current", "unavailable", "incomplete", "stale"] as unknown[]).includes(connector.state)) fail("connector.state is invalid.");
+  if (typeof connector.complete !== "boolean") fail("connector.complete is invalid.");
+  const fetchedAt = connector.fetchedAt === null ? null : instant(connector.fetchedAt, "connector.fetchedAt");
+  if (fetchedAt && Temporal.Instant.compare(fetchedAt, capturedAt) > 0) fail("connector.fetchedAt bounds are invalid.");
+  if (connector.complete && fetchedAt && Temporal.Instant.compare(expiresAt, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) > 0) fail("connector.fetchedAt bounds are invalid.");
+  integer(connector.connectionGeneration, "connector.connectionGeneration", 0);
+  if (connector.schemaVersion !== RECORDED_ACTIVITY_SCHEMA_VERSION) fail("connector.schemaVersion is unsupported.");
+  if (connector.adapterVersion !== HEVY_WORKOUTS_ADAPTER_VERSION) fail("connector.adapterVersion is unsupported.");
+  let rangeStart: Temporal.Instant | null = null;
+  let rangeEnd: Temporal.Instant | null = null;
+  if (connector.coverage !== null) {
+    const coverage = record(connector.coverage, "connector.coverage");
+    exactKeys(coverage, ["startLocalDate", "endLocalDate", "paginationComplete"], "connector.coverage");
+    const start = plainDate(coverage.startLocalDate, "coverage.startLocalDate");
+    const end = plainDate(coverage.endLocalDate, "coverage.endLocalDate");
+    if (coverage.endLocalDate !== localDate || Temporal.PlainDate.compare(start, end) > 0 || start.until(end).days + 1 > RECORDED_ACTIVITY_MAX_RANGE_DAYS) {
+      fail("Activity coverage must end on the context day and span at most 31 days.");
+    }
+    if (typeof coverage.paginationComplete !== "boolean") fail("coverage.paginationComplete is invalid.");
+    rangeStart = start.toZonedDateTime({ timeZone: zone }).toInstant();
+    rangeEnd = end.add({ days: 1 }).toZonedDateTime({ timeZone: zone }).toInstant();
+  }
+  const activities = array(connector.activities, "connector.activities", ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT);
+  if (!connector.complete && activities.length > 0) fail("Incomplete connector cannot expose activities.");
+  const refs = new Set<string>();
+  activities.forEach((value) => {
+    const activity = record(value, "activity");
+    exactKeys(activity, ["ref", "startAt", "endAt", "duration", "localStartDate", "location"], "activity");
+    const ref = nonempty(activity.ref, "activity.ref");
+    if (refs.has(ref)) fail("Activity refs must be unique.");
+    refs.add(ref);
+    const start = instant(activity.startAt, "activity.startAt");
+    const end = instant(activity.endAt, "activity.endAt");
+    if (Temporal.Instant.compare(end, start) <= 0) fail("Activity end must follow start.");
+    if (Temporal.Instant.compare(end, capturedAt) > 0) fail("Activity cannot end after capture.");
+    if (!rangeStart || !rangeEnd || Temporal.Instant.compare(start, rangeEnd) >= 0 || Temporal.Instant.compare(end, rangeStart) <= 0) fail("Activity falls outside its coverage.");
+    const duration = record(activity.duration, "activity.duration");
+    exactKeys(duration, ["kind", "seconds"], "activity.duration");
+    if (duration.kind !== "known" || duration.seconds !== start.until(end).total({ unit: "seconds" })) fail("Activity duration does not match its interval.");
+    if (activity.localStartDate !== start.toZonedDateTimeISO(zone).toPlainDate().toString()) fail("Activity localStartDate is invalid.");
+    if (activity.location !== "unsupported") fail("activity.location is invalid.");
+  });
+  validateConnectorFailure(connector.failure);
+  if (connector.complete !== (connector.state === "current") || (connector.complete && (connector.failure !== null || fetchedAt === null || connector.coverage === null || record(connector.coverage, "connector.coverage").paginationComplete !== true))) {
     fail("Connector completeness fields disagree.");
   }
   if (!connector.complete && connector.failure === null && (connector.state === "unavailable" || connector.state === "incomplete")) fail("Unavailable or incomplete connector requires a failure.");
