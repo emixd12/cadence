@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-10-11",
+  "updated": "2026-10-18",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -114,6 +114,14 @@
       "routes": [
         "/login",
         "/auth/test-login"
+      ]
+    },
+    {
+      "id": "oauth_consent",
+      "label": "AI client consent",
+      "kind": "authenticated",
+      "routes": [
+        "/oauth/consent"
       ]
     }
   ],
@@ -785,7 +793,7 @@
       "classification": "excluded",
       "interaction_marker_count": 86,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Excluded from product interaction counts. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; hidden tabs and account/consent changes still clear private output. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173–174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Excluded from product interaction counts. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls."
     },
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
@@ -819,6 +827,33 @@
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002"
+      ]
+    },
+    {
+      "path": "components/oauth/ConsentForm.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-OAUTH-001",
+        "INT-OAUTH-002",
+        "INT-OAUTH-003"
+      ]
+    },
+    {
+      "path": "components/settings/ConnectedAppsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-OAUTH-004",
+        "INT-OAUTH-005"
+      ]
+    },
+    {
+      "path": "app/oauth/consent/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-OAUTH-004"
       ]
     }
   ],
@@ -12870,6 +12905,388 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-001",
+      "name": "Approve AI client access",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Approve AI client access.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Allow"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Issue a single-use authorization code for only the selected permissions.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_grant"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx",
+        "app/oauth/consent/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx",
+            "app/oauth/consent/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-002",
+      "name": "Deny AI client access",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Deny AI client access.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Deny"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Consume the pending request and return access_denied with the issuer.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_denial"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx",
+        "app/oauth/consent/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx",
+            "app/oauth/consent/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-003",
+      "name": "Narrow AI client permissions",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Narrow AI client permissions.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Write permission checkbox"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Change the permission draft; required read remains selected.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-004",
+      "name": "Disconnect an AI client",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#connected-apps"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Disconnect an AI client.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Disconnect"
+        }
+      ],
+      "availability": "Signed in, under Settings → Connected apps.",
+      "success_result": "Revoke the owned grant and every token immediately.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_revocation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/ConnectedAppsPanel.tsx",
+        "app/(app)/settings/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx",
+            "app/(app)/settings/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-005",
+      "name": "View recent AI client activity",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#connected-apps"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "View recent AI client activity.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Recent activity"
+        }
+      ],
+      "availability": "Signed in, under Settings → Connected apps.",
+      "success_result": "Expand or collapse operation, time, and outcome records without payloads.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "disclosure"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/ConnectedAppsPanel.tsx"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
         }
       }
     }

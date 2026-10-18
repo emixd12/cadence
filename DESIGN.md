@@ -665,3 +665,16 @@ geometry, spacing, typography, square borders and responsive columns are unchang
 The private briefing workbench adds one text line to its existing account-access
 panel for the local month and reserved travel spend. It uses existing typography
 and wraps at 390px. No new control, token or Settings field is added.
+
+## OAuth consent and Connected apps (Ticket 227)
+
+`ConsentForm` uses one max-width column, native write-permission checkboxes,
+plain required-read disclosure, and the existing underlined Allow/Deny actions.
+Client names, account addresses, and redirect hosts wrap on narrow screens.
+Optional logos load directly in the browser without a referrer. No new token,
+modal, or navigation item is added.
+
+`ConnectedAppsPanel` reuses `SettingsPanel`, divider-led grant rows, account-
+timezone dates, app-named Disconnect buttons, and a closed native Recent activity
+disclosure. Loading failures, empty grants, pending actions, and action results
+have separate text. Controls preserve 44px targets and semantic live feedback.

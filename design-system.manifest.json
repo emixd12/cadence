@@ -549,6 +549,34 @@
       "trackUsages": "required",
       "status": "active",
       "notes": "Separate routing disclosure, optional saved base, selected mode and foreground location permission. Synthetic bench never reads location or contacts a provider."
+    },
+    {
+      "id": "flow.consent-form",
+      "name": "ConsentForm",
+      "kind": "flow",
+      "source": "components/oauth/ConsentForm.tsx",
+      "exportName": "ConsentForm",
+      "usageNames": [
+        "ConsentForm"
+      ],
+      "benchAnchor": "design-system#ds-flow-consent-form",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Hosted account grants; web only."
+    },
+    {
+      "id": "module.connected-apps-panel",
+      "name": "ConnectedAppsPanel",
+      "kind": "module",
+      "source": "components/settings/ConnectedAppsPanel.tsx",
+      "exportName": "ConnectedAppsPanel",
+      "usageNames": [
+        "ConnectedAppsPanel"
+      ],
+      "benchAnchor": "design-system#ds-module-connected-apps-panel",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Hosted account grants; web only."
     }
   ]
 }

@@ -1452,6 +1452,31 @@
       "id": "INT-TRAVEL-004",
       "classification": "external_provider",
       "reason": "Manual travel refresh can trigger a reviewed route provider request."
+    },
+    {
+      "id": "INT-OAUTH-001",
+      "classification": "destructive_serial_only",
+      "reason": "Consent creates a scoped OAuth grant and requires an isolated account, browser binding, and PKCE client."
+    },
+    {
+      "id": "INT-OAUTH-002",
+      "classification": "destructive_serial_only",
+      "reason": "Denial consumes one browser-bound authorization request and redirects to its registered client."
+    },
+    {
+      "id": "INT-OAUTH-003",
+      "classification": "not_load_bearing",
+      "reason": "Permission switches only narrow the consent form draft; approval owns the server mutation."
+    },
+    {
+      "id": "INT-OAUTH-004",
+      "classification": "destructive_serial_only",
+      "reason": "Disconnect revokes a grant and its tokens; verify rejection with an isolated synthetic client."
+    },
+    {
+      "id": "INT-OAUTH-005",
+      "classification": "browser_only",
+      "reason": "Recent activity expands records already loaded in Settings without a separate request."
     }
   ]
 }

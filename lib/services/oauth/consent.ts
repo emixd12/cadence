@@ -19,7 +19,7 @@ export async function getOAuthConsent(request: Request, id: string, userClient: 
   if (!pending || pending.resource !== resource) throw new OAuthError("invalid_request");
   const client = await getOAuthClient(pending.clientId);
   if (!redirectAllowed(client.redirectUris, pending.redirectUri)) throw new OAuthError("invalid_request");
-  return { ...pending, clientName: client.clientName, verifiedClient: client.verifiedClient };
+  return { ...pending, clientName: client.clientName, logoUri: client.logoUri, verifiedClient: client.verifiedClient };
 }
 
 /** Call on explicit Allow/Deny POST only. null scopes means Deny. */

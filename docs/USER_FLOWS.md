@@ -899,3 +899,24 @@ server's reset instant; the last same-day plan stays marked stale. At renewal,
 Refresh travel becomes available without a reload.
 The private workbench account-access read shows month-to-date reserved travel spend
 without provider calls or generation.
+
+## Connect and disconnect an AI client
+
+1. Start a Cadence connection from the AI client.
+2. Cadence validates the request. If signed out, use the existing Google login;
+   Cadence returns to the same browser-bound consent request.
+3. Check the client name, verified/unverified label, redirect host, and Cadence
+   account. Read is required. Switch off either requested write permission to
+   narrow access. Notes may contain sensitive information.
+4. Choose Allow to issue a single-use code for the approved permissions, or Deny
+   to return `access_denied` with the issuer. Both consume the pending request.
+5. Review grants in Settings → Connected apps. Expand Recent activity to review
+   operations, times, and outcomes; no note text or operation payloads appear.
+6. Choose Disconnect beside an app. Cadence revokes the grant and all its tokens;
+   its next token check fails. Reconnect from the client for new access.
+
+Consent requires the original HttpOnly browser cookie and a same-origin action.
+A request ID alone cannot approve access. A changed signed-in account rejects an
+old consent form. Expired, consumed, or invalid requests require a new client
+connection. A failed Disconnect remains visible with a reload/retry instruction.
+No hosted actions or live Google-provider acceptance follow from local tests.

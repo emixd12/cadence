@@ -1078,6 +1078,59 @@
           "notes": "Mobile app icon and splash/launch marks should derive from this family when scheduled."
         }
       ]
+    },
+    {
+      "id": "flow.oauth-access",
+      "name": "Hosted AI client access",
+      "tier": "flow",
+      "definition": "Consent permissions and Connected apps grant review and revocation.",
+      "sharedContract": [
+        "Read is required; requested write permissions are individually optional.",
+        "Show the client identity, redirect host, and signed-in account.",
+        "Disconnect revokes the grant immediately; activity contains no payloads."
+      ],
+      "surfaceImplementations": [
+        {
+          "surfaceId": "web-app",
+          "status": "implemented",
+          "parity": "canonical",
+          "sources": [
+            "components/oauth/ConsentForm.tsx",
+            "components/settings/ConnectedAppsPanel.tsx",
+            "app/oauth/consent/page.tsx",
+            "app/(app)/settings/page.tsx"
+          ],
+          "implementationIds": [
+            "flow.consent-form",
+            "module.connected-apps-panel"
+          ],
+          "notes": "Native controls and existing SettingsPanel, verified with synthetic local accounts."
+        },
+        {
+          "surfaceId": "desktop",
+          "status": "not-applicable",
+          "parity": "not-applicable",
+          "sources": [],
+          "implementationIds": [],
+          "notes": "Hosted grants are managed on the web; account-free data is unreachable."
+        },
+        {
+          "surfaceId": "marketing",
+          "status": "not-applicable",
+          "parity": "not-applicable",
+          "sources": [],
+          "implementationIds": [],
+          "notes": "Account grant controls belong to the authenticated web app."
+        },
+        {
+          "surfaceId": "mobile",
+          "status": "not-applicable",
+          "parity": "not-applicable",
+          "sources": [],
+          "implementationIds": [],
+          "notes": "Native mobile remains outside v1; responsive web provides this flow."
+        }
+      ]
     }
   ]
 }
