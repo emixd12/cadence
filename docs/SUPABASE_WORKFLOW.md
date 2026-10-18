@@ -790,8 +790,9 @@ documents these states (read 2026-10-18):
 
 A freshly imported key starts in **standby**, which the Data API does not
 accept. Minted tokens work only after the key is **current** or **previously
-used**. Hosted acceptance has not been verified; Ticket 232 verifies it on
-staging first.
+used**. Hosted acceptance has not been verified. On October 18, 2026, the owner
+selected existing production for Ticket 232 planning only. Execution still
+requires approval of the target-specific release packet.
 
 1. Generate the key on a trusted machine:
    `supabase gen signing-key --algorithm ES256`. Keep the output out of shells
@@ -807,7 +808,8 @@ staging first.
    minutes), then **Rotate keys** so the imported key becomes current. Supabase
    Auth then signs new sessions with it too; existing sessions stay valid
    because the previous key becomes previously used.
-6. Verify with a staging test account: an integration request reads only that
+6. After approval, verify with a dedicated synthetic account in the selected
+   environment: an integration request reads only that
    account's rows. Do not revoke the previous key until all of its sessions
    expire (at least the JWT expiry plus 15 minutes).
 7. Key state changes are throttled for about 5 minutes. Record the date, `kid`,

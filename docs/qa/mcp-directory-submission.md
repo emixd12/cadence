@@ -413,17 +413,22 @@ client compatibility, production deployment, directory listing, or approval.
 Do not execute these steps under Ticket 231. Record approvals, target identities,
 commit SHAs, sanitized evidence, and rollback decisions in Ticket 232.
 
+The owner selected existing production for Ticket 232 planning on October 18,
+2026. This replaces the staging-first assumption, not the execution gates.
+Use the target-specific review packet in the Ticket 232 workspace note before
+any hosted action. No directory submission is authorized by that selection.
+
 1. **Approve release scope.** Approve the legal drafts, effective date, health-data
    eligibility answer, publisher details, support coverage, and reviewer plan.
    Reconcile every older no-AI-sharing claim in served legal content before MCP
-   publication. Approve staging targets and exact migration/deployment scope.
+   publication. Approve production targets and exact migration/deployment scope.
 2. **Verify OpenAI identity.** In the OpenAI Platform, select the owning
    organization/project. An organization owner uses Organization settings →
    General to complete business verification for Identity Scaffolding LLC, or
    confirms the appropriate verified identity. Give the submitting member Apps
    Management Write if needed. Confirm the displayed publisher before upload.
 3. **Apply hosted migrations only after authorization.** From the approved SHA,
-   confirm the linked Supabase project matches the authorized staging target.
+   confirm the linked Supabase project matches the authorized production target.
    Run `npm run supabase -- migration list`, then
    `npm run supabase -- db push --dry-run`. Review the exact pending list; stop
    for unexpected migrations. After approval, run `npm run supabase -- db push`
@@ -441,16 +446,16 @@ commit SHAs, sanitized evidence, and rollback decisions in Ticket 232.
    standby keys do not work. Account for the documented JWKS cache interval.
    This changes signing for normal Auth sessions too. Preserve the previous key
    until its sessions expire plus the documented safety margin. Record only `kid`
-   and state, never key material. Prove two-user RLS on staging.
+   and state, never key material. Prove two-user RLS with dedicated synthetic accounts.
 5. **Set Vercel variables.** Use existing project `cadence`, Settings → Environment
-   Variables, selecting only the authorized Preview/staging environment first.
+   Variables, selecting only the explicitly authorized Production environment.
    Set `CADENCE_INTEGRATION_JWT_SIGNING_KEY`, exact HTTPS
    `CADENCE_OAUTH_ISSUER`, and `CADENCE_MCP_ENABLED=false` initially. Confirm
    existing Supabase URL/publishable/server-only service credentials target the
    same project. Set `OPENAI_APPS_CHALLENGE` to the exact portal token when
    available. No `NEXT_PUBLIC_` or `VITE_` prefix on these integration variables.
    Do not duplicate production secrets into another environment by assumption.
-6. **Deploy and verify.** Deploy the approved SHA to the authorized staging
+6. **Deploy and verify.** Deploy the approved SHA to the authorized Production
    environment in existing `cadence` and `cadence-marketing` projects under
    `docs/VERCEL_WORKFLOW.md`. Match web issuer, callback, marketing and app URLs.
    Configure approved expiry maintenance for `oauth_purge_expired` and verify

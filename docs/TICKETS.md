@@ -13382,12 +13382,17 @@ Scope and acceptance:
 | Marketing | Listing copy and disclosures after owner approval. |
 | Future mobile | Not applicable. |
 
-## Ticket 232: Staging deployment and live client acceptance
+## Ticket 232: Production deployment and live client acceptance
 
-Status: filed October 18, 2026; planned (wave 5); owner-gated.
+Status: filed October 18, 2026; production preparation only (wave 5); awaiting owner approval.
 Dependencies: 226–231 and explicit owner authorization for every provider step.
 
 Goal: prove the deployed server works in real Claude and ChatGPT clients.
+
+The owner selected existing production for planning on October 18, 2026.
+Preparation permits bounded read-only metadata checks, not hosted changes or
+live account operations. No staging project will be provisioned. The review
+packet lives in the Ticket 232 workspace note and shared PR Context.
 
 Scope and acceptance:
 
@@ -13405,5 +13410,5 @@ Scope and acceptance:
 |---|---|
 | Web | Deployed server and acceptance evidence. |
 | Desktop | Linked-desktop sync check only; no desktop code. |
-| Marketing | Not applicable. |
+| Marketing | Deploy Ticket 229 developer docs through existing `cadence-marketing`; verify public links and Trust provenance. |
 | Future mobile | Not applicable. |

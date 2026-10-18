@@ -218,7 +218,8 @@ Discovery → OAuth (CIMD and DCR paths) → consent with one write scope switch
 → `tools/list` → one read tool → one write tool with idempotent replay → missing
 scope returns 403 → Disconnect → next call returns 401. Ticket 228 proves it
 locally with MCP Inspector on `next dev` and a second isolated user. Ticket 232
-repeats it on staging with Claude, Claude Code, ChatGPT developer mode, and MCP
+repeats it on the owner-selected production target, after execution approval,
+with Claude, Claude Code, ChatGPT developer mode, and MCP
 Inspector, plus a linked desktop that shows an MCP-made change after sync.
 
 ## 8. Release, rollback, and cleanup
