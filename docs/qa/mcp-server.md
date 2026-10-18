@@ -151,3 +151,51 @@ with `--no-backup`. No `cadence-mcp-228` containers, volumes or network remain;
 no task listeners remain on 4321/4324–4326 or 56920–56929. Private signing keys,
 Inspector state, credential-bearing runtime/start logs and the proxy socket were
 removed. Browser test tabs closed. Owner and sibling databases were not touched.
+
+## Local expiry maintenance (Ticket 232, October 18, 2026)
+
+This evidence covers local maintenance, not hosted deployment or live-client
+acceptance. Node 24.22.0 came from an isolated official runtime archive verified
+against its published SHA-256. No global runtime or dependency changed.
+
+The existing daily occurrence-sync route starts maintenance after authentication
+and awaits it on every authenticated exit. Tests preserve occurrence responses,
+503/Retry-After and breaker skips; cover early failures, zero profiles, disabled
+MCP, purge failure and malformed counts; and prove that deleting the final await
+breaks the route regressions. Seven raw count fields require nonnegative safe
+integers. Fixed failure events never include error payloads or success counts.
+
+Focused route/repository/service/transport tests: 46 passed. The actual Supabase
+client and Node HTTP transport settled an eight-second abort while the response
+body stalled, with one request and no retry. The route's 17 regressions also
+passed after the removed-await mutation was restored.
+
+Assigned stack: `cadence-mcp-232`, API `127.0.0.1:56121`, database
+`127.0.0.1:56122`, local mail sink `127.0.0.1:56124`. A private Docker proxy
+forced loopback bindings; no owner/default database operations ran. Existing
+85 migrations replayed without schema changes. SQL222 passed; SQL232 proved
+expired-row deletion, valid-row preservation, retained used DCR/CIMD metadata,
+pending-request cleanup and idempotent retry inside a rolled-back transaction.
+
+Three opt-in local tests exercise real maintenance and locked-query cancellation.
+An early HTTP abort settled the client but left the SQL query active. The local
+`authenticator` role's existing eight-second statement/lock timeouts then ended
+the query while the lock remained held. The service also settled at its deadline
+without a success event. This proves local transport settlement and the existing
+local database bound; it does not prove HTTP abort cancels PostgreSQL or that
+production has the same bounds. No new timeout configuration or migration was
+introduced. Production database bounds and route duration remain activation gates.
+
+Node 24 gates passed: agents, interactions, resolvers, core, design-system, lint,
+typecheck, tests and web build; marketing build/check, generated developer docs,
+plugin checker and both Claude strict validations. Full suite: 2,803 passed,
+94 skipped, including the three local tests run separately. Existing opt-in
+hosted/native cases remain skipped. The plugin validator's README installation
+advice is nonblocking. No legal copy, production settings, hosted data, production signing keys,
+deployment, push, scheduler invocation or directory submission changed.
+
+Cleanup verified zero users, clients, grants and active purge queries before
+stopping only `cadence-mcp-232` with `--no-backup`. No matching containers,
+volumes or networks remain. The private proxy, signing key, credential loader,
+config/workdir and provider logs were removed. No browser server ran. Owner and
+sibling databases remained untouched; nonsecret test logs remain in `/tmp`.

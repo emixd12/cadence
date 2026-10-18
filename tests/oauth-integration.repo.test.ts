@@ -10,6 +10,7 @@ import {
   consumeOAuthRateLimit,
   exchangeAuthorizationCode,
   OAuthPersistenceError,
+  purgeExpiredOAuthRecords,
   readOAuthClient,
   rotateRefreshToken,
   verifyAccessToken,
@@ -170,5 +171,49 @@ describe("integration repository", () => {
       }),
     ).rejects.toMatchObject({ code: "too_many_entities" });
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+const purgeCounts = {
+  authorization_codes: 1, access_tokens: 2, token_families: 3,
+  clients: 4, idempotency_records: 5, activity: 6, rate_limit_counters: 7,
+};
+
+describe("OAuth purge result boundary", () => {
+  function purgeClient(data: unknown, error: unknown = null) {
+    const abortSignal = vi.fn().mockResolvedValue({ data, error });
+    const rpc = vi.fn().mockReturnValue({ abortSignal });
+    return { client: { rpc } as never, rpc, abortSignal };
+  }
+
+  it("passes cancellation to the RPC and returns all seven validated counts", async () => {
+    const { client, rpc, abortSignal } = purgeClient(purgeCounts);
+    const signal = new AbortController().signal;
+    await expect(purgeExpiredOAuthRecords(client, signal)).resolves.toEqual(purgeCounts);
+    expect(rpc).toHaveBeenCalledWith("oauth_purge_expired");
+    expect(abortSignal).toHaveBeenCalledWith(signal);
+  });
+
+  it.each([
+    null, [], {}, { ...purgeCounts, extra: 1 },
+    ...[-1, 1.5, Infinity, NaN, "1", null, Number.MAX_SAFE_INTEGER + 1]
+      .map((activity) => ({ ...purgeCounts, activity })),
+  ])("rejects malformed raw purge result %#", async (data) => {
+    await expect(purgeExpiredOAuthRecords(purgeClient(data).client, new AbortController().signal))
+      .rejects.toMatchObject({ code: "invalid_purge_result" });
+  });
+
+  it("rejects each missing count", async () => {
+    for (const key of Object.keys(purgeCounts)) {
+      const data: Record<string, number> = { ...purgeCounts };
+      delete data[key];
+      await expect(purgeExpiredOAuthRecords(purgeClient(data).client, new AbortController().signal))
+        .rejects.toMatchObject({ code: "invalid_purge_result" });
+    }
+  });
+
+  it("rejects database failures without accepting their data", async () => {
+    await expect(purgeExpiredOAuthRecords(purgeClient(purgeCounts, { message: "private error" }).client, new AbortController().signal))
+      .rejects.toBeInstanceOf(OAuthPersistenceError);
   });
 });

@@ -411,19 +411,28 @@ export async function consumeOAuthRateLimit(
   };
 }
 
+const PURGE_COUNT_KEYS = [
+  "authorization_codes", "access_tokens", "token_families", "clients",
+  "idempotency_records", "activity", "rate_limit_counters",
+] as const;
+
+export type OAuthPurgeCounts = Record<(typeof PURGE_COUNT_KEYS)[number], number>;
+
 export async function purgeExpiredOAuthRecords(
   serviceClient: AppSupabaseClient,
-): Promise<Record<string, number>> {
-  const { data, error } = await serviceClient.rpc("oauth_purge_expired");
+  signal: AbortSignal,
+): Promise<OAuthPurgeCounts> {
+  const { data, error } = await serviceClient.rpc("oauth_purge_expired").abortSignal(signal);
   if (error) {
     throw databaseError(error);
   }
-  const record = asObject(data) ?? {};
-  return Object.fromEntries(
-    Object.entries(record).filter(
-      (entry): entry is [string, number] => typeof entry[1] === "number",
-    ),
-  );
+  const record = asObject(data);
+  if (!record || Object.keys(record).length !== PURGE_COUNT_KEYS.length ||
+      PURGE_COUNT_KEYS.some((key) => !Object.hasOwn(record, key) ||
+        typeof record[key] !== "number" || !Number.isSafeInteger(record[key]) || record[key] < 0)) {
+    throw new OAuthPersistenceError("OAuth purge result was malformed.", "invalid_purge_result");
+  }
+  return record as OAuthPurgeCounts;
 }
 
 /** Incident response: revokes every active grant. Returns the count. */

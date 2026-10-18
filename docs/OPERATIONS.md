@@ -1766,9 +1766,38 @@ after thirty idle days, and cannot outlive their ninety-day family. Reused codes
 or refresh tokens revoke their entire family. Grant revocation applies on the
 next verification; last-used writes occur at most once per minute. Codes and
 browser-bound pending requests expire after ten minutes. Unused DCR registrations
-expire after 24 hours. Schedule `oauth_purge_expired` through a privileged
-operator job under the usual provider authorization rules; expired rows already
-fail validation before physical deletion.
+expire after 24 hours. Ticket 232 calls `oauth_purge_expired` from the existing
+00:05 UTC `/api/occurrences/sync` schedule through
+`lib/services/oauth-maintenance.service.ts`. After scheduler authentication,
+maintenance runs independently of occurrence work and MCP enablement. The route
+awaits both paths, including breaker-open and early occurrence failures. The
+occurrence breaker still skips occurrence work and returns its existing
+503/Retry-After. Purge failure does not change the occurrence response.
+
+Maintenance propagates an eight-second AbortSignal into the Supabase RPC and
+awaits transport settlement. It clears the timer on every exit, rejects malformed
+raw counts, and never retries immediately. HTTP cancellation does not establish
+PostgreSQL cancellation; failures/timeouts have unknown database outcome.
+Verify the target's database-side statement/lock bounds and route duration budget
+before activation. Additional bounds require separate schema/config approval.
+
+`oauth_maintenance_completed` records seven nonnegative integer deletion counts
+using fixed labels: codes, access, families, clients, retries, activity and
+counters, each suffixed `_deleted`. Its platform timestamp is last-success
+freshness. `oauth_maintenance_failed` and `oauth_maintenance_timed_out` contain
+no exception payloads or success counts and do not advance freshness. Check
+successful-run age within 26 hours; stale or failing maintenance holds activation
+and requires operator attention. Automated alerts are not implemented.
+
+Healthy daily runs physically delete expired rows within roughly one extra day;
+failures extend retention. Expired credentials already fail validation. Backup
+retention is separate. Used DCR and CIMD registrations do not expire; retain
+shared metadata. Dedicated test registration deletion needs separately approved
+ID-bound cleanup, or owner-accepted retention.
+
+Prefer observing the scheduled run. A manual call also performs all-account due
+archive processing, occurrence generation and reminder planning. It is not a
+synthetic-only maintenance probe and needs authority for those side effects.
 
 CIMD fetches use HTTPS on port 443, approved DNS addresses pinned to the TLS
 connection, at most two redirects, a five-second total network deadline, a

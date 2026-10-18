@@ -254,6 +254,16 @@ Inspector, plus a linked desktop that shows an MCP-made change after sync.
   ID-bound cleanup proving no grants, pending requests or shared use. Keys,
   tokens, and provider payloads stay outside git.
 
+Ticket 232 local maintenance uses the existing daily occurrence-sync route after
+scheduler authentication. It awaits independent, eight-second abortable purge
+work even when occurrence work fails, has no profiles, or its breaker is open.
+MCP disablement does not disable retention. The repository validates all seven
+raw counts before success logging. HTTP abort leaves database outcome unknown;
+local/target database timeout evidence remains separate. See
+`docs/OPERATIONS.md#oauth-authorization-server-ticket-226` for freshness, failure
+handling and all-account effects of a manual scheduler call. No new scheduler
+or schema is required by this local implementation; hosted activation remains gated.
+
 ## 9. Owner-only actions
 
 - Approve the Privacy and Terms changes (Ticket 231).
