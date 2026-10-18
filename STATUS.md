@@ -10,7 +10,7 @@ superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets
 - Ticket 220 (MCP direction and integration brief): docs complete October 18, 2026; awaiting wave-1 verification. Decisions, AGENTS.md scope, `docs/MCP_INTEGRATION.md`, planned routes, follow-ups, and Tickets 220–232 recorded.
 - Ticket 221 (versioned MCP operation contract): in progress, wave 1.
 - Ticket 222 (OAuth and integration persistence): in progress, wave 1.
-- Ticket 223 (RLS-scoped request context for integrations): in progress, wave 1.
+- Ticket 223 (RLS-scoped request context for integrations): implementation complete October 18, 2026; awaiting wave-1 verification. ES256 internal tokens (Node crypto, 5-minute expiry) and `lib/integrations/request-context.ts`; local two-user RLS isolation passed in `cadence-mcp-223`. Hosted signing-key import remains an owner action (`docs/SUPABASE_WORKFLOW.md`).
 - Ticket 224 (integration read operations): planned, wave 2.
 - Ticket 225 (integration write operations): planned, wave 2.
 - Ticket 226 (OAuth authorization server endpoints): planned, wave 2.
