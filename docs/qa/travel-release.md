@@ -773,3 +773,22 @@ Platform impact: desktop uses the shared planner and native transaction ordering
 web tracking is unchanged and hosted data keeps its identities. Marketing is not
 applicable. Future mobile inherits the planner rule. Installed verification of
 the corrected candidate remains in progress.
+
+
+Preview.50 is installed from source commit `ce7d671`. Artifact checks verify the
+app, archive, updater signature, DMG and minimum-target metadata. The private
+pre-install SQLite backup is retained. The changed native binary triggered
+another macOS Keychain prompt while reading the existing session. A process
+sample confirms `SecItemCopyMatching` in `auth_secret_get`; Computer Use cannot
+operate this security prompt. Runtime convergence and protected-data preservation
+checks remain pending owner action. No manual database repair was applied.
+
+The final source passes agent, interaction and resolver checks, lint, web and
+desktop type checks, 2,378 TypeScript tests (31 skipped), 110 native tests, and
+both frontend builds. Native formatting check reports existing formatting drift
+in unrelated files; no repository-wide formatting was applied.
+
+A read-only selected-Calendar check found 13 events across October 19–23, with
+10 location fields. This does not establish six route legs on one day. No extra
+Maps call was made for that check. The two-leg timing sample remains the only
+live performance evidence; six-leg and before/after comparisons remain unverified.

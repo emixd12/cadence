@@ -12639,7 +12639,7 @@ transmission or new provider account.
 
 Status: deployed October 18, 2026 with Ticket 214. Hosted migrations, approved
 privacy text and bounded production QA pass. Installed desktop acceptance waits
-for macOS Keychain approval. Restores hosted routing.
+for the new macOS Keychain prompt on preview.50. Restores hosted routing.
 Evidence: `docs/qa/travel-release.md`, October 18.
 Dependencies: existing quota function `consume_travel_route_quota()`
 (`supabase/migrations/20260922200000_travel_route_quota_admissions.sql`).

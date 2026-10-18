@@ -12,13 +12,15 @@ Web narrow-layout and Refresh travel checks pass. Production-based validation:
 Review fixes withdraw cached guidance for reopened stops and changed durations,
 and check duration history before reserving spend.
 
-Owner Keychain approval is complete. Installed preview.49 loads the account and
+The first Keychain approval is complete. Installed preview.49 loaded the account and
 Calendar after correcting the local build helper's missing connector setting.
 Account sync exposed 229 freshly generated local duplicates of hosted schedule
 identities. The shared planner now retains hosted identities for only untouched,
 unreferenced local duplicates; native atomic apply frees the old unique slots.
 No private database repair was applied. The correction passes 2,378 TypeScript
-and 110 native tests. Final installed acceptance is in progress.
+and 110 native tests. Installed preview.50 includes the correction and connector
+setting. Its changed native binary triggered another Keychain prompt; runtime
+acceptance waits for the owner to clear that prompt.
 Production remains `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
 See `docs/qa/travel-release.md` for evidence and measurement limits.
 
