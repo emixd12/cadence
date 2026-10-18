@@ -338,6 +338,5 @@ part of L-002.
   match the deployment date.
 - **Status:** closed October 18, 2026. Production deployment
   `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` serves the approved notices; live readback passed.
-- **Next action:** retain the verified notices with future releases; the deployment resolves
-  this entry resolved. The Privacy statement that Cadence does not send behavior data
+- **Next action:** retain the verified notices with future releases; this entry is resolved. The Privacy statement that Cadence does not send behavior data
   to an AI provider is a separate conflict under Ticket 187.
