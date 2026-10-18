@@ -792,3 +792,37 @@ A read-only selected-Calendar check found 13 events across October 19–23, with
 10 location fields. This does not establish six route legs on one day. No extra
 Maps call was made for that check. The two-leg timing sample remains the only
 live performance evidence; six-leg and before/after comparisons remain unverified.
+
+
+### Final installed acceptance — October 18, 2026
+
+The owner cleared the second Keychain prompt. Installed preview.50 completed
+normal synchronization and displayed “Account data is current.” The account-sync
+cursor advanced to `2026-10-18T06:34:26.509Z`; no outbox mutations remain pending.
+Read-only comparison with the pre-install backup confirmed:
+
+- All 1,456 existing status events and 13 time sessions are byte-for-byte intact.
+- All 34 existing Notes remain intact. No prior resolved Occurrence was removed
+  or changed to another status.
+- All import mappings, imported Notes, imported interventions, Behavior definition
+  events and Behavior configuration events remain intact. Hosted history was added.
+- The planner removed 229 untouched independently generated duplicates. Normal
+  hosted reconciliation also removed three older untouched Occurrences. None
+  contained a Note, decision, status history or completed timestamp.
+- SQLite quick-check is `ok`, foreign-key errors are zero, and no duplicate
+  schedule identities remain. No private database repair was applied.
+
+The native app loaded selected Calendar context. Raising its window activated
+foreground travel and displayed “Travel as of 2:35 AM” with Refresh travel.
+Refresh travel disabled while pending, then completed and re-enabled. The
+current three-hour window contained no route legs, so these native checks made
+no Google Maps call. The cumulative reserved QA cost remains US$0.135. The
+production owner-account two-leg runs above cover actual saved/Calendar routing.
+No tracking decision, Note, saved address or Calendar event was edited for QA.
+
+Tickets 213–214 functional acceptance is complete. The measured performance
+claim is limited to four two-leg samples. Six-leg and pre-change comparisons
+remain unmeasured; the exhausted old pilot could not supply a successful
+baseline. Current-device native location and Apple-trusted distribution remain
+separate Tickets 115/165 gates. The main promotion follows PR #107 and the
+existing matching-marketing-deployment procedure.

@@ -12637,9 +12637,9 @@ transmission or new provider account.
 
 ## Ticket 213: Renewable monthly travel budget and accurate limit messages
 
-Status: deployed October 18, 2026 with Ticket 214. Hosted migrations, approved
-privacy text and bounded production QA pass. Installed desktop acceptance waits
-for the new macOS Keychain prompt on preview.50. Restores hosted routing.
+Status: completed October 18, 2026 with Ticket 214. Hosted migrations, approved
+privacy text, bounded production QA and installed preview.50 acceptance pass.
+Restores hosted routing.
 Evidence: `docs/qa/travel-release.md`, October 18.
 Dependencies: existing quota function `consume_travel_route_quota()`
 (`supabase/migrations/20260922200000_travel_route_quota_admissions.sql`).
@@ -12679,10 +12679,13 @@ Platform impact:
 
 ## Ticket 214: Places looked up once, change-driven refresh and a faster server path
 
-Status: deployed October 18, 2026; installed desktop acceptance remains open.
+Status: completed October 18, 2026. Installed preview.50 synchronization,
+Calendar context, foreground activation and Refresh travel pass.
 Whole-day routing runs once per generated Daily Brief within the existing eight-leg
-safety bound. Four two-leg production samples measured p50 3.3562 s and p95 3.5984 s. Evidence:
-`docs/qa/travel-release.md`, October 18.
+safety bound. Four two-leg production samples measured p50 3.3562 s and p95 3.5984 s.
+Six-leg and before/after performance remain unmeasured; the old exhausted pilot
+could not provide a successful baseline. Evidence: `docs/qa/travel-release.md`,
+October 18.
 Dependencies: 213. The refresh-trigger change ships with 213.
 
 Goal: a refresh pays only for route legs that need travel and returns quickly.
