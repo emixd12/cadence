@@ -692,3 +692,146 @@ time only while the source commit and both deployment IDs remain identical.
 Subject mismatch makes the result Not run. Deadline expiry makes it Stale.
 The smoke reports success only after all three temporary users delete
 successfully. Cleanup failure is Failed and blocks a Passed release.
+
+## Integration request tokens (Ticket 223)
+
+Integration operations (the MCP server, Tickets 224–228) run as the grant's
+user through normal RLS. They never use cookies or the service role. After the
+caller verifies an opaque Cadence access token and an active grant,
+`createIntegrationContext` in `lib/integrations/request-context.ts` mints an
+internal Supabase access token with `lib/supabase/integration-token.ts`. The
+context's Supabase client sends that token with the publishable key.
+
+The internal token:
+
+- is an ES256 JWT whose header `kid` matches a signing key Supabase trusts;
+- carries `sub` (user id), `role: "authenticated"`, `aud: "authenticated"`,
+  `iat`, `exp`, `jti`, `cadence_channel`, `cadence_grant_id`, and
+  `cadence_client_id`;
+- expires in at most 5 minutes from the injected `now`;
+- never leaves the server and is never logged, stored, or returned to a client.
+
+The client uses the supabase-js `accessToken` option, which disables
+`supabase.auth`. The token therefore cannot reach the Auth user API through the
+context client. Requests reuse `fetchWithJwtIssuedAtFutureRetry` for
+`JWT issued at future` clock skew.
+
+### Key custody
+
+- `CADENCE_INTEGRATION_JWT_SIGNING_KEY` holds the private ES256 JWK, including
+  its `kid`. It is server-only: never prefix it with `NEXT_PUBLIC_` or `VITE_`,
+  and never put it in desktop bundles, logs, notes, or commits.
+- The variable accepts one JWK, the JSON array that `supabase gen signing-key`
+  writes, or a `{ "keys": [...] }` set. The first key is used.
+- A blank variable makes `createIntegrationContext` throw. Integration routes
+  must treat that as unavailable.
+- Anyone holding this key can act as any Cadence user through the Data API.
+  Store it only in local private env files and the hosted deployment's secret
+  store. Rotate it if it is exposed.
+
+### Local setup
+
+The committed `supabase/config.toml` keeps `signing_keys_path` commented out.
+TOML offers no optional path, and enabling it in the committed config would
+make the default local start depend on an untracked key file. Enable it only
+in an isolated project's temporary config copy. `supabase gen signing-key`
+with the path set needs the file to exist, so create an empty array first:
+
+```bash
+WORKDIR="$(mktemp -d)"
+mkdir -p "$WORKDIR/supabase"
+cp supabase/config.toml supabase/seed.sql "$WORKDIR/supabase/"
+cp -R supabase/migrations "$WORKDIR/supabase/"
+# In the copy: set a unique project_id and ports, then uncomment
+# signing_keys_path = "./signing_keys.json" under [auth].
+echo '[]' > "$WORKDIR/supabase/signing_keys.json"
+chmod 600 "$WORKDIR/supabase/signing_keys.json"
+supabase gen signing-key --algorithm ES256 --append --workdir "$WORKDIR"
+supabase start --workdir "$WORKDIR" --network-id cadence-local
+```
+
+The local Auth server then signs sessions with that key, and its JWKS
+(`/auth/v1/.well-known/jwks.json`) publishes the matching public key, so local
+PostgREST accepts minted tokens. Confirm the published ports bind to
+`127.0.0.1` before continuing (see "Local environment lifecycle"). Never copy
+the key file into `supabase/`; `.gitignore` excludes
+`supabase/signing_keys*.json` as a backstop.
+
+For the app or tests, pass the file contents as the JWK value without printing
+them:
+
+```bash
+CADENCE_INTEGRATION_JWT_SIGNING_KEY="$(cat "$WORKDIR/supabase/signing_keys.json")"
+```
+
+The opt-in RLS test `tests/integration-request-context.local-integration.test.ts`
+runs only when all of these are set, and refuses non-loopback URLs:
+`CADENCE_LOCAL_SUPABASE_URL`, `CADENCE_LOCAL_SUPABASE_SERVICE_KEY` (creates
+and deletes the two test users only), `CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY`,
+and `CADENCE_LOCAL_INTEGRATION_SIGNING_KEY`. It proves that user A's minted
+context reads A's rows, cannot read or write user B's profile, categories,
+Behaviors, or Occurrences, and that expired or untrusted-key tokens get 401.
+It creates Behaviors through the existing core `createBehavior` service and web
+Behavior store, unchanged.
+
+### Hosted import runbook (owner action)
+
+Importing a hosted signing key requires explicit owner authorization. Agents
+write this runbook only. Supabase's
+[signing keys guide](https://supabase.com/docs/guides/auth/signing-keys)
+documents these states (read 2026-10-18):
+
+| Key state | Data API accepts its tokens | Auth signs new sessions with it |
+|---|---|---|
+| Standby | No ("current key only") | No |
+| Current (in use) | Yes | Yes |
+| Previously used | Yes, until revoked | No |
+| Revoked | No | No |
+
+A freshly imported key starts in **standby**, which the Data API does not
+accept. Minted tokens work only after the key is **current** or **previously
+used**. Hosted acceptance has not been verified; Ticket 232 verifies it on
+staging first.
+
+1. Generate the key on a trusted machine:
+   `supabase gen signing-key --algorithm ES256`. Keep the output out of shells
+   with history, logs, and chat.
+2. If the project still uses the legacy JWT secret, first complete Supabase's
+   migration to signing keys (Dashboard → JWT signing keys → Migrate JWT
+   secret), and confirm the app does not verify JWTs with the legacy secret.
+3. Dashboard → JWT signing keys → create a standby key → import the private
+   JWK. Record the `kid` that Supabase shows; it must equal the JWK's `kid`.
+4. Set `CADENCE_INTEGRATION_JWT_SIGNING_KEY` in the target deployment's
+   server-only environment (owner action under `docs/VERCEL_WORKFLOW.md`).
+5. Wait for JWKS caches (Supabase's edge caches the discovery endpoint for 10
+   minutes), then **Rotate keys** so the imported key becomes current. Supabase
+   Auth then signs new sessions with it too; existing sessions stay valid
+   because the previous key becomes previously used.
+6. Verify with a staging test account: an integration request reads only that
+   account's rows. Do not revoke the previous key until all of its sessions
+   expire (at least the JWT expiry plus 15 minutes).
+7. Key state changes are throttled for about 5 minutes. Record the date, `kid`,
+   and resulting states in `STATUS.md`, never the key.
+
+Rollback: remove `CADENCE_INTEGRATION_JWT_SIGNING_KEY` to stop integration
+requests. To distrust the key, rotate to another key, then revoke it after
+sessions expire.
+
+### Tables and RPCs reachable with the internal token
+
+The token has the same database privileges as the user's web session. RLS and
+function checks bind every row to `auth.uid()`. The integration operations
+planned in Tickets 224–225 are expected to reach these objects through
+existing repositories; those tickets confirm the final list.
+
+| Use | Tables | RPCs |
+|---|---|---|
+| Account context | `profiles` | — |
+| Behaviors, schedules, categories | `behaviors`, `behavior_schedules`, `behavior_schedule_slots`, `categories`, `behavior_definition_events`, `behavior_configuration_events` | `create_behavior_with_schedule_graph`, `update_behavior_with_schedule_graph`, `create_behavior_with_definition_event`, `update_behavior_with_definition_event`, `archive_my_due_behaviors` |
+| Occurrences and timeline | `occurrences`, `occurrence_status_events`, `occurrence_sync_state` | `apply_occurrence_status_transition`, `update_occurrence_note_with_shortcut`, `apply_occurrence_generation_plan`, `mark_occurrence_sync_fresh_if_configuration_current` |
+| Time sessions | `occurrence_time_sessions` | `list_my_occurrence_time_sessions`, `list_my_occurrence_time_session_history` |
+
+Tickets 222 and 224–228 must not grant this token anything beyond the user's
+own web-session privileges. Excluded data classes (Calendar, travel, Daily
+Brief, reminder deliveries, push subscriptions) stay readable under RLS to the
+same user, so the operations layer must not query them.
