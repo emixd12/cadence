@@ -1,14 +1,55 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
+import { createSatteriMarkdownProcessor } from "@astrojs/markdown-satteri";
 import { describe, expect, it } from "vitest";
 import { INTEGRATION_OPERATIONS, INTEGRATION_OPERATION_NAMES, validateOperationInput, validateOperationOutput } from "@cadence/core/integration";
 import reference from "../apps/marketing/src/data/developer-reference.json";
 import { developerPages, developerReleaseNotice } from "../apps/marketing/src/data/developers";
 import { marketingRoutes } from "../apps/marketing/src/data/routes";
+// @ts-expect-error Operational JavaScript module intentionally has no declarations.
+import { table } from "../apps/marketing/scripts/developer-reference.mjs";
+
+async function rendered(markdown: string) {
+  const renderer = await createSatteriMarkdownProcessor({ syntaxHighlight: false });
+  const container = document.createElement("div");
+  container.innerHTML = (await renderer.render(markdown)).code;
+  return container;
+}
+
+function row(container: HTMLElement, path: string) {
+  return [...container.querySelectorAll("tbody tr")].find((element) => element.querySelector("td")?.textContent === path);
+}
 
 // @ts-expect-error Operational JavaScript module intentionally has no declarations.
 import { collectRoutes, marketingContracts } from "../scripts/compare-public-routes.mjs";
 
 describe("developer documentation", () => {
+  it("renders schema regex, enum and const values literally", async () => {
+    const value = "^(?=.*\\S)[a|`b`\\\\]*$";
+    const container = await rendered(table({ properties: { value: { type: "string", pattern: value, enum: [value], const: value } } }));
+    expect([...row(container, "value")!.querySelectorAll("td:last-child code")].map((code) => code.textContent)).toEqual([value, value, value]);
+    expect(container.querySelector("em")).toBeNull();
+    const page = reference.tools.find((entry) => entry.title === "create_behavior")!;
+    const actual = await rendered(page.markdown);
+    const schema = INTEGRATION_OPERATIONS.create_behavior.input.schema.properties as Record<string, { pattern: string }>;
+    expect([...row(actual, "title")!.querySelectorAll("code")].map((code) => code.textContent)).toContain(schema.title.pattern);
+  });
+
+  it("renders nullable object and array children with their containing-object requirements", async () => {
+    const timeline = await rendered(reference.tools.find((entry) => entry.title === "get_timeline")!.markdown);
+    expect(row(timeline, "needs_decision")?.children[2].textContent).toBe("object or null");
+    for (const path of ["occurrences", "total_count", "truncated", "lookback_start_local_date", "occurrences[].id"]) {
+      expect(row(timeline, `needs_decision.${path}`)?.children[1].textContent).toBe("yes");
+    }
+    for (const [name, prefix] of [["list_behaviors", "behaviors[]"], ["get_behavior", "behavior"], ["create_behavior", "behavior"], ["update_behavior", "behavior"], ["archive_behavior", "behavior"], ["restore_behavior", "behavior"]]) {
+      const container = await rendered(reference.tools.find((entry) => entry.title === name)!.markdown);
+      for (const field of ["id", "name"]) expect(row(container, `${prefix}.category.${field}`)?.children[1].textContent).toBe("yes");
+    }
+    const nullableArray = await rendered(table({ properties: { records: { anyOf: [{ type: "array", items: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } }, { type: "null" }] } } }));
+    expect(row(nullableArray, "records")?.children[2].textContent).toBe("array or null");
+    expect(row(nullableArray, "records[].id")?.children[1].textContent).toBe("yes");
+    expect((await rendered(table(INTEGRATION_OPERATIONS.update_behavior.input.schema))).textContent).toContain("Provide at least one of:");
+  });
   it("covers every tool with fixture-valid examples and current permissions", () => {
     expect(reference.tools.map((page) => page.title)).toEqual(INTEGRATION_OPERATION_NAMES);
     for (const name of INTEGRATION_OPERATION_NAMES) {
