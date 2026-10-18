@@ -158,15 +158,16 @@ Keychain-correlated state, never credentials.
 
 ## Planned connector routes (Tickets 222–227)
 
-Planned October 18, 2026; none is implemented. Each provider gets its own routes,
+Planned October 18, 2026. Outlook routes (Ticket 224) are implemented locally with
+synthetic tests; the others are not implemented. Each provider gets its own routes,
 mirroring the Google connector. No generic connector route or new primary screen
 is added. All responses are no-store, use the same session, same-origin, and
 Tauri-origin rules, and expose no provider write.
 
 | Route | Methods | Ticket | Purpose |
 |---|---|---:|---|
-| `/api/outlook-calendar/connection` | GET, POST, DELETE | 224 | Status, start consent, disconnect |
-| `/auth/outlook-calendar/callback` | GET | 224 | One-use state, PKCE, same `tid`/`sub` check, sealed install |
+| `/api/outlook-calendar/connection` | GET, POST, PUT, DELETE | 224 | Status; start consent; desktop completion with the desktop session and Keychain client state; disconnect with the Microsoft removal instruction |
+| `/auth/outlook-calendar/callback` | GET | 224 | Web: consume one-use state, require the initiating cookie user, PKCE, nonce, issuer, `tid`/`sub` binding, sealed install. Desktop: forward code and state to `cadence://outlook-calendar/callback` without consuming the attempt |
 | `/api/outlook-calendar/calendars` | GET, PUT | 224 | List readable calendars; save selection |
 | `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30 |
 | `/api/icloud-calendar/connection` | GET, POST, DELETE | 227 | Status, accept credential once, disconnect |

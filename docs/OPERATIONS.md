@@ -1527,6 +1527,19 @@ keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
 Never reuse the Google key. Missing configuration reports `not_configured`. The
 same rotation rules below apply.
 
+Outlook Calendar (Ticket 224) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
+Entra application GUID), `OUTLOOK_CALENDAR_CLIENT_SECRET`, and
+`OUTLOOK_CALENDAR_CALLBACK_URL` (exact HTTPS `/auth/outlook-calendar/callback`,
+on the same host as the web session). Register one multitenant app that also
+accepts personal accounts. Configure only the delegated `Calendars.ReadBasic`
+permission; the token check refuses any other Graph permission, including
+`User.Read`. Status reports `not_configured` until both these values and the
+connector keyring are present. Disconnect deletes Cadence's sealed refresh token
+only. Microsoft documents no app-side revocation for these scopes, so Settings
+must send users to their Microsoft account or My Apps permissions page. Publisher
+verification and per-tenant consent policy remain release gates. Local
+implementation does not authorize app registration or live-account access.
+
 For key rotation, retain old decrypt keys while credentials use those key IDs.
 New consent seals with the current key. Remove an old key only after every
 connection using it reconnects or disconnects. Missing keys fail closed and

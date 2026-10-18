@@ -30,7 +30,19 @@ The integrated baseline `d7af234` was independently approved.
   Google storage and wire behavior are unchanged. Evidence is source, synthetic
   fixtures, and a disposable CLI-pinned local Supabase replay. No provider call,
   route, UI, consent, desktop cache, hosted migration, or deployment exists.
-  Tickets 223–228 are not started.
+- Ticket 224 (Outlook Calendar) is implemented locally and awaits independent
+  verification. Microsoft Graph `calendarView` reads selected calendars with
+  `Calendars.ReadBasic` only, immutable IDs, validated next links, a 20-page
+  bound, and one 25-second deadline across token refresh, listing, pages, and
+  retries. Identity is the ID-token `tid` plus `sub`; web callbacks require the
+  initiating cookie user, and desktop completion requires the initiating Cadence
+  session plus its Keychain client state. All-day dates use the event's own zone
+  through a pinned CLDR 48.2 Windows-zone table; unresolved zones quarantine with
+  a recorded reason. It reuses the Ticket 222 lifecycle; no migration. Evidence
+  is source and synthetic fixtures only. No app registration, live personal or
+  work/school account, publisher verification, UI, desktop client, or Daily
+  Brief consent exists.
+- Ticket 223 (Hevy) is in progress. Tickets 225–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

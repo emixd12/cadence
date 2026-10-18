@@ -13799,7 +13799,16 @@ Platform impact:
 
 ## Ticket 224: Outlook Calendar connector
 
-Status: not started.
+Status: implemented locally on October 18, 2026 with synthetic fixtures;
+independent verification pending. `lib/services/outlook-calendar-{oauth,provider}.ts`,
+`lib/services/outlook-calendar.service.ts`, the pinned CLDR 48.2 table
+`lib/services/outlook-calendar-windows-zones.ts`, `app/api/outlook-calendar/*`, and
+`/auth/outlook-calendar/callback` own it. It reuses the Ticket 222 lifecycle
+(`connectors.repo.ts`, `connector-credentials.ts`); no migration was needed.
+Desktop completion is `PUT /api/outlook-calendar/connection` with the desktop
+session and Keychain client state; the desktop client itself belongs to Ticket 225.
+No app registration, live personal or work/school account, publisher verification,
+UI, or Daily Brief consent exists.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -13817,8 +13826,8 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | `lib/services/outlook-calendar-*.ts`, `lib/db/outlook-calendar.repo.ts`, `app/api/outlook-calendar/*`, and `/auth/outlook-calendar/callback`. |
-| Desktop | `apps/desktop/src/calendar/outlook-calendar.ts` using the hosted broker and opaque Keychain state. |
+| Web | `lib/services/outlook-calendar-*.ts`, `lib/services/outlook-calendar.service.ts`, `app/api/outlook-calendar/*`, and `/auth/outlook-calendar/callback`. The Ticket 222 `lib/db/connectors.repo.ts` replaces a provider-specific repository. |
+| Desktop | `apps/desktop/src/calendar/outlook-calendar.ts` (Ticket 225) handles `cadence://outlook-calendar/callback` and completes through the hosted `PUT` with its session and opaque Keychain state. |
 | Marketing | Disclosure in 228. |
 | Future mobile | Deferred. |
 
@@ -13838,6 +13847,20 @@ Acceptance:
   titles or exercise data and never change Occurrences.
 - Update `interaction-registry.json` and the design-system catalogs only for
   implemented interactions. Use impeccable and design-system-bench.
+- Desktop keeps one disposable cache per source and linked account, outside
+  `cadence.sqlite3` and user-created backups. Each cache key binds source,
+  account, connection generation, selected calendars, and range. Disconnect,
+  sign-out, and account switch delete that source's cache before new content
+  shows. Desktop never stores provider credentials.
+- Disconnect and account-deletion confirmation copy render each provider's
+  revocation instruction key from Ticket 222: remove Cadence in Microsoft
+  account or My Apps permissions (Outlook), remove the app-specific password at
+  account.apple.com (iCloud), and remove or regenerate the Hevy API key. Copy
+  never claims Cadence revoked provider access.
+- Desktop Outlook handles `cadence://outlook-calendar/callback`, ignores any
+  link whose state it did not start, and completes with
+  `PUT /api/outlook-calendar/connection` using its session and Keychain client
+  state.
 
 Platform impact:
 

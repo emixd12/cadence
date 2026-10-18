@@ -374,8 +374,9 @@ Outlook mapping (Ticket 224) uses Microsoft Graph `calendarView`:
 | User response | `responseStatus.response`, mapped to the existing response vocabulary. |
 | Revision | `lastModifiedDateTime` and `changeKey`. |
 | Details | `subject` only, as bounded untrusted plaintext. `Calendars.ReadBasic` excludes body, attachments, and extensions. Location, attendees, organizer, and online-meeting data are not requested in the first slice and use `unsupported`. |
-| Source link | `webLink` is converted to the current Outlook on the web format documented by Microsoft and must be HTTPS. |
-| Pagination | `$top` of at most 1,000 per page. Completion requires a response without `@odata.nextLink`. |
+| Source link | `webLink` is kept only when it is HTTPS on `outlook.office365.com`, `outlook.office.com`, or `outlook.live.com` without credentials or a port; otherwise it is null with `source_url: not_provided`. Ticket 224 found no Microsoft-documented conversion to a newer Outlook on the web format, so none is applied (not verified against live links). |
+| Pagination | `$top` of at most 1,000 per page. Completion requires a response without `@odata.nextLink`. Each next link must be HTTPS on `graph.microsoft.com` (default port, no credentials) and keep the same `/v1.0/me/calendars/{id}/calendarView` path before the bearer token is sent; otherwise the read fails as `malformed_provider_response`. A repeated link or a 21st page is `incomplete_pagination`. Pages are capped at 5 MB. |
+| Quarantine record | Ticket 224: a quarantined item (`timezone_unresolved`, `not_midnight`, `invalid_interval`, `unexpected_response_timezone`, `series_master`, or `malformed_item`) does not stop the read. That calendar's coverage has `paginationComplete: false`, and one non-retryable `malformed_provider_response` failure with its `calendarId` lists the reason counts. The snapshot is `incomplete`. |
 
 iCloud mapping (Ticket 227) uses CalDAV:
 

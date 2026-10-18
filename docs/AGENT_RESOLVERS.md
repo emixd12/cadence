@@ -399,6 +399,15 @@ in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
 and field discard. Services own credentials, generations, and fences. Repositories
 in `lib/db` own owner-scoped persistence. UI renders validated results only.
 
+Ticket 224 implements the Outlook slice: `lib/services/outlook-calendar-provider.ts`
+(Graph GET allowlist, next-link validation, deadline, and calendarView mapping),
+`outlook-calendar-oauth.ts` (Microsoft identity), `outlook-calendar.service.ts`
+(lifecycle and fences through `connector-credentials.ts`), and the pinned CLDR
+table `outlook-calendar-windows-zones.ts`. It reuses `connectors.repo.ts`; no
+`outlook-calendar.repo.ts` is needed. Routes call only the service. Paired tests:
+`tests/outlook-calendar-{provider,oauth}.test.ts` and
+`tests/outlook-calendar.service.test.ts`. No resolver changed.
+
 Recorded activity never feeds `status.resolver.ts`, `timeline.resolver.ts`
 Occurrence grouping, reminders, analytics, or exports. Calendar overlap cues keep
 using scheduled events only. Daily Brief reads new sources through the existing
