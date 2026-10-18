@@ -252,3 +252,23 @@ troubleshooting. Each page gets a Markdown mirror and route-manifest entry.
 `proxy.ts` must add `/oauth/:path*` for cookie refresh on the consent screen
 (Ticket 227). `/mcp`, `/oauth/token`, `/oauth/register`, `/oauth/revoke`, and the
 `.well-known` routes use no cookie session.
+
+### Implemented OAuth transport (Ticket 226)
+
+| Route | Method | Service and boundary |
+|---|---|---|
+| `/.well-known/oauth-authorization-server` | GET, OPTIONS | `lib/services/oauth/server.ts`; RFC 8414 metadata |
+| `/.well-known/oauth-protected-resource` | GET, OPTIONS | RFC 9728 metadata for the exact `/mcp` URL |
+| `/.well-known/oauth-protected-resource/mcp` | GET, OPTIONS | Same protected-resource metadata, path-specific discovery |
+| `/oauth/authorize` | GET | Client/redirect/resource/state/scopes/S256 validation; ten-minute browser-bound pending request; redirects to Ticket 227's `/oauth/consent?request=<uuid>` |
+| `/oauth/token` | POST, OPTIONS | Form-urlencoded authorization-code exchange and refresh rotation |
+| `/oauth/register` | POST, OPTIONS | Bounded public-client RFC 7591 registration |
+| `/oauth/revoke` | POST, OPTIONS | RFC 7009 token revocation |
+
+These Node route handlers call services, never tracking repositories. Native
+`.well-known` segments need no rewrites. All endpoints fail closed under
+`CADENCE_MCP_ENABLED`; all responses prohibit caching. Consent UI and Settings
+remain Ticket 227. `getOAuthConsent` and `completeOAuthConsent` in
+`lib/services/oauth/consent.ts` take a signed-in user client and enforce browser
+binding; completion additionally requires a same-origin POST. Ticket 228 calls
+`verifyMcpAccessToken` before creating its RLS integration context.

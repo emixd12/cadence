@@ -49,6 +49,7 @@ export type OAuthClientRegistration = {
 };
 
 export type OAuthTokenIssue = {
+  offlineAccess: boolean;
   grantId: string;
   userId: string;
   clientId: string;
@@ -226,6 +227,7 @@ function parseTokenResult(value: Json | null): OAuthTokenResult {
   }
   return {
     ok: true,
+    offlineAccess: record.offline_access === true,
     grantId: requireString(record, "grant_id"),
     userId: requireString(record, "user_id"),
     clientId: requireString(record, "client_id"),
@@ -379,7 +381,7 @@ export async function consumeOAuthRateLimit(
   serviceClient: AppSupabaseClient,
   input:
     | { action: "mcp_read" | "mcp_write"; grantId: string }
-    | { action: "client_registration"; sourceHash: string },
+    | { action: "client_registration" | "oauth_request" | "oauth_global"; sourceHash: string },
 ): Promise<OAuthRateLimitDecision> {
   const { data, error } = await serviceClient.rpc("oauth_consume_rate_limit", {
     p_action: input.action,
@@ -526,4 +528,55 @@ export async function listOAuthActivity(
     errorCode: row.error_code ?? null,
     occurredAt: row.occurred_at,
   }));
+}
+
+export type PendingAuthorization = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  verifiedClient: OAuthVerifiedClient | null;
+  redirectUri: string;
+  resource: string;
+  scopes: OAuthScope[];
+  offlineAccess: boolean;
+  state: string | null;
+  expiresAt: string;
+};
+
+export async function createPendingAuthorization(client: AppSupabaseClient, input: {
+  browserHash: string; clientId: string; redirectUri: string; codeChallenge: string;
+  resource: string; scopes: OAuthScope[]; offlineAccess: boolean; state: string | null;
+}): Promise<string> {
+  const { data, error } = await client.rpc("oauth_create_pending", {
+    p_browser_hash: input.browserHash, p_client_id: input.clientId, p_redirect_uri: input.redirectUri,
+    p_code_challenge: input.codeChallenge, p_resource: input.resource, p_scopes: input.scopes,
+    p_offline_access: input.offlineAccess, p_state: nullable(input.state),
+  });
+  if (error) throw databaseError(error);
+  if (typeof data !== "string") throw new OAuthPersistenceError("Missing request ID.", "malformed_result");
+  return data;
+}
+
+export async function readPendingAuthorization(client: AppSupabaseClient, id: string, browserHash: string): Promise<PendingAuthorization | null> {
+  const { data, error } = await client.rpc("oauth_read_pending", { p_id: id, p_browser_hash: browserHash });
+  if (error) throw databaseError(error);
+  const row = asObject(data);
+  if (!row) return null;
+  return {
+    id: requireString(row, "id"), clientId: requireString(row, "client_id"), clientName: requireString(row, "client_name"),
+    verifiedClient: asVerifiedClient(row.verified_client), redirectUri: requireString(row, "redirect_uri"),
+    resource: requireString(row, "resource"), scopes: asScopes(row.scopes), offlineAccess: row.offline_access === true,
+    state: asString(row.state), expiresAt: requireString(row, "expires_at"),
+  };
+}
+
+export async function finishPendingAuthorization(client: AppSupabaseClient, input: {
+  id: string; browserHash: string; scopes: OAuthScope[] | null; codeHash: string | null;
+}): Promise<{ redirectUri: string; state: string | null; approved: boolean } | null> {
+  const { data, error } = await client.rpc("oauth_finish_pending", {
+    p_id: input.id, p_browser_hash: input.browserHash, p_scopes: nullable(input.scopes), p_code_hash: nullable(input.codeHash),
+  });
+  if (error) throw databaseError(error);
+  const row = asObject(data);
+  return row ? { redirectUri: requireString(row, "redirect_uri"), state: asString(row.state), approved: row.approved === true } : null;
 }

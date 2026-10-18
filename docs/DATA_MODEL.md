@@ -2137,3 +2137,32 @@ DCR and CIMD client rows are not user data and remain until purge.
 Repositories: `lib/db/oauth.repo.ts` (token endpoint, consent, Connected apps)
 and `lib/db/integration.repo.ts` (integration session). Local verification:
 `tests/sql/ticket-222-oauth-persistence-smoke.sql`.
+
+### OAuth pending authorization (Ticket 226)
+
+Migration `20261018170000_oauth_authorization_requests.sql` adds private
+`pending_authorizations`. This is pre-login protocol state, not a user-owned
+tracking table. It stores a random request UUID, SHA-256 browser-secret hash,
+client ID, exact redirect URI, S256 challenge, resource, requested tracking
+scopes, `offline_access`, client state, and a ten-minute expiry. RLS is enabled;
+no API role has direct table access. Expired rows are removed at creation and by
+`oauth_purge_expired`. A request becomes account-bound only through explicit
+consent with the signed-in user's database client.
+
+`oauth_create_pending` is service-role-only. Authenticated
+`oauth_read_pending` and `oauth_finish_pending` require the browser-secret hash.
+The finish function locks and consumes the request in the same transaction as
+`oauth_approve_consent`; it accepts only a subset of requested tracking scopes.
+A null scope list denies and consumes without creating a grant. The server
+also requires a same-origin POST and a matching HttpOnly cookie. Neither the
+browser secret nor the client state appears in the consent URL.
+
+Codes and token families gain an `offline_access` boolean, separate from the
+three data-access scopes. Token responses include that permission when approved.
+The existing one-hour access, thirty-day refresh idle and ninety-day absolute
+family lifetimes remain. PKCE and browser-secret checks compare fixed-size
+hashes without a data-dependent early exit. Token lookup remains an indexed
+SHA-256 hash lookup. OAuth admission adds `oauth_request` (60/minute per source)
+and `oauth_global` (600/minute across sources) to the existing private counters.
+Registration additionally retains its 10/hour source limit and 24-hour unused
+registration expiry. Tracking tables and desktop sync contracts do not change.

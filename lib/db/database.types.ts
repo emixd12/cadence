@@ -1566,6 +1566,18 @@ export type Database = {
         }
         Returns: Json
       }
+      integration_apply_write: {
+        Args: {
+          p_args: Json
+          p_as_of: string
+          p_external_ref?: string
+          p_hash: string
+          p_key: string
+          p_operation: string
+          p_rpc: string
+        }
+        Returns: Json
+      }
       integration_find_external_reference: {
         Args: { p_entity_type: string; p_external_id: string }
         Returns: string
@@ -1607,6 +1619,10 @@ export type Database = {
           entity_id: string
           external_id: string
         }[]
+      }
+      integration_lock_write: {
+        Args: { p_hash: string; p_key: string; p_operation: string }
+        Returns: Json
       }
       integration_record_activity: {
         Args: {
@@ -1687,6 +1703,19 @@ export type Database = {
         Args: { p_action: string; p_grant_id: string; p_source_hash: string }
         Returns: Json
       }
+      oauth_create_pending: {
+        Args: {
+          p_browser_hash: string
+          p_client_id: string
+          p_code_challenge: string
+          p_offline_access: boolean
+          p_redirect_uri: string
+          p_resource: string
+          p_scopes: string[]
+          p_state: string
+        }
+        Returns: string
+      }
       oauth_exchange_authorization_code: {
         Args: {
           p_access_token_hash: string
@@ -1696,6 +1725,15 @@ export type Database = {
           p_redirect_uri: string
           p_refresh_token_hash: string
           p_resource: string
+        }
+        Returns: Json
+      }
+      oauth_finish_pending: {
+        Args: {
+          p_browser_hash: string
+          p_code_hash: string
+          p_id: string
+          p_scopes: string[]
         }
         Returns: Json
       }
@@ -1727,6 +1765,10 @@ export type Database = {
         }[]
       }
       oauth_purge_expired: { Args: never; Returns: Json }
+      oauth_read_pending: {
+        Args: { p_browser_hash: string; p_id: string }
+        Returns: Json
+      }
       oauth_register_client: {
         Args: {
           p_application_type: string

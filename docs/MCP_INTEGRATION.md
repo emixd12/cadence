@@ -1,7 +1,7 @@
 # Cadence MCP server integration brief
 
-Status: local foundations implemented; endpoints and client acceptance remain
-planned. The owner approved the direction on 2026-10-18; Tickets 220–232
+Status: local foundations and OAuth endpoints implemented; consent UI, MCP
+transport and live client acceptance remain planned. The owner approved the direction on 2026-10-18; Tickets 220–232
 implement it. `STATUS.md` holds the current implementation state. Decisions and
 superseded lines are in `docs/DECISIONS.md` ("2026-10-18: Cadence MCP server and
 AI plugins"). The operation contract (tool names, schemas, scopes, error codes,
@@ -10,8 +10,8 @@ follows the template in `docs/INTEGRATION_PLAYBOOK.md`.
 
 Tickets 220, 221, and 223 passed independent wave-1 verification. Ticket 222's
 retry-storage correction awaits independent re-verification. The operation
-contract, persistence, and RLS request context exist locally. OAuth endpoints,
-operation handlers, consent UI, and MCP transport do not exist yet. Sections
+contract, persistence, RLS request context and OAuth endpoints exist locally.
+Consent UI and MCP transport remain separate later tickets. Sections
 below describe the intended full integration; section 11 records proven scope.
 
 ## 1. Outcome and boundary
@@ -276,3 +276,58 @@ rows; do not rewrite earlier rows.
 | Fixture or contract check | Ticket 222 correction: `tests/integration-idempotency.local-integration.test.ts` validates large outputs and exercises real begin/complete/replay RPCs, preserving long notes. A forward migration permits 512 KiB of JSONB text while the wire cap remains 100,000 bytes; rationale in `DATA_MODEL.md`. An isolated clean reset (82 migrations), SQL smoke, and 232 focused contract/repository/RLS tests passed. A 99,948-byte Behavior response occupies 297,181 JSONB text bytes, proving 256 KiB insufficient. Independent correction review remains pending. |
 | Fixture or contract check | The existing `smoke:rls` fixture fails before assertions with “Configuration event plan does not match behavior state.” The verifier reproduced it on base `041546ed573af042cf6a7fb4ed9ce832696ca539`; its creation snapshot omits `location_text`. This correction does not change that fixture. |
 | Deployed behavior | No hosted migration push or deployment is reported for Tickets 220–223. Hosted state was not queried during the correction. Signing-key import, staging, live clients, and deployment acceptance remain owner-gated in Ticket 232. Wave 2 remains on hold pending independent re-verification. |
+
+
+## 12. OAuth implementation (Ticket 226)
+
+`lib/services/oauth/` owns protocol validation, safe CIMD retrieval, consent
+handoff and token verification. Native `.well-known` route segments publish
+RFC 8414 and RFC 9728 metadata. Authorization responses include `iss`; invalid
+client or redirect requests receive a local error and never redirect. All code
+requests require S256 and the exact resource. The issuer comes from trusted
+server configuration, never request headers. See `OPERATIONS.md` for the kill
+switch, exact lifetimes, rate limits, deadlines and deployment prerequisites.
+
+The server accepts `offline_access` as refresh permission alongside the three
+tracking scopes. Pending requests, codes and token families preserve it
+separately; it never grants tracking access and never appears in protected
+resource metadata. Refresh tokens remain available under the server's explicit
+consent policy even when the client omits that optional scope. Token responses
+report the approved tracking scopes and approved `offline_access`.
+
+Public clients may use HTTPS CIMD URLs or RFC 7591 registration. DCR honors
+`application_type`: web redirects require HTTPS; native clients may use HTTP
+localhost/127.0.0.1 with port-agnostic matching. Other redirects match exactly.
+Known identities use exact CIMD URLs or exclusively known callback URLs;
+unknown client names remain unverified. CIMD caches expire within one hour and
+refresh before new authorization. TLS connections pin approved DNS addresses
+and validate every redirect target. No metadata-driven user-data request exists.
+
+`/oauth/authorize` stores a ten-minute pending request and a hash of a browser
+secret. The HttpOnly cookie carries the secret; the consent URL carries only a
+request UUID. Ticket 227 uses `getOAuthConsent(request, id, userClient)` for
+display and `completeOAuthConsent(request, id, scopesOrNull, userClient)` on an
+explicit same-origin Allow/Deny POST. The database atomically consumes the
+request and creates its grant/code under the authenticated user. Scopes can
+only narrow. Render client text as text, identify unverified clients, and show
+the redirect host. Preserve the cookie through the existing Google login flow.
+
+Ticket 228 uses `verifyMcpAccessToken` to resolve a SHA-256 hash, check token
+expiry, exact audience, active grant/family/client and requested scopes. The
+returned `VerifiedIntegrationGrant` feeds `createIntegrationContext`; no
+service-role client enters the tracking operations. SQL throttles last-used
+updates to once per minute. Optional required scopes produce `insufficient_scope`
+without converting a valid-but-under-scoped token into an invalid token.
+
+Web is the only changed runtime. Desktop, marketing and future mobile code are
+not applicable. Consent UI, Settings and MCP tool handling remain outside
+Ticket 226. Local verification is synthetic; it is not hosted deployment or
+Claude/ChatGPT acceptance.
+
+Compatibility source check, 2026-10-18: the [Claude Code CIMD](https://claude.ai/oauth/claude-code-client-metadata)
+omits `application_type` while declaring loopback redirects. Cadence infers native
+only when CIMD omits that field and has a valid loopback URI; an explicit web
+type still forbids HTTP redirects. The [ChatGPT CIMD](https://chatgpt.com/oauth/client.json)
+prefers `private_key_jwt` but lists `none` among supported alternatives. Cadence
+selects that public-client alternative; it does not claim private-key JWT support.
+Focused tests preserve both observed metadata shapes.
