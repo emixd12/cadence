@@ -224,17 +224,35 @@ Inspector, plus a linked desktop that shows an MCP-made change after sync.
 
 ## 8. Release, rollback, and cleanup
 
-- Release dependencies: hosted migration push, signing-key import, Vercel
-  environment variables, deployment, owner-approved Privacy and Terms, OpenAI
-  organization verification and domain challenge, directory submissions, and a
-  reviewer sign-in decision. All are owner-only.
-- Rollback: the kill switch disables `/mcp`, `/oauth/*`, and discovery without a
-  deploy; the incident function revokes every grant; Vercel instant rollback
-  restores the prior deployment; migrations only add a private schema and new
-  objects (disable, then a forward migration removes them if needed); listings
-  can be delisted in each portal.
+- Disabled deployment requires a reviewed maintenance/legal candidate, Node 24
+  verification, exact migration/deployment approval, runtime pairing and a
+  backup/rollback plan. Approve any synthetic session checks separately.
+- Public activation requires approved disclosures/data policy, working retention,
+  logging privacy, signing/Auth/RLS evidence and explicit owner approval for all
+  eligible users to connect. There is no synthetic-account allowlist.
+- Directory publication separately requires publisher verification, reviewer
+  access, domain challenge when requested, listings and submission approval.
+  These are not disabled-deployment prerequisites and do not authorize activation.
+- Legal text and dates belong to `components/settings/LegalContent.tsx`.
+  Approve complete Privacy/Terms text there; verify public routes, Settings
+  consumers and public-content tests. Do not fork text into route wrappers.
+- Rollback starts with `CADENCE_MCP_ENABLED=false`, restart/redeploy and readback
+  of `/mcp`, `/oauth/*` and discovery. Prefer keeping the reviewed disabled
+  candidate, including maintenance and approved disclosures. The older `041546e`
+  build lacks the future purge caller, restores old disclosures and returns 404
+  for absent protocol routes, not the candidate's disabled 503.
+  An older-code fallback requires a separately reviewed recovery build retaining
+  maintenance and approved disclosures, with its own SHA, tests and approval.
+  The incident function revokes all users' grants only with incident authority.
+  Preserve signing-key overlap and shared SQL: migration `20261018180000` changes
+  an existing status function. App rollback cannot undo it; use a reviewed forward
+  migration if necessary. Never reset or automatically restore production.
 - Cleanup (Ticket 232): revoke test grants, delete test data and accounts, and
-  read back the cleanup. Keys, tokens, and provider payloads stay outside git.
+  read back scoped counts. Retain shared/public client registrations. Used DCR
+  and CIMD metadata has no expiry; purge is not its cleanup path. Dedicated
+  test-only registrations need owner-accepted retention or separately approved,
+  ID-bound cleanup proving no grants, pending requests or shared use. Keys,
+  tokens, and provider payloads stay outside git.
 
 ## 9. Owner-only actions
 

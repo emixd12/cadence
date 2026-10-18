@@ -815,9 +815,17 @@ requires approval of the target-specific release packet.
 7. Key state changes are throttled for about 5 minutes. Record the date, `kid`,
    and resulting states in `STATUS.md`, never the key.
 
-Rollback: remove `CADENCE_INTEGRATION_JWT_SIGNING_KEY` to stop integration
-requests. To distrust the key, rotate to another key, then revoke it after
-sessions expire.
+Rollback: set `CADENCE_MCP_ENABLED=false`, restart/redeploy and verify protocol
+and discovery readback. Prefer the reviewed disabled candidate so approved legal
+disclosures and expiry maintenance remain available. Removing
+`CADENCE_INTEGRATION_JWT_SIGNING_KEY` only prevents new internal token minting
+after restart; it does not disable OAuth/discovery or revoke issued tokens.
+Grant-wide revocation needs separate incident authority. Preserve current and
+previous signing-key trust while sessions and caches expire; key rotation and
+revocation require their own approval. App rollback leaves shared status SQL
+from migration `20261018180000` intact; correct it through a reviewed forward
+migration. An older-code recovery build must preserve maintenance/disclosures
+and pass review before use. Never automatically restore backups or reset data.
 
 ### Tables and RPCs reachable with the internal token
 

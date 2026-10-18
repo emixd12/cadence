@@ -418,11 +418,23 @@ The owner selected existing production for Ticket 232 planning on October 18,
 Use the target-specific review packet in the Ticket 232 workspace note before
 any hosted action. No directory submission is authorized by that selection.
 
-1. **Approve release scope.** Approve the legal drafts, effective date, health-data
-   eligibility answer, publisher details, support coverage, and reviewer plan.
-   Reconcile every older no-AI-sharing claim in served legal content before MCP
-   publication. Approve production targets and exact migration/deployment scope.
-2. **Verify OpenAI identity.** In the OpenAI Platform, select the owning
+These are separate approval tracks, not authority inherited from step order.
+Disabled technical deployment requires a reviewed maintenance/legal candidate,
+Node 24 checks, exact migration/deployment authority, runtime pairing and a
+backup/rollback plan. Public activation additionally requires disclosure/data
+policy, retention/logging, signing/Auth/RLS proof and explicit all-user activation
+approval. Directory publisher, reviewer, challenge and submission gates apply
+only to directory publication. User-operated Google test access does not prove
+unattended directory reviewer access.
+
+1. **Approve release scope.** Approve complete Privacy/Terms text and dates in
+   `components/settings/LegalContent.tsx`, including older no-AI-sharing claims.
+   Verify public routes, Settings consumers and public-content tests; route
+   metadata changes only when approved copy requires them. Approve production
+   targets and exact migration/deployment scope separately from public activation.
+   Decide health-data eligibility before activation. Publisher details, support
+   coverage and reviewer access belong to the separate directory track.
+2. **Verify OpenAI identity for directory publication.** In the OpenAI Platform, select the owning
    organization/project. An organization owner uses Organization settings →
    General to complete business verification for Identity Scaffolding LLC, or
    confirms the appropriate verified identity. Give the submitting member Apps
@@ -452,17 +464,18 @@ any hosted action. No directory submission is authorized by that selection.
    Set `CADENCE_INTEGRATION_JWT_SIGNING_KEY`, exact HTTPS
    `CADENCE_OAUTH_ISSUER`, and `CADENCE_MCP_ENABLED=false` initially. Confirm
    existing Supabase URL/publishable/server-only service credentials target the
-   same project. Set `OPENAI_APPS_CHALLENGE` to the exact portal token when
-   available. No `NEXT_PUBLIC_` or `VITE_` prefix on these integration variables.
+   same project. Set `OPENAI_APPS_CHALLENGE` only under separate directory approval
+   when the portal provides it. No `NEXT_PUBLIC_` or `VITE_` prefix on these variables.
    Do not duplicate production secrets into another environment by assumption.
 6. **Deploy and verify.** Deploy the approved SHA to the authorized Production
    environment in existing `cadence` and `cadence-marketing` projects under
    `docs/VERCEL_WORKFLOW.md`. Match web issuer, callback, marketing and app URLs.
    Configure approved expiry maintenance for `oauth_purge_expired` and verify
-   cleanup readback. Disable sensitive request/query/header logging. After
-   migration, key, legal and maintenance checks, set `CADENCE_MCP_ENABLED=true`
-   and restart/redeploy affected instances. Run Ticket 232 live acceptance for
-   Claude, Claude Code and ChatGPT. Promote only with owner authorization.
+   cleanup readback. Approve any changes to sensitive request/query/header logging.
+   Keep the deployment disabled until the separate public-activation gates above
+   pass and the owner explicitly authorizes `CADENCE_MCP_ENABLED=true` plus restart.
+   All eligible users can then connect; there is no synthetic-only activation.
+   Run Ticket 232 acceptance only with named test identities and approved actions.
 7. **Finish the ChatGPT draft.** Open Platform → Plugins, select Upload new or
    existing plugin, choose the verified identity, and upload Ticket 230's reviewed
    ZIP with MCP included. Inspect Metadata & Skills findings. In MCPs → Connect,
@@ -481,10 +494,16 @@ any hosted action. No directory submission is authorized by that selection.
    package. Coordinate that submission with the connector record.
 9. **Record acceptance and rollback.** Save directory draft/listing IDs and URLs,
    approved SHAs, client results, deployment IDs, public link checks and sanitized
-   purge evidence. If acceptance fails, disable MCP and restart instances; revoke
-   affected grants and roll back the app deployment if needed. Leave additive
-   schema intact. Do not revoke the signing key without accounting for ordinary
-   Auth sessions. Delist through each owner portal if already published.
+   purge evidence. If acceptance fails, disable MCP and restart instances; prefer
+   retaining the reviewed candidate's maintenance and approved disclosures.
+   Older `041546e` lacks both; use only a separately reviewed recovery build
+   preserving them. Protocol routes absent in that build return 404, not 503.
+   Revoke grants only with scoped authority. Preserve key overlap and shared SQL;
+   migration `20261018180000` changes an existing status function. Use reviewed
+   forward fixes, never automatic backup restoration. Shared client registrations
+   stay; used DCR/CIMD metadata does not expire. Dedicated test registrations need
+   accepted retention or separately approved ID-bound cleanup proving no grants,
+   pending requests or shared use. Delisting requires separate portal authority.
 
 OpenAI's current [submission guide](https://developers.openai.com/plugins/deploy/submission)
 specifies organization verification, ZIP upload, OAuth/domain verification,
