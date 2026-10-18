@@ -7,6 +7,9 @@ type SettingsPanelProps = Readonly<{
   description?: string;
   children: ReactNode;
   className?: string;
+  /** Level 3 is for a source nested inside the connector library. */
+  headingLevel?: 2 | 3;
+  id?: string;
 }>;
 
 export function SettingsPanel({
@@ -14,14 +17,18 @@ export function SettingsPanel({
   description,
   children,
   className = "",
+  headingLevel = 2,
+  id,
 }: SettingsPanelProps) {
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   return (
     <section
+      id={id}
       className={["bg-background py-4 first:pt-0 last:pb-0", className]
         .filter(Boolean)
         .join(" ")}
     >
-      <h2 className="text-xl leading-tight">{title}</h2>
+      <Heading className={headingLevel === 3 ? "text-lg font-bold leading-tight" : "text-xl leading-tight"}>{title}</Heading>
       {description ? (
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">
           {description}

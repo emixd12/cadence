@@ -55,7 +55,8 @@ export class DesktopCalendarBroker {
     return this.request(`/api/google-calendar/events?${query}`);
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  /** Authenticated hosted-broker request; Ticket 225 connector clients reuse this transport. */
+  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = await this.accessToken();
     if (!token) throw new CalendarBrokerError("unauthenticated", 401);
     let response: Response;

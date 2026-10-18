@@ -1,4 +1,4 @@
-import type { NormalizedExternalEvent } from "../types/day-progress";
+import type { ExternalEventFreshness, NormalizedExternalEvent } from "../types/day-progress";
 import type {
   ExternalEventSchedulingFact,
   ExternalEventSchedulingProjection,
@@ -81,4 +81,21 @@ export function projectExternalEventSchedulingEvent(event: NormalizedExternalEve
     recurrence: event.recurrence,
     revision: event.revision,
   };
+}
+
+const FRESHNESS_WEAKNESS: Readonly<Record<ExternalEventFreshness["state"], number>> = { current: 0, stale: 1, incomplete: 2, unavailable: 3 };
+
+/**
+ * Ticket 225: one freshness for Timeline overlap cues across calendar sources.
+ * No-overlap can be asserted only when every active source can assert it; the
+ * weakest non-current source otherwise speaks for the merged Timeline. Returns
+ * null when no source is active.
+ */
+export function combineExternalEventFreshness(values: readonly ExternalEventFreshness[]): ExternalEventFreshness | null {
+  if (values.length === 0) return null;
+  if (values.length === 1) return values[0]!;
+  const weakest = [...values].sort((left, right) => FRESHNESS_WEAKNESS[right.state] - FRESHNESS_WEAKNESS[left.state])[0]!;
+  if (weakest.state !== "current") return { ...weakest, canAssertNoOverlap: false };
+  const refreshed = values.map((value) => value.refreshedAt).filter((value): value is string => value !== null).sort();
+  return { state: "current", refreshedAt: refreshed[0] ?? null, label: weakest.label, canAssertNoOverlap: values.every((value) => value.canAssertNoOverlap) };
 }

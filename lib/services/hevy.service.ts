@@ -1,8 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
-import { recordedActivitySnapshotScopeKey } from "@cadence/core/services/recorded-activity-validation";
+import { applyRecordedActivityRefresh, type RecordedActivityRefresh } from "@cadence/core/services/recorded-activity-refresh";
 import {
   RECORDED_ACTIVITY_MAX_RANGE_DAYS,
-  type RecordedActivityFailure,
   type RecordedActivitySnapshotV1,
 } from "@cadence/core/types/recorded-activity";
 import {
@@ -93,37 +92,13 @@ export async function getHevyActivities(caller: ConnectorCaller, start: string, 
   });
 }
 
-export type HevyActivityRefresh = Readonly<{
-  snapshot: RecordedActivitySnapshotV1;
-  /** True only when `next` replaced the cached snapshot. */
-  replaced: boolean;
-  /** Failures of the attempted refresh, kept even when the cached snapshot remains. */
-  refreshFailures: RecordedActivityFailure[];
-}>;
-
 /**
- * Cache rule for Ticket 225 consumers. A complete refresh replaces the cached
- * snapshot for the same scope at once, which is how edits and deletions are
- * proved. An incomplete refresh never erases known records. A response from an
- * older connection generation or an earlier fetch than the cached one is late
- * and ignored. A different account, range, or timezone never reuses the cache.
+ * Cache rule for Ticket 225 consumers. The pure implementation lives in
+ * `@cadence/core/services/recorded-activity-refresh` so web and desktop clients
+ * can apply it without importing this server module.
  */
-export function applyHevyActivityRefresh(cached: RecordedActivitySnapshotV1 | null, next: RecordedActivitySnapshotV1): HevyActivityRefresh {
-  if (!cached || cached.accountId !== next.accountId) return { snapshot: next, replaced: true, refreshFailures: next.failures };
-  if (next.connectionGeneration < cached.connectionGeneration) return { snapshot: cached, replaced: false, refreshFailures: next.failures };
-  if (scopeKey(cached) !== scopeKey(next)) return { snapshot: next, replaced: true, refreshFailures: next.failures };
-  if (Temporal.Instant.compare(Temporal.Instant.from(next.fetchedAt), Temporal.Instant.from(cached.fetchedAt)) < 0) {
-    return { snapshot: cached, replaced: false, refreshFailures: next.failures };
-  }
-  if (next.completeness === "complete") return { snapshot: next, replaced: true, refreshFailures: next.failures };
-  return { snapshot: cached, replaced: false, refreshFailures: next.failures };
-}
-
-function scopeKey(snapshot: RecordedActivitySnapshotV1): string {
-  return recordedActivitySnapshotScopeKey({ source: snapshot.source, accountId: snapshot.accountId,
-    connectionGeneration: snapshot.connectionGeneration, startLocalDate: snapshot.requestedRange.startLocalDate,
-    endLocalDate: snapshot.requestedRange.endLocalDate, timezone: snapshot.requestedRange.timezone });
-}
+export type HevyActivityRefresh = RecordedActivityRefresh;
+export const applyHevyActivityRefresh = applyRecordedActivityRefresh;
 
 async function profileTimezone(caller: ConnectorCaller): Promise<string> {
   const { data, error } = await caller.client.from("profiles").select("timezone").eq("id", caller.user.id).single();

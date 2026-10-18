@@ -20,7 +20,7 @@ import {
   PULL_TO_REFRESH_THRESHOLD,
   type PullToRefreshState,
 } from "@/components/timeline/mobile-pull-to-refresh";
-import { reloadWebTimelineConnectors } from "@/lib/ui/google-calendar";
+import { reloadWebTimelineConnectors } from "@/lib/ui/timeline-connector-reloads";
 import {
   hasTimelineScrollableAncestor,
   isTimelineInteractiveTarget,

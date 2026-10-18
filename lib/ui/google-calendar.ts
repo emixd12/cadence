@@ -10,6 +10,7 @@ import type {
   CalendarListEntry,
   CalendarPreferences,
 } from "@/lib/types/google-calendar";
+import { registerTimelineConnectorReload } from "./timeline-connector-reloads";
 
 export type CalendarEventRange = Readonly<{
   startLocalDate: string;
@@ -39,14 +40,10 @@ type PendingEvents = Readonly<{ accountId: string; epoch: number; promise: Promi
 
 const PENDING_EVENTS = new Map<string, PendingEvents>();
 const ACCOUNT_EPOCHS = new Map<string, number>();
-const TIMELINE_RELOADS = new Set<() => Promise<boolean>>();
 const EVENT_REFRESH_MS = 15 * 60_000;
 let activeAccountId: string | null = null;
 
-export async function reloadWebTimelineConnectors(): Promise<boolean> {
-  const results = await Promise.all([...TIMELINE_RELOADS].map((reload) => reload()));
-  return results.every(Boolean);
-}
+export { reloadWebTimelineConnectors } from "./timeline-connector-reloads";
 
 export const webGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
   async getConnection() {
@@ -179,9 +176,7 @@ export function useWebGoogleCalendarTimeline(input: Readonly<{
 
   useEffect(() => {
     if (!input.enabled || !range) return;
-    const reload = () => refresh(true);
-    TIMELINE_RELOADS.add(reload);
-    return () => { TIMELINE_RELOADS.delete(reload); };
+    return registerTimelineConnectorReload(() => refresh(true));
   }, [input.enabled, range, refresh]);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import {
   ACCOUNT_DELETION_INITIAL_STATE,
   type AccountDeletionActionState,
 } from "@/lib/types/account";
+import { CONNECTOR_REVOCATION_COPY } from "@/lib/ui/connectors";
 
 export type DeleteAccountAction = (
   state: AccountDeletionActionState,
@@ -50,6 +51,17 @@ export function AccountDeletionPanel({
             Download a BehaviorLog or full JSON backup from Export before
             deleting the account.
           </p>
+          <div>
+            <p>
+              Deletion also removes Cadence&apos;s saved access for connected
+              sources. Cadence asks Google to revoke Calendar access. Other
+              services keep their permission until you remove it there:
+            </p>
+            <ul className="mt-2 grid list-disc gap-1 pl-5">
+              <li>Outlook Calendar: {CONNECTOR_REVOCATION_COPY.microsoft_account_permissions}</li>
+              <li>Hevy: {CONNECTOR_REVOCATION_COPY.hevy_api_key}</li>
+            </ul>
+          </div>
           <p>
             <a
               href="/export"
