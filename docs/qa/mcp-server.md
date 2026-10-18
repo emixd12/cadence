@@ -186,7 +186,7 @@ local database bound; it does not prove HTTP abort cancels PostgreSQL or that
 production has the same bounds. No new timeout configuration or migration was
 introduced. Production database bounds and route duration remain activation gates.
 
-Node 24 gates passed: agents, interactions, resolvers, core, design-system, lint,
+Earlier PATH-selected gates passed: agents, interactions, resolvers, core, design-system, lint,
 typecheck, tests and web build; marketing build/check, generated developer docs,
 plugin checker and both Claude strict validations. Full suite: 2,803 passed,
 94 skipped, including the three local tests run separately. Existing opt-in
@@ -199,3 +199,38 @@ stopping only `cadence-mcp-232` with `--no-backup`. No matching containers,
 volumes or networks remain. The private proxy, signing key, credential loader,
 config/workdir and provider logs were removed. No browser server ran. Owner and
 sibling databases remained untouched; nonsecret test logs remain in `/tmp`.
+
+
+### Reporting-failure correction and runtime assurance
+
+Review at `e13756d` found that the fallback maintenance logger could throw and
+replace occurrence responses. The route now contains that final reporting
+failure. It still observes maintenance rejection immediately and awaits final
+settlement. The real service/route regressions preserve 200/503/500 bodies,
+Retry-After, original unexpected exceptions, timer cleanup and delayed sync
+without unhandled rejections. A successful purge whose logger fails is not
+retried. The shared monitoring implementation is unchanged.
+
+Eight new tests failed before the correction and passed afterward. The retained
+verifier reproducer changed from three failures to three passes. Focused tests:
+54 passed, including the eight-second real stalled-response transport test.
+Full suite: 2,811 passed, 94 skipped.
+
+These correction runs pin the official Node 24.22.0 executable and npm entrypoint.
+A preload checks the executable's real path and major in Node child processes;
+a temporary Vitest setup hook asserts both inside every executed test file.
+An npm script shell restores the pinned runtime before resolving child commands.
+Earlier logs identified a Node 24 launcher through PATH but did not assert every
+child runtime. The verifier observed bare `npm exec -- node` selecting Node 26;
+such a diagnostic is not accepted as Node 24 evidence. The guarded required
+checks supersede the earlier required-check runtime attribution. The temporary
+test config preserves the repository config except for runtime assertions.
+
+Required agents/interactions/resolvers, lint, typecheck, full tests and web build
+pass on the corrected runtime tree. The unchanged SQL222/232 and three local
+integration results are reused execution evidence from the previous local run,
+not a fresh database verification. No SQL reset was needed: this correction
+changes only final route error containment, tests and related documentation.
+Unchanged core/design/marketing/plugin checks retain their earlier evidence;
+they were not rerun or newly attributed to guarded Node 24. Production bounds,
+legal approval and live-client acceptance remain unverified and separately gated.

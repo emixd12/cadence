@@ -533,6 +533,7 @@ resolver, product-table access, new scheduler or client transport is involved.
 Maintenance is independent of occurrence batch breaker/enablement/profile work;
 the route awaits settlement on every authenticated exit. Tests:
 `tests/oauth-maintenance.service.test.ts`, `tests/oauth-maintenance.transport.test.ts`,
+`tests/oauth-maintenance-monitoring-route.test.ts`,
 `tests/oauth-maintenance.local-integration.test.ts`,
 `tests/oauth-integration.repo.test.ts`, `tests/occurrence-sync-route.test.ts`, and
 `tests/sql/ticket-232-oauth-maintenance-smoke.sql`.

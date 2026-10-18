@@ -1773,6 +1773,9 @@ maintenance runs independently of occurrence work and MCP enablement. The route
 awaits both paths, including breaker-open and early occurrence failures. The
 occurrence breaker still skips occurrence work and returns its existing
 503/Retry-After. Purge failure does not change the occurrence response.
+The route observes rejected maintenance immediately and still awaits settlement.
+Even if both maintenance reporting attempts throw, the occurrence response or
+original exception survives. Missing success events do not advance freshness.
 
 Maintenance propagates an eight-second AbortSignal into the Supabase RPC and
 awaits transport settlement. It clears the timer on every exit, rejects malformed

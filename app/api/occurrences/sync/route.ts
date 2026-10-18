@@ -84,7 +84,11 @@ async function processOccurrenceSyncRequest(request: NextRequest) {
   occurrenceSyncAuthFailureLimiter.reset(rateLimitKey);
 
   const maintenance = runOAuthMaintenance().catch(() => {
-    reportMonitoringEvent({ name: "oauth_maintenance_failed", severity: "error", context: { outcome: "unknown" } });
+    try {
+      reportMonitoringEvent({ name: "oauth_maintenance_failed", severity: "error", context: { outcome: "unknown" } });
+    } catch {
+      // A failed monitoring sink must not replace the occurrence result or error.
+    }
   });
   try {
     return await processAuthenticatedOccurrenceSyncRequest(request);
