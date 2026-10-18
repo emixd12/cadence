@@ -283,10 +283,12 @@
           "parity": "adapted",
           "sources": [
             "apps/marketing/src/layouts/BaseLayout.astro",
-            "apps/marketing/src/data/routes.ts"
+            "apps/marketing/src/data/routes.ts",
+            "apps/marketing/src/layouts/DeveloperLayout.astro",
+            "apps/marketing/src/styles/developers.css"
           ],
           "implementationIds": [],
-          "notes": "Marketing header renders a Cadence-only brand lockup, a compact macOS preview-download button, and a persistent login action. Footer links carry supporting Cadence, BehaviorLog, trust, and legal routes."
+          "notes": "Marketing header renders a Cadence-only brand lockup, a compact macOS preview-download button, and a persistent login action. Footer links carry supporting Cadence, BehaviorLog, trust, and legal routes. DeveloperLayout adds a sticky documentation sidebar, section contents, copyable examples and previous/next links with responsive stacking."
         },
         {
           "surfaceId": "desktop",

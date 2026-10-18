@@ -1477,6 +1477,16 @@
       "id": "INT-OAUTH-005",
       "classification": "browser_only",
       "reason": "Recent activity expands records already loaded in Settings without a separate request."
+    },
+    {
+      "id": "INT-MKT-013",
+      "classification": "not_load_bearing",
+      "reason": "Static marketing navigation and local clipboard operation have no authenticated data mutations."
+    },
+    {
+      "id": "INT-MKT-014",
+      "classification": "not_load_bearing",
+      "reason": "Static marketing navigation and local clipboard operation have no authenticated data mutations."
     }
   ]
 }

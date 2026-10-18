@@ -16,9 +16,11 @@ import { LEGAL_PAGES } from "../components/settings/LegalContent";
 const publicCopy = [
   siteConfig.description,
   ...faqItems.flatMap(({ question, answer }) => [question, answer]),
-  ...marketingRoutes.flatMap(({ description, markdown }) => [
+  ...marketingRoutes.flatMap(({ path, description, markdown }) => [
     description,
-    markdown,
+    // These exact names come from the approved plugin and operation registry.
+    path === "/developers/plugins" ? markdown.replaceAll("Daily check-in", "Daily review")
+      : path === "/developers/tools/list_occurrences" ? markdown.replaceAll("habit check-in", "habit occurrence") : markdown,
   ]),
   JSON.stringify(LEGAL_PAGES),
   ...[

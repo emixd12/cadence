@@ -1,3 +1,4 @@
+import { developerPages } from "./developers";
 import { buildFaqMarkdown } from "./faq";
 import { siteConfig } from "./site";
 import { exportFormats, statusDefinitions } from "./vocabulary";
@@ -22,6 +23,7 @@ export type MarketingRoute = {
   includeInLlms: boolean;
   includeInMarkdownMirror: boolean;
   markdown: string;
+  sourcePath?: string;
 };
 
 export const marketingRoutes = [
@@ -202,6 +204,21 @@ Cadence is the application where a user creates and reviews a Record. BehaviorLo
 - Privacy: ${siteConfig.cadenceAppUrl}/privacy
 `,
   },
+  ...developerPages.map((page): MarketingRoute => ({
+    routeId: `developers/${page.slug || "overview"}`,
+    path: page.slug ? `/developers/${page.slug}` : "/developers",
+    markdownPath: page.slug ? `/developers/${page.slug}.md` : "/developers.md",
+    type: "documentation",
+    title: page.title,
+    navLabel: page.title,
+    description: page.description,
+    lastModified: "2026-10-18",
+    includeInSitemap: true,
+    includeInLlms: true,
+    includeInMarkdownMirror: true,
+    markdown: page.markdown,
+    sourcePath: page.slug.startsWith("tools/") ? "src/data/developer-reference.json" : "src/data/developers.ts",
+  })),
 ] as const satisfies MarketingRoute[];
 
 export type MarketingRouteId = (typeof marketingRoutes)[number]["routeId"];
@@ -236,7 +253,7 @@ export function getRouteManifest() {
     include_in_llms: route.includeInLlms,
     include_in_feed: false,
     include_in_markdown_mirror: route.includeInMarkdownMirror,
-    source_path: `src/pages${route.path === "/" ? "/index" : route.path}.astro`,
+    source_path: (route as MarketingRoute).sourcePath ?? `src/pages${route.path === "/" ? "/index" : route.path}.astro`,
   }));
 }
 
@@ -248,7 +265,7 @@ export function markdownWithFrontmatter(route: MarketingRoute): string {
     `canonical_url: ${getCanonicalUrl(route.path)}`,
     `last_updated: ${route.lastModified}`,
     "status: stable",
-    `source: src/pages${route.path === "/" ? "/index" : route.path}.astro`,
+    `source: ${route.sourcePath ?? `src/pages${route.path === "/" ? "/index" : route.path}.astro`}`,
     "---",
     "",
     route.markdown.trim(),

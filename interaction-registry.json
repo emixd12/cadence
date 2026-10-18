@@ -35,7 +35,8 @@
         "/docs",
         "/examples",
         "/about",
-        "/cadent"
+        "/cadent",
+        "/developers"
       ]
     },
     {
@@ -372,7 +373,7 @@
     {
       "path": "apps/marketing/src/layouts/BaseLayout.astro",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-MKT-001",
         "INT-MKT-002",
@@ -842,10 +843,11 @@
     {
       "path": "components/settings/ConnectedAppsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 5,
       "interaction_ids": [
         "INT-OAUTH-004",
-        "INT-OAUTH-005"
+        "INT-OAUTH-005",
+        "INT-MKT-013"
       ]
     },
     {
@@ -854,6 +856,15 @@
       "interaction_marker_count": 1,
       "interaction_ids": [
         "INT-OAUTH-004"
+      ]
+    },
+    {
+      "path": "apps/marketing/src/layouts/DeveloperLayout.astro",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-MKT-013",
+        "INT-MKT-014"
       ]
     }
   ],
@@ -1908,7 +1919,8 @@
         "/trust",
         "/api/public/trust-evidence",
         "/privacy",
-        "/terms"
+        "/terms",
+        "/developers"
       ],
       "journeys": [
         "J01",
@@ -1962,6 +1974,11 @@
           "id": "terms",
           "label": "Terms",
           "result": "Open the deployed /terms page."
+        },
+        {
+          "id": "developers",
+          "label": "Developers",
+          "result": "Open developer documentation."
         }
       ],
       "availability": "Available in the marketing footer.",
@@ -13287,6 +13304,160 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-MKT-013",
+      "name": "Read developer documentation",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#developer-documentation"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "marketing",
+        "settings"
+      ],
+      "routes": [
+        "/developers",
+        "/developers/:path*",
+        "/settings"
+      ],
+      "journeys": [
+        "J01"
+      ],
+      "intent": "Open developer guides, tool reference pages, page contents, adjacent pages, or Markdown mirrors.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Developer documentation links"
+        }
+      ],
+      "availability": "Public documentation is open to everyone. The Settings link appears in the signed-in web Connected apps panel.",
+      "success_result": "Opens the selected documentation destination.",
+      "failure_result": "Normal navigation failure applies.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/marketing/src/layouts/DeveloperLayout.astro",
+        "components/settings/ConnectedAppsPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/developer-docs.test.ts"
+        ],
+        "notes": "Contract examples and route coverage checked automatically; navigation and code-copy success feedback verified in browser. Clipboard byte readback and denied-permission simulation were not verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "marketing": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/marketing/src/layouts/DeveloperLayout.astro"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        }
+      }
+    },
+    {
+      "id": "INT-MKT-014",
+      "name": "Copy developer code example",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#developer-documentation"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "marketing"
+      ],
+      "routes": [
+        "/developers",
+        "/developers/:path*"
+      ],
+      "journeys": [
+        "J01"
+      ],
+      "intent": "Copy an example from the developer documentation to the clipboard.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Copy code"
+        }
+      ],
+      "availability": "Available on public developer documentation pages.",
+      "success_result": "Copies the code and announces success.",
+      "failure_result": "Announces copy failure and focuses the code for manual copying.",
+      "effects": [
+        "clipboard"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/marketing/src/layouts/DeveloperLayout.astro"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/developer-docs.test.ts"
+        ],
+        "notes": "Contract examples and route coverage checked automatically; navigation and code-copy success feedback verified in browser. Clipboard byte readback and denied-permission simulation were not verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "marketing": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/marketing/src/layouts/DeveloperLayout.astro"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
         }
       }
     }

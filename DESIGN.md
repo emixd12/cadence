@@ -678,3 +678,7 @@ modal, or navigation item is added.
 timezone dates, app-named Disconnect buttons, and a closed native Recent activity
 disclosure. Loading failures, empty grants, pending actions, and action results
 have separate text. Controls preserve 44px targets and semantic live feedback.
+
+## Developer documentation (Ticket 229)
+
+The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.

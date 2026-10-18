@@ -13303,7 +13303,7 @@ Scope and acceptance:
 
 ## Ticket 229: Developer documentation
 
-Status: filed October 18, 2026; planned (wave 4).
+Status: implemented locally October 18, 2026 (wave 4); awaiting independent review.
 Dependencies: 221, 228.
 
 Goal: public developer docs for every feature of the Cadence MCP server.
@@ -13323,10 +13323,10 @@ Scope and acceptance:
 
 | Platform | Impact |
 |---|---|
-| Web | Links to the docs only. |
-| Desktop | Not applicable. |
-| Marketing | New `/developers` section. |
-| Future mobile | Not applicable. |
+| Web | `components/settings/ConnectedAppsPanel.tsx` links to the docs. |
+| Desktop | Not applicable: public documentation adds no desktop interface or data access. |
+| Marketing | `apps/marketing/src/layouts/DeveloperLayout.astro` and the route manifest provide `/developers`; catalog and interactions updated. |
+| Future mobile | Not applicable: native mobile remains deferred. |
 
 ## Ticket 230: Claude and ChatGPT plugin packages
 

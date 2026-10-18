@@ -12,6 +12,7 @@ export function ConnectedAppsPanel({ view, timezone, action }: { view: Connected
     <SettingsPanel id="connected-apps" title="Connected apps" className="scroll-mt-20">
       <div className="grid min-w-0 gap-4">
         <p className="text-sm leading-6 text-muted-readable">AI clients with access to this Cadence account. Disconnect stops their access immediately.</p>
+        <a href="https://cadence-me.com/developers" className="product-action min-h-11 w-fit py-2">Developer documentation</a>
         {view.error ? <p role="alert" className="text-sm text-accent">{view.error}</p> : <>
           {view.grants.length === 0 ? <p className="text-sm leading-6 text-muted-readable">No apps connected. Start a connection from an AI client to review its permissions here.</p> : (
             <ul className="grid min-w-0 divide-y divide-line">
