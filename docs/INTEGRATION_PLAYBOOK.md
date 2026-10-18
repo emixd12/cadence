@@ -420,6 +420,7 @@ Each row is **documented support** from a public source read on October 18,
 | Event `id` changes on a move unless `Prefer: IdType="ImmutableId"` is sent. Events expose `isAllDay`, `isCancelled`, `showAs`, `type`, `seriesMasterId`, `originalStart`, `originalStartTimeZone`, `responseStatus`, `changeKey`, and `webLink`. | [Event resource](https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0), updated 2026-04-20 |
 | `sub` is an immutable per-application identifier. `tid` is the tenant; personal accounts use `9188040d-6c67-4c5b-b112-36a304b66dad`. `oid` requires the `profile` scope. Email and `preferred_username` are mutable and must not authorize. | [ID token claims](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference), updated 2026-06-15 |
 | Authority segments are `common`, `organizations`, `consumers`, or a tenant. PKCE is recommended for confidential clients. Refresh tokens need `offline_access`, have no fixed web lifetime, and may be replaced on redemption. | [Authorization code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow), updated 2026-06-15 |
+| `dateTimeTimeZone.timeZone` accepts Windows zones plus a listed IANA subset. `America/New_York` is listed; `America/Toronto` and `Europe/Madrid` are not. | [dateTimeTimeZone](https://learn.microsoft.com/en-us/graph/api/resources/datetimetimezone), updated 2025-02-11 |
 | Outlook allows 10,000 requests per 10 minutes and four concurrent requests per app and mailbox. | [Throttling limits](https://learn.microsoft.com/en-us/graph/throttling-limits), updated 2026-09-17 |
 | With risk-based step-up consent, users cannot consent to most newer multitenant apps from unverified publishers. Verification needs a verified Microsoft AI Cloud Partner Program account and a non-`onmicrosoft.com` publisher domain. | [Publisher verification](https://learn.microsoft.com/en-us/entra/identity-platform/publisher-verification-overview), updated 2026-06-15 |
 | Apple lets users authorize "supported" third-party apps for iCloud Mail, Calendar, and Contacts and revoke them under Account Data Sharing. It names no eligibility, registration, protocol, scopes, or token lifetime. | [Apple Support 121539](https://support.apple.com/en-us/121539), published 2025-10-07 |
@@ -428,16 +429,18 @@ Each row is **documented support** from a public source read on October 18,
 
 Research gaps, all **not verified**:
 
-- No Apple developer documentation for the Apple Account authorization flow was
-  found. Its eligibility and protocol remain unknown.
+- No public Apple developer documentation for the Apple Account authorization
+  flow was found on 2026-10-18. Its eligibility and protocol remain unknown.
 - Apple publishes no iCloud CalDAV host in a primary source that was found.
   `caldav.icloud.com` appears only in third-party guides.
-- Apple does not document whether an app-specific password is limited to one
-  service. Cadence treats it as an account credential for Mail, Contacts, and
-  Calendar.
-- No Microsoft primary source documents an API that lets a web app revoke its
-  own delegated grant. Third-party guides point users to Microsoft account
-  consent pages.
+- Apple does not limit an app-specific password to Calendar. Apple 102654 says
+  the app "can access information like mail, contacts, and calendars that you
+  store in iCloud". Cadence treats it as reaching at least iCloud Mail,
+  Contacts, and Calendar.
+- No Microsoft primary source found documents an API that lets a web app revoke
+  its own delegated grant within the requested delegated scopes. Deleting an
+  `oauth2PermissionGrant` needs higher, admin-consented permission (not
+  re-fetched). Third-party guides point users to Microsoft account consent pages.
 - Hevy documents no key revocation operation, ordering for workout lists, or
   rate limits.
 
@@ -449,10 +452,11 @@ Research gaps, all **not verified**:
 | Connect | The user pastes a Hevy API key into Settings on web or linked desktop. The hosted service validates it with `user/info`, rejects `is_pro = false` as `permission_denied`, seals it, and returns only connection state. The key is never echoed, logged, or stored on desktop. |
 | Allowed calls | Exactly `GET /v1/user/info`, `GET /v1/workouts/count`, and `GET /v1/workouts`. A fixed method/path allowlist and tests reject every other call. Cadence enforces read-only behavior because Hevy has no read-only key. |
 | Range | Today and up to 30 prior local dates in the profile timezone. |
-| Pagination | `pageSize=10`, pages 1 through `page_count`. Ceiling: 50 pages (500 workouts). Because ordering is undocumented, `complete` requires reading every page. An account with more than 500 workouts returns `incomplete_pagination`. An early-stop rule requires documented ordering or recorded live evidence and a contract revision. |
+| Pagination | Call `GET /v1/workouts/count` first. Above 500 workouts, return `incomplete_pagination` without reading pages. Otherwise read `pageSize=10`, pages 1 through `page_count`, at most 50 pages, sequentially. Remove duplicate IDs, keeping the latest `updated_at`. Call `count` again after the last page. The read is `complete` only if every page was read, the count and `page_count` match before and after, and the 25-second deadline held. This 50-page ceiling applies only to the activity contract; the 20-page calendar bound is unchanged. An early-stop rule requires documented ordering or recorded live evidence and a contract revision. |
+| Residual limits | Offset pages with undocumented ordering mean a workout created or deleted during the read can shift pages and be skipped. Equal before/after counts do not exclude a creation plus a deletion. `complete` therefore means no change was detected, not an atomic snapshot. Fifty-two sequential calls may not fit the deadline on slow responses; that returns `timeout`. Accounts with more than 500 workouts always read as incomplete. Ticket 228 discloses the 500-workout limit. |
 | Fields | Workout ID, start, end, derived duration, and update revision. Everything else is discarded in the adapter. |
 | Missing values | Location and source timezone are `unsupported`. An invalid or reversed interval quarantines the item and makes coverage incomplete. |
-| Failures | 401/403 → `reconnect_required`; 404 user → `reconnect_required`; 429 if returned → `rate_limited`; 5xx and timeouts retry within the shared budget. Schema drift → `malformed_provider_response`. |
+| Failures | 401/403 → `reconnect_required`; 404 user → `reconnect_required`; 429 if returned → `rate_limited`; 503 and other 5xx → `provider_unavailable`; deadline exhaustion → `timeout`. Retries follow the shared deadline rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Schema drift → `malformed_provider_response`. |
 | Refresh | Manual and existing foreground refresh only. No polling. |
 | Disconnect | Delete the sealed key and caches. Hevy documents no revocation call. Settings tells the user to remove or regenerate the key in Hevy's developer settings. |
 | Account deletion | The confirmation screen gives the same Hevy key instruction before deletion. Deletion removes the sealed key with the account. |
@@ -469,9 +473,9 @@ Research gaps, all **not verified**:
 | Identity | Validated ID token `tid` plus `sub` (pairwise for Cadence's client ID). Reconnect must return the same pair or the callback fails as `wrong_account`. Email never identifies. |
 | Connect | Five-minute one-use state, PKCE `S256`, nonce, issuer validation per tenant, and exact granted-scope validation. Refresh-token rotation replaces the sealed credential atomically. |
 | Calendars | `GET /me/calendars`, paged by `@odata.nextLink`, at most 20 pages. |
-| Events | `GET /me/calendars/{id}/calendarView` with offset-bearing bounds, `$top=1000`, `Prefer: IdType="ImmutableId"`, and the timezone rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Calendars are read sequentially to stay under four concurrent requests. |
+| Events | `GET /me/calendars/{id}/calendarView` with offset-bearing bounds widened by one day on each side, `$top=1000`, `Prefer: IdType="ImmutableId"`, no `Prefer: outlook.timezone`, and the event-zone all-day rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Windows zone names map only through a pinned CLDR `windowsZones.xml` release. Calendars are read sequentially to stay under four concurrent requests. |
 | Missing values | Location, attendees, organizer, online meeting, and body are `unsupported` by scope or policy. Event state is `unknown` unless cancelled. |
-| Failures | `invalid_grant` or `interaction_required` → `reconnect_required`; 403 → `permission_denied`; 429/503 honor `Retry-After` within the budget. |
+| Failures | `invalid_grant` or `interaction_required` → `reconnect_required`; 403 → `permission_denied`; 429 → `rate_limited`; 503 → `provider_unavailable`. `Retry-After` is honored only when it fits the remaining deadline; otherwise the read stops with `retryAfterSeconds`. |
 | Disconnect | Delete the sealed refresh credential and caches. No documented app-side revocation call was found. Settings links users to Microsoft account or My Apps permission pages to remove Cadence. |
 | Account deletion | Same as disconnect after Auth deletion. No external revocation call. |
 | Model disclosure | Separate default-off Outlook disclosure using the Calendar consumer projection. |
@@ -482,13 +486,13 @@ Research gaps, all **not verified**:
 
 The user confirmed iCloud on web and desktop on October 18, 2026. A hosted
 server-side connector is the only path that reaches both surfaces. Apple's
-"supported app" authorization has no public developer documentation, so Cadence
-cannot implement it. The only path with Apple-documented user steps is an
-app-specific password used for CalDAV.
+"supported app" authorization had no public developer documentation that could
+be found on 2026-10-18, so Cadence does not pursue that path. The only path with
+Apple-documented user steps is an app-specific password used for CalDAV.
 
 | Item | Decision |
 |---|---|
-| Credential | Apple Account email plus a user-generated app-specific password, entered in Settings on web or linked desktop and sent once over HTTPS to the hosted service. The service seals both values. Desktop never stores them. The UI says this credential can reach iCloud Mail, Contacts, and Calendar, that Cadence reads only Calendar, and how to revoke it. |
+| Credential | Apple Account email plus a user-generated app-specific password, entered in Settings on web or linked desktop and sent once over HTTPS to the hosted service. The service seals both values. Desktop never stores them. The UI says Apple does not limit the password to Calendar and that it can reach at least iCloud Mail, Contacts, and Calendar, that Cadence reads only Calendar, and how to revoke it. |
 | Endpoint | `https://caldav.icloud.com` from third-party evidence only. Redirects are followed only to HTTPS hosts under `icloud.com`, at most three hops. |
 | Discovery | `PROPFIND` depth 0 for `DAV:current-user-principal`; `PROPFIND` on the principal for `CALDAV:calendar-home-set`; `PROPFIND` depth 1 on the home for `DAV:resourcetype`, `DAV:displayname`, `CALDAV:supported-calendar-component-set`, `CALDAV:calendar-timezone`, and `DAV:getetag`. Only collections supporting `VEVENT` are listed. |
 | Identity | The `current-user-principal` href binds the connection. Reconnect with a different principal requires disconnect first. The email is a login value, not an identity key. |
@@ -496,19 +500,20 @@ app-specific password used for CalDAV.
 | Allowed methods | Only `PROPFIND` and `REPORT`. A method allowlist and tests reject `PUT`, `DELETE`, `MKCALENDAR`, `PROPPATCH`, `MOVE`, `COPY`, and `POST`. |
 | Bounds | 32 calendars, 31 days, 5 MB per response, and the shared retry budget. |
 | Missing values | Follow the iCloud mapping in `docs/EXTERNAL_EVENT_CONTRACT.md`. Unexpanded recurrence makes that calendar incomplete. |
-| Failures | 401 → `reconnect_required`; 403 → `permission_denied`; 429/503 → `rate_limited` or `provider_unavailable` with `Retry-After`; malformed XML → `malformed_provider_response`; 507 or truncation → `incomplete_pagination`. |
-| Disconnect | Delete the sealed credential and caches. No revocation API exists for this path. Settings tells the user to remove the app-specific password at account.apple.com under Sign-In and Security. |
+| Failures | 401 → `reconnect_required`; 403 → `permission_denied`; 429 → `rate_limited`; 503 → `provider_unavailable`; `Retry-After` follows the shared deadline rule; malformed XML → `malformed_provider_response`; 507 or truncation → `incomplete_pagination`. |
+| Disconnect | Delete the sealed credential and caches. Apple documents no programmatic revocation. Settings tells the user to remove the password at account.apple.com under Sign-In and Security → App-Specific Passwords, using Remove or Revoke All. |
 | Account deletion | The confirmation screen gives the same instruction before deletion. |
 | Model disclosure | Separate default-off iCloud disclosure using the Calendar consumer projection. |
 | Files | `lib/services/icloud-calendar-provider.ts`, `lib/services/icloud-calendar.service.ts`, `lib/services/icloud-calendar-request.ts`, `lib/db/icloud-calendar.repo.ts`, `app/api/icloud-calendar/{connection,calendars,events}/route.ts`, and `apps/desktop/src/calendar/icloud-calendar.ts`. |
-| Tests | `tests/icloud-calendar-provider.test.ts` with synthetic multistatus fixtures under `tests/fixtures/icloud-calendar/` covering discovery, timed, all-day, floating, `DURATION`, unspecified end, expanded and unexpanded recurrence, cancelled instances, `TRANSP`, 401, 403, 429 with `Retry-After`, 507, oversize, malformed XML, off-domain redirects, and the method allowlist. Lifecycle tests cover sealing, wrong principal, disconnect, account deletion, and export exclusion. |
+| Tests | `tests/icloud-calendar-provider.test.ts` with synthetic multistatus fixtures under `tests/fixtures/icloud-calendar/` covering discovery, timed, all-day, floating, `DURATION`, unspecified end, expanded and unexpanded recurrence, cancelled instances, `TRANSP`, 401, 403, 429 with fitting and non-fitting `Retry-After`, 503, deadline exhaustion, 507, oversize, malformed XML, off-domain redirects, and the method allowlist. Lifecycle tests cover sealing, wrong principal, disconnect, account deletion, and export exclusion. |
 | Live-access gate | An owner-authorized Apple Account with two-factor authentication and an app-specific password. Not available in this wave. |
 | Public-approval gate | None for the app-specific-password path. Apple "supported app" eligibility is unknown and not pursued. |
 
-Decision before Ticket 227 starts: the owner must accept hosted custody of an
-app-specific password, which Apple does not document as Calendar-only. Until
-then, only the fixture-backed provider adapter and mapping may proceed. Credential
-intake, storage, and any live read wait for that decision.
+Local source work for Ticket 227 is approved and proceeds now: the intake route,
+sealing, schema, provider adapter, and tests with synthetic credentials. Owner
+acceptance of hosted app-specific-password custody is a product decision required
+before any real Apple credential is used and before user release. Deployment and
+live reads remain unauthorized.
 
 ### Later coverage, not implemented
 

@@ -564,8 +564,11 @@ only after its own default-off disclosure; the existing Calendar disclosure stay
 Google-only.
 
 iCloud uses a user-generated app-specific password over CalDAV. Apple does not
-document that password as Calendar-only, so credential intake waits for the owner
-decision recorded under Ticket 227. Local Mac calendars and EventKit stay out of
+limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
+Calendar. Local implementation with synthetic credentials is approved. Real
+Apple credentials and user release wait for the owner custody decision recorded
+under Ticket 227. Hevy reads stop at 500 workouts and report no detected change,
+not an atomic snapshot. Local Mac calendars and EventKit stay out of
 scope. Generic CalDAV providers and subscription feeds are later coverage. Live
 provider access, Microsoft publisher verification, and deployment remain separate
 gates. Briefs and research: `docs/INTEGRATION_PLAYBOOK.md`.

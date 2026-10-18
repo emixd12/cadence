@@ -17,10 +17,18 @@ before review.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.
-- Decision needed before Ticket 227 credential intake: the owner must accept
-  hosted custody of an iCloud app-specific password, which Apple does not
-  document as Calendar-only. Apple's "supported app" authorization has no public
-  developer documentation.
+- Ticket 220 correction pass (verifier findings 1–5): Outlook all-day dates use
+  the event's own zone; provider reads have 25-second deadlines and bounded
+  `Retry-After`; Hevy reads use a count preflight, duplicate removal, and
+  before/after checks without claiming an atomic snapshot; Apple claims are
+  qualified; the iCloud local-work gate is removed.
+- Product decision before real iCloud use and user release: the owner must
+  accept hosted custody of an app-specific password. Apple does not limit it to
+  Calendar. No public Apple developer documentation for "supported app"
+  authorization was found on 2026-10-18. Ticket 227 local source work with
+  synthetic credentials is approved.
+- Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds
+  without a request deadline. Its runtime is unchanged in this expansion.
 - Live-access gates: Hevy Pro key, Microsoft app registration and test tenants,
   and an Apple Account app-specific password. Public-approval gate: Microsoft
   publisher verification. None blocks source or fixture work.

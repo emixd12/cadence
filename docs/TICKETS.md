@@ -13209,11 +13209,16 @@ connector framework, background polling, new primary route, or mobile app.
 | 224 | Outlook Calendar connector | 222 |
 | 225 | Connector library and Timeline on web and desktop | 223, 224; 227 when ready |
 | 226 | Separately approved connector context in Daily Brief | 225 |
-| 227 | iCloud Calendar connector | 222; owner custody decision below |
+| 227 | iCloud Calendar connector | 222 |
 | 228 | Verification and disclosure reconciliation | 221–227 |
 
 Tickets 223 and 224 may run in parallel in separate provider files. Shared schema,
 registry, Settings, Timeline, and briefing files are edited serially.
+
+Shared read deadlines: 25 seconds per interactive provider read, capped by Daily
+Brief's remaining budget; `Retry-After` is honored only when it fits. 429 maps to
+`rate_limited` and 503 to `provider_unavailable`. The existing Google adapter's
+300-second `Retry-After` cap stays unchanged here and is a recorded follow-up.
 
 Release gates stay separate. **Live access** means an owner-authorized provider
 account or configuration exists for a bounded test. **Public approval** means a
@@ -13328,11 +13333,15 @@ Status: not started.
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
 
 Acceptance: follow the Hevy brief exactly. Only the three allowlisted `GET` calls
-are possible. The API key is sealed server-side. Pagination reads every page up to
-50 pages and otherwise reports `incomplete_pagination`. The adapter discards all
+are possible. The API key is sealed server-side. A count preflight returns
+`incomplete_pagination` above 500 workouts without reading pages. Otherwise it
+reads at most 50 pages, removes duplicate IDs, and re-checks count and
+`page_count` after the read under a 25-second deadline. `complete` means no change
+was detected, not an atomic snapshot. The adapter discards all
 exercise, title, routine, and note data. Location stays unsupported. Fixtures
 cover non-Pro, revoked key, empty, populated, reversed interval, schema drift,
-over-ceiling, and retry exhaustion. No live Hevy account is used without owner
+over-ceiling without page reads, duplicates across pages, count change during the
+read, deadline exhaustion, and retry exhaustion. No live Hevy account is used without owner
 authorization.
 
 Platform impact:
@@ -13355,7 +13364,9 @@ Acceptance: follow the Outlook brief exactly. Scopes are `openid offline_access
 Calendars.ReadBasic`. Identity is `tid` plus `sub`. Reads use `calendarView`
 with immutable IDs and bounded paging. Fixtures cover personal and work/school
 tokens, wrong account, consent denial, cancelled and recurring instances,
-all-day timezone handling, throttling, and partial pages. Live tenant access and
+all-day dates in the event's own zone (including a Pacific all-day event read by
+a New York profile), unresolved and custom zones, pinned CLDR Windows-zone
+mapping, 429 versus 503, `Retry-After` beyond the deadline, and partial pages. Live tenant access and
 publisher verification remain separate gates.
 
 Platform impact:
@@ -13404,7 +13415,11 @@ Acceptance: add default-off Outlook, iCloud, and Hevy disclosure preferences.
 keys treated as off. Each enablement changes the disclosure revision. Model input
 uses only the documented projections. Disconnect, disablement, account change,
 and generation change fence pending delivery. Missing or partial coverage never
-proves free time or workout absence.
+proves free time or workout absence. Settings `PUT` accepts exactly the existing
+two- and four-key sets plus the four keys with the three new source keys; an
+older two- or four-key `PUT` turns the new disclosures off, following
+`updateDailyBriefSettings`. `AdvisorDayContext` moves to version `1.1` for new
+connector kinds and keeps accepting `1.0` Google-only records.
 
 Platform impact:
 
@@ -13417,16 +13432,21 @@ Platform impact:
 
 ## Ticket 227: iCloud Calendar connector
 
-Status: not started. Credential intake waits for the owner custody decision.
+Status: not started.
 
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
 
-Decision needed: Apple documents no developer path for its "supported app"
-authorization. The implementable path stores an Apple Account email and a
-user-generated app-specific password, sealed server-side. Apple does not document
-that password as Calendar-only. The owner must accept that custody before
-credential intake, storage, or live reads. Fixture-only adapter work may proceed.
+No public Apple developer documentation for its "supported app" authorization
+was found on 2026-10-18, so Cadence does not pursue that path. The implementable
+path stores an Apple Account email and a user-generated app-specific password,
+sealed server-side. Apple does not limit that password to Calendar; it can reach
+at least iCloud Mail, Contacts, and Calendar. Local source work proceeds now:
+intake route, sealing, schema, adapter, and tests with synthetic credentials.
+
+Product decision before real use: the owner must accept hosted custody of that
+password before any real Apple credential is used and before user release.
+Deployment and live reads remain unauthorized.
 
 Acceptance: follow the iCloud brief exactly, including the pinned operations,
 `PROPFIND`/`REPORT` allowlist, bounds, file paths, and tests. Disconnect and
@@ -13450,7 +13470,8 @@ Goal: independently verify 221–227 and align public and in-app disclosures.
 
 Acceptance: re-run all required checks and the acceptance matrix in the
 integration playbook. Update Privacy, FAQ, user guide, and marketing provider
-claims with verified availability only. Record source, fixture, live-provider,
+claims with verified availability only. Disclose the 500-workout Hevy read limit
+and that a Hevy read reports no detected change rather than an atomic snapshot. Record source, fixture, live-provider,
 installed-native, deployed, and public-approval evidence separately in
 `STATUS.md`. Live and approval gaps stay explicit.
 

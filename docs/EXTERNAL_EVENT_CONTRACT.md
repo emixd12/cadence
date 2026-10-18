@@ -330,8 +330,11 @@ revisions. Ticket 221 owns the shared type change.
 | Validator | Accepts `1.0.0` only with Google literals and `1.1.0` only with Outlook or iCloud literals. Every other version fails as `unsupported_schema_version`. |
 | Cache identity | Every cache or stored snapshot key includes source, account ID, connection generation, selected calendar IDs, and requested range. A snapshot from one source can never satisfy or clear another source's cache. |
 | Range | Same as Google: today through at most today + 30, inclusive, in the profile timezone. Provider end bound is the next local midnight after the inclusive end date. |
-| Bounds | At most 32 selected calendars per source and 20 pages per calendar where the provider paginates. At most two retries per request, with capped backoff and a bounded `Retry-After` of up to five minutes. |
+| Bounds | At most 32 selected calendars per source and 20 pages per calendar where the provider paginates. This 20-page calendar bound is unchanged by the 50-page recorded-activity ceiling below. |
+| Deadlines and retries | Every provider read receives one absolute deadline: 25 seconds for an interactive Settings or Timeline request. Daily Brief passes the smaller of 25 seconds and its remaining 60-second budget minus a 10-second reserve for generation. Each HTTP attempt times out at 10 seconds or the remaining time, whichever is less. At most two retries per request. Without `Retry-After`, backoff is capped exponential with jitter, at most 5 seconds. A numeric `Retry-After` is honored only when the wait plus one second still fits before the deadline. Otherwise the read stops at once with a typed failure carrying `retryAfterSeconds`. Deadline exhaustion returns `timeout` with an incomplete result. |
+| Status mapping | 429 → `rate_limited`. 503 → `provider_unavailable`. Both are retryable only under the deadline rule above. Other 5xx responses → `provider_unavailable`. |
 | Failures | Reuse the stable read error codes above. Do not add provider-specific codes. |
+| Google follow-up | The existing Google adapter caps `Retry-After` at 300 seconds (`retryAfterSeconds` in `lib/services/google-calendar-provider.ts`) and does not check a request deadline. Its runtime stays unchanged in this expansion. Aligning it with the deadline rule is a separate follow-up recorded in `STATUS.md`. |
 | Writes | None. Provider adapters expose no create, update, delete, respond, or move operation. |
 
 Outlook mapping (Ticket 224) uses Microsoft Graph `calendarView`:
@@ -339,9 +342,11 @@ Outlook mapping (Ticket 224) uses Microsoft Graph `calendarView`:
 | Normalized fact | Graph source and rule |
 |---|---|
 | Identity | Calendar `id`, event `id` requested with `Prefer: IdType="ImmutableId"`, `seriesMasterId`, and `originalStart` for instance identity. `iCalUId` is never the sole deduplication key. |
-| Timed interval | `start` and `end` (`dateTimeTimeZone`), normalized to UTC instants with the returned `timeZone`. Query bounds carry explicit offsets because Graph interprets `startDateTime`/`endDateTime` by their offset, or as UTC without one. |
-| All-day span | `isAllDay = true`. Graph documents all-day bounds as midnight in one timezone and returns UTC unless `Prefer: outlook.timezone` is sent. The adapter sends the profile timezone in that header, reads all-day dates from the returned values, and quarantines values that are not midnight. Graph's acceptance of each IANA profile timezone in that header is not verified; Ticket 224 fixtures and the live gate must prove the chosen form or a mapped Windows name. |
-| Source timezone | `originalStartTimeZone` when it maps to IANA; otherwise request fallback with `sourceTimezoneFallback` recorded. `tzone://Microsoft/Custom` is a fallback. |
+| Request | No `Prefer: outlook.timezone` header, so Graph returns UTC, its default. Query bounds carry explicit offsets because Graph interprets `startDateTime`/`endDateTime` by their offset, or as UTC without one. The provider query widens the requested window by one day on each side so all-day events in distant zones are returned; the adapter then filters timed events by instant overlap with the requested local days and all-day events by date overlap. Widening does not change the 31-day request bound or the page bounds. |
+| Timed interval | `start` and `end` (`dateTimeTimeZone`, UTC), normalized to instants. |
+| Event zone | Resolve `originalStartTimeZone` to IANA. A value Temporal accepts as IANA is used directly. A Windows name maps only through the `windowsZones.xml` table of a pinned Unicode CLDR release, recorded with its version in the adapter and covered by fixtures. Ad hoc mappings are forbidden. `tzone://Microsoft/Custom`, an unmapped name, or a missing value is unresolved. Graph documents Windows zones plus a listed IANA subset in [dateTimeTimeZone](https://learn.microsoft.com/en-us/graph/api/resources/datetimetimezone) (updated 2025-02-11). |
+| All-day span | `isAllDay = true`. Graph's event resource says all-day start and end are midnight in one timezone: the event's own zone. The adapter converts the UTC start/end into the resolved event zone and uses those calendar dates. It never re-dates an all-day event into the profile zone. It quarantines the item with a recorded reason (`timezone_unresolved` or `not_midnight`) when the zone is unresolved or either bound is not midnight in that zone, and marks that calendar's coverage incomplete. Required fixture: an all-day event created in Pacific Standard Time, read by a profile in America/New_York, keeps its original date. |
+| Source timezone | The resolved event zone. An unresolved zone on a timed event uses the request fallback with `sourceTimezoneFallback` recorded. |
 | State | `isCancelled = true` becomes a tombstone. Live events use `unknown` state because Graph has no confirmed/tentative event status. |
 | Availability | `showAs`: `free` → free; `busy` and `oof` → busy; `tentative`, `workingElsewhere`, and `unknown` → unknown. |
 | User response | `responseStatus.response`, mapped to the existing response vocabulary. |
@@ -382,8 +387,9 @@ event snapshot in `packages/core`.
 | `accountId`, `connectionGeneration` | Same meanings as the event snapshot. |
 | `requestedRange` | Inclusive `startLocalDate`/`endLocalDate` plus IANA `timezone`. Default and maximum: today and up to 30 prior local dates. |
 | `fetchedAt` | UTC instant. |
-| `completeness` | `complete` only after every page is read. Otherwise `incomplete` with a stable failure. |
-| `coverage` | `pagesRead`, provider `pageCount`, `itemCount`, and `paginationComplete`. |
+| `completeness` | `complete` only when every page was read before the deadline, no duplicate conflicted, and the pre-read and post-read count and `page_count` match. Otherwise `incomplete` with a stable failure. `complete` means no change was detected. It is not an atomic snapshot: a creation and a deletion during the read can keep both counts unchanged while shifting offset pages, and list ordering is undocumented. |
+| `coverage` | `pagesRead`, provider `pageCount`, `countBefore`, `countAfter`, `itemCount` after duplicate removal, `duplicatesRemoved`, and `paginationComplete`. |
+| Read bounds | Count preflight, then at most 50 pages of 10 (500 workouts), under the shared 25-second deadline and retry rule. Above 500 workouts the read returns `incomplete_pagination` without reading pages. This 50-page ceiling applies only to recorded activity. Duplicate provider IDs are removed, keeping the copy with the latest `updated_at`. |
 | `activities[].id` | Opaque account-scoped ID derived from source and provider workout ID. |
 | `activities[].kind` | `workout`. |
 | `activities[].startAt` / `endAt` | UTC instants from Hevy `start_time`/`end_time`. End is exclusive and must be later than start; otherwise the item is quarantined and coverage is incomplete. |
@@ -408,6 +414,21 @@ Ticket 226 adds one separate default-off disclosure per new source:
 Outlook Calendar, iCloud Calendar, and Hevy workout timing. Enabling one
 increments the disclosure revision. Validators keep accepting stored preference
 records written before these keys existed and treat missing keys as off.
+
+Settings `PUT` follows the existing precedent in
+`lib/services/daily-brief.service.ts` (`updateDailyBriefSettings`). It accepts
+exactly three key sets: the original two keys, the current four keys, and the
+four keys plus the three new source keys. A two- or four-key `PUT` from an older
+client sets the new disclosures to off, so an update never grants them silently.
+That revocation is expected and must be visible in Settings. Every other key set
+is `invalid_request`. Enabling a new source requires its connection to be
+connected, as `includeCalendar` does today.
+
+`AdvisorDayContext` is version `1.0` with Google-only connectors. Adding
+connector kinds changes its accepted values, so Ticket 221 adds version `1.1`.
+Validators accept `1.0` only with Google or no connectors and `1.1` with any
+known connector. Saved workbench records at `1.0` stay readable. Desktop does
+not consume this contract.
 
 The consumer projection for Outlook and iCloud equals the Google projection
 above, with connector kind `outlook_calendar` or `icloud_calendar`. The activity
