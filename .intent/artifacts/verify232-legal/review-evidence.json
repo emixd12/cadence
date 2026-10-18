@@ -1,0 +1,38 @@
+{
+  "implementationSHA": "43a79dd4b712b7e871d51f47848766320a9f307c",
+  "observedHEAD": "023ff91a8e32cce54e062ae67ad42d618d5de879",
+  "successorChange": "Only .intent/artifacts/legal232/approved.json; product/test/docs identical",
+  "candidateNote": "40ead73d-db34-4e1b-8c2e-438d89b7e2fd",
+  "comparison": "Rendered actual LEGAL_PAGES data as candidate Markdown; compared full policy bodies after whitespace normalization only",
+  "privacy": {
+    "equal": true,
+    "normalizedCharacters": 21680
+  },
+  "terms": {
+    "equal": true,
+    "normalizedCharacters": 9511
+  },
+  "runtime": {
+    "version": "24.22.0",
+    "platform": "darwin-arm64",
+    "officialArchiveSHA256": "6a9724d9b50a5f22b4816cded441b5a8d9ddae546191a5e5b7efa5a5e2ee26d5",
+    "executable": "/private/tmp/cadence-legal-verify.fyfR2f/node-v24.22.0-darwin-arm64/bin/node",
+    "guard": "NODE_OPTIONS preload checked canonical executable and major24 for npm and descendants; beforeAll checked actual test workers"
+  },
+  "independentTests": {
+    "passed": 18,
+    "files": 4
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:4321",
+    "actualInnerWidth": 297,
+    "documentOverflow": false,
+    "tableOverflowX": "auto",
+    "tableRowsIncludingHeader": [
+      9,
+      20
+    ],
+    "unsupportedSentencePresent": false,
+    "limitations": "Requested390 viewport returned297 despite resize; screenshot blank/not-painting. Do not count as independent390/1440 screenshot evidence. Inspected existing implementor screenshots/metrics instead."
+  }
+}
