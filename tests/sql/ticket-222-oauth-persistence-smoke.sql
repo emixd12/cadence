@@ -46,9 +46,10 @@ begin
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and (p.proname like 'oauth\_%' or p.proname like 'integration\_%')
-      and (not p.prosecdef or p.proconfig is distinct from array['search_path=""'])
+      and (p.prosecdef is distinct from (p.proname <> 'integration_apply_write')
+        or p.proconfig is distinct from array['search_path=""'])
   ) then
-    raise exception 'OAuth functions must be SECURITY DEFINER with an empty search_path';
+    raise exception 'OAuth functions require an empty search_path; only the product write wrapper must be SECURITY INVOKER';
   end if;
   if has_function_privilege('authenticated', 'public.oauth_verify_access_token(text, text)', 'EXECUTE')
     or has_function_privilege('anon', 'public.oauth_exchange_authorization_code(text, text, text, text, text, text, text)', 'EXECUTE')

@@ -2166,3 +2166,51 @@ SHA-256 hash lookup. OAuth admission adds `oauth_request` (60/minute per source)
 and `oauth_global` (600/minute across sources) to the existing private counters.
 Registration additionally retains its 10/hour source limit and 24-hour unused
 registration expiry. Tracking tables and desktop sync contracts do not change.
+
+## Integration write transactions (Ticket 225)
+
+Migration `20261018180000_integration_atomic_writes.sql` adds two authenticated
+integration functions. Neither grants direct access to the private schema or
+adds columns to synced tables.
+
+- `integration_lock_write(key, operation, hash)` validates the active grant,
+  authenticated owner, and operation scope. Its privileged work is limited to
+  private replay bookkeeping. It holds an advisory lock and a replay-row lock
+  until the calling transaction finishes.
+- `integration_apply_write(operation, key, hash, rpc, args, as_of, external_ref)`
+  runs as the authenticated caller under RLS. A fixed allowlist routes resolver
+  plans to the existing status and Behavior graph transactions. Notes use the
+  same normalized, expected-note update as the web service, with an additional
+  `updated_at` check. Behavior reads share the existing configuration-writer
+  advisory lock; no direct Behavior UPDATE privilege is added.
+
+The transaction stores a versioned committed snapshot in the existing replay
+record. It includes the product RPC result, Behavior graph, optional Occurrence,
+previous status, change flag, original clock and account timezone, and
+client-specific external reference. These internal fields never become tool output. Pure allowlist
+serializers produce the public contract output from the snapshot. Replays use
+that snapshot even after later edits, preserving microsecond revisions and the
+original derived day state. The existing 512 KiB storage bound applies; a
+snapshot exceeding it rolls back the product write. A pending claim may still
+expire after two minutes, but a product write and its completed receipt commit
+together, so reclaim cannot duplicate a completed write.
+
+External references attach within the create transaction. A conflicting link
+rolls back the Behavior, schedules, and events. Successful transactions record
+client attribution atomically; the handler records denied, invalid, failed,
+and replay attempts without note text or tokens. Interrupted-response retries
+also repair the normal occurrence/reminder graph and invalidate web caches.
+
+Status writes keep `explicit_user_mark` / `explicit_user_correction`, confidence
+`high`, and use the already-supported `manual_text` capture method. The existing
+status RPC now accepts `manual_text` alongside `manual_tap`. Behavior definition
+and configuration events retain `manual` and the existing reason codes. No
+vocabulary or desktop migration changes. Linked desktop receives ordinary
+Behavior, Occurrence, and event rows through existing synchronization.
+Marketing and future mobile have no implementation changes.
+
+Verification: `tests/integration-write.test.ts` and opt-in
+`tests/integration-write.local-integration.test.ts` cover validation, permission
+checks, concurrency, exact replay, rollback, ownership, and web/desktop row
+compatibility. Use only an isolated loopback database and the local integration
+test environment documented in `docs/SUPABASE_WORKFLOW.md`.
