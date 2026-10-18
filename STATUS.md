@@ -12,8 +12,8 @@ Web narrow-layout and Refresh travel checks pass. Production-based validation:
 
 Installed preview.47 passed artifact checks and preserves a private database
 backup plus preview.45 rollback. Launch waits for macOS Keychain approval of the
-existing session. Installed UI acceptance and final sampling-override cleanup
-remain. Tickets stay open until that acceptance completes. Apple distribution
+existing session. Installed UI acceptance remains. The clean production deployment restores
+the existing logging configuration and records release commit `7db9e3c`. Tickets stay open until that acceptance completes. Apple distribution
 and native position gates remain in Tickets 115/165. See
 `docs/qa/travel-release.md` for exact evidence and measurement limits.
 

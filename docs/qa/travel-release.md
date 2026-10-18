@@ -632,8 +632,13 @@ Login, Privacy and Terms return 200. Protected screens redirect unauthenticated
 requests; both travel APIs return 401.
 
 The sampling deployment overrides only `CADENCE_PERF_LOG=1`. Project environment
-values remain unchanged. A final deployment without that override must restore
-the existing project configuration after acceptance.
+values remain unchanged. Deployment `dpl_6FfpW18n8tTRaJUVckLKJLvqkN3j` reached READY at
+05:44:15 UTC without that override, restoring existing project configuration.
+Its metadata records `7db9e3c696b3315bbf641320fcd838001060394c`.
+The new `.vercelignore` excludes local desktop artifacts, signing state, private
+exports and linked-provider metadata from CLI uploads. A dry-run manifest verified
+those exclusions. The intermediate artifact-bearing upload was canceled before
+promotion; its app source was unchanged and contained no signing secret.
 
 ### Provider and cost evidence
 
@@ -705,3 +710,10 @@ existing account session. Installed UI acceptance remains pending that owner
 action. Do not treat the frontend build or app process as runtime acceptance.
 No credential, private location, raw route response or database backup is
 included in this public evidence.
+
+Read-only installed-data verification compares all 30 SQLite tables with the
+pre-install backup: zero changed, new or removed tables; quick_check passes and
+foreign-key violations are zero. The preview.45 rollback ZIP was extracted,
+compared file-by-file including permissions and symlinks, and signature-verified
+before its redundant unpacked copies were removed. The native Keychain prompt
+requires owner input; Computer Use refuses SecurityAgent interaction.
