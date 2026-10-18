@@ -1442,6 +1442,18 @@ Service-role access is reserved for narrow server-only maintenance,
 scheduled-processing, or deletion workflows. It must not become the normal path
 for user-facing reads or writes.
 
+OAuth and integration records (Ticket 222) live in the non-exposed
+`cadence_oauth_private` schema. Its tables enable RLS and grant nothing to
+`public`, `anon`, `authenticated`, or `service_role`. The only new
+service-role boundary is the token-endpoint function set: client registration
+and lookup, code exchange, refresh rotation, access-token verification, token
+revocation, OAuth rate limits, retention purge, and the incident revoke-all
+function. Those functions read and write only OAuth records, never Cadence
+product rows. Consent, Connected apps, and integration bookkeeping functions
+are `authenticated`-only and check `auth.uid()`. Integration operations reach
+product data through the user's RLS with the internal token from Ticket 223.
+See [OAuth and integration persistence](#oauth-and-integration-persistence-ticket-222).
+
 ## Abuse and public-product protections
 
 Before broad public launch, add standard protections around sensitive routes
@@ -1963,3 +1975,131 @@ unmigrated environments as `source_unavailable`, never invented finish-time data
 Shared summaries use `docs/DATETIME_STRATEGY.md`; no raw private mark timestamps
 enter the model or inspector. The SQL function signature still returns JSON, so
 public generated database types have no new columns or RPC arguments.
+
+## OAuth and integration persistence (Ticket 222)
+
+Migration `20261018160000_add_oauth_integration_persistence.sql` adds the
+database objects for Cadence's OAuth authorization server and MCP integration
+bookkeeping. It changes no existing table.
+
+Platform impact: hosted web database only. Desktop: not applicable. No synced
+table changes, and these records never enter account-sync snapshots, desktop
+SQLite, exports, BehaviorLog bundles, or backups made by Cadence. Marketing and
+future mobile: not applicable.
+
+### Schema and access
+
+All tables are in `cadence_oauth_private`, which the Data API does not expose.
+Every table enables RLS without policies. `public`, `anon`, `authenticated`, and
+`service_role` have no schema usage and no table grants. Clients reach the data
+only through the `SECURITY DEFINER` functions below. Each pins
+`search_path = ''` and uses fully qualified names.
+
+| Table | Contents | Owner link |
+|---|---|---|
+| `clients` | DCR registrations and cached CIMD metadata: `client_id`, `registration_type` (`dcr` or `cimd`), name, client and logo URIs, redirect URIs (1–10; HTTPS or loopback HTTP, no fragments), `application_type`, bounded metadata JSON, `verified_client`, CIMD `metadata_expires_at`, DCR `registration_expires_at`, `disabled_at` | Not user data |
+| `grants` | One active grant per user, client, and resource: granted scopes, created, updated, last used, revoked time and reason | `user_id` cascade |
+| `authorization_codes` | Code SHA-256 hash, grant, client, redirect URI, PKCE S256 challenge, resource, scopes, expiry at most 10 minutes after creation, `consumed_at`, issued `family_id` | `user_id` cascade |
+| `token_families` | One family per code exchange; absolute expiry; revoked time and reason | `user_id` cascade |
+| `tokens` | Access and refresh token SHA-256 hashes, type, family, grant, scopes, resource, expiry, refresh `rotated_at`, `revoked_at` | `user_id` cascade |
+| `activity` | Grant, client, operation name, up to 25 target UUIDs, outcome, error code, time. No free text or payloads | `user_id` cascade |
+| `idempotency_records` | User + client + key, operation, request hash, `pending` or `completed`, stored result (at most 64 KiB), 24-hour expiry | `user_id` cascade |
+| `external_references` | User + client + entity type + entity id + external id (Facets foundations). Unique per user and client on both the external id and the entity. v1 supports `behavior` only and cascades from `behaviors` | `user_id` cascade |
+| `rate_limit_counters` | Fixed-window counters for `mcp_read` and `mcp_write` per grant, and `client_registration` per SHA-256 source hash | Grant cascade |
+
+Scopes are exactly `cadence.read` (always required), `cadence.occurrences.write`,
+and `cadence.behaviors.write`. `verified_client` (`claude`, `claude_code`,
+`chatgpt`) is accepted only for the exact known identity. A check constraint
+enforces it: Claude Code's CIMD URL, ChatGPT's CIMD URL or `chatgpt.com`
+connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback.
+
+`launch_rate_limits` is not reused. It is keyed by account and requires a user,
+while client registration happens before sign-in and MCP limits apply per grant.
+
+### Lifetimes
+
+| Record | Lifetime |
+|---|---|
+| Authorization code | 10 minutes, single use |
+| Access token | 1 hour |
+| Refresh token | 30 days idle, capped by the family's 90-day absolute expiry |
+| Unused DCR registration | 24 hours until its first consent |
+| CIMD metadata cache | Caller-supplied, at most 24 hours |
+| Idempotency record | 24 hours; a `pending` claim older than 2 minutes can be reclaimed |
+| Activity | 90 days |
+| Rate-limit windows | `mcp_read` 120 per 60 s, `mcp_write` 30 per 60 s, `client_registration` 10 per hour |
+
+The functions fix these values; callers cannot choose them.
+
+### Token-endpoint functions (`service_role` only)
+
+- `oauth_register_client(...)` inserts a DCR client or upserts cached CIMD
+  metadata. It rejects a CIMD refresh that collides with a DCR id.
+- `oauth_get_client(client_id)` returns client metadata, or null for unknown,
+  disabled, or expired unused clients. `metadata_stale` tells the caller to
+  refetch CIMD metadata.
+- `oauth_exchange_authorization_code(...)` locks the code, burns it on any
+  failed check (expiry, client, exact redirect URI, resource, PKCE S256, revoked
+  grant), and issues one access and one refresh token in a new family. A second
+  use of a consumed code revokes the family issued from it.
+- `oauth_rotate_refresh_token(...)` rotates a refresh token. It may narrow
+  scopes but never widen them. Reuse of a rotated token revokes the whole
+  family, including the newest access and refresh tokens.
+- `oauth_verify_access_token(hash, resource)` checks type, expiry, revocation,
+  family, grant, client, and exact resource. It returns the user, grant,
+  client, and effective scopes: the token's scopes intersected with the
+  grant's. It updates `last_used_at` at most once a minute.
+- `oauth_revoke_token(hash, client_id)` implements RFC 7009. A refresh token
+  revokes its family; an access token revokes itself.
+- `oauth_consume_rate_limit(action, grant_id, source_hash)` returns `allowed`,
+  `limit_count`, `remaining`, `reset_at`, and `retry_after_seconds`.
+- `oauth_purge_expired()` deletes expired codes, access tokens, families past
+  absolute expiry, unused DCR clients, idempotency records, activity older than
+  90 days, and idle counters. Run it from scheduled maintenance.
+- `oauth_revoke_all_grants()` is the incident function. It revokes every active
+  grant with its families, tokens, and unconsumed codes.
+
+Token-endpoint functions that can revoke return `{ ok: false, error }` instead of
+raising. Raising would roll back the reuse revocation.
+
+### User-session functions (`authenticated` only)
+
+- `oauth_approve_consent(...)` validates the client, the redirect URI (exact, or
+  port-agnostic for loopback), the scopes, and the resource. It creates or
+  updates the caller's grant, clears the client's unused-registration expiry,
+  and stores a 10-minute code hash. Re-consent replaces the grant's scopes.
+- `oauth_list_grants()` lists the caller's active grants for Connected apps.
+- `oauth_revoke_grant(grant_id)` revokes the caller's grant, all of its tokens,
+  and its pending codes. The next token check fails.
+- `oauth_list_activity(limit, before)` returns the caller's last 90 days of
+  activity (operation, outcome, error code, time), at most 100 rows a page.
+
+### Integration-session functions (`authenticated` with `cadence_grant_id`)
+
+These require the internal token's `cadence_grant_id` claim for a grant the
+caller owns. Ordinary web sessions lack the claim and are rejected. Client
+attribution comes from the grant, never from arguments.
+
+- `integration_record_activity(operation, target_ids, outcome, error_code)`
+  also deletes the caller's activity older than 90 days.
+- `integration_idempotency_begin(key, operation, request_hash)` returns
+  `started`, `replay` with the stored result, `mismatch`, or `in_progress`.
+  `integration_idempotency_complete` stores the result.
+  `integration_idempotency_release` drops a pending claim after a failed write.
+  The claim and the product write are separate calls, so a crash between them
+  leaves a pending claim that expires after 2 minutes.
+- `integration_link_external_reference(entity_type, entity_id, external_id)`
+  returns `linked`, `existing`, or `conflict`. It requires a caller-owned
+  Behavior. `integration_find_external_reference` and
+  `integration_list_external_references` (at most 200 ids) read links for the
+  current client.
+
+### Account deletion
+
+Deleting the Auth user cascades through grants, codes, families, tokens,
+activity, idempotency records, external references, and per-grant counters.
+DCR and CIMD client rows are not user data and remain until purge.
+
+Repositories: `lib/db/oauth.repo.ts` (token endpoint, consent, Connected apps)
+and `lib/db/integration.repo.ts` (integration session). Local verification:
+`tests/sql/ticket-222-oauth-persistence-smoke.sql`.
