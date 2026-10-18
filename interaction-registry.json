@@ -12816,7 +12816,7 @@
           "control": "Refresh travel"
         }
       ],
-      "availability": "Timeline status line while travel is enabled and a view or a retryable failure message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload.",
+      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload.",
       "success_result": "Replaces the travel estimates and shows the observation time.",
       "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message. Tracking data is preserved; offline desktop shows the unavailable message without a request.",
       "effects": [

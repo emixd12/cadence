@@ -8,7 +8,9 @@ Google Maps notices and routing implementation from focused release commit
 confirms seven geocodes and eight routes. Four two-leg samples measured server
 p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
 Web narrow-layout and Refresh travel checks pass. Production-based validation:
-2,365 tests passed, 31 skipped; required checks and both frontend builds pass.
+2,370 tests passed, 31 skipped; required checks and both frontend builds pass.
+Review fixes withdraw cached guidance for reopened stops and changed durations,
+and check duration history before reserving spend.
 
 Installed preview.47 passed artifact checks and preserves a private database
 backup plus preview.45 rollback. Launch waits for macOS Keychain approval of the

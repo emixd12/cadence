@@ -460,11 +460,32 @@ it("recomputes occupancy after a decision without inventing replacement routes",
   const evidence = resolveTravelEvidence(evidenceInput(plan, plan.legs.map(leg => resultFor(leg,
     estimate("2026-09-16T17:00:00Z", "2026-09-16T17:10:00Z", 600))), []));
   const ref = plan.commitments[0]!.ref;
-  const updated = resolveTravelAfterDecisions(evidence, new Set([ref]));
+  const updated = resolveTravelAfterDecisions(evidence, [{ id: ref, status: "completed" }])!;
   expect(updated.legs.every(({ leg }) => leg.destinationCommitmentRef !== ref && leg.originCommitmentRef !== ref)).toBe(true);
   expect(updated.segments.every(segment => !segment.sourceRefs.includes(ref))).toBe(true);
   expect(updated.completeTrip).toBe(false);
   expect(updated.finalAvailabilityAt).toBeNull();
-  expect(resolveTravelAfterDecisions(evidence, new Set())).toBe(evidence);
+  expect(resolveTravelAfterDecisions(evidence, [])).toBe(evidence);
   expect(evidence.legs.length).toBeGreaterThan(updated.legs.length);
+});
+
+
+it("withdraws a cached trip when a previously omitted occurrence becomes unresolved", () => {
+  const plan = resolveTravelPlan(planningInput());
+  const evidence = { ...resolveTravelEvidence(evidenceInput(plan, [], [])),
+    behaviorSources: [{ ref: "omitted", behaviorId: "behavior", unresolved: false }] };
+  expect(resolveTravelAfterDecisions(evidence, [{ id: "omitted", status: "unresolved" }])).toBeNull();
+});
+
+it("withdraws stale duration-dependent routes without invalidating range schedules or unchanged estimates", () => {
+  const plan = resolveTravelPlan(planningInput());
+  const evidence = { ...resolveTravelEvidence(evidenceInput(plan, [], [])),
+    behaviorSources: [{ ref: "exact", behaviorId: "behavior", unresolved: true, durationSeconds: 600 }] };
+  const duration = { kind: "known" as const, seconds: 600, durationLabel: "10 minutes", sampleCount: 3, lookbackDays: 90, provenance: "completed_stopped_occurrence_mean" as const };
+  const occurrences = [{ id: "exact", status: "unresolved" as const }];
+  expect(resolveTravelAfterDecisions(evidence, occurrences, { behavior: duration })).toBe(evidence);
+  expect(resolveTravelAfterDecisions(evidence, occurrences, { behavior: { ...duration, seconds: 1200 } })).toBeNull();
+  expect(resolveTravelAfterDecisions(evidence, occurrences)).toBeNull();
+  const range = { ...evidence, behaviorSources: [{ ref: "exact", behaviorId: "behavior", unresolved: true }] };
+  expect(resolveTravelAfterDecisions(range, occurrences)).toBe(range);
 });

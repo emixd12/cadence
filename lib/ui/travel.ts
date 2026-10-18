@@ -91,7 +91,7 @@ export type TravelBehaviorRevision = Readonly<{ id: string; locationText: string
 /**
  * Travel inputs only: visible events, occurrence schedule and owning Behavior location revisions.
  * Status, Note and duration-history changes are excluded (Ticket 214): they make no provider call.
- * Core recomputes overlaps from current statuses; the next refresh drops resolved stops.
+ * Core filters resolved stops and withdraws evidence when a reopened stop or duration needs new routes.
  */
 export function travelSourceKey(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections" | "durationEstimates">, behaviors: readonly TravelBehaviorRevision[] = []): string {
   const byId = new Map(behaviors.map((behavior) => [behavior.id, behavior.locationText]));

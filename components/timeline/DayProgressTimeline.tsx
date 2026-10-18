@@ -126,9 +126,14 @@ export function DayProgressTimeline({
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
+  const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,
-    new Set(timeline.daySections.flatMap(section => section.occurrences.filter(occurrence => occurrence.status !== "unresolved").map(occurrence => occurrence.id))),
-  ) : routeEvidence, [routeEvidence, timeline.daySections]);
+    timeline.daySections.flatMap(section => section.occurrences), durations,
+  ) : routeEvidence, [routeEvidence, timeline.daySections, durations]);
+  const travelStatus = context ? context.travelStatus ?? null : liveTravel;
+  const invalidTravelMessage = routeEvidence && !travel ? "Travel changed. Refresh travel to update estimates." : null;
+  const displayedTravelStatus = invalidTravelMessage && travelStatus
+    ? { ...travelStatus, view: null, message: invalidTravelMessage, stale: true } : travelStatus;
   // The bubble projects current evidence; Ticket 214 requests the day when a brief is generated.
   const briefTravel = useMemo(() => {
     const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
@@ -230,7 +235,7 @@ export function DayProgressTimeline({
     >
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
-      <TravelStatusLine status={context ? context.travelStatus ?? null : liveTravel} message={context?.travelMessage ?? null} timezone={timeline.timezone} />
+      <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} />
       {layout && firstMeasured ? <DayOverlay
         layout={layout}
         measured={measured}

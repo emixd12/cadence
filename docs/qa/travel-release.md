@@ -717,3 +717,19 @@ foreign-key violations are zero. The preview.45 rollback ZIP was extracted,
 compared file-by-file including permissions and symlinks, and signature-verified
 before its redundant unpacked copies were removed. The native Keychain prompt
 requires owner input; Computer Use refuses SecurityAgent interaction.
+
+### Release review corrections — October 18
+
+The response now includes the decision and duration basis for future Behaviors,
+including resolved occurrences omitted from the route. Shared core withdraws the
+cached trip if a newly Unresolved stop was omitted or its learned duration changed.
+Both clients offer manual Refresh travel. These changes make no provider call.
+Resolved stops still filter locally; an unchanged estimate or range schedule keeps
+its cached guidance. Regressions cover the resolver, service and rendered controls.
+
+Duration history now participates in both database fences. Calendar intentionally
+keeps Ticket 214's two reads: the initial snapshot and final revision check.
+A Calendar change during this bounded window can still consume reservations before
+the final check rejects the trip. Eliminating that window would require another
+Calendar read and still could not make an external provider transaction atomic.
+No stale trip is delivered. The review's proposed third read was not adopted.

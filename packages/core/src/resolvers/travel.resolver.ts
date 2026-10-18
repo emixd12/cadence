@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { sha256 } from "../hash";
+import type { BehaviorDurationEstimate } from "../types/day-progress";
+import type { TimelineOccurrenceView } from "../types/timeline";
 
 import type {
   TravelCommitment,
@@ -270,8 +272,18 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
 /** Reuse estimates after manual decisions; never invent a route around a resolved stop. */
 export function resolveTravelAfterDecisions(
   evidence: Omit<TravelEvidenceResult, "modelProjection">,
-  resolvedRefs: ReadonlySet<string>,
-): Omit<TravelEvidenceResult, "modelProjection"> {
+  occurrences: readonly Pick<TimelineOccurrenceView, "id" | "status">[],
+  durationEstimates: Readonly<Record<string, BehaviorDurationEstimate>> = {},
+): Omit<TravelEvidenceResult, "modelProjection"> | null {
+  // An omitted stop or changed duration needs routes we cannot infer from cached estimates.
+  const unresolvedRefs = new Set(occurrences.filter(occurrence => occurrence.status === "unresolved").map(occurrence => occurrence.id));
+  const resolvedRefs = new Set(occurrences.filter(occurrence => occurrence.status !== "unresolved").map(occurrence => occurrence.id));
+  if (evidence.behaviorSources?.some(source => {
+    if (!unresolvedRefs.has(source.ref)) return false;
+    const duration = durationEstimates[source.behaviorId];
+    return !source.unresolved || (source.durationSeconds !== undefined &&
+      source.durationSeconds !== (duration?.kind === "known" ? duration.seconds : null));
+  })) return null;
   if (!resolvedRefs.size) return evidence;
   const legs = evidence.legs.filter(({ leg }) =>
     !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? ""));

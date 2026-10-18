@@ -110,3 +110,7 @@ line; they are not sent to the model. While the Timeline is visible, Cadence che
 an already-allowed device position once per minute. Only movement beyond 500 m,
 allowing for position accuracy, requests new routes. Marking an Occurrence removes
 its affected travel from the display without buying new estimates.
+
+When clearing a decision adds a stop absent from the cached trip, Cadence hides the
+old guidance and offers Refresh travel. A changed duration estimate does the same.
+Neither change calls Google Maps automatically.

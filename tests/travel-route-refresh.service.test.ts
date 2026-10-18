@@ -102,6 +102,15 @@ describe("refreshTravelRoutes", () => {
     expect(mocks.route).not.toHaveBeenCalled();
   });
 
+  it("returns the decision and duration basis even for a resolved stop omitted from routes", async () => {
+    located();
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === day.startLocalDate
+      ? [{ ...occurrence("resolved", "behavior-1", "2026-09-22T10:00:00Z"), status: "completed" }] : []);
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence?.behaviorSources).toEqual([{ ref: "resolved", behaviorId: "behavior-1", unresolved: false, durationSeconds: 1800 }]);
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
   it("reserves lookups once and hands the routing service the same reservation", async () => {
     located();
     await refreshTravelRoutes(caller, day, config, now);
@@ -226,6 +235,15 @@ describe("refreshTravelRoutes", () => {
       : []);
     await expect(refreshTravelRoutes(caller, day, config, now)).resolves.toMatchObject({ accountId: "owner" });
     expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it("refuses changed duration history before reserving provider spend", async () => {
+    located();
+    mocks.historySessions.mockResolvedValueOnce([]).mockResolvedValue([{ id: "new-session", started_at: "2026-09-21T10:00:00Z", stopped_at: "2026-09-21T11:00:00Z" }]);
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.spend).not.toHaveBeenCalled();
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
   });
 
   it("rejects the refresh when a source changes before returning", async () => {

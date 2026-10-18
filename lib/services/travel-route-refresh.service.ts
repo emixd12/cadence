@@ -67,29 +67,27 @@ export async function refreshTravelRoutes(
   const durationRevision = historyRevision(historyOccurrences, historySessions);
   const deadline = AbortSignal.timeout(45_000);
   const changed = () => new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-  // Settings, Behavior locations, Calendar connection and today's occurrences: database reads only.
+  // Database inputs are fenced before spending and before delivery. Calendar has one initial read and one final check.
   const assertSourcesCurrent = async () => {
     if (deadline.aborted) throw changed();
-    const [current, currentCalendar, currentOccurrences] = await Promise.all([
+    const [current, currentCalendar, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions]] = await Promise.all([
       readTravelRouteSource(caller.client, caller.user.id),
       getCalendarConnection(caller),
       listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
+      readDurationHistory(),
     ]);
     if (current.settingsRevision !== source.settingsRevision || current.settings.enabled !== source.settings.enabled ||
       current.settings.mode !== source.settings.mode || current.settings.routingConsentAt !== source.settings.routingConsentAt ||
       currentCalendar.status !== calendar.status || currentCalendar.generation !== calendar.generation || currentCalendar.selectionRevision !== calendar.selectionRevision ||
-      !sameBehaviors(current.behaviors, source.behaviors) || !sameOccurrences(currentOccurrences, occurrenceRevisions)) {
+      !sameBehaviors(current.behaviors, source.behaviors) || !sameOccurrences(currentOccurrences, occurrenceRevisions) ||
+      historyRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
       throw changed();
     }
   };
-  // Also duration history and Calendar event revisions; runs once, before returning.
+  // Calendar event revisions are checked once more before returning.
   const assertAllCurrent = async () => {
     await assertSourcesCurrent();
-    const [[currentHistoryOccurrences, currentHistorySessions], currentEvents] = await Promise.all([
-      readDurationHistory(),
-      snapshot ? getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : Promise.resolve(null),
-    ]);
-    if (historyRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) throw changed();
+    const currentEvents = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
     if (snapshot && (!currentEvents || !sameCalendarRevisions(snapshot.events, currentEvents.events))) throw changed();
     if (deadline.aborted) throw changed();
   };
@@ -154,7 +152,13 @@ export async function refreshTravelRoutes(
     ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
   ];
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
-  return response(caller.user.id, source, projectTravelRouteDisplay(evidence));
+  return response(caller.user.id, source, { ...projectTravelRouteDisplay(evidence),
+    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
+      const duration = durationEstimates.get(occurrence.behavior_id);
+      return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
+        ...(occurrence.schedule_kind === "exact" ? { durationSeconds: duration?.kind === "known" ? duration.seconds : null } : {}) };
+    }),
+  });
 }
 
 /**
