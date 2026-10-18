@@ -42,7 +42,18 @@ The integrated baseline `d7af234` was independently approved.
   is source and synthetic fixtures only. No app registration, live personal or
   work/school account, publisher verification, UI, desktop client, or Daily
   Brief consent exists.
-- Ticket 223 (Hevy) is in progress. Tickets 225–228 are not started.
+- Ticket 223 (Hevy) is implemented in source (`abf9938`) and awaits independent
+  verification. Key intake is verified by `user/info` (non-Pro →
+  `permission_denied`; a refused key → `reconnect_required`). A fixed GET
+  allowlist covers `user/info`, `workouts/count`, and
+  `workouts?page=N&pageSize=10`, and redirects are refused. A count preflight
+  above 500 returns `incomplete_pagination` with no page reads. The read covers at
+  most 50 pages, removes duplicates by the latest `updated_at`, and checks count
+  and `page_count` before and after. One absolute 25-second deadline covers every
+  page and retry; `Retry-After` is honored only when it fits. Responses are capped
+  at 2 MB. Every non-timing field is discarded per item. The route is
+  `/api/hevy/activities`. Not verified: a live Hevy Pro account and deployment.
+- Tickets 225–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

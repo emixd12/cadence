@@ -385,8 +385,9 @@ text, read-only suggestions and trusted source metadata.
 
 ## Connector expansion ownership (Tickets 220–228)
 
-Planned October 18, 2026. Ticket 221 implemented the shared contracts; provider
-adapters and later tickets are not implemented. No new required resolver module
+Planned October 18, 2026. Ticket 221 implemented the shared contracts. Tickets 223
+(Hevy) and 224 (Outlook) implement their provider adapters; iCloud and later
+tickets are not implemented. No new required resolver module
 is added. `packages/core` owns the extended event validator
 (`services/external-event-validation.ts`) and the separate recorded-activity
 types, validation, and normalization (`types/recorded-activity.ts`,
@@ -407,6 +408,12 @@ table `outlook-calendar-windows-zones.ts`. It reuses `connectors.repo.ts`; no
 `outlook-calendar.repo.ts` is needed. Routes call only the service. Paired tests:
 `tests/outlook-calendar-{provider,oauth}.test.ts` and
 `tests/outlook-calendar.service.test.ts`. No resolver changed.
+
+Ticket 223 implements Hevy: `lib/services/hevy-provider.ts` owns the fixed GET
+allowlist and calls the core `normalizeRecordedWorkout` and
+`validateRecordedActivitySnapshot`; `lib/services/hevy.service.ts` owns lifecycle,
+fences, and the `applyHevyActivityRefresh` cache rule. Paired tests:
+`tests/hevy-provider.test.ts` and `tests/hevy.service.test.ts`. No resolver changed.
 
 Recorded activity never feeds `status.resolver.ts`, `timeline.resolver.ts`
 Occurrence grouping, reminders, analytics, or exports. Calendar overlap cues keep

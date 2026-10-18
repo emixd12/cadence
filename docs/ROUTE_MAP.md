@@ -158,8 +158,10 @@ Keychain-correlated state, never credentials.
 
 ## Planned connector routes (Tickets 222–227)
 
-Planned October 18, 2026. Outlook routes (Ticket 224) are implemented locally with
-synthetic tests; the others are not implemented. Each provider gets its own routes,
+Planned October 18, 2026. Hevy (Ticket 223) and Outlook (Ticket 224) routes are
+implemented locally with synthetic tests; iCloud routes are not implemented. Hevy
+`POST /api/hevy/connection` accepts exactly `{apiKey}` under the 8 KB cap and
+returns the view without the key; its `DELETE` adds revocation `hevy_api_key`. Each provider gets its own routes,
 mirroring the Google connector. No generic connector route or new primary screen
 is added. All responses are no-store, use the same session, same-origin, and
 Tauri-origin rules, and expose no provider write.
@@ -174,7 +176,7 @@ Tauri-origin rules, and expose no provider write.
 | `/api/icloud-calendar/calendars` | GET, PUT | 227 | Discover `VEVENT` calendars; save selection |
 | `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30 |
 | `/api/hevy/connection` | GET, POST, DELETE | 223 | Status, accept API key once, disconnect |
-| `/api/hevy/workouts?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot; today and up to 30 prior days |
+| `/api/hevy/activities?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot `1.0.0`; inclusive local days, end no later than today, at most 31 days |
 
 Routes call provider services; services own credentials, provider I/O, and
 validation. Settings remains the only connector UI location.

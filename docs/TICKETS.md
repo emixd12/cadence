@@ -13772,7 +13772,15 @@ Platform impact:
 
 ## Ticket 223: Hevy workout timing connector
 
-Status: not started.
+Status: implemented in source on October 18, 2026 (`abf9938`); fixture evidence
+only; independent verification pending. Live Hevy Pro access is a separate
+acceptance gate. Files: `lib/services/hevy-provider.ts`,
+`lib/services/hevy.service.ts`, `app/api/hevy/{connection,activities}/route.ts`,
+`tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts`, and
+`tests/fixtures/hevy/`. The route is `/api/hevy/activities`, not the earlier
+planned `/api/hevy/workouts`. `applyHevyActivityRefresh` in `hevy.service.ts` is
+the cache rule for Ticket 225: a complete refresh replaces the snapshot, and an
+incomplete, older-fetch, or older-generation result never erases known records.
 
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
 
@@ -13792,7 +13800,7 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | `lib/services/hevy-*.ts`, `lib/db/hevy.repo.ts`, and `app/api/hevy/*` routes. |
+| Web | `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`, and `app/api/hevy/{connection,activities}` routes; the shared Ticket 222 `connectors.repo.ts` replaces a Hevy repository. |
 | Desktop | Hosted broker only, through 225; key entry posts once to the server. |
 | Marketing | Disclosure in 228. |
 | Future mobile | Deferred. |
