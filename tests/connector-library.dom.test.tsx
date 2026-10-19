@@ -172,6 +172,28 @@ describe("OutlookCalendarPanel", () => {
   });
 });
 
+describe("OutlookCalendarPanel reconnect recovery", () => {
+  it("offers Reconnect and Disconnect when the calendar list reports reconnect_required after connecting", async () => {
+    const source = outlookCoordinator({ listCalendars: vi.fn(async () => { throw new ConnectorClientError("reconnect_required"); }) });
+    await act(() => root.render(<OutlookCalendarPanel coordinator={source}
+      refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
+    await vi.waitFor(() => expect(button("Reconnect Outlook Calendar")).toBeDefined());
+    expect([...container.querySelectorAll("button")].some((node) => node.textContent?.trim() === "Save Outlook settings")).toBe(false);
+    await act(() => button("Disconnect Outlook Calendar").click());
+    expect(source.disconnect).toHaveBeenCalled();
+    expect(container.textContent).toContain("Cadence deleted its saved Microsoft access");
+  });
+
+  it("offers Reconnect when a manual refresh reports reconnect_required", async () => {
+    const source = outlookCoordinator({ refreshEvents: vi.fn(async () => { throw new ConnectorClientError("reconnect_required"); }) });
+    await act(() => root.render(<OutlookCalendarPanel coordinator={source}
+      refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Work calendar"));
+    await act(async () => { button("Refresh Outlook Calendar").click(); });
+    await vi.waitFor(() => expect(button("Reconnect Outlook Calendar")).toBeDefined());
+  });
+});
+
 describe("OutlookCalendarPanel partial refresh", () => {
   it("says the Timeline keeps the last complete read when a refresh was incomplete", async () => {
     const kept = { ...outlookFixture, freshness: { ...outlookFixture.freshness, state: "stale", canAssertNoOverlap: false } } as unknown as ExternalEventSnapshotV1_1;

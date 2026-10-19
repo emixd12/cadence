@@ -895,7 +895,7 @@
     {
       "path": "components/settings/OutlookCalendarPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 13,
+      "interaction_marker_count": 15,
       "interaction_ids": [
         "INT-CALENDAR-008",
         "INT-CALENDAR-009",
@@ -12341,7 +12341,7 @@
           "control": "Disconnect Outlook Calendar"
         }
       ],
-      "availability": "Available while Outlook Calendar is connected.",
+      "availability": "Available while Outlook Calendar is connected or requiring reconnection.",
       "success_result": "Deletes the sealed credential and that source's cache, fences late responses, and shows the Microsoft account or My Apps removal step.",
       "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
       "effects": [

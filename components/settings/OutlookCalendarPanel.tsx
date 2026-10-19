@@ -39,12 +39,18 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
       setPreferences(view.preferences);
       if (view.status === "connected") {
         try { const list = await coordinator.listCalendars(); if (active) setCalendars(list); }
-        catch (error) { if (active) setMessage(outlookErrorMessage(connectorErrorCode(error), "Outlook calendar list could not load.")); }
+        catch (error) { if (active) { markReconnectIfNeeded(error); setMessage(outlookErrorMessage(connectorErrorCode(error), "Outlook calendar list could not load.")); } }
       } else setCalendars([]);
     }).catch(() => { if (active) setMessage("Outlook Calendar status is unavailable. Other sources and tracking are unaffected."); });
     return () => { active = false; };
   }, [callbackMessage, coordinator, refreshVersion]);
 
+  // A failed list or refresh that needs new consent moves the row to its reconnect state, as the iCloud panel does.
+  function markReconnectIfNeeded(error: unknown) {
+    if (!["reconnect_required", "permission_denied"].includes(connectorErrorCode(error))) return;
+    setConnection((view) => view ? { ...view, status: "reconnect_required" } : view);
+    setCalendars([]);
+  }
   const connect = async () => {
     setPending("connect"); setMessage(null);
     try { await coordinator.beginConnect(); setMessage("Continue in the browser to connect Outlook Calendar."); }
@@ -76,6 +82,7 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
         : snapshot.freshness.state === "stale" ? "Outlook Calendar refresh was incomplete. The Timeline keeps the last complete read."
         : snapshot.events.length ? "Outlook Calendar refreshed." : "No Outlook Calendar events in this range.");
     } catch (error) {
+      markReconnectIfNeeded(error);
       setMessage(outlookErrorMessage(connectorErrorCode(error), "Outlook Calendar refresh did not finish. Try again; saved settings, other sources, and tracking are unchanged."));
     } finally { setPending(null); }
   };
@@ -106,6 +113,8 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
         {status === "disconnected" || status === "reconnect_required" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">
           {pending === "connect" ? "Opening Outlook connection…" : status === "reconnect_required" ? "Reconnect Outlook Calendar" : "Connect Outlook Calendar"}
         </button> : null}
+        {status === "reconnect_required" ? <button type="button" onClick={disconnect} disabled={pending !== null}
+          className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "disconnect" ? "Disconnecting Outlook…" : "Disconnect Outlook Calendar"}</button> : null}
         {canManage && shared ? <>
           <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
             <legend className="font-bold text-foreground">Outlook display</legend>
