@@ -222,7 +222,11 @@ observations only; no credential or provider record was recorded.
   `calendar-timezone` with a full VTIMEZONE definition, which the adapter marks
   unsupported by design. Floating-time events would therefore quarantine. Not
   live-tested: wrong-principal reconnect (one Apple Account) and quarantine of
-  unexpanded series.
+  unexpanded series. Disconnect showed the Apple revocation instruction. It
+  deleted the sealed credential (0 rows) and moved the connection to
+  `disconnected`, generation 2, with the account digest cleared. A later read
+  returned `not_connected`. Emi removed the app-specific password at Apple, and
+  the test events were deleted.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
