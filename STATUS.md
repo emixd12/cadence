@@ -201,6 +201,28 @@ observations only; no credential or provider record was recorded.
   cleared. A later read returned `not_connected`. Emi deleted the key in Hevy.
   Not live-testable with this account: the over-500-workout path (44 workouts)
   and non-Pro rejection; fixture evidence only.
+- iCloud Calendar (Ticket 240, with 238): **live pass** with Emi's Apple Account
+  and an app-specific password. Intake sealed both values (generation 1). The
+  calendar list returned 5 VEVENT calendars (ID, name and default flag only), and
+  all 5 were selected. The first 30-day read was `complete` with 0 events. A
+  counts-only local diagnostic confirmed that the account had no events in that
+  range, and that server-side time-range filtering matched older events. Owner-approved test
+  events were then added to one existing calendar. The next read was `complete`:
+  0 failures, 0 quarantined items, recurrence supported, 5 events and 0
+  non-test events. A daily `RRULE COUNT=3` event was expanded by the server
+  into 3 instances (9–10 a.m. New York) sharing one series ID. An all-day event
+  kept its own date (one calendar day). A 10–11 a.m. `America/Los_Angeles`
+  event read as 1–2 p.m. New York with its source zone kept. Only titles were
+  carried; other details were unsupported and empty. No event record was stored
+  server-side. Timeline showed all of them with iCloud labels. Hiding all-day
+  iCloud events removed the all-day event. Emi first missed the Los Angeles
+  marker on a day with three markers. The client validation and layout pipeline,
+  replayed locally on the live response, placed it at 1 p.m. A later look found
+  it, so it is not a defect. Finding: every iCloud collection reports a
+  `calendar-timezone` with a full VTIMEZONE definition, which the adapter marks
+  unsupported by design. Floating-time events would therefore quarantine. Not
+  live-tested: wrong-principal reconnect (one Apple Account) and quarantine of
+  unexpanded series.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
