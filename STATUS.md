@@ -20,7 +20,7 @@ The integrated baseline `d7af234` was independently approved.
   projections in `packages/core`. Google `1.0.0` validators, fixtures, routes,
   and runtime callers are unchanged. No provider adapter, route, migration,
   consent, or UI changed.
-- Ticket 222 is implemented locally and awaits independent verification. Migration
+- Ticket 222 is locally verified and independently approved. Migration
   `20261018230000_connector_lifecycle.sql` adds one owner-bound connection per
   provider for Hevy, Outlook, and iCloud, RLS owner metadata, sealed credentials
   and Outlook attempts in `cadence_calendar_private`, and service-role-only
@@ -28,10 +28,12 @@ The integrated baseline `d7af234` was independently approved.
   credentials bound to owner, provider, identity digest, generation, and purpose.
   Disconnect fences one provider; Auth deletion cascades all connector state.
   Google storage and wire behavior are unchanged. Evidence is source, synthetic
-  fixtures, and a disposable CLI-pinned local Supabase replay. No provider call,
-  route, UI, consent, desktop cache, hosted migration, or deployment exists.
-- Ticket 224 (Outlook Calendar) is implemented locally and awaits independent
-  verification. Microsoft Graph `calendarView` reads selected calendars with
+  fixtures, and a disposable CLI-pinned local Supabase replay. That lifecycle
+  slice added no provider call, route, UI, consent or desktop
+  cache. Tickets 223–227 now supply those layers. Hosted migration and deployment
+  remain unverified.
+- Ticket 224 (Outlook Calendar) is locally verified and independently approved.
+  Microsoft Graph `calendarView` reads selected calendars with
   `Calendars.ReadBasic` only, immutable IDs, validated next links, a 20-page
   bound, and one 25-second deadline across token refresh, listing, pages, and
   retries. Identity is the ID-token `tid` plus `sub`; web callbacks require the
@@ -40,16 +42,16 @@ The integrated baseline `d7af234` was independently approved.
   through a pinned CLDR 48.2 Windows-zone table; unresolved zones quarantine with
   a recorded reason. It reuses the Ticket 222 lifecycle; no migration. Evidence
   is source and synthetic fixtures only. No app registration, live personal or
-  work/school account, publisher verification, UI, desktop client, or Daily
-  Brief consent exists.
+  work/school account or publisher verification is verified. Tickets 225–226
+  supply the local UI, desktop client and separate Daily Brief disclosure.
   Review corrections (verifier findings on `56d8ddf`): every Graph and token
   fetch plus body read runs inside `runProviderCallWithTimeout`, so unresponsive,
   stalled, and late responses end as `timeout`; an omitted token `scope` is
   accepted per Microsoft's documentation; next links compare the decoded calendar
   ID; `lastModifiedDateTime` is no longer requested through `$select`; read routes
   forward `request.signal`; app registration must carry only `Calendars.ReadBasic`.
-- Ticket 223 (Hevy) is implemented in source (`abf9938`) and awaits independent
-  verification. Key intake is verified by `user/info` (non-Pro →
+- Ticket 223 (Hevy) is locally verified and independently approved. Its initial
+  implementation is `abf9938`. Key intake is verified by `user/info` (non-Pro →
   `permission_denied`; a refused key → `reconnect_required`). A fixed GET
   allowlist covers `user/info`, `workouts/count`, and
   `workouts?page=N&pageSize=10`, and redirects are refused. A count preflight
@@ -57,11 +59,11 @@ The integrated baseline `d7af234` was independently approved.
   most 50 pages, removes duplicates by the latest `updated_at`, and checks count
   and `page_count` before and after. One absolute 25-second deadline covers every
   page and retry; `Retry-After` is honored only when it fits. Responses are capped
-  at 2 MB. Every non-timing field is discarded per item. The route is
+  at 2 MB. Only identity, revision and timing fields enter normalized snapshots. The route is
   `/api/hevy/activities`. Not verified: a live Hevy Pro account and deployment.
-- Ticket 225 (connector library and Timeline) is implemented locally and awaits
-  independent verification. Settings lists Google Calendar, Outlook Calendar,
-  iCloud Calendar (not available yet), and Hevy in one `ConnectorLibrary`; each
+- Ticket 225 (connector library and Timeline) is locally verified and
+  independently approved. Settings lists Google Calendar, Outlook Calendar,
+  iCloud Calendar (integrated under Ticket 227), and Hevy in one `ConnectorLibrary`; each
   source connects, refreshes, fails, and disconnects on its own. Outlook reuses
   the Google calendar selector; the Hevy API key field clears on submit and is
   never stored on the device; Hevy Pro and the 500-workout limit are disclosed.
@@ -88,7 +90,7 @@ The integrated baseline `d7af234` was independently approved.
   390px, and native cache unit tests. Not verified: live Microsoft or Hevy
   accounts, installed desktop deep links or Keychain, deployment.
 - Ticket 226 (separately approved connector context in Daily Brief) is
-  implemented locally and awaits independent verification. Outlook Calendar,
+  locally verified and independently approved. Outlook Calendar,
   iCloud Calendar, and Hevy each have a default-off Daily Brief disclosure bound to
   the connection generation (and calendar selection) it was granted for; migration
   `20261019010000_daily_brief_connector_disclosure.sql` stores them and fences begin
@@ -104,7 +106,8 @@ The integrated baseline `d7af234` was independently approved.
   off sources that need attention instead of renewing them or failing. Evidence is
   source, synthetic fixtures, model stubs, a disposable local migration replay, and
   bench screenshots; no live provider or model call.
-- Ticket 227 remaining F5 DAV metadata correction is implemented locally; independent re-review is pending. Recovery
+- Ticket 227 is locally verified and independently approved at `40b1dc2`,
+  including all F1–F8 corrections and the final F5 DAV metadata fix. Recovery
   preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
   disconnect, isolated complete-only caches, offline display choices and Timeline
   context. Daily Brief reads iCloud only under its separate generation/selection
@@ -115,7 +118,20 @@ The integrated baseline `d7af234` was independently approved.
   manual Apple password revocation.
   Synthetic tests and responsive bench evidence cover these paths. Live Apple
   access, hosted custody acceptance and installed acceptance remain open.
-- Ticket 228 is not started.
+- Ticket 228 disclosure/status reconciliation is locally verified and awaiting
+  separate final review. Node 24.22.0 passed all seven required checks plus
+  core, design-system, desktop type/build/parity, and marketing build/parity
+  checks. The non-overlapping two-worker test run passed 2,965 tests
+  (31 skipped). Synthetic web and desktop benches and marketing pages passed
+  narrow (390px) and wide (1280px) QA. This pass changes disclosures and evidence,
+  preserves approved runtime logic, and does not authorize release.
+- Reused evidence: unchanged native sources retain 114 passing Rust tests;
+  unchanged migrations retain the disposable 82-migration replay and 16/17 SQL
+  smoke results. The inherited failure remains
+  `tests/sql/behavior-end-date-lifecycle-smoke.sql:138`. Prior desktop acceptance
+  test timeouts passed unchanged reruns; their cause and a base-CI failure are
+  not proven. Final Ticket 228 tests had no timeout. Retained local databases
+  were not touched.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

@@ -541,12 +541,14 @@ open under Ticket 141. Ticket 137 retains controlled provider-failure and
 Workspace-restriction coverage plus dense/overnight installed fixtures and
 multi-day resume evidence. Apple-trusted desktop distribution remains separate
 under Ticket 115. Native mobile and dynamic rearrangement remain deferred.
-Outlook, iCloud, and Hevy connectors are planned under Tickets 220–228.
+Outlook, iCloud, and Hevy connectors have local source/fixture verification
+under Tickets 220–228; live, installed and release acceptance remain open.
 
 ## Connector expansion (Tickets 220–228)
 
-Approved October 18, 2026; Ticket 220 recorded the contracts and the rest is not
-implemented. Cadence adds read-only Outlook Calendar and iCloud Calendar context
+Approved October 18, 2026; Tickets 220–227 are implemented and independently
+verified locally. Ticket 228 reconciles disclosures and final evidence. This
+state does not establish deployed availability or live provider interoperability. Cadence adds read-only Outlook Calendar and iCloud Calendar context
 and Hevy workout timing on web and linked desktop. The Settings connector library
 lists every source with its own connect, refresh, and disconnect controls.
 
@@ -567,7 +569,9 @@ iCloud uses a user-generated app-specific password over CalDAV. Apple does not
 limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
 Calendar. Local implementation with synthetic credentials is approved. Real
 Apple credentials and user release wait for the owner custody decision recorded
-under Ticket 227. Hevy reads stop at 500 workouts and report no detected change,
+under Ticket 227. Hevy requires Pro. Even a today-only request scans global
+workout history, bounded at 500 workouts; larger accounts return incomplete
+without workout page reads. Complete reads report no detected change,
 not an atomic snapshot. Local Mac calendars and EventKit stay out of
 scope. Generic CalDAV providers and subscription feeds are later coverage. Live
 provider access, Microsoft publisher verification, and deployment remain separate
@@ -770,8 +774,8 @@ added. Existing live-data and release gates remain separate.
 - General AI coaching/chat and autonomous execution beyond the in-app read-only
   daily briefing planned under Tickets 146–148
 - Two-way Calendar sync and source-event editing; Tickets 132–137 cover only
-  gated read-only Google Calendar context, and Tickets 220–228 plan read-only
-  Outlook and iCloud Calendar context
+  gated read-only Google Calendar context, and locally verified read-only
+  Outlook and iCloud Calendar context under Tickets 220–228 (release unverified)
 - Workout writes, workout coaching, exercise analysis, and automatic Behavior
   completion from recorded activity
 - Apple Health, EventKit, and local-only Mac calendar access

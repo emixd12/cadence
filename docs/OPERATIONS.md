@@ -1571,6 +1571,58 @@ policy. Cadence exports, account synchronization, and user-created desktop backu
 exclude credentials and cached events. Test the local SQL contract before any hosted
 rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
 
+## Connector expansion acceptance and operation (Tickets 220–228)
+
+Tickets 220–227 have independent local source/synthetic approval through
+`40b1dc2`. Ticket 228 reconciles disclosures and collects final local checks.
+This is not live-provider, installed-desktop, hosted-deployment or public-release
+acceptance. Do not use real provider credentials, publish, deploy, or change hosted
+configuration as part of this verification pass.
+
+Outlook uses only delegated `Calendars.ReadBasic` plus identity/offline scopes.
+Live personal and work/school accounts, tenant policy and publisher verification
+remain unverified. Hevy requires Pro. Its key has no documented read-only scope;
+the adapter permits only account verification, count and workout-list GETs.
+A today-only read still scans global history, up to 500 workouts/50 pages.
+Larger accounts return incomplete without workout page reads. Stable before/after
+counts and page counts mean no detected change, not an atomic snapshot.
+Concurrent changes may escape detection. Cadence discards workout detail fields;
+only timing reaches Timeline or separately authorized Daily Brief.
+
+iCloud uses hosted CalDAV with sealed Apple Account email and app-specific
+password. That password is broader than Calendar. Owner custody acceptance is
+required before real credentials or release. Live endpoint/authentication and
+recurrence interoperability remain unverified. Unsupported recurrence/timezones
+are quarantined as incomplete; they do not prove an empty calendar. No EventKit
+or local-only Mac Calendar access is implemented.
+
+Each source has a separate default-off Daily Brief disclosure. Generation and
+calendar-selection changes require renewed permission. Disablement and older
+client preference saves revoke the new choices. Only current, disclosed timing
+can reach the model; raw provider details and credentials cannot. Source failures
+never change manual Behavior status. Travel remains Google-only. Existing
+production brief retention remains unchanged: no prompt/text history in Cadence,
+bounded operational metadata, `store:false` with provider retention still possible.
+
+Credentials remain sealed in the hosted private schema. Web snapshots stay in
+memory; desktop uses disposable per-source caches outside tracking exports,
+account synchronization and user-created backups. Infrastructure backups can
+retain ciphertext under the existing seven-day policy. Failed/incomplete reads
+may retain stale complete snapshots; offline clients learn of remote removal
+when they next check. Desktop sign-out/account switch clears local caches.
+Disconnect and successful Auth deletion remove live credentials but do not revoke
+Microsoft, Apple or Hevy access. Direct users to Microsoft app permissions/My Apps,
+Apple app-specific-password revocation, or Hevy key removal/regeneration.
+
+Reuse unchanged lifecycle/disclosure migration evidence and native unit-test
+results from the shared PR Context. The inherited
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failure remains unresolved.
+Full-suite desktop-release-acceptance tests have intermittently exceeded their
+unchanged five-second timeout, then passed unchanged. No base-SHA CI link proves
+the cause of that timing observation. Never reset retained `habit-tracking-app`.
+Ticket 228 evidence lives in the workspace task and shared PR Context notes.
+Local disclosure edits do not supersede release approval for published notices.
+
 ## Public Calendar verification execution (Tickets 138–141)
 
 The 2026-09-17 continuation used the owner-selected Cloudflare dashboard.

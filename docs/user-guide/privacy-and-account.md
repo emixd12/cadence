@@ -63,8 +63,8 @@ link remains one focus target.
 **Prerequisites:** The Cadence deployment has enabled the optional Google
 Calendar connector, and you connected the same Google
 identity used for the Cadence account. If Settings says Calendar is not
-configured, the deployment has not enabled provider access. Google's review of
-Calendar access is pending. The connector is not yet verified for public rollout.
+configured, the deployment has not enabled provider access. See the current
+release evidence for deployment and installed-client acceptance.
 
 Cadence requests read-only Calendar-list and event scopes through a separate
 consent flow. It reads your subscribed calendar list for selection, then reads
@@ -115,6 +115,47 @@ does not keep Calendar event details in the Cadence database backup.
 **Recovery or undo:** Reconnect Calendar to grant read-only access again.
 Deleting the Cadence account is permanent and does not recreate any data when a
 new account later connects to the same Google identity.
+
+## Outlook, iCloud, Hevy, and Daily Brief data
+
+These connectors are locally implemented and independently verified with synthetic
+inputs. Live providers, installed desktop behavior and deployment remain unverified.
+iCloud real-credential use and release also require the owner's acceptance of
+hosted custody of an app-specific password that Apple does not limit to Calendar.
+See [Timeline source instructions](timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy).
+
+Cadence seals Outlook refresh credentials, the iCloud email and app-specific
+password, and the Hevy API key in its hosted private schema. Client intake is
+transient. Clients never persist these credentials. Vercel processes provider
+responses; Cadence does not persist source records in its hosted database.
+Web snapshots stay in memory. Desktop uses a separate disposable per-source
+cache outside tracking exports, synchronization and user-created backups.
+Infrastructure backups may retain deleted ciphertext for the existing seven-day
+window. An offline device can retain stale context until its next connection
+check or local account disconnect. Sign-out and account switch clear desktop caches.
+
+Disconnect removes Cadence's saved access. Successful account deletion cascades
+live connector records; a failed deletion preserves connections. Neither action
+revokes these providers' grants or credentials. Remove Cadence in Microsoft
+account app permissions or work/school My Apps, revoke the app-specific password
+at account.apple.com, or remove or regenerate the API key in Hevy settings.
+
+Hevy requires Pro. Its API can return exercise and other workout details;
+Cadence discards them and keeps only identity/revision and timing fields needed
+for normalized snapshots. Timeline shows timing and duration only. A request for
+today still scans global history up to 500 workouts; larger accounts report
+incomplete without page reads. Count/page checks detect some changes, not an
+atomic snapshot. A workout never completes a Behavior or proves free time.
+
+Connecting or displaying a source never permits model access. Each source needs
+its own default-off Daily Brief choice before today's timing can reach OpenAI.
+Calendar titles/details and credentials stay out. Hevy contributes only past
+recorded timing. Reconnect or calendar reselection requires renewed permission.
+Turning Daily Brief off revokes optional choices; older client saves also revoke
+new source choices. Pending results are fenced after withdrawal or account changes.
+Cadence retains no production prompt or briefing history. Text stays in memory;
+preferences and bounded operational metadata persist. OpenAI retention can apply
+even with `store:false`. Withdrawal cannot recall input already sent.
 
 ## Create an export before deletion
 

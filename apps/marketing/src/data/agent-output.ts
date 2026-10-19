@@ -43,7 +43,7 @@ export function getLlmsTxt(): string {
     "- Do not infer failure from unresolved status.",
     "- Calculate Adherence from decided Occurrences only. Keep Unresolved separate.",
     "- Do not infer causes, clinical meaning, or motivation from a Record.",
-    "- Cadence does not send behavior data to an AI provider. The user exports data and chooses any external AI service.",
+    "- You choose whether to share exports with an external AI service. Separately, where enabled, optional Daily Brief sends disclosed context to OpenAI. Each connected source needs its own model-data choice.",
     "- Do not treat the example bundle as real account data.",
     "",
   ];

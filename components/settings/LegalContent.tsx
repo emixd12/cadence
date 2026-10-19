@@ -58,8 +58,8 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Optional Google Calendar",
         paragraphs: [
-          "The Google Calendar connector is optional. Google's review of Calendar access is pending; the connector is not yet verified for public rollout. Where enabled, it requires separate read-only consent for the same Google account used to sign in. Cadence reads your subscribed calendar list so you can choose calendars, then reads events from selected calendars intersecting displayed days, including readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. It does not create, edit, or delete Google events or download attachments automatically.",
-          "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information, use it for advertising, or send it to AI providers.",
+          "The Google Calendar connector is optional. Where enabled, it requires separate read-only consent for the same Google account used to sign in. Cadence reads your subscribed calendar list so you can choose calendars, then reads events from selected calendars intersecting displayed days, including readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. It does not create, edit, or delete Google events or download attachments automatically.",
+          "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information or use it for advertising. Sending selected Calendar timing to OpenAI for Daily Brief requires a separate choice, described below.",
           "Vercel runtime processes Calendar API requests and returned event details while serving a refresh. Supabase stores the account's connector status, calendar selections, display preferences, and encrypted Google refresh credential. Cadence does not store Google event details in its hosted database. The web app holds returned event details in memory. Desktop can store the last complete normalized event snapshot in a separate account-bound cache for offline display; its account session and pending consent state use macOS Keychain.",
           "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Supabase daily infrastructure backups can retain deleted connector records and sealed credential ciphertext for no more than seven days.",
           "Disconnect Google Calendar marks the account connection disconnected, clears selected calendar IDs, deletes the live server credential, and requests Google grant revocation. If Google cannot confirm revocation, the user must remove Cadence in Google Account permissions. Other clients stop refreshing after they next receive the connection change; an offline desktop device may retain stale cached event details until it reconnects or its Cadence account is disconnected.",
@@ -74,10 +74,38 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         ],
       },
       {
+        title: "Outlook Calendar, iCloud Calendar, and Hevy",
+        paragraphs: [
+          "These connectors have local source and synthetic verification on web and linked desktop. Live Microsoft, Apple, and Hevy access, installed desktop behavior, and deployment remain unverified. Local checks do not establish public availability. iCloud real-credential use and release also await the owner's acceptance of hosted password custody.",
+          "Where enabled, Outlook Calendar uses separate Microsoft consent with Calendars.ReadBasic. iCloud Calendar uses an Apple Account email and app-specific password for hosted CalDAV reads. Cadence reads selected calendars and normalizes event titles, times, timezone and availability. It discards unsupported details. Neither connector edits events. iCloud calendars stored only on a Mac are excluded.",
+          "Apple does not limit this app-specific password to Calendar; it can also reach Mail, Contacts and other iCloud data. Cadence restricts its use to Calendar reads. Never enter a primary Apple Account password. Cadence seals the email and app-specific password on the server.",
+          "Hevy requires Hevy Pro and an API key. The key has no documented read-only scope; Cadence permits only its allowlisted reads. Provider responses can contain workout titles, exercises, sets, weights, routines and notes. Cadence discards these details and exposes only recorded workout timing and duration. Location is unsupported. Workouts never automatically complete or change a Behavior or Occurrence.",
+          "Hevy reads scan the account's workout history, even for a request covering today. Accounts above 500 workouts return incomplete coverage without reading workout pages. Within that global bound, count and page checks detect some changes during a read. A complete result means no change was detected; it is not an atomic snapshot and concurrent changes can still escape detection.",
+        ],
+      },
+      {
+        title: "Connector custody and removal",
+        paragraphs: [
+          "Supabase stores account-bound connection metadata, selections and display preferences. Sealed credentials stay in a private schema. Vercel processes provider requests and responses. Provider credentials never enter client responses, tracking exports, account synchronization or user-created desktop backups. Key and password entry is transient; clients send it once to the hosted service and do not persist it.",
+          "Cadence does not persist these source events or workouts in its hosted database. Web snapshots stay in memory. Linked desktop can retain the last complete normalized snapshot in a separate disposable account-bound cache for offline display. This cache is outside the tracking database, exports, synchronization and user-created backups. A failed or incomplete refresh may keep that snapshot with a stale warning; it does not prove availability or workout absence.",
+          "Disconnect deletes Cadence's live credential and clears that source's cache on the client handling it. Other devices learn of removal on their next connection check; an offline device may retain stale data until it reconnects or its Cadence account is disconnected. Desktop sign-out and account switching clear local source caches. Web sign-out leaves account-level connections active. Successful account deletion removes live connection records and sealed credentials; infrastructure backup remnants follow the retention table below.",
+          "Cadence does not revoke Outlook, iCloud or Hevy access at the provider. Remove Cadence in Microsoft account app permissions or work/school My Apps, revoke the app-specific password at account.apple.com, or remove or regenerate the API key in Hevy settings. Do this after disconnect or account deletion if you want the provider credential or grant revoked.",
+        ],
+      },
+      {
+        title: "Optional Daily Brief",
+        paragraphs: [
+          "Where the server supports it, Daily Brief is off until you enable it in Settings. Cadence sends selected Behavior schedule, history and calculated findings to OpenAI to generate a read-only briefing. Optional Notes and reminder history have their own controls. The brief cannot change records or perform actions.",
+          "Google Calendar, Outlook Calendar, iCloud Calendar and Hevy each need a separate Daily Brief choice. Connecting a source or displaying it on Timeline does not grant model access. Calendar context uses today's selected event timing, timezone, availability and response state without event titles or details. Hevy contributes only today's recorded workout timing and duration, never exercise details or evidence of free time. Credentials and raw provider records never enter the model input.",
+          "Reconnecting a new source or changing its calendar selection requires allowing it again. Disconnect, disclosure withdrawal and account changes fence pending results. Turning Daily Brief off revokes its optional source choices. Older clients saving Daily Brief preferences also turn the new source choices off.",
+          "Cadence retains no production prompt or briefing history. Generated text stays in memory until it expires or is cleared. Private operational records retain preferences, recent attempt metadata and admission timestamps; account deletion removes them. Cadence requests store:false from OpenAI, which does not promise zero provider retention. Provider abuse-monitoring and prompt-cache retention can still apply. Turning a source off stops future sharing; it cannot recall input already sent.",
+        ],
+      },
+      {
         title: "Exports and external AI services",
         paragraphs: [
           `Cadence provides ${exportFormats.join(", ")} exports. The user chooses when and where to download or share an export.`,
-          "Cadence provides prepared prompts, but it does not send behavior data to an AI provider. If a user shares an export or prompt with an external AI service, that service's terms and privacy policy govern its processing.",
+          "Cadence provides prepared prompts for users to share independently. Export sharing is separate from the optional Daily Brief described above. If a user shares an export or prompt with an external AI service, that service's terms and privacy policy govern its processing.",
         ],
       },
       {
@@ -115,18 +143,28 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
           rows: [
             [
               "Vercel",
-              "Application and marketing hosting, including Calendar refresh processing",
-              "Request and runtime data, including returned Calendar details during a refresh",
+              "Application and marketing hosting, connector refreshes and Daily Brief requests",
+              "Request and runtime data, returned provider records during a refresh, and disclosed briefing inputs",
             ],
             [
               "Supabase",
               "Google authentication and database storage",
-              "Account and Cadence records, Calendar connector records, selections, and sealed credential ciphertext",
+              "Account and Cadence records, connector metadata, selections, disclosure preferences and sealed credential ciphertext",
             ],
             [
               "Google",
               "User-selected Google sign-in and optional Google Calendar consent and API access",
               "Google account, authentication, selected-calendar, and readable event data",
+            ],
+            [
+              "Microsoft Graph, Apple iCloud, and Hevy",
+              "Optional source access where enabled; live acceptance remains unverified",
+              "Provider authentication and selected-calendar or workout responses; Hevy details are discarded after receipt",
+            ],
+            [
+              "OpenAI",
+              "Optional Daily Brief generation where enabled",
+              "Disclosed Behavior context and separately allowed source timing; provider retention may apply",
             ],
             [
               "Google Maps Platform",
@@ -155,7 +193,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Retention",
         paragraphs: [
           "Cadence uses the retention periods below. A provider may delete data sooner. Specific records may be kept longer when required for a security investigation, fraud prevention, or legal preservation.",
-          "Provider settings and published capabilities were verified before this policy took effect.",
+          "The existing infrastructure retention periods do not establish live verification or release approval for the new connectors.",
         ],
         table: {
           caption: "Cadence retention periods as of October 18, 2026",
@@ -195,6 +233,21 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
               "Desktop Google Calendar cache",
               "Until replacement, Calendar disconnect, Cadence account disconnect or reconnect, or local app-data removal",
               "Separate local cache; excluded from Cadence exports, account synchronization, and user-created desktop backups",
+            ],
+            [
+              "Outlook, iCloud, and Hevy connector records",
+              "Live credential until disconnect or account deletion; connection metadata and disclosure preferences until account deletion",
+              "Disconnect fences reads and deletes the live credential; it does not revoke provider access. Infrastructure backup remnants may remain up to 7 days",
+            ],
+            [
+              "Desktop Outlook, iCloud, and Hevy caches",
+              "Until replacement, observed source removal, desktop sign-out, account switch or local app-data removal",
+              "Disposable source caches outside tracking exports, synchronization and user-created backups; offline devices can retain stale context",
+            ],
+            [
+              "Daily Brief",
+              "Generated text in memory only; preferences until account deletion; bounded attempt metadata clears on disablement",
+              "No production prompt or briefing history in Cadence; OpenAI retention is separate from Cadence storage",
             ],
             [
               "Travel place identifiers",
@@ -306,7 +359,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Exports and external prompts",
         paragraphs: [
           `Cadence provides ${exportFormats.join(", ")} exports. The user is responsible for safeguarding downloaded files and deciding whether to share them.`,
-          "Cadence may provide prepared prompts. The user selects any external AI service and sends data independently. Cadence does not send behavior data to an AI provider, and external services operate under their own terms and privacy policies.",
+          "Cadence may provide prepared prompts for independent export sharing. Separately, enabling Daily Brief permits Cadence to send disclosed context to OpenAI. Each connected source requires its own model-data choice. External services operate under their own terms and privacy policies.",
         ],
       },
       {
@@ -395,7 +448,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Data boundaries",
         paragraphs: [
           "Cadence stores account and behavior records in Supabase. Row Level Security scopes user-owned records to the authenticated account.",
-          "Cadence does not send exported behavior data to an AI provider. Users choose whether to share an export with an external service.",
+          "Cadence does not send exported behavior data to an AI provider. Users choose whether to share an export with an external service. Optional Daily Brief separately sends disclosed context to OpenAI. Local connector tests do not verify live providers, installed desktop behavior or deployment.",
         ],
       },
       {

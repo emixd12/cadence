@@ -40,8 +40,9 @@ Tickets 116–122 implement optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
-in-app horse briefing. Tickets 220–228 plan read-only Outlook Calendar, iCloud
-Calendar, and Hevy workout-timing connectors on web and linked desktop. Mobile and broader workspace restructuring remain deferred.
+in-app horse briefing. Tickets 220–227 implement read-only Outlook Calendar, iCloud Calendar, and Hevy
+workout-timing connectors on web and linked desktop with local verification.
+Ticket 228 owns final disclosure/evidence review; live and release gates remain open. Mobile and broader workspace restructuring remain deferred.
 
 ## Agent operating model
 
@@ -138,7 +139,7 @@ Out of scope for v1:
 - General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
   the in-app read-only daily briefing in the horse bubble
 - Calendar sync and event editing, except read-only Google Calendar context in
-  Tickets 132–137 and planned read-only Outlook and iCloud Calendar context in
+  Tickets 132–137 and locally implemented read-only Outlook and iCloud Calendar context in
   Tickets 220–228
 - Workout writes, coaching, exercise analysis, and automatic Behavior completion
   from recorded activity

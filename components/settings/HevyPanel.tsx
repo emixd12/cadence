@@ -71,12 +71,12 @@ export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0
 
   return (
     <SettingsPanel id="connector-hevy" headingLevel={3} title="Hevy"
-      description="Recorded activity. Cadence reads when each workout started and how long it lasted. It does not read exercises, titles, notes, sets, or weights, and a workout never completes a Behavior.">
+      description="Recorded activity. Cadence reads when each workout started and how long it lasted. Provider responses can contain exercises, titles, notes, sets and weights; Cadence discards these details. A workout never completes a Behavior.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
         <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? hevyStatusLabel(status)}</p>
         {status === "not_configured" ? <p className="text-muted-readable">Hevy connection is not configured for this Cadence deployment.</p> : null}
         {needsKey ? <form onSubmit={connect} className="grid gap-3 border-t border-line pt-4">
-          <p className="text-muted-readable">Hevy API access requires Hevy Pro. Create a key in Hevy settings and enter it once. Cadence stores it encrypted on its server, never on this device, and reads at most 500 workouts; a larger history shows as incomplete.</p>
+          <p className="text-muted-readable">Hevy API access requires Hevy Pro. Create a key in Hevy settings and enter it once. Cadence stores it encrypted on its server, never on this device, and scans at most 500 workouts across your full history, even for today. A larger history shows as incomplete. A complete read means no change was detected during the scan, not an atomic snapshot.</p>
           <label htmlFor={keyId} className="font-bold text-foreground">Hevy API key</label>
           <input id={keyId} type="password" autoComplete="off" spellCheck={false} autoCapitalize="none" value={apiKey}
             onChange={(event) => setApiKey(event.target.value)} disabled={pending !== null}
@@ -110,7 +110,7 @@ export function hevyErrorMessage(code: string, fallback: string): string {
   if (code === "reconnect_required") return "Hevy did not accept this key. Check it in Hevy settings and enter it again.";
   if (code === "wrong_account") return "This key belongs to a different Hevy account. Disconnect Hevy first, then connect the other account.";
   if (code === "invalid_request") return "Enter a valid Hevy API key.";
-  if (code === "incomplete_pagination") return "Hevy has more than 500 workouts, so Cadence could not read a complete list.";
+  if (code === "incomplete_pagination") return "Hevy could not verify a complete list. The scan is limited to 500 workouts; changes during the scan can also make it incomplete.";
   if (code === "timeout") return "Hevy did not respond in time. Try again; other sources and tracking are unchanged.";
   if (code === "rate_limited") return "Hevy asked Cadence to wait before reading again. Try again later.";
   if (code === "not_configured") return "Hevy connection is not configured for this Cadence deployment.";

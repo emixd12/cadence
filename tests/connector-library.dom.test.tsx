@@ -91,7 +91,7 @@ describe("HevyPanel", () => {
     await act(() => root.render(<HevyPanel coordinator={coordinator} localDate="2026-11-01" timezone="America/New_York" />));
     await vi.waitFor(() => expect(container.textContent).toContain("Hevy is not connected."));
     expect(container.textContent).toContain("requires Hevy Pro");
-    expect(container.textContent).toContain("at most 500 workouts");
+    expect(container.textContent).toContain("at most 500 workouts"); expect(container.textContent).toContain("across your full history"); expect(container.textContent).toContain("not an atomic snapshot"); expect(container.textContent).toContain("Cadence discards these details");
     const input = container.querySelector<HTMLInputElement>('input[type="password"]')!;
     expect(input.getAttribute("autocomplete")).toBe("off");
     expect(container.querySelector(`label[for="${input.id}"]`)?.textContent).toBe("Hevy API key");

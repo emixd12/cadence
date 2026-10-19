@@ -39,7 +39,7 @@ the apex `/`.
 | `/faq` | implemented in Astro marketing app | Frequently asked questions | Covers Cadence philosophy, privacy, time tracking, and BehaviorLog portability. |
 | `/docs` | implemented in Astro marketing app | Technical docs entry point for Cadence, BehaviorLog, machine-readable mirrors, and future docs structure | Links to Markdown mirrors, `llms.txt`, `llms-full.txt`, route manifest, sitemap, robots, example bundle, and future docs map. |
 | `/examples` | implemented in Astro marketing app | Sanitized sample BehaviorLog bundle page | Downloads a build-generated `.behaviorlog.zip` that passes the pinned BehaviorLog reference validator. |
-| `/about` | implemented in Astro marketing app | Philosophy, governance, scope boundaries, and open-source posture | No desktop/mobile teaser, billing, AI, analytics, or marketing-cookie scope. |
+| `/about` | implemented in Astro marketing app | Philosophy, governance, scope boundaries, and open-source posture | Product and disclosure copy only; no new mobile, billing, analytics or marketing-cookie feature. Optional Daily Brief disclosure does not imply release acceptance. |
 
 Marketing compatibility redirects:
 

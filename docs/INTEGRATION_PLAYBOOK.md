@@ -355,10 +355,11 @@ tokens, account identifiers, and provider payloads stay outside git.
 
 ## Worked briefs: connector expansion (Tickets 220–228)
 
-Status, October 18, 2026: Ticket 220 completed these briefs as documentation.
-No runtime code, provider configuration, private account read, or deployment has
-occurred. `docs/EXTERNAL_EVENT_CONTRACT.md` owns the planned wire contracts.
-`STATUS.md` owns current state.
+Status, October 18, 2026: Tickets 220–227 are locally implemented and
+independently verified through `40b1dc2`. Ticket 228 reconciles disclosures and
+final evidence. No live provider access, installed desktop acceptance or
+deployment is established. `docs/EXTERNAL_EVENT_CONTRACT.md` owns the wire
+contracts; `STATUS.md` owns current state. iCloud custody acceptance remains open.
 
 ### Shared boundary
 

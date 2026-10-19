@@ -12014,7 +12014,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12103,7 +12103,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12184,7 +12184,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12269,7 +12269,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12352,7 +12352,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12439,7 +12439,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -12524,7 +12524,7 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
         ]
       },
       "status": "implemented",
@@ -13809,7 +13809,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Stop iCloud reads and delete Cadence's saved Microsoft access.",
+      "intent": "Stop iCloud reads and delete Cadence's saved Apple login values.",
       "triggers": [
         {
           "kind": "activate",

@@ -297,7 +297,9 @@ release acceptance. Marketing has no runtime change; native mobile remains defer
 
 ## Connector expansion (Tickets 220–228)
 
-Implemented locally through Ticket 227, with synthetic evidence only. In linked-account mode, desktop uses
+Implemented and independently verified locally through Ticket 227 at `40b1dc2`.
+Evidence includes source, synthetic fixtures and native cache unit tests; it does
+not establish installed application behavior. In linked-account mode, desktop uses
 the same Settings library and Timeline components and calls hosted Outlook,
 iCloud, and Hevy brokers with its Supabase session. Outlook consent uses the
 existing external-browser and opaque Keychain-state pattern. iCloud and Hevy
@@ -305,7 +307,12 @@ credentials are posted once to the hosted service and never stored on the Mac.
 Per-source disposable caches stay outside `cadence.sqlite3` and user-created
 backups. Disconnect, sign-out, and account switching clear them. Local mode shows
 connectors as requiring a linked account. There is no EventKit bridge. Installed
-evidence is required separately under Ticket 228.
+acceptance remains open; Ticket 228 records that gap without claiming release.
+Microsoft/Apple/Hevy live access, iCloud hosted custody acceptance, Microsoft
+publisher verification and deployment remain unverified. Hevy requires Pro and
+scans at most 500 workouts globally even for today; count stability is not an
+atomic snapshot. Each source requires its own default-off Daily Brief disclosure.
+Source timing never automatically completes a Behavior.
 
 ## Travel implementation — Tickets 162–165
 

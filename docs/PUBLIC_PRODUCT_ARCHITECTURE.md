@@ -270,8 +270,12 @@ license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
 
-Cadence provides prepared prompts, but the user exports data and chooses any
-external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides prepared prompts for user-controlled export sharing. Separately,
+optional Daily Brief sends disclosed context to OpenAI where enabled. Every
+connector requires its own model-data choice. Tickets 220–227 have local
+source/fixture verification only; Ticket 228 reconciles public disclosures.
+Live providers, installed desktop, iCloud custody acceptance and release remain
+open. Marketing must not equate local verification with public availability.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
 
