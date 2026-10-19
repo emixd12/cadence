@@ -7,6 +7,7 @@ import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, type 
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
+import { getIcloudCalendarConnection } from "./icloud-calendar.service";
 import { getHevyConnection } from "./hevy.service";
 
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
@@ -21,14 +22,6 @@ const SETTINGS_KEY_SETS = [
   "enabled,includeCalendar,includeNotes,includeReminderHistory",
   "enabled,includeCalendar,includeHevy,includeIcloudCalendar,includeNotes,includeOutlookCalendar,includeReminderHistory",
 ];
-
-/**
- * Ticket 227 seam: iCloud Calendar has a disclosure contract but no adapter yet,
- * so Settings offers no control and an enabling `PUT` is refused.
- */
-export function icloudCalendarBriefAvailable(): boolean {
-  return false;
-}
 
 /** Phase diagnostics record span, duration and error code only; never prompts, facts or output. */
 const phase = <T,>(span: string, operation: () => Promise<T>) => measurePerformanceSpan({ span: `daily_brief.${span}` }, operation);
@@ -66,10 +59,13 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
   };
   if (input.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
   if (input.includeCalendar && (await getCalendarConnection(caller)).status !== "connected") throw new DailyBriefError("calendar_unavailable");
-  if (input.includeIcloudCalendar && !icloudCalendarBriefAvailable()) throw new DailyBriefError("source_unavailable");
   if (input.includeOutlookCalendar) {
     const outlook = await getOutlookCalendarConnection(caller);
     if (outlook.status !== "connected" || outlook.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
+  }
+  if (input.includeIcloudCalendar) {
+    const icloud = await getIcloudCalendarConnection(caller);
+    if (icloud.status !== "connected" || icloud.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
   }
   if (input.includeHevy && (await getHevyConnection(caller)).status !== "connected") throw new DailyBriefError("source_unavailable");
   const current = await readDailyBriefPreferences(caller.client);
@@ -85,20 +81,23 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
  * read offers nothing and reports a disclosed source as unavailable.
  */
 async function dailyBriefConnectorState(caller: CalendarCaller, preferences: DailyBriefPreferences): Promise<Pick<DailyBriefSettings, "connectorSources" | "connectorAttention">> {
-  const [outlook, hevy] = await Promise.all([
+  const [outlook, icloud, hevy] = await Promise.all([
     Promise.resolve().then(() => getOutlookCalendarConnection(caller)).catch(() => null),
+    Promise.resolve().then(() => getIcloudCalendarConnection(caller)).catch(() => null),
     Promise.resolve().then(() => getHevyConnection(caller)).catch(() => null),
   ]);
   const outlookConnected = outlook?.status === "connected";
   const outlookSelected = outlookConnected && outlook.preferences.selectedSourceIds.length > 0;
+  const icloudConnected = icloud?.status === "connected";
+  const icloudSelected = icloudConnected && icloud.preferences.selectedSourceIds.length > 0;
   const hevyConnected = hevy?.status === "connected";
   return {
-    connectorSources: { outlookCalendar: outlookSelected, icloudCalendar: icloudCalendarBriefAvailable(), hevy: hevyConnected },
+    connectorSources: { outlookCalendar: outlookSelected, icloudCalendar: icloudSelected, hevy: hevyConnected },
     connectorAttention: {
       outlookCalendar: !preferences.includeOutlookCalendar ? null : !outlookConnected ? "unavailable" : !outlookSelected ? "no_calendars"
         : outlook.generation !== preferences.outlookConnectionGeneration || outlook.selectionRevision !== preferences.outlookSelectionRevision ? "changed" : null,
-      // Ticket 227 seam: no iCloud adapter yet, so a stored iCloud disclosure is always unavailable.
-      icloudCalendar: preferences.includeIcloudCalendar && !icloudCalendarBriefAvailable() ? "unavailable" : null,
+      icloudCalendar: !preferences.includeIcloudCalendar ? null : !icloudConnected ? "unavailable" : !icloudSelected ? "no_calendars"
+        : icloud.generation !== preferences.icloudConnectionGeneration || icloud.selectionRevision !== preferences.icloudSelectionRevision ? "changed" : null,
       hevy: !preferences.includeHevy ? null : !hevyConnected ? "unavailable"
         : hevy.generation !== preferences.hevyConnectionGeneration ? "changed" : null,
     },

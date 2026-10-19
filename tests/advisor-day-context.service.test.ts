@@ -21,6 +21,8 @@ const connectors = vi.hoisted(() => ({
   getOutlookCalendarConnection: vi.fn(),
   getHevyActivities: vi.fn(),
   getConnectorConnection: vi.fn(),
+  getIcloudCalendarEventsForCaller: vi.fn(),
+  getIcloudCalendarConnection: vi.fn(),
 }));
 
 vi.mock("../lib/services/outlook-calendar.service", () => ({
@@ -28,6 +30,10 @@ vi.mock("../lib/services/outlook-calendar.service", () => ({
   getOutlookCalendarConnection: connectors.getOutlookCalendarConnection,
 }));
 vi.mock("../lib/services/hevy.service", () => ({ getHevyActivities: connectors.getHevyActivities }));
+vi.mock("../lib/services/icloud-calendar.service", () => ({
+  getIcloudCalendarEventsForCaller: connectors.getIcloudCalendarEventsForCaller,
+  getIcloudCalendarConnection: connectors.getIcloudCalendarConnection,
+}));
 vi.mock("../lib/services/connector-credentials", () => ({ getConnectorConnection: connectors.getConnectorConnection }));
 vi.mock("../lib/db/advisor-context.repo", () => repo);
 vi.mock("../lib/db/advisor-read-admission.repo", () => admission);
@@ -636,13 +642,45 @@ describe("separately disclosed connector sources (Ticket 226)", () => {
     ]);
   });
 
-  it("reports a disclosed iCloud source as unavailable without any provider read (Ticket 227 seam)", async () => {
-    const icloud = { ...sourcesAuthorization, icloudCalendar: { calendarIds: ["calendar-a"], connectionGeneration: 1, selectionRevision: 1 } };
-    connectors.getConnectorConnection.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1, preferences: { selectedSourceIds: ["calendar-a"] } });
+  it("reads a disclosed iCloud source through its service within the fence and budget, sending no titles or provider IDs (Ticket 227)", async () => {
+    const { icloudDaySnapshot } = await import("./helpers/connector-day-context");
+    const snapshot = icloudDaySnapshot();
+    Object.assign(snapshot, {
+      requestedRange: { ...snapshot.requestedRange, startLocalDate: "2026-09-19", endLocalDate: "2026-09-19" },
+      fetchedAt: "2026-09-19T12:00:01Z",
+      freshness: { ...snapshot.freshness, refreshedAt: "2026-09-19T12:00:01Z" },
+      coverage: [{ ...snapshot.coverage[0], startLocalDate: "2026-09-19", endLocalDate: "2026-09-19" }],
+      events: [{ ...snapshot.events[0], startAt: "2026-09-19T15:00:00Z", endAt: "2026-09-19T15:30:00Z" }],
+    });
+    const icloud = { ...sourcesAuthorization, icloudCalendar: { calendarIds: ["calendar-1"], connectionGeneration: 4, selectionRevision: 2 } };
+    connectors.getIcloudCalendarEventsForCaller.mockResolvedValue({ connection: { selectionRevision: 2 }, result: { ok: true, snapshot } });
+    connectors.getIcloudCalendarConnection.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 2, preferences: { selectedSourceIds: ["calendar-1"] } });
     const context = await read({ authorization: icloud, revalidateAuthorization: async () => icloud,
-      connectorSources: request({ outlookCalendar: false, hevy: false, icloudCalendar: true }) });
-    expect(context.connectors[1]).toMatchObject({ source: "icloud_calendar", state: "unavailable", events: [], failure: { code: "provider_unavailable" } });
+      connectorSources: request({ outlookCalendar: false, hevy: false, icloudCalendar: true, deadlineAt: Date.now() + 9_000 }) });
+    expect(context.version).toBe("1.1");
+    expect(context.connectors[1]).toMatchObject({ source: "icloud_calendar", state: "current", complete: true, events: [expect.objectContaining({ interval: expect.objectContaining({ startAt: "2026-09-19T15:00:00Z" }) })] });
+    const options = connectors.getIcloudCalendarEventsForCaller.mock.calls[0]![3];
+    expect(connectors.getIcloudCalendarEventsForCaller).toHaveBeenCalledWith({ client, user }, "2026-09-19", "2026-09-19", expect.objectContaining({
+      authorizedCalendarIds: ["calendar-1"], expectedConnectionGeneration: 4, expectedSelectionRevision: 2, signal: expect.any(AbortSignal) }));
+    expect(options.deadlineMs).toBeLessThanOrEqual(9_000);
     expect(connectors.getOutlookCalendarEventsForCaller).not.toHaveBeenCalled();
+    expect(JSON.stringify(context)).not.toMatch(/Private dentist|uid-9|calendar-1/);
+  });
+
+  it("reports an iCloud read failure or spent budget as unavailable, never an empty day, and fences an iCloud change", async () => {
+    const { ConnectorError } = await import("../lib/types/connectors");
+    const icloud = { ...sourcesAuthorization, icloudCalendar: { calendarIds: ["calendar-1"], connectionGeneration: 4, selectionRevision: 2 } };
+    const only = request({ outlookCalendar: false, hevy: false, icloudCalendar: true });
+    connectors.getIcloudCalendarConnection.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 2, preferences: { selectedSourceIds: ["calendar-1"] } });
+    connectors.getIcloudCalendarEventsForCaller.mockRejectedValue(new ConnectorError("incomplete_pagination"));
+    const failed = await read({ authorization: icloud, revalidateAuthorization: async () => icloud, connectorSources: only });
+    expect(failed.connectors[1]).toMatchObject({ source: "icloud_calendar", state: "unavailable", events: [], failure: { code: "incomplete_pagination" } });
+    connectors.getIcloudCalendarEventsForCaller.mockClear();
+    const spent = await read({ authorization: icloud, revalidateAuthorization: async () => icloud, connectorSources: { ...only, deadlineAt: Date.now() - 1 } });
+    expect(connectors.getIcloudCalendarEventsForCaller).not.toHaveBeenCalled();
+    expect(spent.connectors[1]).toMatchObject({ state: "unavailable", failure: { code: "timeout" } });
+    connectors.getIcloudCalendarConnection.mockResolvedValueOnce({ status: "connected", generation: 5, selectionRevision: 2, preferences: { selectedSourceIds: ["calendar-1"] } });
+    await expect(read({ authorization: icloud, revalidateAuthorization: async () => icloud, connectorSources: only })).rejects.toMatchObject({ code: "context_changed" });
   });
 
   it("rejects output when a source connection or selection changes during or after its read", async () => {

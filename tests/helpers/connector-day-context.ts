@@ -7,6 +7,7 @@ import {
 import type { AdvisorDayContextV1, AdvisorDayContextV1_1 } from "@cadence/core/types/advisor-day-context";
 import base from "../fixtures/advisor-day-context.valid.json";
 import outlook from "../fixtures/external-event-snapshot.outlook.valid.json";
+import icloud from "../fixtures/external-event-snapshot.icloud.valid.json";
 import hevy from "../fixtures/recorded-activity-snapshot.valid.json";
 
 // Ticket 226 synthetic fixtures. The `1.0` Daily Brief fixture day is 2026-11-01
@@ -25,6 +26,19 @@ export function outlookDaySnapshot(): FixtureSnapshot {
   snapshot.freshness = { ...snapshot.freshness, refreshedAt: CONNECTOR_FETCHED_AT };
   snapshot.coverage = [{ calendarId: "calendar-1", startLocalDate: "2026-11-01", endLocalDate: "2026-11-01", paginationComplete: true, itemCount: 1 }];
   snapshot.events = [{ ...snapshot.events[0], startAt: "2026-11-01T17:15:00Z", endAt: "2026-11-01T17:45:00Z", duration: { kind: "known", seconds: 1800 }, title: "Private review" }];
+  return snapshot;
+}
+
+/** Ticket 227: one selected iCloud calendar for the fixture day with a busy 15:00–15:30Z event. */
+export function icloudDaySnapshot(): FixtureSnapshot {
+  const snapshot: FixtureSnapshot = structuredClone(icloud);
+  snapshot.requestedRange = { ...snapshot.requestedRange, startLocalDate: "2026-11-01", endLocalDate: "2026-11-01" };
+  snapshot.fetchedAt = CONNECTOR_FETCHED_AT;
+  snapshot.freshness = { ...snapshot.freshness, refreshedAt: CONNECTOR_FETCHED_AT };
+  snapshot.coverage = [{ calendarId: "calendar-1", startLocalDate: "2026-11-01", endLocalDate: "2026-11-01", paginationComplete: true, itemCount: 1 }];
+  snapshot.events = [{ ...snapshot.events[0], recurrence: null, id: "icloud_calendar/account-1/calendar-1/uid-9", logicalInstanceId: "icloud_calendar/account-1/calendar-1/uid-9",
+    providerEventId: "uid-9", startAt: "2026-11-01T15:00:00Z", endAt: "2026-11-01T15:30:00Z", duration: { kind: "known", seconds: 1800 }, title: "Private dentist" }];
+  snapshot.tombstones = [];
   return snapshot;
 }
 

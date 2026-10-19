@@ -51,6 +51,7 @@ import { CalendarConnectionError } from "@/lib/services/google-calendar-oauth";
 import { getConnectorConnection } from "@/lib/services/connector-credentials";
 import { getHevyActivities } from "@/lib/services/hevy.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
+import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
 
 /** Ticket 226: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
@@ -317,14 +318,9 @@ async function assembleDayContexts(
   const reads = Promise.all([
     input.includeGoogleCalendar ? readCalendar(input.caller, authorization, localDate, now, opaqueRef, signal) : Promise.resolve(connector),
     sourceRequest?.outlookCalendar && authorization.outlookCalendar
-      ? readOutlookCalendar(input.caller, authorization.outlookCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
-    // Ticket 227 seam: iCloud has a disclosure contract but no adapter yet, so it is reported unavailable without a read.
-    sourceRequest?.icloudCalendar && authorization.icloudCalendar ? projectUnavailableVersionedAdvisorCalendar({
-      source: "icloud_calendar",
-      connectionGeneration: authorization.icloudCalendar.connectionGeneration,
-      selectionRevision: authorization.icloudCalendar.selectionRevision,
-      failure: { code: "provider_unavailable", retryable: false, retryAfterSeconds: null },
-    }) : null,
+      ? readConnectorCalendar("outlook_calendar", input.caller, authorization.outlookCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
+    sourceRequest?.icloudCalendar && authorization.icloudCalendar
+      ? readConnectorCalendar("icloud_calendar", input.caller, authorization.icloudCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
     sourceRequest?.hevy && authorization.hevy
       ? readHevyActivity(input.caller, authorization.hevy.connectionGeneration, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
   ]);
@@ -520,7 +516,9 @@ function connectorReadDeadline(deadlineAt: number): number {
 
 const SOURCE_TIMEOUT = { code: "timeout" as const, retryable: true, retryAfterSeconds: null };
 
-async function readOutlookCalendar(
+/** Outlook or iCloud: today's selected calendars under the fenced generation, selection, and remaining brief budget. */
+async function readConnectorCalendar(
+  source: "outlook_calendar" | "icloud_calendar",
   caller: CalendarCaller,
   fence: AdvisorCalendarFence,
   localDate: string,
@@ -530,12 +528,13 @@ async function readOutlookCalendar(
   deadlineAt: number,
 ): Promise<AdvisorCalendarConnectorV1_1> {
   const unavailable = (failure: ReturnType<typeof connectorFailure>) => projectUnavailableVersionedAdvisorCalendar({
-    source: "outlook_calendar", connectionGeneration: fence.connectionGeneration, selectionRevision: fence.selectionRevision, failure,
+    source, connectionGeneration: fence.connectionGeneration, selectionRevision: fence.selectionRevision, failure,
   });
   const deadlineMs = connectorReadDeadline(deadlineAt);
   if (deadlineMs <= 0) return unavailable(SOURCE_TIMEOUT);
+  const readEvents = source === "outlook_calendar" ? getOutlookCalendarEventsForCaller : getIcloudCalendarEventsForCaller;
   try {
-    const read = await getOutlookCalendarEventsForCaller(caller, localDate, localDate, {
+    const read = await readEvents(caller, localDate, localDate, {
       deadlineMs,
       signal,
       authorizedCalendarIds: fence.calendarIds,
@@ -595,7 +594,7 @@ async function assertConnectorSourcesCurrent(
   if (!request) return;
   const checks: Array<Promise<boolean>> = [];
   const calendar = (provider: "outlook_calendar" | "icloud_calendar", fence: AdvisorCalendarFence) =>
-    (provider === "outlook_calendar" ? getOutlookCalendarConnection(caller) : getConnectorConnection(caller, provider)).then((current) =>
+    (provider === "outlook_calendar" ? getOutlookCalendarConnection(caller) : getIcloudCalendarConnection(caller)).then((current) =>
       current.status === "connected" && current.generation === fence.connectionGeneration && current.selectionRevision === fence.selectionRevision);
   if (request.outlookCalendar && authorization.outlookCalendar) checks.push(calendar("outlook_calendar", authorization.outlookCalendar));
   if (request.icloudCalendar && authorization.icloudCalendar) checks.push(calendar("icloud_calendar", authorization.icloudCalendar));
