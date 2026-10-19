@@ -1296,7 +1296,7 @@ setting.
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115
-defers Apple-trusted distribution acceptance. Tickets 116–122 plan optional
+owns Apple-trusted distribution acceptance and is in progress. Tickets 116–122 implement optional
 desktop account synchronization. Preserve unrelated working-tree edits and both
 current deployments. Next.js stays at the repository root.
 
@@ -1344,6 +1344,14 @@ Release tooling runs the desktop frontend build with the reviewed environment,
 disables Tauri's nested frontend build, and verifies both public values exist in
 the fresh frontend output before Tauri runs. Native staged-app configured-state
 acceptance remains the packaging and runtime gate.
+Production `check` and `build` also require public `VITE_CALENDAR_BROKER_ORIGIN`.
+Calendar, Daily Brief, and Travel share this origin; use `https://app.cadence-me.com`.
+Production preflight rejects credentials, paths, queries, fragments, and origins
+without an exact reviewed native CSP `connect-src` entry. Fresh frontend output
+must contain the configured origin before Tauri runs. Build reports record public
+variable names and presence without values; this does not prove installed acceptance.
+Preview and local builds may omit the broker origin. Both CSP policies retain
+the legacy broker and allow the current production origin without arbitrary widening.
 Ad hoc preview builds also select the legacy macOS login-Keychain path and fail
 verification when its compiled marker is absent. Production candidates do not
 inherit this preview-only flag and retain the Data Protection Keychain path.
@@ -1393,9 +1401,12 @@ required; the horizon decision does not complete Ticket 108.
 
 Keep signing/updater credentials out of source, logs, and browser code. Ticket
 113's ad hoc Apple Silicon preview and updater acceptance are complete. Ticket
-115 defers Apple Developer Program access, Developer ID signing, notarization,
+115 owns Apple Developer Program access, Developer ID signing, notarization,
 stapled app/DMG verification, quarantined notarized-DMG Gatekeeper acceptance,
-and Apple Silicon macOS 14 execution. See `docs/DESKTOP_RELEASE.md`.
+and installed acceptance on the current Apple Silicon host. The owner deferred
+macOS 14 runtime acceptance without changing the declared and compiled minimum.
+Record the candidate's exact tested macOS version and build. See
+`docs/DESKTOP_RELEASE.md`.
 
 The owner authorized Cadence distribution of the six exact asset hashes in
 `docs/qa/2026-08-30-desktop-asset-provenance.md`. Keep MIT exclusions, reserved
