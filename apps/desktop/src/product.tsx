@@ -320,12 +320,12 @@ export function Product() {
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} },
-      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
+      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
   const calendarContext = {
     travelMessage: travel.message,
     travelStatus: travel,
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
-    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
+    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
     events: visibleCalendarEvents,
     freshness: calendar.snapshot ? { ...calendar.snapshot.freshness, label: calendar.label,
       ...(calendar.stale ? { state: "stale" as const, canAssertNoOverlap: false } : {}) }

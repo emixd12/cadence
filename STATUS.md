@@ -21,6 +21,50 @@ superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets
 - Ticket 231 (privacy disclosure and directory submission packet): review correction implemented October 18, 2026; awaiting independent re-review. Reviewer instructions now separate identical-input replay, changed-input key reuse rejection, and new-key stale-revision conflict; focused integration-write tests pass. `docs/qa/mcp-directory-submission.md` contains unpublished Privacy/Terms drafts, listing copy, reviewer-account options, test cases, recording script and owner release steps. OpenAI challenge route returns exact plain text or 404; focused tests, full tests, build, lint and drift checks pass. Typecheck passes after Ticket 230's shared-file correction; independent compiler recheck passes. Served legal pages unchanged. Web route and marketing listing copy; desktop/mobile not applicable. Legal approval, health-data eligibility, reviewer access and hosted acceptance remain owner gates; no hosted actions.
 - Ticket 232 (production deployment and live client acceptance): disabled release deployed October 18, 2026 from PR108 merge 280b6eacc9ebcabbd9c5b675c67adf1c01870c8d (reviewed tree 81eface). Six approved migrations are deployed; hosted history is 86 and the family-deadline function hashes/permissions match review. Both Node24 production sites are Ready; final web redeploy binds the Ready marketing deployment. MCP/OAuth/discovery return 503, challenge returns 404, and approved Privacy/Terms/marketing text and October18 dates match. Public Trust correctly marks prior-release evidence Stale; its Preview refresh exposed a validator collision with a public tool-reference path. A local field-scoped correction is under review; publication remains paused. Scheduled maintenance and live-client acceptance remain unverified. No public activation, signing-key change, manual scheduler invocation or live account test occurred. Web/marketing released; desktop sync acceptance remains separately gated and future mobile deferred.
 
+## Ticket 215: Three-input travel Settings and Behavior Where — October 19, 2026
+
+Implemented in source on branch `claude/unruffled-babbage-e830a5`; not deployed.
+Hosted migration push, deployment, desktop preview release and production QA remain
+owner-gated.
+
+- Settings: `components/settings/TravelSettingsPanel.tsx` shows the Travel estimates
+  toggle with the Google Maps disclosure, optional Home and usual travel. The toggle
+  saves consent and asks for foreground location in the same click; it stays
+  disabled until usual travel is chosen. The consent checkbox, "saved base" wording,
+  map-app selector and permission-check button are gone. Saves pass the stored
+  `navigation_preference` through unchanged.
+- Navigation: `lib/ui/navigation-platform.ts` opens Apple Maps on Apple devices and
+  Google Maps elsewhere; desktop always uses Apple Maps. Event details say "Home"
+  and "Return home".
+- Where: `behaviors.where_kind` (null = Not set, `anywhere`, `home`, `place`).
+  Migration `20261019180000_add_behavior_where.sql` and SQLite `0018_behavior_where.sql`
+  set `place` for every Behavior with location text, call no provider and rewrite no
+  configuration history. Core `packages/core/src/services/behavior-where.ts` plans
+  and reads Where; snapshots without it read as `place` when they have text. MCP
+  input keeps the earlier text-only rule. Where joins configuration history, account
+  sync (Behavior upserts require `where_kind`) and Full JSON; CSV, JSONL, Markdown
+  and BehaviorLog omit it.
+- Routing: Not set and Anywhere request no route; Home routes to the saved Home
+  (one shared lookup) and requests none without it; A place routes to its text.
+- Registry: `INT-TRAVEL-001` (Save Home and usual travel), `INT-TRAVEL-002` (now the
+  travel toggle), new `INT-TRAVEL-005` (Behavior Where). Docs: user guide, UI spec,
+  user flows, data models, export formats, desktop parity, design catalog notes.
+
+Verification: agents, interactions, resolvers, core, design-system, lint, web and
+desktop typecheck, web and desktop builds and `git diff --check` pass. 2,869 tests
+passed, 96 skipped. 111 native tests pass, including the new 0018 migration test; 21
+real-SQLite contract tests pass. An isolated loopback stack (`cadence-t215`)
+replayed all 87 migrations and the seed from scratch; generated types match the
+checked-in file. The opt-in `tests/behavior-where.local-integration.test.ts` passed
+against it, and six SQL smokes passed. `behavior-end-date-lifecycle-smoke.sql`
+had lacked `location_text` since September 22; it now carries both fields.
+
+Release order: hosted migration, then the web deployment, then a desktop preview.
+Installed preview.50 fails closed on Behavior sync after the hosted migration until
+it updates. Risks and follow-ups: the approved Privacy text still says "saved base"
+and "routing consent" (owner wording update); the MCP contract does not expose
+Where; Ticket 219 owns "location not set" in model input.
+
 ## Tickets 213–214 completed — October 18, 2026
 
 All three migrations deployed and read back. Production serves the approved

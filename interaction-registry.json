@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-10-18",
+  "updated": "2026-10-19",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -271,7 +271,8 @@
         "INT-BEHAVIOR-027",
         "INT-BEHAVIOR-028",
         "INT-BEHAVIOR-030",
-        "INT-BEHAVIOR-031"
+        "INT-BEHAVIOR-031",
+        "INT-TRAVEL-005"
       ]
     },
     {
@@ -452,7 +453,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 43,
+      "interaction_marker_count": 44,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -467,7 +468,8 @@
         "INT-BEHAVIOR-020",
         "INT-BEHAVIOR-021",
         "INT-BEHAVIOR-030",
-        "INT-BEHAVIOR-031"
+        "INT-BEHAVIOR-031",
+        "INT-TRAVEL-005"
       ]
     },
     {
@@ -824,7 +826,7 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 8,
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002"
@@ -5059,7 +5061,7 @@
         "audience": "user",
         "references": [
           "docs/user-guide/behaviors-and-review.md#create-a-behavior",
-          "docs/user-guide/travel.md#add-a-behavior-location"
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
         ]
       },
       "status": "implemented",
@@ -6135,7 +6137,7 @@
         "audience": "user",
         "references": [
           "docs/user-guide/behaviors-and-review.md#create-a-behavior",
-          "docs/user-guide/travel.md#add-a-behavior-location"
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
         ]
       },
       "status": "implemented",
@@ -12599,7 +12601,7 @@
     },
     {
       "id": "INT-TRAVEL-001",
-      "name": "Configure proactive travel",
+      "name": "Save Home and usual travel",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12616,15 +12618,15 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Save user-authored optional base, selected mode, navigation preference and explicit routing consent.",
+      "intent": "Save the optional Home and the usual travel mode (walking, cycling, transit or driving). The travel toggle keeps its state.",
       "triggers": [
         {
           "kind": "activate",
           "control": "Save travel settings"
         }
       ],
-      "availability": "Existing Settings; route estimates remain deployment-gated.",
-      "success_result": "Save user-authored optional base, selected mode, navigation preference and explicit routing consent.",
+      "availability": "Existing Settings; enabled after Home or usual travel changes. Route estimates remain deployment-gated.",
+      "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
@@ -12682,11 +12684,11 @@
     },
     {
       "id": "INT-TRAVEL-002",
-      "name": "Check foreground device location permission",
+      "name": "Turn travel estimates on or off",
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/travel.md#check-device-permission"
+          "docs/user-guide/travel.md#set-up-travel"
         ]
       },
       "status": "implemented",
@@ -12699,18 +12701,21 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Request one foreground position and report its usability without saving or transmitting it.",
+      "intent": "Turning the travel toggle on records routing consent beside the Google Maps disclosure and requests one foreground device position in the same click. Turning it off withdraws consent.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Check device location permission"
+          "kind": "change",
+          "control": "Travel estimates"
         }
       ],
-      "availability": "Existing Settings; route estimates remain deployment-gated.",
-      "success_result": "Request one foreground position and report its usability without saving or transmitting it.",
+      "availability": "Existing Settings after usual travel is chosen; route estimates remain deployment-gated.",
+      "success_result": "Saves the toggle with consent, shows the device location state, and does not save or send the position from this request.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write",
         "permission_request"
       ],
       "risk": "moderate",
@@ -12721,7 +12726,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-navigation.test.ts"
+          "tests/travel-settings.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
       },
@@ -12733,7 +12738,7 @@
             "components/settings/TravelSettingsPanel.tsx"
           ],
           "evidence": [
-            "tests/travel-navigation.test.ts"
+            "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -12745,7 +12750,7 @@
             "apps/desktop/src/product.tsx"
           ],
           "evidence": [
-            "tests/travel-navigation.test.ts"
+            "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -12917,6 +12922,93 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-005",
+      "name": "Choose a Behavior's Where",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Choose Not set, Anywhere, Home or A place for a Behavior. A place takes typed text. Saving the Behavior stores Where and records it in configuration history.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Where"
+        }
+      ],
+      "availability": "Behavior create and edit forms. Not set is the default; travel suggestions never change Where.",
+      "success_result": "Shows the Place field only for A place; the saved Behavior keeps Where and announces travel changes.",
+      "failure_result": "Shows a field error when A place has no text and keeps the draft.",
+      "effects": [
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx",
+        "lib/services/behavior-form.ts",
+        "packages/core/src/services/behavior-where.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-form-travel.dom.test.tsx",
+          "tests/behavior-where.test.ts"
+        ],
+        "notes": "Provider-free tests. Where changes make no provider call; the next travel refresh looks up a new place."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-form-travel.dom.test.tsx",
+            "tests/behavior-where.test.ts"
+          ],
+          "reason": "Shared Behavior form and core Where rules."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/behaviors/BehaviorForm.tsx",
+            "apps/desktop/src/local-behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-form-travel.dom.test.tsx",
+            "tests/desktop-store-contract.test.ts"
+          ],
+          "reason": "Shared form; SQLite and account synchronization carry Where."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot edit authenticated Behaviors."
         },
         "mobile": {
           "applicability": "not_applicable",

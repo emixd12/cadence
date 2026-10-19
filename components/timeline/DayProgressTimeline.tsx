@@ -284,7 +284,7 @@ export function DayProgressTimeline({
         }}
         onOpenExternal={onOpenExternal}
         travel={travel}
-        navigationPreference={context?.navigationPreference ?? liveTravel.view?.navigationPreference}
+        navigationPreference={context?.navigationPreference}
         travelMode={context?.travelMode ?? liveTravel.view?.mode}
         onTravelCorrection={context?.onTravelCorrection ?? (liveTravel.view ? (correction) => {
           setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);

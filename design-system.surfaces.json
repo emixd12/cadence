@@ -513,7 +513,7 @@
         "A shared continuous day-progress axis shows read-only Calendar context, explicit stale coverage, and advisory duration estimates without changing manual occurrence statuses.",
         "Google Calendar provider icons identify the source; thin #DA3278 overlap borders preserve status fills; event durations recolor the 1px axis without thickening it.",
         "Quick previews reserve bottom space; explicit event details use a centered, bounded native modal.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {
@@ -811,7 +811,7 @@
         "Category drafts retain errors; deletion confirms assignment counts and preserves Behavior history; reorder uses accessible buttons.",
         "Global Note shortcuts hides quick-fill and proposals without deleting accepted shortcuts or saved Notes.",
         "Optional read-only Google Calendar requires separate consent for the signed-in Google account; compact searchable selection shows selected-name tags and preserves per-calendar visibility plus explicit Save. Refresh also reloads discovery.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {
@@ -901,7 +901,7 @@
         "Archive preserves history",
         "Category and Sort native selects affect active and archived lists; hidden rows retain drafts, aggregate analytics keep their full scope.",
         "Repeated Note matching remains explicit, Behavior-scoped, and user-reviewed before quick fill.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {

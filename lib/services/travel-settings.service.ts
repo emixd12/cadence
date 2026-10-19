@@ -1,5 +1,7 @@
 import type { TravelSettings } from "@cadence/core/types/travel";
 import { canonicalTravelInstant, planTravelSettingsSave, type TravelSettingsSaveInput } from "@cadence/core/services/travel-settings";
+import { storedBehaviorWhere } from "@cadence/core/services/behavior-where";
+import type { BehaviorWhereKind } from "@cadence/core/types/behavior";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import {
   readTravelBehaviorLocations,
@@ -7,6 +9,13 @@ import {
   updateTravelSettingsRow,
 } from "@/lib/db/travelSettings.repo";
 import type { CalendarCaller } from "./google-calendar.service";
+
+export type TravelRouteBehavior = {
+  id: string;
+  whereKind: BehaviorWhereKind | null;
+  locationText: string | null;
+  updatedAt: string;
+};
 
 export class TravelSettingsError extends Error {
   constructor(readonly code: "invalid_request" | "conflict" | "unavailable", message: string) {
@@ -54,7 +63,7 @@ export async function readTravelRouteSource(
 ): Promise<{
   settings: TravelSettings;
   settingsRevision: string;
-  behaviors: { id: string; locationText: string | null; updatedAt: string }[];
+  behaviors: TravelRouteBehavior[];
 }> {
   const [current, behaviors] = await Promise.all([
     getTravelSettingsForUser(client, userId),
@@ -63,11 +72,15 @@ export async function readTravelRouteSource(
   return {
     settings: current,
     settingsRevision: current.updatedAt,
-    behaviors: behaviors.map((behavior) => ({
-      id: behavior.id,
-      locationText: behavior.location_text,
-      updatedAt: canonicalTravelInstant(behavior.updated_at),
-    })),
+    behaviors: behaviors.map((behavior) => {
+      const where = storedBehaviorWhere(behavior);
+      return {
+        id: behavior.id,
+        whereKind: where.where_kind,
+        locationText: where.location_text,
+        updatedAt: canonicalTravelInstant(behavior.updated_at),
+      };
+    }),
   };
 }
 

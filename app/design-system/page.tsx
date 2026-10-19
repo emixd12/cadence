@@ -2041,6 +2041,7 @@ const activeBehavior: BehaviorView = {
   id: "behavior-reset",
   title: "Evening reset",
   description: "Close the day with a short checklist and note anything unusual.",
+  whereKind: "home",
   categoryId: "category-home",
   categoryName: "Home",
   recurrenceSummary: "Weekly on Mon, Wed, Fri",

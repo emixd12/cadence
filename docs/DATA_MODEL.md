@@ -37,6 +37,14 @@ store only user-authored text. A location is trimmed, contains no control
 characters and has at most 500 characters. Removing a Behavior location or base
 sets that value to null. Account deletion removes both through existing cascades.
 
+Migration `20261019180000_add_behavior_where.sql` (Ticket 215) adds nullable
+`behaviors.where_kind`: null means Not set, otherwise `anywhere`, `home` or
+`place`. `behaviors_where_place_text_valid` requires `location_text` exactly when
+`where_kind = 'place'`; the place text stays in `location_text`. The migration
+sets `where_kind = 'place'` for every Behavior that had location text. It calls
+no provider and does not change `updated_at`; place lookups wait for the next
+travel refresh. Travel Settings calls `base_location_text` Home.
+
 `travel_settings` stores disabled-by-default routing state, optional base, mode,
 supported navigation preference, explicit routing-consent time, onboarding time
 and revision time. Enabling requires both a mode and consent. Disabling clears
@@ -202,6 +210,7 @@ create table behaviors (
   title text not null,
   description text,
   location_text text,
+  where_kind text check (where_kind is null or where_kind in ('anywhere', 'home', 'place')),
 
   recurrence_rule jsonb not null,
   scheduled_time time not null,
@@ -219,9 +228,13 @@ create table behaviors (
 );
 ```
 
-`location_text` is an optional user-authored routing destination. It is part of
-the Behavior configuration revision and account-sync row. It is not a provider
-geocode and never stores coordinates or place identifiers.
+`where_kind` is the optional Behavior Where. Not set and Anywhere request no
+route. Home routes to the saved Home when the user is elsewhere and requests no
+route without one. A place routes to `location_text`, an optional user-authored
+routing destination that only `place` keeps. Both columns are part of the
+Behavior configuration revision and account-sync row. Neither is a provider
+geocode; they never store coordinates or place identifiers. A Where suggestion
+never changes these columns on its own.
 
 ### `travel_settings`
 
@@ -239,8 +252,11 @@ create table travel_settings (
 );
 ```
 
-Supported modes are walking, cycling, transit and driving. Supported navigation
-preferences are Google Maps and Apple Maps. The saved base is optional. Missing
+Supported modes are walking, cycling, transit and driving; Settings calls the
+mode usual travel. `base_location_text` is the optional Home. Since Ticket 215,
+Settings no longer shows `navigation_preference`; saves pass the stored value
+through unchanged, and links follow the platform (Apple Maps on Apple devices,
+Google Maps elsewhere). The column and its sync field remain for compatibility. Missing
 base suppresses final-return advice only. Device samples, provider geocodes,
 route results and Calendar/model grants never enter this table.
 
@@ -390,8 +406,12 @@ create table behavior_configuration_events (
 ```
 
 `behavior_configuration_events` stores append-only configuration history. A
-snapshot contains `category_id`, the complete semantic schedule graph, browser
-and email reminder settings, reminder offset, active state, and timezone.
+snapshot contains `category_id`, `location_text`, `where_kind`, the complete
+semantic schedule graph, browser and email reminder settings, reminder offset,
+active state, and timezone. Ticket 215 did not rewrite earlier events. A snapshot
+without `where_kind` reads as `place` when it has location text and as Not set
+otherwise, in SQL change detection, core normalization and exports.
+`where_kind` is an allowed changed field after `location_text`.
 Schedule and time-entry IDs are excluded. Stable sort order, recurrence JSON,
 local times, and reminder values define the semantic graph.
 
