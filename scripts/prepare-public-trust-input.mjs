@@ -17,7 +17,7 @@ async function temporaryPreviewBypass(deploymentId) {
     body: JSON.stringify({ ttl: 3600 }),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new Error("Unable to create a temporary Preview access boundary.");
+  if (!response.ok) throw new Error(`Unable to create a temporary Preview access boundary (HTTP ${response.status}).`);
   const values = Object.keys((await response.json()).protectionBypass ?? {});
   if (values.length !== 1) throw new Error("Vercel did not return one temporary Preview access boundary.");
   return values[0];

@@ -1217,6 +1217,8 @@ preparation. The collector exchanges each bypass for a short-lived cookie and
 does not include either value in validated or uploaded evidence.
 
 For failure triage, inspect the sanitized snapshot and failing workflow step.
+Temporary Preview access failures report only the HTTP status, never provider
+response bodies, headers, or access values. A status alone does not prove the cause.
 Fix the release or provider outage, then dispatch a new run. Do not edit old
 evidence. A provider outage becomes Unavailable only when collection can still
 produce valid sanitized evidence. Otherwise the prior Pages deployment stays
