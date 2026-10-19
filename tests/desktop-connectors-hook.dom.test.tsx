@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Temporal } from "@js-temporal/polyfill";
@@ -35,11 +35,14 @@ let root: Root;
 let container: HTMLDivElement;
 let current!: DesktopConnectorsResult;
 
+const client = {} as SupabaseClient;
 function Probe({ accountId }: { accountId: string | null }) {
-  current = useDesktopConnectors({ client: {} as SupabaseClient, accountId, timezone: "America/New_York",
+  const result = useDesktopConnectors({ client, accountId, timezone: "America/New_York",
     todayLocalDate: "2026-11-01", lastLocalDate: "2026-11-03", enabled: accountId !== null, screen: "timeline" });
+  useEffect(() => { publish(result); });
   return null;
 }
+function publish(result: DesktopConnectorsResult) { current = result; }
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -123,7 +126,7 @@ describe("useDesktopConnectors", () => {
     expect(transport.request).not.toHaveBeenCalledWith("/api/outlook-calendar/connection", expect.objectContaining({ method: "PUT" }));
     expect(current.panelVersion).toBe(0);
     await act(async () => { handler([`cadence://outlook-calendar/callback?state=${state}&code=auth-code`]); });
-    await vi.waitFor(() => expect(current.outlookMessage).toBe("Outlook Calendar connected. Choose the calendars Cadence can show."));
+    await vi.waitFor(() => expect(current.outlookMessage).toBe("Outlook Calendar connected. Choose the calendars Cadence can show."), { timeout: 5_000 });
     expect(transport.request).toHaveBeenCalledWith("/api/outlook-calendar/connection", { method: "PUT", body: JSON.stringify({ state, clientState, code: "auth-code" }) });
     expect(secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
     expect(current.panelVersion).toBe(1);

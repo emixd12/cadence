@@ -417,7 +417,7 @@ pub fn connector_cache_begin(
         .0
         .lock()
         .map_err(|_| "Calendar cache lock is unavailable.")?;
-    connector_begin(
+    source_cache_begin(
         &auth,
         &mut cache,
         &provider,
@@ -440,7 +440,7 @@ pub fn connector_cache_read(
         .0
         .lock()
         .map_err(|_| "Calendar cache lock is unavailable.")?;
-    connector_read(&auth, &mut cache, &provider, &account_id, &scope_key)
+    source_cache_read(&auth, &mut cache, &provider, &account_id, &scope_key)
 }
 
 #[tauri::command]
@@ -455,7 +455,7 @@ pub fn connector_cache_read_current(
         .0
         .lock()
         .map_err(|_| "Calendar cache lock is unavailable.")?;
-    connector_read_current(&auth, &mut cache, &provider, &account_id)
+    source_cache_read_current(&auth, &mut cache, &provider, &account_id)
 }
 
 #[tauri::command]
@@ -473,7 +473,7 @@ pub fn connector_cache_replace(
         .0
         .lock()
         .map_err(|_| "Calendar cache lock is unavailable.")?;
-    connector_replace(
+    source_cache_replace(
         &auth,
         &mut cache,
         &provider,
@@ -494,7 +494,7 @@ pub fn connector_cache_clear(
         .0
         .lock()
         .map_err(|_| "Calendar cache lock is unavailable.")?;
-    connector_clear(&mut cache, provider.as_deref())
+    source_cache_clear(&mut cache, provider.as_deref())
 }
 
 fn validate_provider(provider: &str) -> Result<(), String> {
@@ -531,7 +531,7 @@ fn validate_scope(provider: &str, account: &str, scope_key: &str) -> Result<i64,
     Ok(generation)
 }
 
-fn connector_fence(tx: &Connection, provider: &str) -> Result<i64, String> {
+fn source_cache_fence(tx: &Connection, provider: &str) -> Result<i64, String> {
     tx.execute(
         "INSERT OR IGNORE INTO connector_fence(provider,value) VALUES(?1,0)",
         params![provider],
@@ -545,7 +545,7 @@ fn connector_fence(tx: &Connection, provider: &str) -> Result<i64, String> {
     .map_err(error)
 }
 
-fn connector_begin(
+fn source_cache_begin(
     auth: &Connection,
     cache: &mut Connection,
     provider: &str,
@@ -561,7 +561,7 @@ fn connector_begin(
     let tx = cache
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(error)?;
-    let fence = connector_fence(&tx, provider)?;
+    let fence = source_cache_fence(&tx, provider)?;
     tx.execute(
         "DELETE FROM connector_snapshot WHERE provider=?1 AND NOT (account_id=?2 AND scope_key=?3)",
         params![provider, account, scope_key],
@@ -572,7 +572,7 @@ fn connector_begin(
     tx.commit().map_err(error)
 }
 
-fn connector_read(
+fn source_cache_read(
     auth: &Connection,
     cache: &mut Connection,
     provider: &str,
@@ -585,7 +585,7 @@ fn connector_read(
         params![provider, account, scope_key], |row| row.get(0)).optional().map_err(error)
 }
 
-fn connector_read_current(
+fn source_cache_read_current(
     auth: &Connection,
     cache: &mut Connection,
     provider: &str,
@@ -605,7 +605,7 @@ fn connector_read_current(
         return Ok(None);
     };
     if owner != account || validate_scope(provider, account, &scope_key).is_err() {
-        connector_clear(cache, Some(provider))?;
+        source_cache_clear(cache, Some(provider))?;
         return Ok(None);
     }
     Ok(Some(ConnectorCachedSnapshot {
@@ -614,7 +614,7 @@ fn connector_read_current(
     }))
 }
 
-fn connector_replace(
+fn source_cache_replace(
     auth: &Connection,
     cache: &mut Connection,
     provider: &str,
@@ -643,7 +643,7 @@ fn connector_replace(
     let pending: Option<i64> = tx.query_row(
         "SELECT fence FROM connector_pending WHERE provider=?1 AND request_id=?2 AND account_id=?3 AND scope_key=?4",
         params![provider, request_id, account, scope_key], |row| row.get(0)).optional().map_err(error)?;
-    let fence = connector_fence(&tx, provider)?;
+    let fence = source_cache_fence(&tx, provider)?;
     if pending != Some(fence) {
         return Err("Connector refresh was cleared or superseded.".into());
     }
@@ -657,7 +657,7 @@ fn connector_replace(
     tx.commit().map_err(error)
 }
 
-fn connector_clear(cache: &mut Connection, provider: Option<&str>) -> Result<(), String> {
+fn source_cache_clear(cache: &mut Connection, provider: Option<&str>) -> Result<(), String> {
     let providers: Vec<&str> = match provider {
         Some(value) => {
             validate_provider(value)?;
@@ -695,7 +695,7 @@ fn connector_clear(cache: &mut Connection, provider: Option<&str>) -> Result<(),
 
 fn clear_all(cache: &mut Connection) -> Result<(), String> {
     clear(cache)?;
-    connector_clear(cache, None)
+    source_cache_clear(cache, None)
 }
 
 fn error(error: impl std::fmt::Display) -> String {
@@ -834,8 +834,8 @@ mod tests {
         let linked = auth(Some("account-a"));
         let hevy = scope("hevy", "account-a", 1, "2026-09-16");
         let outlook = scope("outlook_calendar", "account-a", 2, "2026-09-18");
-        connector_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
-        connector_replace(
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
+        source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -845,7 +845,7 @@ mod tests {
             &connector_snapshot("hevy", "account-a", 1),
         )
         .unwrap();
-        connector_begin(
+        source_cache_begin(
             &linked,
             &mut db,
             "outlook_calendar",
@@ -854,7 +854,7 @@ mod tests {
             "o1",
         )
         .unwrap();
-        connector_replace(
+        source_cache_replace(
             &linked,
             &mut db,
             "outlook_calendar",
@@ -868,24 +868,24 @@ mod tests {
         begin(&linked, &mut db, &google, "g1").unwrap();
         replace(&linked, &mut db, &google, "g1", &snapshot(&google)).unwrap();
         // Clearing Hevy leaves Outlook and Google; clearing Google leaves both connectors.
-        connector_clear(&mut db, Some("hevy")).unwrap();
-        assert!(connector_read(&linked, &mut db, "hevy", "account-a", &hevy)
+        source_cache_clear(&mut db, Some("hevy")).unwrap();
+        assert!(source_cache_read(&linked, &mut db, "hevy", "account-a", &hevy)
             .unwrap()
             .is_none());
         assert!(
-            connector_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
+            source_cache_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
                 .unwrap()
                 .is_some()
         );
         clear(&mut db).unwrap();
         assert!(read(&linked, &mut db, &google).unwrap().is_none());
         assert!(
-            connector_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
+            source_cache_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
                 .unwrap()
                 .is_some()
         );
         // A Hevy snapshot cannot be stored under an Outlook scope or another account.
-        connector_begin(
+        source_cache_begin(
             &linked,
             &mut db,
             "outlook_calendar",
@@ -894,7 +894,7 @@ mod tests {
             "o2",
         )
         .unwrap();
-        assert!(connector_replace(
+        assert!(source_cache_replace(
             &linked,
             &mut db,
             "outlook_calendar",
@@ -904,7 +904,7 @@ mod tests {
             &connector_snapshot("hevy", "account-a", 2)
         )
         .is_err());
-        assert!(connector_begin(
+        assert!(source_cache_begin(
             &linked,
             &mut db,
             "hevy",
@@ -913,9 +913,9 @@ mod tests {
             "h2"
         )
         .is_err());
-        assert!(connector_begin(&linked, &mut db, "hevy", "account-a", &outlook, "h3").is_err());
+        assert!(source_cache_begin(&linked, &mut db, "hevy", "account-a", &outlook, "h3").is_err());
         assert!(
-            connector_begin(&linked, &mut db, "google_calendar", "account-a", &hevy, "x").is_err()
+            source_cache_begin(&linked, &mut db, "google_calendar", "account-a", &hevy, "x").is_err()
         );
     }
 
@@ -924,9 +924,9 @@ mod tests {
         let mut db = cache();
         let linked = auth(Some("account-a"));
         let today = scope("hevy", "account-a", 1, "2026-09-16");
-        connector_begin(&linked, &mut db, "hevy", "account-a", &today, "late").unwrap();
-        connector_clear(&mut db, Some("hevy")).unwrap();
-        assert!(connector_replace(
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &today, "late").unwrap();
+        source_cache_clear(&mut db, Some("hevy")).unwrap();
+        assert!(source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -937,14 +937,14 @@ mod tests {
         )
         .is_err());
         assert!(
-            connector_read_current(&linked, &mut db, "hevy", "account-a")
+            source_cache_read_current(&linked, &mut db, "hevy", "account-a")
                 .unwrap()
                 .is_none()
         );
         // A newer scope replaces the pending request; the older response cannot land.
-        connector_begin(&linked, &mut db, "hevy", "account-a", &today, "first").unwrap();
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &today, "first").unwrap();
         let next_generation = scope("hevy", "account-a", 2, "2026-09-16");
-        connector_begin(
+        source_cache_begin(
             &linked,
             &mut db,
             "hevy",
@@ -953,7 +953,7 @@ mod tests {
             "second",
         )
         .unwrap();
-        assert!(connector_replace(
+        assert!(source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -963,7 +963,7 @@ mod tests {
             &connector_snapshot("hevy", "account-a", 1)
         )
         .is_err());
-        connector_replace(
+        source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -973,12 +973,12 @@ mod tests {
             &connector_snapshot("hevy", "account-a", 2),
         )
         .unwrap();
-        let current = connector_read_current(&linked, &mut db, "hevy", "account-a")
+        let current = source_cache_read_current(&linked, &mut db, "hevy", "account-a")
             .unwrap()
             .unwrap();
         assert_eq!(current.scope_key, next_generation);
         // Incomplete snapshots never replace the cache.
-        connector_begin(
+        source_cache_begin(
             &linked,
             &mut db,
             "hevy",
@@ -989,7 +989,7 @@ mod tests {
         .unwrap();
         let partial =
             connector_snapshot("hevy", "account-a", 2).replace("\"complete\"", "\"incomplete\"");
-        assert!(connector_replace(
+        assert!(source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -1000,7 +1000,7 @@ mod tests {
         )
         .is_err());
         assert!(
-            connector_read(&linked, &mut db, "hevy", "account-a", &next_generation)
+            source_cache_read(&linked, &mut db, "hevy", "account-a", &next_generation)
                 .unwrap()
                 .is_some()
         );
@@ -1011,8 +1011,8 @@ mod tests {
         let mut db = cache();
         let linked = auth(Some("account-a"));
         let hevy = scope("hevy", "account-a", 1, "2026-09-16");
-        connector_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
-        connector_replace(
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
+        source_cache_replace(
             &linked,
             &mut db,
             "hevy",
@@ -1023,14 +1023,14 @@ mod tests {
         )
         .unwrap();
         let switched = auth(Some("account-b"));
-        assert!(connector_read_current(&switched, &mut db, "hevy", "account-a").is_err());
+        assert!(source_cache_read_current(&switched, &mut db, "hevy", "account-a").is_err());
         assert!(
-            connector_read_current(&linked, &mut db, "hevy", "account-a")
+            source_cache_read_current(&linked, &mut db, "hevy", "account-a")
                 .unwrap()
                 .is_none()
         );
         let signed_out = auth(None);
-        assert!(connector_begin(&signed_out, &mut db, "hevy", "account-a", &hevy, "h2").is_err());
+        assert!(source_cache_begin(&signed_out, &mut db, "hevy", "account-a", &hevy, "h2").is_err());
     }
 
     #[cfg(unix)]

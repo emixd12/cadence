@@ -53,7 +53,7 @@ describe("web Outlook coordinator", () => {
     for (const wrong of [{ connectionGeneration: 1 }, { accountId: "someone-else" }, { requestedRange: { ...outlookFixture.requestedRange, timezone: "Europe/Madrid" } },
       { requestedRange: { ...outlookFixture.requestedRange, selectedCalendarIds: ["calendar-2"] } }]) {
       routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("outlook-scope", wrong));
-      await expect(webOutlookCalendarCoordinator.refreshEvents(range, { force: true })).rejects.toMatchObject({ code: expect.stringMatching(/connection_changed|schema|invalid|unsupported/) });
+      await expect(webOutlookCalendarCoordinator.refreshEvents(range, { force: true })).rejects.toMatchObject({ code: expect.stringMatching(/connection_changed|malformed_provider_response/) });
     }
     // A Google 1.0.0 snapshot never satisfies an Outlook request.
     routes["GET /api/outlook-calendar/events"] = () => json({ ...outlookSnapshot("outlook-scope"), schemaVersion: "1.0.0" });

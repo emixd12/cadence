@@ -310,8 +310,8 @@ describe("desktop Outlook deep link", () => {
   function harness() {
     const secrets = new Map<string, string>();
     const broker = {
-      outlookStart: vi.fn(async (_clientState: string) => ({ url: authorize(desktopState) })),
-      outlookComplete: vi.fn(async (_body: unknown) => ({ ...outlookView, result: "connected" })),
+      outlookStart: vi.fn<(clientState: string) => Promise<{ url: string }>>(async () => ({ url: authorize(desktopState) })),
+      outlookComplete: vi.fn<(body: unknown) => Promise<typeof outlookView & { result: string }>>(async () => ({ ...outlookView, result: "connected" })),
     };
     const io = { get: vi.fn(async (name: string) => secrets.get(name) ?? null), set: vi.fn(async (name: string, value: string) => { secrets.set(name, value); }),
       remove: vi.fn(async (name: string) => { secrets.delete(name); }), open: vi.fn(async () => undefined) };
