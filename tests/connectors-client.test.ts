@@ -9,9 +9,11 @@ import {
   clearWebConnectorSource,
   outlookTimelineRange,
   webHevyCoordinator,
+  webIcloudCalendarCoordinator,
   webOutlookCalendarCoordinator,
 } from "@/lib/ui/connectors";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
+import icloudFixture from "./fixtures/external-event-snapshot.icloud.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
 type Route = (init: RequestInit | undefined) => Promise<Response> | Response;
@@ -19,8 +21,8 @@ let routes: Record<string, Route>;
 let calls: { path: string; init?: RequestInit }[];
 
 function json(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status }); }
-function view(accountId: string, provider: "outlook_calendar" | "hevy", overrides: Partial<ConnectorConnectionView> = {}): ConnectorConnectionView {
-  return { accountId, provider, status: "connected", generation: provider === "outlook_calendar" ? 2 : 1, selectionRevision: 1,
+function view(accountId: string, provider: "outlook_calendar" | "icloud_calendar" | "hevy", overrides: Partial<ConnectorConnectionView> = {}): ConnectorConnectionView {
+  return { accountId, provider, status: "connected", generation: provider === "hevy" ? 1 : 2, selectionRevision: 1,
     preferences: { selectedSourceIds: ["calendar-1"], hiddenSourceIds: [], visible: true, showAllDay: true }, ...overrides };
 }
 function outlookSnapshot(accountId: string, overrides: Record<string, unknown> = {}) {
@@ -186,5 +188,58 @@ describe("web Outlook partial reads (Ticket 225 review)", () => {
     const kept = applyOutlookCalendarRefresh(complete, partial);
     expect(kept.store).toBe(false);
     expect(kept.snapshot).toMatchObject({ completeness: "complete", fetchedAt: outlookFixture.fetchedAt, freshness: { state: "stale", canAssertNoOverlap: false } });
+  });
+});
+
+
+describe("web iCloud coordinator", () => {
+  const snapshot = (accountId: string) => ({ ...icloudFixture, accountId, fetchedAt: "2026-11-01T15:00:00Z",
+    freshness: { ...icloudFixture.freshness, refreshedAt: "2026-11-01T15:00:00Z" } });
+  it("sends intake once without keeping login values on the coordinator", async () => {
+    routes["POST /api/icloud-calendar/connection"] = () => json(view("icloud-intake", "icloud_calendar"));
+    await webIcloudCalendarCoordinator.connect("synthetic@example.invalid", "abcd-efgh-ijkl-mnop");
+    expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({ appleId: "synthetic@example.invalid", appPassword: "abcd-efgh-ijkl-mnop" });
+    expect(JSON.stringify(webIcloudCalendarCoordinator)).not.toContain("abcd-efgh");
+  });
+  it("keeps complete iCloud context after an incomplete refresh without sharing Outlook's cache", async () => {
+    const id = "icloud-complete";
+    routes["GET /api/icloud-calendar/connection"] = () => json(view(id, "icloud_calendar"));
+    routes["GET /api/icloud-calendar/events"] = () => json(snapshot(id));
+    const complete = await webIcloudCalendarCoordinator.refreshEvents(range);
+    routes["GET /api/icloud-calendar/events"] = () => json({ ...snapshot(id), events: [], completeness: "incomplete",
+      freshness: { state: "incomplete", refreshedAt: null, label: "Incomplete", canAssertNoOverlap: false },
+      coverage: [{ ...icloudFixture.coverage[0]!, paginationComplete: false }],
+      failures: [{ code: "incomplete_pagination", calendarId: "calendar-1", retryable: false, retryAfterSeconds: null, message: "Unexpanded recurrence" }] });
+    const kept = await webIcloudCalendarCoordinator.refreshEvents(range, { force: true });
+    expect(kept.events).toEqual(complete.events);
+    expect(kept.freshness).toMatchObject({ state: "stale", canAssertNoOverlap: false, label: expect.stringContaining("iCloud Calendar") });
+    clearWebConnectorSource("outlook_calendar", id);
+    expect((await webIcloudCalendarCoordinator.refreshEvents(range)).events).toEqual(complete.events);
+  });
+  it("purges denied data and rejects other accounts and providers even with identical calendar IDs", async () => {
+    const id = "icloud-denied";
+    routes["GET /api/icloud-calendar/connection"] = () => json(view(id, "icloud_calendar"));
+    routes["GET /api/icloud-calendar/events"] = () => json(snapshot(id));
+    await webIcloudCalendarCoordinator.refreshEvents(range);
+    routes["GET /api/icloud-calendar/events"] = () => json({ error: "permission_denied" }, 403);
+    await expect(webIcloudCalendarCoordinator.refreshEvents(range, { force: true })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(webIcloudCalendarCoordinator.refreshEvents(range)).rejects.toMatchObject({ code: "permission_denied" });
+    for (const wrong of [outlookSnapshot(id), snapshot("other-account"), { ...snapshot(id), connectionGeneration: 99 }]) {
+      routes["GET /api/icloud-calendar/events"] = () => json(wrong);
+      await expect(webIcloudCalendarCoordinator.refreshEvents(range)).rejects.toMatchObject({ code: "connection_changed" });
+    }
+  });
+  it("fences a late read after disconnect", async () => {
+    const id = "icloud-late";
+    let release!: (response: Response) => void;
+    routes["GET /api/icloud-calendar/connection"] = () => json(view(id, "icloud_calendar"));
+    routes["GET /api/icloud-calendar/events"] = () => new Promise(resolve => { release = resolve; });
+    routes["DELETE /api/icloud-calendar/connection"] = () => json({ ...view(id, "icloud_calendar", { status: "disconnected" }), revocation: "apple_app_specific_password" });
+    const pending = webIcloudCalendarCoordinator.refreshEvents(range);
+    const rejected = expect(pending).rejects.toMatchObject({ code: "connection_changed" });
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+    await webIcloudCalendarCoordinator.disconnect();
+    release(json(snapshot(id)));
+    await rejected;
   });
 });

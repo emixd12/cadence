@@ -354,3 +354,50 @@ describe("calendar-query events", () => {
     for (const value of ["-PT1H", "P", "PT", "P1H", "1H", "P1W2D"]) expect(() => parseIcalDuration(value), value).toThrow();
   });
 });
+
+describe("iCloud strict response boundaries", () => {
+  it("rejects encoded path separators before forwarding login values", () => {
+    for (const path of ["/home/%2f../other/", "/home/%5cother/", "/home/%00/", "/home/%252f../other/"]) {
+      expect(icloudCalDavUrlAllowed(path)).toBeNull();
+    }
+  });
+
+  it("rejects raw XML control characters and ambiguous DAV properties", async () => {
+    expect(() => parseIcloudXml('<d:multistatus xmlns:d="DAV:">\u0000</d:multistatus>')).toThrow();
+    const duplicate = fixture("principal.xml").replace('</prop>', '<current-user-principal><href>/other/principal/</href></current-user-principal></prop>');
+    const h = harness([xml(duplicate), xml(fixture("home-set.xml"))]);
+    expect(await failure(discoverIcloudCalendar(options(h)))).toMatchObject({ code: "malformed_provider_response" });
+  });
+
+  it("times out stalled body reads and cancels their stream", async () => {
+    const cancel = vi.fn();
+    const h = harness([new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('<d:multistatus')); }, cancel }),
+      { status: 207, headers: { "content-type": "application/xml" } })]);
+    expect(await failure(icloudCalDavRequest({ method: "PROPFIND", url: new URL(ICLOUD_CALDAV_ENDPOINT), depth: "0", body: "", calendarId: null },
+      options(h, { deadlineAt: Date.now() + 30, now: Date.now })))).toMatchObject({ code: "timeout" });
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it("quarantines impossible seconds instead of converting them to valid times", async () => {
+    const body = fixture("events.xml").replace(/T(\d{4})00Z/g, 'T$199Z');
+    const h = harness([xml(body)]);
+    const result = await readIcloudCalendarEvents(readInput(h));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.snapshot.completeness).toBe("incomplete");
+  });
+});
+
+
+describe("normalization deadline", () => {
+  it("refuses complete coverage when the budget ends after the body arrives", async () => {
+    const h = harness([xml(fixture("events.xml"))]);
+    let reads = 0;
+    const result = await readIcloudCalendarEvents(readInput(h, { now: () => ++reads <= 2 ? 0 : 25_000 }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("timeout");
+      expect(result.partialSnapshot.completeness).not.toBe("complete");
+      expect(result.partialSnapshot.freshness.canAssertNoOverlap).toBe(false);
+    }
+  });
+});

@@ -1487,6 +1487,26 @@
       "id": "INT-TRAVEL-004",
       "classification": "external_provider",
       "reason": "Manual travel refresh can trigger a reviewed route provider request."
+    },
+    {
+      "id": "INT-CALENDAR-012",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-013",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-014",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-015",
+      "classification": "destructive_serial_only",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
     }
   ]
 }

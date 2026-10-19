@@ -13964,7 +13964,7 @@ Implementation (October 19, 2026):
 
 ## Ticket 227: iCloud Calendar connector
 
-Status: not started.
+Status: implemented locally; independent verification and live acceptance pending.
 
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
@@ -13989,10 +13989,10 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | Files listed in the iCloud brief. |
+| Web | `lib/services/icloud-calendar.service.ts`, `components/settings/IcloudCalendarPanel.tsx`, `lib/ui/connectors.ts`, Timeline and separately disclosed Daily Brief. |
 | Desktop | `apps/desktop/src/calendar/icloud-calendar.ts` through the hosted broker; no credential storage. |
 | Marketing | Disclosure in 228. |
-| Future mobile | Deferred. |
+| Future mobile | Not applicable: native mobile remains deferred; shared external-event contract is reusable. |
 
 ## Ticket 228: Verification and disclosure reconciliation
 

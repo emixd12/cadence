@@ -40,7 +40,7 @@ and your response for the selected calendars, without titles or details.
 **Include today's recorded Hevy workout times** sends only the start and end of
 workouts already recorded today. A recorded workout never completes a Behavior and
 never shows when you are free. A source that is missing or partly read proves
-nothing about your day. iCloud Calendar has no control until Cadence can read it.
+nothing about your day. Each source needs its own connected account and separate permission.
 If you reconnect a source or change its calendars, the brief stops using it and
 Settings says so under that source. Choose **Allow Outlook Calendar again** or
 **Allow Hevy again** to let the brief use it, or turn it off. Until you choose, the
@@ -351,8 +351,8 @@ See [Privacy, account information, and deletion](privacy-and-account.md#google-c
 Settings lists every read-only source under **Connected sources**: Google
 Calendar, Outlook Calendar, iCloud Calendar, and Hevy. Each source connects,
 refreshes, fails, and disconnects on its own. Tracking never waits on a source.
-iCloud Calendar is listed as not available yet; it cannot be connected in this
-version. On desktop, sources require a linked Cadence account.
+On desktop, sources require a linked Cadence account. The iCloud implementation
+has synthetic verification only; live Apple access and release remain pending.
 
 **Outlook Calendar** shows scheduled events like Google Calendar.
 
@@ -402,3 +402,38 @@ occurrences in the previous 90 local days. Insufficient history shows unknown.
 Running timers remain separate activity signals. Possible overlap is advisory;
 unknown, incomplete, or stale Calendar data cannot establish availability. All-day
 events do not create timed-overlap warnings.
+
+
+### iCloud Calendar
+
+The local implementation uses a hosted CalDAV connection on web and linked
+desktop. It does not read calendars stored only on your Mac. Live Apple access,
+installed desktop acceptance and release remain unverified.
+
+1. Under **Connected sources**, read the custody disclosure. Apple does not limit
+   an app-specific password to Calendar; it can also reach Mail, Contacts and
+   other iCloud data. Cadence uses it only for Calendar reads.
+2. Create an app-specific password at account.apple.com. Enter it with your Apple
+   Account email and choose **Connect iCloud Calendar**. Never enter your primary
+   Apple Account password. Both fields clear immediately. Cadence seals both
+   values on its server; it does not save them on your device.
+3. Select calendars and visibility, then choose **Save iCloud settings**.
+   **Refresh iCloud Calendar** reads the displayed range. Markers and details
+   name iCloud Calendar; duplicate events from other sources remain separate.
+4. Allow selected iCloud timing in **Daily Brief** separately if desired.
+   Reconnecting or changing selection requires **Allow iCloud Calendar again**.
+5. **Disconnect iCloud Calendar** deletes Cadence's saved login and source cache.
+   Apple keeps the password active until you remove it at account.apple.com:
+   **Sign-In and Security → App-Specific Passwords → Remove**, or **Revoke All**.
+   Account deletion shows the same removal instruction.
+
+Reads cover at most 32 calendars and 31 local dates. Unexpanded recurrence,
+truncated data and malformed events make coverage incomplete. A failed refresh
+can retain the last complete read with a stale label. Permission withdrawal
+removes saved context from display. Desktop's disposable source cache preserves
+calendar visibility and all-day choices for offline restart. It stays outside
+tracking exports, synchronization and backups.
+
+Owner acceptance of hosted app-specific-password custody is still required
+before real credentials or user release. No live access is implied by these
+local implementation instructions.

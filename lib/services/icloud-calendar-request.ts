@@ -78,6 +78,9 @@ export function icloudCalDavUrlAllowed(value: string, base: URL | string = ICLOU
   try { url = new URL(value, base); } catch { return null; }
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || url.hash || url.search) return null;
   if (!vettedHost(url.hostname) || url.pathname.length > MAX_HREF_LENGTH || !url.pathname.startsWith("/")) return null;
+  // Refuse encoded separators, controls and nested escapes before comparing resource paths.
+  if (/%(?:2f|5c|25|0[0-9a-f]|1[0-9a-f]|7f)/i.test(url.pathname)) return null;
+  try { decodeURIComponent(url.pathname); } catch { return null; }
   url.port = "";
   return url;
 }
@@ -266,6 +269,7 @@ type OpenElement = { prefix: string; local: string; qname: string; scope: Map<st
  * root. Reaching the end with open elements or an unfinished token is `truncated`.
  */
 export function parseIcloudXml(source: string): XmlElement {
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/.test(source)) throw new IcloudXmlError("malformed", "illegal XML character");
   let index = 0;
   const stack: OpenElement[] = [];
   let root: XmlElement | null = null;
@@ -413,13 +417,17 @@ export function parseIcloudMultistatus(body: string, maxResponses: number): Read
     const hrefs = xmlChildren(item, DAV_NS, "href");
     if (hrefs.length !== 1) throw new IcloudXmlError("malformed", "a response needs exactly one href");
     const href = hrefs[0].text.trim();
+    if (!href || xmlChildren(item, DAV_NS, "status").length > 1) throw new IcloudXmlError("malformed", "ambiguous response");
     const status = statusCode(xmlChild(item, DAV_NS, "status"));
     const propstats = xmlChildren(item, DAV_NS, "propstat").map((propstat) => {
+      if (xmlChildren(propstat, DAV_NS, "status").length !== 1 || xmlChildren(propstat, DAV_NS, "prop").length !== 1) throw new IcloudXmlError("malformed", "ambiguous propstat");
       const code = statusCode(xmlChild(propstat, DAV_NS, "status"));
       const prop = xmlChild(propstat, DAV_NS, "prop");
       if (code === null || !prop) throw new IcloudXmlError("malformed", "a propstat needs a status and a prop");
       return { status: code, prop };
     });
+    const properties = propstats.flatMap(({ prop }) => prop.children.map((child) => JSON.stringify([child.ns, child.name])));
+    if (new Set(properties).size !== properties.length || (status !== null && propstats.length > 0)) throw new IcloudXmlError("malformed", "ambiguous properties");
     if (status === null && propstats.length === 0) throw new IcloudXmlError("malformed", "a response needs a status or a propstat");
     if (status === 507 || propstats.some((entry) => entry.status === 507)) truncated = true;
     return { href, status, propstats };

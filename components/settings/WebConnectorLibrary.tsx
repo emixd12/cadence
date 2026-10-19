@@ -6,11 +6,12 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { ConnectorLibrary } from "./ConnectorLibrary";
 import { HevyPanel } from "./HevyPanel";
+import { IcloudCalendarPanel } from "./IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "./OutlookCalendarPanel";
 import { WebGoogleCalendarPanel } from "./WebGoogleCalendarPanel";
-import { outlookCallbackMessage, outlookTimelineRange, webHevyCoordinator, webOutlookCalendarCoordinator } from "@/lib/ui/connectors";
+import { outlookCallbackMessage, outlookTimelineRange, webHevyCoordinator, webIcloudCalendarCoordinator, webOutlookCalendarCoordinator } from "@/lib/ui/connectors";
 
-/** Web Settings connector library: Google (unchanged flow), Outlook, iCloud availability, and Hevy. */
+/** Web Settings connector library: Google (unchanged flow), Outlook, iCloud, and Hevy. */
 export function WebConnectorLibrary({ timezone }: Readonly<{ timezone: string }>) {
   const searchParams = useSearchParams();
   const today = useMemo(() => Temporal.Now.zonedDateTimeISO(timezone).toPlainDate().toString(), [timezone]);
@@ -19,7 +20,7 @@ export function WebConnectorLibrary({ timezone }: Readonly<{ timezone: string }>
     { id: "google_calendar", content: <WebGoogleCalendarPanel timezone={timezone} nested /> },
     { id: "outlook_calendar", content: <OutlookCalendarPanel coordinator={webOutlookCalendarCoordinator} refreshRange={outlookRange}
       callbackMessage={outlookCallbackMessage(searchParams?.get("outlook_calendar"))} /> },
-    { id: "icloud_calendar" },
+    { id: "icloud_calendar", content: <IcloudCalendarPanel coordinator={webIcloudCalendarCoordinator} refreshRange={outlookRange} /> },
     { id: "hevy", content: <HevyPanel coordinator={webHevyCoordinator} localDate={today} timezone={timezone} /> },
   ]} />;
 }

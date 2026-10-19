@@ -9,6 +9,8 @@ import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorde
 import { useDesktopConnectors, type DesktopConnectorsResult } from "../apps/desktop/src/calendar/use-connectors";
 import { hevyScopeKey } from "../apps/desktop/src/calendar/hevy";
 import { OUTLOOK_ATTEMPT_KEY } from "../apps/desktop/src/calendar/outlook-calendar";
+import { icloudScopeKey } from "../apps/desktop/src/calendar/icloud-calendar";
+import icloudFixture from "./fixtures/external-event-snapshot.icloud.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
 // Ticket 225 desktop connector hook: offline freshness from the per-source cache,
@@ -51,6 +53,7 @@ beforeEach(() => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
   rows = new Map(); secrets = new Map();
+  native.invoke.mockClear();
   native.invoke.mockImplementation(async (command: string, args: Record<string, unknown> = {}) => {
     const provider = args.provider as string;
     if (command === "connector_cache_read_current") { const row = rows.get(provider); return row && row.accountId === args.accountId ? row : null; }
@@ -104,6 +107,7 @@ describe("useDesktopConnectors", () => {
     await vi.waitFor(() => expect(native.invoke).toHaveBeenCalledWith("auth_secret_remove", { name: OUTLOOK_ATTEMPT_KEY }));
     expect(native.invoke).toHaveBeenCalledWith("connector_cache_clear", { provider: "hevy" });
     expect(native.invoke).toHaveBeenCalledWith("connector_cache_clear", { provider: "outlook_calendar" });
+    expect(native.invoke).toHaveBeenCalledWith("connector_cache_clear", { provider: "icloud_calendar" });
     expect(secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
     await act(async () => { release(hevyToday); });
     expect(rows.has("hevy")).toBe(false);
@@ -134,7 +138,51 @@ describe("useDesktopConnectors", () => {
 
   it("requires a linked account in local mode", async () => {
     await act(() => root.render(<Probe accountId={null} />));
-    expect(current).toMatchObject({ outlookCoordinator: null, hevyCoordinator: null, unavailableReason: "local" });
+    expect(current).toMatchObject({ outlookCoordinator: null, icloudCoordinator: null, hevyCoordinator: null, unavailableReason: "local" });
     expect(transport.request).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("desktop iCloud source", () => {
+  const range = { startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" };
+  it("restores an offline snapshot with saved display choices and never requests login values", async () => {
+    const connection = { ...view("icloud_calendar"), preferences: { ...view("icloud_calendar").preferences, hiddenSourceIds: ["calendar-1"], showAllDay: false } };
+    rows.set("icloud_calendar", { accountId: "account-1", scopeKey: icloudScopeKey(connection as never, range), snapshotJson: JSON.stringify(icloudFixture) });
+    transport.request.mockRejectedValue(Object.assign(new Error("offline"), { code: "provider_unavailable" }));
+    await act(() => root.render(<Probe accountId="account-1" />));
+    await vi.waitFor(() => expect(current.icloud.state).toBe("error"));
+    expect(current.icloud.snapshot?.source).toBe("icloud_calendar");
+    expect(current.icloud.hiddenCalendarIds).toEqual(["calendar-1"]);
+    expect(current.icloud.showAllDay).toBe(false);
+    expect(current.icloud.error).toBe("provider_unavailable");
+    expect(secrets.size).toBe(0);
+    await act(() => root.render(<Probe accountId="account-2" />));
+    expect(current.icloud.snapshot).toBeNull();
+    await vi.waitFor(() => expect(rows.has("icloud_calendar")).toBe(false));
+  });
+
+  it("drops cached iCloud context after permission withdrawal without clearing Hevy", async () => {
+    rows.set("icloud_calendar", { accountId: "account-1", scopeKey: icloudScopeKey(view("icloud_calendar") as never, range), snapshotJson: JSON.stringify(icloudFixture) });
+    transport.request.mockImplementation(async (path: string) => {
+      if (path === "/api/icloud-calendar/connection") return view("icloud_calendar");
+      throw Object.assign(new Error("denied"), { code: path.includes("icloud") ? "permission_denied" : "provider_unavailable" });
+    });
+    await act(() => root.render(<Probe accountId="account-1" />));
+    await vi.waitFor(() => expect(current.icloud).toMatchObject({ state: "error", error: "permission_denied", snapshot: null }));
+    expect(rows.has("icloud_calendar")).toBe(false);
+    expect(native.invoke).not.toHaveBeenCalledWith("connector_cache_clear", { provider: "hevy" });
+  });
+
+  it("posts credentials once, clears source cache, and keeps them out of native calls", async () => {
+    transport.request.mockImplementation(async (path: string) => {
+      if (path === "/api/icloud-calendar/connection") return view("icloud_calendar", "account-1", "disconnected");
+      throw Object.assign(new Error("offline"), { code: "provider_unavailable" });
+    });
+    await act(() => root.render(<Probe accountId="account-1" />));
+    await act(async () => { await current.icloudCoordinator!.connect("synthetic@example.invalid", "abcd-efgh-ijkl-mnop"); });
+    expect(transport.request).toHaveBeenCalledWith("/api/icloud-calendar/connection", { method: "POST", body: JSON.stringify({ appleId: "synthetic@example.invalid", appPassword: "abcd-efgh-ijkl-mnop" }) });
+    expect(JSON.stringify(native.invoke.mock.calls)).not.toContain("abcd-efgh-ijkl-mnop");
+    expect(JSON.stringify([...rows.values()])).not.toContain("synthetic@example.invalid");
   });
 });

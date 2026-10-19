@@ -9,12 +9,14 @@ import type { ExternalEventSnapshotV1_1 } from "@cadence/core/types/external-eve
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
+import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { RecordedActivityList } from "@/components/timeline/RecordedActivityList";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
-import { ConnectorClientError, type HevyCoordinator, type HevyTimelineState, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
+import { ConnectorClientError, type HevyCoordinator, type HevyTimelineState, type OutlookCalendarCoordinator, type IcloudCalendarCoordinator } from "@/lib/ui/connectors";
 import outlookFixture from "@/tests/fixtures/external-event-snapshot.outlook.valid.json";
+import icloudFixture from "@/tests/fixtures/external-event-snapshot.icloud.valid.json";
 import hevyFixture from "@/tests/fixtures/recorded-activity-snapshot.valid.json";
 
 // Ticket 225 deterministic connector bench. Synthetic coordinators only: no
@@ -41,7 +43,7 @@ const SCENARIOS: Readonly<Record<Scenario, string>> = {
 };
 
 const range = { startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" };
-function connection(provider: "hevy" | "outlook_calendar", status: ConnectorConnectionView["status"]): ConnectorConnectionView {
+function connection(provider: "hevy" | "outlook_calendar" | "icloud_calendar", status: ConnectorConnectionView["status"]): ConnectorConnectionView {
   return { accountId: "bench-account", provider, status, generation: 2, selectionRevision: 1,
     preferences: { selectedSourceIds: ["calendar-1"], hiddenSourceIds: [], visible: true, showAllDay: true } };
 }
@@ -58,6 +60,21 @@ function outlookCoordinator(scenario: Scenario): OutlookCalendarCoordinator {
     disconnect: async () => ({ view: connection("outlook_calendar", "disconnected"), revocation: "microsoft_account_permissions" }),
   };
 }
+function icloudCoordinator(scenario: Scenario): IcloudCalendarCoordinator {
+  return {
+    getConnection: async () => { if (scenario === "status_error") throw new ConnectorClientError("provider_unavailable"); return connection("icloud_calendar", statusFor(scenario)); },
+    connect: async () => connection("icloud_calendar", "connected"),
+    listCalendars: async () => [{ id: "calendar-1", name: "Family", isDefault: false }, { id: "calendar-2", name: "Shared family calendar with a long name that wraps", isDefault: false }],
+    savePreferences: async (preferences) => ({ ...connection("icloud_calendar", "connected"), preferences }),
+    refreshEvents: async () => validateVersionedExternalEventSnapshot(icloudFixture) as ExternalEventSnapshotV1_1,
+    disconnect: async () => ({ view: connection("icloud_calendar", "disconnected"), revocation: "apple_app_specific_password" }),
+  };
+}
+
+export function IcloudCalendarPanelBench() {
+  return <IcloudCalendarPanel coordinator={icloudCoordinator("disconnected")} refreshRange={range} />;
+}
+
 function hevyCoordinator(scenario: Scenario): HevyCoordinator {
   return {
     getConnection: async () => { if (scenario === "status_error") throw new ConnectorClientError("provider_unavailable"); return connection("hevy", statusFor(scenario)); },
@@ -90,7 +107,8 @@ export function ConnectorLibraryBench() {
         : <GoogleCalendarPanel coordinator={googleCoordinator} refreshRange={range} nested /> },
       { id: "outlook_calendar", content: local ? <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", "local")} />
         : <OutlookCalendarPanel coordinator={outlookCoordinator(scenario)} refreshRange={range} /> },
-      { id: "icloud_calendar" },
+      { id: "icloud_calendar", content: local ? <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", "local")} />
+        : <IcloudCalendarPanel coordinator={icloudCoordinator(scenario)} refreshRange={range} /> },
       { id: "hevy", content: local ? <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", "local")} />
         : <HevyPanel coordinator={hevyCoordinator(scenario)} localDate="2026-11-01" timezone="America/New_York" /> },
     ]} />

@@ -832,7 +832,8 @@
             "components/settings/TravelSettingsPanel.tsx",
             "components/settings/ConnectorLibrary.tsx",
             "components/settings/OutlookCalendarPanel.tsx",
-            "components/settings/HevyPanel.tsx"
+            "components/settings/HevyPanel.tsx",
+            "components/settings/IcloudCalendarPanel.tsx"
           ],
           "implementationIds": [
             "module.timezone-panel",
@@ -845,7 +846,8 @@
             "module.travel-settings-panel",
             "module.connector-library",
             "module.outlook-calendar-panel",
-            "module.hevy-panel"
+            "module.hevy-panel",
+            "module.icloud-calendar-panel"
           ],
           "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 nests Google, Outlook, iCloud availability, and Hevy in ConnectorLibrary; each source fails separately."
         },
@@ -880,7 +882,8 @@
             "components/settings/OutlookCalendarPanel.tsx",
             "components/settings/HevyPanel.tsx",
             "apps/desktop/src/calendar/use-connectors.ts",
-            "tests/desktop-connectors-hook.dom.test.tsx"
+            "tests/desktop-connectors-hook.dom.test.tsx",
+            "components/settings/IcloudCalendarPanel.tsx"
           ],
           "implementationIds": [
             "module.category-panel",
@@ -889,7 +892,8 @@
             "module.travel-settings-panel",
             "module.connector-library",
             "module.outlook-calendar-panel",
-            "module.hevy-panel"
+            "module.hevy-panel",
+            "module.icloud-calendar-panel"
           ],
           "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 mounts ConnectorLibrary in linked-account mode; local mode shows each source as requiring a linked account. Per-source caches stay in calendar-cache.sqlite3; installed-native acceptance is unverified."
         },

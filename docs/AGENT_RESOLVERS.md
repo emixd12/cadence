@@ -386,8 +386,8 @@ text, read-only suggestions and trusted source metadata.
 ## Connector expansion ownership (Tickets 220–228)
 
 Planned October 18, 2026. Ticket 221 implemented the shared contracts. Tickets 223
-(Hevy) and 224 (Outlook) implement their provider adapters; iCloud and later
-tickets are not implemented. No new required resolver module
+(Hevy), 224 (Outlook), and 227 (iCloud) implement their provider adapters locally.
+Live iCloud access and installed desktop acceptance remain unverified. No new required resolver module
 is added. `packages/core` owns the extended event validator
 (`services/external-event-validation.ts`) and the separate recorded-activity
 types, validation, and normalization (`types/recorded-activity.ts`,
@@ -399,6 +399,15 @@ and `tests/advisor-day-context.test.ts`. Provider adapters
 in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
 and field discard. Services own credentials, generations, and fences. Repositories
 in `lib/db` own owner-scoped persistence. UI renders validated results only.
+
+Ticket 227 uses `icloud-calendar-request.ts` for bounded PROPFIND/REPORT,
+redirect validation and XML parsing; `icloud-calendar-provider.ts` for discovery,
+server-expanded events and field minimization; and `icloud-calendar.service.ts`
+for credential custody, identity and generation/selection fences. It reuses
+`connectors.repo.ts`, without a provider-specific repository or migration.
+`tests/icloud-calendar-provider.test.ts` and `tests/icloud-calendar.service.test.ts`
+cover synthetic boundaries. Web and desktop consume the same 1.1 snapshot;
+Daily Brief reads it only under the separate source disclosure.
 
 Ticket 224 implements the Outlook slice: `lib/services/outlook-calendar-provider.ts`
 (Graph GET allowlist, next-link validation, deadline, and calendarView mapping),

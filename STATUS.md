@@ -98,13 +98,21 @@ The integrated baseline `d7af234` was independently approved.
   60-second budget less a 10-second generation reserve. Outlook and iCloud events
   join the planner as fixed blocks; Hevy workouts reach the model only as past
   recorded timing and never affect availability, durations, or Behavior status.
-  iCloud has the contract and an unavailable state only (Ticket 227). Review
+  Ticket 227 now connects the iCloud read behind that same disclosure. Review
   recovery fix: Settings reports per-source `connectorAttention` and offers
   **Allow <source> again** after a reconnect or reselection; unrelated saves turn
   off sources that need attention instead of renewing them or failing. Evidence is
   source, synthetic fixtures, model stubs, a disposable local migration replay, and
   bench screenshots; no live provider or model call.
-- Tickets 227–228 are not started.
+- Ticket 227 is implemented locally and awaits independent verification. Recovery
+  preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
+  disconnect, isolated complete-only caches, offline display choices and Timeline
+  context. Daily Brief reads iCloud only under its separate generation/selection
+  disclosure. CalDAV boundaries reject unsafe URLs/XML, truncate oversized reads,
+  quarantine unsupported recurrence and enforce the shared deadline through parsing.
+  Synthetic tests and responsive bench evidence cover these paths. Live Apple
+  access, hosted custody acceptance and installed acceptance remain open.
+- Ticket 228 is not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

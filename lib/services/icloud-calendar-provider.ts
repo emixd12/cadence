@@ -91,6 +91,12 @@ function malformed(calendarId: string | null, message: string): IcloudCalendarPr
   return new IcloudCalendarProviderError(icloudFailure("malformed_provider_response", calendarId, false, null, message));
 }
 
+function assertReadDeadline(options: IcloudRequestOptions, calendarId: string | null): void {
+  if (options.signal?.aborted || (options.now ?? Date.now)() >= options.deadlineAt) {
+    throw new IcloudCalendarProviderError(icloudFailure("timeout", calendarId, true, null, "iCloud Calendar read deadline ended."));
+  }
+}
+
 function multistatus(body: string, calendarId: string | null, maxResponses: number): DavResponse[] {
   let parsed: ReturnType<typeof parseIcloudMultistatus>;
   try { parsed = parseIcloudMultistatus(body, maxResponses); }
@@ -147,6 +153,7 @@ export async function discoverIcloudCalendar(options: IcloudRequestOptions): Pro
   catch (error) { if (error instanceof IcloudCalendarProviderError) throw error; throw malformed(null, "iCloud Calendar returned no usable calendar home."); }
   if (!home.pathname.endsWith("/")) home.pathname = `${home.pathname}/`;
   // The principal path binds the account; partition hosts may change between sessions.
+  assertReadDeadline(options, null);
   return { principal: principal.pathname, home };
 }
 
@@ -194,12 +201,15 @@ export async function listIcloudCalendars(options: IcloudRequestOptions, discove
       const zone = davProp(response, CALDAV_NS, "calendar-timezone");
       const path = href.pathname.endsWith("/") ? href.pathname : `${href.pathname}/`;
       const id = icloudCalendarId(path);
+      if (calendars.has(id)) throw new ItemError("duplicate collection");
       calendars.set(id, { id, name: label || "Untitled iCloud calendar", isDefault: false, href: new URL(path, href).toString(),
         timezone: zone && zone.status === 200 ? collectionTimezone(zone.element.text) : null });
     }
   } catch (error) {
     throw malformed(null, error instanceof ItemError ? `iCloud Calendar listing: ${error.message}.` : "iCloud Calendar returned a malformed calendar list.");
   }
+  if (calendars.size > EXTERNAL_EVENT_MAX_CALENDARS) throw new IcloudCalendarProviderError(icloudFailure("incomplete_pagination", null, false, null, "iCloud Calendar exceeds the 32-calendar limit."));
+  assertReadDeadline(options, null);
   return [...calendars.values()].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
 }
 
@@ -237,7 +247,9 @@ function parseContentLine(line: string): IcalProperty {
       const end = line.slice(index + 1).search(/[;:]/);
       index = end < 0 ? line.length : index + 1 + end;
     }
-    params[paramMatch[1].toUpperCase()] = value;
+    const key = paramMatch[1].toUpperCase();
+    if (Object.hasOwn(params, key)) throw new ItemError("duplicate parameter");
+    params[key] = value;
   }
   if (line[index] !== ":") throw new ItemError("content line has no value");
   return { name, params, value: line.slice(index + 1) };
@@ -294,6 +306,7 @@ function icalTime(property: IcalProperty): IcalTime {
   }
   const dateTime = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/.exec(value);
   if (!dateTime || (valueType && valueType !== "DATE-TIME")) throw new ItemError("invalid DATE-TIME");
+  if (Number(dateTime[6]) > 60) throw new ItemError("invalid seconds");
   const plain = Temporal.PlainDateTime.from({ year: Number(dateTime[1]), month: Number(dateTime[2]), day: Number(dateTime[3]),
     hour: Number(dateTime[4]), minute: Number(dateTime[5]), second: Math.min(59, Number(dateTime[6])) }, { overflow: "reject" });
   if (dateTime[7] === "Z") return { kind: "utc", instant: plain.toZonedDateTime("UTC").toInstant() };
@@ -549,6 +562,7 @@ export async function readIcloudCalendarEvents(input: IcloudCalendarReadInput): 
       itemCount = responses.length;
       const count = (reason: IcloudQuarantineReason) => quarantined.set(reason, (quarantined.get(reason) ?? 0) + 1);
       for (const item of responses) {
+        assertReadDeadline(input, calendar.id);
         const href = icloudCalDavUrlAllowed(item.href, response.url);
         if (!href || href.origin !== response.url.origin || !href.pathname.startsWith(response.url.pathname.endsWith("/") ? response.url.pathname : `${response.url.pathname}/`)) {
           throw malformed(calendar.id, "iCloud Calendar returned an event outside this calendar.");
@@ -571,6 +585,7 @@ export async function readIcloudCalendarEvents(input: IcloudCalendarReadInput): 
           else if (adapted.kind === "quarantine") { count(adapted.reason); if (adapted.reason === "unexpanded_recurrence") unexpanded = true; }
         }
       }
+      assertReadDeadline(input, calendar.id);
     } catch (error) {
       // Programming errors such as a refused method are never reported as provider state.
       if (error instanceof TypeError) throw error;

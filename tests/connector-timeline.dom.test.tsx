@@ -52,6 +52,7 @@ beforeEach(() => {
       preferences: { selectedCalendarIds: [], hiddenCalendarIds: [], visible: true, showAllDay: true } }),
     "/api/outlook-calendar/connection": () => json(connector("outlook_calendar")),
     "/api/outlook-calendar/events": () => json(outlookToday()),
+    "/api/icloud-calendar/connection": () => json({ ...connector("icloud_calendar"), status: "disconnected" }),
     "/api/hevy/connection": () => json(connector("hevy")),
     "/api/hevy/activities": () => json({ error: "timeout" }, 504),
   };
@@ -135,3 +136,27 @@ function timeline(): TimelineView {
     }],
   };
 }
+
+
+it("renders the same event from iCloud and Outlook separately and withdraws denied iCloud context", async () => {
+  const outlook = outlookToday();
+  const icloud = { ...outlook, source: "icloud_calendar", adapterVersion: "icloud-calendar-v1",
+    events: outlook.events.map(event => ({ ...event, source: "icloud_calendar", id: event.id.replace("outlook_calendar", "icloud_calendar"),
+      logicalInstanceId: event.logicalInstanceId.replace("outlook_calendar", "icloud_calendar"), state: "confirmed", sourceUrl: null, currentUserResponse: null, fieldAvailability: { ...event.fieldAvailability, source_url: "unsupported" } })) };
+  validateVersionedExternalEventSnapshot(icloud);
+  routes["/api/icloud-calendar/connection"] = () => json(connector("icloud_calendar"));
+  routes["/api/icloud-calendar/events"] = () => json(icloud);
+  await render();
+  await vi.waitFor(() => expect(container.querySelector('[data-event-source="mixed"]')).not.toBeNull());
+  const grouped = container.querySelector<HTMLButtonElement>('[data-event-source="mixed"]')!;
+  expect(grouped.getAttribute("aria-label")).toBe("Preview 2 Calendar events starting at the same time");
+  await act(() => grouped.click());
+  expect(container.querySelectorAll('[data-calendar-drawer="preview"] article')).toHaveLength(2);
+  expect(container.querySelectorAll('[data-calendar-drawer="preview"] h3')[0]?.textContent).toBe("Planning review");
+  expect(container.querySelectorAll('[data-calendar-drawer="preview"] h3')[1]?.textContent).toBe("Planning review");
+  routes["/api/icloud-calendar/events"] = () => json({ error: "permission_denied" }, 403);
+  await act(async () => { await reloadWebTimelineConnectors(); });
+  expect(container.querySelector('[data-calendar-node="icloud_calendar/calendar-1/timed-1"]')).toBeNull();
+  expect(container.querySelector('[data-calendar-node="outlook_calendar/calendar-1/timed-1"]')).not.toBeNull();
+  expect(action).not.toHaveBeenCalled();
+});

@@ -5,7 +5,8 @@ import type { ConnectorConnectionView, ConnectorPreferences } from "@/lib/types/
 import {
   ConnectorClientError,
   outlookEventScope,
-  validateOutlookSnapshotForScope,
+  validateCalendarSnapshotForScope,
+  type CalendarConnectorSource,
   type ConnectorEventRange,
   type OutlookCalendarCoordinator,
   type OutlookConnectResult,
@@ -110,7 +111,7 @@ export function outlookSourceRules(): ConnectorSourceRules<ExternalEventSnapshot
   return {
     provider: "outlook_calendar",
     validate(value, scopeKey) {
-      const snapshot = validateOutlookSnapshotForScope(value, scopeFromKey(scopeKey));
+      const snapshot = validateCalendarSnapshotForScope(value, scopeFromKey(scopeKey));
       if (externalEventSnapshotScopeKey(scopeFromKey(scopeKey)) !== scopeKey) throw new ConnectorClientError("connection_changed");
       return snapshot;
     },
@@ -120,12 +121,12 @@ export function outlookSourceRules(): ConnectorSourceRules<ExternalEventSnapshot
 }
 
 /** Parses an Outlook scope key back into the scope it names. */
-export function scopeFromKey(scopeKey: string) {
+export function scopeFromKey(scopeKey: string, source: CalendarConnectorSource = "outlook_calendar") {
   const parsed: unknown = JSON.parse(scopeKey);
-  if (!Array.isArray(parsed) || parsed.length !== 7 || parsed[0] !== "outlook_calendar" || typeof parsed[1] !== "string" || typeof parsed[2] !== "number"
+  if (!Array.isArray(parsed) || parsed.length !== 7 || parsed[0] !== source || typeof parsed[1] !== "string" || typeof parsed[2] !== "number"
     || typeof parsed[3] !== "string" || typeof parsed[4] !== "string" || typeof parsed[5] !== "string" || !Array.isArray(parsed[6])
     || parsed[6].some((id) => typeof id !== "string")) throw new ConnectorClientError("connection_changed");
-  return { source: "outlook_calendar" as const, accountId: parsed[1], connectionGeneration: parsed[2], startLocalDate: parsed[3],
+  return { source, accountId: parsed[1], connectionGeneration: parsed[2], startLocalDate: parsed[3],
     endLocalDate: parsed[4], timezone: parsed[5], selectedCalendarIds: parsed[6] as string[] };
 }
 

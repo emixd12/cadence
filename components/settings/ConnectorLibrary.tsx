@@ -20,12 +20,6 @@ const SOURCE_DETAILS: Readonly<Record<ConnectorLibrarySourceId, Readonly<{ name:
   hevy: { name: "Hevy", kind: "Recorded activity" },
 };
 
-/**
- * Ticket 227 integration point: iCloud Calendar stays listed with this truthful
- * availability until its hosted connector ships; then pass its panel as content.
- */
-export const ICLOUD_CALENDAR_UNAVAILABLE = "Not available yet. Cadence cannot connect iCloud Calendar in this version.";
-
 /** Desktop copy when a source needs a linked Cadence account or a broker-enabled build. */
 export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
   return reason === "build" ? `${name} is unavailable in this build.` : `Link a Cadence account on this Mac to connect ${name}.`;
@@ -40,7 +34,7 @@ export function ConnectorLibrary({ sources }: Readonly<{ sources: readonly Conne
       description="Optional read-only context from other services. Sources never change Behaviors, Occurrences, statuses, Notes, or tracked time. Each source connects and fails separately.">
       <ul className="grid min-w-0 divide-y divide-line border-t border-line">
         {ordered.map((source) => <li key={source.id} className="min-w-0 pt-4 last:pb-0">
-          {source.content ?? <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? ICLOUD_CALENDAR_UNAVAILABLE} />}
+          {source.content ?? <ConnectorUnavailable id={source.id} reason={source.unavailableReason ?? `${SOURCE_DETAILS[source.id].name} is unavailable in this build.`} />}
         </li>)}
       </ul>
     </SettingsPanel>

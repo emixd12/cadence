@@ -179,13 +179,13 @@ describe("desktop connector library (Ticket 225)", () => {
     const { html } = settings({ calendarControls: <ConnectorLibrary sources={[
       { id: "google_calendar", content: <ConnectorUnavailable id="google_calendar" reason="Calendar requires a linked account." /> },
       { id: "outlook_calendar", content: <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", "local")} /> },
-      { id: "icloud_calendar" },
+      { id: "icloud_calendar", content: <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", "local")} /> },
       { id: "hevy", content: <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", "local")} /> },
     ]} /> });
     expect(html).toContain("Connected sources");
     expect(html).toContain("Link a Cadence account on this Mac to connect Outlook Calendar.");
     expect(html).toContain("Link a Cadence account on this Mac to connect Hevy.");
-    expect(html).toContain("Not available yet. Cadence cannot connect iCloud Calendar in this version.");
+    expect(html).toContain("Link a Cadence account on this Mac to connect iCloud Calendar.");
     expect(html).toContain("Recorded activity.");
     expect(html).not.toMatch(/<input[^>]*type="password"/);
     expect(html).not.toContain("Connect Outlook Calendar");

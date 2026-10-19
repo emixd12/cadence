@@ -8,12 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
 import type { ExternalEventSnapshotV1_1 } from "@cadence/core/types/external-event";
 import { AccountDeletionPanel } from "@/components/settings/AccountDeletionPanel";
-import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason, ICLOUD_CALENDAR_UNAVAILABLE } from "@/components/settings/ConnectorLibrary";
+import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 import { HevyPanel } from "@/components/settings/HevyPanel";
+import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { RecordedActivityList, workoutDuration } from "@/components/timeline/RecordedActivityList";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
-import { ConnectorClientError, type HevyCoordinator, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
+import { ConnectorClientError, type HevyCoordinator, type IcloudCalendarCoordinator, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
@@ -29,7 +30,7 @@ beforeEach(() => {
 afterEach(async () => { await act(() => root.unmount()); container.remove(); vi.restoreAllMocks(); });
 
 const hevySnapshot = validateRecordedActivitySnapshot(hevyFixture, { now: Temporal.Instant.from("2026-11-01T15:00:00Z") });
-const view = (provider: "hevy" | "outlook_calendar", overrides: Partial<ConnectorConnectionView> = {}): ConnectorConnectionView => ({
+const view = (provider: "hevy" | "outlook_calendar" | "icloud_calendar", overrides: Partial<ConnectorConnectionView> = {}): ConnectorConnectionView => ({
   accountId: "account-1", provider, status: "connected", generation: 2, selectionRevision: 1,
   preferences: { selectedSourceIds: ["calendar-1"], hiddenSourceIds: [], visible: true, showAllDay: true }, ...overrides });
 
@@ -75,7 +76,7 @@ describe("ConnectorLibrary", () => {
     expect(html.indexOf("Google controls")).toBeLessThan(html.indexOf("Outlook Calendar"));
     expect(html.indexOf("Outlook Calendar")).toBeLessThan(html.indexOf("iCloud Calendar"));
     expect(html.indexOf("iCloud Calendar")).toBeLessThan(html.indexOf("Hevy controls"));
-    expect(html).toContain(ICLOUD_CALENDAR_UNAVAILABLE);
+    expect(html).toContain("iCloud Calendar is unavailable in this build.");
     expect(html).toContain("Link a Cadence account on this Mac to connect Outlook Calendar.");
     expect(html).toMatch(/<h3[^>]*>iCloud Calendar<\/h3>/);
     expect(html).not.toMatch(/Connect iCloud/);
@@ -213,5 +214,46 @@ describe("account deletion copy", () => {
     expect(html).toContain("Microsoft account privacy app permissions");
     expect(html).toContain("remove or regenerate it in Hevy settings");
     expect(html).not.toMatch(/Cadence revokes (Outlook|Microsoft|Hevy)/);
+  });
+});
+
+
+describe("IcloudCalendarPanel", () => {
+  const range = { startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" };
+  function coordinator(overrides: Partial<IcloudCalendarCoordinator> = {}): IcloudCalendarCoordinator {
+    return { ...outlookCoordinator(), getConnection: vi.fn(async () => view("icloud_calendar", { status: "disconnected" })),
+      connect: vi.fn(async () => view("icloud_calendar")),
+      savePreferences: vi.fn(async preferences => view("icloud_calendar", { preferences })),
+      disconnect: vi.fn(async () => ({ view: view("icloud_calendar", { status: "disconnected" }), revocation: "apple_app_specific_password" as const })), ...overrides };
+  }
+  it("discloses broader custody and clears both fields before intake resolves", async () => {
+    let finish!: (view: ConnectorConnectionView) => void;
+    const source = coordinator({ connect: vi.fn(() => new Promise<ConnectorConnectionView>(resolve => { finish = resolve; })) });
+    await act(() => root.render(<IcloudCalendarPanel coordinator={source} refreshRange={range} />));
+    expect(container.textContent).toContain("Never enter your Apple Account password here.");
+    expect(container.textContent).toContain("iCloud Mail, Contacts");
+    const email = container.querySelector<HTMLInputElement>('input[type="email"]')!;
+    const password = container.querySelector<HTMLInputElement>('input[type="password"]')!;
+    await act(() => { type(email, "synthetic@example.invalid"); type(password, "abcd-efgh-ijkl-mnop"); });
+    await act(() => button("Connect iCloud Calendar").click());
+    expect(source.connect).toHaveBeenCalledWith("synthetic@example.invalid", "abcd-efgh-ijkl-mnop");
+    expect(email.value).toBe(""); expect(password.value).toBe("");
+    await act(() => finish(view("icloud_calendar")));
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+  });
+  it("saves selection, offers recovery after revocation, and allows disconnect while reconnect is required", async () => {
+    const source = coordinator({ getConnection: vi.fn(async () => view("icloud_calendar")),
+      refreshEvents: vi.fn(async () => { throw new ConnectorClientError("reconnect_required"); }) });
+    await act(() => root.render(<IcloudCalendarPanel coordinator={source} refreshRange={range} />));
+    const family = [...container.querySelectorAll("label")].find(label => label.textContent?.startsWith("Family"))!.querySelector("input")!;
+    await act(() => family.click());
+    await act(() => button("Save iCloud settings").click());
+    expect(source.savePreferences).toHaveBeenCalledWith(expect.objectContaining({ selectedSourceIds: ["calendar-1", "calendar-2"] }));
+    await act(() => button("Refresh iCloud Calendar").click());
+    expect(button("Reconnect iCloud Calendar")).toBeDefined();
+    await act(() => button("Disconnect iCloud Calendar").click());
+    expect(container.textContent).toContain("Cadence deleted its saved Apple Account email and app-specific password");
+    expect(container.textContent).toContain("Sign-In and Security");
+    expect(container.textContent).not.toContain("Cadence revoked");
   });
 });

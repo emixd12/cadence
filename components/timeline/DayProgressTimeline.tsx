@@ -31,7 +31,7 @@ import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
 import styles from "./day-progress-timeline.module.css";
 import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
-import { useWebHevyActivityTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
+import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
@@ -129,6 +129,9 @@ export function DayProgressTimeline({
   const liveConnectors = liveCalendar && !context;
   const outlook = useWebOutlookCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
     lastLocalDate: visibleSections.at(-1)?.localDate, timezone: timeline.timezone });
+  const icloud = useWebIcloudCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
+    lastLocalDate: visibleSections.at(-1)?.localDate, timezone: timeline.timezone });
+  const icloudActive = liveConnectors && OUTLOOK_ACTIVE.has(icloud.state);
   const hevy = useWebHevyActivityTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate, timezone: timeline.timezone });
   const outlookActive = liveConnectors && OUTLOOK_ACTIVE.has(outlook.state);
   const googleEvents = useMemo(() => live.snapshot?.events.filter((event) =>
@@ -137,9 +140,12 @@ export function DayProgressTimeline({
   const outlookEvents = useMemo(() => outlookActive ? outlook.snapshot?.events.filter((event) =>
     !outlook.hiddenCalendarIds.includes(event.calendarId) && (outlook.showAllDay || event.kind !== "all_day"),
   ) ?? EMPTY_EVENTS : EMPTY_EVENTS, [outlook.hiddenCalendarIds, outlook.showAllDay, outlook.snapshot, outlookActive]);
+  const icloudEvents = useMemo(() => icloudActive ? icloud.snapshot?.events.filter((event) =>
+    !icloud.hiddenCalendarIds.includes(event.calendarId) && (icloud.showAllDay || event.kind !== "all_day"),
+  ) ?? EMPTY_EVENTS : EMPTY_EVENTS, [icloud.hiddenCalendarIds, icloud.showAllDay, icloud.snapshot, icloudActive]);
   const contextEvents = context?.events;
-  const events = useMemo(() => contextEvents ?? (outlookEvents.length ? [...googleEvents, ...outlookEvents] : googleEvents),
-    [contextEvents, googleEvents, outlookEvents]);
+  const events = useMemo(() => contextEvents ?? (outlookEvents.length || icloudEvents.length ? [...googleEvents, ...outlookEvents, ...icloudEvents] : googleEvents),
+    [contextEvents, googleEvents, outlookEvents, icloudEvents]);
   // Travel estimates and their brief guidance stay Google-only (Ticket 225 adds no new routing disclosure).
   const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
@@ -246,14 +252,18 @@ export function DayProgressTimeline({
   const fresh = context?.freshness ?? combineExternalEventFreshness([
     ...(live.snapshot ? [live.snapshot.freshness] : googleFailing ? [UNAVAILABLE] : []),
     ...(outlookActive ? [outlookFreshness(outlook)] : []),
+    ...(icloudActive ? [outlookFreshness(icloud)] : []),
   ]) ?? UNAVAILABLE;
-  const googleUnused = outlookActive && !googleFailing && (live.state === "disconnected" || live.state === "not_configured");
+  const googleUnused = (outlookActive || icloudActive) && !googleFailing && (live.state === "disconnected" || live.state === "not_configured");
   const calendarState = context?.freshness
     ? calendarFreshnessLabel(context.freshness, timeline.timezone)
     : liveCalendar && !googleUnused
       ? calendarStateLabel(live.state, live.error, live.snapshot?.freshness, timeline.timezone)
       : null;
-  const sourceMessages = context ? context.sourceMessages ?? [] : outlookActive ? [outlookStateLabel(outlook, timeline.timezone)].filter(Boolean) : [];
+  const sourceMessages = context ? context.sourceMessages ?? [] : [
+    ...(outlookActive ? [outlookStateLabel(outlook, timeline.timezone, "Outlook Calendar")] : []),
+    ...(icloudActive ? [outlookStateLabel(icloud, timeline.timezone, "iCloud Calendar")] : []),
+  ].filter(Boolean);
   const dayProgressStyle = firstMeasured ? { "--day-progress-axis-left": `${firstMeasured.axisX}px` } as CSSProperties : undefined;
 
   return (
@@ -599,13 +609,13 @@ function outlookFreshness(outlook: OutlookTimelineState): ExternalEventFreshness
   return snapshot.freshness;
 }
 
-function outlookStateLabel(outlook: OutlookTimelineState, timezone: string): string {
+function outlookStateLabel(outlook: OutlookTimelineState, timezone: string, name: string): string {
   const refreshed = outlook.snapshot ? lastRefreshed(outlook.snapshot.fetchedAt, timezone) : "";
-  if (outlook.state === "empty") return "No Outlook Calendar events in the displayed days.";
-  if (outlook.state === "stale") return `Outlook Calendar context may be out of date.${refreshed}`;
-  if (outlook.state === "incomplete") return `Outlook Calendar context is incomplete; some events may be missing.${refreshed}`;
-  if (outlook.state === "error") return `Outlook Calendar context could not refresh: ${outlook.error ?? "unavailable"}.${outlook.snapshot ? ` Showing the last complete read.${refreshed}` : ""}`;
-  if (outlook.state === "reconnect_required") return "Outlook Calendar needs reconnection in Settings.";
+  if (outlook.state === "empty") return `No ${name} events in the displayed days.`;
+  if (outlook.state === "stale") return `${name} context may be out of date.${refreshed}`;
+  if (outlook.state === "incomplete") return `${name} context is incomplete; some events may be missing.${refreshed}`;
+  if (outlook.state === "error") return `${name} context could not refresh: ${outlook.error ?? "unavailable"}.${outlook.snapshot ? ` Showing the last complete read.${refreshed}` : ""}`;
+  if (outlook.state === "reconnect_required") return `${name} needs reconnection in Settings.`;
   return "";
 }
 

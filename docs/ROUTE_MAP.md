@@ -159,7 +159,8 @@ Keychain-correlated state, never credentials.
 ## Planned connector routes (Tickets 222–227)
 
 Planned October 18, 2026. Hevy (Ticket 223) and Outlook (Ticket 224) routes are
-implemented locally with synthetic tests; iCloud routes are not implemented. Hevy
+implemented locally with synthetic tests. Ticket 227 also implements the iCloud
+routes locally; no live Apple account or deployment is verified. Hevy
 `POST /api/hevy/connection` accepts exactly `{apiKey}` under the 8 KB cap and
 returns the view without the key; its `DELETE` adds revocation `hevy_api_key`. Each provider gets its own routes,
 mirroring the Google connector. No generic connector route or new primary screen

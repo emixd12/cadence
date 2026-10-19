@@ -26,7 +26,8 @@ import type {
 } from "@/lib/types/connectors";
 import { registerTimelineConnectorReload } from "./timeline-connector-reloads";
 
-// Ticket 225 client coordinators for Outlook Calendar and Hevy. They call only
+// Ticket 225 client coordinators for Outlook Calendar and Hevy, plus the Ticket
+// 227 iCloud Calendar coordinator. They call only
 // the hosted routes and carry no credential. Each source keeps its own cache,
 // pending requests, and account epoch, so one source failing or clearing never
 // changes another source's state.
@@ -36,14 +37,25 @@ export type ConnectorEventRange = Readonly<{ startLocalDate: string; endLocalDat
 export type ConnectorDisconnectResult = Readonly<{ view: ConnectorConnectionView; revocation: ConnectorRevocationInstruction }>;
 export type OutlookConnectResult = "started" | "connected" | "cancelled" | "admin_approval_required" | "error" | "expired_attempt" | "ignored";
 
-export type OutlookCalendarCoordinator = Readonly<{
+/** Shared calendar-source operations for Outlook and iCloud. */
+export type CalendarConnectorCoordinator = Readonly<{
   getConnection(): Promise<ConnectorConnectionView>;
-  beginConnect(): Promise<void>;
   listCalendars(): Promise<readonly ConnectorCalendarEntry[]>;
   savePreferences(preferences: ConnectorPreferences): Promise<ConnectorConnectionView>;
   refreshEvents(range: ConnectorEventRange, options?: Readonly<{ force?: boolean }>): Promise<ExternalEventSnapshotV1_1>;
   disconnect(): Promise<ConnectorDisconnectResult>;
 }>;
+
+export type OutlookCalendarCoordinator = CalendarConnectorCoordinator & Readonly<{
+  beginConnect(): Promise<void>;
+}>;
+
+export type IcloudCalendarCoordinator = CalendarConnectorCoordinator & Readonly<{
+  /** The caller passes the Apple Account email and app-specific password once; coordinators never store them. */
+  connect(appleId: string, appPassword: string): Promise<ConnectorConnectionView>;
+}>;
+
+export type CalendarConnectorSource = "outlook_calendar" | "icloud_calendar";
 
 export type HevyCoordinator = Readonly<{
   getConnection(): Promise<ConnectorConnectionView>;
@@ -69,7 +81,7 @@ export function connectorErrorCode(error: unknown): string {
 
 /** Codes that mean the cached view belongs to a connection that no longer applies. */
 export function connectorCriticalError(code: string | null): boolean {
-  return code === "unauthenticated" || code === "reconnect_required" || code === "wrong_account"
+  return code === "unauthenticated" || code === "permission_denied" || code === "reconnect_required" || code === "wrong_account"
     || code === "not_connected" || code === "connection_changed" || code === "disconnected" || code === "not_configured";
 }
 
@@ -133,18 +145,24 @@ function owner(key: string): string {
 }
 
 const OUTLOOK = new SourceMemory<ExternalEventSnapshotV1_1>();
+const ICLOUD = new SourceMemory<ExternalEventSnapshotV1_1>();
 const HEVY = new SourceMemory<RecordedActivitySnapshotV1>();
-const MEMORY: Readonly<Record<"outlook_calendar" | "hevy", { clear(accountId: string): void }>> = { outlook_calendar: OUTLOOK, hevy: HEVY };
+const MEMORY: Readonly<Record<ConnectorProvider, { clear(accountId: string): void }>> = { outlook_calendar: OUTLOOK, icloud_calendar: ICLOUD, hevy: HEVY };
 
 /** Clears one source's in-memory web state for an account (disconnect, account change). */
-export function clearWebConnectorSource(provider: "outlook_calendar" | "hevy", accountId: string): void {
+export function clearWebConnectorSource(provider: ConnectorProvider, accountId: string): void {
   MEMORY[provider].clear(accountId);
 }
 
-export function outlookEventScope(connection: ConnectorConnectionView, range: ConnectorEventRange): ExternalEventSnapshotScope {
-  return { source: "outlook_calendar", accountId: connection.accountId, connectionGeneration: connection.generation,
+/** Cache scope for one calendar source: source, account, generation, range, timezone, and selection. */
+export function calendarEventScope(source: CalendarConnectorSource, connection: ConnectorConnectionView, range: ConnectorEventRange): ExternalEventSnapshotScope {
+  return { source, accountId: connection.accountId, connectionGeneration: connection.generation,
     startLocalDate: range.startLocalDate, endLocalDate: range.endLocalDate, timezone: range.timezone,
     selectedCalendarIds: [...connection.preferences.selectedSourceIds] };
+}
+
+export function outlookEventScope(connection: ConnectorConnectionView, range: ConnectorEventRange): ExternalEventSnapshotScope {
+  return calendarEventScope("outlook_calendar", connection, range);
 }
 
 export function hevyActivityScope(connection: ConnectorConnectionView, localDate: string, timezone: string): RecordedActivitySnapshotScope {
@@ -152,13 +170,21 @@ export function hevyActivityScope(connection: ConnectorConnectionView, localDate
     startLocalDate: localDate, endLocalDate: localDate, timezone };
 }
 
-/** Validates an Outlook 1.1.0 response against the exact requested scope. */
-export function validateOutlookSnapshotForScope(value: unknown, scope: ExternalEventSnapshotScope): ExternalEventSnapshotV1_1 {
+/** Validates an Outlook or iCloud 1.1.0 response against the exact requested scope, including its source. */
+export function validateCalendarSnapshotForScope(value: unknown, scope: ExternalEventSnapshotScope): ExternalEventSnapshotV1_1 {
   let snapshot: ReturnType<typeof validateVersionedExternalEventSnapshot>;
   try { snapshot = validateVersionedExternalEventSnapshot(value); }
   catch { throw new ConnectorClientError("malformed_provider_response"); }
-  if (snapshot.source !== "outlook_calendar" || !externalEventSnapshotMatchesScope(snapshot, scope)) throw new ConnectorClientError("connection_changed");
-  return snapshot;
+  if (snapshot.source === "google_calendar" || snapshot.source !== scope.source || !externalEventSnapshotMatchesScope(snapshot, scope)) {
+    throw new ConnectorClientError("connection_changed");
+  }
+  return snapshot as ExternalEventSnapshotV1_1;
+}
+
+/** Validates an Outlook 1.1.0 response against the exact requested scope. */
+export function validateOutlookSnapshotForScope(value: unknown, scope: ExternalEventSnapshotScope): ExternalEventSnapshotV1_1 {
+  if (scope.source !== "outlook_calendar") throw new ConnectorClientError("connection_changed");
+  return validateCalendarSnapshotForScope(value, scope);
 }
 
 export function validateHevySnapshot(value: unknown, now = Temporal.Now.instant()): RecordedActivitySnapshotV1 {
@@ -182,10 +208,53 @@ export function applyOutlookCalendarRefresh(cached: ExternalEventSnapshotV1_1 | 
   snapshot: ExternalEventSnapshotV1_1;
   store: boolean;
 }> {
+  return applyCalendarConnectorRefresh(cached, next);
+}
+
+/** Same cache rule for Outlook and iCloud; the stale label names the snapshot's own source. */
+export function applyCalendarConnectorRefresh(cached: ExternalEventSnapshotV1_1 | null, next: ExternalEventSnapshotV1_1): Readonly<{
+  snapshot: ExternalEventSnapshotV1_1;
+  store: boolean;
+}> {
   if (next.completeness === "complete") return { snapshot: next, store: true };
   if (!cached || cached.completeness !== "complete") return { snapshot: next, store: false };
-  return { snapshot: { ...cached, freshness: { ...cached.freshness, state: "stale", label: "Outlook Calendar refresh was incomplete; showing the last complete read",
+  return { snapshot: { ...cached, freshness: { ...cached.freshness, state: "stale", label: `${CONNECTOR_PROVIDER_NAMES[cached.source]} refresh was incomplete; showing the last complete read`,
     canAssertNoOverlap: false } }, store: false };
+}
+
+/** Web calendar-source refresh: one complete-only, per-scope memory per source, fenced by account epoch. */
+async function refreshWebCalendarEvents(source: CalendarConnectorSource, memory: SourceMemory<ExternalEventSnapshotV1_1>, basePath: string,
+  getConnection: () => Promise<ConnectorConnectionView>, range: ConnectorEventRange, options?: Readonly<{ force?: boolean }>): Promise<ExternalEventSnapshotV1_1> {
+  const connection = await getConnection();
+  memory.note(connection.accountId);
+  if (connection.status !== "connected") { memory.clear(connection.accountId); throw new ConnectorClientError(connection.status); }
+  if (connection.preferences.selectedSourceIds.length === 0) throw new ConnectorClientError("no_selected_calendars");
+  const scope = calendarEventScope(source, connection, range);
+  const key = JSON.stringify([source, connection.accountId, externalEventSnapshotScopeKey(scope), connection.selectionRevision]);
+  memory.retainOnly(connection.accountId, key);
+  const epoch = memory.epoch(connection.accountId);
+  const cached = memory.get(key);
+  // Only complete reads are cached, so an incomplete read never satisfies the refresh window.
+  if (!options?.force && cached && fetchedRecently(cached.fetchedAt)) return cached;
+  const running = memory.pendingFor(key);
+  if (running) return running;
+  return memory.track(key, epoch, request<unknown>(`${basePath}/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`)
+    .then((value) => {
+      const applied = applyCalendarConnectorRefresh(memory.get(key) ?? null, validateCalendarSnapshotForScope(value, scope));
+      if (memory.epoch(connection.accountId) !== epoch) throw new ConnectorClientError("connection_changed");
+      if (applied.store && !memory.set(key, connection.accountId, epoch, applied.snapshot)) throw new ConnectorClientError("connection_changed");
+      return applied.snapshot;
+    }).catch((error: unknown) => {
+      if (connectorCriticalError(connectorErrorCode(error))) memory.clear(connection.accountId);
+      throw error;
+    }));
+}
+
+async function disconnectWebSource(path: string, memory: { clear(accountId: string): void }): Promise<ConnectorDisconnectResult> {
+  const result = await request<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }>(path, { method: "DELETE" });
+  memory.clear(result.accountId);
+  const { revocation, ...view } = result;
+  return { view, revocation };
 }
 
 export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
@@ -200,34 +269,30 @@ export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
     OUTLOOK.clear(view.accountId);
     return view;
   },
-  async refreshEvents(range, options) {
-    const connection = await webOutlookCalendarCoordinator.getConnection();
-    OUTLOOK.note(connection.accountId);
-    if (connection.status !== "connected") { OUTLOOK.clear(connection.accountId); throw new ConnectorClientError(connection.status); }
-    if (connection.preferences.selectedSourceIds.length === 0) throw new ConnectorClientError("no_selected_calendars");
-    const scope = outlookEventScope(connection, range);
-    const key = JSON.stringify(["outlook_calendar", connection.accountId, externalEventSnapshotScopeKey(scope), connection.selectionRevision]);
-    OUTLOOK.retainOnly(connection.accountId, key);
-    const epoch = OUTLOOK.epoch(connection.accountId);
-    const cached = OUTLOOK.get(key);
-    // Only complete reads are cached, so an incomplete read never satisfies the refresh window.
-    if (!options?.force && cached && fetchedRecently(cached.fetchedAt)) return cached;
-    const running = OUTLOOK.pendingFor(key);
-    if (running) return running;
-    return OUTLOOK.track(key, epoch, request<unknown>(`/api/outlook-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`)
-      .then((value) => {
-        const applied = applyOutlookCalendarRefresh(OUTLOOK.get(key) ?? null, validateOutlookSnapshotForScope(value, scope));
-        if (OUTLOOK.epoch(connection.accountId) !== epoch) throw new ConnectorClientError("connection_changed");
-        if (applied.store && !OUTLOOK.set(key, connection.accountId, epoch, applied.snapshot)) throw new ConnectorClientError("connection_changed");
-        return applied.snapshot;
-      }));
+  refreshEvents(range, options) {
+    return refreshWebCalendarEvents("outlook_calendar", OUTLOOK, "/api/outlook-calendar", webOutlookCalendarCoordinator.getConnection, range, options);
   },
-  async disconnect() {
-    const result = await request<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }>("/api/outlook-calendar/connection", { method: "DELETE" });
-    OUTLOOK.clear(result.accountId);
-    const { revocation, ...view } = result;
-    return { view, revocation };
+  disconnect() { return disconnectWebSource("/api/outlook-calendar/connection", OUTLOOK); },
+};
+
+/** Ticket 227. Apple login values cross this boundary once, in the POST body, and are never stored on the client. */
+export const webIcloudCalendarCoordinator: IcloudCalendarCoordinator = {
+  getConnection() { return request<ConnectorConnectionView>("/api/icloud-calendar/connection"); },
+  async connect(appleId, appPassword) {
+    const view = await request<ConnectorConnectionView>("/api/icloud-calendar/connection", { method: "POST", body: JSON.stringify({ appleId, appPassword }) });
+    ICLOUD.clear(view.accountId);
+    return view;
   },
+  async listCalendars() { return (await request<{ calendars: ConnectorCalendarEntry[] }>("/api/icloud-calendar/calendars")).calendars; },
+  async savePreferences(preferences) {
+    const view = await request<ConnectorConnectionView>("/api/icloud-calendar/calendars", { method: "PUT", body: JSON.stringify(preferences) });
+    ICLOUD.clear(view.accountId);
+    return view;
+  },
+  refreshEvents(range, options) {
+    return refreshWebCalendarEvents("icloud_calendar", ICLOUD, "/api/icloud-calendar", webIcloudCalendarCoordinator.getConnection, range, options);
+  },
+  disconnect() { return disconnectWebSource("/api/icloud-calendar/connection", ICLOUD); },
 };
 
 export const webHevyCoordinator: HevyCoordinator = {
@@ -254,12 +319,7 @@ export const webHevyCoordinator: HevyCoordinator = {
     HEVY.set(key, connection.accountId, epoch, applied.snapshot);
     return applied;
   },
-  async disconnect() {
-    const result = await request<ConnectorConnectionView & { revocation: ConnectorRevocationInstruction }>("/api/hevy/connection", { method: "DELETE" });
-    HEVY.clear(result.accountId);
-    const { revocation, ...view } = result;
-    return { view, revocation };
-  },
+  disconnect() { return disconnectWebSource("/api/hevy/connection", HEVY); },
 };
 
 export function outlookCallbackMessage(code: string | null | undefined): string | undefined {
@@ -278,7 +338,7 @@ export function outlookCallbackMessage(code: string | null | undefined): string 
 export const CONNECTOR_REVOCATION_COPY: Readonly<Record<ConnectorRevocationInstruction, string>> = {
   microsoft_account_permissions: "To remove Cadence's Microsoft permission too, open Microsoft account privacy app permissions for a personal account, or My Apps for a work or school account, and remove Cadence.",
   hevy_api_key: "To stop this key working anywhere, remove or regenerate it in Hevy settings.",
-  apple_app_specific_password: "To stop that password working anywhere, remove it at account.apple.com under Sign-In and Security, App-Specific Passwords.",
+  apple_app_specific_password: "Apple keeps the app-specific password active, and it can reach more than Calendar, until you remove it. Sign in at account.apple.com, open Sign-In and Security, choose App-Specific Passwords, and remove the Cadence password, or use Revoke All. Changing your Apple Account password also revokes all of them.",
 };
 
 export const CONNECTOR_PROVIDER_NAMES: Readonly<Record<ConnectorProvider | "google_calendar", string>> = {
@@ -290,13 +350,15 @@ export const CONNECTOR_PROVIDER_NAMES: Readonly<Record<ConnectorProvider | "goog
 
 export type ConnectorTimelineState = "not_loaded" | "not_configured" | "disconnected" | "reconnect_required" | "no_selected_calendars" | "hidden" | "empty" | "ready" | "stale" | "incomplete" | "error";
 
-export type OutlookTimelineState = Readonly<{
+export type CalendarConnectorTimelineState = Readonly<{
   state: ConnectorTimelineState;
   snapshot: ExternalEventSnapshotV1_1 | null;
   error: string | null;
   hiddenCalendarIds: readonly string[];
   showAllDay: boolean;
 }>;
+export type OutlookTimelineState = CalendarConnectorTimelineState;
+export type IcloudTimelineState = CalendarConnectorTimelineState;
 
 export type HevyTimelineState = Readonly<{
   state: ConnectorTimelineState;
@@ -347,18 +409,28 @@ function statusState(status: ConnectorConnectionView["status"]): ConnectorTimeli
   return status === "not_configured" ? "not_configured" : status === "reconnect_required" ? "reconnect_required" : "disconnected";
 }
 
-/** Live Outlook context for the web Timeline. Failures stay inside this source. */
-export function useWebOutlookCalendarTimeline(input: Readonly<{
+type CalendarTimelineInput = Readonly<{
   enabled: boolean;
   todayLocalDate: string;
   lastLocalDate: string | undefined;
   timezone: string;
-  coordinator?: OutlookCalendarCoordinator;
-}>): OutlookTimelineState {
-  const coordinator = input.coordinator ?? webOutlookCalendarCoordinator;
+}>;
+
+/** Live Outlook context for the web Timeline. Failures stay inside this source. */
+export function useWebOutlookCalendarTimeline(input: CalendarTimelineInput & Readonly<{ coordinator?: OutlookCalendarCoordinator }>): OutlookTimelineState {
+  return useWebCalendarConnectorTimeline({ ...input, coordinator: input.coordinator ?? webOutlookCalendarCoordinator });
+}
+
+/** Ticket 227: live iCloud context for the web Timeline, with its own cache and failures. */
+export function useWebIcloudCalendarTimeline(input: CalendarTimelineInput & Readonly<{ coordinator?: IcloudCalendarCoordinator }>): IcloudTimelineState {
+  return useWebCalendarConnectorTimeline({ ...input, coordinator: input.coordinator ?? webIcloudCalendarCoordinator });
+}
+
+function useWebCalendarConnectorTimeline(input: CalendarTimelineInput & Readonly<{ coordinator: CalendarConnectorCoordinator }>): CalendarConnectorTimelineState {
+  const coordinator = input.coordinator;
   const range = useMemo(() => outlookTimelineRange(input.todayLocalDate, input.lastLocalDate, input.timezone), [input.lastLocalDate, input.timezone, input.todayLocalDate]);
-  const empty: OutlookTimelineState = { state: "not_loaded", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: true };
-  const [state, setState] = useState<OutlookTimelineState>(empty);
+  const empty: CalendarConnectorTimelineState = { state: "not_loaded", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: true };
+  const [state, setState] = useState<CalendarConnectorTimelineState>(empty);
   const sequence = useRef(0);
   const last = useRef<ExternalEventSnapshotV1_1 | null>(null);
   const refresh = useCallback(async (force = false): Promise<boolean> => {
@@ -369,7 +441,8 @@ export function useWebOutlookCalendarTimeline(input: Readonly<{
     try {
       const connection = await coordinator.getConnection();
       if (!isCurrent()) return false;
-      if (last.current && last.current.accountId !== connection.accountId) last.current = null;
+      if (last.current && !externalEventSnapshotMatchesScope(last.current, calendarEventScope(
+        last.current.source, connection, range))) last.current = null;
       if (connection.status !== "connected") {
         last.current = null;
         setState({ ...empty, state: statusState(connection.status) });

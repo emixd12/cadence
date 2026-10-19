@@ -60,8 +60,8 @@ function exactKeys(value: unknown, keys: readonly string[]): Record<string, unkn
 /**
  * Normalizes intake. The Apple Account must look like an address without a
  * colon (Basic authentication separator). The password must have the
- * app-specific shape (four groups of four letters), so a primary Apple Account
- * password is refused before any network call.
+ * app-specific shape (four groups of four letters). Shape alone cannot prove
+ * that the value is an app-specific password.
  */
 export function normalizeIcloudLogin(raw: unknown): IcloudLogin {
   const body = exactKeys(raw, ["appleId", "appPassword"]);

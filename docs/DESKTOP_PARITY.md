@@ -297,7 +297,7 @@ release acceptance. Marketing has no runtime change; native mobile remains defer
 
 ## Connector expansion (Tickets 220–228)
 
-Planned October 18, 2026; not implemented. In linked-account mode, desktop uses
+Implemented locally through Ticket 227, with synthetic evidence only. In linked-account mode, desktop uses
 the same Settings library and Timeline components and calls hosted Outlook,
 iCloud, and Hevy brokers with its Supabase session. Outlook consent uses the
 existing external-browser and opaque Keychain-state pattern. iCloud and Hevy
@@ -320,3 +320,13 @@ Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390p
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 `docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+
+
+Ticket 227 mounts `IcloudCalendarPanel` in the linked Settings library and
+consumes the hosted 1.1 snapshot through `calendar/icloud-calendar.ts` and
+`calendar/use-connectors.ts`. The disposable iCloud cache binds account,
+generation, selection revision, range, timezone and display choices. Logout,
+account switch, disconnect and permission withdrawal clear source context.
+Daily Brief reuses the hosted, separately consented projection. Installed
+Keychain/cache behavior and live Apple access remain unverified; no native
+EventKit or local-calendar permission exists.

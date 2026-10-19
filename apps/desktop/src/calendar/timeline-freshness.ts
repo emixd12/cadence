@@ -26,10 +26,11 @@ const OUTLOOK_ACTIVE: ReadonlySet<ConnectorTimelineState> = new Set(["reconnect_
 
 export type DesktopGoogleTimelineInput = Readonly<{ snapshot: ExternalEventSnapshotV1 | null; stale: boolean; label: string; error?: string | null }>;
 
-export function desktopTimelineFreshness(google: DesktopGoogleTimelineInput, outlook: OutlookTimelineState): Readonly<{
+export function desktopTimelineFreshness(google: DesktopGoogleTimelineInput, outlook: OutlookTimelineState, icloud?: OutlookTimelineState): Readonly<{
   freshness: ExternalEventFreshness;
   sourceMessages: string[];
 }> {
+  const icloudActive = icloud !== undefined && OUTLOOK_ACTIVE.has(icloud.state);
   const outlookActive = OUTLOOK_ACTIVE.has(outlook.state);
   const googleFreshness: ExternalEventFreshness | null = google.snapshot
     ? { ...google.snapshot.freshness, label: google.label, ...(google.stale ? { state: "stale" as const, canAssertNoOverlap: false } : {}) }
@@ -38,23 +39,28 @@ export function desktopTimelineFreshness(google: DesktopGoogleTimelineInput, out
     : outlook.snapshot && (outlook.state === "ready" || outlook.state === "empty") ? outlook.snapshot.freshness
       : { state: outlook.state === "incomplete" ? "incomplete" : outlook.snapshot ? "stale" : "unavailable",
         refreshedAt: outlook.snapshot?.fetchedAt ?? null, label: "Outlook Calendar context may be out of date", canAssertNoOverlap: false };
+  const icloudFreshness: ExternalEventFreshness | null = !icloudActive ? null
+    : icloud!.snapshot && (icloud!.state === "ready" || icloud!.state === "empty") ? icloud!.snapshot.freshness
+      : { state: icloud!.state === "incomplete" ? "incomplete" : icloud!.snapshot ? "stale" : "unavailable",
+        refreshedAt: icloud!.snapshot?.fetchedAt ?? null, label: "iCloud Calendar context may be out of date", canAssertNoOverlap: false };
   const unavailable: ExternalEventFreshness = { state: "unavailable", refreshedAt: null, label: google.label, canAssertNoOverlap: false };
   // A connected Google source that cannot read still blocks no-overlap claims; an unused one does not.
   const googleFailing = !google.snapshot && (Boolean(google.error) || DESKTOP_GOOGLE_FAILING_LABELS.has(google.label));
   const freshness = combineExternalEventFreshness([...(googleFreshness ? [googleFreshness] : googleFailing ? [unavailable] : []),
-    ...(outlookFreshness ? [outlookFreshness] : [])])
+    ...(outlookFreshness ? [outlookFreshness] : []), ...(icloudFreshness ? [icloudFreshness] : [])])
     // Neither source is active: keep the existing Google-only label and unavailable state.
     ?? unavailable;
-  const messages = outlookActive ? outlookMessages(outlook.state, outlook.error) : [];
+  const messages = [...(outlookActive ? calendarMessages(outlook.state, outlook.error, "Outlook Calendar") : []),
+    ...(icloudActive ? calendarMessages(icloud.state, icloud.error, "iCloud Calendar") : [])];
   // Without a Google snapshot, Google's own state still speaks unless Google is simply unused.
-  if (outlookActive && !google.snapshot && !googleFailing && !DESKTOP_GOOGLE_UNUSED_LABELS.has(google.label)) messages.unshift(google.label);
+  if ((outlookActive || icloudActive) && !google.snapshot && !googleFailing && !DESKTOP_GOOGLE_UNUSED_LABELS.has(google.label)) messages.unshift(google.label);
   return { freshness, sourceMessages: messages };
 }
 
-function outlookMessages(state: ConnectorTimelineState, error: string | null): string[] {
-  if (state === "stale") return ["Saved Outlook Calendar context may be out of date."];
-  if (state === "incomplete") return ["Outlook Calendar context is incomplete; some events may be missing."];
-  if (state === "error") return [`Outlook Calendar context could not refresh: ${error ?? "unavailable"}.`];
-  if (state === "reconnect_required") return ["Outlook Calendar needs reconnection in Settings."];
+function calendarMessages(state: ConnectorTimelineState, error: string | null, name: string): string[] {
+  if (state === "stale") return [`Saved ${name} context may be out of date.`];
+  if (state === "incomplete") return [`${name} context is incomplete; some events may be missing.`];
+  if (state === "error") return [`${name} context could not refresh: ${error ?? "unavailable"}.`];
+  if (state === "reconnect_required") return [`${name} needs reconnection in Settings.`];
   return [];
 }

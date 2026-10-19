@@ -537,6 +537,20 @@
       "notes": "Ticket 225 Outlook source controls; reuses the shared CalendarSelector and revocation copy. Synthetic bench never contacts Microsoft."
     },
     {
+      "id": "module.icloud-calendar-panel",
+      "name": "IcloudCalendarPanel",
+      "kind": "module",
+      "source": "components/settings/IcloudCalendarPanel.tsx",
+      "exportName": "IcloudCalendarPanel",
+      "usageNames": [
+        "IcloudCalendarPanel"
+      ],
+      "benchAnchor": "design-system#ds-module-icloud-calendar-panel",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 227 iCloud intake, broader-than-Calendar custody disclosure, selector, refresh and disconnect. Synthetic bench only; live Apple and installed acceptance remain unverified."
+    },
+    {
       "id": "module.hevy-panel",
       "name": "HevyPanel",
       "kind": "module",

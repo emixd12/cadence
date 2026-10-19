@@ -14,6 +14,7 @@ import { readMacForegroundLocation } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
+import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
@@ -327,6 +328,9 @@ export function Product() {
     enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
   });
   const outlookTimeline = connectors.outlook;
+  const icloudTimeline = connectors.icloud;
+  const icloudEvents = icloudTimeline.snapshot?.events.filter((event) => !icloudTimeline.hiddenCalendarIds.includes(event.calendarId)
+    && (icloudTimeline.showAllDay || event.kind !== "all_day")) ?? [];
   const outlookEvents = outlookTimeline.snapshot?.events.filter((event) => !outlookTimeline.hiddenCalendarIds.includes(event.calendarId)
     && (outlookTimeline.showAllDay || event.kind !== "all_day")) ?? [];
   const currentTravelCorrections = useMemo(() => (travelCorrections.accountId === accountUserId ? travelCorrections.items : []).filter((correction) => calendar.snapshot?.events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [travelCorrections, calendar.snapshot, accountUserId]);
@@ -343,8 +347,8 @@ export function Product() {
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
     // Travel and its brief guidance stay on Google events; Outlook adds schedule context only.
-    events: outlookEvents.length ? [...visibleCalendarEvents, ...outlookEvents] : visibleCalendarEvents,
-    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline),
+    events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
+    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),
     recordedActivity: connectors.hevy,
   };
   const syncAccount = useCallback((): Promise<SyncCompletion> => {
@@ -526,7 +530,9 @@ export function Product() {
             refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")}
             callbackMessage={connectors.outlookMessage} refreshVersion={connectors.panelVersion} />
             : <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
-          { id: "icloud_calendar" },
+          { id: "icloud_calendar", content: connectors.icloudCoordinator ? <IcloudCalendarPanel key={`icloud-${accountUserId}`} coordinator={connectors.icloudCoordinator}
+            refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")} />
+            : <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
           { id: "hevy", content: connectors.hevyCoordinator ? <HevyPanel key={`hevy-${accountUserId}`} coordinator={connectors.hevyCoordinator}
             localDate={calendarRange.startLocalDate} timezone={profile?.timezone ?? "America/New_York"} refreshVersion={connectors.panelVersion} />
             : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },

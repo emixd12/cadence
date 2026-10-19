@@ -617,8 +617,9 @@ iCloud Calendar, Hevy). Each source is a nested SettingsPanel with an h3 title,
 a one-line kind and boundary description, a status line, and its own controls.
 No new tokens, icon sets, cards, or modals. Outlook reuses the shared
 `CalendarSelector` field and the Google button vocabulary. Hevy uses one labeled
-password-type field that clears on submit. iCloud shows truthful availability
-text only. Desktop local mode shows each source as requiring a linked account.
+password-type field that clears on submit. iCloud uses labeled email/password fields that clear on submission, a broader
+credential-custody disclosure, and the same CalendarSelector. Reconnect states
+retain a Disconnect action. Desktop local mode shows each source as requiring a linked account.
 Disconnect and account deletion copy name the provider-side removal step and
 never claim Cadence revoked provider access.
 
