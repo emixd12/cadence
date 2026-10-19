@@ -52,15 +52,15 @@ afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); 
 function ordinary(request: OsRequest) {
   if (request.operation === "status") return { authorization: "authorized" };
   if (request.operation === "delivered") return { delivered };
-  if (request.operation === "cancel") {
+  if (["cancel", "cancelPending"].includes(request.operation)) {
     for (const id of request.ids ?? []) pending.delete(id);
-    delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
+    if (request.operation === "cancel") delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
   }
   if (request.operation === "schedule") for (const item of request.reminders ?? []) pending.set(item.id, item);
   return { pending: [...pending.values()], errors: [] };
 }
 async function reconcile() { const result = reconcileLocalReminders(NOW); await vi.runAllTimersAsync(); return result; }
-const cancellations = () => mocks.notifications.mock.calls.filter(([request]) => request.operation === "cancel").flatMap(([request]) => request.ids);
+const cancellations = () => mocks.notifications.mock.calls.filter(([request]) => ["cancel", "cancelPending"].includes(request.operation)).flatMap(([request]) => request.ids);
 
 describe("observed native delivery", () => {
   const delivery: NativeDeliveryProof = { requestId: `cadence.local.${uuid(900)}`, fireAt: "2026-08-30T11:00:00Z",
@@ -74,6 +74,29 @@ describe("observed native delivery", () => {
   function capture(proof = delivery) {
     retainNativeDeliveryEvents([{ kind: "notificationActivated", id: delivery.requestId, at: NOW.toString(), delivery: proof }]);
   }
+
+  it("preserves unresolved delivered entries with unknown fire time while cancelling expired pending requests", async () => {
+    existing();
+    const read = mocks.command.getMockImplementation()!;
+    let status = "unresolved";
+    mocks.command.mockImplementation(async (operation, input) => operation === "readOccurrences"
+      ? [{ ...storedExportOccurrence(), id: uuid(900), user_id: USER_ID, scheduled_for: delivery.fireAt, status }]
+      : read(operation, input));
+    delivered = [{ id: delivery.requestId, fireAt: null, title: delivery.title, body: delivery.body, deliveredAt: delivery.deliveredAt }];
+    pending.set(delivery.requestId, { id: delivery.requestId, fireAt: delivery.fireAt, title: delivery.title, body: delivery.body });
+
+    await reconcile();
+    await reconcile();
+    expect(pending.size).toBe(0);
+    expect(delivered).toHaveLength(1);
+    expect(state.reminders.find(({ id }) => id === uuid(901))?.status).toBe("cancelled");
+    expect(mocks.notifications.mock.calls.some(([request]) => request.operation === "cancel" && request.ids.includes(delivery.requestId))).toBe(false);
+    expect(state.coverage).toMatchObject({ status: "complete", expected_count: 0 });
+
+    status = "completed";
+    await reconcile();
+    expect(delivered).toEqual([]);
+  });
 
   it.each(["scheduled", "cancelled"] as const)("preserves clicked OS delivery from %s when Notification Center is already empty", async (status) => {
     existing(status); capture();
@@ -238,7 +261,7 @@ describe("bounded native reminder repair", () => {
   it("does not verify archive cleanup while macOS retains a delivered notification", async () => {
     active = false;
     delivered = [{ id: `cadence.local.${uuid(1)}` }];
-    mocks.notifications.mockImplementation(async (request: OsRequest) => request.operation === "cancel" ? {} : ordinary(request));
+    mocks.notifications.mockImplementation(async (request: OsRequest) => ["cancel", "cancelPending"].includes(request.operation) ? {} : ordinary(request));
     expect((await reconcile()).state.coverage).toMatchObject({ status: "unverified", verified_at: null });
     expect(state.coverage?.reason).toContain("retained a cancelled reminder");
   });
