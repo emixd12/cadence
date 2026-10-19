@@ -1,5 +1,15 @@
 # Implementation Status
 
+## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
+
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with
+"Configuration event plan does not match behavior state." The smoke predates
+migration `20260922010000_add_travel_settings.sql`, which added `location_text`
+to the Behavior configuration snapshot and baseline changed fields. The smoke's
+baseline plan now includes `location_text`; no schema or runtime change. A
+disposable Postgres replay of all 86 migrations passes all 19 SQL smokes.
+Retained local and hosted databases were not touched.
+
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
 Owner direction (2026-10-18): Cadence ships one remote MCP server plus Claude and
