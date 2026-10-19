@@ -12731,8 +12731,9 @@ Platform impact:
 Status: implemented in source October 19, 2026; not deployed. Hosted migration
 `20261019180000_add_behavior_where.sql`, deployment, a desktop preview with SQLite
 migration 0018 and production QA remain owner-gated. Deploy the hosted migration,
-then the web app, then the desktop preview: an older desktop build fails closed on
-Behavior synchronization until it is updated. Model input for Not set ("location
+then the web app, then the desktop preview. The migration accepts the previous web
+build's payloads in between; an older desktop build fails closed on Behavior
+synchronization until it is updated. Model input for Not set ("location
 not set") waits for Ticket 219; travel stays out of model input.
 Dependencies: 214. Ticket 212 reuses these controls in onboarding.
 

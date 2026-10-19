@@ -44,6 +44,11 @@ owner-gated.
   input keeps the earlier text-only rule. Where joins configuration history, account
   sync (Behavior upserts require `where_kind`) and Full JSON; CSV, JSONL, Markdown
   and BehaviorLog omit it.
+- Rollout compatibility (review fix): the hosted graph writers and plan validator
+  also accept the previous web build's payloads, which carry no `where_kind`, so
+  web edits keep working between the migration and the web deployment.
+  `tests/sql/ticket-215-behavior-where-smoke.sql` covers both payload shapes; it
+  fails with the constraint violation against the original writer.
 - Routing: Not set and Anywhere request no route; Home routes to the saved Home
   (one shared lookup) and requests none without it; A place routes to its text.
 - Registry: `INT-TRAVEL-001` (Save Home and usual travel), `INT-TRAVEL-002` (now the
@@ -56,7 +61,9 @@ passed, 96 skipped. 111 native tests pass, including the new 0018 migration test
 real-SQLite contract tests pass. An isolated loopback stack (`cadence-t215`)
 replayed all 87 migrations and the seed from scratch; generated types match the
 checked-in file. The opt-in `tests/behavior-where.local-integration.test.ts` passed
-against it, and six SQL smokes passed. `behavior-end-date-lifecycle-smoke.sql`
+against it, and seven SQL smokes passed, including the new Where smoke. The
+unchanged `origin/main` web store and core service also passed create, edit,
+clear and Home cases against the migrated database (scratch test, not committed). `behavior-end-date-lifecycle-smoke.sql`
 had lacked `location_text` since September 22; it now carries both fields.
 
 Release order: hosted migration, then the web deployment, then a desktop preview.

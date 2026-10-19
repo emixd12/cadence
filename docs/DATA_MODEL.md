@@ -45,6 +45,15 @@ sets `where_kind = 'place'` for every Behavior that had location text. It calls
 no provider and does not change `updated_at`; place lookups wait for the next
 travel refresh. Travel Settings calls `base_location_text` Home.
 
+The migration ships before the web deployment, so the graph writers and
+`insert_behavior_configuration_event` also accept the previous web build. A
+payload without `where_kind` stores `place` when it has location text, clears
+A place when the text is cleared, and otherwise keeps the stored Where. A plan
+whose snapshots lack `where_kind` is compared with Where read the same way and
+with `where_kind` removed from the expected changed fields. Stored events always
+use the database snapshots. A pre-Where plan that would contradict a stored
+Anywhere or Home is refused; a title-only edit keeps it.
+
 `travel_settings` stores disabled-by-default routing state, optional base, mode,
 supported navigation preference, explicit routing-consent time, onboarding time
 and revision time. Enabling requires both a mode and consent. Disabling clears

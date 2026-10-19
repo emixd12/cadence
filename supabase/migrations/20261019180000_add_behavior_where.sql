@@ -68,8 +68,31 @@ as $$
   ]::text[], null) end;
 $$;
 
--- Extend the snapshot and the graph writers in place, preserving every later
--- change to their bodies.
+-- A plan written by a client that predates Where carries snapshots without
+-- where_kind. Read them the same way as stored history: location text means
+-- 'place', none means Not set.
+create function cadence_private.behavior_configuration_with_where(snapshot jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = ''
+as $$
+  select case
+    when jsonb_typeof(snapshot) = 'object' and not (snapshot ? 'where_kind') then
+      snapshot || jsonb_build_object('where_kind',
+        case when snapshot ->> 'location_text' is null then null else 'place' end)
+    else snapshot
+  end;
+$$;
+
+revoke all on function cadence_private.behavior_configuration_with_where(jsonb)
+  from public, anon, authenticated, service_role;
+
+-- Extend the snapshot, the plan validator and the graph writers in place,
+-- preserving every later change to their bodies. The hosted migration ships
+-- before the web deployment, so the writers and the validator also accept
+-- payloads and plans from the previous web build, which send no where_kind.
 do $migration$
 declare
   definition text;
@@ -92,15 +115,43 @@ begin
     behavior_payload -> 'recurrence_rule',$a$;
   if position(anchor in definition) = 0 then raise exception 'Behavior create values changed unexpectedly.'; end if;
   definition := replace(definition, anchor, $patch$    nullif(behavior_payload ->> 'location_text', ''),
-    nullif(behavior_payload ->> 'where_kind', ''),
+    case
+      when behavior_payload ? 'where_kind' then nullif(behavior_payload ->> 'where_kind', '')
+      when nullif(behavior_payload ->> 'location_text', '') is not null then 'place'
+    end,
     behavior_payload -> 'recurrence_rule',$patch$);
   execute definition;
 
   select pg_get_functiondef('public.update_behavior_with_schedule_graph(uuid,jsonb,jsonb,jsonb,timestamp with time zone,jsonb,jsonb,jsonb)'::regprocedure) into definition;
   anchor := $a$    location_text = nullif(behavior_payload ->> 'location_text', ''),$a$;
   if position(anchor in definition) = 0 then raise exception 'Behavior update fields changed unexpectedly.'; end if;
+  -- Without where_kind, text means A place and clearing A place means Not set,
+  -- matching the rule in the core service for callers that predate Where.
   execute replace(definition, anchor, $patch$    location_text = nullif(behavior_payload ->> 'location_text', ''),
-    where_kind = nullif(behavior_payload ->> 'where_kind', ''),$patch$);
+    where_kind = case
+      when behavior_payload ? 'where_kind' then nullif(behavior_payload ->> 'where_kind', '')
+      when nullif(behavior_payload ->> 'location_text', '') is not null then 'place'
+      when current_behavior.where_kind = 'place' then null
+      else current_behavior.where_kind
+    end,$patch$);
+
+  -- The validator still stores the database snapshots and changed fields. A
+  -- pre-Where plan only has to match them with Where read the legacy way.
+  select pg_get_functiondef('cadence_private.insert_behavior_configuration_event(uuid,uuid,jsonb,jsonb,jsonb)'::regprocedure) into definition;
+  anchor := $a$    or configuration_event_plan -> 'previous_configuration'
+      is distinct from coalesce(previous_configuration, 'null'::jsonb)
+    or configuration_event_plan -> 'next_configuration'
+      is distinct from next_configuration
+    or planned_changed_fields is distinct from expected_changed_fields$a$;
+  if position(anchor in definition) = 0 then raise exception 'Configuration event plan validation changed unexpectedly.'; end if;
+  execute replace(definition, anchor, $patch$    or cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'previous_configuration')
+      is distinct from coalesce(previous_configuration, 'null'::jsonb)
+    or cadence_private.behavior_configuration_with_where(configuration_event_plan -> 'next_configuration')
+      is distinct from next_configuration
+    or planned_changed_fields is distinct from (case
+      when (configuration_event_plan -> 'next_configuration') ? 'where_kind' then expected_changed_fields
+      else array_remove(expected_changed_fields, 'where_kind')
+    end)$patch$);
 
   -- Behavior sync writes must carry Where; older desktop builds fail closed
   -- with the existing update message instead of clearing it.
