@@ -415,6 +415,20 @@ allowlist and calls the core `normalizeRecordedWorkout` and
 fences, and the `applyHevyActivityRefresh` cache rule. Paired tests:
 `tests/hevy-provider.test.ts` and `tests/hevy.service.test.ts`. No resolver changed.
 
+Ticket 225 moves the pure cache rule to
+`packages/core/src/services/recorded-activity-refresh.ts`
+(`applyRecordedActivityRefresh`, the same-scope guard
+`applyScopedRecordedActivityRefresh`, and the timing-only day projection
+`projectRecordedActivityDay`); `hevy.service.ts` re-exports it as
+`applyHevyActivityRefresh`. `combineExternalEventFreshness` in
+`services/external-event-projection.ts` merges calendar freshness so no-overlap is
+asserted only when every active source can. Web clients (`lib/ui/connectors.ts`)
+and desktop clients (`apps/desktop/src/calendar/{outlook-calendar,hevy,connector-*}.ts`)
+call these helpers and never import server credential, crypto, or provider
+modules. Paired tests: `tests/recorded-activity-refresh.test.ts`,
+`tests/connectors-client.test.ts`, and `tests/desktop-calendar.test.ts`. No
+resolver changed.
+
 Recorded activity never feeds `status.resolver.ts`, `timeline.resolver.ts`
 Occurrence grouping, reminders, analytics, or exports. Calendar overlap cues keep
 using scheduled events only. Daily Brief reads new sources through the existing

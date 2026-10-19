@@ -7,6 +7,7 @@ import {
 } from "../apps/desktop/src/settings-screen";
 import { DesktopOnboardingGuide } from "../apps/desktop/src/onboarding-guide";
 import { LocalDatabaseSection } from "../apps/desktop/src/local-database-controls";
+import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 
 const complete: NativeSettingsCoverage = {
   status: "complete",
@@ -170,5 +171,23 @@ describe("local database controls", () => {
       busy={false} message="" onConfirmationChange={vi.fn()} onReveal={vi.fn()} onBackup={vi.fn()} onRestore={vi.fn()} />);
     expect(html).toContain("Disconnect the account before restoring");
     expect(html).not.toContain("Restore local database");
+  });
+});
+
+describe("desktop connector library (Ticket 225)", () => {
+  it("shows every source as requiring a linked account in local mode without connect controls", () => {
+    const { html } = settings({ calendarControls: <ConnectorLibrary sources={[
+      { id: "google_calendar", content: <ConnectorUnavailable id="google_calendar" reason="Calendar requires a linked account." /> },
+      { id: "outlook_calendar", content: <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", "local")} /> },
+      { id: "icloud_calendar" },
+      { id: "hevy", content: <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", "local")} /> },
+    ]} /> });
+    expect(html).toContain("Connected sources");
+    expect(html).toContain("Link a Cadence account on this Mac to connect Outlook Calendar.");
+    expect(html).toContain("Link a Cadence account on this Mac to connect Hevy.");
+    expect(html).toContain("Not available yet. Cadence cannot connect iCloud Calendar in this version.");
+    expect(html).toContain("Recorded activity.");
+    expect(html).not.toMatch(/<input[^>]*type="password"/);
+    expect(html).not.toContain("Connect Outlook Calendar");
   });
 });

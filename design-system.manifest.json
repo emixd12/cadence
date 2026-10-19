@@ -464,7 +464,7 @@
       "benchAnchor": "design-system#ds-module-day-progress-timeline",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Shared web/desktop Timeline with Google Calendar markers, thin facet overlap borders and duration lines, and synthetic provider-free preview."
+      "notes": "Shared web/desktop Timeline with source-labeled Google and Outlook Calendar markers, a separate recorded-activity list, thin facet overlap borders and duration lines, and synthetic provider-free preview."
     },
     {
       "id": "module.daily-brief-bubble",
@@ -507,6 +507,62 @@
       "trackUsages": "required",
       "status": "active",
       "notes": "Tickets 133\u2013137; synthetic bench never contacts a provider."
+    },
+    {
+      "id": "module.connector-library",
+      "name": "ConnectorLibrary",
+      "kind": "module",
+      "source": "components/settings/ConnectorLibrary.tsx",
+      "exportName": "ConnectorLibrary",
+      "usageNames": [
+        "ConnectorLibrary"
+      ],
+      "benchAnchor": "design-system#ds-module-connector-library",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 225 sparse Settings list of read-only sources (Google, Outlook, iCloud availability, Hevy); each source fails separately. Synthetic bench states: connected, not connected, not configured, needs reconnection, status unavailable, desktop local mode."
+    },
+    {
+      "id": "module.outlook-calendar-panel",
+      "name": "OutlookCalendarPanel",
+      "kind": "module",
+      "source": "components/settings/OutlookCalendarPanel.tsx",
+      "exportName": "OutlookCalendarPanel",
+      "usageNames": [
+        "OutlookCalendarPanel"
+      ],
+      "benchAnchor": "design-system#ds-module-outlook-calendar-panel",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 225 Outlook source controls; reuses the shared CalendarSelector and revocation copy. Synthetic bench never contacts Microsoft."
+    },
+    {
+      "id": "module.hevy-panel",
+      "name": "HevyPanel",
+      "kind": "module",
+      "source": "components/settings/HevyPanel.tsx",
+      "exportName": "HevyPanel",
+      "usageNames": [
+        "HevyPanel"
+      ],
+      "benchAnchor": "design-system#ds-module-hevy-panel",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 225 recorded-activity source; one-time API key field cleared on submit, Hevy Pro and 500-workout disclosure. Synthetic bench never contacts Hevy."
+    },
+    {
+      "id": "composite.recorded-activity-list",
+      "name": "RecordedActivityList",
+      "kind": "composite",
+      "source": "components/timeline/RecordedActivityList.tsx",
+      "exportName": "RecordedActivityList",
+      "usageNames": [
+        "RecordedActivityList"
+      ],
+      "benchAnchor": "design-system#ds-composite-recorded-activity-list",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 225 current-day Hevy workouts: when and how long only, outside Calendar markers and overlap cues; ready, stale, incomplete, and error states."
     },
     {
       "id": "composite.external-event-details",

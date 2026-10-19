@@ -59,7 +59,26 @@ The integrated baseline `d7af234` was independently approved.
   page and retry; `Retry-After` is honored only when it fits. Responses are capped
   at 2 MB. Every non-timing field is discarded per item. The route is
   `/api/hevy/activities`. Not verified: a live Hevy Pro account and deployment.
-- Tickets 225–228 are not started.
+- Ticket 225 (connector library and Timeline) is implemented locally and awaits
+  independent verification. Settings lists Google Calendar, Outlook Calendar,
+  iCloud Calendar (not available yet), and Hevy in one `ConnectorLibrary`; each
+  source connects, refreshes, fails, and disconnects on its own. Outlook reuses
+  the Google calendar selector; the Hevy API key field clears on submit and is
+  never stored on the device; Hevy Pro and the 500-workout limit are disclosed.
+  Disconnect and account-deletion copy name each provider's removal step and
+  never claim Cadence revoked access. Timeline markers name their source;
+  current-day Hevy workouts render as a separate recorded-activity list (time and
+  duration only) that never changes an Occurrence or overlap cue. Desktop keeps
+  one disposable cache per source in calendar-cache.sqlite3 (outside
+  `cadence.sqlite3` and backups), keyed by provider, account, generation,
+  selection, range, and timezone, with per-source fences; sign-out, account
+  switch, and disconnect clear it. Desktop Outlook completes only a deep link
+  whose state matches its Keychain attempt, through the authenticated `PUT`.
+  Travel stays Google-only; Daily Brief disclosure is unchanged (Ticket 226).
+  Evidence: source, synthetic fixtures, deterministic benches at 1280px and
+  390px, and native cache unit tests. Not verified: live Microsoft or Hevy
+  accounts, installed desktop deep links or Keychain, deployment.
+- Tickets 226–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

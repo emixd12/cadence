@@ -13841,7 +13841,21 @@ Platform impact:
 
 ## Ticket 225: Connector library and Timeline on web and desktop
 
-Status: not started.
+Status: implemented locally on October 18, 2026 with synthetic fixtures;
+independent verification pending. Settings: `components/settings/ConnectorLibrary.tsx`,
+`OutlookCalendarPanel.tsx`, `HevyPanel.tsx`, `WebConnectorLibrary.tsx`, and the
+nested Google panel. Timeline: source-labeled markers in `DayProgressTimeline.tsx`
+and `components/timeline/RecordedActivityList.tsx`. Clients:
+`lib/ui/connectors.ts` and `apps/desktop/src/calendar/{connector-broker,
+connector-cache,connector-coordinator,outlook-calendar,hevy,use-connectors}.ts`.
+Shared rules: `packages/core/src/services/recorded-activity-refresh.ts` and
+`combineExternalEventFreshness`. Native: per-provider tables and commands in
+`calendar_cache.rs` (calendar-cache.sqlite3) plus the
+`pending-outlook-calendar-attempt` Keychain key. iCloud is listed as not
+available yet (Ticket 227 integration point `ICLOUD_CALENDAR_UNAVAILABLE`).
+Travel and its brief guidance stay Google-only; no Daily Brief disclosure or
+model call changed (Ticket 226). Not verified: live Microsoft or Hevy accounts,
+installed desktop deep links and Keychain, deployment.
 
 Goal: one Settings connector library and Timeline presentation for all sources.
 
@@ -13874,10 +13888,10 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | Existing Settings and Timeline components. |
-| Desktop | Shared components; local mode shows connectors as requiring a linked account. |
-| Marketing | Not applicable until 228. |
-| Future mobile | Responsive web only; no native mobile. |
+| Web | `WebConnectorLibrary` in `/settings`; live Outlook and Hevy hooks in `DayProgressTimeline`; interaction registry `INT-CALENDAR-008`–`011` and `INT-CONNECTOR-001`–`003`; design catalog modules `connector-library`, `outlook-calendar-panel`, `hevy-panel`, `recorded-activity-list`. |
+| Desktop | Shared components through `apps/desktop/src/product.tsx` and `use-connectors.ts`; per-source caches in calendar-cache.sqlite3; local mode shows connectors as requiring a linked account; the settings bench (`?bench=settings`) renders the library. |
+| Marketing | Not applicable until 228: no public claim changed. |
+| Future mobile | Responsive web only (verified at 390px on the bench); no native mobile. |
 
 ## Ticket 226: Separately approved connector context in Daily Brief
 

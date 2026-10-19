@@ -609,6 +609,29 @@ visibility. Escape restores summary focus. CalendarSettingsBench includes long
 names and enough synthetic choices to exercise scrolling.
 
 
+## Connected sources (Ticket 225)
+
+Settings groups read-only sources in one `ConnectorLibrary` SettingsPanel: a
+divider-separated list in fixed order (Google Calendar, Outlook Calendar,
+iCloud Calendar, Hevy). Each source is a nested SettingsPanel with an h3 title,
+a one-line kind and boundary description, a status line, and its own controls.
+No new tokens, icon sets, cards, or modals. Outlook reuses the shared
+`CalendarSelector` field and the Google button vocabulary. Hevy uses one labeled
+password-type field that clears on submit. iCloud shows truthful availability
+text only. Desktop local mode shows each source as requiring a linked account.
+Disconnect and account deletion copy name the provider-side removal step and
+never claim Cadence revoked provider access.
+
+Timeline markers name their source in accessible labels and details. Google
+keeps its bundled provider asset; Outlook uses the neutral lucide calendar
+glyph, not provider artwork. Recorded Hevy workouts are a plain
+`RecordedActivityList` under today's date title (Workout, time range, duration,
+12px muted text and an activity glyph). They are never axis markers, overlap
+cues, or Occurrence changes. Non-Google calendar status lines reuse the
+`calendarState` style. `ConnectorBench` and the Day Progress fixture menu cover
+connected, not connected, not configured, needs reconnection, status
+unavailable, desktop local, stale, incomplete, and offline states.
+
 ## Briefing workbench (Tickets 151–155)
 
 `/design-system?preview=briefing-workbench` uses neutral bench controls and the real

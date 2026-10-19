@@ -530,7 +530,8 @@
             "components/timeline/ExternalEventDetails.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
-            "public/brand/google-calendar.svg"
+            "public/brand/google-calendar.svg",
+            "components/timeline/RecordedActivityList.tsx"
           ],
           "implementationIds": [
             "module.timeline",
@@ -541,7 +542,8 @@
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
-            "composite.external-event-preview"
+            "composite.external-event-preview",
+            "composite.recorded-activity-list"
           ],
           "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
         },
@@ -572,13 +574,15 @@
             "components/timeline/ExternalEventDetails.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
-            "public/brand/google-calendar.svg"
+            "public/brand/google-calendar.svg",
+            "components/timeline/RecordedActivityList.tsx"
           ],
           "implementationIds": [
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
-            "composite.external-event-preview"
+            "composite.external-event-preview",
+            "composite.recorded-activity-list"
           ],
           "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
         },
@@ -825,7 +829,10 @@
             "components/settings/CategoryPanel.tsx",
             "components/note-shortcuts/NoteShortcutControls.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/ConnectorLibrary.tsx",
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/HevyPanel.tsx"
           ],
           "implementationIds": [
             "module.timezone-panel",
@@ -835,9 +842,12 @@
             "module.category-panel",
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
-            "module.travel-settings-panel"
+            "module.travel-settings-panel",
+            "module.connector-library",
+            "module.outlook-calendar-panel",
+            "module.hevy-panel"
           ],
-          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 nests Google, Outlook, iCloud availability, and Hevy in ConnectorLibrary; each source fails separately."
         },
         {
           "surfaceId": "marketing",
@@ -865,15 +875,23 @@
             "apps/desktop/src/desktop-update-panel.tsx",
             "tests/desktop-update-panel.test.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/ConnectorLibrary.tsx",
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/use-connectors.ts",
+            "tests/desktop-connectors-hook.dom.test.tsx"
           ],
           "implementationIds": [
             "module.category-panel",
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
-            "module.travel-settings-panel"
+            "module.travel-settings-panel",
+            "module.connector-library",
+            "module.outlook-calendar-panel",
+            "module.hevy-panel"
           ],
-          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 mounts ConnectorLibrary in linked-account mode; local mode shows each source as requiring a linked account. Per-source caches stay in calendar-cache.sqlite3; installed-native acceptance is unverified."
         },
         {
           "surfaceId": "mobile",

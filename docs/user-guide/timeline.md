@@ -328,6 +328,52 @@ account synchronization, and user-created desktop backups. Supabase daily
 backups may retain sealed credential ciphertext for the current seven-day window.
 See [Privacy, account information, and deletion](privacy-and-account.md#google-calendar-data-and-disconnection).
 
+## Connected sources: Outlook Calendar and Hevy
+
+Settings lists every read-only source under **Connected sources**: Google
+Calendar, Outlook Calendar, iCloud Calendar, and Hevy. Each source connects,
+refreshes, fails, and disconnects on its own. Tracking never waits on a source.
+iCloud Calendar is listed as not available yet; it cannot be connected in this
+version. On desktop, sources require a linked Cadence account.
+
+**Outlook Calendar** shows scheduled events like Google Calendar.
+
+1. Choose **Connect Outlook Calendar** and sign in to a personal, work, or school
+   Microsoft account. Your organization may need to approve Cadence first.
+   On desktop, the browser returns to Cadence, which finishes only the connection
+   it started.
+2. Choose calendars and visibility, then **Save Outlook settings**.
+3. Choose **Refresh Outlook Calendar** to read the displayed range now.
+4. On Timeline, Outlook markers use a calendar icon and say "Outlook Calendar"
+   in their label and details.
+
+**Hevy** is recorded activity, not a calendar. It shows when each workout
+started and how long it lasted. Cadence does not read exercises, titles, notes,
+sets, or weights.
+
+1. Hevy API access requires Hevy Pro. Create an API key in Hevy settings.
+2. Enter the key once under **Hevy API key** and choose **Connect Hevy**. The
+   field clears immediately. Cadence stores the key encrypted on its server and
+   never on your device.
+3. Choose **Refresh Hevy** to read today's workouts now.
+4. On Timeline, today's workouts appear under **Recorded activity · Hevy** below
+   the date, apart from Calendar markers.
+
+**Result and persistence:** A workout never completes, changes, or matches a
+Behavior or Occurrence, and Cadence never merges records by similar title or
+time. Cadence reads at most 500 Hevy workouts; a larger history shows as
+incomplete. Desktop keeps one disposable cache per source and linked account,
+outside the tracking database and user-created backups, and labels saved
+context as possibly out of date while offline.
+
+**Recovery or undo:** A failed or incomplete refresh keeps the last complete
+read and labels it. **Disconnect Outlook Calendar** and **Disconnect Hevy**
+delete Cadence's saved access and that source's cache. Neither provider offers
+app-side revocation: remove Cadence in Microsoft account privacy app permissions
+(personal) or My Apps (work or school), and remove or regenerate the Hevy API
+key in Hevy settings. Account switch and sign-out on desktop clear every source
+cache.
+
 **Keyboard and mobile:** Calendar markers have descriptive names and 44px
 targets. Hover does not move focus. The preview does not trap focus. The details
 drawer traps focus while open and returns it on close. Touch uses the same

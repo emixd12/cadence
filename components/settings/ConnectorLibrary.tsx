@@ -26,6 +26,11 @@ const SOURCE_DETAILS: Readonly<Record<ConnectorLibrarySourceId, Readonly<{ name:
  */
 export const ICLOUD_CALENDAR_UNAVAILABLE = "Not available yet. Cadence cannot connect iCloud Calendar in this version.";
 
+/** Desktop copy when a source needs a linked Cadence account or a broker-enabled build. */
+export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
+  return reason === "build" ? `${name} is unavailable in this build.` : `Link a Cadence account on this Mac to connect ${name}.`;
+}
+
 // Ticket 225. One sparse list of read-only sources. Every source connects,
 // refreshes, fails, and disconnects on its own; tracking never depends on them.
 export function ConnectorLibrary({ sources }: Readonly<{ sources: readonly ConnectorLibrarySource[] }>) {

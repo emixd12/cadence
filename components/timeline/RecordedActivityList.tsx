@@ -51,7 +51,13 @@ function clock(instant: string, timezone: string): string {
 }
 
 function timeRange(start: string, end: string, timezone: string): string {
-  return `${clock(start, timezone)}–${clock(end, timezone)}`;
+  const from = clock(start, timezone);
+  const to = clock(end, timezone);
+  if (from !== to) return `${from}–${to}`;
+  // A daylight-saving fall-back hour repeats clock times; name each zone offset.
+  const zoned = (instant: string) => Temporal.Instant.from(instant).toZonedDateTimeISO(timezone)
+    .toLocaleString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  return `${zoned(start)}–${zoned(end)}`;
 }
 
 /** Display-only duration such as "1 hr 5 min" or "45 min". */

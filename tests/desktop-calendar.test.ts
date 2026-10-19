@@ -4,6 +4,19 @@ import { DesktopCalendarCoordinator, shouldRefresh } from "../apps/desktop/src/c
 import { assertSnapshotMatches, type CalendarCacheRequest, DesktopCalendarCache } from "../apps/desktop/src/calendar/cache";
 import { DesktopCalendarBroker, DesktopCalendarConnection, isDesktopCalendarCallback, parseDesktopCalendarCallback, readDesktopCalendarBrokerOrigin } from "../apps/desktop/src/calendar/google-calendar";
 import { clearDesktopCalendarClientState, isDesktopAuthCallback } from "../apps/desktop/src/account/auth";
+import { Temporal } from "@js-temporal/polyfill";
+import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorded-activity-validation";
+import type { ExternalEventSnapshotV1_1 } from "@cadence/core/types/external-event";
+import type { RecordedActivitySnapshotV1 } from "@cadence/core/types/recorded-activity";
+import type { ConnectorProvider } from "@/lib/types/connectors";
+import { DesktopConnectorCache, type ConnectorCacheOperations } from "../apps/desktop/src/calendar/connector-cache";
+import { DesktopConnectorSnapshots, shouldRefreshConnector } from "../apps/desktop/src/calendar/connector-coordinator";
+import { DesktopConnectorBroker } from "../apps/desktop/src/calendar/connector-broker";
+import { hevyScopeKey, hevySourceRules } from "../apps/desktop/src/calendar/hevy";
+import { DesktopOutlookConnection, isDesktopOutlookCallback, OUTLOOK_ATTEMPT_KEY, outlookAuthorizationState, outlookScopeKey,
+  outlookSourceRules } from "../apps/desktop/src/calendar/outlook-calendar";
+import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
+import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
 const request: CalendarCacheRequest = { accountId: "account-a", connectionGeneration: 2, selectionRevision: 4,
   startLocalDate: "2026-09-16", endLocalDate: "2026-09-18", timezone: "America/New_York", selectedCalendarIds: ["primary"],
@@ -166,5 +179,222 @@ describe("desktop Calendar transport", () => {
     await expect(flow.begin("account-a")).rejects.toThrow("browser unavailable");
     expect(secrets.has("pending-calendar-state")).toBe(false);
     expect(broker.connection).toHaveBeenCalledOnce();
+  });
+});
+
+// Ticket 225 desktop connector sources.
+const hevyBase = validateRecordedActivitySnapshot(hevyFixture, { now: Temporal.Instant.from("2026-11-01T15:00:00Z") });
+function hevyToday(overrides: Partial<RecordedActivitySnapshotV1> = {}): RecordedActivitySnapshotV1 {
+  return { ...hevyBase, requestedRange: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-01", timezone: "America/New_York" },
+    activities: hevyBase.activities.filter((activity) => activity.localStartDate === "2026-11-01"), ...overrides };
+}
+const hevyView = { accountId: "account-1", provider: "hevy" as const, status: "connected" as const, generation: 1, selectionRevision: 0,
+  preferences: { selectedSourceIds: [], hiddenSourceIds: [], visible: true, showAllDay: true } };
+const outlookView = { ...hevyView, provider: "outlook_calendar" as const, generation: 2, preferences: { ...hevyView.preferences, selectedSourceIds: ["calendar-1"] } };
+const outlookRange = { startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" };
+
+function memoryCache() {
+  const rows = new Map<ConnectorProvider, { accountId: string; scopeKey: string; json: string }>();
+  const pending = new Map<ConnectorProvider, string>();
+  const cache: ConnectorCacheOperations & { cleared: (ConnectorProvider | undefined)[] } = {
+    cleared: [],
+    read: vi.fn(async (provider, accountId, scopeKey) => { const row = rows.get(provider); return row && row.accountId === accountId && row.scopeKey === scopeKey ? row.json : null; }),
+    readCurrent: vi.fn(async (provider, accountId) => { const row = rows.get(provider); return row && row.accountId === accountId ? { scopeKey: row.scopeKey, snapshotJson: row.json } : null; }),
+    begin: vi.fn(async (provider, _accountId, _scopeKey, requestId) => { pending.set(provider, requestId); }),
+    replace: vi.fn(async (provider, accountId, scopeKey, requestId, json) => {
+      if (pending.get(provider) !== requestId) throw new Error("Connector refresh was cleared or superseded.");
+      rows.set(provider, { accountId, scopeKey, json });
+    }),
+    clear: vi.fn(async (provider) => { cache.cleared.push(provider); for (const value of provider ? [provider] : [...rows.keys()]) { rows.delete(value); pending.delete(value); } }),
+  };
+  return { cache, rows };
+}
+
+describe("desktop connector caches", () => {
+  const now = Date.parse("2026-11-01T15:05:00Z");
+  it("stores only complete, same-scope Hevy reads and keeps them through an incomplete refresh", async () => {
+    const { cache, rows } = memoryCache();
+    const snapshots = new DesktopConnectorSnapshots(hevySourceRules(() => Temporal.Instant.from("2026-11-01T15:05:00Z")), cache);
+    const key = hevyScopeKey(hevyView, "2026-11-01", "America/New_York");
+    await expect(snapshots.refresh("account-1", key, async () => hevyToday(), "manual", now)).resolves.toMatchObject({ source: "network", refreshError: null });
+    expect(JSON.parse(rows.get("hevy")!.json).activities).toHaveLength(1);
+    const incomplete = hevyToday({ completeness: "incomplete", activities: [], fetchedAt: "2026-11-01T15:04:00Z",
+      failures: [{ code: "incomplete_pagination", retryable: false, retryAfterSeconds: null, message: "Over 500" }] });
+    const kept = await snapshots.refresh("account-1", key, async () => incomplete, "manual", now);
+    expect(kept).toMatchObject({ source: "cache", stale: true, refreshError: "incomplete_pagination" });
+    expect(kept.snapshot?.activities).toHaveLength(1);
+    expect(cache.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a response for another account, generation, range, or source", async () => {
+    const { cache, rows } = memoryCache();
+    const snapshots = new DesktopConnectorSnapshots(hevySourceRules(() => Temporal.Instant.from("2026-11-01T15:05:00Z")), cache);
+    const key = hevyScopeKey(hevyView, "2026-11-01", "America/New_York");
+    for (const wrong of [hevyToday({ accountId: "account-2" }), hevyToday({ connectionGeneration: 3 }),
+      hevyToday({ requestedRange: { startLocalDate: "2026-10-31", endLocalDate: "2026-11-01", timezone: "America/New_York" } }),
+      outlookFixture as unknown as RecordedActivitySnapshotV1]) {
+      const result = await snapshots.refresh("account-1", key, async () => wrong, "manual", now);
+      expect(result.snapshot).toBeNull();
+      expect(result.refreshError).toMatch(/connection_changed|malformed_provider_response/);
+    }
+    expect(rows.size).toBe(0);
+  });
+
+  it("fences a late response after disconnect, sign-out, or account switch", async () => {
+    const { cache, rows } = memoryCache();
+    const snapshots = new DesktopConnectorSnapshots(hevySourceRules(() => Temporal.Instant.from("2026-11-01T15:05:00Z")), cache);
+    let release!: (value: unknown) => void;
+    const pending = snapshots.refresh("account-1", hevyScopeKey(hevyView, "2026-11-01", "America/New_York"),
+      () => new Promise((resolve) => { release = resolve; }), "manual", now);
+    await vi.waitFor(() => expect(cache.begin).toHaveBeenCalledOnce());
+    await snapshots.clear();
+    release(hevyToday());
+    await expect(pending).resolves.toEqual({ snapshot: null, source: "none", stale: true, refreshError: "cleared" });
+    expect(rows.size).toBe(0);
+    expect(cache.replace).not.toHaveBeenCalled();
+  });
+
+  it("clears one source without touching the other and validates Outlook scope keys", async () => {
+    const { cache, rows } = memoryCache();
+    const hevy = new DesktopConnectorSnapshots(hevySourceRules(() => Temporal.Instant.from("2026-11-01T15:05:00Z")), cache);
+    const outlook = new DesktopConnectorSnapshots<ExternalEventSnapshotV1_1>(outlookSourceRules(), cache);
+    await hevy.refresh("account-1", hevyScopeKey(hevyView, "2026-11-01", "America/New_York"), async () => hevyToday(), "manual", now);
+    const outlookKey = outlookScopeKey(outlookView, outlookRange);
+    await expect(outlook.refresh("account-1", outlookKey, async () => outlookFixture, "manual", now)).resolves.toMatchObject({ source: "network" });
+    await outlook.clear();
+    expect(cache.cleared).toEqual(["outlook_calendar"]);
+    expect(rows.has("hevy")).toBe(true);
+    expect(rows.has("outlook_calendar")).toBe(false);
+    // A selection change produces a different scope; the old snapshot cannot satisfy it.
+    const otherSelection = outlookScopeKey({ ...outlookView, preferences: { ...outlookView.preferences, selectedSourceIds: ["calendar-2"] } }, outlookRange);
+    await expect(outlook.refresh("account-1", otherSelection, async () => outlookFixture, "manual", now)).resolves.toMatchObject({ snapshot: null });
+    // Offline bootstrap honors only an accepted scope and revalidates the stored snapshot.
+    await expect(hevy.readCurrent("account-1", () => false)).resolves.toBeNull();
+    await expect(hevy.readCurrent("account-1", () => true)).resolves.toMatchObject({ source: "hevy" });
+    await expect(hevy.readCurrent("account-2", () => true)).resolves.toBeNull();
+  });
+
+  it("uses the fifteen-minute policy and always refreshes incomplete snapshots", () => {
+    expect(shouldRefreshConnector(hevyToday(), "visible", Date.parse("2026-11-01T15:14:59Z"))).toBe(false);
+    expect(shouldRefreshConnector(hevyToday(), "visible", Date.parse("2026-11-01T15:15:00Z"))).toBe(true);
+    expect(shouldRefreshConnector(hevyToday({ completeness: "incomplete" }), "visible", Date.parse("2026-11-01T15:01:00Z"))).toBe(true);
+    expect(shouldRefreshConnector(hevyToday(), "manual", Date.parse("2026-11-01T15:01:00Z"))).toBe(true);
+  });
+
+  it("passes the source to every native cache command and never sends credentials", async () => {
+    const calls: [string, Record<string, unknown> | undefined][] = [];
+    const native = new DesktopConnectorCache(async <T,>(command: string, args?: Record<string, unknown>) => { calls.push([command, args]); return null as T; });
+    await native.begin("hevy", "account-1", "[]", "r1");
+    await native.clear("hevy");
+    await native.clear();
+    expect(calls).toEqual([
+      ["connector_cache_begin", { provider: "hevy", accountId: "account-1", scopeKey: "[]", requestId: "r1" }],
+      ["connector_cache_clear", { provider: "hevy" }],
+      ["connector_cache_clear", { provider: null }],
+    ]);
+  });
+
+  it("clears connector caches and the pending Outlook attempt during account cleanup", async () => {
+    const calls: [string, Record<string, unknown> | undefined][] = [];
+    await clearDesktopCalendarClientState(async (command, args) => { calls.push([command, args]); });
+    expect(calls).toEqual(expect.arrayContaining([
+      ["auth_secret_remove", { name: OUTLOOK_ATTEMPT_KEY }],
+      ["connector_cache_clear", { provider: null }],
+    ]));
+  });
+});
+
+describe("desktop Outlook deep link", () => {
+  const authorize = (state: string) => `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x&state=${state}`;
+  const desktopState = `d${"A".repeat(43)}`;
+  function harness() {
+    const secrets = new Map<string, string>();
+    const broker = {
+      outlookStart: vi.fn(async (_clientState: string) => ({ url: authorize(desktopState) })),
+      outlookComplete: vi.fn(async (_body: unknown) => ({ ...outlookView, result: "connected" })),
+    };
+    const io = { get: vi.fn(async (name: string) => secrets.get(name) ?? null), set: vi.fn(async (name: string, value: string) => { secrets.set(name, value); }),
+      remove: vi.fn(async (name: string) => { secrets.delete(name); }), open: vi.fn(async () => undefined) };
+    return { secrets, broker, io, flow: new DesktopOutlookConnection(broker, io) };
+  }
+
+  it("stores a Keychain attempt with the server state and a fresh client state", async () => {
+    const { secrets, broker, flow, io } = harness();
+    await flow.begin("account-1", 1_000);
+    const clientState = broker.outlookStart.mock.calls[0]![0];
+    expect(clientState).toMatch(/^[A-Za-z0-9_-]{32,128}$/);
+    expect(JSON.parse(secrets.get(OUTLOOK_ATTEMPT_KEY)!)).toEqual({ accountId: "account-1", state: desktopState, clientState, createdAt: 1_000 });
+    expect(io.open).toHaveBeenCalledWith(authorize(desktopState));
+  });
+
+  it("ignores links it did not start and keeps the pending attempt", async () => {
+    const { secrets, broker, flow } = harness();
+    await flow.begin("account-1", 1_000);
+    await expect(flow.complete(`cadence://outlook-calendar/callback?state=d${"B".repeat(43)}&code=attacker`, "account-1", 2_000)).resolves.toBe("ignored");
+    await expect(flow.complete("cadence://outlook-calendar/callback?code=attacker", "account-1", 2_000)).resolves.toBe("ignored");
+    await expect(flow.complete("cadence://calendar/callback?state=x&result=connected", "account-1", 2_000)).resolves.toBeNull();
+    expect(broker.outlookComplete).not.toHaveBeenCalled();
+    expect(secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(true);
+    expect(isDesktopOutlookCallback("cadence://outlook-calendar/callback?state=x")).toBe(true);
+    expect(isDesktopOutlookCallback("cadence://outlook-calendar/callback/extra")).toBe(false);
+  });
+
+  it("completes once through the authenticated PUT with the Keychain client state", async () => {
+    const { secrets, broker, flow } = harness();
+    await flow.begin("account-1", 1_000);
+    const clientState = broker.outlookStart.mock.calls[0]![0];
+    const link = `cadence://outlook-calendar/callback?state=${desktopState}&code=auth-code`;
+    await expect(flow.complete(link, "account-1", 2_000)).resolves.toBe("connected");
+    expect(broker.outlookComplete).toHaveBeenCalledWith({ state: desktopState, clientState, code: "auth-code" });
+    expect(secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
+    await expect(flow.complete(link, "account-1", 2_100)).resolves.toBe("ignored");
+    expect(broker.outlookComplete).toHaveBeenCalledOnce();
+  });
+
+  it("clears the attempt on expiry, account change, cancellation, and browser failure", async () => {
+    const expired = harness();
+    await expired.flow.begin("account-1", 1_000);
+    await expect(expired.flow.complete(`cadence://outlook-calendar/callback?state=${desktopState}&code=c`, "account-1", 1_000 + 5 * 60_000 + 1)).resolves.toBe("expired_attempt");
+    expect(expired.secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
+    const switched = harness();
+    await switched.flow.begin("account-1", 1_000);
+    await expect(switched.flow.complete(`cadence://outlook-calendar/callback?state=${desktopState}&code=c`, "account-2", 2_000)).resolves.toBe("expired_attempt");
+    expect(switched.broker.outlookComplete).not.toHaveBeenCalled();
+    const cancelled = harness();
+    cancelled.broker.outlookComplete.mockResolvedValueOnce({ ...outlookView, result: "cancelled" });
+    await cancelled.flow.begin("account-1", 1_000);
+    await expect(cancelled.flow.complete(`cadence://outlook-calendar/callback?state=${desktopState}&result=cancelled`, "account-1", 2_000)).resolves.toBe("cancelled");
+    expect(cancelled.broker.outlookComplete).toHaveBeenCalledWith(expect.objectContaining({ result: "cancelled" }));
+    const odd = harness();
+    odd.broker.outlookComplete.mockResolvedValueOnce({ ...outlookView, result: "error" });
+    await odd.flow.begin("account-1", 1_000);
+    await odd.flow.complete(`cadence://outlook-calendar/callback?state=${desktopState}&result=consent_denied`, "account-1", 2_000);
+    expect(odd.broker.outlookComplete).toHaveBeenCalledWith(expect.objectContaining({ result: "error" }));
+    const browser = harness();
+    browser.io.open.mockRejectedValueOnce(new Error("browser unavailable"));
+    await expect(browser.flow.begin("account-1")).rejects.toThrow("browser unavailable");
+    expect(browser.secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
+    const manual = harness();
+    await manual.flow.begin("account-1");
+    await manual.flow.cancel();
+    expect(manual.secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
+  });
+
+  it("refuses an authorization URL that is not Microsoft's and stores nothing", async () => {
+    const { secrets, broker, flow } = harness();
+    broker.outlookStart.mockResolvedValueOnce({ url: `https://login.example.com/authorize?state=${desktopState}` });
+    await expect(flow.begin("account-1")).rejects.toMatchObject({ code: "invalid_request" });
+    expect(secrets.has(OUTLOOK_ATTEMPT_KEY)).toBe(false);
+    expect(() => outlookAuthorizationState("https://login.microsoftonline.com/authorize?state=short")).toThrow();
+  });
+
+  it("routes connector requests through the bearer broker transport", async () => {
+    const request = vi.fn(async () => ({ ...hevyView, revocation: "hevy_api_key" }));
+    const broker = new DesktopConnectorBroker({ request } as never);
+    await broker.hevyConnect("key-once");
+    expect(request).toHaveBeenCalledWith("/api/hevy/connection", { method: "POST", body: JSON.stringify({ apiKey: "key-once" }) });
+    await expect(broker.hevyDisconnect()).resolves.toEqual({ view: hevyView, revocation: "hevy_api_key" });
+    await broker.outlookComplete({ state: desktopState, clientState: "c".repeat(43), code: "x" });
+    expect(request).toHaveBeenLastCalledWith("/api/outlook-calendar/connection", expect.objectContaining({ method: "PUT" }));
   });
 });

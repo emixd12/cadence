@@ -154,14 +154,16 @@ export function hevyActivityScope(connection: ConnectorConnectionView, localDate
 
 /** Validates an Outlook 1.1.0 response against the exact requested scope. */
 export function validateOutlookSnapshotForScope(value: unknown, scope: ExternalEventSnapshotScope): ExternalEventSnapshotV1_1 {
-  const snapshot = validateVersionedExternalEventSnapshot(value);
+  let snapshot: ReturnType<typeof validateVersionedExternalEventSnapshot>;
+  try { snapshot = validateVersionedExternalEventSnapshot(value); }
+  catch { throw new ConnectorClientError("malformed_provider_response"); }
   if (snapshot.source !== "outlook_calendar" || !externalEventSnapshotMatchesScope(snapshot, scope)) throw new ConnectorClientError("connection_changed");
   return snapshot;
 }
 
 export function validateHevySnapshot(value: unknown, now = Temporal.Now.instant()): RecordedActivitySnapshotV1 {
   try { return validateRecordedActivitySnapshot(value, { now: now.add({ milliseconds: CONNECTOR_CLOCK_SKEW_MS }) }); }
-  catch { throw new ConnectorClientError("schema_drift"); }
+  catch { throw new ConnectorClientError("malformed_provider_response"); }
 }
 
 function fetchedRecently(fetchedAt: string): boolean {

@@ -13,7 +13,7 @@ import { createLocalTravelSettingsClient } from "./local-travel-settings.service
 import { readMacForegroundLocation } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
-import { ConnectorLibrary, ConnectorUnavailable } from "@/components/settings/ConnectorLibrary";
+import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
 import { combineExternalEventFreshness } from "@cadence/core/services/external-event-projection";
@@ -558,10 +558,6 @@ function desktopOutlookMessages(state: string, error: string | null): string[] {
   if (state === "error") return [`Outlook Calendar context could not refresh: ${error ?? "unavailable"}.`];
   if (state === "reconnect_required") return ["Outlook Calendar needs reconnection in Settings."];
   return [];
-}
-
-export function connectorUnavailableReason(name: string, reason: "local" | "build" | null): string {
-  return reason === "build" ? `${name} is unavailable in this build.` : `Link a Cadence account on this Mac to connect ${name}.`;
 }
 
 function noteShortcutMessage(operation: string, view: NoteShortcutView): string {

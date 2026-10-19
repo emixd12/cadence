@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-10-11",
+  "updated": "2026-10-18",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -286,7 +286,14 @@
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
         "INT-TRAVEL-003",
-        "INT-TRAVEL-004"
+        "INT-TRAVEL-004",
+        "INT-CALENDAR-008",
+        "INT-CALENDAR-009",
+        "INT-CALENDAR-010",
+        "INT-CALENDAR-011",
+        "INT-CONNECTOR-001",
+        "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
       ]
     },
     {
@@ -834,6 +841,34 @@
       "interaction_marker_count": 40,
       "interaction_ids": [],
       "reason": "Development-only historical exploration and chronological review under Tickets 182–183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
+    },
+    {
+      "path": "components/settings/OutlookCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 13,
+      "interaction_ids": [
+        "INT-CALENDAR-008",
+        "INT-CALENDAR-009",
+        "INT-CALENDAR-010",
+        "INT-CALENDAR-011"
+      ]
+    },
+    {
+      "path": "components/settings/HevyPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 9,
+      "interaction_ids": [
+        "INT-CONNECTOR-001",
+        "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "app/design-system/ConnectorBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 2,
+      "interaction_ids": [],
+      "reason": "Ticket 225 development-only synthetic connector bench. No production interaction, provider, account, Keychain, or cache access."
     }
   ],
   "interactions": [
@@ -11737,7 +11772,7 @@
         }
       ],
       "availability": "Available when validated visible events intersect the displayed dates.",
-      "success_result": "Google Calendar markers open persistent bottom previews; View details opens one centered native modal. Close or Escape restores focus without reopening the preview.",
+      "success_result": "Google Calendar markers open persistent bottom previews; View details opens one centered native modal. Close or Escape restores focus without reopening the preview. Markers and details name their source (Google or Outlook Calendar); recorded Hevy workouts are a separate non-interactive list and never become markers.",
       "failure_result": "Unavailable details display their field-specific missing-data state.",
       "effects": [
         "ui_state",
@@ -11751,6 +11786,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/connector-timeline.dom.test.tsx",
           "tests/day-progress-timeline.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
@@ -11944,6 +11980,597 @@
             "tests/desktop-calendar.test.ts"
           ],
           "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-008",
+      "name": "Connect or reconnect Outlook Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Bind a read-only Microsoft calendar grant to this Cadence account.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Connect Outlook Calendar"
+        }
+      ],
+      "availability": "Explicit action after Cadence sign-in when Outlook is configured; on desktop it requires a linked account.",
+      "success_result": "Opens Microsoft consent. Web completes through the callback for the same cookie user. Desktop completes only a link whose state matches the Keychain attempt it started, through the authenticated hosted PUT with its client state.",
+      "failure_result": "Consent denial, admin approval, wrong account, expired or foreign attempts leave Cadence data unchanged and show a fixed message. A foreign desktop link is ignored and the pending attempt stays intact.",
+      "effects": [
+        "authentication_session",
+        "external_navigation",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx",
+        "lib/ui/connectors.ts",
+        "apps/desktop/src/calendar/outlook-calendar.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/calendar/use-connectors.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts",
+            "tests/desktop-connectors-hook.dom.test.tsx"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-009",
+      "name": "Select Outlook calendars and visibility",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Choose which Outlook calendars Cadence may show and how.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Save Outlook settings"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "effects": [
+        "database_write",
+        "local_preference"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-010",
+      "name": "Refresh Outlook Calendar context",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Read the displayed Outlook range now.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh Outlook Calendar"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected.",
+      "success_result": "Reloads the calendar list and the selected range; a complete read replaces that scope's cache.",
+      "failure_result": "An incomplete or failed read keeps the last complete read, labels it, and leaves other sources unchanged.",
+      "effects": [
+        "network_request",
+        "database_read"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/connector-coordinator.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-011",
+      "name": "Disconnect Outlook Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop Outlook reads and delete Cadence's saved Microsoft access.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect Outlook Calendar"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected.",
+      "success_result": "Deletes the sealed credential and that source's cache, fences late responses, and shows the Microsoft account or My Apps removal step.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked Microsoft access.",
+      "effects": [
+        "database_delete",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-001",
+      "name": "Connect or reconnect Hevy",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Enter a Hevy API key once so Cadence can read workout timing.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Hevy API key and Connect Hevy"
+        }
+      ],
+      "availability": "Available after Cadence sign-in when connectors are configured; Hevy API access requires Hevy Pro. Desktop requires a linked account.",
+      "success_result": "Clears the field before the request settles, verifies and seals the key on the server, and never stores it on the device.",
+      "failure_result": "A non-Pro, refused, malformed, or different-account key shows a fixed message; the field stays empty.",
+      "effects": [
+        "network_request",
+        "database_write",
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/calendar/connector-broker.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-002",
+      "name": "Refresh Hevy recorded activity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Read today's recorded workout timing now.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh Hevy"
+        }
+      ],
+      "availability": "Available while Hevy is connected.",
+      "success_result": "A complete read replaces the same-scope cache; the Timeline shows when and how long each workout lasted.",
+      "failure_result": "An incomplete or failed read keeps the same-scope complete read, labels it, and leaves other sources and tracking unchanged.",
+      "effects": [
+        "network_request",
+        "database_read"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-003",
+      "name": "Disconnect Hevy",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop Hevy reads and delete Cadence's saved API key.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect Hevy"
+        }
+      ],
+      "availability": "Available while Hevy is connected.",
+      "success_result": "Deletes the sealed key and that source's cache and shows the Hevy key removal step.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key.",
+      "effects": [
+        "database_delete",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
         },
         "marketing": {
           "applicability": "not_applicable",
