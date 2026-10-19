@@ -48,17 +48,23 @@ const LIMIT_LABELS: Record<keyof typeof INTEGRATION_LIMITS, string> = {
 };
 
 function cell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
 function yesNo(value: boolean): string {
   return value ? "yes" : "no";
 }
 
+function code(text: string): string {
+  // GFM tables consume escapes before code spans; HTML keeps literal backslashes.
+  if (text.includes("\\")) return `<code>${Array.from(text, (character) => `&#${character.codePointAt(0)};`).join("")}</code>`;
+  return `\`${text}\``;
+}
+
 function schemaType(schema: JsonSchemaValue | undefined): string {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) return "value";
   const value = schema as JsonSchemaObject;
-  if (value.const !== undefined) return `\`${JSON.stringify(value.const)}\``;
+  if (value.const !== undefined) return code(JSON.stringify(value.const));
   if (Array.isArray(value.oneOf)) return "one of several shapes";
   if (Array.isArray(value.anyOf)) {
     return value.anyOf.map((branch) => schemaType(branch)).join(" or ");
@@ -67,7 +73,7 @@ function schemaType(schema: JsonSchemaValue | undefined): string {
   const base = types.map((type) => {
     if (type === "array") return `array of ${schemaType(value.items)}`;
     if (type === "string" && typeof value.format === "string") return `string (${value.format})`;
-    if (Array.isArray(value.enum)) return value.enum.filter((option) => option !== null).map((option) => `\`${String(option)}\``).join(", ");
+    if (Array.isArray(value.enum)) return value.enum.filter((option) => option !== null).map((option) => code(String(option))).join(", ");
     return type;
   });
   return [...new Set(base)].join(" or ");

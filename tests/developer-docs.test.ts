@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { createSatteriMarkdownProcessor } from "@astrojs/markdown-satteri";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { INTEGRATION_OPERATIONS, INTEGRATION_OPERATION_NAMES, validateOperationInput, validateOperationOutput } from "@cadence/core/integration";
 import reference from "../apps/marketing/src/data/developer-reference.json";
 import { developerPages, developerReleaseNotice } from "../apps/marketing/src/data/developers";
@@ -33,6 +33,32 @@ describe("developer documentation", () => {
     const actual = await rendered(page.markdown);
     const schema = INTEGRATION_OPERATIONS.create_behavior.input.schema.properties as Record<string, { pattern: string }>;
     expect([...row(actual, "title")!.querySelectorAll("code")].map((code) => code.textContent)).toContain(schema.title.pattern);
+  });
+
+  it("preserves backslashes before pipes in literal schema values and plain table text", async () => {
+    for (const value of [String.raw`a\|b`, String.raw`a\\|b`, String.raw`a\\\|b`, String.raw`\S`, String.raw`<a\|b>&`]) {
+      const container = await rendered(table({ properties: { value: { type: "string", pattern: value, enum: [value], const: value, description: String.raw`a\|b` } } }));
+      const cells = row(container, "value")!.querySelectorAll("td");
+      expect(cells).toHaveLength(4);
+      expect([...cells[3].querySelectorAll("code")].map((code) => code.textContent)).toEqual([value, value, value]);
+      expect(cells[3].textContent).toContain(String.raw`a\|b;`);
+    }
+    const title = String.raw`a\|b`;
+    vi.resetModules();
+    vi.doMock("../packages/core/src/integration/operations", () => ({
+      INTEGRATION_OPERATION_NAMES,
+      INTEGRATION_OPERATIONS: { ...INTEGRATION_OPERATIONS, get_account_context: { ...INTEGRATION_OPERATIONS.get_account_context, title, input: { ...INTEGRATION_OPERATIONS.get_account_context.input, schema: { properties: { literal: { type: "string", enum: [title] } } } } } },
+    }));
+    try {
+      const { renderIntegrationContractReference } = await import("../packages/core/src/integration/docs");
+      const container = await rendered(renderIntegrationContractReference());
+      expect(row(container, "get_account_context")?.children[1].textContent).toBe(title);
+      expect(row(container, "get_account_context")?.children).toHaveLength(6);
+      expect(row(container, "literal")?.children[2].querySelector("code")?.textContent).toBe(title);
+    } finally {
+      vi.doUnmock("../packages/core/src/integration/operations");
+      vi.resetModules();
+    }
   });
 
   it("renders nullable object and array children with their containing-object requirements", async () => {

@@ -335,3 +335,34 @@ The full suite passes with 2,815 tests and 94 existing opt-in skips using two
 workers. The initial concurrent run timed out in ten unrelated tests while
 Next compiled QA pages; the server was stopped and the suite passed without
 changing timeouts. Lint retains two pre-existing verifier-config warnings.
+
+
+## PR108 release-check correction (Ticket232, October18,2026)
+
+CodeQL `js/incomplete-sanitization` identified missing backslash escaping in
+the contract Markdown table generator. The marketing table generator shares
+the same failure: a literal backslash immediately before a pipe splits a cell.
+Both now escape plain-text backslashes before pipes. Code literals containing
+backslashes use HTML code with numeric character references because GFM table
+escaping precedes code-span parsing; doubling those backslashes changes their
+literal values. Existing code-span formatting remains for other values.
+
+Rendered regressions cover one, two and three backslashes before a pipe, regex
+backslashes, literal markup characters, table-column counts and contract titles
+and enum values. Generated marketing reference data changes only its encoding;
+rendered catalog preservation is checked against the reviewed candidate.
+No contract, scope, schema, token hashing, legal text or interaction changes.
+Web API and desktop behavior are unchanged. Marketing HTML/Markdown reference
+encoding is affected; future mobile remains deferred.
+
+The separate CodeQL `js/insufficient-password-hash` finding targets SHA256 in
+`lib/services/oauth/protocol.ts`. Issued OAuth credentials use32 random bytes;
+callers hash generated credentials, presented credential lookups and rate-limit
+buckets. There is no password grant or accepted client secret. Hashing remains
+unchanged while independent review evaluates the finding. No alert disposition
+is implied by this documentation.
+
+Hosted history has85 migrations after the authorized release preflight; web
+Production MCP is disabled and the canonical issuer is configured. Production
+application/marketing deployment, final Trust pairing, scheduled maintenance
+observation and live-client acceptance remain separate pending evidence.

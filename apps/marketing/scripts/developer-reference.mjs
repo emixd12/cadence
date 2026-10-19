@@ -3,11 +3,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runnerImport } from "vite";
 
-const cell = (value) => String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+const cell = (value) => String(value).replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\n", " ");
 const json = (value) => `\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n`;
 
 function code(value) {
   const text = typeof value === "string" ? value : JSON.stringify(value);
+  // GFM tables consume escapes before code spans; HTML keeps literal backslashes.
+  if (text.includes("\\")) return `<code>${Array.from(text, (character) => `&#${character.codePointAt(0)};`).join("")}</code>`;
   const delimiter = "`".repeat(1 + Math.max(0, ...[...text.matchAll(/`+/g)].map(([run]) => run.length)));
   return `${delimiter} ${text} ${delimiter}`;
 }
