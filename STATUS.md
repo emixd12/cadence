@@ -74,7 +74,7 @@ The integrated baseline `d7af234` was independently approved.
   selection, range, and timezone, with per-source fences; sign-out, account
   switch, and disconnect clear it. Desktop Outlook completes only a deep link
   whose state matches its Keychain attempt, through the authenticated `PUT`.
-  Travel stays Google-only; Daily Brief disclosure is unchanged (Ticket 226).
+  Travel stays Google-only; Daily Brief disclosure is Ticket 226.
   Review fixes (verifier findings on `e3eb5cb`): desktop Timeline freshness now
   includes Google only with a snapshot and hides the unused Google line while
   Outlook is active (`apps/desktop/src/calendar/timeline-freshness.ts`), matching
@@ -87,7 +87,21 @@ The integrated baseline `d7af234` was independently approved.
   Evidence: source, synthetic fixtures, deterministic benches at 1280px and
   390px, and native cache unit tests. Not verified: live Microsoft or Hevy
   accounts, installed desktop deep links or Keychain, deployment.
-- Tickets 226–228 are not started.
+- Ticket 226 (separately approved connector context in Daily Brief) is
+  implemented locally and awaits independent verification. Outlook Calendar,
+  iCloud Calendar, and Hevy each have a default-off Daily Brief disclosure bound to
+  the connection generation (and calendar selection) it was granted for; migration
+  `20261019010000_daily_brief_connector_disclosure.sql` stores them and fences begin
+  and finish. `includeCalendar` stays Google-only. Older two- and four-key saves
+  turn the new disclosures off, and turning Daily Brief off revokes them. Only the
+  live brief reads a disclosed source: today only, at most 25 seconds and inside the
+  60-second budget less a 10-second generation reserve. Outlook and iCloud events
+  join the planner as fixed blocks; Hevy workouts reach the model only as past
+  recorded timing and never affect availability, durations, or Behavior status.
+  iCloud has the contract and an unavailable state only (Ticket 227). Evidence is
+  source, synthetic fixtures, model stubs, a disposable local migration replay, and
+  bench screenshots; no live provider or model call.
+- Tickets 227–228 are not started.
 - Evidence: public provider documentation read October 18, 2026 (documented
   support only). No live-provider, installed, deployed, or public-approval
   evidence exists.

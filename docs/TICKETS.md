@@ -13895,7 +13895,7 @@ Platform impact:
 
 ## Ticket 226: Separately approved connector context in Daily Brief
 
-Status: not started.
+Status: implemented locally; awaits independent verification.
 
 Goal: let Daily Brief use each new source only after its own disclosure.
 
@@ -13918,6 +13918,40 @@ Platform impact:
 | Desktop | Shared bubble and Settings in linked-account mode. |
 | Marketing | Model-data disclosure in 228. |
 | Future mobile | Deferred. |
+
+Implementation (October 19, 2026):
+
+- Storage: migration `20261019010000_daily_brief_connector_disclosure.sql` adds the
+  three default-off disclosures with their bound generation (and calendar
+  selection) fences, `save_daily_brief_preferences_v3`, and a connector fence
+  inside the existing begin/finish fence. The v2 and original saves revoke the new
+  disclosures. `lib/db/daily-brief.repo.ts` reads missing keys as off.
+- Settings: `updateDailyBriefSettings` accepts exactly the two-, four-, and
+  seven-key sets, requires every value to be boolean, requires each enabled source
+  to be connected (Outlook with a selected calendar), and refuses iCloud with
+  `source_unavailable` until Ticket 227. `DailyBriefSettingsPanel` shows a control
+  only for a connected source or a still-on disclosure, and sends seven keys only
+  to servers that report `connectorSources`.
+- Assembly: only the live brief (`requestInAppDailyBrief`) asks for disclosed
+  sources; the workbench and history never do. `briefing-account-context` fences
+  each source on preference revision, connected status, generation, and selection.
+  `advisor-day-context.service` reads today only. Outlook receives `deadlineMs`,
+  `authorizedCalendarIds`, and the expected generation and selection revision.
+  Hevy receives `expectedConnectionGeneration`, `signal`, and `deadlineMs`. Each
+  read is capped at 25 seconds and by the 60-second attempt minus the 10-second
+  generation reserve; a spent budget reports `timeout` without a read. Failures and
+  partial reads become `unavailable` or `incomplete` with no records. Any disclosed
+  new source makes the context `1.1`; Google-only reads stay exact `1.0`.
+- Briefing: `splitBriefingContext` keeps existing projections on the Google-only
+  view. Outlook and iCloud events join the planner as fixed blocks, and every
+  calendar source must be complete before free time or a move is claimed. Hevy
+  workouts go to a separate `past_recorded_activity` branch that the planner never
+  reads; the connector policy text is appended only when a source is present.
+- iCloud: the disclosure, storage, fence, and unavailable projection exist; no
+  control, read, or operational connection is exposed until Ticket 227.
+- Limitation: as with Google, reconnecting a source or changing its selection
+  leaves the stored disclosure fence stale, so briefs report `context_changed`
+  until the user saves Daily Brief settings again.
 
 ## Ticket 227: iCloud Calendar connector
 

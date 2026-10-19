@@ -33,6 +33,18 @@ In **Settings**, you can separately allow reminder delivery history and Notes on
 Completed occurrences to inform tips, when your Cadence server uses them. Each option
 describes exactly what is sent. Turning Daily Brief off turns both off.
 
+Outlook Calendar, iCloud Calendar and Hevy each need their own choice before the
+brief can use them. Connecting a source or showing it on Timeline never turns it on.
+**Include selected Outlook Calendar timing** sends today's event times, availability
+and your response for the selected calendars, without titles or details.
+**Include today's recorded Hevy workout times** sends only the start and end of
+workouts already recorded today. A recorded workout never completes a Behavior and
+never shows when you are free. A source that is missing or partly read proves
+nothing about your day. iCloud Calendar has no control until Cadence can read it.
+If you reconnect a source, change its calendars, or disconnect it, turn its choice
+off or save it again before the next brief. Turning Daily Brief off turns all of
+these off, and an older Cadence app that saves Daily Brief settings also turns them off.
+
 The briefing can recommend changes but cannot apply them. Cadence stores no
 briefing history. When its timing expires, the bubble offers **Get a fresh brief**.
 After you mark an occurrence or other Timeline facts change, it offers **Refresh brief**.

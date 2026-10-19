@@ -814,7 +814,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 9,
+      "interaction_marker_count": 11,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -13035,7 +13035,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing, reminder delivery history, and Notes on Not Completed occurrences may inform it.",
+      "intent": "Enable or disable the Daily Brief and choose whether selected Google Calendar timing, reminder delivery history, Notes on Not Completed occurrences, and each separately connected Outlook Calendar, iCloud Calendar, or Hevy workout-timing source may inform it.",
       "triggers": [
         {
           "kind": "change",
@@ -13048,10 +13048,14 @@
         {
           "kind": "change",
           "control": "Include Notes on Not Completed occurrences"
+        },
+        {
+          "kind": "change",
+          "control": "Include selected Outlook Calendar timing, Include selected iCloud Calendar timing, or Include today's recorded Hevy workout times"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 227 adds its adapter.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs until it is saved again.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -13071,7 +13075,7 @@
           "tests/daily-brief-ui.dom.test.tsx",
           "tests/daily-brief.service.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields, the optional-source disclosures and revocation on disable; service coverage verifies two- and four-field saves."
+        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, and revocation on disable; service coverage verifies two-, four-, and seven-field saves and connected-source checks."
       },
       "platforms": {
         "web": {

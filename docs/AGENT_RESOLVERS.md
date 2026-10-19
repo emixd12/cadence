@@ -459,6 +459,15 @@ complete relevant coverage. Resolved work stays out of remaining-work evidence.
 Day evidence never grants move permission. The existing inspector retains full
 evidence and rejection details; the model explains ranked supported findings.
 No travel evidence enters this boundary until its separate release gates pass.
+Ticket 226 adds optional `additionalCalendars` (Outlook or iCloud, each at most
+once) to the planner input. Their events are fixed blocks beside Google, and every
+requested Calendar source must be current and complete before a scheduling option
+or feasible opportunity is claimed; combined freshness is the weakest source.
+`splitBriefingContext` in `briefing-config.ts` turns a `1.1` day context into the
+Google-only `1.0` view plus the disclosed sources, and
+`projectBriefingConnectorSources` builds separate calendar and
+`past_recorded_activity` model branches. Recorded Hevy workouts never enter the
+planner, availability, duration estimates, or Behavior status.
 
 `packages/core/src/data/briefing-references.json` stores the editable curated catalog.
 `packages/core/src/services/briefing-references.ts` validates its metadata and owns

@@ -238,3 +238,24 @@ describe("advisor day-context 1.1 compatibility", () => {
     expect(projected.events[0]).not.toHaveProperty("title");
   });
 });
+
+describe("Ticket 226 unavailable connector projections", () => {
+  it("validates unavailable Outlook, iCloud, and Hevy states only in 1.1 and exposes no records", async () => {
+    const { projectUnavailableAdvisorActivity, projectUnavailableVersionedAdvisorCalendar } = await import("../packages/core/src/services/advisor-day-context");
+    const fixture = JSON.parse(await readFile(contextFixture, "utf8"));
+    const failure = { code: "timeout" as const, retryable: true, retryAfterSeconds: null };
+    const outlook = projectUnavailableVersionedAdvisorCalendar({ source: "outlook_calendar", connectionGeneration: 2, selectionRevision: 3, failure });
+    const icloud = projectUnavailableVersionedAdvisorCalendar({ source: "icloud_calendar", connectionGeneration: 1, selectionRevision: 1,
+      failure: { code: "provider_unavailable", retryable: false, retryAfterSeconds: null } });
+    const hevy = projectUnavailableAdvisorActivity({ connectionGeneration: 4, failure });
+    const context = { ...fixture, version: "1.1", status: "partial", connectors: [...fixture.connectors, outlook, icloud, hevy] };
+    expect(validateVersionedAdvisorDayContext(context).connectors.slice(1)).toEqual([
+      expect.objectContaining({ source: "outlook_calendar", state: "unavailable", events: [], coverage: [] }),
+      expect.objectContaining({ source: "icloud_calendar", state: "unavailable", events: [] }),
+      expect.objectContaining({ source: "hevy", state: "unavailable", activities: [], coverage: null }),
+    ]);
+    expect(() => validateVersionedAdvisorDayContext({ ...context, status: "complete" })).toThrow("incomplete connector");
+    expect(() => validateAdvisorDayContext(context)).toThrow("unsupported");
+    expect(() => validateVersionedAdvisorDayContext({ ...context, version: "1.0" })).toThrow();
+  });
+});

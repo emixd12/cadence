@@ -760,7 +760,7 @@
             "module.daily-brief-bubble",
             "module.daily-brief-settings-panel"
           ],
-          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. No native editor or marketing capability follows."
+          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. Ticket 226 adds separate default-off Outlook Calendar, iCloud Calendar, and Hevy workout-timing disclosures in the shared Settings panel; each control appears only while its source is connected or still disclosed, and iCloud offers none until Ticket 227. No native editor or marketing capability follows."
         },
         {
           "surfaceId": "marketing",

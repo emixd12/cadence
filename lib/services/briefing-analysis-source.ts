@@ -1,4 +1,4 @@
-import type { AdvisorDayContextV1, AdvisorOpaqueRef } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorOpaqueRef } from "@cadence/core/types/advisor-day-context";
 import {
   BRIEFING_ANALYSIS_VERSION,
   type BriefingAnalysisConfigurationPeriod,
@@ -26,7 +26,7 @@ const SCHEDULE_FIELDS = new Set(["schedule_graph", "timezone", "active"]);
  */
 export function projectBriefingAnalysisSource(
   snapshot: AdvisorAnalysisSnapshot,
-  input: Readonly<{ context: AdvisorDayContextV1; makeOpaqueRef: AdvisorOpaqueRef; startLocalDate: string }>,
+  input: Readonly<{ context: AdvisorDayContext; makeOpaqueRef: AdvisorOpaqueRef; startLocalDate: string }>,
 ): BriefingAnalysisSource {
   const ref = input.makeOpaqueRef;
   const capped = snapshot.occurrences.length > ADVISOR_ANALYSIS_LIMITS.occurrences;

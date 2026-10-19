@@ -29,6 +29,15 @@ export type DailyBriefSettings = Readonly<{
   includeNotes?: boolean;
   /** Optional sources the server can use; Settings offers only these controls. */
   optionalSources?: Readonly<{ reminders: boolean; notes: boolean }>;
+  /**
+   * Separate connector disclosures (Ticket 226); absent from older servers and
+   * treated as false. `includeCalendar` stays Google Calendar only.
+   */
+  includeOutlookCalendar?: boolean;
+  includeIcloudCalendar?: boolean;
+  includeHevy?: boolean;
+  /** Connected sources this server can disclose; Settings offers a control only for these. */
+  connectorSources?: Readonly<{ outlookCalendar: boolean; icloudCalendar: boolean; hevy: boolean }>;
   revision: number;
   configurationRevision?: string;
   localDate: string;

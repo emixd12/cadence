@@ -6,7 +6,9 @@ import {
   type BriefingConfig,
   type BriefingContextConfig,
   type BriefingContextControlState,
+  type BriefingConnectorSources,
   type BriefingContextProjection,
+  type BriefingModelConnectorSources,
   type BriefingDirectness,
   type BriefingEncouragement,
   type BriefingPreset,
@@ -14,11 +16,11 @@ import {
   type BriefingSuggestionType,
   type BriefingTone,
 } from "../types/briefing-config";
-import type { AdvisorDayContextV1 } from "../types/advisor-day-context";
+import { ADVISOR_DAY_CONTEXT_VERSION, type AdvisorCalendarConnector, type AdvisorCalendarConnectorV1_1, type AdvisorDayContextV1 } from "../types/advisor-day-context";
 import { BRIEFING_ANALYSIS_LANE_IDS, type BriefingAnalysisLaneId } from "../types/briefing-analysis";
 import type { BriefingAnalysisConfig } from "../types/briefing-config";
 import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
-import { validateAdvisorDayContext } from "./advisor-day-context";
+import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "./advisor-day-context";
 
 const TONES: readonly BriefingTone[] = ["calm", "warm", "matter_of_fact"];
 const DIRECTNESS: readonly BriefingDirectness[] = ["gentle", "balanced", "direct"];
@@ -184,6 +186,43 @@ export function scopeBriefingContext(contextValue: unknown, configValue: unknown
     },
     connectors,
   });
+}
+
+/**
+ * Ticket 226. Splits a versioned day context into the Google-only `1.0` view
+ * that scoping, projection, analysis, and the planner already use, plus the
+ * separately disclosed sources. A `1.0` context carries none. Configuration
+ * can only narrow: `scope.includeCalendar: false` drops every calendar source,
+ * and no configuration can add a source the context lacks.
+ */
+export function splitBriefingContext(contextValue: unknown, configValue: unknown): Readonly<{
+  context: AdvisorDayContextV1;
+  sources: BriefingConnectorSources;
+}> {
+  const context = validateVersionedAdvisorDayContext(contextValue);
+  const config = parseBriefingConfig(configValue);
+  if (context.version === ADVISOR_DAY_CONTEXT_VERSION) return { context, sources: { calendars: [], recordedActivity: null } };
+  const google = (context.connectors.find((connector) => connector.source === "google_calendar")
+    ?? { source: "google_calendar", state: "not_requested" }) as AdvisorCalendarConnector | { source: "google_calendar"; state: "not_requested" };
+  const view = validateAdvisorDayContext({
+    ...context,
+    version: ADVISOR_DAY_CONTEXT_VERSION,
+    status: google.state !== "not_requested" && !google.complete ? "partial" : "complete",
+    connectors: [google],
+  });
+  const calendars = config.scope.includeCalendar ? context.connectors.filter((connector): connector is AdvisorCalendarConnectorV1_1 =>
+    (connector.source === "outlook_calendar" || connector.source === "icloud_calendar") && connector.state !== "not_requested") : [];
+  const activity = context.connectors.find((connector) => connector.source === "hevy" && connector.state !== "not_requested");
+  return { context: view, sources: { calendars, recordedActivity: activity && "activities" in activity ? activity : null } };
+}
+
+/** Model branches for disclosed sources. Calendar timing and recorded activity stay separate. */
+export function projectBriefingConnectorSources(sources: BriefingConnectorSources): BriefingModelConnectorSources | null {
+  if (sources.calendars.length === 0 && !sources.recordedActivity) return null;
+  return {
+    ...(sources.calendars.length ? { calendars: sources.calendars } : {}),
+    ...(sources.recordedActivity ? { recordedActivity: { semantics: "past_recorded_activity" as const, ...sources.recordedActivity } } : {}),
+  };
 }
 
 export function projectBriefingContext(contextValue: unknown, configValue: unknown): BriefingContextProjection {

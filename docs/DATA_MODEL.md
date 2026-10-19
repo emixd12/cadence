@@ -1934,6 +1934,31 @@ returns `retry_exhausted`. The one-active-generation rule and six starts/minute
 still apply first; no quota or admission record is cleared. A new local day or
 disclosure revision starts at one. The column stores no prompt or generated text.
 
+Migration `20261019010000_daily_brief_connector_disclosure.sql` (Ticket 226):
+
+- `daily_brief_preferences` adds `include_outlook_calendar`,
+  `include_icloud_calendar`, and `include_hevy` (default false; each requires
+  `enabled`). `include_calendar` stays Google Calendar only. Each disclosure
+  stores the connector fence current when it was granted:
+  `outlook_connection_generation` and `outlook_selection_revision`,
+  `icloud_connection_generation` and `icloud_selection_revision`, and
+  `hevy_connection_generation`. Check constraints require the fence exactly when
+  the disclosure is on. Existing rows read every new disclosure as off.
+- `save_daily_brief_preferences_v3` saves all seven controls. Enabling Outlook or
+  iCloud needs a connected `connector_connections` row with a non-empty
+  `connector_preferences.selected_source_ids`; Hevy needs a connected row. A
+  missing source raises `55000`. `save_daily_brief_preferences_v2` now delegates
+  with the three new disclosures off, and the original three-argument save still
+  delegates to v2, so older clients revoke them. Every save bumps the revision and
+  deletes the owner's `daily_brief_runs`.
+- `daily_brief_connector_fence_is_current(user_id)` (private, not granted to
+  clients) checks each disclosed source's connected status, generation, and
+  selection revision. `daily_brief_calendar_fence_is_current` keeps its signature
+  and now also requires it, so the installed `begin_daily_brief` and
+  `finish_daily_brief` fence the new sources without being rewritten.
+- `read_daily_brief_preferences` returns the new keys. The repository treats a
+  missing key as off and rejects a disclosure without its fence.
+
 Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
 
 - `daily_brief_preferences` adds `include_reminder_history` and `include_notes`

@@ -194,3 +194,48 @@ it("upgrades 1.2 configurations without selecting analysis lanes and orders lane
   const selected = parseBriefingConfig({ ...copy(DEFAULT_BRIEFING_CONFIG), analysis: { lanes: ["decision-debt", "weekday-time-dips"], maxTips: 1, cooldownDays: 14 } });
   expect(selected.analysis.lanes).toEqual(["weekday-time-dips", "decision-debt"]);
 });
+
+describe("separately disclosed connector sources (Ticket 226)", () => {
+  it("keeps a 1.0 context unchanged and carries no new sources", async () => {
+    const { splitBriefingContext } = await import("../packages/core/src/services/briefing-config");
+    const split = splitBriefingContext(fixture, DEFAULT_BRIEFING_CONFIG);
+    expect(split.context).toEqual(fixture);
+    expect(split.sources).toEqual({ calendars: [], recordedActivity: null });
+  });
+
+  it("splits a 1.1 context into the Google-only view plus distinct calendar and activity branches", async () => {
+    const { splitBriefingContext, projectBriefingConnectorSources } = await import("../packages/core/src/services/briefing-config");
+    const { connectorDayContext } = await import("./helpers/connector-day-context");
+    const context = connectorDayContext();
+    const split = splitBriefingContext(context, DEFAULT_BRIEFING_CONFIG);
+    expect(split.context.version).toBe("1.0");
+    expect(split.context.connectors).toEqual([fixture.connectors[0]]);
+    expect(split.sources.calendars.map((item) => item.source)).toEqual(["outlook_calendar"]);
+    expect(split.sources.recordedActivity).toMatchObject({ source: "hevy", complete: true, activities: [{ location: "unsupported", duration: { kind: "known", seconds: 2700 } }] });
+    const model = projectBriefingConnectorSources(split.sources)!;
+    expect(model.recordedActivity?.semantics).toBe("past_recorded_activity");
+    const serialized = JSON.stringify(model);
+    // Titles, provider IDs, and every discarded Hevy field stay out of model input.
+    expect(serialized).not.toMatch(/Private review|Overnight shift|outlook_calendar\/calendar-1|hevy\/[0-9a-f]{16}|exercise|routine|title/);
+
+    const narrowed = splitBriefingContext(context, { ...DEFAULT_BRIEFING_CONFIG, scope: { ...DEFAULT_BRIEFING_CONFIG.scope, includeCalendar: false } });
+    expect(narrowed.sources.calendars).toEqual([]);
+    expect(narrowed.sources.recordedActivity?.source).toBe("hevy");
+    expect(projectBriefingConnectorSources({ calendars: [], recordedActivity: null })).toBeNull();
+  });
+
+  it("reports a partial Google view only from Google, leaving new sources to their own completeness", async () => {
+    const { splitBriefingContext } = await import("../packages/core/src/services/briefing-config");
+    const { connectorDayContext, hevyDaySnapshot } = await import("./helpers/connector-day-context");
+    const hevy = hevyDaySnapshot();
+    hevy.completeness = "incomplete";
+    hevy.coverage = { ...hevy.coverage, paginationComplete: false };
+    hevy.failures = [{ code: "incomplete_pagination", message: "Hevy pages changed during the read.", retryable: true, retryAfterSeconds: null }];
+    const context = connectorDayContext({ hevy });
+    expect(context.status).toBe("partial");
+    const split = splitBriefingContext(context, DEFAULT_BRIEFING_CONFIG);
+    expect(split.context.status).toBe("complete");
+    // Incomplete activity exposes no workouts, so absence is never asserted.
+    expect(split.sources.recordedActivity).toMatchObject({ state: "incomplete", complete: false, activities: [] });
+  });
+});

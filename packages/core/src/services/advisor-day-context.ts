@@ -352,6 +352,48 @@ export function projectUnavailableAdvisorCalendar(input: Readonly<{
   };
 }
 
+/** Unavailable Outlook or iCloud source state for `1.1`; it carries no events or coverage. */
+export function projectUnavailableVersionedAdvisorCalendar(input: Readonly<{
+  source: Exclude<AdvisorCalendarConnectorV1_1["source"], "google_calendar">;
+  connectionGeneration: number;
+  selectionRevision: number;
+  failure: Readonly<{ code: AdvisorSourceFailureCode; retryable: boolean; retryAfterSeconds: number | null }>;
+}>): AdvisorCalendarConnectorV1_1 {
+  const versions = EXTERNAL_EVENT_SOURCE_VERSIONS[input.source];
+  return {
+    source: input.source,
+    state: "unavailable",
+    complete: false,
+    fetchedAt: null,
+    connectionGeneration: input.connectionGeneration,
+    selectionRevision: input.selectionRevision,
+    schemaVersion: versions.schemaVersion,
+    adapterVersion: versions.adapterVersion,
+    coverage: [],
+    failure: input.failure,
+    events: [],
+  };
+}
+
+/** Unavailable Hevy source state. Missing activity never proves that no workout happened. */
+export function projectUnavailableAdvisorActivity(input: Readonly<{
+  connectionGeneration: number;
+  failure: Readonly<{ code: AdvisorSourceFailureCode; retryable: boolean; retryAfterSeconds: number | null }>;
+}>): AdvisorActivityConnector {
+  return {
+    source: "hevy",
+    state: "unavailable",
+    complete: false,
+    fetchedAt: null,
+    connectionGeneration: input.connectionGeneration,
+    schemaVersion: RECORDED_ACTIVITY_SCHEMA_VERSION,
+    adapterVersion: HEVY_WORKOUTS_ADAPTER_VERSION,
+    coverage: null,
+    failure: input.failure,
+    activities: [],
+  };
+}
+
 /**
  * Recorded workout timing only. Titles, provider IDs, and every discarded Hevy
  * field never reach this projection. Incomplete or stale reads expose no

@@ -1818,6 +1818,19 @@ export type Database = {
         }
         Returns: Json
       }
+      save_daily_brief_preferences_v3: {
+        Args: {
+          p_enabled: boolean
+          p_expected_revision: number
+          p_include_calendar: boolean
+          p_include_hevy: boolean
+          p_include_icloud_calendar: boolean
+          p_include_notes: boolean
+          p_include_outlook_calendar: boolean
+          p_include_reminder_history: boolean
+        }
+        Returns: Json
+      }
       update_behavior_with_definition_event: {
         Args: {
           behavior_payload: Json

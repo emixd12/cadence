@@ -387,7 +387,9 @@ describe("connector request boundary", () => {
 
 describe("connector data stays out of tracking surfaces", () => {
   const roots = ["lib", "app", "components", "apps/desktop/src", "apps/desktop/src-tauri/src", "packages", "supabase/migrations"];
-  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261018230000_connector_lifecycle.sql"]);
+  // Ticket 226's Daily Brief fence reads only connection status, generation, and selection revision.
+  const disclosureFence = "supabase/migrations/20261019010000_daily_brief_connector_disclosure.sql";
+  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261018230000_connector_lifecycle.sql", disclosureFence]);
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);
@@ -399,6 +401,8 @@ describe("connector data stays out of tracking surfaces", () => {
     const offenders = roots.flatMap(files).filter((path) => /\.(ts|tsx|mjs|rs|sql)$/.test(path) && !allowed.has(path))
       .filter((path) => /connector_(connections|preferences|credentials|attempts)|connector_(begin|consume|install|read|replace)_|connector_disconnect/.test(readFileSync(path, "utf8")));
     expect(offenders).toEqual([]);
+    const fence = readFileSync(disclosureFence, "utf8");
+    expect(fence).not.toMatch(/connector_(credentials|attempts)|sealed_|account_digest\s*[,=)]|connector_(begin|consume|install|read|replace)_|connector_disconnect/);
   });
   it("does not log from connector lifecycle modules", () => {
     for (const path of ["lib/services/connector-credentials.ts", "lib/services/connector-request.ts", "lib/db/connectors.repo.ts", "lib/types/connectors.ts"]) {

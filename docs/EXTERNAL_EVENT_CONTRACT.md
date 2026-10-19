@@ -470,8 +470,9 @@ not consume this contract. Ticket 221 adds `validateVersionedAdvisorDayContext`,
 `validateVersionedAdvisorDayContextRequest`,
 `projectVersionedAdvisorCalendarConnector`, and `projectAdvisorActivityConnector`
 in `packages/core/src/services/advisor-day-context.ts`. The existing `1.0`
-validators and projections are unchanged and remain the only runtime callers
-until Ticket 226 wires consent and assembly. In `1.1`, each source appears at
+validators and projections are unchanged. Ticket 226 wires consent and assembly:
+a live brief with a disclosed new source produces `1.1`, and Google-only reads
+still produce exact `1.0`. In `1.1`, each source appears at
 most once, event refs are unique across connectors, and Outlook and iCloud refs
 are namespaced by source before hashing. Google refs are unchanged.
 

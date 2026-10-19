@@ -1,5 +1,7 @@
 import type {
+  AdvisorActivityConnector,
   AdvisorCalendarConnector,
+  AdvisorCalendarConnectorV1_1,
   AdvisorCalendarNotRequested,
   AdvisorCompletionHistory,
   AdvisorHistoricalCompletionTimes,
@@ -89,8 +91,25 @@ export type BriefingModelOccurrence = Readonly<{
   duration?: AdvisorDuration;
 }>;
 
+/**
+ * Ticket 226: sources outside the Google-only `1.0` view, each present only
+ * after its own Daily Brief disclosure. Configurations select none of them
+ * explicitly; `scope.includeCalendar: false` drops every calendar source.
+ */
+export type BriefingConnectorSources = Readonly<{
+  /** Outlook or iCloud scheduled timing; the same projection as Google with the source named. */
+  calendars: readonly AdvisorCalendarConnectorV1_1[];
+  /** Past recorded workout timing. Never a schedule, availability, duration estimate, or completion. */
+  recordedActivity: AdvisorActivityConnector | null;
+}>;
+
+export type BriefingModelConnectorSources = Readonly<{
+  calendars?: readonly AdvisorCalendarConnectorV1_1[];
+  recordedActivity?: AdvisorActivityConnector & Readonly<{ semantics: "past_recorded_activity" }>;
+}>;
+
 export type BriefingModelFacts = Readonly<{
-  version: "1.0";
+  version: "1.0" | "1.1";
   snapshotId: string;
   accountRef: string;
   localDate: string;
@@ -116,6 +135,8 @@ export type BriefingModelFacts = Readonly<{
     }>[];
   }>;
   connectors?: Array<AdvisorCalendarConnector | AdvisorCalendarNotRequested>;
+  /** Separately disclosed sources (Ticket 226). Absent unless at least one is included. */
+  connectorSources?: BriefingModelConnectorSources;
 }>;
 
 export type BriefingContextControlState = Readonly<{

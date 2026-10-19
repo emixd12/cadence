@@ -155,3 +155,32 @@ it("honors Calendar, scope and completion exclusions for independent day evidenc
     expect(resolved.cadence.occurrences[0].status).toBe(status);
   }
 });
+
+it("plans around disclosed Outlook events but never treats recorded workouts as busy or free time (Ticket 226)", async () => {
+  const { connectorDayContext, outlookDaySnapshot } = await import("./helpers/connector-day-context");
+  const context = connectorDayContext();
+  const config = { ...DEFAULT_BRIEFING_CONFIG, planner: { ...DEFAULT_BRIEFING_CONFIG.planner, bufferMinutes: 0 } };
+  const googleOnly = prepareBriefing({ ...context, version: "1.0", connectors: [context.connectors[0]!] } as never, config, context.capturedAt);
+  const prepared = prepareBriefing(context, config, context.capturedAt);
+  const outlookRefs = context.connectors.find((item) => item.source === "outlook_calendar")!;
+  const outlookEventRef = "events" in outlookRefs ? outlookRefs.events[0]!.ref : "";
+  // The Outlook event overlapping the 17:30Z Walk becomes day evidence; the workout does not.
+  expect(JSON.stringify(prepared.plan.dayEvidence.findings)).toContain(outlookEventRef);
+  expect(JSON.stringify(googleOnly.plan.dayEvidence.findings)).not.toContain(outlookEventRef);
+  const hevy = context.connectors.find((item) => item.source === "hevy")!;
+  const activityRef = "activities" in hevy ? hevy.activities[0]!.ref : "";
+  expect(JSON.stringify(prepared.plan)).not.toContain(activityRef);
+  expect(prepared.facts).toMatchObject({ version: "1.1", status: "complete", connectorSources: { recordedActivity: { semantics: "past_recorded_activity" } } });
+  expect(prepared.plan.dayEvidence.coverage.calendar).toBe("current_complete");
+
+  // An unavailable Outlook source blocks free-time claims even while Google is complete.
+  const failed = outlookDaySnapshot();
+  failed.completeness = "incomplete";
+  failed.coverage = failed.coverage.map((row: Record<string, unknown>) => ({ ...row, paginationComplete: false }));
+  failed.failures = [{ code: "timeout", message: "Outlook read timed out.", retryable: true, retryAfterSeconds: null, calendarId: "calendar-1" }];
+  failed.freshness = { ...failed.freshness, state: "incomplete", label: "Outlook Calendar incomplete", canAssertNoOverlap: false };
+  const partial = prepareBriefing(connectorDayContext({ outlook: failed }), config, context.capturedAt);
+  expect(partial.plan.dayEvidence.coverage).toMatchObject({ calendar: "current_partial", canClaimFeasibleOpportunities: false });
+  expect(partial.facts.status).toBe("partial");
+  expect(partial.plan.dayEvidence.findings.some((finding) => finding.kind === "feasible_opportunity")).toBe(false);
+});
