@@ -186,6 +186,29 @@ describe("separately disclosed connector sources (Ticket 226)", () => {
     });
   });
 
+  it.each([
+    ["current", {}, {}, { outlookCalendar: null, icloudCalendar: null, hevy: null }],
+    ["Outlook reconnected", { generation: 3 }, {}, { outlookCalendar: "changed", hevy: null }],
+    ["Outlook reselected", { selectionRevision: 4 }, {}, { outlookCalendar: "changed", hevy: null }],
+    ["Hevy reconnected", {}, { generation: 2 }, { outlookCalendar: null, hevy: "changed" }],
+    ["Outlook without calendars", { preferences: { selectedSourceIds: [] } }, {}, { outlookCalendar: "no_calendars" }],
+    ["sources disconnected", { status: "disconnected" }, { status: "reconnect_required" }, { outlookCalendar: "unavailable", hevy: "unavailable" }],
+  ])("reports per-source recovery state when a disclosed source is %s", async (_label, outlook, hevy, attention) => {
+    mocks.read.mockResolvedValue({ ...prefs, includeOutlookCalendar: true, outlookConnectionGeneration: 2, outlookSelectionRevision: 3, includeHevy: true, hevyConnectionGeneration: 1,
+      includeIcloudCalendar: false, icloudConnectionGeneration: null, icloudSelectionRevision: null });
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["calendar-1"] }, ...outlook });
+    mocks.hevy.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 0, preferences: { selectedSourceIds: [] }, ...hevy });
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    expect((await getDailyBriefSettings(caller)).connectorAttention).toMatchObject(attention);
+  });
+
+  it("reports no recovery state for undisclosed sources and an unavailable stored iCloud disclosure", async () => {
+    mocks.read.mockResolvedValue({ ...prefs, includeOutlookCalendar: false, includeHevy: false, includeIcloudCalendar: true, icloudConnectionGeneration: 1, icloudSelectionRevision: 1 });
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 9, selectionRevision: 9, preferences: { selectedSourceIds: ["calendar-1"] } });
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    expect((await getDailyBriefSettings(caller)).connectorAttention).toEqual({ outlookCalendar: null, icloudCalendar: "unavailable", hevy: null });
+  });
+
   it("asks only the live brief for disclosed sources, ending provider reads before the generation reserve", async () => {
     const started = Date.now();
     await requestInAppDailyBrief(caller, input, { generate, now });

@@ -814,7 +814,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 11,
+      "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -13052,10 +13052,14 @@
         {
           "kind": "change",
           "control": "Include selected Outlook Calendar timing, Include selected iCloud Calendar timing, or Include today's recorded Hevy workout times"
+        },
+        {
+          "kind": "activate",
+          "control": "Allow Outlook Calendar again or Allow Hevy again"
         }
       ],
       "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 227 adds its adapter.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs until it is saved again.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -13075,7 +13079,7 @@
           "tests/daily-brief-ui.dom.test.tsx",
           "tests/daily-brief.service.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, and revocation on disable; service coverage verifies two-, four-, and seven-field saves and connected-source checks."
+        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, revocation on disable, per-source changed/no-calendar/unavailable copy, Allow again renewing only its source, and unrelated saves revoking sources that need attention; service coverage verifies two-, four-, and seven-field saves, connected-source checks, and generation/selection renewal state; SQL smoke verifies admission after renewal."
       },
       "platforms": {
         "web": {

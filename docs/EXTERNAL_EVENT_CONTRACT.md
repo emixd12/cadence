@@ -460,7 +460,10 @@ four keys plus the three new source keys. A two- or four-key `PUT` from an older
 client sets the new disclosures to off, so an update never grants them silently.
 That revocation is expected and must be visible in Settings. Every other key set
 is `invalid_request`. Enabling a new source requires its connection to be
-connected, as `includeCalendar` does today.
+connected, as `includeCalendar` does today. Settings `GET` reports
+`connectorAttention` per new source (`changed`, `no_calendars`, `unavailable`, or
+null). A `changed` source needs an explicit seven-key save that names it true to
+rebind its fence; clients send every other source with an attention state as off.
 
 `AdvisorDayContext` is version `1.0` with Google-only connectors. Adding
 connector kinds changes its accepted values, so Ticket 221 adds version `1.1`.

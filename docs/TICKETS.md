@@ -13949,9 +13949,18 @@ Implementation (October 19, 2026):
   reads; the connector policy text is appended only when a source is present.
 - iCloud: the disclosure, storage, fence, and unavailable projection exist; no
   control, read, or operational connection is exposed until Ticket 227.
-- Limitation: as with Google, reconnecting a source or changing its selection
-  leaves the stored disclosure fence stale, so briefs report `context_changed`
-  until the user saves Daily Brief settings again.
+- Recovery (verifier findings on `cc81d99`): reconnecting a source or changing
+  its selection still fences the brief (`context_changed`). Settings `GET` now
+  returns `connectorAttention` per source: `changed` (connected, and selected for
+  Outlook, but generation or selection differs from the stored fence),
+  `no_calendars` (connected Outlook with no selection), or `unavailable` (not
+  connected, status unreadable, or iCloud), and null otherwise. The panel explains
+  each state and offers **Allow <source> again** for `changed`, which re-sends the
+  seven keys with only that source true and rebinds its fence. Any save that does
+  not name a source sends it off when it has an attention state, so unrelated saves
+  neither renew a changed source nor fail on an unavailable one. A
+  `source_unavailable` error shows source-specific text. Google keeps its existing
+  behavior.
 
 ## Ticket 227: iCloud Calendar connector
 

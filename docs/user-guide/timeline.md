@@ -41,9 +41,15 @@ and your response for the selected calendars, without titles or details.
 workouts already recorded today. A recorded workout never completes a Behavior and
 never shows when you are free. A source that is missing or partly read proves
 nothing about your day. iCloud Calendar has no control until Cadence can read it.
-If you reconnect a source, change its calendars, or disconnect it, turn its choice
-off or save it again before the next brief. Turning Daily Brief off turns all of
-these off, and an older Cadence app that saves Daily Brief settings also turns them off.
+If you reconnect a source or change its calendars, the brief stops using it and
+Settings says so under that source. Choose **Allow Outlook Calendar again** or
+**Allow Hevy again** to let the brief use it, or turn it off. Until you choose, the
+brief cannot start. If a source is disconnected or has no selected calendars,
+Settings says which; reconnect it or choose calendars in Connectors, then turn it
+on again. Changing any other Daily Brief choice turns off every source that is
+waiting for your decision; it never allows one again for you. Turning Daily Brief
+off turns all of these off, and an older Cadence app that saves Daily Brief settings
+also turns them off.
 
 The briefing can recommend changes but cannot apply them. Cadence stores no
 briefing history. When its timing expires, the bubble offers **Get a fresh brief**.

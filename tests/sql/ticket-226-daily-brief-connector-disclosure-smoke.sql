@@ -103,15 +103,25 @@ begin
     raise exception 'A completed attempt was delivered after the Hevy generation changed.';
   end if;
 
+  -- The stale Hevy fence keeps refusing admission until the user allows Hevy again.
+  perform pg_temp.expect_error($q$select public.begin_daily_brief('22600000-0000-4000-8000-000000000104', true, 2)$q$, '55000');
+  preference := public.save_daily_brief_preferences_v3(true, false, false, false, true, false, true, 2);
+  if preference ->> 'hevy_connection_generation' <> '2' or preference ->> 'revision' <> '3' then
+    raise exception 'Allowing Hevy again did not rebind its fence: %', preference;
+  end if;
+  if public.begin_daily_brief('22600000-0000-4000-8000-000000000104', false, 3) ->> 'state' <> 'acquired' then
+    raise exception 'A renewed disclosure was not admitted.';
+  end if;
+
   -- An older two- or four-key client revokes every new disclosure.
-  preference := public.save_daily_brief_preferences_v2(true, false, false, false, 2);
+  preference := public.save_daily_brief_preferences_v2(true, false, false, false, 3);
   if (preference ->> 'include_outlook_calendar')::boolean or (preference ->> 'include_hevy')::boolean
     or preference ->> 'outlook_connection_generation' is not null or preference ->> 'hevy_connection_generation' is not null
   then
     raise exception 'An older save kept a new disclosure: %', preference;
   end if;
-  preference := public.save_daily_brief_preferences_v3(true, false, false, false, false, false, true, 3);
-  preference := public.save_daily_brief_preferences(true, false, 4);
+  preference := public.save_daily_brief_preferences_v3(true, false, false, false, false, false, true, 4);
+  preference := public.save_daily_brief_preferences(true, false, 5);
   if (preference ->> 'include_hevy')::boolean then raise exception 'The original save kept Hevy disclosure: %', preference; end if;
 end;
 $$;

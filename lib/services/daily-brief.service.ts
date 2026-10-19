@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { DailyBriefResponse, DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
-import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
+import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
@@ -41,7 +41,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     includeReminderHistory: preferences.includeReminderHistory, includeNotes: preferences.includeNotes, revision: preferences.revision,
     optionalSources: dailyBriefOptionalSources(),
     includeOutlookCalendar: preferences.includeOutlookCalendar, includeIcloudCalendar: preferences.includeIcloudCalendar,
-    includeHevy: preferences.includeHevy, connectorSources: await dailyBriefConnectorSources(caller),
+    includeHevy: preferences.includeHevy, ...await dailyBriefConnectorState(caller, preferences),
     timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString() };
 }
 
@@ -77,16 +77,31 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
   return getDailyBriefSettings(caller);
 }
 
-/** Connected sources Settings may offer. A failed status read offers nothing. */
-async function dailyBriefConnectorSources(caller: CalendarCaller): Promise<NonNullable<DailyBriefSettings["connectorSources"]>> {
+/**
+ * Connected sources Settings may offer, and why a disclosed source cannot be used
+ * (Ticket 226 recovery). `changed` means the source is usable but was reconnected
+ * or reselected after the user allowed it, so the stored fence no longer matches
+ * and the brief refuses to start until the user allows it again. A failed status
+ * read offers nothing and reports a disclosed source as unavailable.
+ */
+async function dailyBriefConnectorState(caller: CalendarCaller, preferences: DailyBriefPreferences): Promise<Pick<DailyBriefSettings, "connectorSources" | "connectorAttention">> {
   const [outlook, hevy] = await Promise.all([
     Promise.resolve().then(() => getOutlookCalendarConnection(caller)).catch(() => null),
     Promise.resolve().then(() => getHevyConnection(caller)).catch(() => null),
   ]);
+  const outlookConnected = outlook?.status === "connected";
+  const outlookSelected = outlookConnected && outlook.preferences.selectedSourceIds.length > 0;
+  const hevyConnected = hevy?.status === "connected";
   return {
-    outlookCalendar: outlook?.status === "connected" && outlook.preferences.selectedSourceIds.length > 0,
-    icloudCalendar: icloudCalendarBriefAvailable(),
-    hevy: hevy?.status === "connected",
+    connectorSources: { outlookCalendar: outlookSelected, icloudCalendar: icloudCalendarBriefAvailable(), hevy: hevyConnected },
+    connectorAttention: {
+      outlookCalendar: !preferences.includeOutlookCalendar ? null : !outlookConnected ? "unavailable" : !outlookSelected ? "no_calendars"
+        : outlook.generation !== preferences.outlookConnectionGeneration || outlook.selectionRevision !== preferences.outlookSelectionRevision ? "changed" : null,
+      // Ticket 227 seam: no iCloud adapter yet, so a stored iCloud disclosure is always unavailable.
+      icloudCalendar: preferences.includeIcloudCalendar && !icloudCalendarBriefAvailable() ? "unavailable" : null,
+      hevy: !preferences.includeHevy ? null : !hevyConnected ? "unavailable"
+        : hevy.generation !== preferences.hevyConnectionGeneration ? "changed" : null,
+    },
   };
 }
 

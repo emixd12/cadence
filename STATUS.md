@@ -98,7 +98,10 @@ The integrated baseline `d7af234` was independently approved.
   60-second budget less a 10-second generation reserve. Outlook and iCloud events
   join the planner as fixed blocks; Hevy workouts reach the model only as past
   recorded timing and never affect availability, durations, or Behavior status.
-  iCloud has the contract and an unavailable state only (Ticket 227). Evidence is
+  iCloud has the contract and an unavailable state only (Ticket 227). Review
+  recovery fix: Settings reports per-source `connectorAttention` and offers
+  **Allow <source> again** after a reconnect or reselection; unrelated saves turn
+  off sources that need attention instead of renewing them or failing. Evidence is
   source, synthetic fixtures, model stubs, a disposable local migration replay, and
   bench screenshots; no live provider or model call.
 - Tickets 227–228 are not started.
