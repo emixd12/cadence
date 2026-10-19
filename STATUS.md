@@ -118,8 +118,11 @@ The integrated baseline `d7af234` was independently approved.
   manual Apple password revocation.
   Synthetic tests and responsive bench evidence cover these paths. Live Apple
   access, hosted custody acceptance and installed acceptance remain open.
-- Ticket 228 disclosure/status reconciliation is locally verified and awaiting
-  separate final review. Node 24.22.0 passed all seven required checks plus
+- Ticket 228 disclosure/status reconciliation is independently approved at
+  `a10b461` for local implementation and synthetic verification. The final
+  reviewer passed 342 focused tests and governance, design-system and marketing
+  checks, and inspected the full-suite evidence below. Node 24.22.0 passed all
+  seven required checks plus
   core, design-system, desktop type/build/parity, and marketing build/parity
   checks. The non-overlapping two-worker test run passed 2,965 tests
   (31 skipped). Synthetic web and desktop benches and marketing pages passed

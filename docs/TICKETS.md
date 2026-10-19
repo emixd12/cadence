@@ -13997,8 +13997,8 @@ Platform impact:
 
 ## Ticket 228: Verification and disclosure reconciliation
 
-Status: disclosure reconciliation and local verification passed; awaiting
-separate final review. Live providers, installed desktop, iCloud
+Status: independently approved at `a10b461` for local implementation and
+synthetic verification. Live providers, installed desktop, iCloud
 custody acceptance and release remain open.
 
 Goal: independently verify 221–227 and align public and in-app disclosures.
