@@ -116,6 +116,26 @@ describe("OAuth HTTP routes", () => {
     overrides.oauth_rotate_refresh_token = { ok: false, error: "invalid_grant", reuse_detected: true };
     expect(await (await token(refresh())).json()).toEqual({ error: "invalid_grant" });
   });
+  it("returns the database-capped refresh lifetime and rejects an expired family", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      overrides.oauth_rotate_refresh_token = { ...issue, access_token_expires_at: new Date(now + 30 * 60_000).toISOString() };
+      expect(await (await token(refresh())).json()).toMatchObject({ expires_in: 1800 });
+      overrides.oauth_rotate_refresh_token = { ok: false, error: "invalid_grant" };
+      const rejected = await token(refresh());
+      expect(rejected.status).toBe(400);
+      expect(await rejected.json()).toEqual({ error: "invalid_grant" });
+    } finally { vi.restoreAllMocks(); }
+  });
+  it("requires the canonical resource on refresh under the MCP authorization profile", async () => {
+    const request = refresh();
+    const body = new URLSearchParams(await request.text());
+    body.delete("resource");
+    expect(await (await token(formRequest("token", Object.fromEntries(body)))).json()).toEqual({ error: "invalid_request" });
+    expect(await (await token(refresh({ resource: "https://wrong.example/mcp" }))).json()).toEqual({ error: "invalid_grant" });
+    expect(rpc.mock.calls.some(([name]) => name === "oauth_rotate_refresh_token")).toBe(false);
+  });
   it("registers public native clients and rejects unsupported client metadata", async () => {
     const send = (body: unknown) => register(new Request(`${issuer}/oauth/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     const response = await send({ client_name: "Native", application_type: "native", redirect_uris: ["http://localhost/callback"] });
@@ -143,6 +163,18 @@ describe("OAuth HTTP routes", () => {
 });
 
 describe("MCP token verification", () => {
+  it("rejects expired families and uses the effective database expiry at the exact boundary", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      overrides.oauth_verify_access_token = { active: false };
+      expect(await verifyMcpAccessToken("a".repeat(43))).toBeNull();
+      for (const offset of [-1, 0, 1]) {
+        overrides.oauth_verify_access_token = { active: true, user_id: "user", grant_id: "grant", client_id: "client", client_name: "Fixture", scopes: ["cadence.read"], resource: `${issuer}/mcp`, expires_at: new Date(now + offset).toISOString() };
+        expect((await verifyMcpAccessToken("a".repeat(43))) !== null).toBe(offset > 0);
+      }
+    } finally { vi.restoreAllMocks(); }
+  });
   it("checks expiry, resource, scopes and labels unknown clients unverified", async () => {
     overrides.oauth_verify_access_token = { active: true, user_id: "user", grant_id: "grant", client_id: "client", client_name: "Fixture", scopes: ["cadence.read"], resource: `${issuer}/mcp`, expires_at: issue.access_token_expires_at };
     expect(await verifyMcpAccessToken("a".repeat(43))).toMatchObject({ userId: "user", clientLabel: "Fixture (unverified)", channel: "mcp" });

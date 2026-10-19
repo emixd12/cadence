@@ -366,3 +366,42 @@ Hosted history has85 migrations after the authorized release preflight; web
 Production MCP is disabled and the canonical issuer is configured. Production
 application/marketing deployment, final Trust pairing, scheduled maintenance
 observation and live-client acceptance remain separate pending evidence.
+
+## Token-family deadline release correction (Ticket 232)
+
+PR108 comment `4309921704` identified access tokens that could outlive their
+90-day family. Forward migration
+`20261019025157_enforce_oauth_family_deadline.sql` caps refreshed access expiry,
+rejects access at or after family expiry, and returns the earlier token/family
+expiry. This also protects tokens issued before this correction. New code
+exchange already creates a fresh family with shorter token lifetimes. The two
+RPC signatures and grants stay unchanged; generated database types are identical.
+The five already-applied migrations remain byte-identical.
+
+The isolated SQL regression `tests/sql/ticket-232-oauth-family-deadline.sql`
+fails against the old functions and passes after a clean 86-migration reset.
+It checks expired, equal, one-microsecond-future, thirty-minute, one-hour and
+two-hour family deadlines; existing overlong tokens; ordinary code issuance;
+and no token mutation on rejected refresh. Existing SQL222/225 smoke tests pass.
+`tests/oauth-server.test.ts` checks the capped `expires_in`, expired-family
+errors, effective-expiry boundary and the existing refresh-resource requirement.
+SQL tests prove database behavior; mocked HTTP tests prove response handling.
+
+PR108 comment `4309921706` proposes optional refresh resource. Cadence implements
+the [MCP authorization profile](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization#resource-parameter-implementation),
+which requires resource on authorization and token requests. The generic
+[RFC8707 resource parameter](https://www.rfc-editor.org/rfc/rfc8707.html#section-2)
+is optional subject to authorization-server policy. Cadence's declared policy
+in `docs/MCP_INTEGRATION.md` requires it. Keep that contract unchanged.
+
+CodeQL17 (`js/insufficient-password-hash`) was independently reviewed and
+dismissed as a false positive on October19 at02:51:48UTC. SHA256 hashes
+server-generated 256-bit credentials and noncredential rate buckets; presented
+values only look up issued hashes. No user-password verifier, password grant or
+client-secret authentication exists. No hashing change was made.
+
+The new migration is local-only pending independent review and separately bound
+hosted approval. PR108 remains held; hosted history is85 and MCP stays disabled.
+This server-only correction changes no desktop, marketing or mobile interface.
+Retained evidence: `.intent/artifacts/deadline232/` (red/green SQL, reset, generated
+types, guarded Node24 gates, function diff, preservation hashes and readback).

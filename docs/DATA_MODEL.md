@@ -2060,7 +2060,7 @@ remain unchanged because this migration changes only a private check constraint.
 | Record | Lifetime |
 |---|---|
 | Authorization code | 10 minutes, single use |
-| Access token | 1 hour |
+| Access token | Up to 1 hour, capped by the family's 90-day absolute expiry |
 | Refresh token | 30 days idle, capped by the family's 90-day absolute expiry |
 | Unused DCR registration | 24 hours until its first consent |
 | CIMD metadata cache | Caller-supplied, at most 24 hours |
@@ -2083,11 +2083,14 @@ The functions fix these values; callers cannot choose them.
   use of a consumed code revokes the family issued from it.
 - `oauth_rotate_refresh_token(...)` rotates a refresh token. It may narrow
   scopes but never widen them. Reuse of a rotated token revokes the whole
-  family, including the newest access and refresh tokens.
+  family, including the newest access and refresh tokens. Both new token expiries
+  are capped by the family's absolute deadline.
 - `oauth_verify_access_token(hash, resource)` checks type, expiry, revocation,
   family, grant, client, and exact resource. It returns the user, grant,
   client, and effective scopes: the token's scopes intersected with the
-  grant's. It updates `last_used_at` at most once a minute.
+  grant's. It rejects a family at or after its absolute deadline, even for
+  previously issued overlong tokens, and returns the earlier token/family expiry.
+  It updates `last_used_at` at most once a minute.
 - `oauth_revoke_token(hash, client_id)` implements RFC 7009. A refresh token
   revokes its family; an access token revokes itself.
 - `oauth_consume_rate_limit(action, grant_id, source_hash)` returns `allowed`,
@@ -2097,6 +2100,14 @@ The functions fix these values; callers cannot choose them.
   90 days, and idle counters. Run it from scheduled maintenance.
 - `oauth_revoke_all_grants()` is the incident function. It revokes every active
   grant with its families, tokens, and unconsumed codes.
+
+Migration `20261019025157_enforce_oauth_family_deadline.sql` replaces only
+`oauth_rotate_refresh_token` and `oauth_verify_access_token`. It preserves their
+signatures, service-role execution grants, SECURITY DEFINER and empty search
+path. It changes no rows or table shapes. New code exchanges already create a
+fresh 90-day family with one-hour access and thirty-day refresh expiries.
+The local regression `tests/sql/ticket-232-oauth-family-deadline.sql` covers
+existing overlong tokens, expired/equal/future deadlines and ordinary issuance.
 
 Token-endpoint functions that can revoke return `{ ok: false, error }` instead of
 raising. Raising would roll back the reuse revocation.
