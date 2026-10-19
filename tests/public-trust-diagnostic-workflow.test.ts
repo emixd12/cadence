@@ -62,7 +62,8 @@ printf '%s' private-stdout
 printf '%s' "$MOCK_ERROR" >&2
 exit "$MOCK_EXIT"
 `, { mode: 0o700 });
-    const env = {
+    const env: NodeJS.ProcessEnv = {
+      NODE_ENV: "test",
       PATH: `${bin}:/usr/bin:/bin`, RUNNER_TEMP: runner,
       GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1",
       TRACE_FILE: trace, MOCK_EXIT: String(code), MOCK_ERROR: String(message),

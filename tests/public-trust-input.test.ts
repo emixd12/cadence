@@ -31,6 +31,7 @@ it.each([401, 403, 404, 429, 500, 503])("reports only HTTP %s when Preview acces
       encoding: "utf8",
       timeout: 10_000,
       env: {
+        NODE_ENV: "test",
         TRUST_SOURCE_COMMIT: "a".repeat(40), TRUST_TARGET: "preview",
         TRUST_APPLICATION_DEPLOYMENT_ID: "app-deployment",
         TRUST_APPLICATION_DEPLOYMENT_URL: "https://app.example.com",
