@@ -253,16 +253,19 @@ The approved public retention schedule is:
   day and Supabase API and database logs retained seven days;
 - security-incident records: up to 90 days or until the investigation
   concludes when an investigation requires preservation;
-- backups: no more than seven days;
-- deleted-account live data: immediately when deletion succeeds, with backup
-  remnants aging out within seven days;
+- backups: Supabase maintains database backups; deleted records may remain in
+  copies until Supabase removes them under its backup lifecycle;
+- deleted-account live data: immediately when deletion succeeds; live-record
+  deletion does not immediately erase existing backups;
 - browser-push payloads: no more than 24 hours;
 - support messages: 12 months after resolution.
 
 Specific records may be retained longer only for security investigations,
 fraud prevention, or legal preservation. The owner confirmed verification of
-the active settings against this schedule on 2026-08-31. Sanitized evidence and
-the completion attestation live in `docs/OPERATIONS.md`.
+the then-active settings against the earlier schedule on 2026-08-31. Sanitized evidence and
+the completion attestation live in `docs/OPERATIONS.md`. Ticket 232 supersedes
+the former strict seven-day backup deadline with owner-approved lifecycle
+wording locally; it does not verify physical cleanup timing or authorize publication.
 
 ## Marketing content and legal contract
 

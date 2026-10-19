@@ -102,6 +102,35 @@ describe("trust and legal UI content", () => {
       .toBe("Cadence retention periods as of October 18, 2026");
   });
 
+  it("discloses backup lifecycle without changing live deletion or ordinary log periods", () => {
+    const privacy = LEGAL_PAGES.privacy;
+    const retention = privacy.sections.find(({ title }) => title === "Retention");
+    const rows = retention?.table?.rows ?? [];
+    const approved = "Supabase maintains database backups. Deleted records may remain in backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.";
+
+    expect(retention?.paragraphs).toContain(approved);
+    expect(renderToStaticMarkup(<LegalPageContent pageKey="privacy" />)).toContain(approved);
+    for (const name of ["Backups", "Deleted-account backup remnants", "Google Calendar connector records", "Travel place identifiers"]) {
+      const row = rows.find(([label]) => label === name);
+      expect(row).toBeDefined();
+      expect(row?.join(" ")).toContain("backup lifecycle");
+      expect(row?.join(" ")).not.toMatch(/(?:7|seven) days/);
+    }
+    const calendar = privacy.sections.find(({ title }) => title === "Optional Google Calendar");
+    expect(calendar?.paragraphs.join(" ")).toContain("sealed credential ciphertext may remain in Supabase backup copies");
+    expect(calendar?.paragraphs.join(" ")).not.toContain("no more than seven days");
+    expect(rows.find(([label]) => label === "Routine logs")).toEqual([
+      "Routine logs", "No more than 7 days",
+      "Vercel Pro runtime logs: 1 day; Supabase Pro API and database logs: 7 days",
+    ]);
+    expect(rows.find(([label]) => label === "Deleted-account live data")).toEqual([
+      "Deleted-account live data", "Immediately or within 7 days",
+      "Auth deletion and database cascades remove live account data immediately when deletion succeeds",
+    ]);
+    expect(rows.find(([label]) => label === "Google Calendar connector records")?.[2]).toContain("Disconnect deletes the live credential;");
+    expect(rows.find(([label]) => label === "Travel place identifiers")?.[2]).toContain("Turning travel off or deleting the account deletes them;");
+  });
+
   it("renders the approved Terms with the settled legal facts", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="terms" />);
 

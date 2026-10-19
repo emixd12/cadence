@@ -61,7 +61,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
           "The Google Calendar connector is optional. Google's review of Calendar access is pending; the connector is not yet verified for public rollout. Where enabled, it requires separate read-only consent for the same Google account used to sign in. Cadence reads your subscribed calendar list so you can choose calendars, then reads events from selected calendars intersecting displayed days, including readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. It does not create, edit, or delete Google events or download attachments automatically.",
           "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information or use it for advertising. If you separately enable selected Google Calendar timing for Daily Brief, Cadence sends that timing to OpenAI as described below. Calendar information is never shared through MCP.",
           "Vercel runtime processes Calendar API requests and returned event details while serving a refresh. Supabase stores the account's connector status, calendar selections, display preferences, and encrypted Google refresh credential. Cadence does not store Google event details in its hosted database. The web app holds returned event details in memory. Desktop can store the last complete normalized event snapshot in a separate account-bound cache for offline display; its account session and pending consent state use macOS Keychain.",
-          "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Supabase daily infrastructure backups can retain deleted connector records and sealed credential ciphertext for no more than seven days.",
+          "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Deleted connector records and sealed credential ciphertext may remain in Supabase backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.",
           "Disconnect Google Calendar marks the account connection disconnected, clears selected calendar IDs, deletes the live server credential, and requests Google grant revocation. If Google cannot confirm revocation, the user must remove Cadence in Google Account permissions. Other clients stop refreshing after they next receive the connection change; an offline desktop device may retain stale cached event details until it reconnects or its Cadence account is disconnected.",
           "Ordinary web sign-out ends that browser's Cadence session but leaves the account-level Calendar connection active. Desktop Cadence account disconnect or reconnect clears that Mac's Calendar cache and pending consent state but does not revoke the global Google grant. Account deletion attempts revocation and removes the live Auth user and owner-scoped connector records. If revocation fails, Google Account permissions may still show the grant.",
           "Cadence's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including its Limited Use requirements.",
@@ -185,6 +185,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Retention",
         paragraphs: [
           "Cadence uses the retention periods below. A provider may delete data sooner. Specific records may be kept longer when required for a security investigation, fraud prevention, or legal preservation.",
+          "Supabase maintains database backups. Deleted records may remain in backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.",
         ],
         table: {
           caption: "Cadence retention periods as of October 18, 2026",
@@ -202,8 +203,8 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Backups",
-              "No more than 7 days",
-              "Supabase Pro daily backups: 7 days",
+              "Until Supabase removes the copies under its backup lifecycle",
+              "Live-record deletion does not immediately erase existing backups.",
             ],
             [
               "Deleted-account live data",
@@ -212,13 +213,13 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Deleted-account backup remnants",
-              "No more than 7 days",
-              "Supabase daily backups: 7 days",
+              "Until Supabase removes the copies under its backup lifecycle",
+              "Live-record deletion does not immediately erase existing backups.",
             ],
             [
               "Google Calendar connector records",
               "Live credential until Calendar disconnect, access revocation, or account deletion; connector status and preferences until account deletion",
-              "Disconnect deletes the live credential; Supabase daily backup remnants retain for no more than 7 days",
+              "Disconnect deletes the live credential; backup copies remain until Supabase removes them under its backup lifecycle",
             ],
             [
               "Desktop Google Calendar cache",
@@ -228,7 +229,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             [
               "Travel place identifiers",
               "While travel stays on; a lookup older than 365 days is repeated when next needed",
-              "Turning travel off or deleting the account deletes them; Supabase daily backup remnants retain for no more than 7 days",
+              "Turning travel off or deleting the account deletes them; backup copies remain until Supabase removes them under its backup lifecycle",
             ],
             [
               "Travel usage totals",

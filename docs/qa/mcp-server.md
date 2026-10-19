@@ -289,3 +289,49 @@ errors in temporary audit scripts were resolved by retaining those scripts as
 text artifacts. No project lint configuration or dependency changed. Browser
 servers and owned tabs were closed; unrelated tabs and port 4322 stayed untouched.
 No SQL reset or runtime/provider test was needed for this copy-only change.
+
+
+### Owner-approved backup wording correction — local review
+
+Ticket 232 replaces only strict backup/remnant deadlines with the approved
+Supabase backup-lifecycle disclosure. The complete approved sentence appears
+in Privacy's Retention section. Calendar connector ciphertext, general backups,
+deleted-account remnants and connector/travel retention rows use the same
+semantics. Live-record deletion does not immediately erase existing backups.
+No new deletion deadline or provider-verification claim is introduced.
+
+Terms, Trust, policy dates/caption, processor disclosures, ordinary log periods,
+live-record deletion commitments and MCP/Daily Brief disclosures remain unchanged.
+A structured comparison against `d2d39244` proves only the Calendar backup
+paragraph, added Retention paragraph and six backup table cells changed.
+The public architecture retention bullets now match the approved local policy;
+its earlier verification attestation remains identified as historical.
+Marketing contains no equivalent strict backup deadline and needs no copy edit.
+
+Public Privacy/Terms and the existing Settings legal-panel fixture were checked
+at 390×844 and 1440×900. No document overflow occurred; Privacy tables retain
+horizontal scrolling inside their containers. The Settings Privacy link opens
+the updated public policy. Browser evidence is retained under
+`.intent/artifacts/backup232/`. One React state-update warning appeared during
+bench preview navigation; its cause was not investigated in this copy-only task.
+The renderer and Settings panel are byte-for-byte unchanged. Authenticated
+account Settings, Timeline and installed desktop were not exercised.
+
+Platform impact remains in the existing inventories: web public policy changes;
+Settings link behavior is unchanged; desktop has no direct policy consumer;
+marketing links to the web owner without a matching deadline; native mobile is
+deferred. No interaction intent, layout, token, fixture or design inventory changes.
+
+This is local wording acceptance only. Actual publication-date selection,
+independent review and exact disabled-deployment authorization remain required.
+Physical backup cleanup and platform sensitive-log capture remain unverified.
+No account/provider/database operation or publication occurred.
+
+Verification used official Node 24.22.0 with executable/major guards inherited
+by child processes and per-test-file runtime assertions. Required agent,
+interaction, resolver, lint, typecheck and web-build gates pass; focused legal
+and public-content tests pass, as do design-system and marketing checks.
+The full suite passes with 2,815 tests and 94 existing opt-in skips using two
+workers. The initial concurrent run timed out in ten unrelated tests while
+Next compiled QA pages; the server was stopped and the suite passed without
+changing timeouts. Lint retains two pre-existing verifier-config warnings.
