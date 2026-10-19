@@ -104,7 +104,7 @@ The integrated baseline `d7af234` was independently approved.
   off sources that need attention instead of renewing them or failing. Evidence is
   source, synthetic fixtures, model stubs, a disposable local migration replay, and
   bench screenshots; no live provider or model call.
-- Ticket 227 corrections F1–F8 are implemented locally; independent re-review is pending. Recovery
+- Ticket 227 remaining F5 DAV metadata correction is implemented locally; independent re-review is pending. Recovery
   preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
   disconnect, isolated complete-only caches, offline display choices and Timeline
   context. Daily Brief reads iCloud only under its separate generation/selection

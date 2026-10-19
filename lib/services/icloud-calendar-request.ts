@@ -404,12 +404,23 @@ function statusCode(element: XmlElement | undefined): number | null {
 }
 
 function hasDavStructure(element: XmlElement): boolean {
-  return ["response", "href", "status", "propstat", "prop"].includes(element.name) || element.children.some(hasDavStructure);
+  return ["multistatus", "response", "href", "status", "propstat", "prop", "responsedescription", "error", "location"].includes(element.name) || element.children.some(hasDavStructure);
+}
+
+function invalidDavMetadata(element: XmlElement): boolean {
+  if (element.name === "responsedescription") return element.children.length !== 0;
+  if (element.name === "error") return Boolean(element.text.trim()) || element.children.some(hasDavStructure);
+  if (element.name === "location") {
+    const href = element.children[0];
+    return Boolean(element.text.trim()) || element.children.length !== 1 || href.ns !== DAV_NS || href.name !== "href"
+      || !href.text.trim() || href.children.length !== 0;
+  }
+  return false;
 }
 
 function davContainer(element: XmlElement, allowed: readonly string[]): void {
   if (element.text.trim() || element.children.some(child =>
-    (child.ns === DAV_NS && !allowed.includes(child.name)) ||
+    (child.ns === DAV_NS && (!allowed.includes(child.name) || invalidDavMetadata(child))) ||
     (child.ns !== DAV_NS && (!child.ns || hasDavStructure(child))))) {
     throw new IcloudXmlError("malformed", "invalid DAV container content");
   }

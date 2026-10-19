@@ -265,3 +265,107 @@ it("rejects response records concealed in extension containers", async () => {
   );
   expect(s.completeness).toBe("incomplete");
 });
+
+const metadataPositions = [
+  [
+    "root description",
+    (body: string) =>
+      xml(`<d:responsedescription>${body}</d:responsedescription>`),
+  ],
+  [
+    "response description",
+    (body: string) =>
+      xml(
+        item(event()).replace(
+          "<d:href>",
+          `<d:responsedescription>${body}</d:responsedescription><d:href>`,
+        ),
+      ),
+  ],
+  [
+    "propstat description",
+    (body: string) =>
+      xml(
+        item(event()).replace(
+          "<d:prop>",
+          `<d:responsedescription>${body}</d:responsedescription><d:prop>`,
+        ),
+      ),
+  ],
+  [
+    "response error",
+    (body: string) =>
+      xml(
+        item(event()).replace("<d:href>", `<d:error>${body}</d:error><d:href>`),
+      ),
+  ],
+  [
+    "propstat error",
+    (body: string) =>
+      xml(
+        item(event()).replace("<d:prop>", `<d:error>${body}</d:error><d:prop>`),
+      ),
+  ],
+  [
+    "response location",
+    (body: string) =>
+      xml(
+        item(event()).replace(
+          "<d:href>",
+          `<d:location>${body}</d:location><d:href>`,
+        ),
+      ),
+  ],
+] as const;
+
+it.each(metadataPositions)(
+  "rejects concealed records or nested wrappers in %s",
+  async (_name, envelope) => {
+    for (const hidden of [
+      item(event()),
+      "<d:status>HTTP/1.1 507 Insufficient Storage</d:status>",
+      "<d:propstat><d:prop/></d:propstat>",
+      `<d:responsedescription>${item(event())}</d:responsedescription>`,
+      "<d:error/>",
+      "<d:location><d:href>/x</d:href></d:location>",
+      `<x:wrapper xmlns:x="urn:example:safe">${item(event())}</x:wrapper>`,
+    ]) {
+      const snapshot = await read(envelope(hidden));
+      expect(snapshot.completeness).toBe("incomplete");
+      expect(snapshot.freshness.canAssertNoOverlap).toBe(false);
+    }
+  },
+);
+
+it.each(metadataPositions.slice(0, 3))(
+  "accepts scalar %s",
+  async (_name, envelope) => {
+    expect(
+      (await read(envelope("No more matching events &amp; no truncation")))
+        .completeness,
+    ).toBe("complete");
+  },
+);
+
+it.each(metadataPositions.slice(3, 5))(
+  "accepts safe condition extensions in %s",
+  async (_name, envelope) => {
+    const snapshot = await read(
+      envelope(
+        '<d:valid-sync-token/><x:condition xmlns:x="urn:example:safe"><x:detail>info</x:detail></x:condition>',
+      ),
+    );
+    expect(snapshot.completeness).toBe("complete");
+    expect(snapshot.events).toHaveLength(1);
+  },
+);
+
+it("accepts a scalar location href without following it", async () => {
+  const snapshot = await read(
+    metadataPositions[5][1](
+      "<d:href>https://example.invalid/elsewhere</d:href>",
+    ),
+  );
+  expect(snapshot.completeness).toBe("complete");
+  expect(snapshot.events).toHaveLength(1);
+});
