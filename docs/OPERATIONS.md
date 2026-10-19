@@ -1175,6 +1175,12 @@ deployment, then deploy the application. Dispatch Production evidence against
 the resulting merge commit and both Ready deployment IDs. Until that snapshot
 is public, the consumer must show older Passed results as Stale.
 
+Trust detail sanitization recognizes exact tool-reference paths from the checked-in
+developer catalog only in marketing route observations and failure prefixes.
+It still screens failure reasons, other fields and original URLs. Validation
+does not rewrite published details or restored history bytes. A validator fix
+is a new evidence-code revision; do not claim it shares a deployed source SHA.
+
 Run `.github/workflows/public-trust-evidence.yml` manually against Preview
 first. Name the exact source commit, Ready application deployment, and Ready
 marketing deployment. Select `run_rls` only when the owner authorizes
