@@ -69,8 +69,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function render() {
-  await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline timeline={timeline()} liveCalendar
+async function render(view: TimelineView = timeline()) {
+  await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline timeline={view} liveCalendar
     statusAction={action} noteAction={action} startTimeTrackingAction={action} stopTimeTrackingAction={action} resetTimeTrackingAction={action} /></RefreshProvider>));
   await act(async () => { observers.forEach((callback) => callback()); await Promise.resolve(); });
 }
@@ -97,6 +97,30 @@ describe("live connector Timeline", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("Outlook Calendar needs reconnection in Settings."));
     expect(container.querySelector("[data-calendar-node]")).toBeNull();
     await vi.waitFor(() => expect(container.textContent).toContain("Hevy workouts could not refresh: permission_denied."));
+  });
+});
+
+const googleConnection = (status: string) => () => json({ accountId: "account-live", status, generation: 1, selectionRevision: 0,
+  preferences: { selectedCalendarIds: ["primary"], hiddenCalendarIds: [], visible: true, showAllDay: true } });
+
+describe("Google source state with Outlook ready (Ticket 225 re-review)", () => {
+  const withEstimate = (): TimelineView => ({ ...timeline(), durationEstimates: { "behavior-1": { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" } } });
+  it.each([
+    ["disconnected", true, googleConnection("disconnected")],
+    ["not configured", true, googleConnection("not_configured")],
+    ["reconnect required", false, googleConnection("reconnect_required")],
+    ["provider unavailable status", false, googleConnection("unavailable")],
+    ["failed status read", false, () => json({ error: "provider_unavailable" }, 503)],
+  ] as const)("Google %s: no-overlap claim allowed = %s", async (_label, canAssert, google) => {
+    routes["/api/google-calendar/connection"] = google;
+    await render(withEstimate());
+    await vi.waitFor(() => expect(container.querySelector('[data-calendar-node="outlook_calendar/calendar-1/timed-1"]')).not.toBeNull());
+    await act(async () => { observers.forEach((callback) => callback()); await Promise.resolve(); });
+    if (canAssert) await vi.waitFor(() => expect(container.textContent).toContain("No timed overlap"));
+    else {
+      await vi.waitFor(() => expect(container.querySelector("[data-calendar-state]")?.getAttribute("data-calendar-state")).toMatch(/disconnected|error/));
+      expect(container.textContent).not.toContain("No timed overlap");
+    }
   });
 });
 

@@ -80,7 +80,10 @@ The integrated baseline `d7af234` was independently approved.
   Outlook is active (`apps/desktop/src/calendar/timeline-freshness.ts`), matching
   web; the web Outlook cache stores only complete reads, so a partial read never
   replaces a complete one or skips a refetch, and a kept read retains its fetch
-  time with a stale label.
+  time with a stale label. Re-review fix: a connected Google source that cannot
+  read (reconnect required, provider unavailable, or a failed read without saved
+  events) contributes unavailable freshness on web and desktop, so Outlook context
+  never claims no overlap past it; an unused Google source stays excluded.
   Evidence: source, synthetic fixtures, deterministic benches at 1280px and
   390px, and native cache unit tests. Not verified: live Microsoft or Hevy
   accounts, installed desktop deep links or Keychain, deployment.

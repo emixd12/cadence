@@ -15,9 +15,16 @@ export const DESKTOP_GOOGLE_UNUSED_LABELS: ReadonlySet<string> = new Set([
   "Calendar requires a linked account.",
 ]);
 
+/** Desktop Google labels for a connected source that cannot read (web: reconnect, unavailable, or error). */
+export const DESKTOP_GOOGLE_FAILING_LABELS: ReadonlySet<string> = new Set([
+  "Reconnect Google Calendar.",
+  "Calendar data is unavailable.",
+  "Calendar cache is unavailable.",
+]);
+
 const OUTLOOK_ACTIVE: ReadonlySet<ConnectorTimelineState> = new Set(["reconnect_required", "empty", "ready", "stale", "incomplete", "error"]);
 
-export type DesktopGoogleTimelineInput = Readonly<{ snapshot: ExternalEventSnapshotV1 | null; stale: boolean; label: string }>;
+export type DesktopGoogleTimelineInput = Readonly<{ snapshot: ExternalEventSnapshotV1 | null; stale: boolean; label: string; error?: string | null }>;
 
 export function desktopTimelineFreshness(google: DesktopGoogleTimelineInput, outlook: OutlookTimelineState): Readonly<{
   freshness: ExternalEventFreshness;
@@ -32,12 +39,15 @@ export function desktopTimelineFreshness(google: DesktopGoogleTimelineInput, out
       : { state: outlook.state === "incomplete" ? "incomplete" : outlook.snapshot ? "stale" : "unavailable",
         refreshedAt: outlook.snapshot?.fetchedAt ?? null, label: "Outlook Calendar context may be out of date", canAssertNoOverlap: false };
   const unavailable: ExternalEventFreshness = { state: "unavailable", refreshedAt: null, label: google.label, canAssertNoOverlap: false };
-  const freshness = combineExternalEventFreshness([...(googleFreshness ? [googleFreshness] : []), ...(outlookFreshness ? [outlookFreshness] : [])])
+  // A connected Google source that cannot read still blocks no-overlap claims; an unused one does not.
+  const googleFailing = !google.snapshot && (Boolean(google.error) || DESKTOP_GOOGLE_FAILING_LABELS.has(google.label));
+  const freshness = combineExternalEventFreshness([...(googleFreshness ? [googleFreshness] : googleFailing ? [unavailable] : []),
+    ...(outlookFreshness ? [outlookFreshness] : [])])
     // Neither source is active: keep the existing Google-only label and unavailable state.
     ?? unavailable;
   const messages = outlookActive ? outlookMessages(outlook.state, outlook.error) : [];
   // Without a Google snapshot, Google's own state still speaks unless Google is simply unused.
-  if (outlookActive && !google.snapshot && !DESKTOP_GOOGLE_UNUSED_LABELS.has(google.label)) messages.unshift(google.label);
+  if (outlookActive && !google.snapshot && !googleFailing && !DESKTOP_GOOGLE_UNUSED_LABELS.has(google.label)) messages.unshift(google.label);
   return { freshness, sourceMessages: messages };
 }
 

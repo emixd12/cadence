@@ -344,7 +344,7 @@ export function Product() {
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
     // Travel and its brief guidance stay on Google events; Outlook adds schedule context only.
     events: outlookEvents.length ? [...visibleCalendarEvents, ...outlookEvents] : visibleCalendarEvents,
-    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label }, outlookTimeline),
+    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline),
     recordedActivity: connectors.hevy,
   };
   const syncAccount = useCallback((): Promise<SyncCompletion> => {

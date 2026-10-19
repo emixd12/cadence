@@ -33,6 +33,8 @@ export type WebCalendarTimelineState = Readonly<{
   error: string | null;
   hiddenCalendarIds: readonly string[];
   showAllDay: boolean;
+  /** Last read connection status; `disconnected` state also covers `reconnect_required` and `unavailable`. */
+  connectionStatus?: CalendarConnectionView["status"];
 }>;
 
 const EVENT_CACHE = new Map<string, ExternalEventSnapshotV1>();
@@ -138,7 +140,7 @@ export function useWebGoogleCalendarTimeline(input: Readonly<{
       if (connection.status !== "connected") {
         clearAccount(connection.accountId);
         lastSnapshot.current = null;
-        setState({ state: "disconnected", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: false });
+        setState({ state: "disconnected", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: false, connectionStatus: connection.status });
         return connection.status === "disconnected";
       }
       if (!connection.preferences.visible || connection.preferences.selectedCalendarIds.length === 0) {

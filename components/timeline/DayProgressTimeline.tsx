@@ -239,11 +239,15 @@ export function DayProgressTimeline({
 
   const layoutsByDate = new Map(layout?.days.map((day) => [day.localDate, day]) ?? []);
   const firstMeasured = visibleSections.map((section) => measured[section.localDate]).find(Boolean);
+  // A connected Google source that cannot read (reconnect, provider unavailable, or a failed read
+  // without saved events) still blocks no-overlap claims; an unused Google source does not.
+  const googleFailing = !live.snapshot && (live.state === "error"
+    || (live.state === "disconnected" && (live.connectionStatus === "reconnect_required" || live.connectionStatus === "unavailable")));
   const fresh = context?.freshness ?? combineExternalEventFreshness([
-    ...(live.snapshot ? [live.snapshot.freshness] : []),
+    ...(live.snapshot ? [live.snapshot.freshness] : googleFailing ? [UNAVAILABLE] : []),
     ...(outlookActive ? [outlookFreshness(outlook)] : []),
   ]) ?? UNAVAILABLE;
-  const googleUnused = outlookActive && (live.state === "disconnected" || live.state === "not_configured");
+  const googleUnused = outlookActive && !googleFailing && (live.state === "disconnected" || live.state === "not_configured");
   const calendarState = context?.freshness
     ? calendarFreshnessLabel(context.freshness, timeline.timezone)
     : liveCalendar && !googleUnused

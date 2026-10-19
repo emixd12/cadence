@@ -413,13 +413,27 @@ describe("desktop Timeline freshness (Ticket 225 review)", () => {
 
   it("still reports Google problems and keeps the Google-only behavior when Outlook is inactive", () => {
     const reconnect = desktopTimelineFreshness({ snapshot: null, stale: true, label: "Reconnect Google Calendar." }, outlookReady);
-    expect(reconnect.freshness.canAssertNoOverlap).toBe(true);
-    expect(reconnect.sourceMessages).toEqual(["Reconnect Google Calendar."]);
+    expect(reconnect.freshness).toEqual({ state: "unavailable", refreshedAt: null, label: "Reconnect Google Calendar.", canAssertNoOverlap: false });
+    expect(reconnect.sourceMessages).toEqual([]);
     expect(desktopTimelineFreshness({ snapshot: null, stale: true, label: "Google Calendar is not connected." }, notLoaded))
       .toEqual({ freshness: { state: "unavailable", refreshedAt: null, label: "Google Calendar is not connected.", canAssertNoOverlap: false }, sourceMessages: [] });
     const google = snapshot();
     expect(desktopTimelineFreshness({ snapshot: google, stale: false, label: "Calendar refreshed." }, notLoaded).freshness)
       .toEqual({ ...google.freshness, label: "Calendar refreshed." });
+  });
+
+  it.each([
+    ["not connected", { label: "Google Calendar is not connected.", error: null }, true],
+    ["not configured in this build", { label: "Calendar is unavailable in this build.", error: null }, true],
+    ["no calendars selected", { label: "No calendars are selected.", error: null }, true],
+    ["reconnect required", { label: "Reconnect Google Calendar.", error: null }, false],
+    ["failed read", { label: "Calendar data is unavailable.", error: "provider_unavailable" }, false],
+    ["unreadable cache", { label: "Calendar cache is unavailable.", error: "cache" }, false],
+    ["connection changed", { label: "Reconnect Google Calendar.", error: "connection_changed" }, false],
+  ] as const)("Google %s with Outlook ready: no-overlap allowed = %s", (_name, google, allowed) => {
+    const result = desktopTimelineFreshness({ snapshot: null, stale: true, ...google }, outlookReady);
+    expect(result.freshness.canAssertNoOverlap).toBe(allowed);
+    expect(result.freshness.state).toBe(allowed ? "current" : "unavailable");
   });
 
   it("weakens overlap claims for stale Google or failing Outlook context", () => {
