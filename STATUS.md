@@ -227,6 +227,25 @@ observations only; no credential or provider record was recorded.
   `disconnected`, generation 2, with the account digest cleared. A later read
   returned `not_connected`. Emi removed the app-specific password at Apple, and
   the test events were deleted.
+- Outlook Calendar, personal Microsoft account (Ticket 237): **failed live**.
+  Graph returns 401 on every calendar endpoint for a token that carries only
+  `Calendars.ReadBasic`. The cause is not yet isolated: either Microsoft-side
+  handling of ReadBasic for personal accounts, or the new, unverified Entra app.
+  No scope change was made. Setup: the Entra app "Cadence Calendar" (personal and
+  multitenant, `Calendars.ReadBasic` + `openid` + `offline_access` only,
+  publisher not verified) and the web app over HTTPS on `https://localhost:4321`.
+  Consent, code redemption and refresh all returned 200 with granted scope
+  `Calendars.ReadBasic` and an opaque token of normal shape. Every Graph read
+  returned 401 with an empty body and no `WWW-Authenticate`:
+  `/v1.0/me/calendars` with and without `$select`, `/v1.0/me/calendar`, and
+  `/beta/me/calendars`. The same account and request shape returned 200 through
+  Microsoft's Graph CLI public client, whose token also held `Calendars.ReadWrite`.
+  As designed, Cadence then marked the connection `reconnect_required` and
+  deleted the credential. Live use exposed a UI defect, fixed in `facf67d`: the
+  Outlook panel kept its connected view after a reconnect-required list or
+  refresh, so no Reconnect button appeared. It now switches state like the
+  iCloud panel, and Disconnect stays available. Two failing-first DOM tests
+  cover it.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
