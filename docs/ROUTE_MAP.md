@@ -156,10 +156,10 @@ No route creates, changes, or deletes a provider event.
 the initiating cookie user. Desktop callbacks use a fixed result and opaque
 Keychain-correlated state, never credentials.
 
-## Planned connector routes (Tickets 222–227)
+## Planned connector routes (Tickets 235–240)
 
-Planned October 18, 2026. Hevy (Ticket 223) and Outlook (Ticket 224) routes are
-implemented locally with synthetic tests. Ticket 227 also implements the iCloud
+Planned October 18, 2026. Hevy (Ticket 236) and Outlook (Ticket 237) routes are
+implemented locally with synthetic tests. Ticket 240 also implements the iCloud
 routes locally; no live Apple account or deployment is verified. Hevy
 `POST /api/hevy/connection` accepts exactly `{apiKey}` under the 8 KB cap and
 returns the view without the key; its `DELETE` adds revocation `hevy_api_key`. Each provider gets its own routes,

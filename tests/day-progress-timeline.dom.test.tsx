@@ -197,7 +197,7 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("[data-current-time-marker]")).not.toBeNull();
   });
 
-  it("labels Outlook markers by source and shows recorded workouts apart from Calendar markers (Ticket 225)", async () => {
+  it("labels Outlook markers by source and shows recorded workouts apart from Calendar markers (Ticket 238)", async () => {
     const input = props();
     const recordedActivity = { state: "ready" as const, error: null, day: { localDate: "2026-09-16", state: "current" as const, fetchedAt: "2026-09-16T13:55:00Z",
       items: [{ id: "hevy/workout-1", startAt: "2026-09-16T11:00:00Z", endAt: "2026-09-16T11:45:00Z", durationSeconds: 2700 }] } };

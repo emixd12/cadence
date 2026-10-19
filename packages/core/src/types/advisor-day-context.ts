@@ -11,7 +11,7 @@ import type { OccurrenceStatus } from "./database";
 export const ADVISOR_DAY_CONTEXT_VERSION = "1.0" as const;
 /**
  * Adds Outlook, iCloud, and Hevy connector kinds. `1.0` stays Google-only and
- * stored `1.0` records stay readable. Runtime assembly and disclosure: Ticket 226.
+ * stored `1.0` records stay readable. Runtime assembly and disclosure: Ticket 239.
  */
 export const ADVISOR_DAY_CONTEXT_VERSION_1_1 = "1.1" as const;
 export const ADVISOR_CALENDAR_SOURCES = ["google_calendar", "outlook_calendar", "icloud_calendar"] as const;
@@ -242,7 +242,7 @@ export type AdvisorConnectorKind = (typeof ADVISOR_CONNECTOR_KINDS)[number];
 export type AdvisorDayContextRequestV1_1 = Readonly<{
   version: typeof ADVISOR_DAY_CONTEXT_VERSION_1_1;
   localDate: string | null;
-  /** Unique known connector kinds. Each new kind still needs its own disclosure (Ticket 226). */
+  /** Unique known connector kinds. Each new kind still needs its own disclosure (Ticket 239). */
   connectors: AdvisorConnectorKind[];
 }>;
 

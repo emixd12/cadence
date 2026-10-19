@@ -3,7 +3,7 @@ import type { ConnectorConnectionView, ConnectorPreferences, ConnectorRevocation
 import type { ConnectorCalendarEntry, ConnectorDisconnectResult, ConnectorEventRange } from "@/lib/ui/connectors";
 import type { DesktopCalendarBroker } from "./google-calendar";
 
-// Ticket 225: Outlook and Hevy hosted routes over the existing authenticated
+// Ticket 238: Outlook and Hevy hosted routes over the existing authenticated
 // broker transport (HTTPS origin, bearer session, no redirects, timeout). The
 // desktop sends entered credentials once and never stores them.
 

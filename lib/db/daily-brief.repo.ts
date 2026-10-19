@@ -11,7 +11,7 @@ export type DailyBriefPreferences = {
   calendarConnectionGeneration: number | null;
   calendarSelectionRevision: number | null;
   /**
-   * Separate connector disclosures (Ticket 226). `includeCalendar` stays Google
+   * Separate connector disclosures (Ticket 239). `includeCalendar` stays Google
    * only. Each binds the connection generation, and calendars also the
    * selection revision, current when it was granted.
    */
@@ -224,7 +224,7 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
     revision: record.revision as number,
     calendarConnectionGeneration: record.calendar_connection_generation as number | null,
     calendarSelectionRevision: record.calendar_selection_revision as number | null,
-    // Absent before migration 20261019010000; absence never grants disclosure.
+    // Absent before migration 20261019041000; absence never grants disclosure.
     includeOutlookCalendar: record.include_outlook_calendar === true,
     outlookConnectionGeneration: record.include_outlook_calendar === true ? fence("outlook_connection_generation") : null,
     outlookSelectionRevision: record.include_outlook_calendar === true ? fence("outlook_selection_revision") : null,

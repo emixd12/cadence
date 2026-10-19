@@ -10,7 +10,7 @@ import outlook from "../fixtures/external-event-snapshot.outlook.valid.json";
 import icloud from "../fixtures/external-event-snapshot.icloud.valid.json";
 import hevy from "../fixtures/recorded-activity-snapshot.valid.json";
 
-// Ticket 226 synthetic fixtures. The `1.0` Daily Brief fixture day is 2026-11-01
+// Ticket 239 synthetic fixtures. The `1.0` Daily Brief fixture day is 2026-11-01
 // in America/New_York, captured at 12:00Z. Connector reads finish at 11:59:50Z.
 export const CONNECTOR_FETCHED_AT = "2026-11-01T11:59:50Z";
 /** Fixture snapshots are edited field by field; validators, not types, check them. */
@@ -29,7 +29,7 @@ export function outlookDaySnapshot(): FixtureSnapshot {
   return snapshot;
 }
 
-/** Ticket 227: one selected iCloud calendar for the fixture day with a busy 15:00–15:30Z event. */
+/** Ticket 240: one selected iCloud calendar for the fixture day with a busy 15:00–15:30Z event. */
 export function icloudDaySnapshot(): FixtureSnapshot {
   const snapshot: FixtureSnapshot = structuredClone(icloud);
   snapshot.requestedRange = { ...snapshot.requestedRange, startLocalDate: "2026-11-01", endLocalDate: "2026-11-01" };

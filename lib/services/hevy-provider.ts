@@ -20,10 +20,10 @@ import {
 } from "@cadence/core/types/recorded-activity";
 import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "./provider-call-timeout";
 
-// Ticket 223 Hevy adapter. It performs exactly three read-only calls and keeps
+// Ticket 236 Hevy adapter. It performs exactly three read-only calls and keeps
 // only workout identity and timing. Titles, descriptions, routines, exercises,
 // sets, weights, reps, and notes are dropped per item before anything else sees
-// them. See docs/INTEGRATION_PLAYBOOK.md "Hevy workout timing (Ticket 223)" and
+// them. See docs/INTEGRATION_PLAYBOOK.md "Hevy workout timing (Ticket 236)" and
 // docs/EXTERNAL_EVENT_CONTRACT.md "Recorded activity snapshot (Hevy)".
 
 export const HEVY_API_ORIGIN = "https://api.hevyapp.com";

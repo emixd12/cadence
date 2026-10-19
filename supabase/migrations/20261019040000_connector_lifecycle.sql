@@ -1,6 +1,6 @@
 begin;
 
--- Ticket 222: owner-bound lifecycle for Hevy, Outlook Calendar, and iCloud Calendar.
+-- Ticket 235: owner-bound lifecycle for Hevy, Outlook Calendar, and iCloud Calendar.
 -- Google Calendar tables, functions, ciphertext, and same-subject rules are unchanged.
 -- Sealed credentials and OAuth attempts live only in the existing non-exposed
 -- cadence_calendar_private schema. Owners read metadata through RLS; every

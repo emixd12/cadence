@@ -6,7 +6,7 @@ import type {
 } from "../types/recorded-activity";
 import { recordedActivitySnapshotScopeKey } from "./recorded-activity-validation";
 
-// Ticket 225 client-safe recorded-activity rules shared by web, desktop, and the
+// Ticket 238 client-safe recorded-activity rules shared by web, desktop, and the
 // Hevy service. This module has no network, storage, credential, or clock access.
 
 export type RecordedActivityRefresh = Readonly<{
@@ -30,7 +30,7 @@ export function recordedActivitySnapshotKey(snapshot: RecordedActivitySnapshotV1
 }
 
 /**
- * Cache rule from Ticket 223. A complete refresh replaces the cached snapshot
+ * Cache rule from Ticket 236. A complete refresh replaces the cached snapshot
  * for the same scope at once, which is how edits and deletions are proved. An
  * incomplete refresh never erases known records. A response from an older
  * connection generation or an earlier fetch than the cached one is late and
@@ -51,7 +51,7 @@ export function applyRecordedActivityRefresh(
 }
 
 /**
- * Ticket 225 consumer guard. `next` must belong to the active scope; otherwise
+ * Ticket 238 consumer guard. `next` must belong to the active scope; otherwise
  * it is a late response for another account, generation, range, or timezone and
  * returns null without touching state. Only a cache entry for that same scope
  * is compared, so a response can never overwrite another scope's entry.

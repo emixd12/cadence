@@ -189,7 +189,7 @@ export function scopeBriefingContext(contextValue: unknown, configValue: unknown
 }
 
 /**
- * Ticket 226. Splits a versioned day context into the Google-only `1.0` view
+ * Ticket 239. Splits a versioned day context into the Google-only `1.0` view
  * that scoping, projection, analysis, and the planner already use, plus the
  * separately disclosed sources. A `1.0` context carries none. Configuration
  * can only narrow: `scope.includeCalendar: false` drops every calendar source,

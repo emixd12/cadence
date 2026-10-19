@@ -295,9 +295,9 @@ native fixtures and multi-day resume remain open.
 The interaction registry records implemented controls separately from Ticket 137
 release acceptance. Marketing has no runtime change; native mobile remains deferred.
 
-## Connector expansion (Tickets 220–228)
+## Connector expansion (Tickets 233–241)
 
-Implemented and independently verified locally through Ticket 227 at `40b1dc2`.
+Implemented and independently verified locally through Ticket 240 at `40b1dc2`.
 Evidence includes source, synthetic fixtures and native cache unit tests; it does
 not establish installed application behavior. In linked-account mode, desktop uses
 the same Settings library and Timeline components and calls hosted Outlook,
@@ -307,7 +307,7 @@ credentials are posted once to the hosted service and never stored on the Mac.
 Per-source disposable caches stay outside `cadence.sqlite3` and user-created
 backups. Disconnect, sign-out, and account switching clear them. Local mode shows
 connectors as requiring a linked account. There is no EventKit bridge. Installed
-acceptance remains open; Ticket 228 records that gap without claiming release.
+acceptance remains open; Ticket 241 records that gap without claiming release.
 Microsoft/Apple/Hevy live access, Microsoft
 publisher verification and deployment remain unverified. Hevy requires Pro and
 scans at most 500 workouts globally even for today; count stability is not an
@@ -329,7 +329,7 @@ account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 `docs/qa/travel-release.md`; existing distribution gates remain unchanged.
 
 
-Ticket 227 mounts `IcloudCalendarPanel` in the linked Settings library and
+Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and
 consumes the hosted 1.1 snapshot through `calendar/icloud-calendar.ts` and
 `calendar/use-connectors.ts`. The disposable iCloud cache binds account,
 generation, selection revision, range, timezone and display choices. Logout,
@@ -338,7 +338,7 @@ Daily Brief reuses the hosted, separately consented projection. Installed
 Keychain/cache behavior and live Apple access remain unverified; no native
 EventKit or local-calendar permission exists.
 
-Ticket 227 review correction: web and desktop retain a known failed or incomplete
+Ticket 240 review correction: web and desktop retain a known failed or incomplete
 refresh warning across cache hits until a complete read succeeds. Desktop cold
 opens verify the provider before treating a saved snapshot as current. The shared
 rule also applies to Outlook and Hevy desktop snapshots. No native schema changed.

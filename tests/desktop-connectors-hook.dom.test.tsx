@@ -13,7 +13,7 @@ import { icloudScopeKey } from "../apps/desktop/src/calendar/icloud-calendar";
 import icloudFixture from "./fixtures/external-event-snapshot.icloud.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
-// Ticket 225 desktop connector hook: offline freshness from the per-source cache,
+// Ticket 238 desktop connector hook: offline freshness from the per-source cache,
 // account-switch cleanup, and the Outlook deep link with Keychain correlation.
 
 const transport = vi.hoisted(() => ({ request: vi.fn() }));

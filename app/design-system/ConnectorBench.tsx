@@ -19,7 +19,7 @@ import outlookFixture from "@/tests/fixtures/external-event-snapshot.outlook.val
 import icloudFixture from "@/tests/fixtures/external-event-snapshot.icloud.valid.json";
 import hevyFixture from "@/tests/fixtures/recorded-activity-snapshot.valid.json";
 
-// Ticket 225 deterministic connector bench. Synthetic coordinators only: no
+// Ticket 238 deterministic connector bench. Synthetic coordinators only: no
 // provider, account, network, Keychain, or cache access.
 
 export const benchOutlookSnapshot = validateVersionedExternalEventSnapshot(outlookFixture) as ExternalEventSnapshotV1_1;

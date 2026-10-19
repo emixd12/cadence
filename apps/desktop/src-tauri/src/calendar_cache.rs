@@ -388,7 +388,7 @@ fn clear(cache: &mut Connection) -> Result<(), String> {
     tx.commit().map_err(error)
 }
 
-// Ticket 225: one disposable snapshot per connector source, keyed by the
+// Ticket 238: one disposable snapshot per connector source, keyed by the
 // client-computed scope key (provider, account, generation, range, timezone, and
 // selection). It shares this file, outside cadence.sqlite3 and user backups,
 // and never stores credentials. Each provider has its own fence, so clearing one

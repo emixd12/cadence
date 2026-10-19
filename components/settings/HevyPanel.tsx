@@ -13,7 +13,7 @@ type HevyPanelProps = Readonly<{
   refreshVersion?: number;
 }>;
 
-// Ticket 225. Hevy is recorded activity, not a calendar: it reports when a
+// Ticket 238. Hevy is recorded activity, not a calendar: it reports when a
 // workout happened and how long it lasted. The API key is held in component
 // state only until submit, then cleared before the request resolves.
 export function HevyPanel({ coordinator, localDate, timezone, refreshVersion = 0 }: HevyPanelProps) {

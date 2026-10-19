@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Synthetic credentials only. The fake mirrors the compare-and-swap rules in
-// 20261018230000_connector_lifecycle.sql; tests/sql/context-connectors-contract.sql
+// 20261019040000_connector_lifecycle.sql; tests/sql/context-connectors-contract.sql
 // proves the same rules against Postgres.
 type Row = { user_id: string; provider: string; account_digest: string | null; attempt_hash: string | null; generation: number; status: string };
 type Pref = { user_id: string; provider: string; selection_revision: number; selected_source_ids: string[]; hidden_source_ids: string[]; visible: boolean; show_all_day: boolean };
@@ -387,9 +387,9 @@ describe("connector request boundary", () => {
 
 describe("connector data stays out of tracking surfaces", () => {
   const roots = ["lib", "app", "components", "apps/desktop/src", "apps/desktop/src-tauri/src", "packages", "supabase/migrations"];
-  // Ticket 226's Daily Brief fence reads only connection status, generation, and selection revision.
-  const disclosureFence = "supabase/migrations/20261019010000_daily_brief_connector_disclosure.sql";
-  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261018230000_connector_lifecycle.sql", disclosureFence]);
+  // Ticket 239's Daily Brief fence reads only connection status, generation, and selection revision.
+  const disclosureFence = "supabase/migrations/20261019041000_daily_brief_connector_disclosure.sql";
+  const allowed = new Set(["lib/db/connectors.repo.ts", "lib/db/database.types.ts", "supabase/migrations/20261019040000_connector_lifecycle.sql", disclosureFence]);
   function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);

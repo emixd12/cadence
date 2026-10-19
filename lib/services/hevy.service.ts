@@ -19,7 +19,7 @@ import {
 } from "./connector-credentials";
 import { HevyProviderError, readHevyWorkouts, verifyHevyApiKey, type HevyRequestOptions } from "./hevy-provider";
 
-// Ticket 223 Hevy orchestration. Credentials stay inside the Ticket 222
+// Ticket 236 Hevy orchestration. Credentials stay inside the Ticket 235
 // lifecycle; this service exposes status, explicit connect or reconnect with a
 // user-entered key, bounded activity reads, and disconnect. It exposes no
 // workout-writing operation. Recorded activity never changes a Behavior,
@@ -93,7 +93,7 @@ export async function getHevyActivities(caller: ConnectorCaller, start: string, 
 }
 
 /**
- * Cache rule for Ticket 225 consumers. The pure implementation lives in
+ * Cache rule for Ticket 238 consumers. The pure implementation lives in
  * `@cadence/core/services/recorded-activity-refresh` so web and desktop clients
  * can apply it without importing this server module.
  */

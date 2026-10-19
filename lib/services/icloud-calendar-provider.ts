@@ -44,7 +44,7 @@ import {
   type ExternalEventSnapshotV1_1,
 } from "@cadence/core/types/external-event";
 
-// Ticket 227 iCloud Calendar adapter over CalDAV. Exactly three read-only
+// Ticket 240 iCloud Calendar adapter over CalDAV. Exactly three read-only
 // operations: discover the principal and calendar home, list VEVENT calendars,
 // and read selected calendars with a server-expanded calendar-query. The first
 // slice keeps only identity, interval, state, availability, revision, and the

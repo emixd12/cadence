@@ -29,7 +29,7 @@ import {
   type ExternalEventSnapshotV1_1,
 } from "@cadence/core/types/external-event";
 
-// Ticket 224 Microsoft Graph adapter. It exposes exactly two read-only
+// Ticket 237 Microsoft Graph adapter. It exposes exactly two read-only
 // operations: list the signed-in user's calendars and read one calendar's
 // calendarView. Every request is GET to https://graph.microsoft.com/v1.0/me/calendars...
 // and every @odata.nextLink is checked against that origin and path before the

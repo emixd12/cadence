@@ -23,7 +23,7 @@ import {
 } from "@/lib/types/connectors";
 import type { CalendarCaller } from "./google-calendar.service";
 
-// Ticket 222 credential custody for Hevy, Outlook Calendar, and iCloud Calendar.
+// Ticket 235 credential custody for Hevy, Outlook Calendar, and iCloud Calendar.
 // The Google Calendar key, AAD, and same-subject rules stay in google-calendar-oauth.ts.
 export type ConnectorCaller = CalendarCaller;
 export type ConnectorCredentialConfig = Readonly<{ key: Buffer; keyId: string; decryptionKeys: Readonly<Record<string, Buffer>> }>;
@@ -152,7 +152,7 @@ export async function getConnectorConnection(caller: ConnectorCaller, provider: 
 
 /**
  * Direct credential intake for Hevy and iCloud. `verify` performs the provider's
- * identity read (Tickets 223 and 227) and returns identity parts for the digest.
+ * identity read (Tickets 236 and 240) and returns identity parts for the digest.
  * The generation read before verification fences concurrent and replayed intake.
  */
 export async function connectDirectCredential(caller: ConnectorCaller, credential: ConnectorCredential & { provider: "hevy" | "icloud_calendar" },
@@ -169,7 +169,7 @@ export async function connectDirectCredential(caller: ConnectorCaller, credentia
   return getConnectorConnection(caller, credential.provider);
 }
 
-/** Stores the sealed PKCE verifier for one Outlook attempt (Ticket 224 owns the OAuth flow). */
+/** Stores the sealed PKCE verifier for one Outlook attempt (Ticket 237 owns the OAuth flow). */
 export async function beginConnectorOAuthAttempt(caller: ConnectorCaller, input: { provider: "outlook_calendar"; state: string; verifier: string;
   target: "web" | "desktop"; clientState: string }): Promise<number> {
   const config = requireConfig();

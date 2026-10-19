@@ -1,11 +1,11 @@
 \set ON_ERROR_STOP on
 
--- Ticket 226: separate Daily Brief disclosure for Outlook Calendar, iCloud
+-- Ticket 239: separate Daily Brief disclosure for Outlook Calendar, iCloud
 -- Calendar, and Hevy. Synthetic users only; everything rolls back.
 begin;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
-values ('22600000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'ticket-226@example.invalid', '{}', '{}');
+values ('22600000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'ticket-239@example.invalid', '{}', '{}');
 insert into auth.sessions (id, user_id)
 values ('22600000-0000-4000-8000-000000000011', '22600000-0000-4000-8000-000000000001');
 
@@ -86,7 +86,7 @@ begin
   if preference ->> 'outlook_selection_revision' <> '1' then raise exception 'Selection fence did not advance: %', preference; end if;
   decision := public.begin_daily_brief('22600000-0000-4000-8000-000000000103', false, 2);
   if decision ->> 'state' <> 'acquired' then raise exception 'Fresh disclosure was not admitted: %', decision; end if;
-  perform set_config('ticket226.lease', decision ->> 'lease_token', true);
+  perform set_config('ticket239.lease', decision ->> 'lease_token', true);
 end;
 $$;
 
@@ -99,7 +99,7 @@ do $$
 declare
   preference jsonb;
 begin
-  if public.finish_daily_brief('22600000-0000-4000-8000-000000000103', current_setting('ticket226.lease')::uuid, true, 2) then
+  if public.finish_daily_brief('22600000-0000-4000-8000-000000000103', current_setting('ticket239.lease')::uuid, true, 2) then
     raise exception 'A completed attempt was delivered after the Hevy generation changed.';
   end if;
 

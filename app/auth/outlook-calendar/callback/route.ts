@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { finishOutlookCalendarCallback } from "@/lib/services/outlook-calendar.service";
 
-// Ticket 224 Microsoft redirect. Provider error text is never echoed.
+// Ticket 237 Microsoft redirect. Provider error text is never echoed.
 const HEADERS = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 export async function GET(request: Request) {
   const url = new URL(request.url);

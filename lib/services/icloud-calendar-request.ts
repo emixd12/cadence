@@ -1,7 +1,7 @@
 import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "@/lib/services/provider-call-timeout";
 import type { ExternalEventErrorCode, ExternalEventFailure } from "@cadence/core/types/external-event";
 
-// Ticket 227 CalDAV transport for iCloud Calendar. It is the only code that sends
+// Ticket 240 CalDAV transport for iCloud Calendar. It is the only code that sends
 // Apple login values. Rules enforced here:
 // - Methods: PROPFIND and REPORT only. Every other method throws before fetch.
 // - Hosts: the fixed HTTPS initial endpoint and HTTPS hosts under icloud.com on

@@ -383,9 +383,9 @@ service, repository/migration and model-adapter tests. UI clients render validat
 text, read-only suggestions and trusted source metadata.
 
 
-## Connector expansion ownership (Tickets 220–228)
+## Connector expansion ownership (Tickets 233–241)
 
-Planned October 18, 2026. Ticket 221 implemented the shared contracts. Tickets 223
+Planned October 18, 2026. Ticket 234 implemented the shared contracts. Tickets 236
 (Hevy), 224 (Outlook), and 227 (iCloud) implement their provider adapters locally.
 Live iCloud access and installed desktop acceptance remain unverified. No new required resolver module
 is added. `packages/core` owns the extended event validator
@@ -400,7 +400,7 @@ in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
 and field discard. Services own credentials, generations, and fences. Repositories
 in `lib/db` own owner-scoped persistence. UI renders validated results only.
 
-Ticket 227 uses `icloud-calendar-request.ts` for bounded PROPFIND/REPORT,
+Ticket 240 uses `icloud-calendar-request.ts` for bounded PROPFIND/REPORT,
 redirect validation and XML parsing; `icloud-calendar-provider.ts` for discovery,
 server-expanded events and field minimization; and `icloud-calendar.service.ts`
 for credential custody, identity and generation/selection fences. It reuses
@@ -409,7 +409,7 @@ for credential custody, identity and generation/selection fences. It reuses
 cover synthetic boundaries. Web and desktop consume the same 1.1 snapshot;
 Daily Brief reads it only under the separate source disclosure.
 
-Ticket 224 implements the Outlook slice: `lib/services/outlook-calendar-provider.ts`
+Ticket 237 implements the Outlook slice: `lib/services/outlook-calendar-provider.ts`
 (Graph GET allowlist, next-link validation, deadline, and calendarView mapping),
 `outlook-calendar-oauth.ts` (Microsoft identity), `outlook-calendar.service.ts`
 (lifecycle and fences through `connector-credentials.ts`), and the pinned CLDR
@@ -418,13 +418,13 @@ table `outlook-calendar-windows-zones.ts`. It reuses `connectors.repo.ts`; no
 `tests/outlook-calendar-{provider,oauth}.test.ts` and
 `tests/outlook-calendar.service.test.ts`. No resolver changed.
 
-Ticket 223 implements Hevy: `lib/services/hevy-provider.ts` owns the fixed GET
+Ticket 236 implements Hevy: `lib/services/hevy-provider.ts` owns the fixed GET
 allowlist and calls the core `normalizeRecordedWorkout` and
 `validateRecordedActivitySnapshot`; `lib/services/hevy.service.ts` owns lifecycle,
 fences, and the `applyHevyActivityRefresh` cache rule. Paired tests:
 `tests/hevy-provider.test.ts` and `tests/hevy.service.test.ts`. No resolver changed.
 
-Ticket 225 moves the pure cache rule to
+Ticket 238 moves the pure cache rule to
 `packages/core/src/services/recorded-activity-refresh.ts`
 (`applyRecordedActivityRefresh`, the same-scope guard
 `applyScopedRecordedActivityRefresh`, and the timing-only day projection
@@ -468,7 +468,7 @@ complete relevant coverage. Resolved work stays out of remaining-work evidence.
 Day evidence never grants move permission. The existing inspector retains full
 evidence and rejection details; the model explains ranked supported findings.
 No travel evidence enters this boundary until its separate release gates pass.
-Ticket 226 adds optional `additionalCalendars` (Outlook or iCloud, each at most
+Ticket 239 adds optional `additionalCalendars` (Outlook or iCloud, each at most
 once) to the planner input. Their events are fixed blocks beside Google, and every
 requested Calendar source must be current and complete before a scheduling option
 or feasible opportunity is claimed; combined freshness is the weakest source.

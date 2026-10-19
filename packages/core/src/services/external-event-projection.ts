@@ -86,7 +86,7 @@ export function projectExternalEventSchedulingEvent(event: NormalizedExternalEve
 const FRESHNESS_WEAKNESS: Readonly<Record<ExternalEventFreshness["state"], number>> = { current: 0, stale: 1, incomplete: 2, unavailable: 3 };
 
 /**
- * Ticket 225: one freshness for Timeline overlap cues across calendar sources.
+ * Ticket 238: one freshness for Timeline overlap cues across calendar sources.
  * No-overlap can be asserted only when every active source can assert it; the
  * weakest non-current source otherwise speaks for the merged Timeline. Returns
  * null when no source is active.

@@ -8,7 +8,7 @@ import type { RecordedActivitySnapshotV1 } from "@cadence/core/types/recorded-ac
 import { ConnectorError, type ConnectorConnection, type ConnectorCredential } from "@/lib/types/connectors";
 
 // Synthetic credentials and provider responses only. The lifecycle fake keeps the
-// Ticket 222 contract: verify before install, generation fencing after a read,
+// Ticket 235 contract: verify before install, generation fencing after a read,
 // and reconnect_required marking. tests/connector-lifecycle.test.ts covers the
 // real lifecycle against its repository fake.
 const KEY = "00000000-0000-4000-8000-00000000hevy";

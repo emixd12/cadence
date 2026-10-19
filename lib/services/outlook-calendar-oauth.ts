@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "@/lib/services/provider-call-timeout";
 import { ConnectorError } from "@/lib/types/connectors";
 
-// Ticket 224 Microsoft identity platform client for Outlook Calendar.
+// Ticket 237 Microsoft identity platform client for Outlook Calendar.
 // Microsoft linking is separate from Cadence's Google sign-in: no Google identity,
 // login hint, or Supabase provider session is used. The connection binds to the
 // Cadence account that started the attempt and to the validated ID-token

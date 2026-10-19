@@ -21,7 +21,7 @@ type OutlookCalendarPanelProps = Readonly<{
   refreshVersion?: number;
 }>;
 
-// Ticket 225. Same scheduled-event semantics and selection field as Google
+// Ticket 238. Same scheduled-event semantics and selection field as Google
 // Calendar; Outlook keeps its own status, errors, and saved selection.
 export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessage, refreshVersion = 0 }: OutlookCalendarPanelProps) {
   const [connection, setConnection] = useState<ConnectorConnectionView | null>(null);

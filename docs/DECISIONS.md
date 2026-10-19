@@ -845,7 +845,7 @@ package names, desktop identity and production domains are unchanged.
 
 ## 2026-10-19: Accept hosted custody of the iCloud app-specific password
 
-Ticket 227. The owner accepted the documented risk that Cadence's hosted server
+Ticket 240. The owner accepted the documented risk that Cadence's hosted server
 holds a sealed iCloud app-specific password, although Apple does not limit that
 password to Calendar; it can reach at least iCloud Mail and Contacts. Cadence
 still uses it only for read-only CalDAV `PROPFIND`/`REPORT` calls, and disconnect

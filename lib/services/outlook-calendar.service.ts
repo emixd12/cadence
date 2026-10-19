@@ -46,8 +46,8 @@ import {
   type OutlookGraphFetch,
 } from "./outlook-calendar-provider";
 
-// Ticket 224 Outlook Calendar broker for web and linked desktop. Lifecycle,
-// sealing, generation fencing, and disconnect come from Ticket 222
+// Ticket 237 Outlook Calendar broker for web and linked desktop. Lifecycle,
+// sealing, generation fencing, and disconnect come from Ticket 235
 // (connector-credentials.ts). Microsoft linking never uses or changes Cadence's
 // Google sign-in. Disconnect deletes Cadence's sealed refresh token only;
 // Microsoft documents no app-side revocation for these delegated scopes, so the

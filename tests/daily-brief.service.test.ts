@@ -145,7 +145,7 @@ describe("first-party daily briefing service", () => {
   });
 });
 
-describe("separately disclosed connector sources (Ticket 226)", () => {
+describe("separately disclosed connector sources (Ticket 239)", () => {
   const seven = { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true };
   beforeEach(() => {
     mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["calendar-1"] } });
@@ -163,7 +163,7 @@ describe("separately disclosed connector sources (Ticket 226)", () => {
     await expect(updateDailyBriefSettings(caller, seven)).rejects.toMatchObject({ code: "source_unavailable" });
     mocks.hevy.mockResolvedValue({ status: "reconnect_required", generation: 1, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
     await expect(updateDailyBriefSettings(caller, { ...seven, includeOutlookCalendar: false })).rejects.toMatchObject({ code: "source_unavailable" });
-    // Ticket 227: iCloud needs a connected source with a selected calendar, like Outlook.
+    // Ticket 240: iCloud needs a connected source with a selected calendar, like Outlook.
     const icloudOnly = { ...seven, includeOutlookCalendar: false, includeHevy: false, includeIcloudCalendar: true };
     await expect(updateDailyBriefSettings(caller, icloudOnly)).rejects.toMatchObject({ code: "source_unavailable" });
     mocks.icloud.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 2, preferences: { selectedSourceIds: [] } });

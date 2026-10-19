@@ -45,7 +45,7 @@ export async function prepareAccountBriefingContexts(
     /** Reads analysis history only when a configuration selects lanes. Optional sources also need their disclosure. */
     analysis?: Readonly<{ includeReminders: boolean; includeNotes: boolean }>;
     /**
-     * Ticket 226: only the live Daily Brief passes this. Each source is read
+     * Ticket 239: only the live Daily Brief passes this. Each source is read
      * only with its own disclosure; `deadlineAt` (epoch ms) ends provider reads
      * before the generation reserve. Workbench and history omit it, so older
      * presets and evaluations never read a new source.

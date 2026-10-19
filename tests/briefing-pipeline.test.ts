@@ -156,7 +156,7 @@ it("honors Calendar, scope and completion exclusions for independent day evidenc
   }
 });
 
-it("plans around disclosed Outlook events but never treats recorded workouts as busy or free time (Ticket 226)", async () => {
+it("plans around disclosed Outlook events but never treats recorded workouts as busy or free time (Ticket 239)", async () => {
   const { connectorDayContext, outlookDaySnapshot } = await import("./helpers/connector-day-context");
   const context = connectorDayContext();
   const config = { ...DEFAULT_BRIEFING_CONFIG, planner: { ...DEFAULT_BRIEFING_CONFIG.planner, bufferMinutes: 0 } };

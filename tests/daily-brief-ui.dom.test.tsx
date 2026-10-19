@@ -120,7 +120,7 @@ it("offers optional sources with exact disclosures and revokes them when Daily B
   await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: false, includeCalendar: false, includeReminderHistory: false, includeNotes: false }));
 });
 
-it("offers each connected source as a separate default-off disclosure and revokes all of them on disable (Ticket 226)", async () => {
+it("offers each connected source as a separate default-off disclosure and revokes all of them on disable (Ticket 239)", async () => {
   const offered: DailyBriefSettings = { ...settings, includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false,
     connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: true } };
   const adapter = client({ preferences: vi.fn(async () => offered), updatePreferences: vi.fn(async (input) => ({ ...offered, ...input })) });
@@ -161,7 +161,7 @@ it("keeps a disclosure for a disconnected source visible so it can be turned off
   await vi.waitFor(() => expect(older.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false }));
 });
 
-describe("connector disclosure recovery (Ticket 226)", () => {
+describe("connector disclosure recovery (Ticket 239)", () => {
   const recovery: DailyBriefSettings = { ...settings, includeReminderHistory: false, includeNotes: false,
     includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true,
     connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: true },

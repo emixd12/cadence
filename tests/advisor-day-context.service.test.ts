@@ -529,7 +529,7 @@ it('summarizes completion marks from one snapshot for each selected window and g
   expect((await readAdvisorDayContext({ ...input, includeHistoricalCompletionTimes: true })).cadence.historicalCompletionTimes?.behaviors[0].reason).toBe('source_unavailable');
 });
 
-describe("separately disclosed connector sources (Ticket 226)", () => {
+describe("separately disclosed connector sources (Ticket 239)", () => {
   const sourcesAuthorization: AdvisorAuthorizationFence = {
     ...authorization,
     outlookCalendar: { calendarIds: ["calendar-1"], connectionGeneration: 2, selectionRevision: 3 },
@@ -642,7 +642,7 @@ describe("separately disclosed connector sources (Ticket 226)", () => {
     ]);
   });
 
-  it("reads a disclosed iCloud source through its service within the fence and budget, sending no titles or provider IDs (Ticket 227)", async () => {
+  it("reads a disclosed iCloud source through its service within the fence and budget, sending no titles or provider IDs (Ticket 240)", async () => {
     const { icloudDaySnapshot } = await import("./helpers/connector-day-context");
     const snapshot = icloudDaySnapshot();
     Object.assign(snapshot, {

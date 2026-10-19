@@ -195,7 +195,7 @@ it("upgrades 1.2 configurations without selecting analysis lanes and orders lane
   expect(selected.analysis.lanes).toEqual(["weekday-time-dips", "decision-debt"]);
 });
 
-describe("separately disclosed connector sources (Ticket 226)", () => {
+describe("separately disclosed connector sources (Ticket 239)", () => {
   it("keeps a 1.0 context unchanged and carries no new sources", async () => {
     const { splitBriefingContext } = await import("../packages/core/src/services/briefing-config");
     const split = splitBriefingContext(fixture, DEFAULT_BRIEFING_CONFIG);

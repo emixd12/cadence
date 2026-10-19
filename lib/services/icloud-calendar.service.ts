@@ -31,10 +31,10 @@ import {
   type IcloudRequestOptions,
 } from "./icloud-calendar-provider";
 
-// Ticket 227 iCloud Calendar broker for web and linked desktop. The user enters
+// Ticket 240 iCloud Calendar broker for web and linked desktop. The user enters
 // an Apple Account email and an app-specific password once; this service
 // verifies them against CalDAV discovery, binds the connection to the
-// `current-user-principal` href, seals both values with the Ticket 222
+// `current-user-principal` href, seals both values with the Ticket 235
 // lifecycle, and never returns them. Apple does not limit an app-specific
 // password to Calendar, so Cadence's reads are limited by its own PROPFIND and
 // REPORT allowlist. Apple documents no programmatic revocation: disconnect

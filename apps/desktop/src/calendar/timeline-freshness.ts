@@ -3,7 +3,7 @@ import type { ExternalEventFreshness } from "@cadence/core/types/day-progress";
 import type { ExternalEventSnapshotV1 } from "@cadence/core/types/external-event";
 import type { ConnectorTimelineState, OutlookTimelineState } from "@/lib/ui/connectors";
 
-// Ticket 225 review fix: desktop Timeline freshness and status lines follow the
+// Ticket 238 review fix: desktop Timeline freshness and status lines follow the
 // web semantics in DayProgressTimeline. Google contributes freshness only when
 // it has a snapshot; an unused Google connection never weakens Outlook context
 // or adds its "not connected" line while Outlook is active.

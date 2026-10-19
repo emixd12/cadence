@@ -183,7 +183,7 @@ describe("desktop Calendar transport", () => {
   });
 });
 
-// Ticket 225 desktop connector sources.
+// Ticket 238 desktop connector sources.
 const hevyBase = validateRecordedActivitySnapshot(hevyFixture, { now: Temporal.Instant.from("2026-11-01T15:00:00Z") });
 function hevyToday(overrides: Partial<RecordedActivitySnapshotV1> = {}): RecordedActivitySnapshotV1 {
   return { ...hevyBase, requestedRange: { startLocalDate: "2026-11-01", endLocalDate: "2026-11-01", timezone: "America/New_York" },
@@ -400,7 +400,7 @@ describe("desktop Outlook deep link", () => {
   });
 });
 
-describe("desktop Timeline freshness (Ticket 225 review)", () => {
+describe("desktop Timeline freshness (Ticket 238 review)", () => {
   const outlookReady = { state: "ready" as const, snapshot: outlookFixture as unknown as ExternalEventSnapshotV1_1, error: null, hiddenCalendarIds: [], showAllDay: true };
   const notLoaded = { state: "not_loaded" as const, snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: true };
 

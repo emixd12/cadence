@@ -1,6 +1,6 @@
 begin;
 
--- Ticket 226: separate, default-off Daily Brief disclosure for Outlook Calendar,
+-- Ticket 239: separate, default-off Daily Brief disclosure for Outlook Calendar,
 -- iCloud Calendar, and Hevy workout timing. `include_calendar` keeps its meaning:
 -- Google Calendar only. Connecting or displaying a source never grants one of
 -- these. Each disclosure binds the connector generation, and calendar sources

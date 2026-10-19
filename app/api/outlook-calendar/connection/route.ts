@@ -1,7 +1,7 @@
 import { completeOutlookCalendarDesktopConnection, disconnectOutlookCalendar, getOutlookCalendarConnection, startOutlookCalendarConnection } from "@/lib/services/outlook-calendar.service";
 import { connectorPreflight, readConnectorCredentialBody, runConnectorRequest } from "@/lib/services/connector-request";
 
-// Ticket 224. GET status; POST starts consent; PUT completes a desktop attempt
+// Ticket 237. GET status; POST starts consent; PUT completes a desktop attempt
 // with the desktop session and Keychain client state; DELETE disconnects.
 export const OPTIONS = connectorPreflight;
 export function GET(request: Request) { return runConnectorRequest(request, getOutlookCalendarConnection); }

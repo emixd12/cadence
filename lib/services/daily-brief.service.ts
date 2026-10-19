@@ -13,7 +13,7 @@ import { getHevyConnection } from "./hevy.service";
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
 import { measurePerformanceSpan } from "./performance-timing";
 
-/** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 226). */
+/** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
 export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
 
@@ -40,7 +40,7 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
 
 /**
  * Accepts exactly the original two controls, the four current controls, or the
- * four plus the three connector disclosures (Ticket 226). Older clients that
+ * four plus the three connector disclosures (Ticket 239). Older clients that
  * send two or four controls revoke every disclosure they omit, so an update
  * never grants a source silently. Turning Daily Brief off requires every
  * disclosure off.
@@ -75,7 +75,7 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
 
 /**
  * Connected sources Settings may offer, and why a disclosed source cannot be used
- * (Ticket 226 recovery). `changed` means the source is usable but was reconnected
+ * (Ticket 239 recovery). `changed` means the source is usable but was reconnected
  * or reselected after the user allowed it, so the stored fence no longer matches
  * and the brief refuses to start until the user allows it again. A failed status
  * read offers nothing and reports a disclosed source as unavailable.

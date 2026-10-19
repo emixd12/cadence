@@ -1,7 +1,7 @@
 import { connectorPreflight, readConnectorCredentialBody, runConnectorRequest } from "@/lib/services/connector-request";
 import { connectHevy, disconnectHevy, getHevyConnection } from "@/lib/services/hevy.service";
 
-// Ticket 223: status, one-time API key intake, and disconnect. The key is read
+// Ticket 236: status, one-time API key intake, and disconnect. The key is read
 // from a size-capped body, sealed server-side, and never returned.
 export const OPTIONS = connectorPreflight;
 export function GET(request: Request) { return runConnectorRequest(request, getHevyConnection); }

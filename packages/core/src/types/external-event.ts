@@ -12,7 +12,7 @@ import type {
 /** Google Calendar wire version. Google responses stay exactly `1.0.0`. */
 export const EXTERNAL_EVENT_SCHEMA_VERSION = "1.0.0" as const;
 export const EXTERNAL_EVENT_ADAPTER_VERSION = "google-calendar-v1" as const;
-/** Wire version for the Outlook and iCloud calendar sources only (Ticket 221). */
+/** Wire version for the Outlook and iCloud calendar sources only (Ticket 234). */
 export const EXTERNAL_EVENT_SCHEMA_VERSION_1_1 = "1.1.0" as const;
 export const OUTLOOK_CALENDAR_ADAPTER_VERSION = "outlook-calendar-v1" as const;
 export const ICLOUD_CALENDAR_ADAPTER_VERSION = "icloud-calendar-v1" as const;

@@ -13615,17 +13615,19 @@ Platform impact:
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
 
-## Connector expansion: Tickets 220–228
+## Connector expansion: Tickets 233–241
 
 Filed October 18, 2026 after the owner approved the connector expansion plan and
 confirmed iCloud Calendar on web and desktop. `origin/main` already allocates
 Tickets 187–219 (travel and other work). This branch began before those
 tickets and merged `origin/main` (`041546e`) locally on October 18, 2026, before
-Ticket 221 runtime work. These numbers avoid that collision.
+Ticket 234 runtime work. These numbers avoid that collision.
+Renumbered from 220–228 on 2026-10-19 to avoid collision with main's MCP
+Tickets 220–232; earlier commits and approvals cite the old numbers.
 
 Source of truth: the October 18 connector request, `AGENTS.md`,
-`docs/INTEGRATION_PLAYBOOK.md#worked-briefs-connector-expansion-tickets-220228`,
-and `docs/EXTERNAL_EVENT_CONTRACT.md#connector-expansion-contracts-tickets-220228`.
+`docs/INTEGRATION_PLAYBOOK.md#worked-briefs-connector-expansion-tickets-233241`,
+and `docs/EXTERNAL_EVENT_CONTRACT.md#connector-expansion-contracts-tickets-233241`.
 These tickets add read-only Outlook Calendar, iCloud Calendar, and Hevy workout
 timing to the existing Settings library, Timeline, and Daily Brief bubble.
 They add no provider writes, automatic Behavior completion, general chat,
@@ -13644,7 +13646,7 @@ connector framework, background polling, new primary route, or mobile app.
 | 227 | iCloud Calendar connector | 222 |
 | 228 | Verification and disclosure reconciliation | 221–227 |
 
-Tickets 223 and 224 may run in parallel in separate provider files. Shared schema,
+Tickets 236 and 237 may run in parallel in separate provider files. Shared schema,
 registry, Settings, Timeline, and briefing files are edited serially.
 
 Shared read deadlines: 25 seconds per interactive provider read, capped by Daily
@@ -13657,7 +13659,7 @@ account or configuration exists for a bounded test. **Public approval** means a
 provider or platform approved Cadence's client. Missing live access does not
 block source or fixture work. Neither gate follows from filing these tickets.
 
-### Shared verification for Tickets 220–228
+### Shared verification for Tickets 233–241
 
 Run all seven required commands from `AGENTS.md` for every code slice. Shared core
 changes also run `npm run core:check`. Reusable UI runs `npm run design-system:check`,
@@ -13667,7 +13669,7 @@ loopback port in 4321–4330. Schema changes need tracked migrations, updated
 database. Never reset a retained database. Use synthetic fixtures; do not print
 credentials or private provider records.
 
-## Ticket 220: Connector scope and provider contracts
+## Ticket 233: Connector scope and provider contracts
 
 Status: documentation complete and independently approved at `668a4cd`.
 
@@ -13693,15 +13695,15 @@ Platform impact:
 |---|---|
 | Web | Documentation only; runtime follows in 221–227. |
 | Desktop | Documentation only; linked-account consumption follows in 222 and 225. |
-| Marketing | No public copy changes; Ticket 228 owns disclosure updates. |
+| Marketing | No public copy changes; Ticket 241 owns disclosure updates. |
 | Future mobile | Not applicable: no mobile contract or permission is added. |
 
-## Ticket 221: Shared calendar-source and recorded-activity contracts
+## Ticket 234: Shared calendar-source and recorded-activity contracts
 
 Status: implemented and independently approved at `41c4e2c` on October 18,
 2026. Artifacts and enforced rules are listed in
 `docs/EXTERNAL_EVENT_CONTRACT.md` under "Connector expansion contracts". The
-new AdvisorDayContext `1.1` entry points are consumed by Ticket 226.
+new AdvisorDayContext `1.1` entry points are consumed by Ticket 239.
 
 Goal: let validated contracts carry Outlook and iCloud events and Hevy workout
 timing without changing Google wire behavior.
@@ -13729,16 +13731,16 @@ Platform impact:
 | Marketing | Not applicable: no public claim. |
 | Future mobile | Shared contract remains reusable; no mobile code. |
 
-## Ticket 222: Secure lifecycle for new connectors
+## Ticket 235: Secure lifecycle for new connectors
 
 Status: hosted lifecycle locally verified and independently approved.
-Migration `20261018230000_connector_lifecycle.sql`,
+Migration `20261019040000_connector_lifecycle.sql`,
 `lib/types/connectors.ts`, `lib/db/connectors.repo.ts`,
 `lib/services/connector-credentials.ts`, and `lib/services/connector-request.ts`
 own it; `docs/DATA_MODEL.md` records the schema. No provider network call,
-route, UI, or consent was added in this slice. Ticket 225 added desktop
+route, UI, or consent was added in this slice. Ticket 238 added desktop
 per-source caches outside `cadence.sqlite3` with the cleanup below.
-Provider revocation instructions are returned as stable keys for Ticket 225 to
+Provider revocation instructions are returned as stable keys for Ticket 238 to
 render.
 
 Goal: give each new source owner-bound sealed credentials, generations,
@@ -13769,7 +13771,7 @@ Platform impact:
 | Marketing | Not applicable until 228 updates privacy text. |
 | Future mobile | Deferred; would define its own cache and cleanup. |
 
-## Ticket 223: Hevy workout timing connector
+## Ticket 236: Hevy workout timing connector
 
 Status: implemented in source on October 18, 2026 (`abf9938`); fixture evidence
 and independent local verification passed. Live Hevy Pro access is a separate
@@ -13778,7 +13780,7 @@ acceptance gate. Files: `lib/services/hevy-provider.ts`,
 `tests/hevy-provider.test.ts`, `tests/hevy.service.test.ts`, and
 `tests/fixtures/hevy/`. The route is `/api/hevy/activities`, not the earlier
 planned `/api/hevy/workouts`. `applyHevyActivityRefresh` in `hevy.service.ts` is
-the cache rule for Ticket 225: a complete refresh replaces the snapshot, and an
+the cache rule for Ticket 238: a complete refresh replaces the snapshot, and an
 incomplete, older-fetch, or older-generation result never erases known records.
 
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
@@ -13799,23 +13801,23 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`, and `app/api/hevy/{connection,activities}` routes; the shared Ticket 222 `connectors.repo.ts` replaces a Hevy repository. |
+| Web | `lib/services/hevy-provider.ts`, `lib/services/hevy.service.ts`, and `app/api/hevy/{connection,activities}` routes; the shared Ticket 235 `connectors.repo.ts` replaces a Hevy repository. |
 | Desktop | Hosted broker only, through 225; key entry posts once to the server. |
 | Marketing | Disclosure in 228. |
 | Future mobile | Deferred. |
 
-## Ticket 224: Outlook Calendar connector
+## Ticket 237: Outlook Calendar connector
 
 Status: locally verified and independently approved with synthetic fixtures.
 `lib/services/outlook-calendar-{oauth,provider}.ts`,
 `lib/services/outlook-calendar.service.ts`, the pinned CLDR 48.2 table
 `lib/services/outlook-calendar-windows-zones.ts`, `app/api/outlook-calendar/*`, and
-`/auth/outlook-calendar/callback` own it. It reuses the Ticket 222 lifecycle
+`/auth/outlook-calendar/callback` own it. It reuses the Ticket 235 lifecycle
 (`connectors.repo.ts`, `connector-credentials.ts`); no migration was needed.
 Desktop completion is `PUT /api/outlook-calendar/connection` with the desktop
-session and Keychain client state; the desktop client itself belongs to Ticket 225.
+session and Keychain client state; the desktop client itself belongs to Ticket 238.
 App registration, live personal or work/school access and publisher verification
-remain unverified. Tickets 225–226 added UI and separate Daily Brief disclosure.
+remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -13833,12 +13835,12 @@ Platform impact:
 
 | Platform | Implementation or not-applicable reason |
 |---|---|
-| Web | `lib/services/outlook-calendar-*.ts`, `lib/services/outlook-calendar.service.ts`, `app/api/outlook-calendar/*`, and `/auth/outlook-calendar/callback`. The Ticket 222 `lib/db/connectors.repo.ts` replaces a provider-specific repository. |
-| Desktop | `apps/desktop/src/calendar/outlook-calendar.ts` (Ticket 225) handles `cadence://outlook-calendar/callback` and completes through the hosted `PUT` with its session and opaque Keychain state. |
+| Web | `lib/services/outlook-calendar-*.ts`, `lib/services/outlook-calendar.service.ts`, `app/api/outlook-calendar/*`, and `/auth/outlook-calendar/callback`. The Ticket 235 `lib/db/connectors.repo.ts` replaces a provider-specific repository. |
+| Desktop | `apps/desktop/src/calendar/outlook-calendar.ts` (Ticket 238) handles `cadence://outlook-calendar/callback` and completes through the hosted `PUT` with its session and opaque Keychain state. |
 | Marketing | Disclosure in 228. |
 | Future mobile | Deferred. |
 
-## Ticket 225: Connector library and Timeline on web and desktop
+## Ticket 238: Connector library and Timeline on web and desktop
 
 Status: locally verified and independently approved with synthetic fixtures.
 Settings: `components/settings/ConnectorLibrary.tsx`,
@@ -13850,9 +13852,9 @@ connector-cache,connector-coordinator,outlook-calendar,hevy,use-connectors}.ts`.
 Shared rules: `packages/core/src/services/recorded-activity-refresh.ts` and
 `combineExternalEventFreshness`. Native: per-provider tables and commands in
 `calendar_cache.rs` (calendar-cache.sqlite3) plus the
-`pending-outlook-calendar-attempt` Keychain key. Ticket 227 now integrates iCloud
+`pending-outlook-calendar-attempt` Keychain key. Ticket 240 now integrates iCloud
 intake, selection and reads. Travel and its brief guidance stay Google-only;
-Ticket 226 supplies separate Daily Brief disclosure. Not verified: live Microsoft,
+Ticket 239 supplies separate Daily Brief disclosure. Not verified: live Microsoft,
 Apple or Hevy accounts,
 installed desktop deep links and Keychain, deployment.
 
@@ -13874,7 +13876,7 @@ Acceptance:
   sign-out, and account switch delete that source's cache before new content
   shows. Desktop never stores provider credentials.
 - Disconnect and account-deletion confirmation copy render each provider's
-  revocation instruction key from Ticket 222: remove Cadence in Microsoft
+  revocation instruction key from Ticket 235: remove Cadence in Microsoft
   account or My Apps permissions (Outlook), remove the app-specific password at
   account.apple.com (iCloud), and remove or regenerate the Hevy API key. Copy
   never claims Cadence revoked provider access.
@@ -13892,7 +13894,7 @@ Platform impact:
 | Marketing | Not applicable until 228: no public claim changed. |
 | Future mobile | Responsive web only (verified at 390px on the bench); no native mobile. |
 
-## Ticket 226: Separately approved connector context in Daily Brief
+## Ticket 239: Separately approved connector context in Daily Brief
 
 Status: locally verified and independently approved.
 
@@ -13920,14 +13922,14 @@ Platform impact:
 
 Implementation (October 19, 2026):
 
-- Storage: migration `20261019010000_daily_brief_connector_disclosure.sql` adds the
+- Storage: migration `20261019041000_daily_brief_connector_disclosure.sql` adds the
   three default-off disclosures with their bound generation (and calendar
   selection) fences, `save_daily_brief_preferences_v3`, and a connector fence
   inside the existing begin/finish fence. The v2 and original saves revoke the new
   disclosures. `lib/db/daily-brief.repo.ts` reads missing keys as off.
 - Settings: `updateDailyBriefSettings` accepts exactly the two-, four-, and
   seven-key sets, requires every value to be boolean, requires each enabled source
-  to be connected (Outlook and iCloud with a selected calendar). Ticket 227
+  to be connected (Outlook and iCloud with a selected calendar). Ticket 240
   supplies iCloud connection and selection validation. `DailyBriefSettingsPanel`
   shows a control
   only for a connected source or a still-on disclosure, and sends seven keys only
@@ -13947,7 +13949,7 @@ Implementation (October 19, 2026):
   calendar source must be complete before free time or a move is claimed. Hevy
   workouts go to a separate `past_recorded_activity` branch that the planner never
   reads; the connector policy text is appended only when a source is present.
-- iCloud: Ticket 227 wires the shared disclosure, storage and fence to its
+- iCloud: Ticket 240 wires the shared disclosure, storage and fence to its
   connected-source control and hosted read; live acceptance remains unverified.
 - Recovery (verifier findings on `cc81d99`): reconnecting a source or changing
   its selection still fences the brief (`context_changed`). Settings `GET` now
@@ -13962,7 +13964,7 @@ Implementation (October 19, 2026):
   `source_unavailable` error shows source-specific text. Google keeps its existing
   behavior.
 
-## Ticket 227: iCloud Calendar connector
+## Ticket 240: iCloud Calendar connector
 
 Status: locally verified and independently approved at `40b1dc2`, including
 F1–F8 and the final DAV metadata correction. Live acceptance remains unverified.
@@ -13995,7 +13997,7 @@ Platform impact:
 | Marketing | Disclosure in 228. |
 | Future mobile | Not applicable: native mobile remains deferred; shared external-event contract is reusable. |
 
-## Ticket 228: Verification and disclosure reconciliation
+## Ticket 241: Verification and disclosure reconciliation
 
 Status: independently approved at `a10b461` for local implementation and
 synthetic verification. Live providers, installed desktop, iCloud

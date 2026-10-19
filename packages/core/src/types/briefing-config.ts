@@ -92,7 +92,7 @@ export type BriefingModelOccurrence = Readonly<{
 }>;
 
 /**
- * Ticket 226: sources outside the Google-only `1.0` view, each present only
+ * Ticket 239: sources outside the Google-only `1.0` view, each present only
  * after its own Daily Brief disclosure. Configurations select none of them
  * explicitly; `scope.includeCalendar: false` drops every calendar source.
  */
@@ -135,7 +135,7 @@ export type BriefingModelFacts = Readonly<{
     }>[];
   }>;
   connectors?: Array<AdvisorCalendarConnector | AdvisorCalendarNotRequested>;
-  /** Separately disclosed sources (Ticket 226). Absent unless at least one is included. */
+  /** Separately disclosed sources (Ticket 239). Absent unless at least one is included. */
   connectorSources?: BriefingModelConnectorSources;
 }>;
 

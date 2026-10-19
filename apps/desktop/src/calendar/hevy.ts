@@ -7,7 +7,7 @@ import { ConnectorClientError, hevyActivityScope, validateHevySnapshot, type Hev
 import type { DesktopConnectorBroker } from "./connector-broker";
 import { DesktopConnectorSnapshots, type ConnectorSourceRules } from "./connector-coordinator";
 
-// Ticket 225 desktop Hevy. The key is posted once to the hosted broker and never
+// Ticket 238 desktop Hevy. The key is posted once to the hosted broker and never
 // stored on this Mac. Recorded workouts are cached per account, generation,
 // day, and timezone; the cache compares a refresh only with its same-scope entry.
 

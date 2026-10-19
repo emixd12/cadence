@@ -1,4 +1,4 @@
-# Synthetic iCloud CalDAV fixtures (Ticket 227)
+# Synthetic iCloud CalDAV fixtures (Ticket 240)
 
 Hand-written multistatus bodies. No real Apple Account, principal, calendar, or
 event is represented. Hosts follow the third-party-documented

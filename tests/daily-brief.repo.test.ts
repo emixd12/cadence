@@ -44,7 +44,7 @@ describe("Daily Brief repository", () => {
     expect(abortSignal).toHaveBeenCalledWith(signal);
   });
 
-  it("reads connector disclosures with their bound fences and rejects a disclosure without one (Ticket 226)", async () => {
+  it("reads connector disclosures with their bound fences and rejects a disclosure without one (Ticket 239)", async () => {
     const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
     await expect(read({
       ...preferences, include_outlook_calendar: true, outlook_connection_generation: 4, outlook_selection_revision: 5,

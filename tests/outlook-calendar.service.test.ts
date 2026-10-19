@@ -3,7 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Synthetic credentials, identities, and Graph data only. The fake database
-// mirrors the Ticket 222 RPC rules (tests/connector-lifecycle.test.ts and
+// mirrors the Ticket 235 RPC rules (tests/connector-lifecycle.test.ts and
 // tests/sql/context-connectors-contract.sql prove them against the real code and Postgres).
 type Row = { user_id: string; provider: string; account_digest: string | null; attempt_hash: string | null; generation: number; status: string };
 type Pref = { user_id: string; provider: string; selection_revision: number; selected_source_ids: string[]; hidden_source_ids: string[]; visible: boolean; show_all_day: boolean };

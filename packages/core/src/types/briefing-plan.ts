@@ -35,7 +35,7 @@ export type BriefingPlanMovableOccurrence = Readonly<{
 export type BriefingPlanInput = Readonly<{
   context: AdvisorDayContextV1;
   /**
-   * Separately disclosed Outlook or iCloud sources (Ticket 226). Their events
+   * Separately disclosed Outlook or iCloud sources (Ticket 239). Their events
    * are fixed commitments, and each must be current and complete before any
    * scheduling option or feasible opportunity is claimed. Recorded workout
    * activity is never a planner input.

@@ -18,7 +18,7 @@ const SOURCE_NAMES: Readonly<Record<ExternalEventSource, string>> = {
   icloud_calendar: "iCloud Calendar",
 };
 
-/** Ticket 225 source label for scheduled calendar events. */
+/** Ticket 238 source label for scheduled calendar events. */
 export function externalEventSourceName(source: ExternalEventSource): string {
   return SOURCE_NAMES[source] ?? "Calendar";
 }

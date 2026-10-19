@@ -25,7 +25,7 @@ import { DesktopHevyCoordinator, hevyScopeFromKey, hevyScopeKey, hevySourceRules
 import { DesktopOutlookCalendarPanelCoordinator, DesktopOutlookConnection, isDesktopOutlookCallback, OUTLOOK_ATTEMPT_KEY,
   outlookScopeKey, outlookSourceRules, scopeFromKey } from "./outlook-calendar";
 
-// Ticket 225: Outlook and Hevy on linked desktop. Each source has its own cache,
+// Ticket 238: Outlook and Hevy on linked desktop. Each source has its own cache,
 // epoch, lease, and failure state. Local mode shows connectors as requiring a
 // linked account; tracking never waits on them.
 

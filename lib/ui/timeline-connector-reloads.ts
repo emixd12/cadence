@@ -1,6 +1,6 @@
 "use client";
 
-// Ticket 225: one manual Timeline reload across independent connector sources.
+// Ticket 238: one manual Timeline reload across independent connector sources.
 // Each source registers its own reload and reports whether it finished current;
 // one source failing never prevents the others from reloading.
 const TIMELINE_RELOADS = new Set<() => Promise<boolean>>();

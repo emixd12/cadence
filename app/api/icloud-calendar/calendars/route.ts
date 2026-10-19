@@ -2,7 +2,7 @@ import { listIcloudCalendarsForCaller, updateIcloudCalendarPreferences } from "@
 import { connectorPreflight, runConnectorRequest } from "@/lib/services/connector-request";
 import { readCalendarRequestBody } from "@/lib/services/google-calendar-request";
 
-// Ticket 227. GET lists VEVENT calendars with opaque IDs; PUT saves the selection.
+// Ticket 240. GET lists VEVENT calendars with opaque IDs; PUT saves the selection.
 export const OPTIONS = connectorPreflight;
 export function GET(request: Request) { return runConnectorRequest(request, (caller) => listIcloudCalendarsForCaller(caller, { signal: request.signal })); }
 export function PUT(request: Request) {

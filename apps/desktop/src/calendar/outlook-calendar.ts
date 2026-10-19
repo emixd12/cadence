@@ -15,7 +15,7 @@ import type { DesktopConnectorBroker } from "./connector-broker";
 import { DesktopConnectorSnapshots, type ConnectorSourceRules } from "./connector-coordinator";
 import { randomState } from "./google-calendar";
 
-// Ticket 225 desktop Outlook Calendar. Completion goes through the hosted PUT
+// Ticket 238 desktop Outlook Calendar. Completion goes through the hosted PUT
 // with this app's Cadence session and a Keychain-held client state. A callback
 // is honored only when its state matches the attempt this app started; the
 // attempt is one-use and cleared on success, failure, cancellation, expiry, and

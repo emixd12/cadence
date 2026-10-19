@@ -1521,13 +1521,13 @@ Server environment names: `GOOGLE_CALENDAR_CLIENT_ID`,
 configured HTTPS `/auth/google-calendar/callback` path. Desktop uses only public
 `VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets.
 
-Hevy, Outlook, and iCloud credentials (Ticket 222) use a separate server-only
+Hevy, Outlook, and iCloud credentials (Ticket 235) use a separate server-only
 keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
 `CONNECTOR_CREDENTIAL_KEY_ID`, and optional `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS`.
 Never reuse the Google key. Missing configuration reports `not_configured`. The
 same rotation rules below apply.
 
-Outlook Calendar (Ticket 224) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
+Outlook Calendar (Ticket 237) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
 Entra application GUID), `OUTLOOK_CALENDAR_CLIENT_SECRET`, and
 `OUTLOOK_CALENDAR_CALLBACK_URL` (exact HTTPS `/auth/outlook-calendar/callback`,
 on the same host as the web session).
@@ -1571,10 +1571,10 @@ policy. Cadence exports, account synchronization, and user-created desktop backu
 exclude credentials and cached events. Test the local SQL contract before any hosted
 rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
 
-## Connector expansion acceptance and operation (Tickets 220–228)
+## Connector expansion acceptance and operation (Tickets 233–241)
 
-Tickets 220–227 have independent local source/synthetic approval through
-`40b1dc2`. Ticket 228 reconciles disclosures and collects final local checks.
+Tickets 233–240 have independent local source/synthetic approval through
+`40b1dc2`. Ticket 241 reconciles disclosures and collects final local checks.
 This is not live-provider, installed-desktop, hosted-deployment or public-release
 acceptance. Do not use real provider credentials, publish, deploy, or change hosted
 configuration as part of this verification pass.
@@ -1620,7 +1620,7 @@ results from the shared PR Context. The inherited
 Full-suite desktop-release-acceptance tests have intermittently exceeded their
 unchanged five-second timeout, then passed unchanged. No base-SHA CI link proves
 the cause of that timing observation. Never reset retained `habit-tracking-app`.
-Ticket 228 evidence lives in the workspace task and shared PR Context notes.
+Ticket 241 evidence lives in the workspace task and shared PR Context notes.
 Local disclosure edits do not supersede release approval for published notices.
 
 ## Public Calendar verification execution (Tickets 138–141)

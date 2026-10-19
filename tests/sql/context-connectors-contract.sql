@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Ticket 222 connector lifecycle contract. Synthetic owners and ciphertext only.
+-- Ticket 235 connector lifecycle contract. Synthetic owners and ciphertext only.
 begin;
 insert into auth.users(id,aud,role,email,raw_app_meta_data,raw_user_meta_data)
 values('22200000-0000-4000-8000-000000000001','authenticated','authenticated','connector-one@example.invalid','{}','{}'),

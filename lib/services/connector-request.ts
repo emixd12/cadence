@@ -3,7 +3,7 @@ import { CalendarConnectionError } from "./google-calendar-oauth";
 import { authenticateCalendarRequest, calendarPreflight, calendarResponse, readCalendarRequestBody } from "./google-calendar-request";
 import type { ConnectorCaller } from "./connector-credentials";
 
-// Ticket 222 request boundary for the new connector routes. It reuses the Google
+// Ticket 235 request boundary for the new connector routes. It reuses the Google
 // Calendar caller authentication: a user JWT from web cookies or a desktop bearer
 // token, same-origin writes, the fixed Tauri origins, and no-store responses.
 // Error bodies carry only a stable code; messages, causes, and provider bodies

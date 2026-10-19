@@ -456,7 +456,7 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - Optional desktop Google account linking and synchronization under Tickets 116–122
 - Incremental shared domain code and design tokens, with preserved web APIs
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
-  Tickets 220–228
+  Tickets 233–241
 
 ## Day-progress timeline and gated Calendar context (Tickets 132–137)
 
@@ -542,12 +542,12 @@ Workspace-restriction coverage plus dense/overnight installed fixtures and
 multi-day resume evidence. Apple-trusted desktop distribution remains separate
 under Ticket 115. Native mobile and dynamic rearrangement remain deferred.
 Outlook, iCloud, and Hevy connectors have local source/fixture verification
-under Tickets 220–228; live, installed and release acceptance remain open.
+under Tickets 233–241; live, installed and release acceptance remain open.
 
-## Connector expansion (Tickets 220–228)
+## Connector expansion (Tickets 233–241)
 
-Approved October 18, 2026; Tickets 220–227 are implemented and independently
-verified locally. Ticket 228 reconciles disclosures and final evidence. This
+Approved October 18, 2026; Tickets 233–240 are implemented and independently
+verified locally. Ticket 241 reconciles disclosures and final evidence. This
 state does not establish deployed availability or live provider interoperability. Cadence adds read-only Outlook Calendar and iCloud Calendar context
 and Hevy workout timing on web and linked desktop. The Settings connector library
 lists every source with its own connect, refresh, and disconnect controls.
@@ -567,7 +567,7 @@ Google-only.
 
 iCloud uses a user-generated app-specific password over CalDAV. Apple does not
 limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
-Calendar. The owner accepted hosted custody on 2026-10-19 (Ticket 227), so
+Calendar. The owner accepted hosted custody on 2026-10-19 (Ticket 240), so
 owner-run live tests may use real Apple credentials. User release remains a
 separate gate. Hevy requires Pro. Even a today-only request scans global
 workout history, bounded at 500 workouts; larger accounts return incomplete
@@ -775,7 +775,7 @@ added. Existing live-data and release gates remain separate.
   daily briefing planned under Tickets 146–148
 - Two-way Calendar sync and source-event editing; Tickets 132–137 cover only
   gated read-only Google Calendar context, and locally verified read-only
-  Outlook and iCloud Calendar context under Tickets 220–228 (release unverified)
+  Outlook and iCloud Calendar context under Tickets 233–241 (release unverified)
 - Workout writes, workout coaching, exercise analysis, and automatic Behavior
   completion from recorded activity
 - Apple Health, EventKit, and local-only Mac calendar access

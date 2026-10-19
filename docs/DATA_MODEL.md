@@ -1828,9 +1828,9 @@ never enter exports, sync snapshots, or desktop backups. Hosting infrastructure
 backups may retain sealed ciphertext under the existing provider retention policy.
 Local ownership/race verification: `tests/sql/google-calendar-contract.sql`.
 
-## Hevy, Outlook, and iCloud connector lifecycle (Ticket 222)
+## Hevy, Outlook, and iCloud connector lifecycle (Ticket 235)
 
-Migration `20261018230000_connector_lifecycle.sql` adds owner metadata for the
+Migration `20261019040000_connector_lifecycle.sql` adds owner metadata for the
 new hosted connectors. Google Calendar tables, functions, ciphertext, and
 same-subject rules are unchanged.
 
@@ -1934,7 +1934,7 @@ returns `retry_exhausted`. The one-active-generation rule and six starts/minute
 still apply first; no quota or admission record is cleared. A new local day or
 disclosure revision starts at one. The column stores no prompt or generated text.
 
-Migration `20261019010000_daily_brief_connector_disclosure.sql` (Ticket 226):
+Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
 
 - `daily_brief_preferences` adds `include_outlook_calendar`,
   `include_icloud_calendar`, and `include_hevy` (default false; each requires

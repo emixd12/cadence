@@ -3,7 +3,7 @@ import { connectorErrorCode } from "@/lib/ui/connectors";
 import type { ConnectorCacheOperations } from "./connector-cache";
 import type { CalendarRefreshTrigger } from "./coordinator";
 
-// Ticket 225: one coordinator per connector source on desktop. Each instance
+// Ticket 238: one coordinator per connector source on desktop. Each instance
 // owns its own epoch, so disconnect, sign-out, account switch, or a scope change
 // for one source fences that source's late responses without touching others.
 

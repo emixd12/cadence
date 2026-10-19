@@ -760,7 +760,7 @@
             "module.daily-brief-bubble",
             "module.daily-brief-settings-panel"
           ],
-          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. Ticket 226 adds separate default-off Outlook Calendar, iCloud Calendar, and Hevy workout-timing disclosures in the shared Settings panel; each control appears only while its source is connected or still disclosed, and iCloud offers none until Ticket 227. No native editor or marketing capability follows."
+          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. Ticket 239 adds separate default-off Outlook Calendar, iCloud Calendar, and Hevy workout-timing disclosures in the shared Settings panel; each control appears only while its source is connected or still disclosed, and iCloud offers none until Ticket 240. No native editor or marketing capability follows."
         },
         {
           "surfaceId": "marketing",
@@ -849,7 +849,7 @@
             "module.hevy-panel",
             "module.icloud-calendar-panel"
           ],
-          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 nests Google, Outlook, iCloud availability, and Hevy in ConnectorLibrary; each source fails separately."
+          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 238 nests Google, Outlook, iCloud availability, and Hevy in ConnectorLibrary; each source fails separately."
         },
         {
           "surfaceId": "marketing",
@@ -895,7 +895,7 @@
             "module.hevy-panel",
             "module.icloud-calendar-panel"
           ],
-          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 225 mounts ConnectorLibrary in linked-account mode; local mode shows each source as requiring a linked account. Per-source caches stay in calendar-cache.sqlite3; installed-native acceptance is unverified."
+          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 238 mounts ConnectorLibrary in linked-account mode; local mode shows each source as requiring a linked account. Per-source caches stay in calendar-cache.sqlite3; installed-native acceptance is unverified."
         },
         {
           "surfaceId": "mobile",

@@ -52,7 +52,7 @@ export async function deleteCurrentAccountFromFormData(
 
   // Auth deletion cascades local credentials before any external revocation.
   // Hevy, Outlook, and iCloud connections, sealed credentials, and attempts also
-  // cascade with the Auth user (Ticket 222). None documents app-side revocation,
+  // cascade with the Auth user (Ticket 235). None documents app-side revocation,
   // so no provider call follows; a failed deletion above leaves them intact.
   try { await revokeCalendar?.(); }
   catch { /* A provider outage must not turn completed deletion into a retry. */ }

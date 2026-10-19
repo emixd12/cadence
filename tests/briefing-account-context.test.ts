@@ -253,7 +253,7 @@ describe("analysis source reads (Ticket 169)", () => {
   });
 });
 
-describe("separately disclosed connector fences (Ticket 226)", () => {
+describe("separately disclosed connector fences (Ticket 239)", () => {
   const disclosed = { ...preferences, includeOutlookCalendar: true, outlookConnectionGeneration: 2, outlookSelectionRevision: 3, includeHevy: true, hevyConnectionGeneration: 5 };
   const sources = { calendars: true, recordedActivity: true, deadlineAt: Date.now() + 50_000 };
   beforeEach(() => {

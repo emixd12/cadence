@@ -8,7 +8,7 @@ import styles from "./day-progress-timeline.module.css";
 import type { HevyTimelineState } from "@/lib/ui/connectors";
 
 /**
- * Ticket 225. Recorded workouts from Hevy for the current day: when and how
+ * Ticket 238. Recorded workouts from Hevy for the current day: when and how
  * long only. They are actual past activity, so they never appear as Calendar
  * markers, never create overlap cues, and never change an Occurrence.
  */

@@ -26,7 +26,7 @@ import type {
 } from "@/lib/types/connectors";
 import { registerTimelineConnectorReload } from "./timeline-connector-reloads";
 
-// Ticket 225 client coordinators for Outlook Calendar and Hevy, plus the Ticket
+// Ticket 238 client coordinators for Outlook Calendar and Hevy, plus the Ticket
 // 227 iCloud Calendar coordinator. They call only
 // the hosted routes and carry no credential. Each source keeps its own cache,
 // pending requests, and account epoch, so one source failing or clearing never
@@ -201,7 +201,7 @@ function fetchedRecently(fetchedAt: string): boolean {
 }
 
 /**
- * Ticket 225 web Outlook cache rule, matching desktop and Hevy: a complete read
+ * Ticket 238 web Outlook cache rule, matching desktop and Hevy: a complete read
  * replaces the same-scope entry; an incomplete read never replaces a complete
  * one and is never stored. When a complete entry is kept, it is returned with
  * its original fetch time and a stale freshness, so a failed refresh never
@@ -289,7 +289,7 @@ export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
   disconnect() { return disconnectWebSource("/api/outlook-calendar/connection", OUTLOOK); },
 };
 
-/** Ticket 227. Apple login values cross this boundary once, in the POST body, and are never stored on the client. */
+/** Ticket 240. Apple login values cross this boundary once, in the POST body, and are never stored on the client. */
 export const webIcloudCalendarCoordinator: IcloudCalendarCoordinator = {
   getConnection() { return webCalendarConnection(ICLOUD, "/api/icloud-calendar/connection"); },
   async connect(appleId, appPassword) {
@@ -435,7 +435,7 @@ export function useWebOutlookCalendarTimeline(input: CalendarTimelineInput & Rea
   return useWebCalendarConnectorTimeline({ ...input, coordinator: input.coordinator ?? webOutlookCalendarCoordinator });
 }
 
-/** Ticket 227: live iCloud context for the web Timeline, with its own cache and failures. */
+/** Ticket 240: live iCloud context for the web Timeline, with its own cache and failures. */
 export function useWebIcloudCalendarTimeline(input: CalendarTimelineInput & Readonly<{ coordinator?: IcloudCalendarCoordinator }>): IcloudTimelineState {
   return useWebCalendarConnectorTimeline({ ...input, coordinator: input.coordinator ?? webIcloudCalendarCoordinator });
 }

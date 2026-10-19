@@ -25,7 +25,7 @@ export function connectorUnavailableReason(name: string, reason: "local" | "buil
   return reason === "build" ? `${name} is unavailable in this build.` : `Link a Cadence account on this Mac to connect ${name}.`;
 }
 
-// Ticket 225. One sparse list of read-only sources. Every source connects,
+// Ticket 238. One sparse list of read-only sources. Every source connects,
 // refreshes, fails, and disconnects on its own; tracking never depends on them.
 export function ConnectorLibrary({ sources }: Readonly<{ sources: readonly ConnectorLibrarySource[] }>) {
   const ordered = SOURCE_ORDER.flatMap((id) => sources.filter((source) => source.id === id));

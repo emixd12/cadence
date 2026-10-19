@@ -373,7 +373,7 @@ it("signals whole-day travel only after a brief is ready", async () => {
     expect(listener).toHaveBeenCalledOnce();
   } finally { window.removeEventListener("cadence:brief-travel", listener); }
 });
-it("drops pending output when a connector disclosure is withdrawn in Settings (Ticket 226)", async () => {
+it("drops pending output when a connector disclosure is withdrawn in Settings (Ticket 239)", async () => {
   const { DailyBriefSettingsPanel } = await import("@/components/briefing/DailyBriefSettingsPanel");
   let complete!: (value: DailyBriefResponse) => void;
   const settings = { accountRef: "owner", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York",

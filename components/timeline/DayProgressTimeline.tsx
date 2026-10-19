@@ -53,9 +53,9 @@ export type DayProgressContext = Readonly<{
   travelMode?: TravelMode | null;
   navigationPreference?: TravelNavigationPreference | null;
   onTravelCorrection?: (correction: TravelCorrection) => void;
-  /** Ticket 225: today's recorded Hevy workouts, shown apart from Calendar markers. */
+  /** Ticket 238: today's recorded Hevy workouts, shown apart from Calendar markers. */
   recordedActivity?: HevyTimelineState | null;
-  /** Ticket 225: status lines for calendar sources other than Google. */
+  /** Ticket 238: status lines for calendar sources other than Google. */
   sourceMessages?: readonly string[];
 }>;
 
@@ -146,7 +146,7 @@ export function DayProgressTimeline({
   const contextEvents = context?.events;
   const events = useMemo(() => contextEvents ?? (outlookEvents.length || icloudEvents.length ? [...googleEvents, ...outlookEvents, ...icloudEvents] : googleEvents),
     [contextEvents, googleEvents, outlookEvents, icloudEvents]);
-  // Travel estimates and their brief guidance stay Google-only (Ticket 225 adds no new routing disclosure).
+  // Travel estimates and their brief guidance stay Google-only (Ticket 238 adds no new routing disclosure).
   const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);

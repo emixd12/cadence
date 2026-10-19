@@ -6,7 +6,7 @@ import type { DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import { DailyBriefRequestError, createWebDailyBriefClient, type DailyBriefClient, type DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
 import { SettingsPanel } from "@/components/settings/SettingsPanels";
 
-/** Ticket 226: each new source has its own default-off disclosure, separate from connecting or showing it on Timeline. */
+/** Ticket 239: each new source has its own default-off disclosure, separate from connecting or showing it on Timeline. */
 const CONNECTOR_DISCLOSURES = [
   {
     key: "includeOutlookCalendar", offer: "outlookCalendar", id: "daily-brief-outlook-disclosure", source: "Outlook Calendar", calendar: true,

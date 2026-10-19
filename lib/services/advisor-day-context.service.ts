@@ -54,7 +54,7 @@ import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from 
 import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
 
-/** Ticket 226: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
+/** Ticket 239: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
 export const ADVISOR_CONNECTOR_READ_DEADLINE_MS = 25_000;
 
 type AdvisorCalendarFence = Readonly<{
@@ -72,7 +72,7 @@ export type AdvisorAuthorizationFence = Readonly<{
   grantExpiresAt: string;
   behaviorIds: string[];
   calendar: AdvisorCalendarFence | null;
-  /** Separately disclosed sources (Ticket 226); absent unless the caller requested connector sources. */
+  /** Separately disclosed sources (Ticket 239); absent unless the caller requested connector sources. */
   outlookCalendar?: AdvisorCalendarFence | null;
   icloudCalendar?: AdvisorCalendarFence | null;
   hevy?: Readonly<{ connectionGeneration: number }> | null;

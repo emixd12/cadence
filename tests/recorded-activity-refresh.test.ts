@@ -27,7 +27,7 @@ const scope: RecordedActivitySnapshotScope = { source: "hevy", accountId: "accou
 const incomplete = (snapshot: RecordedActivitySnapshotV1): RecordedActivitySnapshotV1 => ({ ...snapshot, completeness: "incomplete", activities: [],
   fetchedAt: "2026-11-01T15:01:00Z", failures: [{ code: "timeout", retryable: true, retryAfterSeconds: null, message: "Timed out" }] });
 
-describe("recorded activity refresh rule (Ticket 225 extraction)", () => {
+describe("recorded activity refresh rule (Ticket 238 extraction)", () => {
   it("keeps the Hevy service export bound to the shared pure rule", () => {
     expect(applyHevyActivityRefresh).toBe(applyRecordedActivityRefresh);
   });

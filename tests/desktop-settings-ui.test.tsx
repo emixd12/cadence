@@ -174,7 +174,7 @@ describe("local database controls", () => {
   });
 });
 
-describe("desktop connector library (Ticket 225)", () => {
+describe("desktop connector library (Ticket 238)", () => {
   it("shows every source as requiring a linked account in local mode without connect controls", () => {
     const { html } = settings({ calendarControls: <ConnectorLibrary sources={[
       { id: "google_calendar", content: <ConnectorUnavailable id="google_calendar" reason="Calendar requires a linked account." /> },

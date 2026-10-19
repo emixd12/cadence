@@ -51,7 +51,7 @@ Still deferred:
   consumer, MCP server or generic connector framework.
 - Two-way Calendar sync and source-event editing.
 - Connectors beyond Google Calendar and the Outlook, iCloud, and Hevy sources
-  locally implemented in Tickets 220–227, with live/release acceptance open under 228. Focus Keeper capabilities remain unverified.
+  locally implemented in Tickets 233–240, with live/release acceptance open under 228. Focus Keeper capabilities remain unverified.
 - Generic CalDAV coverage for providers such as Fastmail, Zoho, and Yahoo. Each
   needs its own authentication research and ticket. Not implemented.
 - Read-only subscription-feed calendars, such as Proton shared links. Link

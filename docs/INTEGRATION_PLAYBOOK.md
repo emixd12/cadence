@@ -353,10 +353,10 @@ connection, clears desktop cache and pending state, restores the primary account
 and verifies SQLite integrity and owner rows. Private backups, recordings,
 tokens, account identifiers, and provider payloads stay outside git.
 
-## Worked briefs: connector expansion (Tickets 220–228)
+## Worked briefs: connector expansion (Tickets 233–241)
 
-Status, October 18, 2026: Tickets 220–227 are locally implemented and
-independently verified through `40b1dc2`. Ticket 228 reconciles disclosures and
+Status, October 18, 2026: Tickets 233–240 are locally implemented and
+independently verified through `40b1dc2`. Ticket 241 reconciles disclosures and
 final evidence. No live provider access, installed desktop acceptance or
 deployment is established. `docs/EXTERNAL_EVENT_CONTRACT.md` owns the wire
 contracts; `STATUS.md` owns current state. The owner accepted iCloud custody on 2026-10-19.
@@ -387,12 +387,12 @@ contracts; `STATUS.md` owns current state. The owner accepted iCloud custody on 
 
 | Platform | Impact |
 |---|---|
-| Web | Provider routes and services under Tickets 222–224 and 227; Settings library and Timeline under Ticket 225; Daily Brief under Ticket 226. |
+| Web | Provider routes and services under Tickets 235–237 and 240; Settings library and Timeline under Ticket 238; Daily Brief under Ticket 239. |
 | Desktop | Linked-account mode only. Desktop calls hosted brokers with its Supabase session and never stores provider credentials. Per-source disposable caches stay outside `cadence.sqlite3` and user-created backups. No EventKit bridge. Local mode shows the library as requiring an account. |
-| Marketing | Ticket 228 updates provider availability, credential custody, retention, model disclosure, and pending-approval language. No connector runtime. |
+| Marketing | Ticket 241 updates provider availability, credential custody, retention, model disclosure, and pending-approval language. No connector runtime. |
 | Future mobile | Deferred. The validated hosted contracts remain reusable. No mobile permission, cache, or offline behavior is implied. |
 
-Shared lifecycle (Ticket 222): connect installs owner-bound AES-256-GCM sealed
+Shared lifecycle (Ticket 235): connect installs owner-bound AES-256-GCM sealed
 credentials in the existing private schema and increments the generation.
 Disconnect fences new reads, deletes credentials and caches, then performs any
 documented provider revocation. Account deletion captures cleanup, deletes the
@@ -445,7 +445,7 @@ Research gaps, all **not verified**:
 - Hevy documents no key revocation operation, ordering for workout lists, or
   rate limits.
 
-### Hevy workout timing (Ticket 223)
+### Hevy workout timing (Ticket 236)
 
 | Item | Decision |
 |---|---|
@@ -454,7 +454,7 @@ Research gaps, all **not verified**:
 | Allowed calls | Exactly `GET /v1/user/info`, `GET /v1/workouts/count`, and `GET /v1/workouts`. A fixed method/path allowlist and tests reject every other call. Cadence enforces read-only behavior because Hevy has no read-only key. |
 | Range | Today and up to 30 prior local dates in the profile timezone. |
 | Pagination | Call `GET /v1/workouts/count` first. Above 500 workouts, return `incomplete_pagination` without reading pages. Otherwise read `pageSize=10`, pages 1 through `page_count`, at most 50 pages, sequentially. Remove duplicate IDs, keeping the latest `updated_at`. Call `count` again after the last page. The read is `complete` only if every page was read, the count and `page_count` match before and after, and the 25-second deadline held. This 50-page ceiling applies only to the activity contract; the 20-page calendar bound is unchanged. An early-stop rule requires documented ordering or recorded live evidence and a contract revision. |
-| Residual limits | Offset pages with undocumented ordering mean a workout created or deleted during the read can shift pages and be skipped. Equal before/after counts do not exclude a creation plus a deletion. `complete` therefore means no change was detected, not an atomic snapshot. Fifty-two sequential calls may not fit the deadline on slow responses; that returns `timeout`. Accounts with more than 500 workouts always read as incomplete. Ticket 228 discloses the 500-workout limit. |
+| Residual limits | Offset pages with undocumented ordering mean a workout created or deleted during the read can shift pages and be skipped. Equal before/after counts do not exclude a creation plus a deletion. `complete` therefore means no change was detected, not an atomic snapshot. Fifty-two sequential calls may not fit the deadline on slow responses; that returns `timeout`. Accounts with more than 500 workouts always read as incomplete. Ticket 241 discloses the 500-workout limit. |
 | Fields | Workout ID, start, end, derived duration, and update revision. Everything else is discarded in the adapter. |
 | Missing values | Location and source timezone are `unsupported`. An invalid or reversed interval quarantines the item and makes coverage incomplete. |
 | Failures | 401/403 → `reconnect_required`; 404 user → `reconnect_required`; 429 if returned → `rate_limited`; 503 and other 5xx → `provider_unavailable`; deadline exhaustion → `timeout`. Retries follow the shared deadline rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Schema drift → `malformed_provider_response`. |
@@ -465,14 +465,14 @@ Research gaps, all **not verified**:
 | Live-access gate | An owner-authorized Hevy Pro test account and key. Not available in this wave. |
 | Public-approval gate | None documented. Hevy terms review is not verified. |
 
-### Outlook Calendar (Ticket 224)
+### Outlook Calendar (Ticket 237)
 
 | Item | Decision |
 |---|---|
 | Registration | One Microsoft Entra multitenant app that also accepts personal accounts (authority `common`), a server-held client secret or certificate, and exact web callback `/auth/outlook-calendar/callback`. Desktop uses the hosted broker with an opaque Keychain-correlated state, like Google. |
 | Scopes | `openid offline_access Calendars.ReadBasic`. `profile`, `email`, `User.Read`, `Calendars.Read`, and write scopes are not requested. `Calendars.Read` would expose body and attachments that Cadence does not need. |
 | Identity | Validated ID token `tid` plus `sub` (pairwise for Cadence's client ID). Reconnect must return the same pair or the callback fails as `wrong_account`. Email never identifies. |
-| Connect | Five-minute one-use state, PKCE `S256`, nonce, issuer validation per tenant, and exact granted-scope validation. Refresh-token rotation replaces the sealed credential atomically. Ticket 224 implementation: state is a target marker (`w` or `d`) plus 32 random bytes; the stored hash covers the marker. The nonce is derived from the sealed PKCE verifier. The ID token comes directly from the token endpoint over TLS, so Cadence checks its claims (audience, `https://login.microsoftonline.com/{tid}/v2.0` issuer, `ver` 2.0, nonce, expiry) and not its signature. A present token `scope` must carry exactly one Graph permission, `Calendars.ReadBasic`; OpenID scopes may be echoed. An omitted `scope` is accepted, because Microsoft's v2 auth-code flow documents that it then covers the scopes requested on the initial leg. Token requests and token refreshes share the read's absolute deadline, and a refresh completing after it is discarded before use or rotation. Web callbacks require the initiating cookie user. Desktop callbacks forward the code and state to `cadence://outlook-calendar/callback` without consuming the attempt; the app then calls `PUT /api/outlook-calendar/connection` with its Cadence session and Keychain client state, and the service requires the same owner and client state before redeeming the code. OAuth state alone never binds an account. `consent_required` and AADSTS 65001/90094/90095 map to `admin_approval_required`; other denials map to `cancelled`. Provider error text is never stored or shown. |
+| Connect | Five-minute one-use state, PKCE `S256`, nonce, issuer validation per tenant, and exact granted-scope validation. Refresh-token rotation replaces the sealed credential atomically. Ticket 237 implementation: state is a target marker (`w` or `d`) plus 32 random bytes; the stored hash covers the marker. The nonce is derived from the sealed PKCE verifier. The ID token comes directly from the token endpoint over TLS, so Cadence checks its claims (audience, `https://login.microsoftonline.com/{tid}/v2.0` issuer, `ver` 2.0, nonce, expiry) and not its signature. A present token `scope` must carry exactly one Graph permission, `Calendars.ReadBasic`; OpenID scopes may be echoed. An omitted `scope` is accepted, because Microsoft's v2 auth-code flow documents that it then covers the scopes requested on the initial leg. Token requests and token refreshes share the read's absolute deadline, and a refresh completing after it is discarded before use or rotation. Web callbacks require the initiating cookie user. Desktop callbacks forward the code and state to `cadence://outlook-calendar/callback` without consuming the attempt; the app then calls `PUT /api/outlook-calendar/connection` with its Cadence session and Keychain client state, and the service requires the same owner and client state before redeeming the code. OAuth state alone never binds an account. `consent_required` and AADSTS 65001/90094/90095 map to `admin_approval_required`; other denials map to `cancelled`. Provider error text is never stored or shown. |
 | Calendars | `GET /me/calendars`, paged by `@odata.nextLink`, at most 20 pages. |
 | Events | `GET /me/calendars/{id}/calendarView` with offset-bearing bounds widened by one day on each side, `$top=1000`, `Prefer: IdType="ImmutableId"`, no `Prefer: outlook.timezone`, and the event-zone all-day rule in `docs/EXTERNAL_EVENT_CONTRACT.md`. Windows zone names map only through a pinned CLDR `windowsZones.xml` release. Calendars are read sequentially to stay under four concurrent requests. |
 | Missing values | Location, attendees, organizer, online meeting, and body are `unsupported` by scope or policy. Event state is `unknown` unless cancelled. |
@@ -483,7 +483,7 @@ Research gaps, all **not verified**:
 | Live-access gate | App registration, server secret, callback configuration, one personal Microsoft account, and one work/school tenant that permits user consent. Not available in this wave. |
 | Public-approval gate | Publisher verification before public release, separate from technical acceptance. Tenant consent policies remain per customer and may require an administrator. |
 
-### iCloud Calendar (Ticket 227)
+### iCloud Calendar (Ticket 240)
 
 The user confirmed iCloud on web and desktop on October 18, 2026. A hosted
 server-side connector is the only path that reaches both surfaces. Apple's
@@ -510,7 +510,7 @@ Apple-documented user steps is an app-specific password used for CalDAV.
 | Live-access gate | An owner-authorized Apple Account with two-factor authentication and an app-specific password. Not available in this wave. |
 | Public-approval gate | None for the app-specific-password path. Apple "supported app" eligibility is unknown and not pursued. |
 
-Local source work for Ticket 227 is approved and proceeds now: the intake route,
+Local source work for Ticket 240 is approved and proceeds now: the intake route,
 sealing, schema, provider adapter, and tests with synthetic credentials. The
 owner accepted hosted app-specific-password custody on 2026-10-19, so owner-run
 live tests may use a real Apple credential. Deployment and user release remain

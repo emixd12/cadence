@@ -609,7 +609,7 @@ visibility. Escape restores summary focus. CalendarSettingsBench includes long
 names and enough synthetic choices to exercise scrolling.
 
 
-## Connected sources (Ticket 225)
+## Connected sources (Ticket 238)
 
 Settings groups read-only sources in one `ConnectorLibrary` SettingsPanel: a
 divider-separated list in fixed order (Google Calendar, Outlook Calendar,

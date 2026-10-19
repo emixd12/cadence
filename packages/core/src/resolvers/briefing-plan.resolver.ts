@@ -491,7 +491,7 @@ function calendarFreshness(
 
 type PlannerCalendar = NonNullable<BriefingPlanInput["additionalCalendars"]>[number];
 
-/** Google from the `1.0` view first, then separately disclosed Outlook or iCloud sources (Ticket 226). */
+/** Google from the `1.0` view first, then separately disclosed Outlook or iCloud sources (Ticket 239). */
 function requestedCalendars(input: BriefingPlanInput): readonly PlannerCalendar[] {
   const google = input.context.connectors[0];
   return [...(google && google.state !== "not_requested" ? [google] : []), ...(input.additionalCalendars ?? [])];

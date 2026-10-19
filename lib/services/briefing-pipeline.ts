@@ -42,7 +42,7 @@ export function briefingConfigurationRevision(value: unknown = activeBriefingCon
 
 export function prepareBriefing(sourceContext: AdvisorDayContext, value: unknown, now: string, analysisInput?: BriefingAnalysisInput) {
   const config = parseBriefingConfig(value);
-  // Ticket 226: existing projections see the Google-only `1.0` view; disclosed sources travel separately.
+  // Ticket 239: existing projections see the Google-only `1.0` view; disclosed sources travel separately.
   const { context, sources } = splitBriefingContext(sourceContext, config);
   const plannerContext = scopeBriefingContext(context, config);
   const projected = projectBriefingContext(context, config);

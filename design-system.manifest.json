@@ -520,7 +520,7 @@
       "benchAnchor": "design-system#ds-module-connector-library",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 225 sparse Settings list of read-only sources (Google, Outlook, iCloud availability, Hevy); each source fails separately. Synthetic bench states: connected, not connected, not configured, needs reconnection, status unavailable, desktop local mode."
+      "notes": "Ticket 238 sparse Settings list of read-only sources (Google, Outlook, iCloud availability, Hevy); each source fails separately. Synthetic bench states: connected, not connected, not configured, needs reconnection, status unavailable, desktop local mode."
     },
     {
       "id": "module.outlook-calendar-panel",
@@ -534,7 +534,7 @@
       "benchAnchor": "design-system#ds-module-outlook-calendar-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 225 Outlook source controls; reuses the shared CalendarSelector and revocation copy. Synthetic bench never contacts Microsoft."
+      "notes": "Ticket 238 Outlook source controls; reuses the shared CalendarSelector and revocation copy. Synthetic bench never contacts Microsoft."
     },
     {
       "id": "module.icloud-calendar-panel",
@@ -548,7 +548,7 @@
       "benchAnchor": "design-system#ds-module-icloud-calendar-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 227 iCloud intake, broader-than-Calendar custody disclosure, selector, refresh and disconnect. Synthetic bench only; live Apple and installed acceptance remain unverified."
+      "notes": "Ticket 240 iCloud intake, broader-than-Calendar custody disclosure, selector, refresh and disconnect. Synthetic bench only; live Apple and installed acceptance remain unverified."
     },
     {
       "id": "module.hevy-panel",
@@ -562,7 +562,7 @@
       "benchAnchor": "design-system#ds-module-hevy-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 225 recorded-activity source; one-time API key field cleared on submit, Hevy Pro and 500-workout disclosure. Synthetic bench never contacts Hevy."
+      "notes": "Ticket 238 recorded-activity source; one-time API key field cleared on submit, Hevy Pro and 500-workout disclosure. Synthetic bench never contacts Hevy."
     },
     {
       "id": "composite.recorded-activity-list",
@@ -576,7 +576,7 @@
       "benchAnchor": "design-system#ds-composite-recorded-activity-list",
       "trackUsages": "optional",
       "status": "active",
-      "notes": "Ticket 225 current-day Hevy workouts: when and how long only, outside Calendar markers and overlap cues; ready, stale, incomplete, and error states."
+      "notes": "Ticket 238 current-day Hevy workouts: when and how long only, outside Calendar markers and overlap cues; ready, stale, incomplete, and error states."
     },
     {
       "id": "composite.external-event-details",

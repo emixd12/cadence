@@ -10,7 +10,7 @@ import { reloadWebTimelineConnectors } from "@/lib/ui/timeline-connector-reloads
 import type { TimelineView } from "@/lib/types/timeline";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
 
-// Ticket 225: live web Timeline with Google disconnected, Outlook connected, and
+// Ticket 238: live web Timeline with Google disconnected, Outlook connected, and
 // Hevy failing. Each source fails or succeeds on its own and tracking is untouched.
 
 const action = vi.fn(async () => ({ status: "idle" as const, message: "" }));
@@ -104,7 +104,7 @@ describe("live connector Timeline", () => {
 const googleConnection = (status: string) => () => json({ accountId: "account-live", status, generation: 1, selectionRevision: 0,
   preferences: { selectedCalendarIds: ["primary"], hiddenCalendarIds: [], visible: true, showAllDay: true } });
 
-describe("Google source state with Outlook ready (Ticket 225 re-review)", () => {
+describe("Google source state with Outlook ready (Ticket 238 re-review)", () => {
   const withEstimate = (): TimelineView => ({ ...timeline(), durationEstimates: { "behavior-1": { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" } } });
   it.each([
     ["disconnected", true, googleConnection("disconnected")],

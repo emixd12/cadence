@@ -239,7 +239,7 @@ describe("advisor day-context 1.1 compatibility", () => {
   });
 });
 
-describe("Ticket 226 unavailable connector projections", () => {
+describe("Ticket 239 unavailable connector projections", () => {
   it("validates unavailable Outlook, iCloud, and Hevy states only in 1.1 and exposes no records", async () => {
     const { projectUnavailableAdvisorActivity, projectUnavailableVersionedAdvisorCalendar } = await import("../packages/core/src/services/advisor-day-context");
     const fixture = JSON.parse(await readFile(contextFixture, "utf8"));

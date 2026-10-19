@@ -129,7 +129,7 @@ describe("web Hevy coordinator", () => {
   });
 });
 
-describe("web Outlook partial reads (Ticket 225 review)", () => {
+describe("web Outlook partial reads (Ticket 238 review)", () => {
   const eventsCalls = () => calls.filter((call) => call.path.startsWith("/api/outlook-calendar/events")).length;
   const incomplete = (accountId: string, overrides: Record<string, unknown> = {}) => outlookSnapshot(accountId, {
     completeness: "incomplete", events: [], fetchedAt: "2026-11-01T15:04:00Z",

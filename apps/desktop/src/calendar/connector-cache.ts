@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ConnectorProvider } from "@/lib/types/connectors";
 
-// Ticket 225: thin transport for the per-source native cache in
+// Ticket 238: thin transport for the per-source native cache in
 // calendar-cache.sqlite3 (outside cadence.sqlite3 and user backups). It stores
 // only validated, complete snapshots keyed by the scope key and never a credential.
 

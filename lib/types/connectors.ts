@@ -1,6 +1,6 @@
 import type { ExternalEventErrorCode } from "@cadence/core/types/external-event";
 
-// Ticket 222 lifecycle types for the new hosted connectors. Google Calendar keeps
+// Ticket 235 lifecycle types for the new hosted connectors. Google Calendar keeps
 // its own types in `lib/types/google-calendar.ts`.
 export const CONNECTOR_PROVIDERS = ["hevy", "outlook_calendar", "icloud_calendar"] as const;
 export type ConnectorProvider = (typeof CONNECTOR_PROVIDERS)[number];

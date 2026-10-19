@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Synthetic Apple login values and CalDAV bodies only. The fake database mirrors
-// the Ticket 222 RPC rules for direct intake (tests/connector-lifecycle.test.ts and
+// the Ticket 235 RPC rules for direct intake (tests/connector-lifecycle.test.ts and
 // tests/sql/context-connectors-contract.sql prove them against the real code and Postgres).
 type Row = { user_id: string; provider: string; account_digest: string | null; generation: number; status: string };
 type Pref = { user_id: string; provider: string; selection_revision: number; selected_source_ids: string[]; hidden_source_ids: string[]; visible: boolean; show_all_day: boolean };

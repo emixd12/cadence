@@ -3,7 +3,7 @@
 // Source: https://github.com/unicode-org/cldr/blob/release-48-2/common/supplemental/windowsZones.xml
 // File SHA-256: 9cf3db6a31fb382fee21b70be6feba1e82766b0fcd06e6261fb7936a73e537ff
 // mapTimezones otherVersion="7e11800" typeVersion="2021a". Only territory="001"
-// (the default zone for each Windows name) is used. Ticket 224 forbids ad hoc mappings.
+// (the default zone for each Windows name) is used. Ticket 237 forbids ad hoc mappings.
 export const OUTLOOK_WINDOWS_ZONES_CLDR_RELEASE = "48.2" as const;
 export const OUTLOOK_WINDOWS_ZONES_SHA256 = "9cf3db6a31fb382fee21b70be6feba1e82766b0fcd06e6261fb7936a73e537ff" as const;
 
