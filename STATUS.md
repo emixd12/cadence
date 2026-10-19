@@ -176,6 +176,32 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   and an Apple Account app-specific password. Public-approval gate: Microsoft
   publisher verification. None blocks source or fixture work.
 
+### Owner-run live acceptance — October 19, 2026
+
+Environment: a disposable local Supabase stack (`cadence-live-connectors`,
+loopback-only ports, all 88 branch migrations replayed, version list identical
+to `supabase/migrations`) and `next dev` on Node 24.22.0 at
+`http://127.0.0.1:4321`. Cadence sessions used development test-login, not
+Google sign-in. The retained local stack was not changed. No hosted migration,
+deployment or hosted data was used. Evidence is counts, statuses and owner
+observations only; no credential or provider record was recorded.
+
+- Hevy (Ticket 236, with 238 and 239): **live pass** with Emi's Hevy Pro key.
+  Intake sealed the key (one `keyId.iv.tag.ciphertext` row, generation 1) and the
+  key field cleared. A 31-day read was `complete`: count 44 before and after,
+  5/5 pages, 44 items, 0 duplicates, 20 in range. Activities carried only ID,
+  kind, start, end, known duration, local date, revision and field availability.
+  A single-day read returned the expected workout; today returned none; a 41-day
+  request returned `invalid_request`. No workout record was stored server-side.
+  Daily Brief `includeHevy` was off by default. On the Timeline, today showed no
+  Hevy line before a workout. After Emi logged one, it showed
+  "Recorded activity · Hevy" with time and duration only, no title. Disconnect
+  showed the Hevy key-removal instruction. It deleted the credential and moved
+  the connection to `disconnected`, generation 2, with the account digest
+  cleared. A later read returned `not_connected`. Emi deleted the key in Hevy.
+  Not live-testable with this account: the over-500-workout path (44 workouts)
+  and non-Pro rejection; fixture evidence only.
+
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
 Owner direction (2026-10-18): Cadence ships one remote MCP server plus Claude and
