@@ -171,6 +171,23 @@ function fetchedRecently(fetchedAt: string): boolean {
   catch { return false; }
 }
 
+/**
+ * Ticket 225 web Outlook cache rule, matching desktop and Hevy: a complete read
+ * replaces the same-scope entry; an incomplete read never replaces a complete
+ * one and is never stored. When a complete entry is kept, it is returned with
+ * its original fetch time and a stale freshness, so a failed refresh never
+ * claims fresh complete context. `cached` must be the entry for the same scope.
+ */
+export function applyOutlookCalendarRefresh(cached: ExternalEventSnapshotV1_1 | null, next: ExternalEventSnapshotV1_1): Readonly<{
+  snapshot: ExternalEventSnapshotV1_1;
+  store: boolean;
+}> {
+  if (next.completeness === "complete") return { snapshot: next, store: true };
+  if (!cached || cached.completeness !== "complete") return { snapshot: next, store: false };
+  return { snapshot: { ...cached, freshness: { ...cached.freshness, state: "stale", label: "Outlook Calendar refresh was incomplete; showing the last complete read",
+    canAssertNoOverlap: false } }, store: false };
+}
+
 export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
   getConnection() { return request<ConnectorConnectionView>("/api/outlook-calendar/connection"); },
   async beginConnect() {
@@ -193,14 +210,16 @@ export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
     OUTLOOK.retainOnly(connection.accountId, key);
     const epoch = OUTLOOK.epoch(connection.accountId);
     const cached = OUTLOOK.get(key);
+    // Only complete reads are cached, so an incomplete read never satisfies the refresh window.
     if (!options?.force && cached && fetchedRecently(cached.fetchedAt)) return cached;
     const running = OUTLOOK.pendingFor(key);
     if (running) return running;
     return OUTLOOK.track(key, epoch, request<unknown>(`/api/outlook-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`)
       .then((value) => {
-        const snapshot = validateOutlookSnapshotForScope(value, scope);
-        if (!OUTLOOK.set(key, connection.accountId, epoch, snapshot)) throw new ConnectorClientError("connection_changed");
-        return snapshot;
+        const applied = applyOutlookCalendarRefresh(OUTLOOK.get(key) ?? null, validateOutlookSnapshotForScope(value, scope));
+        if (OUTLOOK.epoch(connection.accountId) !== epoch) throw new ConnectorClientError("connection_changed");
+        if (applied.store && !OUTLOOK.set(key, connection.accountId, epoch, applied.snapshot)) throw new ConnectorClientError("connection_changed");
+        return applied.snapshot;
       }));
   },
   async disconnect() {

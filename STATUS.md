@@ -75,6 +75,12 @@ The integrated baseline `d7af234` was independently approved.
   switch, and disconnect clear it. Desktop Outlook completes only a deep link
   whose state matches its Keychain attempt, through the authenticated `PUT`.
   Travel stays Google-only; Daily Brief disclosure is unchanged (Ticket 226).
+  Review fixes (verifier findings on `e3eb5cb`): desktop Timeline freshness now
+  includes Google only with a snapshot and hides the unused Google line while
+  Outlook is active (`apps/desktop/src/calendar/timeline-freshness.ts`), matching
+  web; the web Outlook cache stores only complete reads, so a partial read never
+  replaces a complete one or skips a refetch, and a kept read retains its fetch
+  time with a stale label.
   Evidence: source, synthetic fixtures, deterministic benches at 1280px and
   390px, and native cache unit tests. Not verified: live Microsoft or Hevy
   accounts, installed desktop deep links or Keychain, deployment.

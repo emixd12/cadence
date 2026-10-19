@@ -73,6 +73,7 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
       const snapshot = await coordinator.refreshEvents(refreshRange, { force: true });
       setMessage(snapshot.completeness !== "complete"
         ? "Outlook Calendar refresh was incomplete. Some events may be missing from the Timeline."
+        : snapshot.freshness.state === "stale" ? "Outlook Calendar refresh was incomplete. The Timeline keeps the last complete read."
         : snapshot.events.length ? "Outlook Calendar refreshed." : "No Outlook Calendar events in this range.");
     } catch (error) {
       setMessage(outlookErrorMessage(connectorErrorCode(error), "Outlook Calendar refresh did not finish. Try again; saved settings, other sources, and tracking are unchanged."));

@@ -171,6 +171,18 @@ describe("OutlookCalendarPanel", () => {
   });
 });
 
+describe("OutlookCalendarPanel partial refresh", () => {
+  it("says the Timeline keeps the last complete read when a refresh was incomplete", async () => {
+    const kept = { ...outlookFixture, freshness: { ...outlookFixture.freshness, state: "stale", canAssertNoOverlap: false } } as unknown as ExternalEventSnapshotV1_1;
+    await act(() => root.render(<OutlookCalendarPanel coordinator={outlookCoordinator({ refreshEvents: vi.fn(async () => kept) })}
+      refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Work calendar"));
+    await act(async () => { button("Refresh Outlook Calendar").click(); });
+    await vi.waitFor(() => expect(container.textContent).toContain("The Timeline keeps the last complete read."));
+    expect(container.textContent).not.toContain("Outlook Calendar refreshed.");
+  });
+});
+
 describe("RecordedActivityList", () => {
   const day = { localDate: "2026-11-01", state: "current" as const, fetchedAt: "2026-11-01T15:00:00Z",
     items: [{ id: "hevy/abc", startAt: "2026-11-01T12:05:00Z", endAt: "2026-11-01T13:10:00Z", durationSeconds: 3900 }] };

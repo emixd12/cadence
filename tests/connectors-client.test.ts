@@ -5,6 +5,7 @@ import { validateRecordedActivitySnapshot } from "@cadence/core/services/recorde
 import type { RecordedActivitySnapshotV1 } from "@cadence/core/types/recorded-activity";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
 import {
+  applyOutlookCalendarRefresh,
   clearWebConnectorSource,
   outlookTimelineRange,
   webHevyCoordinator,
@@ -123,5 +124,67 @@ describe("web Hevy coordinator", () => {
     routes["GET /api/hevy/connection"] = () => json(view("hevy-off", "hevy", { status: "not_configured" }));
     await expect(webHevyCoordinator.refreshActivities("2026-11-01", "America/New_York")).rejects.toMatchObject({ code: "not_configured" });
     expect(calls.some((call) => call.path.startsWith("/api/hevy/activities"))).toBe(false);
+  });
+});
+
+describe("web Outlook partial reads (Ticket 225 review)", () => {
+  const eventsCalls = () => calls.filter((call) => call.path.startsWith("/api/outlook-calendar/events")).length;
+  const incomplete = (accountId: string, overrides: Record<string, unknown> = {}) => outlookSnapshot(accountId, {
+    completeness: "incomplete", events: [], fetchedAt: "2026-11-01T15:04:00Z",
+    freshness: { state: "incomplete", refreshedAt: "2026-11-01T15:04:00Z", label: "Incomplete", canAssertNoOverlap: false },
+    coverage: [{ ...outlookFixture.coverage[0]!, paginationComplete: false, itemCount: 0 }],
+    failures: [{ code: "incomplete_pagination", calendarId: "calendar-1", retryable: true, retryAfterSeconds: null, message: "Incomplete" }], ...overrides });
+
+  it("keeps a complete read through a forced incomplete read and an unforced read", async () => {
+    routes["GET /api/outlook-calendar/connection"] = () => json(view("partial-a", "outlook_calendar"));
+    routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("partial-a", { fetchedAt: "2026-11-01T15:00:00Z",
+      freshness: { ...outlookFixture.freshness, refreshedAt: "2026-11-01T15:00:00Z" } }));
+    const complete = await webOutlookCalendarCoordinator.refreshEvents(range);
+    expect(complete.events).toHaveLength(2);
+    routes["GET /api/outlook-calendar/events"] = () => json(incomplete("partial-a"));
+    const forced = await webOutlookCalendarCoordinator.refreshEvents(range, { force: true });
+    // The last complete read stays, with its original fetch time and an honest stale label.
+    expect(forced.completeness).toBe("complete");
+    expect(forced.events).toHaveLength(2);
+    expect(forced.fetchedAt).toBe(complete.fetchedAt);
+    expect(forced.freshness).toMatchObject({ state: "stale", canAssertNoOverlap: false });
+    const before = eventsCalls();
+    const unforced = await webOutlookCalendarCoordinator.refreshEvents(range);
+    expect(eventsCalls()).toBe(before);
+    expect(unforced).toEqual(complete);
+  });
+
+  it("never treats an initially incomplete read as fresh and retries it", async () => {
+    routes["GET /api/outlook-calendar/connection"] = () => json(view("partial-b", "outlook_calendar"));
+    routes["GET /api/outlook-calendar/events"] = () => json(incomplete("partial-b"));
+    await expect(webOutlookCalendarCoordinator.refreshEvents(range)).resolves.toMatchObject({ completeness: "incomplete", events: [] });
+    const before = eventsCalls();
+    routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("partial-b"));
+    await expect(webOutlookCalendarCoordinator.refreshEvents(range)).resolves.toMatchObject({ completeness: "complete" });
+    expect(eventsCalls()).toBe(before + 1);
+  });
+
+  it("does not let a complete read for one scope stand in for an incomplete read of another", async () => {
+    routes["GET /api/outlook-calendar/connection"] = () => json(view("partial-c", "outlook_calendar"));
+    routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("partial-c"));
+    await webOutlookCalendarCoordinator.refreshEvents(range);
+    const shorter = { ...range, endLocalDate: "2026-11-02" };
+    routes["GET /api/outlook-calendar/events"] = () => json(incomplete("partial-c", {
+      requestedRange: { ...outlookFixture.requestedRange, endLocalDate: "2026-11-02" },
+      coverage: [{ ...outlookFixture.coverage[0]!, endLocalDate: "2026-11-02", paginationComplete: false, itemCount: 0 }] }));
+    const other = await webOutlookCalendarCoordinator.refreshEvents(shorter);
+    expect(other).toMatchObject({ completeness: "incomplete", events: [] });
+    expect(other.requestedRange.endLocalDate).toBe("2026-11-02");
+  });
+
+  it("applies the pure rule without storing partial reads", () => {
+    const complete = outlookSnapshot("pure") as never;
+    const partial = incomplete("pure") as never;
+    expect(applyOutlookCalendarRefresh(null, partial)).toEqual({ snapshot: partial, store: false });
+    expect(applyOutlookCalendarRefresh(complete, complete)).toEqual({ snapshot: complete, store: true });
+    expect(applyOutlookCalendarRefresh(partial, complete)).toEqual({ snapshot: complete, store: true });
+    const kept = applyOutlookCalendarRefresh(complete, partial);
+    expect(kept.store).toBe(false);
+    expect(kept.snapshot).toMatchObject({ completeness: "complete", fetchedAt: outlookFixture.fetchedAt, freshness: { state: "stale", canAssertNoOverlap: false } });
   });
 });

@@ -15,6 +15,7 @@ import { DesktopConnectorBroker } from "../apps/desktop/src/calendar/connector-b
 import { hevyScopeKey, hevySourceRules } from "../apps/desktop/src/calendar/hevy";
 import { DesktopOutlookConnection, isDesktopOutlookCallback, OUTLOOK_ATTEMPT_KEY, outlookAuthorizationState, outlookScopeKey,
   outlookSourceRules } from "../apps/desktop/src/calendar/outlook-calendar";
+import { desktopTimelineFreshness } from "../apps/desktop/src/calendar/timeline-freshness";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
@@ -396,5 +397,35 @@ describe("desktop Outlook deep link", () => {
     await expect(broker.hevyDisconnect()).resolves.toEqual({ view: hevyView, revocation: "hevy_api_key" });
     await broker.outlookComplete({ state: desktopState, clientState: "c".repeat(43), code: "x" });
     expect(request).toHaveBeenLastCalledWith("/api/outlook-calendar/connection", expect.objectContaining({ method: "PUT" }));
+  });
+});
+
+describe("desktop Timeline freshness (Ticket 225 review)", () => {
+  const outlookReady = { state: "ready" as const, snapshot: outlookFixture as unknown as ExternalEventSnapshotV1_1, error: null, hiddenCalendarIds: [], showAllDay: true };
+  const notLoaded = { state: "not_loaded" as const, snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: true };
+
+  it("keeps Outlook-only context able to assert no timed overlap and hides the unused Google line", () => {
+    const result = desktopTimelineFreshness({ snapshot: null, stale: true, label: "Google Calendar is not connected." }, outlookReady);
+    expect(result.freshness).toMatchObject({ state: "current", canAssertNoOverlap: true });
+    expect(result.freshness.label).not.toContain("Google");
+    expect(result.sourceMessages).toEqual([]);
+  });
+
+  it("still reports Google problems and keeps the Google-only behavior when Outlook is inactive", () => {
+    const reconnect = desktopTimelineFreshness({ snapshot: null, stale: true, label: "Reconnect Google Calendar." }, outlookReady);
+    expect(reconnect.freshness.canAssertNoOverlap).toBe(true);
+    expect(reconnect.sourceMessages).toEqual(["Reconnect Google Calendar."]);
+    expect(desktopTimelineFreshness({ snapshot: null, stale: true, label: "Google Calendar is not connected." }, notLoaded))
+      .toEqual({ freshness: { state: "unavailable", refreshedAt: null, label: "Google Calendar is not connected.", canAssertNoOverlap: false }, sourceMessages: [] });
+    const google = snapshot();
+    expect(desktopTimelineFreshness({ snapshot: google, stale: false, label: "Calendar refreshed." }, notLoaded).freshness)
+      .toEqual({ ...google.freshness, label: "Calendar refreshed." });
+  });
+
+  it("weakens overlap claims for stale Google or failing Outlook context", () => {
+    expect(desktopTimelineFreshness({ snapshot: snapshot(), stale: true, label: "Saved" }, outlookReady).freshness).toMatchObject({ state: "stale", canAssertNoOverlap: false });
+    const failing = desktopTimelineFreshness({ snapshot: snapshot(), stale: false, label: "Fresh" }, { ...notLoaded, state: "error", error: "timeout" });
+    expect(failing.freshness).toMatchObject({ state: "unavailable", canAssertNoOverlap: false });
+    expect(failing.sourceMessages).toEqual(["Outlook Calendar context could not refresh: timeout."]);
   });
 });

@@ -16,7 +16,7 @@ import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { HevyPanel } from "@/components/settings/HevyPanel";
-import { combineExternalEventFreshness } from "@cadence/core/services/external-event-projection";
+import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { createDesktopDailyBriefClient } from "./daily-brief";
 import { TimelineScreen } from "./timeline-screen";
@@ -344,14 +344,7 @@ export function Product() {
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
     // Travel and its brief guidance stay on Google events; Outlook adds schedule context only.
     events: outlookEvents.length ? [...visibleCalendarEvents, ...outlookEvents] : visibleCalendarEvents,
-    freshness: combineExternalEventFreshness([calendar.snapshot ? { ...calendar.snapshot.freshness, label: calendar.label,
-      ...(calendar.stale ? { state: "stale" as const, canAssertNoOverlap: false } : {}) }
-      : { state: "unavailable" as const, refreshedAt: null, label: calendar.label, canAssertNoOverlap: false },
-    ...(OUTLOOK_TIMELINE_ACTIVE.has(outlookTimeline.state) ? [outlookTimeline.snapshot && (outlookTimeline.state === "ready" || outlookTimeline.state === "empty")
-      ? outlookTimeline.snapshot.freshness
-      : { state: outlookTimeline.state === "incomplete" ? "incomplete" as const : outlookTimeline.snapshot ? "stale" as const : "unavailable" as const,
-        refreshedAt: outlookTimeline.snapshot?.fetchedAt ?? null, label: "Outlook Calendar context may be out of date", canAssertNoOverlap: false }] : [])])!,
-    sourceMessages: desktopOutlookMessages(outlookTimeline.state, outlookTimeline.error),
+    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label }, outlookTimeline),
     recordedActivity: connectors.hevy,
   };
   const syncAccount = useCallback((): Promise<SyncCompletion> => {
@@ -548,16 +541,6 @@ export function Product() {
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
     </> : null}
   </DesktopApp>;
-}
-
-const OUTLOOK_TIMELINE_ACTIVE = new Set(["reconnect_required", "empty", "ready", "stale", "incomplete", "error"]);
-
-function desktopOutlookMessages(state: string, error: string | null): string[] {
-  if (state === "stale") return ["Saved Outlook Calendar context may be out of date."];
-  if (state === "incomplete") return ["Outlook Calendar context is incomplete; some events may be missing."];
-  if (state === "error") return [`Outlook Calendar context could not refresh: ${error ?? "unavailable"}.`];
-  if (state === "reconnect_required") return ["Outlook Calendar needs reconnection in Settings."];
-  return [];
 }
 
 function noteShortcutMessage(operation: string, view: NoteShortcutView): string {
