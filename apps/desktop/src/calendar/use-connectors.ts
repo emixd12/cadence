@@ -144,6 +144,7 @@ export function useDesktopConnectors(options: DesktopConnectorsOptions): Desktop
       if (!current()) return false;
       const code = connectorErrorCode(error);
       if (connectorCriticalError(code)) await outlookSnapshots.clear();
+      else outlookSnapshots.recordFailure(accountId, code);
       if (current()) setOutlook({ ...OUTLOOK_EMPTY, ...display, state: "error", error: code, snapshot: connectorCriticalError(code) ? null : offline });
       return false;
     }
@@ -196,6 +197,7 @@ export function useDesktopConnectors(options: DesktopConnectorsOptions): Desktop
       if (!current()) return false;
       const code = connectorErrorCode(error);
       if (connectorCriticalError(code)) await icloudSnapshots.clear();
+      else icloudSnapshots.recordFailure(accountId, code);
       if (current()) setIcloud({ ...OUTLOOK_EMPTY, ...display, state: "error", error: code, snapshot: connectorCriticalError(code) ? null : offline });
       return false;
     }
@@ -239,6 +241,7 @@ export function useDesktopConnectors(options: DesktopConnectorsOptions): Desktop
       if (!current()) return false;
       const code = connectorErrorCode(error);
       if (connectorCriticalError(code)) await hevySnapshots.clear();
+      else hevySnapshots.recordFailure(accountId, code);
       if (current()) setHevy({ state: "error", day: offline && !connectorCriticalError(code) ? day(offline, true) : null, error: code });
       return false;
     }

@@ -28,6 +28,7 @@ const REFRESH_INTERVAL_MS = 15 * 60_000;
 
 export class DesktopConnectorSnapshots<T extends ConnectorSnapshotLike> {
   private epoch = 0;
+  private readonly failures = new Map<string, string | null>();
   private readonly running = new Map<string, Promise<ConnectorSourceResult<T>>>();
 
   constructor(private readonly rules: ConnectorSourceRules<T>, private readonly cache: ConnectorCacheOperations) {}
@@ -39,7 +40,12 @@ export class DesktopConnectorSnapshots<T extends ConnectorSnapshotLike> {
     const epoch = this.epoch;
     const stored = await this.cache.readCurrent(this.rules.provider, accountId);
     if (!stored || epoch !== this.epoch || !accept(stored.scopeKey)) return null;
-    try { return this.rules.validate(JSON.parse(stored.snapshotJson), stored.scopeKey); }
+    try {
+      const snapshot = this.rules.validate(JSON.parse(stored.snapshotJson), stored.scopeKey);
+      const key = JSON.stringify([accountId, stored.scopeKey]);
+      if (!this.failures.has(key)) this.failures.set(key, null);
+      return snapshot;
+    }
     catch { await this.cache.clear(this.rules.provider); return null; }
   }
 
@@ -53,10 +59,17 @@ export class DesktopConnectorSnapshots<T extends ConnectorSnapshotLike> {
     return refresh;
   }
 
+  recordFailure(accountId: string, code: string): void {
+    for (const key of this.failures.keys()) {
+      if (JSON.parse(key)[0] === accountId) this.failures.set(key, code);
+    }
+  }
+
   /** Deletes this source's cache and fences every in-flight response for it. */
   clear(): Promise<void> {
     this.epoch += 1;
     this.running.clear();
+    this.failures.clear();
     return this.cache.clear(this.rules.provider);
   }
 
@@ -68,11 +81,13 @@ export class DesktopConnectorSnapshots<T extends ConnectorSnapshotLike> {
   }
 
   private async run(accountId: string, scopeKey: string, load: () => Promise<unknown>, trigger: CalendarRefreshTrigger, now: number, epoch: number): Promise<ConnectorSourceResult<T>> {
+    const key = JSON.stringify([accountId, scopeKey]);
     let cached: T | null = null;
     try {
       cached = await this.read(accountId, scopeKey);
       if (epoch !== this.epoch) return cleared();
-      if (cached && !shouldRefreshConnector(cached, trigger, now)) return { snapshot: cached, source: "cache", stale: false, refreshError: null };
+      if (cached && !this.failures.has(key)) this.failures.set(key, null);
+      if (cached && !shouldRefreshConnector(cached, trigger, now)) return { snapshot: cached, source: "cache", stale: Boolean(this.failures.get(key)), refreshError: this.failures.get(key) ?? null };
       const requestId = crypto.randomUUID();
       await this.cache.begin(this.rules.provider, accountId, scopeKey, requestId);
       const value = await load();
@@ -85,10 +100,13 @@ export class DesktopConnectorSnapshots<T extends ConnectorSnapshotLike> {
         if (epoch !== this.epoch) return cleared();
       }
       const incomplete = next.completeness !== "complete";
+      if (incomplete) this.failures.set(key, next.failures[0]?.code ?? "incomplete_pagination");
+      else this.failures.set(key, null);
       return { snapshot: shown, source: shown === next ? "network" : "cache", stale: incomplete && shown !== next,
         refreshError: incomplete ? next.failures[0]?.code ?? "incomplete_pagination" : null };
     } catch (error) {
       if (epoch !== this.epoch) return cleared();
+      this.failures.set(key, connectorErrorCode(error));
       return { snapshot: cached, source: cached ? "cache" : "none", stale: true, refreshError: connectorErrorCode(error) };
     }
   }
@@ -99,7 +117,7 @@ function cleared<T>(): ConnectorSourceResult<T> {
 }
 
 export function shouldRefreshConnector(snapshot: ConnectorSnapshotLike | null, trigger: CalendarRefreshTrigger, now: number): boolean {
-  if (trigger === "manual" || !snapshot || snapshot.completeness !== "complete") return true;
+  if (trigger === "manual" || trigger === "open" || !snapshot || snapshot.completeness !== "complete") return true;
   const fetched = Date.parse(snapshot.fetchedAt);
   return !Number.isFinite(fetched) || now - fetched >= REFRESH_INTERVAL_MS || now < fetched;
 }

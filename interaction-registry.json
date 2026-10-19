@@ -9057,7 +9057,7 @@
           "control": "Delete account"
         }
       ],
-      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending.",
+      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion.",
       "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation and global sign-out to clear the current browser session and redirects to the public login confirmation.",
       "failure_result": "A validation, service-role verification, or user-deletion failure shows a specific recoverable error and preserves both account and session. A post-deletion sign-out error cannot restore the deleted account and does not block the success redirect.",
       "effects": [

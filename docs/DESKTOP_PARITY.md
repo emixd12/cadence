@@ -330,3 +330,8 @@ account switch, disconnect and permission withdrawal clear source context.
 Daily Brief reuses the hosted, separately consented projection. Installed
 Keychain/cache behavior and live Apple access remain unverified; no native
 EventKit or local-calendar permission exists.
+
+Ticket 227 review correction: web and desktop retain a known failed or incomplete
+refresh warning across cache hits until a complete read succeeds. Desktop cold
+opens verify the provider before treating a saved snapshot as current. The shared
+rule also applies to Outlook and Hevy desktop snapshots. No native schema changed.

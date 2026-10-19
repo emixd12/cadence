@@ -75,6 +75,7 @@ import {
   connectIcloudCalendar, disconnectIcloudCalendar, getIcloudCalendarConnection, getIcloudCalendarEvents, getIcloudCalendarEventsForCaller,
   listIcloudCalendarsForCaller, normalizeIcloudLogin, updateIcloudCalendarPreferences, type IcloudServiceOptions,
 } from "@/lib/services/icloud-calendar.service";
+import * as connectorRepo from "@/lib/db/connectors.repo";
 import { ConnectorError } from "@/lib/types/connectors";
 import * as connectionRoute from "@/app/api/icloud-calendar/connection/route";
 import * as calendarsRoute from "@/app/api/icloud-calendar/calendars/route";
@@ -314,5 +315,37 @@ describe("disconnect and routes", () => {
     expect(text).not.toMatch(/synthetic@|abcd|principal/);
     const unauthenticated = await eventsRoute.GET(new Request(`${ORIGIN}/api/icloud-calendar/events?start=2026-11-01&end=2026-11-01`));
     expect(unauthenticated.status).toBe(401);
+  });
+});
+
+
+describe("whole service deadline", () => {
+  it.each(["credential", "final fence"])("settles a stalled %s read and discards late completion", async stage => {
+    await connectAndSelect();
+    apple.calls = [];
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    if (stage === "credential") {
+      const original = connectorRepo.readConnectorCredential;
+      vi.spyOn(connectorRepo, "readConnectorCredential").mockImplementation(async connection => {
+        await pending;
+        return original(connection);
+      });
+    } else {
+      const original = connectorRepo.readConnectorConnection;
+      let reads = 0;
+      vi.spyOn(connectorRepo, "readConnectorConnection").mockImplementation(async (...args) => {
+        if (++reads === 2) await pending;
+        return original(...args);
+      });
+    }
+    const result = getIcloudCalendarEventsForCaller(caller(OWNER), "2026-11-01", "2026-11-01", { ...options, deadlineMs: 20 });
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
+    const calls = apple.calls.length;
+    expect(calls).toBe(stage === "credential" ? 0 : 4);
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(apple.calls).toHaveLength(calls);
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
   });
 });

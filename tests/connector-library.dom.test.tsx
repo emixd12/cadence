@@ -213,6 +213,8 @@ describe("account deletion copy", () => {
     expect(html).toContain("Cadence asks Google to revoke Calendar access");
     expect(html).toContain("Microsoft account privacy app permissions");
     expect(html).toContain("remove or regenerate it in Hevy settings");
+    expect(html).toContain("App-Specific Passwords");
+    expect(html).toContain("account.apple.com");
     expect(html).not.toMatch(/Cadence revokes (Outlook|Microsoft|Hevy)/);
   });
 });

@@ -1,3 +1,4 @@
+import { ProviderCallTimeoutError, runProviderCallWithTimeout } from "./provider-call-timeout";
 import { Temporal } from "@js-temporal/polyfill";
 import { saveConnectorPreferences } from "@/lib/db/connectors.repo";
 import {
@@ -78,6 +79,29 @@ function deadlineFor(options: IcloudServiceOptions): number {
   return (options.clock ?? Date.now)() + Math.min(ICLOUD_READ_DEADLINE_MS, options.deadlineMs ?? ICLOUD_READ_DEADLINE_MS);
 }
 
+function assertReadActive(options: IcloudServiceOptions, deadlineAt: number): void {
+  if (options.signal?.aborted || (options.clock ?? Date.now)() >= deadlineAt) throw new ConnectorError("timeout");
+}
+
+/** Includes database waits and the final credential fence, even if a dependency ignores abort. */
+async function boundedRead<T>(options: IcloudServiceOptions, read: (options: IcloudServiceOptions, deadlineAt: number) => Promise<T>): Promise<T> {
+  const deadlineAt = deadlineFor(options);
+  const timeoutMs = Math.max(1, Math.ceil(deadlineAt - (options.clock ?? Date.now)()));
+  const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])]);
+  const bounded = { ...options, signal };
+  try {
+    return await runProviderCallWithTimeout(async () => {
+      assertReadActive(bounded, deadlineAt);
+      const result = await read(bounded, deadlineAt);
+      assertReadActive(bounded, deadlineAt);
+      return result;
+    }, { signal, timeoutMs });
+  } catch (error) {
+    if (error instanceof ProviderCallTimeoutError) throw new ConnectorError("timeout");
+    throw error;
+  }
+}
+
 function requestOptions(login: IcloudLogin, deadlineAt: number, options: IcloudServiceOptions): IcloudRequestOptions {
   return { login, deadlineAt, now: options.clock, fetch: options.fetch, signal: options.signal, sleep: options.sleep, random: options.random };
 }
@@ -113,6 +137,7 @@ type IcloudAccess = Readonly<{ login: IcloudLogin; connection: ConnectorConnecti
 async function withIcloudAccess<T>(caller: ConnectorCaller, options: IcloudServiceOptions, deadlineAt: number,
   read: (access: IcloudAccess, discovered: Awaited<ReturnType<typeof discoverIcloudCalendar>>) => Promise<T>): Promise<T> {
   return withConnectorCredential(caller, PROVIDER, async (credential: ConnectorCredential, connection) => {
+    assertReadActive(options, deadlineAt);
     if (credential.provider !== PROVIDER) throw new ConnectorError("reconnect_required");
     const access = { login: { appleId: credential.appleId, appPassword: credential.appPassword }, connection, deadlineAt };
     try {
@@ -128,11 +153,10 @@ async function withIcloudAccess<T>(caller: ConnectorCaller, options: IcloudServi
 }
 
 export async function listIcloudCalendarsForCaller(caller: ConnectorCaller, options: IcloudServiceOptions = {}): Promise<{ calendars: IcloudCalendar[] }> {
-  const deadlineAt = deadlineFor(options);
-  return withIcloudAccess(caller, options, deadlineAt, async (access, discovered) => {
-    const calendars = await listIcloudCalendars(requestOptions(access.login, deadlineAt, options), discovered);
+  return boundedRead(options, (bounded, deadlineAt) => withIcloudAccess(caller, bounded, deadlineAt, async (access, discovered) => {
+    const calendars = await listIcloudCalendars(requestOptions(access.login, deadlineAt, bounded), discovered);
     return { calendars: calendars.map(({ id, name, isDefault }) => ({ id, name, isDefault })) };
-  });
+  }));
 }
 
 function idList(value: unknown): string[] {
@@ -166,12 +190,17 @@ export type IcloudCalendarRead = Readonly<{ connection: ConnectorConnection; res
 /**
  * Reads today through at most today + 30 in the profile timezone for the saved
  * selection, under one absolute deadline across credential opening, discovery,
- * listing, every selected calendar, every retry, and every body.
+ * listing, every selected calendar, every retry, every body, and the final credential fence.
  */
 export async function getIcloudCalendarEventsForCaller(caller: ConnectorCaller, start: string, end: string, options: IcloudEventsOptions = {}): Promise<IcloudCalendarRead> {
+  return boundedRead(options, (bounded, deadlineAt) => readEventsForCaller(caller, start, end, { ...options, signal: bounded.signal }, deadlineAt));
+}
+
+async function readEventsForCaller(caller: ConnectorCaller, start: string, end: string, options: IcloudEventsOptions, deadlineAt: number): Promise<IcloudCalendarRead> {
   const clock = options.clock ?? Date.now;
-  const deadlineAt = deadlineFor(options);
-  const { data: profile, error } = await caller.client.from("profiles").select("timezone").eq("id", caller.user.id).single();
+  const query = caller.client.from("profiles").select("timezone").eq("id", caller.user.id);
+  const { data: profile, error } = await (options.signal && query.abortSignal ? query.abortSignal(options.signal) : query).single();
+  assertReadActive(options, deadlineAt);
   if (error || !profile) throw new ConnectorError("provider_unavailable");
   let first: Temporal.PlainDate; let last: Temporal.PlainDate;
   try { first = Temporal.PlainDate.from(start); last = Temporal.PlainDate.from(end); }

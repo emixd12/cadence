@@ -21,7 +21,7 @@ type IcloudCalendarPanelProps = Readonly<{
 }>;
 
 /** Custody disclosure shown before intake. Apple does not scope app-specific passwords to Calendar. */
-export const ICLOUD_CUSTODY_COPY = "Apple offers Cadence no Calendar-only permission. To connect, create an app-specific password at account.apple.com and enter it here with your Apple Account email. Apple does not limit that password to Calendar: it can also reach iCloud Mail, Contacts, and other iCloud data. Cadence stores both values encrypted on its server and does not save them on this device, and uses them only to read the calendars you select.";
+export const ICLOUD_CUSTODY_COPY = "This connection uses an app-specific password, which Apple does not limit to Calendar. To connect, create an app-specific password at account.apple.com and enter it here with your Apple Account email. Apple does not limit that password to Calendar: it can also reach iCloud Mail, Contacts, and other iCloud data. Cadence stores both values encrypted on its server and does not save them on this device, and uses them only to read the calendars you select.";
 
 // Ticket 227. Same scheduled-event semantics and selection field as Google and
 // Outlook. The Apple Account email and app-specific password live in component

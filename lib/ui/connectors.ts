@@ -108,6 +108,9 @@ class SourceMemory<T> {
 
   epoch(accountId: string): number { return this.epochs.get(accountId) ?? 0; }
   get(key: string): T | undefined { return this.cache.get(key); }
+  updateCached(update: (value: T) => T): void {
+    for (const [key, value] of this.cache) this.cache.set(key, update(value));
+  }
   set(key: string, accountId: string, epoch: number, value: T): boolean {
     if (this.epoch(accountId) !== epoch) return false;
     this.cache.set(key, value);
@@ -234,7 +237,7 @@ async function refreshWebCalendarEvents(source: CalendarConnectorSource, memory:
   memory.retainOnly(connection.accountId, key);
   const epoch = memory.epoch(connection.accountId);
   const cached = memory.get(key);
-  // Only complete reads are cached, so an incomplete read never satisfies the refresh window.
+  // Retained complete data keeps its stale warning until a complete refresh succeeds.
   if (!options?.force && cached && fetchedRecently(cached.fetchedAt)) return cached;
   const running = memory.pendingFor(key);
   if (running) return running;
@@ -242,10 +245,12 @@ async function refreshWebCalendarEvents(source: CalendarConnectorSource, memory:
     .then((value) => {
       const applied = applyCalendarConnectorRefresh(memory.get(key) ?? null, validateCalendarSnapshotForScope(value, scope));
       if (memory.epoch(connection.accountId) !== epoch) throw new ConnectorClientError("connection_changed");
-      if (applied.store && !memory.set(key, connection.accountId, epoch, applied.snapshot)) throw new ConnectorClientError("connection_changed");
+      if ((applied.store || cached?.completeness === "complete") && !memory.set(key, connection.accountId, epoch, applied.snapshot)) throw new ConnectorClientError("connection_changed");
       return applied.snapshot;
     }).catch((error: unknown) => {
       if (connectorCriticalError(connectorErrorCode(error))) memory.clear(connection.accountId);
+      else if (cached) memory.set(key, connection.accountId, epoch, { ...cached, freshness: { ...cached.freshness,
+        state: "stale", canAssertNoOverlap: false, label: `${CONNECTOR_PROVIDER_NAMES[source]} refresh failed; showing the last complete read` } });
       throw error;
     }));
 }
@@ -257,8 +262,17 @@ async function disconnectWebSource(path: string, memory: { clear(accountId: stri
   return { view, revocation };
 }
 
+async function webCalendarConnection(memory: SourceMemory<ExternalEventSnapshotV1_1>, path: string): Promise<ConnectorConnectionView> {
+  try { return await request<ConnectorConnectionView>(path); }
+  catch (error) {
+    memory.updateCached(snapshot => ({ ...snapshot, freshness: { ...snapshot.freshness, state: "stale", canAssertNoOverlap: false,
+      label: `${CONNECTOR_PROVIDER_NAMES[snapshot.source]} connection could not refresh; showing the last complete read` } }));
+    throw error;
+  }
+}
+
 export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
-  getConnection() { return request<ConnectorConnectionView>("/api/outlook-calendar/connection"); },
+  getConnection() { return webCalendarConnection(OUTLOOK, "/api/outlook-calendar/connection"); },
   async beginConnect() {
     const result = await request<{ url: string }>("/api/outlook-calendar/connection", { method: "POST", body: JSON.stringify({ target: "web" }) });
     window.location.assign(result.url);
@@ -277,7 +291,7 @@ export const webOutlookCalendarCoordinator: OutlookCalendarCoordinator = {
 
 /** Ticket 227. Apple login values cross this boundary once, in the POST body, and are never stored on the client. */
 export const webIcloudCalendarCoordinator: IcloudCalendarCoordinator = {
-  getConnection() { return request<ConnectorConnectionView>("/api/icloud-calendar/connection"); },
+  getConnection() { return webCalendarConnection(ICLOUD, "/api/icloud-calendar/connection"); },
   async connect(appleId, appPassword) {
     const view = await request<ConnectorConnectionView>("/api/icloud-calendar/connection", { method: "POST", body: JSON.stringify({ appleId, appPassword }) });
     ICLOUD.clear(view.accountId);

@@ -162,6 +162,28 @@ describe("desktop iCloud source", () => {
     await vi.waitFor(() => expect(rows.has("icloud_calendar")).toBe(false));
   });
 
+  it("keeps a failed connection refresh stale through later cache hits", async () => {
+    const snapshot = { ...icloudFixture, fetchedAt: "2026-11-01T15:00:00Z" };
+    rows.set("icloud_calendar", { accountId: "account-1", scopeKey: icloudScopeKey(view("icloud_calendar") as never, range), snapshotJson: JSON.stringify(snapshot) });
+    let unavailable = true;
+    const events = vi.fn(() => snapshot);
+    transport.request.mockImplementation(async (path: string) => {
+      if (path === "/api/icloud-calendar/connection" && !unavailable) return view("icloud_calendar");
+      if (path.startsWith("/api/icloud-calendar/events")) return events();
+      throw Object.assign(new Error("offline"), { code: "provider_unavailable" });
+    });
+    await act(() => root.render(<Probe accountId="account-1" />));
+    await vi.waitFor(() => expect(current.icloud.state).toBe("error"));
+    unavailable = false;
+    await act(async () => { await current.refresh("visible"); });
+    expect(current.icloud).toMatchObject({ state: "error", error: "provider_unavailable" });
+    expect(current.icloud.snapshot?.events).toEqual(icloudFixture.events);
+    expect(events).not.toHaveBeenCalled();
+    await act(async () => { await current.refresh("manual"); });
+    expect(current.icloud).toMatchObject({ state: "ready", error: null });
+    expect(events).toHaveBeenCalledTimes(1);
+  });
+
   it("drops cached iCloud context after permission withdrawal without clearing Hevy", async () => {
     rows.set("icloud_calendar", { accountId: "account-1", scopeKey: icloudScopeKey(view("icloud_calendar") as never, range), snapshotJson: JSON.stringify(icloudFixture) });
     transport.request.mockImplementation(async (path: string) => {

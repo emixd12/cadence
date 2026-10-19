@@ -397,9 +397,22 @@ export type DavResponse = Readonly<{ href: string; status: number | null; propst
 
 function statusCode(element: XmlElement | undefined): number | null {
   if (!element) return null;
+  if (element.children.length) throw new IcloudXmlError("malformed", "nested status");
   const match = /^HTTP\/\d(?:\.\d)?\s+(\d{3})(?:\s|$)/.exec(element.text.trim());
   if (!match) throw new IcloudXmlError("malformed", "invalid DAV:status");
   return Number(match[1]);
+}
+
+function hasDavStructure(element: XmlElement): boolean {
+  return ["response", "href", "status", "propstat", "prop"].includes(element.name) || element.children.some(hasDavStructure);
+}
+
+function davContainer(element: XmlElement, allowed: readonly string[]): void {
+  if (element.text.trim() || element.children.some(child =>
+    (child.ns === DAV_NS && !allowed.includes(child.name)) ||
+    (child.ns !== DAV_NS && (!child.ns || hasDavStructure(child))))) {
+    throw new IcloudXmlError("malformed", "invalid DAV container content");
+  }
 }
 
 /**
@@ -410,16 +423,20 @@ function statusCode(element: XmlElement | undefined): number | null {
 export function parseIcloudMultistatus(body: string, maxResponses: number): Readonly<{ responses: DavResponse[]; truncated: boolean }> {
   const root = parseIcloudXml(body);
   if (root.ns !== DAV_NS || root.name !== "multistatus") throw new IcloudXmlError("malformed", "root is not DAV:multistatus");
+  davContainer(root, ["response", "responsedescription"]);
   const items = xmlChildren(root, DAV_NS, "response");
   if (items.length > maxResponses) return { responses: [], truncated: true };
   let truncated = false;
   const responses = items.map((item) => {
+    davContainer(item, ["href", "status", "propstat", "error", "responsedescription", "location"]);
     const hrefs = xmlChildren(item, DAV_NS, "href");
     if (hrefs.length !== 1) throw new IcloudXmlError("malformed", "a response needs exactly one href");
+    if (hrefs[0].children.length) throw new IcloudXmlError("malformed", "nested href");
     const href = hrefs[0].text.trim();
     if (!href || xmlChildren(item, DAV_NS, "status").length > 1) throw new IcloudXmlError("malformed", "ambiguous response");
     const status = statusCode(xmlChild(item, DAV_NS, "status"));
     const propstats = xmlChildren(item, DAV_NS, "propstat").map((propstat) => {
+      davContainer(propstat, ["prop", "status", "error", "responsedescription"]);
       if (xmlChildren(propstat, DAV_NS, "status").length !== 1 || xmlChildren(propstat, DAV_NS, "prop").length !== 1) throw new IcloudXmlError("malformed", "ambiguous propstat");
       const code = statusCode(xmlChild(propstat, DAV_NS, "status"));
       const prop = xmlChild(propstat, DAV_NS, "prop");

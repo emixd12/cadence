@@ -104,12 +104,15 @@ The integrated baseline `d7af234` was independently approved.
   off sources that need attention instead of renewing them or failing. Evidence is
   source, synthetic fixtures, model stubs, a disposable local migration replay, and
   bench screenshots; no live provider or model call.
-- Ticket 227 is implemented locally and awaits independent verification. Recovery
+- Ticket 227 corrections F1–F8 are implemented locally; independent re-review is pending. Recovery
   preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
   disconnect, isolated complete-only caches, offline display choices and Timeline
   context. Daily Brief reads iCloud only under its separate generation/selection
   disclosure. CalDAV boundaries reject unsafe URLs/XML, truncate oversized reads,
-  quarantine unsupported recurrence and enforce the shared deadline through parsing.
+  quarantine unsupported recurrence/timezones and conflicting identities, and bound the
+  full service read through the final credential fence. Failed or incomplete refreshes
+  keep cached context stale until a complete read succeeds. Account deletion includes
+  manual Apple password revocation.
   Synthetic tests and responsive bench evidence cover these paths. Live Apple
   access, hosted custody acceptance and installed acceptance remain open.
 - Ticket 228 is not started.

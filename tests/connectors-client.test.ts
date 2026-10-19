@@ -153,7 +153,8 @@ describe("web Outlook partial reads (Ticket 225 review)", () => {
     const before = eventsCalls();
     const unforced = await webOutlookCalendarCoordinator.refreshEvents(range);
     expect(eventsCalls()).toBe(before);
-    expect(unforced).toEqual(complete);
+    expect(unforced).toEqual(forced);
+    expect(unforced.freshness.canAssertNoOverlap).toBe(false);
   });
 
   it("never treats an initially incomplete read as fresh and retries it", async () => {

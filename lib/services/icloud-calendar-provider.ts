@@ -69,7 +69,7 @@ const UNSUPPORTED_DETAILS = ["description", "location", "organizer", "attendees"
 
 export type IcloudCalendar = Readonly<{ id: string; name: string; isDefault: boolean }>;
 /** Server-only calendar facts; the href and timezone never leave the service. */
-export type IcloudCalendarCollection = IcloudCalendar & Readonly<{ href: string; timezone: string | null }>;
+export type IcloudCalendarCollection = IcloudCalendar & Readonly<{ href: string; timezone: string | null; timezoneUnsupported?: boolean }>;
 export type IcloudDiscovery = Readonly<{ principal: string; home: URL }>;
 export type IcloudQuarantineReason = "timezone_unresolved" | "invalid_interval" | "unexpanded_recurrence" | "malformed_item" | "unavailable_item";
 
@@ -169,11 +169,17 @@ export function icloudTimezone(value: string | null | undefined): string | null 
   catch { return null; }
 }
 
+function namedTimezone(zone: IcalComponent): string | null {
+  // Only a bare IANA reference is supported; supplied observance rules are not interpreted.
+  if (zone.components.length || zone.properties.some(property => property.name !== "TZID")) return null;
+  return icloudTimezone(single(zone, "TZID")?.value);
+}
+
 function collectionTimezone(text: string): string | null {
   try {
     const parsed = parseIcalendar(text);
-    const zone = parsed.components.find((component) => component.name === "VTIMEZONE");
-    return icloudTimezone(zone?.properties.find((property) => property.name === "TZID")?.value);
+    const zones = parsed.components.filter((component) => component.name === "VTIMEZONE");
+    return zones.length === 1 ? namedTimezone(zones[0]) : null;
   } catch { return null; }
 }
 
@@ -202,8 +208,10 @@ export async function listIcloudCalendars(options: IcloudRequestOptions, discove
       const path = href.pathname.endsWith("/") ? href.pathname : `${href.pathname}/`;
       const id = icloudCalendarId(path);
       if (calendars.has(id)) throw new ItemError("duplicate collection");
+      const timezone = zone?.status === 200 ? collectionTimezone(zone.element.text) : null;
+      const timezoneUnsupported = Boolean(zone && zone.status !== 404 && (zone.status !== 200 || timezone === null));
       calendars.set(id, { id, name: label || "Untitled iCloud calendar", isDefault: false, href: new URL(path, href).toString(),
-        timezone: zone && zone.status === 200 ? collectionTimezone(zone.element.text) : null });
+        timezone, timezoneUnsupported });
     }
   } catch (error) {
     throw malformed(null, error instanceof ItemError ? `iCloud Calendar listing: ${error.message}.` : "iCloud Calendar returned a malformed calendar list.");
@@ -242,7 +250,8 @@ function parseContentLine(line: string): IcalProperty {
       value = end < 0 ? line.slice(index) : line.slice(index, index + end);
       index += value.length;
     }
-    // Multi-valued parameters keep only their first value; none used here is multi-valued.
+    if (["TZID", "VALUE", "RANGE"].includes(paramMatch[1].toUpperCase()) && (line[index] === "," || value.includes(","))) throw new ItemError("multivalued time parameter");
+    // Uninterpreted extension parameters may contain multiple values.
     while (line[index] === ",") {
       const end = line.slice(index + 1).search(/[;:]/);
       index = end < 0 ? line.length : index + 1 + end;
@@ -374,7 +383,7 @@ export function adaptIcloudEvent(component: IcalComponent, context: IcloudAdapte
 function adaptComponent(component: IcalComponent, context: IcloudAdapterContext): IcloudAdaptedItem {
   const { calendar, range } = context;
   // A server that returned a series master did not expand it; Cadence never expands locally.
-  if (component.properties.some((property) => property.name === "RRULE" || property.name === "RDATE")) return { kind: "quarantine", reason: "unexpanded_recurrence" };
+  if (component.properties.some((property) => ["RRULE", "RDATE", "EXRULE", "EXDATE"].includes(property.name) || (property.name === "RECURRENCE-ID" && property.params.RANGE !== undefined))) return { kind: "quarantine", reason: "unexpanded_recurrence" };
   const uidProperty = single(component, "UID");
   const uid = uidProperty?.value ?? "";
   if (!uid || uid.length > MAX_UID) throw new ItemError("UID is required");
@@ -384,6 +393,7 @@ function adaptComponent(component: IcalComponent, context: IcloudAdapterContext)
   const endProperty = single(component, "DTEND");
   const durationProperty = single(component, "DURATION");
   if (endProperty && durationProperty) throw new ItemError("DTEND and DURATION are exclusive");
+  if (calendar.timezoneUnsupported && [startProperty, endProperty, single(component, "RECURRENCE-ID")].some(property => property && icalTime(property).kind === "floating")) return { kind: "quarantine", reason: "timezone_unresolved" };
   const fallbackZone = calendar.timezone ?? range.timezone;
   const fallbackKind = calendar.timezone ? "calendar" as const : "request" as const;
   if (start.kind === "zoned" && !start.zone) return { kind: "quarantine", reason: "timezone_unresolved" };
@@ -417,7 +427,7 @@ function adaptComponent(component: IcalComponent, context: IcloudAdapterContext)
     if (Temporal.PlainDate.compare(last, rangeStart) <= 0 || Temporal.PlainDate.compare(start.date, rangeEndExclusive) >= 0) return { kind: "outside_range" };
     interval = { kind: "all_day", first: start.date, last };
   } else {
-    const zoned = start.kind === "utc" ? start.instant.toZonedDateTimeISO(zone)
+    const zoned = start.kind === "utc" ? start.instant.toZonedDateTimeISO("UTC")
       : start.dateTime.toZonedDateTime(zone, { disambiguation: "compatible" });
     let endAt: Temporal.Instant; let unspecified = false;
     if (endProperty) {
@@ -547,6 +557,7 @@ export async function readIcloudCalendarEvents(input: IcloudCalendarReadInput): 
   validateReadInput(input);
   const events = new Map<string, NormalizedExternalEvent>();
   const tombstones = new Map<string, ExternalEventCancellationTombstoneV1_1>();
+  const conflicts = new Set<string>();
   const coverage: ExternalEventCoverage[] = [];
   const failures: ExternalEventFailure[] = [];
   let unexpanded = false;
@@ -575,13 +586,21 @@ export async function readIcloudCalendarEvents(input: IcloudCalendarReadInput): 
         const etag = etagText && etagText.length <= MAX_TEXT ? etagText : null;
         let vcalendar: IcalComponent;
         try { vcalendar = parseIcalendar(data.element.text); } catch { count("malformed_item"); continue; }
+        const zones = vcalendar.components.filter(component => component.name === "VTIMEZONE");
+        if (zones.some(zone => !namedTimezone(zone)) || new Set(zones.map(zone => single(zone, "TZID")?.value)).size !== zones.length) { count("timezone_unresolved"); continue; }
         const vevents = vcalendar.components.filter((component) => component.name === "VEVENT");
         const uids = new Set(vevents.map((component) => component.properties.find((property) => property.name === "UID")?.value ?? ""));
         if (vevents.length === 0 || uids.size !== 1) { count("malformed_item"); continue; }
         for (const vevent of vevents) {
           const adapted = adaptIcloudEvent(vevent, { accountId: input.accountId, calendar, range: input.range, etag });
-          if (adapted.kind === "event") { events.set(adapted.event.id, adapted.event); tombstones.delete(adapted.event.id); }
-          else if (adapted.kind === "tombstone") { tombstones.set(adapted.tombstone.id, adapted.tombstone); events.delete(adapted.tombstone.id); }
+          if (adapted.kind === "event" || adapted.kind === "tombstone") {
+            const value = adapted.kind === "event" ? adapted.event : adapted.tombstone;
+            const previous = events.get(value.id) ?? tombstones.get(value.id);
+            if (conflicts.has(value.id) || (previous && JSON.stringify(previous) !== JSON.stringify(value))) {
+              conflicts.add(value.id); events.delete(value.id); tombstones.delete(value.id); count("malformed_item");
+            } else if (adapted.kind === "event") events.set(value.id, adapted.event);
+            else tombstones.set(value.id, adapted.tombstone);
+          }
           else if (adapted.kind === "quarantine") { count(adapted.reason); if (adapted.reason === "unexpanded_recurrence") unexpanded = true; }
         }
       }

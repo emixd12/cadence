@@ -13964,7 +13964,7 @@ Implementation (October 19, 2026):
 
 ## Ticket 227: iCloud Calendar connector
 
-Status: implemented locally; independent verification and live acceptance pending.
+Status: verifier corrections F1–F8 implemented locally; independent re-review and live acceptance pending.
 
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.

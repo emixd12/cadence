@@ -60,6 +60,7 @@ export function AccountDeletionPanel({
             <ul className="mt-2 grid list-disc gap-1 pl-5">
               <li>Outlook Calendar: {CONNECTOR_REVOCATION_COPY.microsoft_account_permissions}</li>
               <li>Hevy: {CONNECTOR_REVOCATION_COPY.hevy_api_key}</li>
+              <li>iCloud Calendar: {CONNECTOR_REVOCATION_COPY.apple_app_specific_password}</li>
             </ul>
           </div>
           <p>
