@@ -3,22 +3,22 @@ import type { ReactNode } from "react";
 import { LEGAL_PAGE_ORDER, LEGAL_PAGES } from "@/components/settings/LegalContent";
 
 type SettingsPanelProps = Readonly<{
+  id?: string;
   title: string;
   description?: string;
   children: ReactNode;
   className?: string;
   /** Level 3 is for a source nested inside the connector library. */
   headingLevel?: 2 | 3;
-  id?: string;
 }>;
 
 export function SettingsPanel({
+  id,
   title,
   description,
   children,
   className = "",
   headingLevel = 2,
-  id,
 }: SettingsPanelProps) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
   return (

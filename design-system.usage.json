@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-19T01:51:54.208133+00:00",
+  "generatedAt": "2026-10-19T03:46:32.377746+00:00",
   "root": "/Users/emi/intent/workspaces/expansion-connectors/cadence",
   "usages": [
     {
@@ -278,7 +278,7 @@
     {
       "componentId": "flow.account-deletion-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 80,
+      "line": 86,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -311,6 +311,38 @@
       "componentId": "flow.account-deletion-panel",
       "file": "tests/ux-ticket-049-052-ui.test.tsx",
       "line": 119,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.consent-form",
+      "file": "app/oauth/consent/page.tsx",
+      "line": 21,
+      "route": "oauth/consent/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.consent-form",
+      "file": "tests/oauth-ui.dom.test.tsx",
+      "line": 13,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.consent-form",
+      "file": "tests/oauth-ui.dom.test.tsx",
+      "line": 16,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.consent-form",
+      "file": "tests/oauth-ui.dom.test.tsx",
+      "line": 22,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -398,7 +430,7 @@
     {
       "componentId": "layout.screen-frame",
       "file": "app/(app)/settings/page.tsx",
-      "line": 35,
+      "line": 38,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -598,7 +630,7 @@
     {
       "componentId": "module.category-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 74,
+      "line": 80,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -615,6 +647,30 @@
       "componentId": "module.category-panel",
       "file": "tests/category-controls.dom.test.tsx",
       "line": 21,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.connected-apps-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 78,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.connected-apps-panel",
+      "file": "tests/oauth-ui.dom.test.tsx",
+      "line": 33,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.connected-apps-panel",
+      "file": "tests/oauth-ui.dom.test.tsx",
+      "line": 38,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -710,7 +766,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 72,
+      "line": 76,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1166,7 +1222,7 @@
     {
       "componentId": "module.icloud-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 232,
+      "line": 234,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1174,7 +1230,7 @@
     {
       "componentId": "module.icloud-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 247,
+      "line": 249,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1254,7 +1310,7 @@
     {
       "componentId": "module.note-shortcut-controls",
       "file": "app/(app)/settings/page.tsx",
-      "line": 76,
+      "line": 82,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1318,7 +1374,7 @@
     {
       "componentId": "module.notification-permission-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 64,
+      "line": 68,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1590,7 +1646,7 @@
     {
       "componentId": "module.timezone-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 59,
+      "line": 63,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1622,7 +1678,7 @@
     {
       "componentId": "module.travel-settings-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 70,
+      "line": 74,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1654,7 +1710,7 @@
     {
       "componentId": "module.trust-and-legal-panel",
       "file": "app/(app)/settings/page.tsx",
-      "line": 78,
+      "line": 84,
       "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
@@ -1662,7 +1718,7 @@
     {
       "componentId": "module.trust-and-legal-panel",
       "file": "tests/legal-content.test.tsx",
-      "line": 101,
+      "line": 164,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1701,7 +1757,7 @@
     }
   ],
   "summary": {
-    "productUsages": 212,
+    "productUsages": 219,
     "benchPreviews": 0
   }
 }

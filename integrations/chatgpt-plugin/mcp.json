@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "cadence": {
+      "type": "streamable-http",
+      "url": "https://app.cadence-me.com/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": { "mode": "cimd" },
+            "resource": "https://app.cadence-me.com/mcp",
+            "baseScopes": ["cadence.read"],
+            "defaultScopes": ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"]
+          }
+        }
+      }
+    }
+  }
+}

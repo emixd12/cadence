@@ -575,3 +575,46 @@ production snapshot restrictions. `briefing-sequence.service.ts` uses the pipeli
 for no-model selection and delegates validated generation to the comparison service.
 Components render coverage and decisions; they do not calculate domain findings.
 Focused history, sequence, budget and Days tests own these adapters.
+
+## Integration operations ownership (Tickets 220–232)
+
+Planned, not implemented. This section registers one new allowed-caller category,
+**integration operations**, for the remote MCP server (`docs/MCP_INTEGRATION.md`).
+
+| Layer | Planned location | May call | Must not |
+|---|---|---|---|
+| Operation contract | `packages/core/src/integration/` (Ticket 221) | Nothing outside core | Read the network, database, environment, or clock |
+| Request context | `lib/integrations/request-context.ts` (Ticket 223) | Supabase client factory with a short-lived internal user token | Use the service role for user data |
+| Integration operations | `lib/integrations/operations/read/` and `write/` (Tickets 224–225) | Existing services and core services through injected-client functions | Query tables directly, duplicate resolver rules, or call another transport |
+| MCP transport | `app/mcp/route.ts`, `lib/mcp/` (Ticket 228) | Token verification, request context, integration operations | Call services, repositories, or resolvers directly |
+| OAuth endpoints | `/oauth/*`, `.well-known` (Ticket 226) | OAuth repositories and token-endpoint functions | Read or write tracking data |
+
+Integration operations are allowed callers of the same services that pages,
+server actions, and API routes call: timeline, analytics, Behavior, Occurrence
+status, Occurrence note, and occurrence-freshness services. They receive
+`now` and the timezone through the request context. They reuse
+`applyOccurrenceStatusTransition`, `updateOccurrenceNote`, and core
+`createBehavior`, `updateBehavior`, and `setBehaviorActive`, so MCP writes
+produce the same rows and status history as the web app.
+
+Forbidden bypasses: no recurrence, Needs decision, adherence, or status logic in
+`lib/mcp/` or `lib/integrations/`; no service-role reads of user data; no handler
+that skips the scope check. This is one transport adapter over one contract, not a
+connector SDK or provider registry. `npm run resolvers:check` still applies to every
+new module. Required tests are named in Tickets 221–228 in `docs/TICKETS.md`.
+
+### OAuth expiry maintenance (Ticket 232)
+
+`app/api/occurrences/sync/route.ts` calls
+`lib/services/oauth-maintenance.service.ts` only after scheduler authentication.
+The service calls `purgeExpiredOAuthRecords` in `lib/db/oauth.repo.ts` using the
+server-only client; only the existing purge RPC touches OAuth persistence. The
+repository validates all seven raw counts and propagates cancellation. No
+resolver, product-table access, new scheduler or client transport is involved.
+Maintenance is independent of occurrence batch breaker/enablement/profile work;
+the route awaits settlement on every authenticated exit. Tests:
+`tests/oauth-maintenance.service.test.ts`, `tests/oauth-maintenance.transport.test.ts`,
+`tests/oauth-maintenance-monitoring-route.test.ts`,
+`tests/oauth-maintenance.local-integration.test.ts`,
+`tests/oauth-integration.repo.test.ts`, `tests/occurrence-sync-route.test.ts`, and
+`tests/sql/ticket-232-oauth-maintenance-smoke.sql`.

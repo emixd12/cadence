@@ -342,3 +342,12 @@ Ticket 240 review correction: web and desktop retain a known failed or incomplet
 refresh warning across cache hits until a complete read succeeds. Desktop cold
 opens verify the provider before treating a saved snapshot as current. The shared
 rule also applies to Outlook and Hevy desktop snapshots. No native schema changed.
+
+## Hosted client access (Ticket 227)
+
+OAuth consent and Connected apps are web-only in v1. Grants live on the hosted
+account, so desktop implementation is not applicable. Manage access in the web
+Settings screen. Linked desktop data becomes readable after synchronization;
+account-free local data never reaches this server. Marketing and future mobile
+are not applicable to this ticket. The interaction registry and design-system
+surface catalog carry the same platform decision.

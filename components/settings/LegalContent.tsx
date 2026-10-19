@@ -59,9 +59,9 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Optional Google Calendar",
         paragraphs: [
           "The Google Calendar connector is optional. Where enabled, it requires separate read-only consent for the same Google account used to sign in. Cadence reads your subscribed calendar list so you can choose calendars, then reads events from selected calendars intersecting displayed days, including readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. It does not create, edit, or delete Google events or download attachments automatically.",
-          "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information or use it for advertising. Sending selected Calendar timing to OpenAI for Daily Brief requires a separate choice, described below.",
+          "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information or use it for advertising. Sending selected Calendar timing to OpenAI for Daily Brief requires a separate choice, described below. Calendar information is never shared through MCP.",
           "Vercel runtime processes Calendar API requests and returned event details while serving a refresh. Supabase stores the account's connector status, calendar selections, display preferences, and encrypted Google refresh credential. Cadence does not store Google event details in its hosted database. The web app holds returned event details in memory. Desktop can store the last complete normalized event snapshot in a separate account-bound cache for offline display; its account session and pending consent state use macOS Keychain.",
-          "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Supabase daily infrastructure backups can retain deleted connector records and sealed credential ciphertext for no more than seven days.",
+          "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Deleted connector records and sealed credential ciphertext may remain in Supabase backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.",
           "Disconnect Google Calendar marks the account connection disconnected, clears selected calendar IDs, deletes the live server credential, and requests Google grant revocation. If Google cannot confirm revocation, the user must remove Cadence in Google Account permissions. Other clients stop refreshing after they next receive the connection change; an offline desktop device may retain stale cached event details until it reconnects or its Cadence account is disconnected.",
           "Ordinary web sign-out ends that browser's Cadence session but leaves the account-level Calendar connection active. Desktop Cadence account disconnect or reconnect clears that Mac's Calendar cache and pending consent state but does not revoke the global Google grant. Account deletion attempts revocation and removes the live Auth user and owner-scoped connector records. If revocation fails, Google Account permissions may still show the grant.",
           "Cadence's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including its Limited Use requirements.",
@@ -93,19 +93,37 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         ],
       },
       {
-        title: "Optional Daily Brief",
+        title: "Exports and connected AI clients",
         paragraphs: [
-          "Where the server supports it, Daily Brief is off until you enable it in Settings. Cadence sends selected Behavior schedule, history and calculated findings to OpenAI to generate a read-only briefing. Optional Notes and reminder history have their own controls. The brief cannot change records or perform actions.",
-          "Google Calendar, Outlook Calendar, iCloud Calendar and Hevy each need a separate Daily Brief choice. Connecting a source or displaying it on Timeline does not grant model access. Calendar context uses today's selected event timing, timezone, availability and response state without event titles or details. Hevy contributes only today's recorded workout timing and duration, never exercise details or evidence of free time. Credentials and raw provider records never enter the model input.",
-          "Reconnecting a new source or changing its calendar selection requires allowing it again. Disconnect, disclosure withdrawal and account changes fence pending results. Turning Daily Brief off revokes its optional source choices. Older clients saving Daily Brief preferences also turn the new source choices off.",
-          "Cadence retains no production prompt or briefing history. Generated text stays in memory until it expires or is cleared. Private operational records retain preferences, recent attempt metadata and admission timestamps; account deletion removes them. Cadence requests store:false from OpenAI, which does not promise zero provider retention. Provider abuse-monitoring and prompt-cache retention can still apply. Turning a source off stops future sharing; it cannot recall input already sent.",
+          `Cadence provides ${exportFormats.join(", ")} exports and prepared prompts. The user chooses when and where to download or share an export or prompt.`,
+          "You can also connect an AI client, such as Claude or ChatGPT, to your hosted Cadence account. When you authorize the connection and direct the client to use Cadence, Cadence sends requested tracking records to that client and its provider. The client's terms, privacy policy, retention settings, and data-use controls govern its processing of information it receives.",
+          "Read permission covers active and archived Behaviors, descriptions, user-authored Behavior locations, schedules, time entries, categories, Occurrences, statuses, status history, Occurrence notes, archive notes, time sessions, adherence summaries, reminder settings, and your profile timezone. Responses also include record identifiers, revision and freshness information, and a client-specific account reference. Behaviors and notes can reveal personal health information or other sensitive information you enter. Read access is not limited to records you mention in one conversation. Connect only clients you trust with these records.",
+          "Google Calendar data and its connection are never shared through MCP. MCP also excludes travel settings, route estimates, device location, Daily Brief content and preferences, reminder delivery logs, push subscriptions, import-run internals, account email addresses, and credentials. A user can still type sensitive information into a Behavior or note; Cadence does not automatically remove that information from tracking records.",
+          "Read access is required for a connection. You may separately allow the client to mark Occurrences and edit their notes, or create, edit, archive, and restore Behaviors. MCP provides no delete operation. You direct and confirm changes in the AI client. Cadence checks the permissions granted to the connection; the AI client controls its per-action confirmation experience.",
+          "Cadence records integration activity to show access and changes and investigate problems. This record contains the client, operation, record identifiers, time, outcome, and error code. It does not contain note text, full request or response content, or authentication secrets. The activity retention policy is 90 days. Older entries disappear from the activity view and become eligible for deletion by maintenance, or when further activity triggers cleanup for that account.",
+          "Cadence separately stores write results for retry protection for a 24-hour validity period. Those results may contain the tracking content returned by the operation. Maintenance deletes expired retry records. Expiry prevents reuse; it does not mean immediate physical deletion. Healthy daily maintenance removes eligible records within roughly one additional day. Failed maintenance can extend storage. Backup retention is separate.",
+          "Disconnect a client in Settings > Connected apps to revoke that connection. Cadence rejects its next access or refresh request. Disconnecting does not delete tracking records, erase completed changes, or retrieve copies already received by the client. Contact the client's provider to manage those copies. Deleting your Cadence account removes its live account-owned integration records. Backup remnants follow the retention periods in this policy.",
+          "Cadence also keeps shared client registration metadata, such as client names, redirect addresses, and registration details. Used dynamic client registrations and cached client metadata have no automatic deletion deadline. A metadata refresh interval is not a deletion deadline. Disconnecting or deleting an account does not remove a shared client registration.",
+          "Cadence does not sell your personal data. Cadence shares tracking records through MCP to carry out the access you authorize and the requests you direct. Account-free desktop records stay on the device and are unavailable through MCP. Linked desktop records become available after synchronization.",
         ],
       },
       {
-        title: "Exports and external AI services",
+        title: "Optional Daily Brief",
         paragraphs: [
-          `Cadence provides ${exportFormats.join(", ")} exports. The user chooses when and where to download or share an export.`,
-          "Cadence provides prepared prompts for users to share independently. Export sharing is separate from the optional Daily Brief described above. If a user shares an export or prompt with an external AI service, that service's terms and privacy policy govern its processing.",
+          "Daily Brief is separate from connected AI clients. When you enable Daily Brief, Cadence can prepare a read-only briefing when you first open Timeline each day. Cadence sends today's Behavior schedule and completion history, including findings calculated from it, to OpenAI. The briefing cannot change tracking or Calendar records.",
+          "Google Calendar, Outlook Calendar, iCloud Calendar and Hevy each need a separate Daily Brief choice. Connecting a source or displaying it on Timeline does not grant model access. Calendar context uses today's selected event timing, timezone, availability and response state without event titles or details. Hevy contributes only today's recorded workout timing and duration, never exercise details or evidence of free time. Credentials and raw provider records never enter the model input.",
+          "Where the optional controls are available, reminder delivery history and Notes on Not Completed occurrences also require separate choices. Reminder analysis sends only counts calculated from reminder send records, never reminder content. When a Notes pattern is selected as the tip, Cadence sends up to 12 Notes, the first 280 characters of each, from Not Completed occurrences in the last 90 days. Other Notes are not sent through that option.",
+          "Reconnecting a new source or changing its calendar selection requires allowing it again. Disconnect, disclosure withdrawal and account changes fence pending results. Turning Daily Brief off revokes its optional source choices. Older clients saving Daily Brief preferences also turn the new source choices off.",
+          "Daily Brief settings are stored with your account. Cadence keeps operational metadata to control generation attempts and avoid repeated tips. It does not save prompts or generated briefing text in its hosted database. Generated text stays in page-session memory. Device markers record attempt and display state, not generated text.",
+          "Cadence retains no production prompt or briefing history. Generated text stays in memory until it expires or is cleared. Private operational records retain preferences, recent attempt metadata and admission timestamps; account deletion removes them. Cadence requests store:false from OpenAI, which does not promise zero provider retention. Provider abuse-monitoring and prompt-cache retention can still apply. Turning a source off stops future sharing; it cannot recall input already sent.",
+          "Turning Daily Brief off stops future generation and clears optional Daily Brief disclosure choices. It removes live generation-run and tip-repetition metadata. Account deletion removes live account-owned Daily Brief records. Copies already processed by OpenAI are subject to OpenAI's data controls and retention; Cadence does not promise zero provider retention or recall information already sent.",
+          "On desktop, Daily Brief is available only to linked, online accounts. Its hosted context excludes local-only and unsynchronized desktop records. Daily Brief consent does not authorize MCP access, and MCP consent does not authorize Daily Brief.",
+        ],
+        links: [
+          {
+            label: "Read OpenAI's API data controls",
+            href: "https://developers.openai.com/api/docs/guides/your-data",
+          },
         ],
       },
       {
@@ -128,7 +146,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "How Cadence uses data",
         paragraphs: [
-          "Cadence uses data to authenticate accounts, generate scheduled Occurrences, display records, save explicit Decisions and notes, provide optional timing, send configured reminders, calculate basic analytics, create exports, secure the service, prevent abuse, diagnose failures, and respond to requests.",
+          "Cadence uses data to authenticate accounts, generate scheduled Occurrences, display records, save explicit Decisions and notes, provide optional timing, send configured reminders, calculate basic analytics, create exports, secure the service, prevent abuse, diagnose failures, and respond to requests. Cadence also carries out the connected-client access you authorize and prepares Daily Brief when you enable it.",
           "Cadence does not sell personal information or share it for cross-context behavioral advertising. Cadence does not automatically turn an Unresolved Occurrence into a failure.",
         ],
       },
@@ -136,6 +154,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Processors",
         paragraphs: [
           "Cadence uses the following service providers for the stated purposes. A provider processes data under its own service terms and the operator's configuration.",
+          "A connected external AI client's provider receives the tracking data described under Exports and connected AI clients. That provider's terms and privacy policy govern its processing. This is separate from Cadence's use of OpenAI for Daily Brief.",
         ],
         table: {
           caption: "Cadence service providers and purposes",
@@ -186,6 +205,11 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
               "Privacy, support, and dispute correspondence",
               "Contact details and message content",
             ],
+            [
+              "OpenAI",
+              "Optional in-app Daily Brief generation",
+              "Behavior schedule, completion history and calculated findings; separately enabled Calendar timing, reminder counts, and selected note excerpts",
+            ],
           ],
         },
       },
@@ -194,6 +218,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         paragraphs: [
           "Cadence uses the retention periods below. A provider may delete data sooner. Specific records may be kept longer when required for a security investigation, fraud prevention, or legal preservation.",
           "The existing infrastructure retention periods do not establish live verification or release approval for the new connectors.",
+          "Supabase maintains database backups. Deleted records may remain in backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.",
         ],
         table: {
           caption: "Cadence retention periods as of October 18, 2026",
@@ -211,8 +236,8 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Backups",
-              "No more than 7 days",
-              "Supabase Pro daily backups: 7 days",
+              "Until Supabase removes the copies under its backup lifecycle",
+              "Live-record deletion does not immediately erase existing backups.",
             ],
             [
               "Deleted-account live data",
@@ -221,13 +246,13 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Deleted-account backup remnants",
-              "No more than 7 days",
-              "Supabase daily backups: 7 days",
+              "Until Supabase removes the copies under its backup lifecycle",
+              "Live-record deletion does not immediately erase existing backups.",
             ],
             [
               "Google Calendar connector records",
               "Live credential until Calendar disconnect, access revocation, or account deletion; connector status and preferences until account deletion",
-              "Disconnect deletes the live credential; Supabase daily backup remnants retain for no more than 7 days",
+              "Disconnect deletes the live credential; backup copies remain until Supabase removes them under its backup lifecycle",
             ],
             [
               "Desktop Google Calendar cache",
@@ -252,7 +277,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             [
               "Travel place identifiers",
               "While travel stays on; a lookup older than 365 days is repeated when next needed",
-              "Turning travel off or deleting the account deletes them; Supabase daily backup remnants retain for no more than 7 days",
+              "Turning travel off or deleting the account deletes them; backup copies remain until Supabase removes them under its backup lifecycle",
             ],
             [
               "Travel usage totals",
@@ -279,6 +304,36 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
               "12 months after resolution",
               "Microsoft 365 mailbox retention is configured for this period",
             ],
+            [
+              "Integration activity",
+              "90-day policy; older entries are hidden and eligible for cleanup",
+              "Daily maintenance and account activity can delete older entries. Healthy daily maintenance adds roughly one day; failures can delay deletion.",
+            ],
+            [
+              "Integration retry results",
+              "24-hour validity; physical deletion follows maintenance",
+              "Expired results cannot be reused. Results can contain returned tracking content. Daily maintenance removes expired rows; failures can delay deletion.",
+            ],
+            [
+              "Connection grants and account-owned integration references",
+              "Until account deletion; disconnect revokes access without deleting every record",
+              "Account deletion removes live account-owned records. Shared client registration metadata remains separate.",
+            ],
+            [
+              "Authorization requests, code hashes, and token hashes",
+              "No access after expiry or revocation; physical deletion follows the applicable cleanup rule",
+              "Maintenance deletes expired authorization requests, code hashes and access-token hashes. Refresh families and their tokens are deleted after the family's absolute expiry, which is at most 90 days. Disconnect does not promise immediate physical deletion.",
+            ],
+            [
+              "Shared client registration metadata",
+              "Unused dynamic registrations expire after 24 hours; used dynamic registrations and cached client metadata have no automatic deletion deadline",
+              "Maintenance removes eligible expired unused registrations without grants. Shared registrations remain after an account disconnects or is deleted. Refreshing cached client metadata is not deletion.",
+            ],
+            [
+              "Daily Brief preferences and operational metadata",
+              "Preferences until account deletion; run and tip metadata until replacement, applicable cleanup, disablement, or account deletion",
+              "Preference changes clear run metadata. Turning Daily Brief off also clears tip-repetition metadata. These records do not contain prompts or generated briefing text. Provider retention is separate.",
+            ],
           ],
         },
       },
@@ -294,6 +349,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         paragraphs: [
           `Users can export records as ${exportFormats.join(", ")}, manage reminder choices, edit their records, and delete their account in Settings. Export needed records before deletion because account deletion is permanent.`,
           "A user can deny browser notification permission or leave optional email reminders disabled. Required account and service processing cannot be disabled while using the hosted tracker.",
+          "Users can manage connected-client access in Settings > Connected apps and control Daily Brief separately in Settings. Turning off Daily Brief does not revoke an MCP connection, and disconnecting an MCP client does not turn off Daily Brief.",
         ],
       },
       {
@@ -356,10 +412,20 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         ],
       },
       {
-        title: "Exports and external prompts",
+        title: "Exports and connected AI clients",
         paragraphs: [
-          `Cadence provides ${exportFormats.join(", ")} exports. The user is responsible for safeguarding downloaded files and deciding whether to share them.`,
-          "Cadence may provide prepared prompts for independent export sharing. Separately, enabling Daily Brief permits Cadence to send disclosed context to OpenAI. Each connected source requires its own model-data choice. External services operate under their own terms and privacy policies.",
+          `Cadence provides ${exportFormats.join(", ")} exports and prepared prompts. The user is responsible for safeguarding downloaded files and deciding whether to share them.`,
+          "You may authorize an external AI client to access your hosted Cadence account through MCP. You choose the client and grant its permissions. You direct the requests and review changes before confirming them in that client. Read permission permits access to tracking records, including notes and history; write permissions separately allow Occurrence changes or Behavior changes. There is no MCP delete operation. Calendar data is never shared through MCP.",
+          "A client may misunderstand a request or produce incorrect information. Check the Behavior, Occurrence, date, and proposed values before confirming a change. You remain responsible for the declarations and instructions you provide. Cadence does not verify that a Behavior occurred and does not turn an Unresolved Occurrence into an automatic failure.",
+          "External AI clients operate under their own terms and privacy policies. Cadence's Privacy Policy describes the data disclosed through MCP, integration activity retention, and your controls. Cadence does not sell your personal data. Disconnect in Settings > Connected apps to stop further access by that connection. Disconnecting does not reverse earlier changes or delete copies that another service already received.",
+          "Cadence remains a personal recordkeeping service. Neither this connection nor an AI response makes it medical advice, a dosing system, an emergency service, or a substitute for a qualified professional. Do not use it for safety-critical decisions or share records you are not entitled to disclose.",
+        ],
+      },
+      {
+        title: "Optional Daily Brief",
+        paragraphs: [
+          "Daily Brief is an optional, read-only feature separate from connected AI clients. When enabled, it uses OpenAI to prepare a briefing from the data described in the Privacy Policy. Separate choices control optional Calendar timing, reminder delivery counts, and selected Notes. Each connected source requires its own model-data choice.",
+          "A briefing can be incomplete or incorrect. It cannot change tracking or Calendar records. Check its suggestions against your records and circumstances. Daily Brief is subject to the General-purpose recordkeeping limits above and must not be used for safety-critical decisions.",
         ],
       },
       {

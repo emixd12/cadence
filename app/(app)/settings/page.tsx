@@ -14,6 +14,9 @@ import {
   TrustAndLegalPanel,
 } from "@/components/settings/SettingsPanels";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
+import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
+import { getConnectedApps } from "@/lib/services/oauth-ui.service";
+import { disconnectAppAction } from "./actions";
 import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
@@ -47,9 +50,10 @@ async function SettingsContent() {
     () => getSettingsPageData(),
   );
 
-  const [categorySettings, noteShortcutView] = await Promise.all([
+  const [categorySettings, noteShortcutView, connectedApps] = await Promise.all([
     getCategorySettings(),
     getNoteShortcutViewForCurrentUser(null),
+    getConnectedApps(),
   ]);
 
   return (
@@ -70,6 +74,8 @@ async function SettingsContent() {
       <TravelSettingsPanel />
 
       <DailyBriefSettingsPanel />
+
+      <ConnectedAppsPanel view={connectedApps} timezone={settings.timezone} action={disconnectAppAction} />
 
       <CategoryPanel {...categorySettings} action={changeCategoryAction} />
 

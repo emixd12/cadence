@@ -253,3 +253,23 @@ even after hosted deletion.
 Enter or Space once. The destructive action is text-labeled and uses the form
 gates in addition to visual styling. After navigation, focus moves to the
 **Account deleted.** status so the result is announced on Login.
+
+## Connect and disconnect an AI client
+
+Start a Cadence connection from your AI client. Sign in with Google if needed.
+Review the client name, verified or unverified label, return host, and account.
+Read access is required and includes notes, which may contain sensitive data.
+Switch off either write permission to narrow access. Choose **Allow** to connect
+or **Deny** to refuse. Expired requests must be restarted from the AI client.
+
+Open **Settings → Connected apps** to review permissions, connected dates, and
+last use. Expand **Recent activity** for operations, times, and outcomes. Cadence
+does not show operation payloads there. Choose **Disconnect** beside an app to
+stop its access immediately. Reconnect from the AI client to restore access.
+A failed Disconnect asks you to reload Settings and try again.
+
+Use Tab to reach checkboxes and actions, Space to change a checkbox or expand
+Recent activity, and Enter to submit. These controls also work in narrow mobile
+browsers. Hosted grants are managed on the web; account-free desktop data is
+not accessible to connected clients. Google Calendar, travel, Daily Brief, and
+your email address are excluded from this access.

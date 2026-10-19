@@ -40,9 +40,13 @@ Tickets 116–122 implement optional Google
 account linking and offline-capable desktop synchronization. The desktop track
 uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
-in-app horse briefing. Tickets 233–240 implement read-only Outlook Calendar, iCloud Calendar, and Hevy
-workout-timing connectors on web and linked desktop with local verification.
-Ticket 241 owns final disclosure/evidence review; live and release gates remain open. Mobile and broader workspace restructuring remain deferred.
+in-app horse briefing. Tickets 220–232 plan one remote MCP server, a
+Cadence-owned OAuth server, and Claude and ChatGPT plugins; see
+`docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
+read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
+web and linked desktop with local verification. Ticket 241 owns final
+disclosure/evidence review; live and release gates remain open. Mobile and
+broader workspace restructuring remain deferred.
 
 ## Agent operating model
 
@@ -100,6 +104,8 @@ Product and implementation docs:
 22. `/docs/DESKTOP_DATA_MODEL.md`
 23. `/docs/DESKTOP_PARITY.md`
 24. `/docs/INTEGRATION_PLAYBOOK.md`
+25. `/docs/MCP_INTEGRATION.md`
+26. `/docs/MCP_CONTRACT.md` (Ticket 221)
 
 ## Product constraints
 
@@ -125,6 +131,10 @@ In scope:
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241, each with separate Daily Brief disclosure
+- Remote MCP server, Cadence-owned OAuth server, consent and Connected apps
+  settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
+  full tracking-data read plus scoped, user-confirmed writes (Occurrence status
+  and notes; create, edit, archive, and restore Behaviors; no deletes)
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -137,7 +147,13 @@ Out of scope for v1:
 - Medication dose tracking
 - Supply/refill inventory
 - General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
-  the in-app read-only daily briefing in the horse bubble
+  the in-app read-only daily briefing in the horse bubble. Outside AI clients may
+  call scoped MCP tools at the user's direction (Tickets 220–232); Cadence itself
+  runs no server-side AI agent or autonomous execution through MCP
+- MCP follow-ups: MCP Apps widgets, a REST/webhook adapter, Facets sync, a local
+  stdio MCP server for account-free desktop, MCP prompts/resources, per-event
+  client provenance in synced history and BehaviorLog, and a production reviewer
+  sign-in (see `docs/FUTURE_UPDATES.md`)
 - Calendar sync and event editing, except read-only Google Calendar context in
   Tickets 132–137 and locally implemented read-only Outlook and iCloud Calendar context in
   Tickets 233–241
@@ -484,6 +500,10 @@ Do not expand scope to solve speculative future requirements.
 - Use RLS on all user-owned web tables.
 - Never commit `.env` files or secrets.
 - Never expose service-role keys to the browser.
+- MCP integration tokens are opaque, hashed at rest, bound to the MCP URL, and
+  revocable. Integration operations reach user data only through RLS as the
+  grant's user; the service role is limited to OAuth token-endpoint functions.
+  Never log tokens or note text.
 - Use server-side code for privileged operations.
 - Treat provider CLI login output, API keys, and approval codes as secrets.
 

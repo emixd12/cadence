@@ -16,7 +16,7 @@ export const faqGroups: readonly FaqGroup[] = [
   ] },
   { id: "review-and-analysis", title: "Review and analysis", items: [
     { id: "how-adherence-works", question: "How does Adherence work?", answer: "Cadence shows Adherence across 7, 30, or 90 days. Adherence is the share of decided Occurrences marked Completed. Unresolved Occurrences remain separate from final calculations." },
-    { id: "use-external-ai", question: "Can I analyze my Record with an AI service?", answer: "You choose whether to share exports with an external AI service. Separately, where enabled, optional Daily Brief sends disclosed context to OpenAI. Each connected source needs its own model-data choice." },
+    { id: "use-external-ai", question: "Can I analyze my Record with an AI service?", answer: "Cadence provides exports and prepared prompts for services you choose. When enabled, Daily Brief separately sends selected tracking information to OpenAI; Calendar timing and other optional sources require separate choices. MCP lets a connected AI client read tracking records and make permitted changes you direct and confirm. Calendar data is never shared through MCP. Hosted MCP launch remains pending." },
   ] },
   { id: "google-calendar", title: "Google Calendar", items: [
     { id: "is-calendar-required", question: "Is Google Calendar required?", answer: "No. Cadence tracking works without Calendar. Where enabled, Google Calendar requires separate read-only consent. Provider approval and acceptance of a particular deployment or desktop build are separate evidence." },

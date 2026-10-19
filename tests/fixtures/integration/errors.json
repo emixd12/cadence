@@ -1,0 +1,100 @@
+{
+  "valid": [
+    {
+      "name": "invalid input",
+      "value": {
+        "code": "invalid_input",
+        "message": "Check the input: $.title must not be empty.",
+        "retryable": true,
+        "retry": "after_change",
+        "field_errors": [
+          {
+            "path": "$.title",
+            "message": "must not be empty"
+          }
+        ],
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "insufficient scope",
+      "value": {
+        "code": "insufficient_scope",
+        "message": "set_occurrence_status needs the cadence.occurrences.write permission.",
+        "retryable": true,
+        "retry": "after_authorization",
+        "required_scopes": [
+          "cadence.occurrences.write"
+        ],
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "rate limited",
+      "value": {
+        "code": "rate_limited",
+        "message": "Too many requests.",
+        "retryable": true,
+        "retry": "after_delay",
+        "retry_after_seconds": 30,
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "not found",
+      "value": {
+        "code": "not_found",
+        "message": "No Behavior with that id.",
+        "retryable": false,
+        "retry": "never",
+        "contract_version": "1.0.0"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown code",
+      "value": {
+        "code": "teapot",
+        "message": "x",
+        "retryable": false,
+        "retry": "never",
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "empty message",
+      "value": {
+        "code": "not_found",
+        "message": "",
+        "retryable": false,
+        "retry": "never",
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "unknown scope",
+      "value": {
+        "code": "insufficient_scope",
+        "message": "x",
+        "retryable": true,
+        "retry": "after_authorization",
+        "required_scopes": [
+          "admin"
+        ],
+        "contract_version": "1.0.0"
+      }
+    },
+    {
+      "name": "stack trace field",
+      "value": {
+        "code": "internal_error",
+        "message": "x",
+        "retryable": true,
+        "retry": "after_delay",
+        "stack": "at foo",
+        "contract_version": "1.0.0"
+      }
+    }
+  ]
+}

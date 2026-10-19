@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { LegalPageContent } from "../components/settings/LegalContent";
+import { LEGAL_PAGES, LegalPageContent } from "../components/settings/LegalContent";
 import { TrustAndLegalPanel } from "../components/settings/SettingsPanels";
 
 vi.mock("../lib/marketing-site", () => ({
@@ -70,12 +70,75 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("Local checks do not establish public availability");
     expect(html).toContain("retains no production prompt or briefing history");
     expect(html).toContain("outside the tracking database, exports, synchronization and user-created backups");
+    expect(html).not.toContain("Provider settings and published capabilities were verified");
     expect(html).toContain("Limited Use requirements");
     expect(html).toContain(
       'href="https://developers.google.com/terms/api-services-user-data-policy"',
     );
     expect(html).not.toContain("review of Calendar access is pending");
     expect(html).not.toContain("currently limited to Google OAuth test users");
+  });
+
+  it("separates connected-client permissions, retained copies, and Daily Brief consent", () => {
+    const privacy = JSON.stringify(LEGAL_PAGES.privacy);
+    const terms = JSON.stringify(LEGAL_PAGES.terms);
+    for (const copy of [privacy, terms]) {
+      expect(copy).toContain("Exports and connected AI clients");
+      expect(copy).toContain("Optional Daily Brief");
+      expect(copy).toContain("Calendar data");
+      expect(copy).toContain("never shared through MCP");
+      expect(copy).not.toContain("does not send behavior data to an AI provider");
+    }
+    for (const disclosure of [
+      "user-authored Behavior locations", "Read access is not limited to records you mention",
+      "MCP provides no delete operation", "the AI client controls its per-action confirmation",
+      "retrieve copies already received by the client", "Daily Brief consent does not authorize MCP access",
+      "up to 12 Notes, the first 280 characters of each", "never reminder content",
+      "does not promise zero provider retention",
+    ]) expect(privacy).toContain(disclosure);
+  });
+
+  it("distinguishes validity, physical cleanup, and shared registration retention", () => {
+    const privacy = JSON.stringify(LEGAL_PAGES.privacy);
+    for (const disclosure of [
+      "90-day policy", "24-hour validity", "it does not mean immediate physical deletion",
+      "Failed maintenance can extend storage", "no automatic deletion deadline",
+      "does not remove a shared client registration", "live account-owned integration records",
+    ]) expect(privacy).toContain(disclosure);
+    expect(LEGAL_PAGES.privacy.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.terms.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.trust.updated).toBe("August 27, 2026");
+    expect(LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.caption)
+      .toBe("Cadence retention periods as of October 18, 2026");
+  });
+
+  it("discloses backup lifecycle without changing live deletion or ordinary log periods", () => {
+    const privacy = LEGAL_PAGES.privacy;
+    const retention = privacy.sections.find(({ title }) => title === "Retention");
+    const rows = retention?.table?.rows ?? [];
+    const approved = "Supabase maintains database backups. Deleted records may remain in backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.";
+
+    expect(retention?.paragraphs).toContain(approved);
+    expect(renderToStaticMarkup(<LegalPageContent pageKey="privacy" />)).toContain(approved);
+    for (const name of ["Backups", "Deleted-account backup remnants", "Google Calendar connector records", "Travel place identifiers"]) {
+      const row = rows.find(([label]) => label === name);
+      expect(row).toBeDefined();
+      expect(row?.join(" ")).toContain("backup lifecycle");
+      expect(row?.join(" ")).not.toMatch(/(?:7|seven) days/);
+    }
+    const calendar = privacy.sections.find(({ title }) => title === "Optional Google Calendar");
+    expect(calendar?.paragraphs.join(" ")).toContain("sealed credential ciphertext may remain in Supabase backup copies");
+    expect(calendar?.paragraphs.join(" ")).not.toContain("no more than seven days");
+    expect(rows.find(([label]) => label === "Routine logs")).toEqual([
+      "Routine logs", "No more than 7 days",
+      "Vercel Pro runtime logs: 1 day; Supabase Pro API and database logs: 7 days",
+    ]);
+    expect(rows.find(([label]) => label === "Deleted-account live data")).toEqual([
+      "Deleted-account live data", "Immediately or within 7 days",
+      "Auth deletion and database cascades remove live account data immediately when deletion succeeds",
+    ]);
+    expect(rows.find(([label]) => label === "Google Calendar connector records")?.[2]).toContain("Disconnect deletes the live credential;");
+    expect(rows.find(([label]) => label === "Travel place identifiers")?.[2]).toContain("Turning travel off or deleting the account deletes them;");
   });
 
   it("renders the approved Terms with the settled legal facts", () => {

@@ -1,0 +1,162 @@
+{
+  "operation": "restore_behavior",
+  "valid_inputs": [
+    {
+      "name": "restore",
+      "value": {
+        "behavior_id": "00000002-1111-4111-8111-000000000002",
+        "idempotency_key": "restore-0000-0001"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "missing id",
+      "value": {
+        "expected_revision": "b2.1"
+      },
+      "code": "invalid_input",
+      "path": "$.behavior_id"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "already active",
+      "value": {
+        "behavior": {
+          "id": "00000001-1111-4111-8111-000000000001",
+          "title": "Morning walk",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": {
+            "id": "00000003-1111-4111-8111-000000000003",
+            "name": "Fitness"
+          },
+          "state": "active",
+          "archived_at": null,
+          "auto_archived_at": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "days_of_week": [
+                  "monday",
+                  "thursday"
+                ]
+              },
+              "recurrence_summary": "Weekly on Monday and Thursday",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                {
+                  "id": "00000008-1111-4111-8111-000000000008",
+                  "kind": "range",
+                  "preset": "evening",
+                  "start_time": "18:00",
+                  "end_time": "00:00",
+                  "label": "Evening"
+                }
+              ],
+              "time_summary": "7:30 AM, Evening"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [],
+          "external_ref": null,
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        },
+        "changed": false
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "unknown state",
+      "value": {
+        "behavior": {
+          "id": "00000001-1111-4111-8111-000000000001",
+          "title": "Morning walk",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": {
+            "id": "00000003-1111-4111-8111-000000000003",
+            "name": "Fitness"
+          },
+          "state": "deleted",
+          "archived_at": null,
+          "auto_archived_at": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "days_of_week": [
+                  "monday",
+                  "thursday"
+                ]
+              },
+              "recurrence_summary": "Weekly on Monday and Thursday",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                {
+                  "id": "00000008-1111-4111-8111-000000000008",
+                  "kind": "range",
+                  "preset": "evening",
+                  "start_time": "18:00",
+                  "end_time": "00:00",
+                  "label": "Evening"
+                }
+              ],
+              "time_summary": "7:30 AM, Evening"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [],
+          "external_ref": null,
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        },
+        "changed": true
+      },
+      "code": "internal_error",
+      "path": "$.behavior.state"
+    }
+  ]
+}

@@ -35,7 +35,8 @@
         "/docs",
         "/examples",
         "/about",
-        "/cadent"
+        "/cadent",
+        "/developers"
       ]
     },
     {
@@ -114,6 +115,14 @@
       "routes": [
         "/login",
         "/auth/test-login"
+      ]
+    },
+    {
+      "id": "oauth_consent",
+      "label": "AI client consent",
+      "kind": "authenticated",
+      "routes": [
+        "/oauth/consent"
       ]
     }
   ],
@@ -375,7 +384,7 @@
     {
       "path": "apps/marketing/src/layouts/BaseLayout.astro",
       "classification": "cataloged",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-MKT-001",
         "INT-MKT-002",
@@ -837,6 +846,43 @@
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002"
+      ]
+    },
+    {
+      "path": "components/oauth/ConsentForm.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-OAUTH-001",
+        "INT-OAUTH-002",
+        "INT-OAUTH-003"
+      ]
+    },
+    {
+      "path": "components/settings/ConnectedAppsPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 5,
+      "interaction_ids": [
+        "INT-OAUTH-004",
+        "INT-OAUTH-005",
+        "INT-MKT-013"
+      ]
+    },
+    {
+      "path": "app/oauth/consent/page.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 1,
+      "interaction_ids": [
+        "INT-OAUTH-004"
+      ]
+    },
+    {
+      "path": "apps/marketing/src/layouts/DeveloperLayout.astro",
+      "classification": "cataloged",
+      "interaction_marker_count": 7,
+      "interaction_ids": [
+        "INT-MKT-013",
+        "INT-MKT-014"
       ]
     },
     {
@@ -1937,7 +1983,8 @@
         "/trust",
         "/api/public/trust-evidence",
         "/privacy",
-        "/terms"
+        "/terms",
+        "/developers"
       ],
       "journeys": [
         "J01",
@@ -1991,6 +2038,11 @@
           "id": "terms",
           "label": "Terms",
           "result": "Open the deployed /terms page."
+        },
+        {
+          "id": "developers",
+          "label": "Developers",
+          "result": "Open developer documentation."
         }
       ],
       "availability": "Available in the marketing footer.",
@@ -13534,6 +13586,542 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-001",
+      "name": "Approve AI client access",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Approve AI client access.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Allow"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Issue a single-use authorization code for only the selected permissions.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_grant"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx",
+        "app/oauth/consent/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx",
+            "app/oauth/consent/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-002",
+      "name": "Deny AI client access",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Deny AI client access.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Deny"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Consume the pending request and return access_denied with the issuer.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_denial"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx",
+        "app/oauth/consent/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx",
+            "app/oauth/consent/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-003",
+      "name": "Narrow AI client permissions",
+      "status": "implemented",
+      "surfaces": [
+        "oauth_consent"
+      ],
+      "routes": [
+        "/oauth/consent"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Narrow AI client permissions.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Write permission checkbox"
+        }
+      ],
+      "availability": "Signed in; consent also requires a valid browser-bound pending request.",
+      "success_result": "Change the permission draft; required read remains selected.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/oauth/ConsentForm.tsx"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/oauth/ConsentForm.tsx"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-004",
+      "name": "Disconnect an AI client",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#connected-apps"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Disconnect an AI client.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Disconnect"
+        }
+      ],
+      "availability": "Signed in, under Settings \u2192 Connected apps.",
+      "success_result": "Revoke the owned grant and every token immediately.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "oauth_revocation"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/ConnectedAppsPanel.tsx",
+        "app/(app)/settings/actions.ts",
+        "lib/services/oauth-ui.service.ts"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx",
+            "app/(app)/settings/actions.ts",
+            "lib/services/oauth-ui.service.ts"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-OAUTH-005",
+      "name": "View recent AI client activity",
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings#connected-apps"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "View recent AI client activity.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Recent activity"
+        }
+      ],
+      "availability": "Signed in, under Settings \u2192 Connected apps.",
+      "success_result": "Expand or collapse operation, time, and outcome records without payloads.",
+      "failure_result": "A failed request shows a recoverable error without exposing private details.",
+      "effects": [
+        "disclosure"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/ConnectedAppsPanel.tsx"
+      ],
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/privacy-and-account.md#connect-and-disconnect-an-ai-client"
+        ]
+      },
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/oauth-ui.dom.test.tsx",
+          "tests/oauth-ui-actions.test.ts"
+        ],
+        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/oauth-ui.dom.test.tsx",
+            "tests/oauth-ui-actions.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Hosted grants are managed through the web app; account-free data is not reachable."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing does not manage account grants."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile is outside v1; responsive web provides this flow."
+        }
+      }
+    },
+    {
+      "id": "INT-MKT-013",
+      "name": "Read developer documentation",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#developer-documentation"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "marketing",
+        "settings"
+      ],
+      "routes": [
+        "/developers",
+        "/developers/:path*",
+        "/settings"
+      ],
+      "journeys": [
+        "J01"
+      ],
+      "intent": "Open developer guides, tool reference pages, page contents, adjacent pages, or Markdown mirrors.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Developer documentation links"
+        }
+      ],
+      "availability": "Public documentation is open to everyone. The Settings link appears in the signed-in web Connected apps panel.",
+      "success_result": "Opens the selected documentation destination.",
+      "failure_result": "Normal navigation failure applies.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/marketing/src/layouts/DeveloperLayout.astro",
+        "components/settings/ConnectedAppsPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/developer-docs.test.ts"
+        ],
+        "notes": "Contract examples and route coverage checked automatically; navigation and code-copy success feedback verified in browser. Clipboard byte readback and denied-permission simulation were not verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/ConnectedAppsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "marketing": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/marketing/src/layouts/DeveloperLayout.astro"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        }
+      }
+    },
+    {
+      "id": "INT-MKT-014",
+      "name": "Copy developer code example",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/public-and-sign-in.md#developer-documentation"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "marketing"
+      ],
+      "routes": [
+        "/developers",
+        "/developers/:path*"
+      ],
+      "journeys": [
+        "J01"
+      ],
+      "intent": "Copy an example from the developer documentation to the clipboard.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Copy code"
+        }
+      ],
+      "availability": "Available on public developer documentation pages.",
+      "success_result": "Copies the code and announces success.",
+      "failure_result": "Announces copy failure and focuses the code for manual copying.",
+      "effects": [
+        "clipboard"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "apps/marketing/src/layouts/DeveloperLayout.astro"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/developer-docs.test.ts"
+        ],
+        "notes": "Contract examples and route coverage checked automatically; navigation and code-copy success feedback verified in browser. Clipboard byte readback and denied-permission simulation were not verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "desktop": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
+        },
+        "marketing": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/marketing/src/layouts/DeveloperLayout.astro"
+          ],
+          "evidence": [
+            "tests/developer-docs.test.ts"
+          ]
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Public developer documentation belongs to the marketing site."
         }
       }
     },
