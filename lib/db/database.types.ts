@@ -1566,6 +1566,73 @@ export type Database = {
         }
         Returns: Json
       }
+      integration_apply_write: {
+        Args: {
+          p_args: Json
+          p_as_of: string
+          p_external_ref?: string
+          p_hash: string
+          p_key: string
+          p_operation: string
+          p_rpc: string
+        }
+        Returns: Json
+      }
+      integration_find_external_reference: {
+        Args: { p_entity_type: string; p_external_id: string }
+        Returns: string
+      }
+      integration_idempotency_begin: {
+        Args: {
+          p_idempotency_key: string
+          p_operation: string
+          p_request_hash: string
+        }
+        Returns: {
+          result: Json
+          state: string
+        }[]
+      }
+      integration_idempotency_complete: {
+        Args: {
+          p_idempotency_key: string
+          p_request_hash: string
+          p_result: Json
+        }
+        Returns: boolean
+      }
+      integration_idempotency_release: {
+        Args: { p_idempotency_key: string; p_request_hash: string }
+        Returns: boolean
+      }
+      integration_link_external_reference: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_external_id: string
+        }
+        Returns: string
+      }
+      integration_list_external_references: {
+        Args: { p_entity_ids: string[]; p_entity_type: string }
+        Returns: {
+          entity_id: string
+          external_id: string
+        }[]
+      }
+      integration_lock_write: {
+        Args: { p_hash: string; p_key: string; p_operation: string }
+        Returns: Json
+      }
+      integration_record_activity: {
+        Args: {
+          p_error_code: string
+          p_operation: string
+          p_outcome: string
+          p_target_ids: string[]
+        }
+        Returns: undefined
+      }
       list_my_occurrence_time_session_history: {
         Args: {
           cursor_session_id: string
@@ -1619,6 +1686,123 @@ export type Database = {
           target_updated_count: number
           target_user_id: string
         }
+        Returns: Json
+      }
+      oauth_approve_consent: {
+        Args: {
+          p_client_id: string
+          p_code_challenge: string
+          p_code_hash: string
+          p_redirect_uri: string
+          p_resource: string
+          p_scopes: string[]
+        }
+        Returns: Json
+      }
+      oauth_consume_rate_limit: {
+        Args: { p_action: string; p_grant_id: string; p_source_hash: string }
+        Returns: Json
+      }
+      oauth_create_pending: {
+        Args: {
+          p_browser_hash: string
+          p_client_id: string
+          p_code_challenge: string
+          p_offline_access: boolean
+          p_redirect_uri: string
+          p_resource: string
+          p_scopes: string[]
+          p_state: string
+        }
+        Returns: string
+      }
+      oauth_exchange_authorization_code: {
+        Args: {
+          p_access_token_hash: string
+          p_client_id: string
+          p_code_hash: string
+          p_code_verifier: string
+          p_redirect_uri: string
+          p_refresh_token_hash: string
+          p_resource: string
+        }
+        Returns: Json
+      }
+      oauth_finish_pending: {
+        Args: {
+          p_browser_hash: string
+          p_code_hash: string
+          p_id: string
+          p_scopes: string[]
+        }
+        Returns: Json
+      }
+      oauth_get_client: { Args: { p_client_id: string }; Returns: Json }
+      oauth_list_activity: {
+        Args: { p_before?: string; p_limit?: number }
+        Returns: {
+          activity_id: number
+          client_name: string
+          error_code: string
+          grant_id: string
+          occurred_at: string
+          operation: string
+          outcome: string
+        }[]
+      }
+      oauth_list_grants: {
+        Args: never
+        Returns: {
+          client_id: string
+          client_name: string
+          client_uri: string
+          created_at: string
+          grant_id: string
+          last_used_at: string
+          logo_uri: string
+          scopes: string[]
+          verified_client: string
+        }[]
+      }
+      oauth_purge_expired: { Args: never; Returns: Json }
+      oauth_read_pending: {
+        Args: { p_browser_hash: string; p_id: string }
+        Returns: Json
+      }
+      oauth_register_client: {
+        Args: {
+          p_application_type: string
+          p_client_id: string
+          p_client_name: string
+          p_client_uri: string
+          p_logo_uri: string
+          p_metadata: Json
+          p_metadata_expires_at: string
+          p_redirect_uris: string[]
+          p_registration_type: string
+          p_verified_client: string
+        }
+        Returns: Json
+      }
+      oauth_revoke_all_grants: { Args: never; Returns: number }
+      oauth_revoke_grant: { Args: { p_grant_id: string }; Returns: boolean }
+      oauth_revoke_token: {
+        Args: { p_client_id: string; p_token_hash: string }
+        Returns: boolean
+      }
+      oauth_rotate_refresh_token: {
+        Args: {
+          p_access_token_hash: string
+          p_client_id: string
+          p_next_refresh_token_hash: string
+          p_refresh_token_hash: string
+          p_resource: string
+          p_scopes: string[]
+        }
+        Returns: Json
+      }
+      oauth_verify_access_token: {
+        Args: { p_access_token_hash: string; p_resource: string }
         Returns: Json
       }
       read_account_sync_snapshot: { Args: never; Returns: Json }
@@ -1897,3 +2081,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

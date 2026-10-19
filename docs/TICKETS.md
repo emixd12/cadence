@@ -12960,3 +12960,455 @@ Platform impact:
 - Marketing: review AI and privacy claims, including the public no-AI disclosure
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
+
+## Cadence MCP server and AI plugins: Tickets 220–232
+
+Filed October 18, 2026. The owner directed Cadence to ship one remote MCP server
+plus Claude and ChatGPT plugins, with full tracking-data read and scoped,
+user-confirmed writes. The owner made four decisions the same day
+(`docs/DECISIONS.md`, 2026-10-18):
+
+1. Sign-in: a Cadence-run OAuth server with opaque, audience-bound, revocable tokens.
+2. Writes: Occurrence status, Occurrence notes, create Behavior, edit Behavior,
+   archive and restore. No deletes.
+3. Facets readiness: foundations only (client attribution, retry-safe writes,
+   external record links, "changed since" reads). Facets sync, REST, and webhooks
+   are follow-ups.
+4. Developer docs: a `/developers` section in `apps/marketing`.
+
+Brief: `docs/MCP_INTEGRATION.md`. Contract: `docs/MCP_CONTRACT.md` (Ticket 221).
+Planned routes: `docs/ROUTE_MAP.md`. Layer ownership: `docs/AGENT_RESOLVERS.md`.
+
+Scopes: `cadence.read` (required), `cadence.occurrences.write`, and
+`cadence.behaviors.write`. Excluded data classes: Google Calendar events and
+connection, travel settings, routes, and device location, Daily Brief text and
+preferences, reminder delivery logs, push subscriptions, import-run internals,
+credentials and tokens, and the email address.
+
+| Ticket | Delivery slice | Wave | Dependencies |
+|---|---|---:|---|
+| 220 | MCP direction and integration brief (docs only) | 1 | None |
+| 221 | Versioned MCP operation contract | 1 | None |
+| 222 | OAuth and integration persistence | 1 | None |
+| 223 | RLS-scoped request context for integrations | 1 | None |
+| 224 | Integration read operations | 2 | 221, 223 |
+| 225 | Integration write operations | 2 | 221, 222, 223 |
+| 226 | OAuth authorization server endpoints | 2 | 222 |
+| 227 | Consent screen and Connected apps settings | 3 | 222, 226 |
+| 228 | MCP endpoint | 3 | 221–226 |
+| 229 | Developer documentation | 4 | 221, 228 |
+| 230 | Claude and ChatGPT plugin packages | 4 | 221, 228 |
+| 231 | Privacy disclosure and directory submission packet | 4 | 227, 228 |
+| 232 | Staging deployment and live client acceptance | 5 | 226–231; owner authorization |
+
+Shared rules: integration operations call existing services, never tables or
+resolvers directly. The service role never reads or writes user data; it is
+limited to token-endpoint functions. Never log tokens or note text. Never start,
+reset, or stop the default local Supabase project. A verifier re-runs the
+`AGENTS.md` check list after every wave. Filing these tickets authorizes no
+hosted migration push, signing-key import, deployment, legal publication, or
+directory submission.
+
+## Ticket 220: Record the MCP direction and integration brief
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: align governance docs with the owner's MCP direction before runtime work.
+
+Scope and acceptance:
+
+- `docs/DECISIONS.md`: a dated 2026-10-18 entry with the four owner decisions, the
+  rejection of Supabase's OAuth server (citing `docs/qa/advisor-auth-isolation.md`),
+  separate read and write grants, the Facets adherence-only boundary, and the
+  superseded "no MCP server" lines.
+- `AGENTS.md`: MCP server and plugins in scope; outside clients may call scoped
+  tools at the user's direction; no general AI coaching or server-side autonomous
+  execution; deferred follow-ups listed.
+- `docs/FUTURE_UPDATES.md`: MCP transport removed from "still deferred"; follow-ups
+  added (MCP Apps widgets, REST/webhook adapter, Facets sync, local stdio server,
+  per-event client provenance, MCP prompts/resources, reviewer sign-in).
+- `docs/MCP_INTEGRATION.md`: the completed playbook brief with dated research.
+- `docs/ROUTE_MAP.md`: planned MCP, OAuth, discovery, challenge, Connected apps, and
+  `/developers` routes.
+- Pointers in `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  and `docs/AGENT_RESOLVERS.md` (integration operations caller category).
+- This ticket group and the `STATUS.md` section. Dated historical records stay intact.
+- Verification: `npm run agents:check`, `npm run interactions:check`; `git diff --stat`
+  shows documentation only.
+
+| Platform | Impact |
+|---|---|
+| Web | Documentation only. |
+| Desktop | Documentation only. |
+| Marketing | Documentation only. |
+| Future mobile | Documentation only. |
+
+## Ticket 221: Versioned MCP operation contract
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none. The only wave-1 ticket allowed to add a dependency.
+
+Goal: one machine-readable source of truth for every MCP operation, read by the
+endpoint, handlers, tests, plugins, and developer docs.
+
+Scope and acceptance:
+
+- `packages/core/src/integration/`: operation registry for every catalog tool,
+  scope constants, stable error codes with retry meaning, limits, TypeScript types,
+  JSON Schema 2020-12 inputs and outputs, runtime validators, contract version
+  `1.0.0`, and a compatibility policy (published tool names never change).
+- One schema source only. Respect `npm run core:check`.
+- Output conventions: Cadence domain terms; `local_date` plus IANA timezone plus
+  UTC instants; `revision` on editable records; pairwise account id only; Needs
+  decision derived; adherence excludes Unresolved; no streaks.
+- Descriptions say what each tool does, with no instructions to the model. Every
+  tool has `title` and accurate `readOnlyHint`, `destructiveHint`,
+  `idempotentHint`, and `openWorldHint: false`.
+- Write inputs: optional `idempotency_key`, `expected_status`, `expected_revision`,
+  and `external_ref` on create.
+- Fixtures in `tests/fixtures/integration/`, `tests/integration-contract.test.ts`,
+  and `docs/MCP_CONTRACT.md` with a drift check against the registry.
+- Verification: `npm run core:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Consumed by Tickets 224–228; no web change in this ticket. |
+| Desktop | Not applicable: shared core only; desktop has no MCP surface in v1. |
+| Marketing | Consumed by Ticket 229's generated tool reference; no change here. |
+| Future mobile | Not applicable yet; a future client can reuse the contract. |
+
+## Ticket 222: OAuth and integration persistence
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: database objects for the authorization server and integration bookkeeping.
+
+Scope and acceptance:
+
+- Migrations in a private schema the Data API does not expose: OAuth clients (DCR
+  and cached CIMD metadata, verified flag), authorization codes (hash, PKCE,
+  resource, scopes, redirect, at most 10 minutes, single use), grants, access and
+  refresh token hashes with rotation families and reuse detection, integration
+  activity (no free text, 90-day retention), idempotency records (24 hours), and
+  external references (hosted only, never synced).
+- Rate-limit actions for MCP reads, writes, and client registration.
+- Token-endpoint functions (`SECURITY DEFINER`, pinned `search_path`, executable
+  only by `service_role`); user-session functions with `auth.uid()` owner checks;
+  an incident function that revokes every grant.
+- Account deletion removes all grants, tokens, codes, and activity.
+- `docs/DATA_MODEL.md`, regenerated types, `lib/db/` repositories, SQL smoke tests,
+  and the RLS registry test. No synced table changes.
+- Verification: isolated-project `db reset`, the SQL smoke, `npm run smoke:rls:local`,
+  `npm run test`, `npm run typecheck`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Hosted database objects and repositories. |
+| Desktop | Not applicable: no synced table changes; recorded in `docs/DATA_MODEL.md`. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 223: RLS-scoped request context for integrations
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: let server code act as a verified grant's user through normal RLS, without
+cookies or the service role.
+
+Scope and acceptance:
+
+- `lib/integrations/request-context.ts`: `IntegrationContext` (client, user id,
+  injected `now`, actor with channel, client id, grant id, client label, scopes)
+  and a factory from a verified grant.
+- Internal ES256 token minting with Node `crypto`: `kid` of an imported Supabase
+  signing key, `role` and `aud` `authenticated`, at most 5 minutes, Cadence grant
+  claims. Never leaves the server; never logged.
+- Server-only key variables in `.env.example`; local steps and the hosted import
+  runbook in `docs/SUPABASE_WORKFLOW.md`. No hosted key import.
+- Unit tests for claims, expiry, and `kid`; an opt-in local two-user isolation test.
+- Verification: `npm run test`, `npm run smoke:rls:local`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Server-only request context. |
+| Desktop | Not applicable: hosted server path only. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 224: Integration read operations
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 221, 223.
+
+Goal: transport-independent read handlers that return contract-valid results
+through existing services.
+
+Scope and acceptance:
+
+- `lib/integrations/operations/read/` exporting `readOperationHandlers`: account
+  context, list and get Behaviors, list categories, Timeline view, list and get
+  Occurrences (bounded ranges, cursor pagination, `updated_since`), adherence
+  summary, and `search` and `fetch` in OpenAI's standard shapes.
+- Read services expose injected-client functions; existing page functions become
+  thin wrappers. No duplicated resolver logic.
+- Run the same Occurrence freshness maintenance as the web Timeline; never change
+  statuses, notes, or definitions.
+- Never return an excluded data class. Over-limit requests fail with stable errors.
+- Tests: midnight and DST boundaries, Needs decision, archived Behaviors, stable
+  pagination, limits, excluded-field assertions, opt-in two-user isolation.
+- Verification: `npm run resolvers:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Server read handlers; web pages behave as before. |
+| Desktop | Not applicable: hosted data only; account-free data is unreachable. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 225: Integration write operations
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 221, 222, 223.
+
+Goal: scoped, retry-safe, concurrency-safe write handlers on the web app's write paths.
+
+Scope and acceptance:
+
+- `lib/integrations/operations/write/` exporting `writeOperationHandlers`.
+- `set_occurrence_status` through `applyOccurrenceStatusTransition` with optional
+  `expected_status`; `update_occurrence_note` through `updateOccurrenceNote`;
+  `create_behavior` and `update_behavior` through core `createBehavior` and
+  `updateBehavior` with the web form's validation; `archive_behavior` and
+  `restore_behavior` through `setBehaviorActive`.
+- Optional `idempotency_key` on every write; replay returns the stored result.
+- Existing provenance vocabularies only; client attribution in hosted activity.
+  Vocabulary changes need owner approval and a desktop impact note.
+- `external_ref` on create. Scope check again at handler entry.
+- Tests: status transitions and corrections, stale `expected_status`, note
+  concurrency, validation errors, idempotent replay, scope denial, two-user
+  isolation, and row parity with the web app.
+- Verification: `npm run resolvers:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`, and `npm run smoke:account-sync:local` where feasible.
+
+| Platform | Impact |
+|---|---|
+| Web | Server write handlers. |
+| Desktop | Linked desktop receives these changes through existing sync; verify row shapes. No desktop code. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 226: OAuth authorization server endpoints
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 222.
+
+Goal: a standards-compliant OAuth 2.1 authorization server for Claude, Claude Code,
+and ChatGPT that issues opaque tokens bound to the MCP URL.
+
+Scope and acceptance:
+
+- Discovery: RFC 8414 authorization-server metadata and RFC 9728 protected-resource
+  metadata at both `.well-known` paths.
+- Metadata: PKCE S256, `none` auth method, CIMD supported, `iss` in every
+  authorization response (RFC 9207), `offline_access` in the authorization server's
+  `scopes_supported`.
+- `/oauth/authorize` validation and hand-off to consent; `/oauth/token` with PKCE,
+  refresh rotation, reuse detection, and `invalid_grant`; `/oauth/register`
+  (RFC 7591, rate-limited); `/oauth/revoke` (RFC 7009).
+- SSRF-protected CIMD fetches; exact redirect match plus port-agnostic loopback.
+- Token verification service for `/mcp`. One server-only kill switch, documented
+  in `docs/OPERATIONS.md`.
+- Tests for every endpoint and error path, plus a scripted code flow on `next dev`.
+- Updates `docs/MCP_INTEGRATION.md`, `docs/ROUTE_MAP.md`, and `.env.example`.
+- Verification: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`; `curl` the discovery endpoints.
+
+| Platform | Impact |
+|---|---|
+| Web | OAuth and discovery routes. |
+| Desktop | Not applicable: desktop uses its existing Supabase session, not this server. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 227: Consent screen and Connected apps settings
+
+Status: filed October 18, 2026; planned (wave 3).
+Dependencies: 222, 226.
+
+Goal: let users approve, narrow, review, and revoke AI client access.
+
+Scope and acceptance:
+
+- Consent page behind `/oauth/authorize`: Cadence sign-in required; client name,
+  logo, redirect host, verified or unverified label, account; read required and
+  each write scope switchable; Allow and Deny; CSRF protection.
+- Settings → Connected apps: grants with permissions, dates, last use, recent
+  activity; Disconnect revokes at once.
+- Sparse, mobile-responsive, accessible UI. Impeccable workflow first; the
+  design-system-bench skill for reusable UI; register intents in
+  `interaction-registry.json`; update `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, and
+  `DESIGN.md`; add `/oauth/:path*` to `proxy.ts`.
+- Record the desktop decision in `docs/DESKTOP_PARITY.md`.
+- Verification: `npm run interactions:check`, `npm run design-system:check`,
+  `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`; screenshots at 390 px and 1440 px.
+
+| Platform | Impact |
+|---|---|
+| Web | Consent page and Settings section. |
+| Desktop | Not applicable in v1: grants are hosted; recorded in `docs/DESKTOP_PARITY.md`. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 228: MCP endpoint
+
+Status: implemented locally October 18, 2026 (wave 3); awaiting independent review.
+Inspector OAuth and all 16 tool happy paths pass; its error-display limitation is
+recorded in `docs/qa/mcp-server.md`.
+Dependencies: 221–226.
+
+Goal: ship the remote MCP server at the planned `https://app.cadence-me.com/mcp`.
+
+Scope and acceptance:
+
+- `app/mcp/route.ts` and `lib/mcp/`: stateless Streamable HTTP with
+  pinned `@modelcontextprotocol/server@2.3.1` and dev-only
+  `@modelcontextprotocol/client@2.3.1`; protocol 2026-07-28 plus documented older versions;
+  deterministic `tools/list`.
+- 401 with `resource_metadata` and `scope`; 403 `insufficient_scope`; ChatGPT
+  `_meta["mcp/www_authenticate"]`; only tokens for this resource.
+- Tools from the Ticket 221 registry with schemas, annotations, and
+  `securitySchemes`; `structuredContent` plus short text; stable tool errors.
+  Omit optional `openai/profile`: its strict identity-only schema conflicts with
+  the approved account-context schema. Preserve all 16 tools and schemas.
+- Pipeline: verify → context → scope → rate limit → handler → output validation →
+  activity → monitoring. Honors the kill switch. Origin validation, body limit,
+  timeouts, credential-free CORS.
+- SDK client tests and a documented MCP Inspector run in `docs/qa/mcp-server.md`.
+- Verification: `npm run test`, `npm run resolvers:check`, `npm run typecheck`,
+  `npm run lint`, `npm run build`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | `/mcp` route and transport. |
+| Desktop | Not applicable: linked desktop sees MCP writes through sync. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 229: Developer documentation
+
+Status: implemented locally October 18, 2026 (wave 4); awaiting independent review.
+Dependencies: 221, 228.
+
+Goal: public developer docs for every feature of the Cadence MCP server.
+
+Scope and acceptance:
+
+- A `/developers` section in `apps/marketing` with docs layout, Markdown mirrors,
+  `llms.txt` entries, route manifest, and sitemap.
+- Overview, quickstarts, concepts, authentication and permissions, one generated
+  page per tool, errors, limits, idempotency and concurrency, data and privacy,
+  building integrations (Facets labeled as foundations), plugins, versioning, and
+  troubleshooting.
+- A generator and drift check (one npm script). Claim only verified behavior.
+- A Developers link in marketing navigation or footer.
+- Verification: `npm run marketing:build`, `npm run marketing:check`, the drift
+  script, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | `components/settings/ConnectedAppsPanel.tsx` links to the docs. |
+| Desktop | Not applicable: public documentation adds no desktop interface or data access. |
+| Marketing | `apps/marketing/src/layouts/DeveloperLayout.astro` and the route manifest provide `/developers`; catalog and interactions updated. |
+| Future mobile | Not applicable: native mobile remains deferred. |
+
+## Ticket 230: Claude and ChatGPT plugin packages
+
+Status: implemented locally October 18, 2026; awaiting independent wave-4 review.
+Dependencies: 221, 228.
+
+Goal: installable plugins that bundle Cadence skills with the remote MCP server.
+
+Scope and acceptance:
+
+- Read and cite the current Claude and OpenAI plugin docs in `docs/MCP_INTEGRATION.md`.
+- `integrations/skills/`: daily check-in, weekly review, and routine setup skills.
+  Skills never tell the model to skip host confirmations.
+- `integrations/claude-plugin/` with plugin manifest, `.mcp.json`, skills, and a
+  marketplace manifest; `integrations/chatgpt-plugin/` in OpenAI's current format
+  with a packaging script writing to a git-ignored folder. No secrets.
+- Both standalone packages contain byte-identical shared skills. Root Claude marketplace; OpenAI portable Agent Plugins format with OAuth metadata.
+- `node scripts/check-plugins.mjs` validates manifests and assets; `node scripts/package-plugins.mjs` writes reproducible ignored ZIPs.
+- `tests/plugins.test.ts` checks registry tool references, the structured input example, archives, metadata and copy drift. No publishing or live-install claim.
+- Verification: plugin validators, `npm run test`, `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Not applicable: distribution artifacts only. |
+| Desktop | Not applicable. |
+| Marketing | Linked from Ticket 229 docs. |
+| Future mobile | Not applicable. |
+
+## Ticket 231: Privacy disclosure and directory submission packet
+
+Status: filed October 18, 2026; planned (wave 4).
+Dependencies: 227, 228.
+
+Goal: legal drafts, the OpenAI challenge route, and the directory submission packet.
+
+Scope and acceptance:
+
+- Draft Privacy and Terms changes: disclosure to connected AI clients at the user's
+  direction, shared data classes, permissions, activity retention, revocation, no
+  sale, Calendar never shared through MCP. Owner approves before publication.
+- `/.well-known/openai-apps-challenge` from a server-only variable; 404 when unset.
+- `docs/qa/mcp-directory-submission.md`: listing copy, data-handling answers,
+  test cases, reviewer instructions, demo script, release notes, and the reviewer
+  account options (no production reviewer login without owner approval).
+- Owner-only action list with exact steps.
+- Verification: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Legal page drafts and the challenge route. |
+| Desktop | Not applicable. |
+| Marketing | Listing copy and disclosures after owner approval. |
+| Future mobile | Not applicable. |
+
+## Ticket 232: Production deployment and live client acceptance
+
+Status: filed October 18, 2026; production preparation only (wave 5); awaiting owner approval.
+Dependencies: 226–231 and explicit owner authorization for every provider step.
+
+Goal: prove the deployed server works in real Claude and ChatGPT clients.
+
+The owner selected existing production for planning on October 18, 2026.
+Preparation permits bounded read-only metadata checks, not hosted changes or
+live account operations. No staging project will be provisioned. The review
+packet lives in the Ticket 232 workspace note and shared PR Context.
+
+Scope and acceptance:
+
+- With authorization: hosted migration push, signing-key import, Vercel variables,
+  and deployment per `docs/VERCEL_WORKFLOW.md`.
+- Live acceptance with a test account: Claude custom connector (consent with a write
+  scope off, every tool, Disconnect then failure), Claude Code, ChatGPT developer
+  mode, MCP Inspector, two-account isolation, and a linked desktop showing an
+  MCP-made change after sync.
+- Evidence with playbook labels in `docs/qa/mcp-server.md`; `STATUS.md` updated.
+- Clean up test grants, data, and accounts, and read back the cleanup.
+- Verification: the live checks; `npm run agents:check` after doc updates.
+
+| Platform | Impact |
+|---|---|
+| Web | Deployed server and acceptance evidence. |
+| Desktop | Linked-desktop sync check only; no desktop code. |
+| Marketing | Deploy Ticket 229 developer docs through existing `cadence-marketing`; verify public links and Trust provenance. |
+| Future mobile | Not applicable. |

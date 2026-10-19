@@ -1,0 +1,92 @@
+{
+  "operation": "search",
+  "valid_inputs": [
+    {
+      "name": "keyword",
+      "value": {
+        "query": "walk"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "blank query",
+      "value": {
+        "query": "   "
+      },
+      "code": "invalid_input",
+      "path": "$.query"
+    },
+    {
+      "name": "empty query",
+      "value": {
+        "query": ""
+      },
+      "code": "invalid_input",
+      "path": "$.query"
+    },
+    {
+      "name": "query too long",
+      "value": {
+        "query": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "code": "invalid_input",
+      "path": "$.query"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "two results",
+      "value": {
+        "results": [
+          {
+            "id": "behavior:00000001-1111-4111-8111-000000000001",
+            "title": "Morning walk",
+            "url": "https://app.cadence-me.com/behaviors?behavior=00000001-1111-4111-8111-000000000001"
+          },
+          {
+            "id": "occurrence:00000005-1111-4111-8111-000000000005",
+            "title": "Morning walk on 2026-10-18",
+            "url": "https://app.cadence-me.com/timeline?date=2026-10-18&occurrence=00000005-1111-4111-8111-000000000005"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no results",
+      "value": {
+        "results": []
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "relative url",
+      "value": {
+        "results": [
+          {
+            "id": "behavior:00000001-1111-4111-8111-000000000001",
+            "title": "Morning walk",
+            "url": "/behaviors"
+          }
+        ]
+      },
+      "code": "internal_error",
+      "path": "$.results[0].url"
+    },
+    {
+      "name": "bad id prefix",
+      "value": {
+        "results": [
+          {
+            "id": "calendar:00000001-1111-4111-8111-000000000001",
+            "title": "Meeting",
+            "url": "https://app.cadence-me.com/"
+          }
+        ]
+      },
+      "code": "internal_error",
+      "path": "$.results[0].id"
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "operation": "update_occurrence_note",
+  "valid_inputs": [
+    {
+      "name": "multi-line note",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "note": "Felt good.\nCold out.",
+        "expected_revision": "o1.3"
+      }
+    },
+    {
+      "name": "clear note",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "note": ""
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "note too long",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "code": "invalid_input",
+      "path": "$.note"
+    },
+    {
+      "name": "control character",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "note": "bad\u0007bell"
+      },
+      "code": "invalid_input",
+      "path": "$.note"
+    },
+    {
+      "name": "missing note",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005"
+      },
+      "code": "invalid_input",
+      "path": "$.note"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "unchanged",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3"
+        },
+        "changed": false
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "needs_decision missing",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3"
+        },
+        "changed": true
+      },
+      "code": "internal_error",
+      "path": "$.occurrence.needs_decision"
+    }
+  ]
+}

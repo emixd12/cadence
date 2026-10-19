@@ -21,14 +21,6 @@
     },
     {
       "componentId": "module.daily-brief-settings-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 53,
-      "route": "(app)/settings/page",
-      "usageKind": "render",
-      "confidence": "manual"
-    },
-    {
-      "componentId": "module.daily-brief-settings-panel",
       "file": "apps/desktop/src/product.tsx",
       "line": 477,
       "route": null,
@@ -253,14 +245,6 @@
     },
     {
       "componentId": "flow.account-deletion-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 80,
-      "route": "(app)/settings/page",
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "flow.account-deletion-panel",
       "file": "tests/settings-interactions-ui.test.tsx",
       "line": 72,
       "route": null,
@@ -352,14 +336,6 @@
       "file": "app/(app)/export/page.tsx",
       "line": 41,
       "route": "(app)/export/page",
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "layout.screen-frame",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 35,
-      "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
     },
@@ -552,14 +528,6 @@
       "file": "tests/ticket-090-ui.test.tsx",
       "line": 74,
       "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.category-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 74,
-      "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
     },
@@ -941,14 +909,6 @@
     },
     {
       "componentId": "module.note-shortcut-controls",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 76,
-      "route": "(app)/settings/page",
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.note-shortcut-controls",
       "file": "apps/desktop/src/product.tsx",
       "line": 497,
       "route": null,
@@ -1000,14 +960,6 @@
       "file": "tests/occurrence-note-shortcuts-ui.test.tsx",
       "line": 213,
       "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.notification-permission-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 64,
-      "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
     },
@@ -1213,14 +1165,6 @@
     },
     {
       "componentId": "module.timezone-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 59,
-      "route": "(app)/settings/page",
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.timezone-panel",
       "file": "apps/desktop/src/settings-screen.tsx",
       "line": 96,
       "route": null,
@@ -1245,14 +1189,6 @@
     },
     {
       "componentId": "module.travel-settings-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 70,
-      "route": "(app)/settings/page",
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.travel-settings-panel",
       "file": "apps/desktop/src/product.tsx",
       "line": 504,
       "route": null,
@@ -1264,14 +1200,6 @@
       "file": "tests/travel-settings.dom.test.tsx",
       "line": 19,
       "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.trust-and-legal-panel",
-      "file": "app/(app)/settings/page.tsx",
-      "line": 78,
-      "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
     },
@@ -1304,6 +1232,94 @@
       "file": "tests/public-trust-page.test.tsx",
       "line": 33,
       "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.daily-brief-settings-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 76,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.account-deletion-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 86,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "layout.screen-frame",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 38,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.category-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 80,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.note-shortcut-controls",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 82,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.notification-permission-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 68,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.timezone-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 63,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.travel-settings-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 74,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.trust-and-legal-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 84,
+      "route": "(app)/settings/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "flow.consent-form",
+      "file": "app/oauth/consent/page.tsx",
+      "line": 21,
+      "route": "oauth/consent/page",
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.connected-apps-panel",
+      "file": "app/(app)/settings/page.tsx",
+      "line": 78,
+      "route": "(app)/settings/page",
       "usageKind": "render",
       "confidence": "exact"
     }

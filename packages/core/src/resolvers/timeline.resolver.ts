@@ -22,6 +22,7 @@ export type ResolveTimelineInput = {
   now: Temporal.Instant;
   timezone?: string;
   futureDays?: number;
+  startLocalDate?: string;
 };
 
 // Resolve one persisted Occurrence without applying the feed's date range.
@@ -60,6 +61,7 @@ export function resolveTimeline(input: ResolveTimelineInput): TimelineView {
     daySections: resolveForwardDaySections({
       occurrences,
       today,
+      startDate: input.startLocalDate ? Temporal.PlainDate.from(input.startLocalDate) : today,
       visibleFutureDays,
     }),
   };
@@ -87,12 +89,14 @@ function resolveNeedsDecision(
 function resolveForwardDaySections(input: {
   occurrences: TimelineOccurrenceView[];
   today: Temporal.PlainDate;
+  startDate: Temporal.PlainDate;
   visibleFutureDays: number;
 }): TimelineDaySection[] {
   const sections: TimelineDaySection[] = [];
 
   for (let offset = 0; offset <= input.visibleFutureDays; offset += 1) {
-    const date = input.today.add({ days: offset });
+    const date = input.startDate.add({ days: offset });
+    const daysFromToday = input.today.until(date, { largestUnit: "days" }).days;
     const localDate = date.toString();
     const dayOccurrences = input.occurrences
       .filter((occurrence) => occurrence.localDate === localDate)
@@ -100,10 +104,10 @@ function resolveForwardDaySections(input: {
 
     sections.push({
       key: `day-${localDate}`,
-      kind: offset === 0 ? "today" : "future",
+      kind: daysFromToday === 0 ? "today" : "future",
       localDate,
       label: formatDateLabel(date),
-      relativeLabel: relativeDayLabel(offset),
+      relativeLabel: relativeDayLabel(daysFromToday),
       emptyMessage: EMPTY_DAY_MESSAGE,
       occurrences: dayOccurrences,
       unresolvedOccurrenceCount: countUnresolvedOccurrences(dayOccurrences),

@@ -1,0 +1,10 @@
+{
+  "name": "cadence",
+  "version": "1.0.0",
+  "description": "Review Cadence routines and record user-confirmed tracking changes.",
+  "author": { "name": "Identity Scaffolding LLC", "url": "https://cadence-me.com" },
+  "homepage": "https://cadence-me.com/developers",
+  "repository": "https://github.com/emixd12/cadence",
+  "license": "MIT",
+  "keywords": ["cadence", "routines", "behavior-tracking"]
+}

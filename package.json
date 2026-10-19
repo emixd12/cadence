@@ -22,7 +22,8 @@
     "desktop:parity:check": "node scripts/check-interactions.mjs --desktop-release",
     "marketing:dev": "npm --workspace apps/marketing run dev",
     "marketing:build": "npm --workspace apps/marketing run build",
-    "marketing:check": "npm --workspace apps/marketing run check",
+    "marketing:check": "npm run developers:check && npm --workspace apps/marketing run check",
+    "developers:check": "node apps/marketing/scripts/developer-reference.mjs",
     "marketing:preview": "npm --workspace apps/marketing run preview",
     "design-system:check": "node scripts/check-design-system.mjs",
     "agents:check": "node scripts/check-agents.mjs",
@@ -90,6 +91,7 @@
     "@cadence/core": "*",
     "@cadence/ui": "*",
     "@js-temporal/polyfill": "^0.5.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
     "lucide-react": "^1.17.0",
@@ -99,6 +101,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
     "@types/react": "^19",
@@ -106,6 +109,7 @@
     "@types/web-push": "^3.6.4",
     "@typescript/native": "npm:typescript@^7.0.2",
     "agentmail-cli": "^0.7.14",
+    "ajv": "^8.20.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "jsdom": "30.0.1",

@@ -187,3 +187,7 @@ authentication; its public Privacy page lists stored product and provider data.
 the external provider returns, focus begins in the Cadence page normally. If
 you use browser zoom or a screen magnifier, confirm the account shown by Google
 before continuing.
+
+## Developer documentation
+
+Choose Developers in the marketing footer, or Developer documentation in Settings → Connected apps. The public guides explain MCP setup, permissions and every tool. Use the documentation navigation, On this page links, and Previous/Next links to browse. Read Markdown opens the same page without navigation. Copy code copies an example; if copying fails, select the code manually. Local examples use synthetic records. Hosted launch and directory approval remain pending.

@@ -52,6 +52,14 @@ export async function getTimelinePageBundle(
 ): Promise<TimelinePageBundle> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
+  return getTimelinePageBundleForUser(supabase, userId, options);
+}
+
+export async function getTimelinePageBundleForUser(
+  supabase: AppSupabaseClient,
+  userId: string,
+  options: GetTimelinePageDataOptions = {},
+): Promise<TimelinePageBundle> {
   const now = options.now ?? Temporal.Now.instant();
   await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, importRuns, syncState] = await Promise.all([
@@ -85,6 +93,14 @@ export async function getTimelinePageData(
 ): Promise<TimelineView> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
+  return getTimelinePageDataForUser(supabase, userId, options);
+}
+
+export async function getTimelinePageDataForUser(
+  supabase: AppSupabaseClient,
+  userId: string,
+  options: GetTimelinePageDataOptions = {},
+): Promise<TimelineView> {
   const now = options.now ?? Temporal.Now.instant();
   await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, syncState] = await Promise.all([

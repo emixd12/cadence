@@ -19,6 +19,9 @@ export function getLlmsTxt(): string {
     "- [Example bundle](/examples.md): Sanitized sample bundle for inspection.",
     "- [About Cadence](/about.md): Recording principles, scope, and vocabulary.",
     "",
+    "## Developers",
+    ...marketingRoutes.filter((route) => route.path.startsWith("/developers") && route.includeInLlms).map((route) => `- [${route.title}](${route.markdownPath}): ${route.description}`),
+    "",
     "## Machine-Readable Files",
     `- [Trust evidence](${siteConfig.trustEvidenceUrl}): Normalized current results for all nine public checks.`,
     "- [Route manifest](/data/route-manifest.json): Canonical route data used by generated outputs.",
@@ -43,7 +46,7 @@ export function getLlmsTxt(): string {
     "- Do not infer failure from unresolved status.",
     "- Calculate Adherence from decided Occurrences only. Keep Unresolved separate.",
     "- Do not infer causes, clinical meaning, or motivation from a Record.",
-    "- Cadence does not send behavior data to an AI provider. The user exports data and chooses any external AI service.",
+    "- Exported data goes to an external service only when the user chooses it. MCP access is consent-based; hosted launch remains pending. See /developers/data-and-privacy.md.",
     "- Do not treat the example bundle as real account data.",
     "",
   ];
@@ -57,7 +60,7 @@ export function getLlmsFullTxt(): string {
     "",
     `Generated from route manifest. Last updated: ${siteConfig.lastModified}.`,
     "",
-    "This file is intentionally small. Prefer the per-route Markdown files when targeting one page.",
+    "Full guide text follows. Generated tool references have separate Markdown mirrors linked below to keep this file bounded.",
     `Canonical Trust page: ${siteConfig.trustUrl}`,
     `Normalized Trust evidence: ${siteConfig.trustEvidenceUrl}`,
     `Canonical Privacy HTML: ${siteConfig.cadenceAppUrl}/privacy`,
@@ -73,7 +76,7 @@ export function getLlmsFullTxt(): string {
       `Markdown: ${getCanonicalUrl(route.markdownPath)}`,
       `Last updated: ${route.lastModified}`,
       "",
-      route.markdown.trim(),
+      route.path.startsWith("/developers/tools/") ? `${route.description} Read the full reference: ${getCanonicalUrl(route.markdownPath)}` : route.markdown.trim(),
       "",
     );
   }

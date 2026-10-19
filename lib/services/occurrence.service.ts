@@ -698,6 +698,7 @@ export async function applyOccurrenceStatusTransition(
     expectedStatus?: OccurrenceStatus;
     nextStatus: OccurrenceStatus;
     now: Temporal.Instant;
+    sourceCaptureMethod?: "manual_tap" | "manual_text";
   },
 ): Promise<ApplyOccurrenceStatusTransitionRpcResult> {
   const { result, timezone } = await applySharedStatusTransition({
@@ -712,7 +713,10 @@ export async function applyOccurrenceStatusTransition(
         timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE,
       } : null;
     },
-    applyStatusTransition: (plan) => applyOccurrenceStatusTransitionRpc(supabase, plan),
+    applyStatusTransition: (plan) => applyOccurrenceStatusTransitionRpc(supabase, {
+      ...plan,
+      event: plan.event ? { ...plan.event, sourceCaptureMethod: input.sourceCaptureMethod ?? "manual_tap" } : null,
+    }),
   }, input);
 
   if (
@@ -729,7 +733,7 @@ export async function applyOccurrenceStatusTransition(
   return result;
 }
 
-async function repairClearedDecisionReminderCoverage(
+export async function repairClearedDecisionReminderCoverage(
   supabase: AppSupabaseClient,
   userId: string,
   input: {
@@ -795,10 +799,13 @@ export async function updateOccurrenceNote(
     expectedNote: string;
     note: string;
     usedShortcut?: boolean;
+    persistNote?: (plan: { occurrenceId: string; expectedNote: string | null; note: string | null }) => Promise<Occurrence | null>;
   },
 ): Promise<Occurrence> {
   return updateSharedOccurrenceNote({
-    updateOccurrenceNote: (plan) => updateOccurrenceNoteIfExpected(supabase, { userId, ...plan }),
+    updateOccurrenceNote: input.persistNote ?? ((plan) => updateOccurrenceNoteIfExpected(supabase, {
+      userId, ...plan,
+    })),
   }, input);
 }
 

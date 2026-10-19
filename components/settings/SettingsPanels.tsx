@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { LEGAL_PAGE_ORDER, LEGAL_PAGES } from "@/components/settings/LegalContent";
 
 type SettingsPanelProps = Readonly<{
+  id?: string;
   title: string;
   description?: string;
   children: ReactNode;
@@ -10,6 +11,7 @@ type SettingsPanelProps = Readonly<{
 }>;
 
 export function SettingsPanel({
+  id,
   title,
   description,
   children,
@@ -17,6 +19,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   return (
     <section
+      id={id}
       className={["bg-background py-4 first:pt-0 last:pb-0", className]
         .filter(Boolean)
         .join(" ")}
