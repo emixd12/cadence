@@ -403,7 +403,10 @@ macOS disk-image service must still be available to the build process.
 Standalone `verify` records frontend configuration as not verified by that command.
 It checks the app identifier/version/architecture, signing authority, hardened
 runtime, code signatures,
-Gatekeeper acceptance, and stapled notarization for the app and DMG. It decodes
+Gatekeeper acceptance, and stapled notarization for the app and DMG. For production,
+`verify-entitlements.py` requires the signed entitlements to equal
+`src-tauri/Entitlements.plist` exactly. The embedded provisioning profile must belong
+to the same team, be unexpired, and authorize every entitlement. It decodes
 Tauri's public-key/signature envelopes and asks Minisign to verify the updater
 archive. It compares every file's bytes and permissions, directory, and symlink
 target with the verified app. It rejects missing, surplus, duplicate, unsafe,
