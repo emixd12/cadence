@@ -308,7 +308,7 @@ Per-source disposable caches stay outside `cadence.sqlite3` and user-created
 backups. Disconnect, sign-out, and account switching clear them. Local mode shows
 connectors as requiring a linked account. There is no EventKit bridge. Installed
 acceptance remains open; Ticket 228 records that gap without claiming release.
-Microsoft/Apple/Hevy live access, iCloud hosted custody acceptance, Microsoft
+Microsoft/Apple/Hevy live access, Microsoft
 publisher verification and deployment remain unverified. Hevy requires Pro and
 scans at most 500 workouts globally even for today; count stability is not an
 atomic snapshot. Each source requires its own default-off Daily Brief disclosure.

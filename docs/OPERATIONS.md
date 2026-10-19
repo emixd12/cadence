@@ -1590,8 +1590,8 @@ Concurrent changes may escape detection. Cadence discards workout detail fields;
 only timing reaches Timeline or separately authorized Daily Brief.
 
 iCloud uses hosted CalDAV with sealed Apple Account email and app-specific
-password. That password is broader than Calendar. Owner custody acceptance is
-required before real credentials or release. Live endpoint/authentication and
+password. That password is broader than Calendar. The owner accepted hosted
+custody on 2026-10-19; release remains a separate gate. Live endpoint/authentication and
 recurrence interoperability remain unverified. Unsupported recurrence/timezones
 are quarantined as incomplete; they do not prove an empty calendar. No EventKit
 or local-only Mac Calendar access is implemented.

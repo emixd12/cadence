@@ -359,7 +359,7 @@ Status, October 18, 2026: Tickets 220–227 are locally implemented and
 independently verified through `40b1dc2`. Ticket 228 reconciles disclosures and
 final evidence. No live provider access, installed desktop acceptance or
 deployment is established. `docs/EXTERNAL_EVENT_CONTRACT.md` owns the wire
-contracts; `STATUS.md` owns current state. iCloud custody acceptance remains open.
+contracts; `STATUS.md` owns current state. The owner accepted iCloud custody on 2026-10-19.
 
 ### Shared boundary
 
@@ -511,10 +511,10 @@ Apple-documented user steps is an app-specific password used for CalDAV.
 | Public-approval gate | None for the app-specific-password path. Apple "supported app" eligibility is unknown and not pursued. |
 
 Local source work for Ticket 227 is approved and proceeds now: the intake route,
-sealing, schema, provider adapter, and tests with synthetic credentials. Owner
-acceptance of hosted app-specific-password custody is a product decision required
-before any real Apple credential is used and before user release. Deployment and
-live reads remain unauthorized.
+sealing, schema, provider adapter, and tests with synthetic credentials. The
+owner accepted hosted app-specific-password custody on 2026-10-19, so owner-run
+live tests may use a real Apple credential. Deployment and user release remain
+separate gates.
 
 ### Later coverage, not implemented
 

@@ -117,7 +117,8 @@ The integrated baseline `d7af234` was independently approved.
   keep cached context stale until a complete read succeeds. Account deletion includes
   manual Apple password revocation.
   Synthetic tests and responsive bench evidence cover these paths. Live Apple
-  access, hosted custody acceptance and installed acceptance remain open.
+  access and installed acceptance remain open; the owner accepted hosted custody
+  on 2026-10-19.
 - Ticket 228 disclosure/status reconciliation is independently approved at
   `a10b461` for local implementation and synthetic verification. The final
   reviewer passed 342 focused tests and governance, design-system and marketing
@@ -143,11 +144,12 @@ The integrated baseline `d7af234` was independently approved.
   `Retry-After`; Hevy reads use a count preflight, duplicate removal, and
   before/after checks without claiming an atomic snapshot; Apple claims are
   qualified; the iCloud local-work gate is removed.
-- Product decision before real iCloud use and user release: the owner must
-  accept hosted custody of an app-specific password. Apple does not limit it to
-  Calendar. No public Apple developer documentation for "supported app"
-  authorization was found on 2026-10-18. Ticket 227 local source work with
-  synthetic credentials is approved.
+- Product decision recorded 2026-10-19: the owner accepted hosted custody of
+  the iCloud app-specific password as documented, although Apple does not limit
+  it to Calendar. No public Apple developer documentation for "supported app"
+  authorization was found on 2026-10-18. Real Apple credentials may now be used
+  in owner-run live tests. Live Apple access, deployment and user release remain
+  separate gates.
 - Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds and
   does not compare it with the remaining request deadline; a caller abort signal
   still ends the wait. Its runtime is unchanged in this expansion.

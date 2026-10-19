@@ -274,8 +274,8 @@ Cadence provides prepared prompts for user-controlled export sharing. Separately
 optional Daily Brief sends disclosed context to OpenAI where enabled. Every
 connector requires its own model-data choice. Tickets 220–227 have local
 source/fixture verification only; Ticket 228 reconciles public disclosures.
-Live providers, installed desktop, iCloud custody acceptance and release remain
-open. Marketing must not equate local verification with public availability.
+Live providers, installed desktop and release remain open; the owner accepted
+iCloud custody on 2026-10-19. Marketing must not equate local verification with public availability.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
 

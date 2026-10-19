@@ -13977,9 +13977,9 @@ sealed server-side. Apple does not limit that password to Calendar; it can reach
 at least iCloud Mail, Contacts, and Calendar. Local source work proceeds now:
 intake route, sealing, schema, adapter, and tests with synthetic credentials.
 
-Product decision before real use: the owner must accept hosted custody of that
-password before any real Apple credential is used and before user release.
-Deployment and live reads remain unauthorized.
+Product decision: the owner accepted hosted custody of that password on
+2026-10-19 (see `docs/DECISIONS.md`). Real Apple credentials may be used in
+owner-run live tests. Deployment and user release remain separate gates.
 
 Acceptance: follow the iCloud brief exactly, including the pinned operations,
 `PROPFIND`/`REPORT` allowlist, bounds, file paths, and tests. Disconnect and

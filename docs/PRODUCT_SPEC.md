@@ -567,9 +567,9 @@ Google-only.
 
 iCloud uses a user-generated app-specific password over CalDAV. Apple does not
 limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
-Calendar. Local implementation with synthetic credentials is approved. Real
-Apple credentials and user release wait for the owner custody decision recorded
-under Ticket 227. Hevy requires Pro. Even a today-only request scans global
+Calendar. The owner accepted hosted custody on 2026-10-19 (Ticket 227), so
+owner-run live tests may use real Apple credentials. User release remains a
+separate gate. Hevy requires Pro. Even a today-only request scans global
 workout history, bounded at 500 workouts; larger accounts return incomplete
 without workout page reads. Complete reads report no detected change,
 not an atomic snapshot. Local Mac calendars and EventKit stay out of
