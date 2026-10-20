@@ -1,6 +1,29 @@
 # Implementation Status
 
-## Tickets 178 and 181: 0.1.2 replaces the 0.1.1 candidate — October 20, 2026
+## Ticket 178: revoked-session fix, 0.1.3 replaces 0.1.2 — October 20, 2026
+
+In progress; not published. **0.1.2 is superseded; do not publish it.** On installed
+0.1.2 the owner confirmed the stray-callback fix: a replayed sign-in callback left the
+account signed in with a notice and sync current. Calendar callback replay changed
+nothing. Calendar expiry cannot be observed on the Mac, because the hosted broker
+completes the Google connection and the Mac then shows that server state; a unit test
+covers the 5-minute local callback rejection.
+
+Remote sign-out found a third defect. Deleting the test account's sessions made
+**Sync now** show "permission denied for function read_account_sync_snapshot" instead
+of the revoked state with **Reconnect account**. Supabase drops the session after the
+refresh fails, so the next RPC runs unauthenticated and PostgREST answers 401 with
+`42501`, but the sync adapter threw the error without that status. A Claude Code
+read-only comparison on the test Mac found no lost rows, schema 17 and an integrity
+check of `ok` before and after.
+
+The fix keeps a 401 status on sync RPC errors so they map to "revoked"; a signed-in
+403 still reports its message. A regression test fails on the previous code. Version
+`0.1.3` replaces 0.1.2. Open: the signed 0.1.3 build and notarization, a remote
+sign-out recheck on 0.1.3, the owner Mac's one-hour renewal result, merging PR #115
+and the publish instruction.
+
+## Tickets 178 and 181: 0.1.2 replaces the 0.1.1 candidate — October 20, 2026 (superseded by 0.1.3)
 
 In progress; not published. The 0.1.1 candidate below is **superseded; do not
 publish it.** Installed acceptance on 0.1.1 passed on the second Mac: quarantined
