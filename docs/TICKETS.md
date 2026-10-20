@@ -12562,6 +12562,11 @@ September 29: the owner passed clean second-Mac offline creation/status/Note,
 restart persistence and reconnection. Chrome showed exactly one matching Behavior
 and matching Completed status and Note. Session renewal and explicit replay/expiry
 remain open.
+October 20: on signed 0.1.1, a replayed sign-in callback was rejected but replaced the
+working linked state with an error (false "revoked" sync, Calendar actions inert until
+relaunch). `4d9526f` fixes it in 0.1.2. Replay, Calendar expiry, revoked-session and
+renewal checks are repeated on 0.1.2; see
+`docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
 Original preview.45, the complete primary directory and reminders were restored.
 Dependencies: Ticket 115's retained notarized candidate; existing
 account-sync and Calendar contracts in Tickets 118–122 and 137.
@@ -12739,6 +12744,10 @@ verified, with the `desktop-stable` update feed. All 86 migrations replayed clea
 with the contract and 92 RLS checks passing. Ticket 178 checks, quarantined download,
 preview.50 updater run and publication remain open. Packet:
 `docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
+October 20: 0.1.1 is superseded and must not be published. Candidate `0.1.2` from
+`4d9526f` is notarized, stapled and verified. Its quarantined download, Ticket 178
+rechecks and publication remain open. Packet:
+`docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
 Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
 Maps-handoff outcomes separately; no location-success claim while that gate is open.
 

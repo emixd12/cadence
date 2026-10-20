@@ -1,6 +1,26 @@
 # Implementation Status
 
-## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+## Tickets 178 and 181: 0.1.2 replaces the 0.1.1 candidate — October 20, 2026
+
+In progress; not published. The 0.1.1 candidate below is **superseded; do not
+publish it.** Installed acceptance on 0.1.1 passed on the second Mac: quarantined
+browser download and normal first open. On the owner Mac, the preview.51 → 0.1.1
+update preserved every Behavior, Occurrence, status, Note, session and import record;
+only sync and reminder bookkeeping changed. Two defects were found:
+
+- A replayed sign-in callback replaced a working linked state with an error, so sync
+  reported "revoked" and Calendar actions did nothing until relaunch.
+- A refused restart showed its reason far from the Restart button.
+
+`4d9526f` (PR #115) fixes both and sets version `0.1.2`. Candidate `0.1.2` is built
+from that commit, notarized (the DMG on resubmission, after Apple left the first
+submission in progress for two hours), stapled, and passes all 14 artifact checks.
+Its files and the QA feed are on the QA prerelease. Open: the quarantined download,
+callback replay, Calendar expiry, revoked-session and one-hour renewal checks on
+0.1.2, merging PR #115, and the publish instruction. Packet:
+`docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026 (superseded by 0.1.2)
 
 In progress; not published. Candidate `0.1.1` is built from
 `95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
