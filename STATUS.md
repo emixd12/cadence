@@ -267,6 +267,30 @@ observations only; no credential or provider record was recorded.
   permission tables. A Cadence fix would need `Calendars.Read`, which exposes
   bodies and attachments that the brief excludes. That is an owner contract
   decision; Cadence's scope set is unchanged.
+- Outlook Calendar, work/school account (Ticket 237, with 238): **live pass**
+  in the app's home tenant (identityscaffolding.com). Connect returned without
+  a consent screen; the token was a Graph-audience JWT with `scp`
+  `Calendars.ReadBasic openid profile email`. `profile` and `email` came from
+  prior tenant consent and were accepted as OIDC scopes. Cadence does not request them.
+  The connection was sealed (generation 3), and 3 calendars were listed. A 7-day
+  read of the primary calendar was `complete` with 0 failures and 6 test events.
+  The daily series was expanded by `calendarView` into 3 instances (9–10 a.m.
+  New York) sharing one series ID. The all-day event kept its own date (event
+  zone Etc/UTC). A 10–11 a.m. Pacific event read as 1–2 p.m. New York, with
+  source zone America/Los_Angeles. Today's event was at 3–3:30 p.m. Only
+  titles, the user's response, and permitted Outlook web links were carried. No
+  event record was stored. Repeated token refreshes succeeded. Agent UI checks
+  in the in-app browser placed all 5 timed markers on the correct days, with the
+  Los Angeles event at 1:00–2:00 PM on Oct 23 and the all-day event in Oct 22's
+  All day area. Hiding all-day Outlook events removed it, and it was then
+  restored. Disconnect showed the Microsoft account / My Apps instruction. It
+  deleted the credential (0 rows) and moved the connection to `disconnected`
+  (generation 4), and later reads returned `not_connected`. Limits: home tenant
+  only, so cross-tenant user consent, `admin_approval_required` and the
+  unverified-publisher block were not exercised; wrong-account reconnect was not
+  live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
+  list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
+  This likely explains the owner's empty first load.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
