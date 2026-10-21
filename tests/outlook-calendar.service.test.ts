@@ -312,6 +312,8 @@ describe("desktop completion", () => {
     await expect(completeOutlookCalendarDesktopConnection(caller(OWNER), { state: attackerState, clientState: CLIENT_STATE, code: "victim-code" }, options)).rejects.toThrow("expired_attempt");
     const state = await startDesktop();
     await expect(completeOutlookCalendarDesktopConnection(caller(OWNER), { state, clientState: `${CLIENT_STATE}x`, code: "c" }, options)).rejects.toThrow("expired_attempt");
+    const sameLength = await startDesktop();
+    await expect(completeOutlookCalendarDesktopConnection(caller(OWNER), { state: sameLength, clientState: `${CLIENT_STATE.slice(0, -1)}0`, code: "c" }, options)).rejects.toThrow("expired_attempt");
     expect(tokenCalls()).toBe(0);
     expect(db.credentials.size).toBe(0);
   });

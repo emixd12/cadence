@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
 import { saveConnectorPreferences } from "@/lib/db/connectors.repo";
@@ -142,10 +142,16 @@ export async function finishOutlookCalendarCallback(input: { state: string; code
   } catch (error) { return settingsUrl(resultFor(error)); }
 }
 
+// Client states are 32–128 URL-safe characters. Fixed-width buffers keep the
+// comparison constant-time and hide the expected length without hashing either value.
 function sameClientState(expected: string, presented: string): boolean {
-  const left = createHash("sha256").update(expected).digest();
-  const right = createHash("sha256").update(presented).digest();
-  return timingSafeEqual(left, right) && expected.length > 0;
+  const width = 128;
+  if (!expected || expected.length > width || presented.length > width) return false;
+  const left = Buffer.alloc(width);
+  const right = Buffer.alloc(width);
+  left.write(expected, "ascii");
+  right.write(presented, "ascii");
+  return timingSafeEqual(left, right) && expected.length === presented.length;
 }
 
 /**
