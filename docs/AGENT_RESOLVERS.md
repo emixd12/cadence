@@ -383,6 +383,75 @@ service, repository/migration and model-adapter tests. UI clients render validat
 text, read-only suggestions and trusted source metadata.
 
 
+## Connector expansion ownership (Tickets 233–241)
+
+Planned October 18, 2026. Ticket 234 implemented the shared contracts. Tickets 236
+(Hevy), 237 (Outlook), and 240 (iCloud) implement their provider adapters locally.
+`STATUS.md` records provider-specific live acceptance and remaining release gates.
+Installed desktop acceptance remains unverified. No new required resolver module
+is added. `packages/core` owns the extended event validator
+(`services/external-event-validation.ts`) and the separate recorded-activity
+types, validation, and normalization (`types/recorded-activity.ts`,
+`services/recorded-activity-validation.ts`). The consumer projection is
+`projectAdvisorActivityConnector` in `services/advisor-day-context.ts`. These are
+pure functions with injected time; required tests are
+`tests/external-event-contract.test.ts`, `tests/recorded-activity-contract.test.ts`,
+and `tests/advisor-day-context.test.ts`. Provider adapters
+in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
+and field discard. Services own credentials, generations, and fences. Repositories
+in `lib/db` own owner-scoped persistence. UI renders validated results only.
+
+`lib/services/connector-read-deadline.ts` bounds Outlook, iCloud and Hevy reads
+from the initial database query through the final credential fence. Late database
+completion cannot start provider work after cancellation. Calendar preference
+writes compare the selection revision captured before provider validation, so a
+concurrent save or disconnect cannot be overwritten. Service tests and
+`tests/connector-service-deadline.test.ts` cover these boundaries.
+
+Ticket 240 uses `icloud-calendar-request.ts` for bounded PROPFIND/REPORT,
+redirect validation and XML parsing; `icloud-calendar-provider.ts` for discovery,
+server-expanded events and field minimization; and `icloud-calendar.service.ts`
+for credential custody, identity and generation/selection fences. It reuses
+`connectors.repo.ts`, without a provider-specific repository or migration.
+`tests/icloud-calendar-provider.test.ts` and `tests/icloud-calendar.service.test.ts`
+cover synthetic boundaries. Web and desktop consume the same 1.1 snapshot;
+Daily Brief reads it only under the separate source disclosure.
+
+Ticket 237 implements the Outlook slice: `lib/services/outlook-calendar-provider.ts`
+(Graph GET allowlist, next-link validation, deadline, and calendarView mapping),
+`outlook-calendar-oauth.ts` (Microsoft identity), `outlook-calendar.service.ts`
+(lifecycle and fences through `connector-credentials.ts`), and the pinned CLDR
+table `outlook-calendar-windows-zones.ts`. It reuses `connectors.repo.ts`; no
+`outlook-calendar.repo.ts` is needed. Routes call only the service. Paired tests:
+`tests/outlook-calendar-{provider,oauth}.test.ts` and
+`tests/outlook-calendar.service.test.ts`. No resolver changed.
+
+Ticket 236 implements Hevy: `lib/services/hevy-provider.ts` owns the fixed GET
+allowlist and calls the core `normalizeRecordedWorkout` and
+`validateRecordedActivitySnapshot`; `lib/services/hevy.service.ts` owns lifecycle,
+fences, and the `applyHevyActivityRefresh` cache rule. Paired tests:
+`tests/hevy-provider.test.ts` and `tests/hevy.service.test.ts`. No resolver changed.
+
+Ticket 238 moves the pure cache rule to
+`packages/core/src/services/recorded-activity-refresh.ts`
+(`applyRecordedActivityRefresh`, the same-scope guard
+`applyScopedRecordedActivityRefresh`, and the timing-only day projection
+`projectRecordedActivityDay`); `hevy.service.ts` re-exports it as
+`applyHevyActivityRefresh`. `combineExternalEventFreshness` in
+`services/external-event-projection.ts` merges calendar freshness so no-overlap is
+asserted only when every active source can. Web clients (`lib/ui/connectors.ts`)
+and desktop clients (`apps/desktop/src/calendar/{outlook-calendar,hevy,connector-*}.ts`)
+call these helpers and never import server credential, crypto, or provider
+modules. Paired tests: `tests/recorded-activity-refresh.test.ts`,
+`tests/connectors-client.test.ts`, and `tests/desktop-calendar.test.ts`. No
+resolver changed.
+
+Recorded activity never feeds `status.resolver.ts`, `timeline.resolver.ts`
+Occurrence grouping, reminders, analytics, or exports. Calendar overlap cues keep
+using scheduled events only. Daily Brief reads new sources through the existing
+day-context service after their separate disclosure. Run `npm run resolvers:check`
+after each slice.
+
 ## Briefing configuration, references and planning (Tickets 151–155)
 
 Scope and acceptance remain in `docs/TICKETS.md`.
@@ -407,6 +476,15 @@ complete relevant coverage. Resolved work stays out of remaining-work evidence.
 Day evidence never grants move permission. The existing inspector retains full
 evidence and rejection details; the model explains ranked supported findings.
 No travel evidence enters this boundary until its separate release gates pass.
+Ticket 239 adds optional `additionalCalendars` (Outlook or iCloud, each at most
+once) to the planner input. Their events are fixed blocks beside Google, and every
+requested Calendar source must be current and complete before a scheduling option
+or feasible opportunity is claimed; combined freshness is the weakest source.
+`splitBriefingContext` in `briefing-config.ts` turns a `1.1` day context into the
+Google-only `1.0` view plus the disclosed sources, and
+`projectBriefingConnectorSources` builds separate calendar and
+`past_recorded_activity` model branches. Recorded Hevy workouts never enter the
+planner, availability, duration estimates, or Behavior status.
 
 `packages/core/src/data/briefing-references.json` stores the editable curated catalog.
 `packages/core/src/services/briefing-references.ts` validates its metadata and owns
@@ -494,6 +572,17 @@ Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
 
 No component, API route, provider adapter or prompt computes rates, fits or travel
 intervals. These tickets add no connector registry, new connector or agent runtime.
+
+### Historical workbench evaluation (Tickets 182–183)
+
+`lib/services/briefing-history.service.ts` composes existing authenticated repositories,
+`projectAdvisorCadenceSource`, `resolveBehaviorDurationSources`, and the existing
+briefing pipeline for explicitly Retrospective evaluation. Synthetic fixtures shift
+calendar dates through Temporal. It does not infer as-of status/Note state or bypass
+production snapshot restrictions. `briefing-sequence.service.ts` uses the pipeline
+for no-model selection and delegates validated generation to the comparison service.
+Components render coverage and decisions; they do not calculate domain findings.
+Focused history, sequence, budget and Days tests own these adapters.
 
 ## Integration operations ownership (Tickets 220–232)
 

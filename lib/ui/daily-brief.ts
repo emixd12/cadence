@@ -30,6 +30,10 @@ export type DailyBriefPreferenceInput = Readonly<{
   includeCalendar: boolean;
   includeReminderHistory?: boolean;
   includeNotes?: boolean;
+  /** Sent only with all four keys above, to servers that report `connectorSources` (Ticket 239). */
+  includeOutlookCalendar?: boolean;
+  includeIcloudCalendar?: boolean;
+  includeHevy?: boolean;
 }>;
 
 export class DailyBriefRequestError extends Error {

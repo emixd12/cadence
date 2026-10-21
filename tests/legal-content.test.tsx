@@ -38,7 +38,7 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("delete their account in Settings");
   });
 
-  it("renders the approved Privacy policy with processor and retention tables", () => {
+  it("renders Privacy with processor, retention and separate connector disclosures", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="privacy" />);
 
     expect(html).toContain("October 18, 2026");
@@ -60,12 +60,22 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("California disclosures");
     expect(html).toContain("only for people age 18 or older");
     expect(html).not.toContain("does not send behavior data to an AI provider");
+    expect(html).toContain("Optional Daily Brief");
+    expect(html).toContain("each need a separate Daily Brief choice");
+    expect(html).toContain("Hevy requires Hevy Pro");
+    expect(html).toContain("Accounts above 500 workouts");
+    expect(html).toContain("not an atomic snapshot");
+    expect(html).toContain("Apple does not limit this app-specific password to Calendar");
+    expect(html).toContain("does not revoke Outlook, iCloud or Hevy access");
+    expect(html).toContain("Local checks do not establish public availability");
+    expect(html).toContain("retains no production prompt or briefing history");
+    expect(html).toContain("outside the tracking database, exports, synchronization and user-created backups");
     expect(html).not.toContain("Provider settings and published capabilities were verified");
     expect(html).toContain("Limited Use requirements");
     expect(html).toContain(
       'href="https://developers.google.com/terms/api-services-user-data-policy"',
     );
-    expect(html).toContain("review of Calendar access is pending");
+    expect(html).not.toContain("review of Calendar access is pending");
     expect(html).not.toContain("currently limited to Google OAuth test users");
   });
 

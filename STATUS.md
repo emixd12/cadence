@@ -1,5 +1,461 @@
 # Implementation Status
 
+## Ticket 215 merge review and rollout boundary — October 21, 2026
+
+Current main is integrated. The lifecycle SQL smoke preserves both
+`location_text` and `where_kind`. The refreshed source passes 2,897 tests
+(167 skipped), the web and desktop builds, typechecks, registry checks, lint
+and Design System Bench verification. This Linux review did not rerun the
+earlier Postgres or Rust acceptance recorded in the PR.
+
+Hosted rollout remains blocked on an ordered migration plan and a compatible,
+installed desktop candidate. The connector migrations in PR #111 precede
+`20261019180000_add_behavior_where.sql`; deploy them in order if both features
+ship. Older installed desktops do not send `where_kind` and fail closed on
+Behavior synchronization after the hosted migration. Build and verify the
+replacement before changing hosted schema. The signed 0.1.3 artifact does not
+cover this contract. See `docs/qa/2026-10-21-behavior-where-rollout.md`.
+
+Reviewed PR #111 (`e9c2dc6`) is now integrated. The desktop Timeline retains
+Google, Outlook and iCloud events, their freshness, and Hevy activity while
+using Apple Maps. Travel stays Google-only. The combined source passes 366
+focused tests (one local-database test skipped), registry/design checks, lint,
+web/desktop typechecks, core portability and desktop parity. Deployment and
+installed acceptance remain gated by the rollout plan.
+
+## Tickets 233–241 connector expansion — October 18, 2026
+
+The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
+timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
+this branch (`expansion-connectors`, based on `12ea89a`) merged `origin/main`
+at `041546e` locally on October 18, 2026, before Ticket 234 runtime work.
+The integrated baseline `d7af234` was independently approved.
+Renumbered from 220–228 on 2026-10-19 to avoid collision with main's MCP
+Tickets 220–232; earlier commits and approvals cite the old numbers.
+
+- PR #111 review, October 21, 2026: fixed Outlook and Hevy service reads that
+  could wait past their deadline on database queries or the final credential
+  fence. All three new connectors now use one shared deadline helper, and late
+  database completion cannot start provider work after timeout. Fixed Outlook
+  and iCloud selection saves that could restore selected calendars after a
+  concurrent disconnect; writes now compare the previously read selection
+  revision. Eight failing-first regressions reproduced both defects. No schema,
+  provider permission, or disclosure changed. Hosted migration, personal Outlook
+  scope approval, and installed/deployed acceptance remain separate gates.
+  Verification: all seven required checks pass; the full suite passed 3,384
+  tests with 165 skipped after an elevated rerun for loopback/subprocess fixtures.
+  The web build passed on an elevated retry after an initial generic webpack
+  failure that did not identify its cause. Core, desktop
+  typecheck/build/parity, design-system and load-manifest checks also pass.
+  This Linux review environment has no Docker or Rust toolchain, so it did not
+  repeat migration replay or native tests.
+
+- Review stack integration, October 21, 2026: merged reviewed PR #83 and current
+  main `d598afc`, including #110's corrected SQL smoke. Connector behavior,
+  disclosure defaults, `requireCurrentUser`, monthly travel-spend readback and
+  its unavailable fallback remain present. This merge changes documentation
+  and a SQL smoke fixture, without changing application runtime code; migration
+  replay still requires the separate local database environment.
+
+- Merge of `origin/main` at `c42ca9e` (MCP Tickets 220–232), October 19, 2026:
+  connector migrations were renamed to `20261019040000_connector_lifecycle.sql`
+  and `20261019041000_daily_brief_connector_disclosure.sql` so they sort after
+  main's hosted head `20261019025157`; neither was ever applied on hosted.
+  Seventeen conflicts kept both sides; legal copy keeps main's approved MCP text
+  plus the connector paragraphs. Merge fixes restored `requireCurrentUser` (used
+  by main's OAuth UI) and removed a duplicate `SettingsPanel` `id` prop. Node
+  26.0.0 passed all seven required checks plus core, design-system, load
+  manifest, desktop typecheck/build/parity and marketing build/check. The
+  two-worker suite passed 3,432 tests (94 skipped) with no timeout. A disposable
+  `cadence-merge-replay` project applied all 88 migrations; its CLI start
+  published ports on `0.0.0.0` briefly, so the containers were stopped at once
+  and smokes ran in a port-less container. 20 of 21 `tests/sql` smokes pass; the
+  inherited `behavior-end-date-lifecycle-smoke.sql:138` failure is a stale test
+  fixed on main by PR #110. Everything disposable was removed; retained
+  databases were not touched. No hosted migration push or deployment.
+- Merge of `origin/main` at `7cb8133` (signed desktop 0.1.1 work, Tickets 115
+  and 178–181), October 20, 2026: no new migrations and no ticket-number overlap.
+  Conflicts in STATUS, TICKETS and two desktop tests kept both sides. All seven
+  required checks plus core, design-system, load manifest, desktop
+  typecheck/build/parity and marketing build/check pass. The two-worker suite
+  passed 3,434 tests (94 skipped); only `tests/desktop-release-cli.test.ts`
+  failed, on 5-second timeouts. Run alone it still times out; with
+  `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
+  broken, and it also fails on the pre-change commit.
+
+- Ticket 233 is documentation-complete and independently approved at `668a4cd`.
+  It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
+  `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
+  `docs/FUTURE_UPDATES.md`. No runtime code, migration, or provider configuration
+  changed.
+- Ticket 234 is independently approved at `41c4e2c`. It
+  adds the Outlook/iCloud calendar schema `1.1.0`, the separate Hevy
+  recorded-activity contract, and AdvisorDayContext `1.1` validators and
+  projections in `packages/core`. Google `1.0.0` validators, fixtures, routes,
+  and runtime callers are unchanged. No provider adapter, route, migration,
+  consent, or UI changed.
+- Ticket 235 is locally verified and independently approved. Migration
+  `20261019040000_connector_lifecycle.sql` adds one owner-bound connection per
+  provider for Hevy, Outlook, and iCloud, RLS owner metadata, sealed credentials
+  and Outlook attempts in `cadence_calendar_private`, and service-role-only
+  compare-and-swap RPCs. A separate `CONNECTOR_CREDENTIAL_*` keyring seals
+  credentials bound to owner, provider, identity digest, generation, and purpose.
+  Disconnect fences one provider; Auth deletion cascades all connector state.
+  Google storage and wire behavior are unchanged. Evidence is source, synthetic
+  fixtures, and a disposable CLI-pinned local Supabase replay. That lifecycle
+  slice added no provider call, route, UI, consent or desktop
+  cache. Tickets 236–240 now supply those layers. Hosted migration and deployment
+  remain unverified.
+- Ticket 237 (Outlook Calendar) is locally verified and independently approved.
+  Microsoft Graph `calendarView` reads selected calendars with
+  `Calendars.ReadBasic` only, immutable IDs, validated next links, a 20-page
+  bound, and one 25-second deadline across token refresh, listing, pages, and
+  retries. Identity is the ID-token `tid` plus `sub`; web callbacks require the
+  initiating cookie user, and desktop completion requires the initiating Cadence
+  session plus its Keychain client state. All-day dates use the event's own zone
+  through a pinned CLDR 48.2 Windows-zone table; unresolved zones quarantine with
+  a recorded reason. It reuses the Ticket 235 lifecycle; no migration. Evidence
+  is source and synthetic fixtures only. No app registration, live personal or
+  work/school account or publisher verification is verified. Tickets 238–239
+  supply the local UI, desktop client and separate Daily Brief disclosure.
+  Review corrections (verifier findings on `56d8ddf`): every Graph and token
+  fetch plus body read runs inside `runProviderCallWithTimeout`, so unresponsive,
+  stalled, and late responses end as `timeout`; an omitted token `scope` is
+  accepted per Microsoft's documentation; next links compare the decoded calendar
+  ID; `lastModifiedDateTime` is no longer requested through `$select`; read routes
+  forward `request.signal`; app registration must carry only `Calendars.ReadBasic`.
+- Ticket 236 (Hevy) is locally verified and independently approved. Its initial
+  implementation is `abf9938`. Key intake is verified by `user/info` (non-Pro →
+  `permission_denied`; a refused key → `reconnect_required`). A fixed GET
+  allowlist covers `user/info`, `workouts/count`, and
+  `workouts?page=N&pageSize=10`, and redirects are refused. A count preflight
+  above 500 returns `incomplete_pagination` with no page reads. The read covers at
+  most 50 pages, removes duplicates by the latest `updated_at`, and checks count
+  and `page_count` before and after. One absolute 25-second deadline covers every
+  page and retry; `Retry-After` is honored only when it fits. Responses are capped
+  at 2 MB. Only identity, revision and timing fields enter normalized snapshots. The route is
+  `/api/hevy/activities`. Not verified: a live Hevy Pro account and deployment.
+- Ticket 238 (connector library and Timeline) is locally verified and
+  independently approved. Settings lists Google Calendar, Outlook Calendar,
+  iCloud Calendar (integrated under Ticket 240), and Hevy in one `ConnectorLibrary`; each
+  source connects, refreshes, fails, and disconnects on its own. Outlook reuses
+  the Google calendar selector; the Hevy API key field clears on submit and is
+  never stored on the device; Hevy Pro and the 500-workout limit are disclosed.
+  Disconnect and account-deletion copy name each provider's removal step and
+  never claim Cadence revoked access. Timeline markers name their source;
+  current-day Hevy workouts render as a separate recorded-activity list (time and
+  duration only) that never changes an Occurrence or overlap cue. Desktop keeps
+  one disposable cache per source in calendar-cache.sqlite3 (outside
+  `cadence.sqlite3` and backups), keyed by provider, account, generation,
+  selection, range, and timezone, with per-source fences; sign-out, account
+  switch, and disconnect clear it. Desktop Outlook completes only a deep link
+  whose state matches its Keychain attempt, through the authenticated `PUT`.
+  Travel stays Google-only; Daily Brief disclosure is Ticket 239.
+  Review fixes (verifier findings on `e3eb5cb`): desktop Timeline freshness now
+  includes Google only with a snapshot and hides the unused Google line while
+  Outlook is active (`apps/desktop/src/calendar/timeline-freshness.ts`), matching
+  web; the web Outlook cache stores only complete reads, so a partial read never
+  replaces a complete one or skips a refetch, and a kept read retains its fetch
+  time with a stale label. Re-review fix: a connected Google source that cannot
+  read (reconnect required, provider unavailable, or a failed read without saved
+  events) contributes unavailable freshness on web and desktop, so Outlook context
+  never claims no overlap past it; an unused Google source stays excluded.
+  Evidence: source, synthetic fixtures, deterministic benches at 1280px and
+  390px, and native cache unit tests. Not verified: live Microsoft or Hevy
+  accounts, installed desktop deep links or Keychain, deployment.
+- Ticket 239 (separately approved connector context in Daily Brief) is
+  locally verified and independently approved. Outlook Calendar,
+  iCloud Calendar, and Hevy each have a default-off Daily Brief disclosure bound to
+  the connection generation (and calendar selection) it was granted for; migration
+  `20261019041000_daily_brief_connector_disclosure.sql` stores them and fences begin
+  and finish. `includeCalendar` stays Google-only. Older two- and four-key saves
+  turn the new disclosures off, and turning Daily Brief off revokes them. Only the
+  live brief reads a disclosed source: today only, at most 25 seconds and inside the
+  60-second budget less a 10-second generation reserve. Outlook and iCloud events
+  join the planner as fixed blocks; Hevy workouts reach the model only as past
+  recorded timing and never affect availability, durations, or Behavior status.
+  Ticket 240 now connects the iCloud read behind that same disclosure. Review
+  recovery fix: Settings reports per-source `connectorAttention` and offers
+  **Allow <source> again** after a reconnect or reselection; unrelated saves turn
+  off sources that need attention instead of renewing them or failing. Evidence is
+  source, synthetic fixtures, model stubs, a disposable local migration replay, and
+  bench screenshots; no live provider or model call.
+- Ticket 240 is locally verified and independently approved at `40b1dc2`,
+  including all F1–F8 corrections and the final F5 DAV metadata fix. Recovery
+  preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
+  disconnect, isolated complete-only caches, offline display choices and Timeline
+  context. Daily Brief reads iCloud only under its separate generation/selection
+  disclosure. CalDAV boundaries reject unsafe URLs/XML, truncate oversized reads,
+  quarantine unsupported recurrence/timezones and conflicting identities, and bound the
+  full service read through the final credential fence. Failed or incomplete refreshes
+  keep cached context stale until a complete read succeeds. Account deletion includes
+  manual Apple password revocation.
+  Synthetic tests and responsive bench evidence cover these paths. Live Apple
+  access and installed acceptance remain open; the owner accepted hosted custody
+  on 2026-10-19.
+- Ticket 241 disclosure/status reconciliation is independently approved at
+  `a10b461` for local implementation and synthetic verification. The final
+  reviewer passed 342 focused tests and governance, design-system and marketing
+  checks, and inspected the full-suite evidence below. Node 24.22.0 passed all
+  seven required checks plus
+  core, design-system, desktop type/build/parity, and marketing build/parity
+  checks. The non-overlapping two-worker test run passed 2,965 tests
+  (31 skipped). Synthetic web and desktop benches and marketing pages passed
+  narrow (390px) and wide (1280px) QA. This pass changes disclosures and evidence,
+  preserves approved runtime logic, and does not authorize release.
+- Reused evidence: unchanged native sources retain 114 passing Rust tests;
+  unchanged migrations retain the disposable 82-migration replay and 16/17 SQL
+  smoke results. The inherited failure remains
+  `tests/sql/behavior-end-date-lifecycle-smoke.sql:138`. Prior desktop acceptance
+  test timeouts passed unchanged reruns; their cause and a base-CI failure are
+  not proven. Final Ticket 241 tests had no timeout. Retained local databases
+  were not touched.
+- Evidence: public provider documentation read October 18, 2026 (documented
+  support only). No live-provider, installed, deployed, or public-approval
+  evidence exists.
+- Ticket 233 correction pass (verifier findings 1–5): Outlook all-day dates use
+  the event's own zone; provider reads have 25-second deadlines and bounded
+  `Retry-After`; Hevy reads use a count preflight, duplicate removal, and
+  before/after checks without claiming an atomic snapshot; Apple claims are
+  qualified; the iCloud local-work gate is removed.
+- Product decision recorded 2026-10-19: the owner accepted hosted custody of
+  the iCloud app-specific password as documented, although Apple does not limit
+  it to Calendar. No public Apple developer documentation for "supported app"
+  authorization was found on 2026-10-18. Real Apple credentials may now be used
+  in owner-run live tests. Live Apple access, deployment and user release remain
+  separate gates.
+- Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds and
+  does not compare it with the remaining request deadline; a caller abort signal
+  still ends the wait. Its runtime is unchanged in this expansion.
+- Live-access gates: Hevy Pro key, Microsoft app registration and test tenants,
+  and an Apple Account app-specific password. Public-approval gate: Microsoft
+  publisher verification. None blocks source or fixture work.
+
+### Owner-run live acceptance — October 19, 2026
+
+Environment: a disposable local Supabase stack (`cadence-live-connectors`,
+loopback-only ports, all 88 branch migrations replayed, version list identical
+to `supabase/migrations`) and `next dev` on Node 24.22.0 at
+`http://127.0.0.1:4321`. Cadence sessions used development test-login, not
+Google sign-in. The retained local stack was not changed. No hosted migration,
+deployment or hosted data was used. Evidence is counts, statuses and owner
+observations only; no credential or provider record was recorded.
+
+- Hevy (Ticket 236, with 238 and 239): **live pass** with Emi's Hevy Pro key.
+  Intake sealed the key (one `keyId.iv.tag.ciphertext` row, generation 1) and the
+  key field cleared. A 31-day read was `complete`: count 44 before and after,
+  5/5 pages, 44 items, 0 duplicates, 20 in range. Activities carried only ID,
+  kind, start, end, known duration, local date, revision and field availability.
+  A single-day read returned the expected workout; today returned none; a 41-day
+  request returned `invalid_request`. No workout record was stored server-side.
+  Daily Brief `includeHevy` was off by default. On the Timeline, today showed no
+  Hevy line before a workout. After Emi logged one, it showed
+  "Recorded activity · Hevy" with time and duration only, no title. Disconnect
+  showed the Hevy key-removal instruction. It deleted the credential and moved
+  the connection to `disconnected`, generation 2, with the account digest
+  cleared. A later read returned `not_connected`. Emi deleted the key in Hevy.
+  Not live-testable with this account: the over-500-workout path (44 workouts)
+  and non-Pro rejection; fixture evidence only.
+- iCloud Calendar (Ticket 240, with 238): **live pass** with Emi's Apple Account
+  and an app-specific password. Intake sealed both values (generation 1). The
+  calendar list returned 5 VEVENT calendars (ID, name and default flag only), and
+  all 5 were selected. The first 30-day read was `complete` with 0 events. A
+  counts-only local diagnostic confirmed that the account had no events in that
+  range, and that server-side time-range filtering matched older events. Owner-approved test
+  events were then added to one existing calendar. The next read was `complete`:
+  0 failures, 0 quarantined items, recurrence supported, 5 events and 0
+  non-test events. A daily `RRULE COUNT=3` event was expanded by the server
+  into 3 instances (9–10 a.m. New York) sharing one series ID. An all-day event
+  kept its own date (one calendar day). A 10–11 a.m. `America/Los_Angeles`
+  event read as 1–2 p.m. New York with its source zone kept. Only titles were
+  carried; other details were unsupported and empty. No event record was stored
+  server-side. Timeline showed all of them with iCloud labels. Hiding all-day
+  iCloud events removed the all-day event. Emi first missed the Los Angeles
+  marker on a day with three markers. The client validation and layout pipeline,
+  replayed locally on the live response, placed it at 1 p.m. A later look found
+  it, so it is not a defect. Finding: every iCloud collection reports a
+  `calendar-timezone` with a full VTIMEZONE definition, which the adapter marks
+  unsupported by design. Floating-time events would therefore quarantine. Not
+  live-tested: wrong-principal reconnect (one Apple Account) and quarantine of
+  unexpanded series. Disconnect showed the Apple revocation instruction. It
+  deleted the sealed credential (0 rows) and moved the connection to
+  `disconnected`, generation 2, with the account digest cleared. A later read
+  returned `not_connected`. Emi removed the app-specific password at Apple, and
+  the test events were deleted.
+- Outlook Calendar, personal Microsoft account (Ticket 237): **failed live**.
+  Graph returns 401 on every calendar endpoint for a token that carries only
+  `Calendars.ReadBasic`. The cause is not yet isolated: either Microsoft-side
+  handling of ReadBasic for personal accounts, or the new, unverified Entra app.
+  No scope change was made. Setup: the Entra app "Cadence Calendar" (personal and
+  multitenant, `Calendars.ReadBasic` + `openid` + `offline_access` only,
+  publisher not verified) and the web app over HTTPS on `https://localhost:4321`.
+  Consent, code redemption and refresh all returned 200 with granted scope
+  `Calendars.ReadBasic` and an opaque token of normal shape. Every Graph read
+  returned 401 with an empty body and no `WWW-Authenticate`:
+  `/v1.0/me/calendars` with and without `$select`, `/v1.0/me/calendar`, and
+  `/beta/me/calendars`. The same account and request shape returned 200 through
+  Microsoft's Graph CLI public client, whose token also held `Calendars.ReadWrite`.
+  As designed, Cadence then marked the connection `reconnect_required` and
+  deleted the credential. Live use exposed a UI defect, fixed in `facf67d`: the
+  Outlook panel kept its connected view after a reconnect-required list or
+  refresh, so no Reconnect button appeared. It now switches state like the
+  iCloud panel, and Disconnect stays available. Two failing-first DOM tests
+  cover it. A retry on 2026-10-21, about 44 hours after app creation, failed
+  identically (all four contrast reads returned 401), so slow propagation of a
+  new app is unlikely. That retry also showed the "connected" callback message
+  persisting after the server reported `reconnect_required`. The panel now
+  drops that message when the server state differs (failing-first DOM test).
+  Root-cause evidence (2026-10-21): the coordinator registered a separate public
+  client in the same tenant, never consented by the personal account. Using
+  authority `/consumers` and requesting only `Calendars.ReadBasic`, it received
+  an opaque token for `Calendars.ReadBasic`. Graph returned 401 with an empty
+  body for both `/me/calendars` and `/me/calendarView`. A ReadBasic-only token
+  for a personal account is therefore rejected by Graph regardless of Cadence's
+  client, consent state, or request code, despite Microsoft's permission tables
+  listing it for personal accounts. With the same Cadence app and scope, the
+  work/school account received a Graph-audience JWT and was accepted. The same
+  fresh probe app then requested `Calendars.Read` and was granted
+  `Calendars.Read Calendars.ReadBasic`, still with an opaque token. Graph returned
+  200 for `/me/calendars` and `/me/calendarView`. Root cause: Graph accepts a
+  personal-account calendar token only when it carries `Calendars.Read` or a
+  broader scope, and rejects a ReadBasic-only one. That contradicts Microsoft's
+  permission tables. A Cadence fix would need `Calendars.Read`, which exposes
+  bodies and attachments that the brief excludes. That is an owner contract
+  decision; Cadence's scope set is unchanged.
+- Outlook Calendar, work/school account (Ticket 237, with 238): **live pass**
+  in the app's home tenant (identityscaffolding.com). Connect returned without
+  a consent screen; the token was a Graph-audience JWT with `scp`
+  `Calendars.ReadBasic openid profile email`. `profile` and `email` came from
+  prior tenant consent and were accepted as OIDC scopes. Cadence does not request them.
+  The connection was sealed (generation 3), and 3 calendars were listed. A 7-day
+  read of the primary calendar was `complete` with 0 failures and 6 test events.
+  The daily series was expanded by `calendarView` into 3 instances (9–10 a.m.
+  New York) sharing one series ID. The all-day event kept its own date (event
+  zone Etc/UTC). A 10–11 a.m. Pacific event read as 1–2 p.m. New York, with
+  source zone America/Los_Angeles. Today's event was at 3–3:30 p.m. Only
+  titles, the user's response, and permitted Outlook web links were carried. No
+  event record was stored. Repeated token refreshes succeeded. Agent UI checks
+  in the in-app browser placed all 5 timed markers on the correct days, with the
+  Los Angeles event at 1:00–2:00 PM on Oct 23 and the all-day event in Oct 22's
+  All day area. Hiding all-day Outlook events removed it, and it was then
+  restored. Disconnect showed the Microsoft account / My Apps instruction. It
+  deleted the credential (0 rows) and moved the connection to `disconnected`
+  (generation 4), and later reads returned `not_connected`. Limits: home tenant
+  only, and the app already had tenant-wide admin consent. One
+  `oauth2PermissionGrant` existed (`consentType` AllPrincipals, scope
+  `openid offline_access Calendars.ReadBasic`), which explains the missing
+  consent screen. The coordinator deleted that grant after the test (0 remain).
+  The user-consent screen was shown later (see below). Cross-tenant consent,
+  `admin_approval_required` and a tenant that blocks unverified apps were not
+  exercised; wrong-account reconnect was not
+  live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
+  list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
+  This likely explains the owner's empty first load.
+- Daily Brief connector disclosure (Ticket 239): **live pass** (owner-approved
+  paid call, 2026-10-21). Disclosures were default-off (`includeHevy` false while
+  Hevy was connected). After the Outlook work account was reconnected, a
+  seven-key save enabled Daily Brief with only `includeOutlookCalendar`
+  (`connectorSources.outlookCalendar` true, no attention state). One live brief
+  read today's Outlook data (token refresh, list, calendarView 200) and made one
+  model call, which returned `ready` with `complete` coverage. A counts-only
+  audit of the model request found 0 event titles and no `description`,
+  `location` or attendee fields. The account had no Behaviors, so the brief
+  reported no schedule issue. Turning Daily Brief off revoked the disclosure.
+  The Daily Brief preference was set through the app API as the test user
+  (`PUT /api/advisor/preferences`), not through the Settings UI. The Daily
+  Brief panel did not hydrate in the in-app browser tab. The brief request and
+  the final disconnect also used the app API.
+- Outlook work/school user consent (Ticket 237), 2026-10-21: after the
+  tenant-wide grant was removed, reconnecting showed Microsoft's user-consent
+  screen. It marked "Cadence Calendar" as **unverified** ("not published by
+  Microsoft"; no terms links) and listed "Maintain access to data you have given
+  it access to", "Read basic details of your calendars" and "View your basic
+  profile". As an admin, the owner also saw "Consent on behalf of your
+  organization", which he reports leaving unticked. The connect then succeeded
+  in the home tenant. The stored result, however, was again a single
+  AllPrincipals (tenant-wide) grant with the same grant ID and scope
+  `openid offline_access Calendars.ReadBasic`, and no per-user grant existed.
+  Recorded as: user-consent screen shown; resulting grant type AllPrincipals;
+  cause unclear (an admin consent path, or an earlier delete that had not
+  propagated). This is not verified per-user consent. Disconnect deleted the
+  credential again (generation 6). The coordinator deleted the grant again and
+  confirmed after 45 s that 0 grants remain and a GET by ID returns 404.
+- Installed desktop (Ticket 238 desktop items: Keychain, `cadence://` deep
+  links, per-source cache cleanup): **blocked by Ticket 115**. No signed
+  installed build containing the connector code exists, so this step was not
+  simulated.
+- Pending owner action: remove "Cadence Calendar" and the probe apps at
+  account.live.com/consent for the personal Microsoft account (the site was in
+  maintenance at the time of testing).
+
+## PR 83 integration review — October 21, 2026
+
+Reconciled the briefing workbench branch with current main `d598afc`. The original
+Tickets 169–174 are already on main; the remaining changes provide the local
+Compare/Review/Days workbench, historical and sequence evaluation, a shared
+comparison budget, saved-review retention, pure bubble presentation, repository
+cleanup and the bounded Search Console CLI. There are no main-relative database
+migrations or production preset changes.
+
+The cleanup had removed `requireCurrentUser`, which current main's OAuth consent
+and Connected apps service imports. Restored that helper and retained the monthly
+travel-spend readback with its DOM regression while resolving the stale branch.
+Current MCP/OAuth, travel-budget and desktop-release changes remain present.
+
+Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+shared core, desktop TypeScript and both frontend builds pass. The full suite
+passed 2,965 tests with 165 skipped; its 20 sandbox-blocked socket/subprocess
+failures passed in an elevated rerun of all ten affected files (86 tests).
+The 173 focused workbench tests also pass. No hosted deployment, database replay,
+private-account model run or installed native acceptance was performed. Details:
+`docs/qa/briefing-workbench.md`.
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+
+In progress; not published. Candidate `0.1.1` is built from
+`95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
+accepted app and DMG notarization; both are stapled. All 14 artifact checks pass,
+including signed entitlements and the embedded provisioning profile. The app
+checks the new `desktop-stable` feed, the owner's choice on October 19. A clean
+replay of all 86 migrations in the separate local project `cadence-release-20261019`
+passed the authenticated contract and 92 RLS ownership checks; it left no data.
+
+Xcode 27.1 `strip` broke release proc-macro dylibs under the macOS 14.0 deployment
+target. `[profile.release.build-override] strip = false` fixes the build; the
+shipped executable is unaffected.
+
+Open before publication: Ticket 178 installed checks on this build, a quarantined
+browser download of this DMG, an updater run from preview.50, merging the version
+and build-fix commits, and the owner's publish instruction. Packet, hashes, feed
+entry, release notes and rollback: `docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
+
+## Signed-release tooling on main — October 19, 2026
+
+Ticket 181 preparation. The signed-release work behind rc.1–rc.4 existed only on
+unmerged branch `claude/tickets-169-173-advisor-analysis` (commit `9508550`). Main
+lacked the Developer ID entitlements, provisioning-profile embedding, DMG
+notarization and stapling, the production Keychain guard and the Ticket 180
+reminder fixes. This change applies `9508550` and `12ea89a` to current main.
+Four conflicts came from the Ticket 186 rename; each keeps `emixd12/cadence`.
+The Daily Brief smoke keeps main's key-tolerant default check.
+
+Release records also move to main: Tickets 178–181, the Ticket 115 and 165 status,
+`docs/qa/2026-09-27-apple-distribution.md`, the September 27 execution plan and the
+signed-native travel evidence. Briefing and Calendar-agent work on that branch is
+excluded. The final `0.1.1` candidate is built from main after this change merges.
+No build, notarization, publication or hosted change ran. Ticket 178 session
+renewal and replay/expiry checks and Ticket 181 publication remain open.
+## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
+
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with
+"Configuration event plan does not match behavior state." The smoke predates
+migration `20260922010000_add_travel_settings.sql`, which added `location_text`
+to the Behavior configuration snapshot and baseline changed fields. The smoke's
+baseline plan now includes `location_text`; no schema or runtime change. A
+disposable Postgres replay of all 86 migrations passes all 19 SQL smokes.
+Retained local and hosted databases were not touched.
+
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
 Owner direction (2026-10-18): Cadence ships one remote MCP server plus Claude and
@@ -146,6 +602,298 @@ Its job is to answer:
 - `docs/TICKETS.md` for ticket scope and acceptance criteria.
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
+
+## Tickets 182–185 briefing exploration and owner decisions — September 28, 2026
+
+Tickets 182–183 are implemented in the existing development workbench. Historical
+inspection defaults to 14 prior days, caps target ranges at 90 days, and labels
+current retained account rows Retrospective. Reconstruction remains unavailable.
+Missing records, original completion counts, elapsed history, Notes and reminder
+state remain unknown. Historical planning cannot infer free time from retained rows.
+Optional past Calendar uses live authorization and stays separate from pattern history.
+
+Days supports saved-day A/B review, no-model selection simulation, diagnostic lane
+previews, explicit call budgets and cancellation with retained partial output.
+All workbench tabs share at most two active calls and a default 100-call rolling-hour
+budget. Failed and dispatched cancelled calls count; queued cancellation releases
+reservations. Local reports preserve complete visible text and exact feedback.
+Production admission, tip history, storage policy and presets remain unchanged.
+
+Ticket 184's owner criteria were recorded September 30, 2026: actionable adherence
+analysis and day planning, a general one-minute read, longitudinal quiet-day insights,
+and varied lanes with justified repeats for important patterns. Initial coverage is
+`daily-brief-balanced@1`: six tuning cases, ten reserved cases and a seven-day sequence.
+Profile revisions and evaluation iterations are recorded separately in the packet
+and existing QA record. Iteration 1 has not run. Private comparisons, quality
+acceptance, candidate promotion, rollback execution and release gates remain open.
+Ticket 185 has a concrete lifecycle proposal; every product decision remains pending.
+Owner packet: `docs/plans/2026-09-28-briefing-owner-review.md`.
+Implementation and verification: `docs/qa/briefing-workbench.md`.
+Existing desktop release work and prior briefing changes remain intact.
+Verification: 2,519 tests pass with 29 opt-in skips using two workers and a
+30-second test timeout for existing desktop subprocess checks. Governance,
+core/design-system, lint, web/desktop TypeScript and web/desktop builds pass.
+Browser QA verifies 390 px and 1440 px layouts, no-model planning and draft retention.
+Fresh independent read-only review returned `ship` after correcting the source freeze
+and two Days state defects. Three regression tests cover the UI corrections.
+
+## Remaining signed-release tickets — September 28, 2026
+
+The owner requested explicit tickets for the remaining release work. Tickets
+178–181 are authorized for execution: signed account/Calendar lifecycle; notification activation and
+sleep/wake; real preview-to-signed updater acceptance; final acceptance/publication.
+Ticket 115 stays in progress as the umbrella. Ticket 165 retains location and Maps
+handoff, with the signed rc.2/rc.3 timeout now reflected in its current state.
+Preparation can proceed independently; live installed-app tests must be serialized.
+Ticket 180 follows account-transition evidence, and 181 follows 178–180 while
+reconciling 165's separate travel gates. macOS 14 testing remains owner-deferred.
+Execution started after the owner requested all four release tickets. All 76 current
+migrations replayed in the separate `cadence-release-20260928` local project.
+The real authenticated adapter contract and 92 RLS ownership checks passed.
+The smoke fixture needed seven location-history fields to match the existing schema.
+Post-run counts confirmed temporary-account cleanup. All ports stayed on loopback;
+the stack and proxy stopped, and existing volumes remained intact.
+Controlled-feed preview.46 built and passed independent parent artifact verification.
+Earlier September 29 checkpoints (superseded by completion below): owner Keychain
+approval resolved source launch. The separate QA feed
+and signed target are published. Wrong-signature, tampered-archive and unavailable
+stages failed safely. Native Install replaced the bundle with the exact notarized
+rc.3 executable. Explicit Restart launched a new process; the owner confirmed its window is visible.
+Independent comparison passed domain preservation across all 30 tables; only
+sync timestamps and reminder bookkeeping changed. Interruption recovery remains unverified.
+Original preview.45/full primary data are restored and verified; retained evidence
+lives under `updater-20260929`. Account data is current, automatic downloads are
+enabled and latest original reminder readback is 99/434. Updated rc.3 readback was 2/434
+after owner refresh. Investigation found source preview.46 already at 4/434 before
+installation, OS “Too many requests” drops, and simultaneous old-build pending
+schedules (97 preview.45 + 1 preview.46, including a duplicate identifier).
+Controlled withdrawal confirmed old-source capacity competition: removing five old
+requests let rc.3 retain exactly five, alongside 95 older-source records. Cleanup
+preserved all 46 delivered identifiers. Original app/data are restored and verified;
+evidence lives under `withdrawal-20260929`. Consecutive signed rc.2/rc.3 continuity
+now passes: both use one source and retain the same five available requests.
+`signed-continuity-20260929` records restored app/data and unchanged delivered history.
+Historical preview.45 migration now passes: withdrawing its 99 requests lets rc.3
+retain the exact same 99. All 46 delivered identifiers survive; original app/data
+are restored. Preview.46 retains one owner-blocked request. A UI-created three-row
+pending outbox survives restart and strict fixture validation; actual updater
+preservation and interrupted recovery remain open. The delivered-history cleanup
+fix passes fresh review and required regression/build checks. Fixed rc4 and signed
+preview.47 preparation stopped before credential access: automatic approval review
+requires owner authorization for Apple notarization. See the QA owner checklist.
+Ticket 180 is complete September 29. Explicit credential-and-Apple-submission
+authorization enabled notarized rc.4 and signed preview.47 app/DMG builds; both pass
+all artifact checks. Native interrupted-download/Retry, Install and separate Restart
+pass on signed preview.47→rc.4. Strict preservation passes all 30 tables and all three
+pending outbox rows. Seven reminder identities/fire times survive the real updater.
+Installed rc.4 preserves a delivered notification during reconciliation and unverified
+pending cleanup, then removes only that synthetic notification when its Occurrence
+is Completed. The historical source migration and signed continuity evidence resolve
+the observed capacity competition; preview.46 now has zero pending requests.
+The original preview.45 app and full primary data are restored and verified. Account
+data is current; automatic downloads are enabled. Final native readback is 100/434,
+with 100 unique original-source requests and no temporary signed requests. All 56
+protected delivered identifiers remain. The QA feed is restored byte-for-byte to rc.3;
+the public desktop-preview feed is unchanged. The relay is stopped. No owner action
+remains for Ticket 180. The QA record contains the final acceptance matrix and exact
+artifact, preservation and rollback evidence. Tickets 178 and 181 remain separate.
+The owner’s clean M2 Pro MacBook Pro on macOS 26.7 opened rc.3 normally and linked
+the dedicated test account. Offline creation/status/Note, restart persistence and
+reconnection passed. Chrome confirmed exactly one matching Behavior and matching
+Completed status and Note. Second-Mac notification permission and OS readback pass:
+30/30 reminders cover the full target through October 29 at 11:03:50 EDT. This does
+not explain the first Mac’s different-load 2/434 result. No public feed change or
+final publication ran.
+The dedicated test Calendar now has a timed public-landmark event without guests
+or notifications. The owner selected Chrome, confirmed test-account sign-in,
+and is available for notification/sleep-wake checks. A second Mac is available
+for location acceptance. The restoration manifest and retained QA copies live
+under `owner-assisted-lifecycle`. Signed rc.3 passed Notification Center activation,
+actual sleep/wake reconciliation, notification permission revocation/recovery,
+Calendar pending-state restart/cancellation/cleanup, and timed event rendering.
+Google Maps search handoff opened the public-landmark destination in Chrome;
+Ticket 165 now has owner-observed second-Mac foreground acquisition after manually
+enabling Location Services. Missing initial prompt and first-Mac timeout remain open. Wrong-account reconnection
+rejected the dedicated test identity against copied primary data; strict 30-table
+preservation passed. Same-account reconnection and restart persistence passed;
+post-sync domain/history comparison passed independent review. Original app/data restoration
+and primary reminder readback passed. Ticket 179 is complete; 96 of 433 eligible
+primary reminders are retained with truthful limited coverage. Automatic downloads
+returned to their original enabled setting at the September 28 checkpoint. Session/replay checks in 178
+and final publication in 181 remain open; Ticket 180 is complete as recorded above.
+The concurrent numbering collision is resolved: Daily Brief follow-ups use 182–185.
+Verification: governance/parity/design checks, lint, web/desktop TypeScript, web and
+marketing builds, 109 native tests, six crypto tests, 20 SQLite contract tests, and
+48 focused release/RLS tests pass. Full-suite failures were socket restrictions and
+timeouts; affected files passed scoped reruns, with a 30-second timeout for the
+46 subprocess-based release-acceptance tests. One SQLite capacity test remains opt-in.
+Fresh independent review of the exact QA endpoint allowlist and seven RLS fixture
+corrections returned `ship` with no findings on September 28. Installed updater
+acceptance subsequently passed under Ticket 180 on September 29.
+
+## Tickets 175–177 briefing review workbench — September 28, 2026
+
+Owner-requested review corrections pass automated checks. Fresh independent read-only
+review returned `ship` with no actionable findings after correcting its first three findings.
+Confirmed fixes cover saved-rerun consent, retention, storage errors, candidate
+lineage, anchored feedback, stale reads, unsaved rerun visibility, and reading/quotation
+consistency. Tickets 182–184 cover remaining bench phases. Ticket 185 owns the
+separate stored-brief product decision. Parallel Ticket 115 work remains separate.
+
+Review verification: agents, interactions, resolvers, core, design-system, lint,
+TypeScript, desktop typecheck/build and web build pass. The full suite passes
+2,467 tests with 29 skipped using two workers. The initial default-worker run had
+one timeout in a parallel desktop release test; that file passed separately.
+The workbench has 40 passing DOM tests. Browser checks at 1440 px and
+390 px confirm equal/stacked columns, closed configuration controls, keyboard editing,
+long-text wrapping and visible unconfigured-provider errors. No private capture,
+provider generation, schema change or deployment ran during this review.
+The shared bubble now uses consistent en-US times in the briefing timezone so
+rendered quotations match server validation. Actual prose quality still needs owner
+review; the production preset remains unchanged.
+
+The owner asked to implement Phases 0–2 of `docs/plans/2026-09-27-briefing-bench-review.md`
+and authorized full account capture for local reviews. Tickets 175–177 are complete in
+source. Their initial implementation added the shared `realistic-timing` fix, which
+only matters once `advisor-analysis` is promoted. The review also aligns shared time
+formatting as described above; production generation policy remains unchanged.
+
+- 175: midnight-ending ranges end the next day in `realistic-timing`; plain-language lane,
+  state and tip-decision labels; reading-burden, repetition and internal-term warnings
+  (`packages/core/src/services/briefing-review.ts`).
+- 176: the workbench opens on Compare with Saved reviews. Cases, candidates, runs and
+  prose feedback persist under `.local/briefing-bench/` (0700/0600, 30-day retention,
+  delete). Account cases keep captured inputs for exact reruns.
+- 177: review packets for coding agents, validated proposal files, owner decisions, and
+  candidate-only reruns on a saved case's captured clock after current consent checks.
+
+Verification: agents, interactions, resolvers, core, design-system, lint, TypeScript,
+tests (2,435 passed, 29 skipped) and build pass. An earlier full run failed
+`tests/desktop-release-acceptance.test.ts` once under load; it is under the parallel
+Ticket 115 edits and passed alone and on the final run. Browser QA ran one synthetic
+comparison. See `docs/qa/briefing-workbench.md`. Remaining: owner review of
+real account comparisons; Phases 3–5 are now tracked by Tickets 182–184.
+
+## Ticket 115 execution — September 27, 2026
+
+The owner authorized every step of the Apple Developer execution plan, including
+computer/browser use. Post-notarization authentication, Calendar, location, reminders,
+and distribution acceptance now run under the parallel work plan; the parent owns
+all installed-app interactions. Ticket 115 is in progress. The Developer ID Application
+identity is installed and valid. Apple's provisioning profile authorizes Cadence's
+App ID and Keychain group. Apple accepted the Keychain-held notarization credentials.
+Apple accepted both `0.1.1-rc.1` app and DMG notarization. Both staples, Gatekeeper,
+and strict artifact verification pass. The release helper now notarizes and staples
+the DMG before verification. The hourly monitor remains paused after completion.
+rc.2 also passes the full automated notarization/verification path and normal
+quarantined Finder installation/first launch. Installed inspection found the
+missing public Calendar/Daily Brief endpoint; a reviewed configuration fix now
+passes rc.3 app/DMG notarization and strict artifact checks. The dedicated
+Google test identity completed rc.3 native login and synchronized successfully.
+Sign-in survived normal quit/relaunch; Calendar list, test-calendar selection,
+refresh, disconnection, and account sign-out passed. Sign-out survived restart.
+The browser completion path was not observed; this does not verify direct Codex
+browser handoff or Calendar callback restart/replay. The
+original primary app/data are restored and preview.45 runs signed in.
+The initial authenticated local Supabase adapter contract passed against the retained
+74-migration schema. September 28 verification supersedes that limitation: all 76
+current migrations replayed in a separate disposable project and the real adapter
+contract passed with verified cleanup. Existing local data remained intact.
+The test stack is stopped.
+The real native Data Protection Keychain adapter passed synthetic write, update,
+cross-process read, and deletion. September 28 rc.3 checks proved copied-primary
+launch preservation across 30 tables and 6,326 rows. The release checker now
+recognizes only two canonical completed native reminder receipts that launch
+reconciliation replaces; pending, malformed, and domain receipts remain protected.
+An isolated QA reminder was delivered while Cadence was closed. Notification
+activation, sleep/wake, real updater installation, and other installed lifecycle
+gates remain open. Signed rc.3 location still times out without a permission grant;
+no app defect is confirmed. QA reminders were canceled by archiving the synthetic
+Behavior. Original preview.45 and the complete primary directory were restored;
+the account is current, all three databases pass integrity/foreign-key checks,
+and reminders are refreshed with the existing OS-limited horizon disclosed.
+Receipt-check verification passed: 46 focused tests; repository checks, lint,
+TypeScript, and build. The full suite had 2,427 passes and 29 skips; all nine
+sandbox socket failures passed in the scoped unsandboxed rerun (27 tests).
+Fresh independent review returned ship with no findings. Publication remains open.
+The owner deferred macOS 14 runtime acceptance without changing the
+compiled minimum. See `docs/qa/2026-09-27-apple-distribution.md` for current evidence.
+
+## Historical Apple Developer planning checkpoint — September 27, 2026
+
+At this checkpoint, Apple Developer Program membership became available. Ticket
+115 was deferred for execution with its membership blocker resolved. The execution
+entry above supersedes this historical planning state. The local signing check returned zero valid identities. The host
+runs macOS 27.0 on arm64; macOS 14 acceptance remains unverified. Notarization
+credentials were not inspected.
+
+The inventory and execution plan are in
+`docs/plans/2026-09-27-apple-developer-unblocked-work.md`. They cover Developer ID,
+notarization, production Keychain and Calendar pending-state acceptance,
+Gatekeeper, upgrades, and the Ticket 165 location-signing hypothesis. Signing
+is not a confirmed location fix. Existing preview tickets remain complete.
+No credential creation, build, installation, Apple submission, or publication ran.
+
+Planning verification passed: `npm run agents:check`, `npm run interactions:check`,
+and `git diff --check`. Runtime tests and builds were not run for these documentation
+changes. No ticket is marked complete by this planning pass.
+
+## Daily Brief web production deployment — September 26, 2026
+
+Deployed application commit `9eda5c039bbf1c6e306a40a2a720f8d0cb02c43a`
+to the existing Vercel `cadence` project and promoted Ready deployment
+`dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n` to `https://app.cadence-me.com`.
+The owner explicitly requested application deployment after the hosted migrations.
+The CLI uploaded a clean `git archive HEAD`; Vercel's `sourceCommit` metadata
+matches that commit. Local migration evidence and SQL smoke edits were not part
+of the application source archive.
+
+Vercel's production build and TypeScript checks passed. Inspection of the
+production domain resolves to the new Ready deployment. Eleven unauthenticated
+route checks passed: Login, Privacy and Terms return 200; Timeline, Behaviors,
+Settings, Export and Analytics redirect to Login; Daily Brief preferences,
+Daily Brief POST and reminder processing reject missing authentication with 401.
+Daily Brief GET correctly returns 405 because the endpoint requires POST.
+The deployment error-log query returned zero records during the release window.
+
+Rollback target: `dpl_EySiseVj858i81TyfRuYjz8qY6pt`. Both new database
+migrations remain applied if the application needs rollback. No provider gates,
+Daily Brief preset, marketing deployment or native package changed. Owner-run
+private comparisons, authenticated acceptance and installed-desktop acceptance
+remain open under Ticket 174. This release does not establish fresh Trust Passed
+evidence. Prior local source checks and full build remain applicable.
+
+## Daily Brief hosted migrations — September 26, 2026
+
+Applied `20260926150000_daily_brief_bounded_recovery.sql` and
+`20260926170000_daily_brief_analysis_sources.sql` to the linked Cadence project
+`qjodzutjxtmtzczbloxa` under the owner's migration request. Hosted history now
+matches all 76 repository migrations. Read-only catalog checks confirmed the
+three new columns, forced tip-table RLS, denied direct authenticated table reads,
+and authenticated-only analysis RPC access. Generated hosted public-schema types
+match the checked-in public-schema types exactly; no type change was needed.
+
+Local verification replayed all 76 migration files against disposable Supabase
+Postgres 17.6.1.159 with the real GoTrue v2.195.0 Auth schema. No application-data
+stubs were used. The container published only `127.0.0.1:55322`. CLI `db reset`
+was attempted but requires its managed stack; this was a direct ordered SQL replay,
+not a successful CLI reset. The npm CLI wrapper has an invalid macOS signature,
+including after reinstalling the exact 2.105.0 package. The package's working
+`supabase-go` backend performed history, dry-run, push and type generation.
+
+Updated `tests/sql/ticket-147-daily-brief-smoke.sql` for current preference defaults
+and completed-attempt retries. Its rollback-only smoke passes recovery limits,
+Calendar fencing, session revocation/expiry, optional-source disclosure,
+snapshot revision matching, old-client disclosure revocation, lease-bound tip
+records and deletion on disable. Hosted checks read catalogs only; no private
+account comparison or synthetic hosted user was created.
+
+Verification: 50 targeted tests pass; agents, interactions, resolvers, lint and
+typecheck pass. Full tests report 2,315 passed and 29 skipped, with five sandbox
+localhost-bind failures; all seven tests in that file pass outside the sandbox.
+The production build passes. Fixture rollback left zero Auth users; the disposable
+container and its volume were removed. Application deployment, owner-run comparisons,
+and installed-desktop acceptance remain open under Ticket 174.
 
 ## Tickets 169–174 advisor analysis, tips and travel — September 26, 2026
 
@@ -1139,6 +1887,12 @@ September 26 scheduled follow-up could not independently repeat that pane check:
 the Identity Scaffolding Chrome session is unavailable, and automatic approval
 review blocked broad Claude inspection. The recorded September 26 result above
 is preserved; this automation obtained no new provider decision.
+September 27 and 28 scheduled follow-ups: the Identity Scaffolding Chrome session remains
+unavailable. Today's provider status is not verified. The recorded September 26
+approval evidence remains the latest; post-approval smoke checks remain outstanding.
+September 28: the owner requested disabling the Google review follow-up automation.
+`cadence-google-review-follow-up` is now paused. Google approval remains recorded;
+Ticket 141 still requires the one-time post-approval web/native smoke checks.
 Unrelated working-tree changes were excluded from the isolated releases.
 
 Ticket 138: Cloudflare's initially empty `cadence-me.com` zone now has two
@@ -8308,14 +9062,14 @@ Owner authorization: 2026-08-30. Current requirements live in
 | Ticket | Status | Current note |
 |---|---|---|
 | 107: Desktop track activation | complete | Owning docs, 88 existing interaction IDs with platform metadata, 63 planned desktop intents, strict references, and required checks pass. |
-| 108: Native boundary proof | complete | SQLite commit/rollback/restart, scheduling/replacement/cancellation, denied permission, fully quit delivery, and real notification activation pass. The owner accepted visible OS-limited coverage. System sleep/wake subsequently passed under Ticket 112; macOS 14 remains a release check. |
+| 108: Native boundary proof | complete | SQLite commit/rollback/restart, scheduling/replacement/cancellation, denied permission, fully quit delivery, and real notification activation pass. The owner accepted visible OS-limited coverage. System sleep/wake subsequently passed under Ticket 112; owner deferred macOS 14 runtime testing on September 27. |
 | 109: Shared core and design foundations | complete | Portable core, atomic contracts, tokens, fonts, runtime callbacks, final 0.3 regression checks, and web/marketing builds pass. |
 | 110: Local persistence and atomic operations | complete | SQLite schema 6, stable seed, atomic outbox/history writes, migration preservation, and both final 0.3 adapter contracts pass. Clean local Supabase reset replayed 47 migrations; 92 RLS checks pass. |
 | 111: Desktop tracking parity | complete | Four screens and native tracking/export/import/replay/keyboard workflows pass. Final 0.3 artifacts are verified. The owner confirmed disconnected-network launch and status persistence; SQLite, process-start, and native UI evidence independently confirm saved completion survived relaunch. The synthetic Behavior is archived with history preserved. |
 | 112: Native reminder coverage | complete | Product scheduling, coverage readback, cancellation, fully quit delivery, click/focus, and preserved delivery export pass. Precise profile-midnight, DST, and wake/resume tests pass. Actual 2026-08-31 system sleep/wake renewed coverage before GUI inspection. Ticket 111's dependency is complete. |
 | 113: Unnotarized Apple Silicon preview and updater acceptance | complete | The approved preview prerelease is public. Downloaded launch, three updater failure paths, valid .1 to .2 installation, separate restart, and data preservation pass. Both versions use schema 6, so shipped-migration testing is not applicable to this release. |
 | 114: BehaviorLog 0.3 portability parity | complete | Canonical passive observations, retained configuration identity, exact passive replay, and accepted source schedule fingerprints pass real SQLite/SQL and native export/import acceptance. Hosted rollout remains separate. |
-| 115: Apple-trusted macOS distribution acceptance | deferred | Apple Developer Program access, Developer ID signing, notarization, stapled artifact verification, quarantined notarized-DMG Gatekeeper acceptance, and Apple Silicon macOS 14 execution remain unavailable. The strict production check reaches only these Apple blockers. |
+| 115: Apple-trusted macOS distribution acceptance | in progress | Owner authorized all plan steps September 27. Membership confirmed; valid Developer ID identity and provisioning profile installed; notarization credentials accepted. Apple accepted candidate 0.1.1-rc.1 app and DMG notarization; stapling, Gatekeeper, and strict artifact verification pass. Synthetic production Keychain probe passed; installed acceptance remains open. Owner deferred macOS 14 runtime testing. See `docs/plans/2026-09-27-apple-developer-unblocked-work.md`. |
 | 116: Desktop account-sync product and architecture contract | complete | `AGENTS.md`, `docs/PRODUCT_SPEC.md`, `docs/DESKTOP_BUILD.md`, `docs/DECISIONS.md`, `docs/FUTURE_UPDATES.md`, `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, `docs/AGENT_RESOLVERS.md`, and `docs/TICKETS.md` define the optional account boundary, 100,000-row/64-MiB/30-second snapshot ceilings, planner and retry ownership, and security rules. `npm run agents:check`, `npm run interactions:check`, `npm run resolvers:check`, and `git diff --check` passed. No runtime, schema, provider, or hosted changes. |
 | 117: Desktop local database controls | complete | Exact Application Support path disclosure, Finder reveal, consistent online backup, protected local-only restore, validation, rollback contracts, and native restart acceptance pass. |
 | 118: Desktop Google authentication and account session | complete | Official Tauri deep-link delivery, query-state validation, exact-once Google PKCE exchange, fixed Keychain storage, distinct SQLite metadata, one-account enforcement, restart persistence, replay rejection, and secret scans pass. Installed preview.15 completed the owner Google round trip through the preview-only legacy login-Keychain path. Production Data Protection Keychain acceptance remains under Apple-signed Ticket 115. See `docs/qa/2026-08-31-desktop-authentication.md`. |
@@ -8434,8 +9188,8 @@ release occurred. Preserve all unrelated Ticket 106 edits.
 - Ticket 025 is now split into 025A restore preview and 025B restore apply/UI.
   Implement 025A first, verify it fully, then implement 025B. Ticket 025B is
   intentionally more destructive than the current import/create/merge paths.
-- Tickets 107–114 and 116–122 are complete. Keep Ticket 115 deferred until its
-  Apple access and macOS 14 blockers change. Do not start web offline/PWA,
+- Tickets 107–114 and 116–122 are complete. Ticket 115 membership is now available;
+  owner-authorized execution is in progress under the September 27 plan. Do not start web offline/PWA,
   broader workspace restructuring, mobile, billing, or AI work without scoped
   authorization.
 - Run `npm run agents:check` and `npm run resolvers:check` before standard lint/typecheck/test/build verification.

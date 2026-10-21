@@ -55,7 +55,8 @@ export class DesktopCalendarBroker {
     return this.request(`/api/google-calendar/events?${query}`);
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  /** Authenticated hosted-broker request; Ticket 238 connector clients reuse this transport. */
+  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = await this.accessToken();
     if (!token) throw new CalendarBrokerError("unauthenticated", 401);
     let response: Response;
@@ -181,7 +182,9 @@ export function isDesktopCalendarCallback(value: string): boolean {
 
 export function parseDesktopCalendarCallback(value: string, pending: PendingCalendarConnection, accountId: string, now: number): "connected" | "cancelled" | "error" | "same_account_required" {
   const url = new URL(value);
-  if (!isDesktopCalendarCallback(value) || pending.accountId !== accountId || now < pending.createdAt || now - pending.createdAt > MAX_CALLBACK_AGE_MS
+  if (!isDesktopCalendarCallback(value) || !pending || pending.accountId !== accountId
+    || typeof pending.state !== "string" || !pending.state || !Number.isFinite(pending.createdAt)
+    || now < pending.createdAt || now - pending.createdAt > MAX_CALLBACK_AGE_MS
     || url.searchParams.get("state") !== pending.state) throw new Error("Cadence rejected an invalid Calendar connection callback.");
   const result = url.searchParams.get("result");
   if (result !== "connected" && result !== "cancelled" && result !== "error" && result !== "same_account_required") throw new Error("Cadence rejected an invalid Calendar connection result.");

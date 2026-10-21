@@ -1,5 +1,5 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 declare global {
@@ -223,6 +223,9 @@ export async function clearDesktopCalendarClientState(
   await Promise.all([
     call("auth_secret_remove", { name: "pending-calendar-state" }),
     call("calendar_cache_clear"),
+    // Ticket 238: connector source caches and any pending Outlook attempt.
+    call("auth_secret_remove", { name: "pending-outlook-calendar-attempt" }),
+    call("connector_cache_clear", { provider: null }),
   ]);
 }
 
@@ -243,5 +246,3 @@ export function accountStateFromSession(session: Session | null): DesktopAccount
   const name = [metadata?.full_name, metadata?.name].find((value) => typeof value === "string" && value.trim());
   return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null } : { status: "local" };
 }
-
-export function desktopAuthAvailable(): boolean { return isTauri() && readDesktopAuthConfig() !== null; }

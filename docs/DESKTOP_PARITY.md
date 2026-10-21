@@ -240,10 +240,14 @@ to Ticket 113. Native rollback tests remain current evidence. The first future
 schema-changing update must upgrade an older installed version through the real
 updater after a protected database backup.
 
-Ticket 115 owns Apple Developer Program access, Developer ID signing,
+Ticket 115 has confirmed Apple Developer Program access. Developer ID signing,
 notarization, stapled app/DMG verification, quarantined notarized-DMG Gatekeeper
-acceptance, and Apple Silicon macOS 14 execution. These remain deferred, not
-passed. Marketing must not claim notarized or generally available distribution.
+acceptance, and installed acceptance on the current Apple Silicon host remain
+open, not passed. The owner deferred macOS 14 runtime acceptance on
+September 27 without changing the compiled minimum. Record each candidate's
+exact tested macOS version and build. Marketing must not claim notarized or
+generally available distribution before Ticket 115 passes, or compatibility
+with any untested macOS version.
 
 ## Verification boundary
 
@@ -291,6 +295,25 @@ native fixtures and multi-day resume remain open.
 The interaction registry records implemented controls separately from Ticket 137
 release acceptance. Marketing has no runtime change; native mobile remains deferred.
 
+## Connector expansion (Tickets 233–241)
+
+Implemented and independently verified locally through Ticket 240 at `40b1dc2`.
+Evidence includes source, synthetic fixtures and native cache unit tests; it does
+not establish installed application behavior. In linked-account mode, desktop uses
+the same Settings library and Timeline components and calls hosted Outlook,
+iCloud, and Hevy brokers with its Supabase session. Outlook consent uses the
+existing external-browser and opaque Keychain-state pattern. iCloud and Hevy
+credentials are posted once to the hosted service and never stored on the Mac.
+Per-source disposable caches stay outside `cadence.sqlite3` and user-created
+backups. Disconnect, sign-out, and account switching clear them. Local mode shows
+connectors as requiring a linked account. There is no EventKit bridge. Installed
+acceptance remains open; Ticket 241 records that gap without claiming release.
+Microsoft/Apple/Hevy live access, Microsoft
+publisher verification and deployment remain unverified. Hevy requires Pro and
+scans at most 500 workouts globally even for today; count stability is not an
+atomic snapshot. Each source requires its own default-off Daily Brief disclosure.
+Source timing never automatically completes a Behavior.
+
 ## Travel implementation — Tickets 162–165
 
 `apps/desktop/src/product.tsx` uses the shared Settings and Timeline travel
@@ -306,6 +329,21 @@ Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390p
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 `docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+
+
+Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and
+consumes the hosted 1.1 snapshot through `calendar/icloud-calendar.ts` and
+`calendar/use-connectors.ts`. The disposable iCloud cache binds account,
+generation, selection revision, range, timezone and display choices. Logout,
+account switch, disconnect and permission withdrawal clear source context.
+Daily Brief reuses the hosted, separately consented projection. Installed
+Keychain/cache behavior and live Apple access remain unverified; no native
+EventKit or local-calendar permission exists.
+
+Ticket 240 review correction: web and desktop retain a known failed or incomplete
+refresh warning across cache hits until a complete read succeeds. Desktop cold
+opens verify the provider before treating a saved snapshot as current. The shared
+rule also applies to Outlook and Hevy desktop snapshots. No native schema changed.
 
 ## Hosted client access (Ticket 227)
 

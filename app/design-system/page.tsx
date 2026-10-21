@@ -1,5 +1,6 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
+import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
 import { TravelSettingsBench } from "./TravelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import type { Metadata } from "next";
@@ -1614,6 +1615,11 @@ const previewFactories: Record<
       </ProductPreview>
     ),
   "module.google-calendar-panel": () => <ProductPreview><CalendarSettingsBench /></ProductPreview>,
+  "module.connector-library": () => <ProductPreview maxHeight="48rem"><ConnectorLibraryBench /></ProductPreview>,
+  "module.icloud-calendar-panel": () => <ProductPreview><IcloudCalendarPanelBench /></ProductPreview>,
+  "module.outlook-calendar-panel": () => <ProductPreview><OutlookCalendarPanelBench /></ProductPreview>,
+  "module.hevy-panel": () => <ProductPreview><HevyPanelBench /></ProductPreview>,
+  "composite.recorded-activity-list": () => <ProductPreview><RecordedActivityBench /></ProductPreview>,
   "module.travel-settings-panel": () => <ProductPreview><TravelSettingsBench /></ProductPreview>,
   "module.daily-brief-bubble": () => <ProductPreview><DailyBriefBubbleBench /></ProductPreview>,
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,

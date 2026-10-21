@@ -1869,6 +1869,52 @@ never enter exports, sync snapshots, or desktop backups. Hosting infrastructure
 backups may retain sealed ciphertext under the existing provider retention policy.
 Local ownership/race verification: `tests/sql/google-calendar-contract.sql`.
 
+## Hevy, Outlook, and iCloud connector lifecycle (Ticket 235)
+
+Migration `20261019040000_connector_lifecycle.sql` adds owner metadata for the
+new hosted connectors. Google Calendar tables, functions, ciphertext, and
+same-subject rules are unchanged.
+
+- `connector_connections`: primary key `(user_id, provider)`, so each Cadence
+  account has at most one connection per provider. `provider` is `hevy`,
+  `outlook_calendar`, or `icloud_calendar`. `account_digest` is a SHA-256 of the
+  provider-namespaced identity (Hevy `user/info` id, Outlook `tid` plus `sub`, or
+  the iCloud principal href); it is never an email address. `generation` advances
+  on every install, disconnect, and `reconnect_required` transition. `status` is
+  `connected`, `disconnected`, or `reconnect_required`. Authenticated owners
+  have column SELECT on everything except `attempt_hash`, and no write grants.
+- `connector_preferences`: owner SELECT and column UPDATE of
+  `selected_source_ids`, `hidden_source_ids`, `visible`, and `show_all_day`.
+  The existing `cadence_calendar_private.advance_selection()` trigger advances
+  `selection_revision` on every update. Hidden IDs must be a subset of selected
+  IDs; Hevy rows hold no selections.
+- `cadence_calendar_private.connector_credentials` holds one sealed credential
+  per owner and provider, keyed to the connection's identity and generation.
+  `cadence_calendar_private.connector_attempts` holds one five-minute Outlook
+  OAuth attempt per owner with a sealed PKCE verifier. Both enable RLS and deny
+  every client grant, including direct service-role table reads.
+
+Exact `connector_*` RPCs are executable only by `service_role`, use empty search
+paths, and take the owner from the authenticated caller or a consumed attempt.
+Install is a compare-and-swap on generation (and on the attempt hash for
+Outlook). A bound identity must disconnect before a different provider account
+connects; `reconnect_required` keeps the binding. Reads require owner, provider,
+identity digest, and generation to match a connected row. Refresh rotation
+replaces ciphertext only inside the live generation. Disconnect affects one
+provider: it advances the generation, releases the identity, and deletes that
+provider's credential, attempts, and selections. Every row cascades from its
+Auth owner, so failed Auth deletion preserves connections and successful
+deletion removes them. None of these providers documents app-side revocation.
+
+AES-256-GCM uses the separate `CONNECTOR_CREDENTIAL_*` keyring. Associated data
+binds the `cadence-connector-v1` tag, provider, purpose (`credential` or
+`verifier`), owner, identity digest, generation, and attempt hash. Credentials,
+raw provider responses, and source records stay out of exports, BehaviorLog,
+account synchronization, desktop SQLite, and user-created backups. Hosting
+infrastructure backups may retain sealed ciphertext under the existing provider
+retention policy. Local verification: `tests/sql/context-connectors-contract.sql`
+and `tests/connector-lifecycle.test.ts`.
+
 ## Advisor day-context reads (Ticket 146)
 
 Migration `20260919010100_add_advisor_cadence_snapshot.sql` adds owner-scoped
@@ -1928,6 +1974,31 @@ disclosure revision: one automatic start plus three deliberate retries. The fift
 returns `retry_exhausted`. The one-active-generation rule and six starts/minute
 still apply first; no quota or admission record is cleared. A new local day or
 disclosure revision starts at one. The column stores no prompt or generated text.
+
+Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
+
+- `daily_brief_preferences` adds `include_outlook_calendar`,
+  `include_icloud_calendar`, and `include_hevy` (default false; each requires
+  `enabled`). `include_calendar` stays Google Calendar only. Each disclosure
+  stores the connector fence current when it was granted:
+  `outlook_connection_generation` and `outlook_selection_revision`,
+  `icloud_connection_generation` and `icloud_selection_revision`, and
+  `hevy_connection_generation`. Check constraints require the fence exactly when
+  the disclosure is on. Existing rows read every new disclosure as off.
+- `save_daily_brief_preferences_v3` saves all seven controls. Enabling Outlook or
+  iCloud needs a connected `connector_connections` row with a non-empty
+  `connector_preferences.selected_source_ids`; Hevy needs a connected row. A
+  missing source raises `55000`. `save_daily_brief_preferences_v2` now delegates
+  with the three new disclosures off, and the original three-argument save still
+  delegates to v2, so older clients revoke them. Every save bumps the revision and
+  deletes the owner's `daily_brief_runs`.
+- `daily_brief_connector_fence_is_current(user_id)` (private, not granted to
+  clients) checks each disclosed source's connected status, generation, and
+  selection revision. `daily_brief_calendar_fence_is_current` keeps its signature
+  and now also requires it, so the installed `begin_daily_brief` and
+  `finish_daily_brief` fence the new sources without being rewritten.
+- `read_daily_brief_preferences` returns the new keys. The repository treats a
+  missing key as off and rejects a disclosure without its fence.
 
 Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
 

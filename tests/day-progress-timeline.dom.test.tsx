@@ -197,6 +197,33 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("[data-current-time-marker]")).not.toBeNull();
   });
 
+  it("labels Outlook markers by source and shows recorded workouts apart from Calendar markers (Ticket 238)", async () => {
+    const input = props();
+    const recordedActivity = { state: "ready" as const, error: null, day: { localDate: "2026-09-16", state: "current" as const, fetchedAt: "2026-09-16T13:55:00Z",
+      items: [{ id: "hevy/workout-1", startAt: "2026-09-16T11:00:00Z", endAt: "2026-09-16T11:45:00Z", durationSeconds: 2700 }] } };
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input}
+      context={{ ...input.context, events: [allDayEvent(), outlookEvent()], recordedActivity, sourceMessages: ["Outlook Calendar context is incomplete; some events may be missing."] }} /></RefreshProvider>));
+    await act(async () => { observers.forEach((callback) => callback()); await Promise.resolve(); });
+    const marker = container.querySelector<HTMLButtonElement>('[data-calendar-node="outlook_calendar/calendar-1/planning"]');
+    expect(marker?.getAttribute("aria-label")).toBe("Preview Outlook Calendar event: Planning review");
+    expect(marker?.dataset.eventSource).toBe("outlook_calendar");
+    expect(marker?.querySelector("img")).toBeNull();
+    expect(container.textContent).toContain("Outlook Calendar context is incomplete; some events may be missing.");
+    const activity = container.querySelector('[data-recorded-activity="ready"]');
+    expect(activity?.closest("section[aria-labelledby='today-2026-09-16-title']")).not.toBeNull();
+    expect(activity?.textContent).toContain("Workout");
+    expect(activity?.textContent).toContain("7:00 AM–7:45 AM");
+    expect(activity?.textContent).toContain("45 min");
+    // A workout is never a Calendar marker, overlap cue, or Occurrence change.
+    expect(container.querySelectorAll("[data-calendar-node]")).toHaveLength(1);
+    expect(container.querySelector('[data-calendar-node^="hevy/"]')).toBeNull();
+    expect(container.querySelector('article[data-occurrence-id="occurrence-1"]')?.textContent).not.toContain("Completed ·");
+    expect(action).not.toHaveBeenCalled();
+    await act(() => marker!.click());
+    await act(() => button("View details: Planning review").click());
+    expect(container.querySelector('[data-calendar-drawer="details"]')?.textContent).toContain("Outlook Calendar");
+  });
+
   it("stops the current-time work while hidden and restarts it on visibility", async () => {
     expect(container.querySelector("[data-current-time-marker]")).not.toBeNull();
     expect(vi.getTimerCount()).toBeGreaterThan(0);
@@ -238,6 +265,12 @@ function timeline(): TimelineView {
       occurrenceGroups: [{ key: "occurrence-1", behaviorId: "behavior-1", title: "Morning walk", occurrences: [], isGroupedStack: false }],
     }],
   };
+}
+
+function outlookEvent() {
+  return { ...allDayEvent(), id: "outlook_calendar/calendar-1/planning", providerEventId: "planning", logicalInstanceId: "outlook_calendar/calendar-1/planning",
+    source: "outlook_calendar" as const, calendarName: "Work", title: "Planning review", kind: "timed" as const, startAt: "2026-09-16T15:00:00Z", endAt: "2026-09-16T16:00:00Z",
+    endUnspecified: false, duration: { kind: "known" as const, seconds: 3600 }, startLocalDate: undefined, endLocalDate: undefined };
 }
 
 function allDayEvent() {

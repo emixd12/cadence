@@ -5,6 +5,7 @@ import type {
   ExternalEventFieldAvailability,
   ExternalEventOriginalStart,
   ExternalEventRevision,
+  ExternalEventSource,
   NormalizedExternalEvent,
 } from "../types/day-progress";
 import {
@@ -13,8 +14,11 @@ import {
   EXTERNAL_EVENT_MAX_CALENDARS,
   EXTERNAL_EVENT_MAX_RANGE_DAYS,
   EXTERNAL_EVENT_SCHEMA_VERSION,
+  EXTERNAL_EVENT_SOURCE_VERSIONS,
   type ExternalEventCancellationTombstone,
+  type ExternalEventSnapshotScope,
   type ExternalEventSnapshotV1,
+  type VersionedExternalEventSnapshot,
 } from "../types/external-event";
 
 const FIELD_AVAILABILITY = new Set<ExternalEventFieldAvailability>([
@@ -57,27 +61,107 @@ const EVENT_BASE_KEYS = [
   "attachments",
 ] as const;
 
+export type ExternalEventValidationErrorCode =
+  | "unsupported_schema_version"
+  | "malformed_provider_response";
+
 export class ExternalEventValidationError extends Error {
-  constructor(public readonly path: string, message: string) {
+  constructor(
+    public readonly path: string,
+    message: string,
+    public readonly code: ExternalEventValidationErrorCode = "malformed_provider_response",
+  ) {
     super(`${path}: ${message}`);
     this.name = "ExternalEventValidationError";
   }
 }
 
+const V1_1_SOURCES = new Set<ExternalEventSource>(["outlook_calendar", "icloud_calendar"]);
+const V1_1_UNSUPPORTED_DETAILS = [
+  "description", "location", "organizer", "attendees", "conference", "attachments",
+] as const;
+
+/**
+ * Exact Google `1.0.0` entry point. Older desktop caches and every existing
+ * Google route keep using it; it rejects `1.1.0` snapshots.
+ */
 export function validateExternalEventSnapshot(
   value: unknown,
 ): ExternalEventSnapshotV1 {
+  return validateSnapshot(value, "google_only") as ExternalEventSnapshotV1;
+}
+
+/**
+ * Accepts `1.0.0` only with Google literals and `1.1.0` only with Outlook or
+ * iCloud literals. Every other combination fails as `unsupported_schema_version`.
+ */
+export function validateVersionedExternalEventSnapshot(
+  value: unknown,
+): VersionedExternalEventSnapshot {
+  return validateSnapshot(value, "versioned");
+}
+
+/** Source-namespaced normalized identity, matching the Google `source/part/part` form. */
+export function externalEventNormalizedId(
+  source: ExternalEventSource,
+  parts: readonly [string, ...string[]],
+): string {
+  if (parts.some((part) => part.length === 0)) {
+    throw new ExternalEventValidationError("id", "identity parts must not be empty");
+  }
+  return [source, ...parts.map((part) => encodeURIComponent(part))].join("/");
+}
+
+export function externalEventSnapshotScope(
+  snapshot: VersionedExternalEventSnapshot,
+): ExternalEventSnapshotScope {
+  return {
+    source: snapshot.source,
+    accountId: snapshot.accountId,
+    connectionGeneration: snapshot.connectionGeneration,
+    startLocalDate: snapshot.requestedRange.startLocalDate,
+    endLocalDate: snapshot.requestedRange.endLocalDate,
+    timezone: snapshot.requestedRange.timezone,
+    selectedCalendarIds: snapshot.requestedRange.selectedCalendarIds,
+  };
+}
+
+/** Cache key: one source's snapshot can never satisfy or clear another source's cache. */
+export function externalEventSnapshotScopeKey(scope: ExternalEventSnapshotScope): string {
+  return JSON.stringify([
+    scope.source,
+    scope.accountId,
+    scope.connectionGeneration,
+    scope.startLocalDate,
+    scope.endLocalDate,
+    scope.timezone,
+    [...scope.selectedCalendarIds].sort(),
+  ]);
+}
+
+export function externalEventSnapshotMatchesScope(
+  snapshot: VersionedExternalEventSnapshot,
+  scope: ExternalEventSnapshotScope,
+): boolean {
+  return externalEventSnapshotScopeKey(externalEventSnapshotScope(snapshot))
+    === externalEventSnapshotScopeKey(scope);
+}
+
+function validateSnapshot(
+  value: unknown,
+  mode: "google_only" | "versioned",
+): VersionedExternalEventSnapshot {
   const snapshot = object(value, "$snapshot");
   exactKeys(snapshot, "$snapshot", [
     "schemaVersion", "adapterVersion", "accountId", "connectionGeneration",
     "source", "requestedRange", "fetchedAt", "completeness", "freshness",
     "capabilities", "coverage", "failures", "events", "tombstones",
   ]);
-  literal(snapshot.schemaVersion, EXTERNAL_EVENT_SCHEMA_VERSION, "schemaVersion");
-  literal(snapshot.adapterVersion, EXTERNAL_EVENT_ADAPTER_VERSION, "adapterVersion");
+  const source = mode === "google_only"
+    ? validateGoogleVersion(snapshot)
+    : validateSourceVersion(snapshot);
   nonEmptyString(snapshot.accountId, "accountId");
   integer(snapshot.connectionGeneration, "connectionGeneration", 1);
-  literal(snapshot.source, "google_calendar", "source");
 
   const requestedRange = object(snapshot.requestedRange, "requestedRange");
   exactKeys(requestedRange, "requestedRange", [
@@ -139,7 +223,7 @@ export function validateExternalEventSnapshot(
   const events = array(snapshot.events, "events");
   const eventIds = new Set<string>();
   for (let index = 0; index < events.length; index += 1) {
-    const event = validateEvent(events[index], `events[${index}]`);
+    const event = validateEvent(events[index], `events[${index}]`, source);
     if (!selectedCalendarIds.includes(event.calendarId) || eventIds.has(event.id)) {
       fail(`events[${index}].id`, "must be unique and belong to a selected calendar");
     }
@@ -149,14 +233,69 @@ export function validateExternalEventSnapshot(
   const tombstones = array(snapshot.tombstones, "tombstones");
   const tombstoneIds = new Set<string>();
   for (let index = 0; index < tombstones.length; index += 1) {
-    const tombstone = validateTombstone(tombstones[index], `tombstones[${index}]`);
+    const tombstone = validateTombstone(tombstones[index], `tombstones[${index}]`, source);
     if (!selectedCalendarIds.includes(tombstone.calendarId) || tombstoneIds.has(tombstone.id)) {
       fail(`tombstones[${index}].id`, "must be unique and belong to a selected calendar");
     }
     tombstoneIds.add(tombstone.id);
   }
 
-  return value as ExternalEventSnapshotV1;
+  return value as VersionedExternalEventSnapshot;
+}
+
+function validateGoogleVersion(snapshot: Record<string, unknown>): ExternalEventSource {
+  literal(snapshot.schemaVersion, EXTERNAL_EVENT_SCHEMA_VERSION, "schemaVersion", "unsupported_schema_version");
+  literal(snapshot.adapterVersion, EXTERNAL_EVENT_ADAPTER_VERSION, "adapterVersion", "unsupported_schema_version");
+  literal(snapshot.source, "google_calendar", "source", "unsupported_schema_version");
+  return "google_calendar";
+}
+
+function validateSourceVersion(snapshot: Record<string, unknown>): ExternalEventSource {
+  const versions = EXTERNAL_EVENT_SOURCE_VERSIONS as Readonly<Record<string, Readonly<{
+    schemaVersion: string;
+    adapterVersion: string;
+  }>>>;
+  const source = typeof snapshot.source === "string" && Object.hasOwn(versions, snapshot.source)
+    ? snapshot.source as ExternalEventSource
+    : null;
+  const expected = source ? versions[source] : null;
+  if (!source || !expected || snapshot.schemaVersion !== expected.schemaVersion) {
+    fail("schemaVersion", "is unsupported for this source", "unsupported_schema_version");
+  }
+  if (snapshot.adapterVersion !== expected.adapterVersion) {
+    fail("adapterVersion", `must equal ${expected.adapterVersion} for ${source}`, "unsupported_schema_version");
+  }
+  return source;
+}
+
+function validateV1_1Identity(value: unknown, source: ExternalEventSource, path: string): void {
+  if (!(value as string).startsWith(`${source}/`)) {
+    fail(path, `must be namespaced by ${source}/`);
+  }
+}
+
+/** Outlook and iCloud first slices read the subject only; every other detail is unsupported. */
+function validateV1_1Event(event: Record<string, unknown>, source: ExternalEventSource, path: string): void {
+  validateV1_1Identity(event.id, source, `${path}.id`);
+  validateV1_1Identity(event.logicalInstanceId, source, `${path}.logicalInstanceId`);
+  literal(event.description, "", `${path}.description`);
+  literal(event.location, "", `${path}.location`);
+  for (const key of ["organizer", "attendees", "conference", "attachments"] as const) {
+    if (event[key] !== null) fail(`${path}.${key}`, "is unsupported for this source");
+  }
+  if (event.attendeesOmitted !== false) fail(`${path}.attendeesOmitted`, "must be false for this source");
+  const availability = event.fieldAvailability as Record<string, unknown>;
+  for (const field of V1_1_UNSUPPORTED_DETAILS) {
+    literal(availability[field], "unsupported", `${path}.fieldAvailability.${field}`);
+  }
+  if (source === "outlook_calendar") {
+    literal(event.state, "unknown", `${path}.state`);
+  }
+  if (source === "icloud_calendar") {
+    if (event.sourceUrl !== null) fail(`${path}.sourceUrl`, "is unsupported for this source");
+    if (event.currentUserResponse !== null) fail(`${path}.currentUserResponse`, "is unsupported for this source");
+    literal(availability.source_url, "unsupported", `${path}.fieldAvailability.source_url`);
+  }
 }
 
 function validateFreshness(value: unknown, completeness: unknown): void {
@@ -203,13 +342,13 @@ function validateFailure(value: unknown, path: string): void {
   nonEmptyString(failure.message, `${path}.message`);
 }
 
-function validateEvent(value: unknown, path: string): NormalizedExternalEvent {
+function validateEvent(value: unknown, path: string, source: ExternalEventSource): NormalizedExternalEvent {
   const event = object(value, path);
   nonEmptyString(event.id, `${path}.id`);
   nonEmptyString(event.providerEventId, `${path}.providerEventId`);
   nonEmptyString(event.logicalInstanceId, `${path}.logicalInstanceId`);
   nonEmptyString(event.calendarId, `${path}.calendarId`);
-  literal(event.source, "google_calendar", `${path}.source`);
+  literal(event.source, source, `${path}.source`);
   nonEmptyString(event.calendarName, `${path}.calendarName`);
   timezone(event.sourceTimezone, `${path}.sourceTimezone`);
   oneOf(event.sourceTimezoneFallback, ["none", "calendar", "request"], `${path}.sourceTimezoneFallback`);
@@ -231,6 +370,7 @@ function validateEvent(value: unknown, path: string): NormalizedExternalEvent {
   validateConference(event.conference, `${path}.conference`);
   validateRecurrence(event.recurrence, `${path}.recurrence`);
   validateAttachments(event.attachments, `${path}.attachments`);
+  if (V1_1_SOURCES.has(source)) validateV1_1Event(event, source, path);
 
   if (event.kind === "timed") {
     exactKeys(event, path, [...EVENT_BASE_KEYS, "kind", "startAt", "endAt", "endUnspecified", "duration"]);
@@ -364,7 +504,11 @@ function validateAttachments(value: unknown, path: string): void {
   });
 }
 
-function validateTombstone(value: unknown, path: string): ExternalEventCancellationTombstone {
+function validateTombstone(
+  value: unknown,
+  path: string,
+  source: ExternalEventSource,
+): ExternalEventCancellationTombstone {
   const tombstone = object(value, path);
   exactKeys(tombstone, path, [
     "id", "providerEventId", "logicalInstanceId", "calendarId", "source",
@@ -374,7 +518,11 @@ function validateTombstone(value: unknown, path: string): ExternalEventCancellat
   nonEmptyString(tombstone.providerEventId, `${path}.providerEventId`);
   nonEmptyString(tombstone.logicalInstanceId, `${path}.logicalInstanceId`);
   nonEmptyString(tombstone.calendarId, `${path}.calendarId`);
-  literal(tombstone.source, "google_calendar", `${path}.source`);
+  literal(tombstone.source, source, `${path}.source`);
+  if (V1_1_SOURCES.has(source)) {
+    validateV1_1Identity(tombstone.id, source, `${path}.id`);
+    validateV1_1Identity(tombstone.logicalInstanceId, source, `${path}.logicalInstanceId`);
+  }
   validateRecurrence(tombstone.recurrence, `${path}.recurrence`);
   validateRevision(tombstone.revision, `${path}.revision`);
   return value as ExternalEventCancellationTombstone;
@@ -511,8 +659,13 @@ function finitePositive(value: unknown, path: string): number {
   return value;
 }
 
-function literal<T extends string | number>(value: unknown, expected: T, path: string): T {
-  if (value !== expected) fail(path, `must equal ${String(expected)}`);
+function literal<T extends string | number>(
+  value: unknown,
+  expected: T,
+  path: string,
+  code?: ExternalEventValidationErrorCode,
+): T {
+  if (value !== expected) fail(path, `must equal ${String(expected)}`, code);
   return expected;
 }
 
@@ -531,6 +684,6 @@ function unique(values: string[], path: string): void {
   if (new Set(values).size !== values.length) fail(path, "must contain unique values");
 }
 
-function fail(path: string, message: string): never {
-  throw new ExternalEventValidationError(path, message);
+function fail(path: string, message: string, code?: ExternalEventValidationErrorCode): never {
+  throw new ExternalEventValidationError(path, message, code);
 }

@@ -25,7 +25,6 @@ import { repairUserOccurrenceReminderGraphBestEffort } from "@/lib/services/occu
 import {
   invalidateBehaviorData,
   invalidateImportRunData,
-  readCachedBehaviorLogImportRuns,
 } from "@/lib/cache/stable-user-data.cache";
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 import type {
@@ -189,14 +188,6 @@ export async function createBehaviorLogRestorePreviewRun(
   invalidateImportRunData(input.userId);
 
   return { preview, importRun };
-}
-
-export async function getBehaviorLogRestorePageData(): Promise<BehaviorLogRestorePageData> {
-  const supabase = await createClient();
-  const userId = await requireUserId(supabase);
-  const recentRuns = await readCachedBehaviorLogImportRuns(supabase, userId, 12);
-
-  return createBehaviorLogRestorePageDataFromRuns(recentRuns);
 }
 
 export function createBehaviorLogRestorePageDataFromRuns(
