@@ -500,9 +500,10 @@ Signed builds use the stable feed
 `https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json`,
 chosen by the owner on October 19, 2026. Supply it as `CADENCE_UPDATER_ENDPOINT`.
 Previews keep the `desktop-preview` feed. At publication, that feed also names the
-signed release, so preview users can move to it. The current candidate is `0.1.2`:
-[2026-10-20 release packet](qa/2026-10-20-desktop-0.1.2-release-packet.md). It
-replaces the unpublished `0.1.1`
+signed release, so preview users can move to it. The current candidate is `0.1.3`:
+[2026-10-21 release packet](qa/2026-10-21-desktop-0.1.3-release-packet.md). It
+replaces the unpublished `0.1.2`
+([2026-10-20 packet](qa/2026-10-20-desktop-0.1.2-release-packet.md)) and `0.1.1`
 ([2026-10-19 packet](qa/2026-10-19-desktop-0.1.1-release-packet.md)).
 
 Xcode 27.1 `strip` corrupts release proc-macro dylibs built with the macOS 14.0

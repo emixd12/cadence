@@ -1,5 +1,29 @@
 # Implementation Status
 
+## Tickets 178 and 181: 0.1.3 passes installed acceptance — October 21, 2026
+
+Not published; waiting on the owner's publish instruction. Candidate `0.1.3` from
+`dcefe7e` is notarized (app `ac2067a7`, DMG `618874b4`), stapled, and passes all 14
+artifact checks. A Gatekeeper check on a quarantined download passes, and
+`syspolicy_check distribution` reports it ready for distribution. Its files and the
+QA feed are on the QA prerelease.
+
+Installed acceptance on the test Mac ran over Tailscale SSH, with the owner signing in
+twice through Screen Sharing:
+- 0.1.3 installed from the verified DMG, and the test account reconnected.
+- With explicit owner authorization, the account's only hosted session was deleted
+  through the linked Supabase CLI.
+- After the access token expired, the running app showed "The account session
+  expired or was revoked" with Reconnect account, not "permission denied".
+- Reconnect synced. Compared with the baseline, no table lost rows; integrity was
+  `ok` and the schema stayed at 17.
+
+Sign-in renewal passed on the owner Mac: the same 0.1.2 process synced 11 hours after
+launch. Every Ticket 178 gate now has installed or test evidence; Calendar expiry is
+covered by a unit test, because the hosted broker completes the Google connection.
+Open: merge PR #115, then publication under Ticket 181. Packet:
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+
 ## Ticket 178: revoked-session fix, 0.1.3 replaces 0.1.2 — October 20, 2026
 
 In progress; not published. **0.1.2 is superseded; do not publish it.** On installed

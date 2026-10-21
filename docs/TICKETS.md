@@ -12567,6 +12567,12 @@ working linked state with an error (false "revoked" sync, Calendar actions inert
 relaunch). `4d9526f` fixes it in 0.1.2. Replay, Calendar expiry, revoked-session and
 renewal checks are repeated on 0.1.2; see
 `docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
+October 21: on 0.1.2, the replay check passed. Remote sign-out showed a raw permission
+error instead of Reconnect account; `dcefe7e` fixes it in 0.1.3. On installed 0.1.3,
+remote sign-out showed the revoked state with Reconnect account, and reconnecting
+synced with no lost data. Sign-in renewal passed over 11 hours on the owner Mac.
+Calendar expiry is covered by a unit test. Every Ticket 178 gate has evidence; see
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 Original preview.45, the complete primary directory and reminders were restored.
 Dependencies: Ticket 115's retained notarized candidate; existing
 account-sync and Calendar contracts in Tickets 118–122 and 137.
@@ -12748,6 +12754,10 @@ October 20: 0.1.1 is superseded and must not be published. Candidate `0.1.2` fro
 `4d9526f` is notarized, stapled and verified. Its quarantined download, Ticket 178
 rechecks and publication remain open. Packet:
 `docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
+October 21: 0.1.2 is also superseded. Candidate `0.1.3` from `dcefe7e` is notarized,
+stapled and verified, and passes installed acceptance. Gatekeeper on a quarantined
+download and `syspolicy_check distribution` pass. Merging PR #115 and the owner's
+publish instruction remain. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
 Maps-handoff outcomes separately; no location-success claim while that gate is open.
 
