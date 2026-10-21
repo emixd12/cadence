@@ -936,3 +936,15 @@ still uses it only for read-only CalDAV `PROPFIND`/`REPORT` calls, and disconnec
 and account deletion still tell the user to revoke it. This unblocks owner-run
 live tests with a real Apple credential. Hosted migration, deployment and user
 release remain separate approvals.
+
+
+## 2026-10-21: Request Calendars.Read for Outlook Calendar
+
+Ticket 242. Live testing showed Microsoft Graph rejects personal Microsoft
+account tokens that carry only `Calendars.ReadBasic`, contrary to its permission
+tables; `Calendars.Read` works. The owner requires personal accounts to work, so
+the Outlook connector requests `Calendars.Read` for all Microsoft accounts. This
+supersedes the earlier choice of `Calendars.ReadBasic` as the least-privileged
+scope. Cadence still requests only the contract's fields and never downloads
+bodies, attachments or extensions; disclosures say Microsoft's permission is
+broader than what Cadence reads.

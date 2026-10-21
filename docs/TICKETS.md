@@ -14093,15 +14093,16 @@ connector framework, background polling, new primary route, or mobile app.
 
 | Ticket | Delivery slice | Dependencies |
 |---|---|---|
-| 220 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
-| 221 | Shared calendar-source and recorded-activity contracts | 220 |
-| 222 | Secure lifecycle for new connectors | 221 |
-| 223 | Hevy workout timing connector | 222 |
-| 224 | Outlook Calendar connector | 222 |
-| 225 | Connector library and Timeline on web and desktop | 223, 224; 227 when ready |
-| 226 | Separately approved connector context in Daily Brief | 225 |
-| 227 | iCloud Calendar connector | 222 |
-| 228 | Verification and disclosure reconciliation | 221–227 |
+| 233 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
+| 234 | Shared calendar-source and recorded-activity contracts | 233 |
+| 235 | Secure lifecycle for new connectors | 234 |
+| 236 | Hevy workout timing connector | 235 |
+| 237 | Outlook Calendar connector | 235 |
+| 238 | Connector library and Timeline on web and desktop | 236, 237; 240 when ready |
+| 239 | Separately approved connector context in Daily Brief | 238 |
+| 240 | iCloud Calendar connector | 235 |
+| 241 | Verification and disclosure reconciliation | 234–240 |
+| 242 | Outlook personal-account support via `Calendars.Read` | 237, 241 live evidence |
 
 Tickets 236 and 237 may run in parallel in separate provider files. Shared schema,
 registry, Settings, Timeline, and briefing files are edited serially.
@@ -14467,8 +14468,8 @@ Platform impact:
 ## Ticket 241: Verification and disclosure reconciliation
 
 Status: independently approved at `a10b461` for local implementation and
-synthetic verification. Live providers, installed desktop, iCloud
-custody acceptance and release remain open.
+synthetic verification. Live providers, installed desktop and release remain
+open; the owner accepted iCloud custody on 2026-10-19.
 
 Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
@@ -14488,4 +14489,57 @@ Platform impact:
 | Web | `components/settings/LegalContent.tsx`; source/fixture verification with unchanged connector runtime. |
 | Desktop | `docs/DESKTOP_PARITY.md` and shared UI/broker checks; installed acceptance remains open. |
 | Marketing | Existing FAQ, homepage, About/docs and generated mirrors under `apps/marketing/src`; no deployment. |
+| Future mobile | Not applicable: no mobile surface. |
+
+## Ticket 242: Outlook Calendar personal-account support via Calendars.Read
+
+Status: approved by the owner on 2026-10-21; not started.
+
+Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
+personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
+every calendar endpoint returns 401 with an empty body. The same personal
+account read its calendars with a token carrying `Calendars.Read`, through a
+fresh test app. Work/school accounts work with either permission. Most people
+will connect personal Outlook.com, Hotmail or Live accounts, so the connector
+must support them. Owner direction: anyone with a Microsoft account must be able
+to connect it.
+
+Decision: request `openid offline_access Calendars.Read` for every Microsoft
+account (one Entra app, authority `common`). Do not branch scopes by account
+type. This matches the Google Calendar connector, whose read-only scope also
+covers event details. Data minimization moves from the permission to the
+request: Cadence keeps `$select` limited to the fields the contract already
+allows, never requests bodies, attachments or extensions, and discards any
+field outside the contract.
+
+Acceptance:
+
+- `OUTLOOK_CALENDAR_SCOPES` and granted-scope validation accept exactly one
+  Graph data permission, `Calendars.Read`; OIDC scopes may be echoed. A token
+  whose scope adds write or other Graph permissions is still rejected. An
+  existing connection granted only `Calendars.ReadBasic` moves to
+  `reconnect_required` on its next read, without crashing.
+- Graph requests keep explicit `$select` lists. Tests prove no request asks
+  for `body`, `bodyPreview`, `attachments` or extensions, and that unexpected
+  response fields are dropped before validation output.
+- Update `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`
+  (Outlook brief: scopes, rationale and the live evidence), `docs/OPERATIONS.md`,
+  `.env.example`, `docs/DECISIONS.md`, Settings legal text
+  (`components/settings/LegalContent.tsx`), the Outlook Settings disclosure, and
+  marketing FAQ/Privacy copy: Microsoft's permission allows reading event
+  details; Cadence requests only titles, times, calendar and response fields.
+- The Entra app "Cadence Calendar" lists `Calendars.Read` (delegated) instead of
+  `Calendars.ReadBasic` in its configured permissions.
+- Live retest on a disposable local stack: one personal account and one
+  work/school account connect, list calendars, read events and disconnect.
+  Agents drive the UI; the owner only signs in and consents.
+- Required checks, interaction registry and design-system checks pass.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `lib/services/outlook-calendar-oauth.ts`, Outlook service and adapter, Settings Outlook panel disclosure and legal text. |
+| Desktop | Same hosted broker and shared contracts; no desktop-specific scope handling. Installed acceptance stays with Ticket 238/115. |
+| Marketing | FAQ and Privacy wording for the broader Microsoft permission. |
 | Future mobile | Not applicable: no mobile surface. |
