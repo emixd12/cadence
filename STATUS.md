@@ -290,7 +290,7 @@ observations only; no credential or provider record was recorded.
   `oauth2PermissionGrant` existed (`consentType` AllPrincipals, scope
   `openid offline_access Calendars.ReadBasic`), which explains the missing
   consent screen. The coordinator deleted that grant after the test (0 remain).
-  User consent was exercised later (see below). Cross-tenant consent,
+  The user-consent screen was shown later (see below). Cross-tenant consent,
   `admin_approval_required` and a tenant that blocks unverified apps were not
   exercised; wrong-account reconnect was not
   live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
@@ -306,17 +306,25 @@ observations only; no credential or provider record was recorded.
   audit of the model request found 0 event titles and no `description`,
   `location` or attendee fields. The account had no Behaviors, so the brief
   reported no schedule issue. Turning Daily Brief off revoked the disclosure.
-  The settings save, brief request and disconnect used the app's own API as the
-  test user; the in-app browser's Settings panel did not hydrate reliably.
+  The Daily Brief preference was set through the app API as the test user
+  (`PUT /api/advisor/preferences`), not through the Settings UI. The Daily
+  Brief panel did not hydrate in the in-app browser tab. The brief request and
+  the final disconnect also used the app API.
 - Outlook work/school user consent (Ticket 237), 2026-10-21: after the
   tenant-wide grant was removed, reconnecting showed Microsoft's user-consent
   screen. It marked "Cadence Calendar" as **unverified** ("not published by
   Microsoft"; no terms links) and listed "Maintain access to data you have given
   it access to", "Read basic details of your calendars" and "View your basic
   profile". As an admin, the owner also saw "Consent on behalf of your
-  organization" (left unticked). User consent then succeeded in the home tenant.
-  Disconnect deleted the credential again (generation 6). Pending owner action:
-  remove the user grant at My Apps.
+  organization", which he reports leaving unticked. The connect then succeeded
+  in the home tenant. The stored result, however, was again a single
+  AllPrincipals (tenant-wide) grant with the same grant ID and scope
+  `openid offline_access Calendars.ReadBasic`, and no per-user grant existed.
+  Recorded as: user-consent screen shown; resulting grant type AllPrincipals;
+  cause unclear (an admin consent path, or an earlier delete that had not
+  propagated). This is not verified per-user consent. Disconnect deleted the
+  credential again (generation 6). The coordinator deleted the grant again and
+  confirmed after 45 s that 0 grants remain and a GET by ID returns 404.
 - Installed desktop (Ticket 238 desktop items: Keychain, `cadence://` deep
   links, per-source cache cleanup): **blocked by Ticket 115**. No signed
   installed build containing the connector code exists, so this step was not
