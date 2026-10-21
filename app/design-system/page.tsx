@@ -1,3 +1,4 @@
+import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { TravelSettingsBench } from "./TravelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
@@ -1884,6 +1885,8 @@ const previewFactories: Record<
     <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
       action={async () => { "use server"; return { status: "error", message: "Preview only. Your draft remains available." }; }} /></ProductPreview>
   ),
+  "flow.consent-form": () => <ProductPreview><ConsentBench /></ProductPreview>,
+  "module.connected-apps-panel": () => <ProductPreview><ConnectedAppsBench /></ProductPreview>,
   "module.timezone-panel": () => (
       <ProductPreview>
         <TimezonePanel
@@ -2008,7 +2011,7 @@ const trustEvidenceFixture: PublicTrustView = {
     application_deployment_url: "https://cadence-blush-three.vercel.app",
     marketing_deployment_id: "dpl_marketing",
     marketing_deployment_url: "https://cadence-marketing-two.vercel.app",
-    workflow_url: "https://github.com/emixd12/habit-tracking-app/actions/runs/123456789",
+    workflow_url: "https://github.com/emixd12/cadence/actions/runs/123456789",
     built_at: "2026-08-27T04:35:10Z",
     verified_at: "2026-08-27T04:41:10Z",
     freshness_deadline: "2026-08-28T04:41:10Z",

@@ -11,7 +11,9 @@
     "./behavior-store": "./src/behavior-store.ts",
     "./hash": "./src/hash.ts",
     "./behaviorlog.schema.json": "./src/behaviorlog.schema.json",
-    "./export-prompts": "./src/export-prompts.ts"
+    "./export-prompts": "./src/export-prompts.ts",
+    "./integration": "./src/integration/index.ts",
+    "./integration/*": "./src/integration/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --project tsconfig.json"

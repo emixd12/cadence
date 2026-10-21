@@ -6,6 +6,7 @@ import type { CalendarConnection, CalendarConnectionView, CalendarPreferences } 
 import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
 import { CalendarConnectionError, calendarGoogleSubject, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
+import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 
 export type CalendarCaller = { client: AppSupabaseClient; user: User };
 function config(requestOrigin?: string) { const value = readCalendarOAuthConfig(process.env, requestOrigin); if (!value) throw new CalendarConnectionError("not_configured"); return value; }
@@ -135,6 +136,37 @@ export async function getCalendarEventsForAdvisor(
     signal?: AbortSignal;
   }> = {},
 ): Promise<AdvisorCalendarRead> {
+  return readAuthorizedCalendarRange(caller, start, end, options, false);
+}
+
+/** Development-only Retrospective reads. Live authorization never uses the evaluation clock. */
+export async function getCalendarEventsForWorkbenchHistory(
+  caller: CalendarCaller, start: string, end: string,
+  options: Readonly<{ signal?: AbortSignal }> = {},
+): Promise<AdvisorCalendarRead> {
+  if (process.env.NODE_ENV !== "development") throw new CalendarConnectionError("permission_denied");
+  options.signal?.throwIfAborted();
+  const preference = await readDailyBriefPreferences(caller.client, options.signal);
+  if (!preference.enabled || !preference.includeCalendar) throw new CalendarConnectionError("permission_denied");
+  const connection = await getCalendarConnection(caller);
+  if (connection.status !== "connected" || connection.generation !== preference.calendarConnectionGeneration || connection.selectionRevision !== preference.calendarSelectionRevision) {
+    throw new CalendarConnectionError("connection_changed");
+  }
+  const result = await readAuthorizedCalendarRange(caller, start, end, {
+    authorizedCalendarIds: connection.preferences.selectedCalendarIds,
+    expectedConnectionGeneration: connection.generation, expectedSelectionRevision: connection.selectionRevision,
+    authorizationScope: `briefing-history:${preference.revision}`, signal: options.signal,
+  }, true);
+  const current = await readDailyBriefPreferences(caller.client, options.signal);
+  options.signal?.throwIfAborted();
+  if (JSON.stringify(current) !== JSON.stringify(preference)) throw new CalendarConnectionError("connection_changed");
+  return result;
+}
+
+async function readAuthorizedCalendarRange(
+  caller: CalendarCaller, start: string, end: string,
+  options: NonNullable<Parameters<typeof getCalendarEventsForAdvisor>[3]>, historical: boolean,
+): Promise<AdvisorCalendarRead> {
   const connection = await connected(caller);
   if (
     (options.expectedConnectionGeneration !== undefined && options.expectedConnectionGeneration !== connection.generation) ||
@@ -147,7 +179,8 @@ export async function getCalendarEventsForAdvisor(
   catch { throw new CalendarConnectionError("invalid_request"); }
   const now = options.now ?? Temporal.Now.instant();
   const today = now.toZonedDateTimeISO(profile.timezone).toPlainDate();
-  if (first.toString() !== start || last.toString() !== end || Temporal.PlainDate.compare(first, today) !== 0 || first.until(last).days < 0 || first.until(last).days > 30) throw new CalendarConnectionError("invalid_request");
+  if (first.toString() !== start || last.toString() !== end || first.until(last).days < 0 || first.until(last).days > 30 ||
+      (historical ? Temporal.PlainDate.compare(last, today) >= 0 : Temporal.PlainDate.compare(first, today) !== 0)) throw new CalendarConnectionError("invalid_request");
   const authorizedCalendarIds = options.authorizedCalendarIds === undefined
     ? null
     : [...new Set(options.authorizedCalendarIds)].sort();

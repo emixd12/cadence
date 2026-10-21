@@ -1,0 +1,34 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "cadence",
+  "version": "1.0.0",
+  "description": "Review Cadence routines and record user-confirmed tracking changes.",
+  "author": { "name": "Identity Scaffolding LLC", "url": "https://cadence-me.com" },
+  "homepage": "https://cadence-me.com/developers",
+  "repository": "https://github.com/emixd12/cadence",
+  "license": "MIT",
+  "keywords": ["cadence", "routines", "behavior-tracking"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Cadence",
+        "shortDescription": "Track and review routines",
+        "longDescription": "Review today's Occurrences and Needs decision, summarize weekly adherence, and set up recurring Behaviors. Changes require your confirmation and the appropriate Cadence permission. Unresolved Occurrences stay separate from adherence. Cadence reads only your connected account's tracking data, which may include personal health information you entered. Calendar events, travel data, and Daily Brief content are excluded. Account-free desktop data is unavailable; linked desktop data must synchronize first. Cadence does not provide medical advice or medication dosing.",
+        "developerName": "Identity Scaffolding LLC",
+        "category": "Productivity",
+        "capabilities": ["Review tracking data", "Record confirmed statuses", "Create confirmed routines"],
+        "websiteURL": "https://cadence-me.com",
+        "privacyPolicyURL": "https://app.cadence-me.com/privacy",
+        "termsOfServiceURL": "https://app.cadence-me.com/terms",
+        "supportURL": "https://github.com/emixd12/cadence/issues",
+        "defaultPrompt": [
+          "Review today's Cadence Occurrences and Needs decision with me.",
+          "Summarize my last seven complete days of Cadence adherence.",
+          "Help me set up a daily walking routine in Cadence."
+        ],
+        "composerIcon": "./assets/logo.png",
+        "logo": "./assets/logo.png"
+      }
+    }
+  }
+}

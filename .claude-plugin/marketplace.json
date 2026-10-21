@@ -1,0 +1,12 @@
+{
+  "name": "cadence-plugins",
+  "description": "Cadence tracking workflows and its remote MCP connection.",
+  "owner": { "name": "Identity Scaffolding LLC" },
+  "plugins": [
+    {
+      "name": "cadence",
+      "source": "./integrations/claude-plugin",
+      "description": "Review Cadence routines and record user-confirmed tracking changes."
+    }
+  ]
+}

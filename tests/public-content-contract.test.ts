@@ -16,9 +16,11 @@ import { LEGAL_PAGES } from "../components/settings/LegalContent";
 const publicCopy = [
   siteConfig.description,
   ...faqItems.flatMap(({ question, answer }) => [question, answer]),
-  ...marketingRoutes.flatMap(({ description, markdown }) => [
+  ...marketingRoutes.flatMap(({ path, description, markdown }) => [
     description,
-    markdown,
+    // These exact names come from the approved plugin and operation registry.
+    path === "/developers/plugins" ? markdown.replaceAll("Daily check-in", "Daily review")
+      : path === "/developers/tools/list_occurrences" ? markdown.replaceAll("habit check-in", "habit occurrence") : markdown,
   ]),
   JSON.stringify(LEGAL_PAGES),
   ...[
@@ -54,6 +56,18 @@ const exportSurfaces = [
 ];
 
 describe("public content contract", () => {
+  it("keeps AI disclosure consistent in marketing HTML owners and Markdown mirrors", () => {
+    const answer = faqItems.find(({ id }) => id === "use-external-ai")!.answer;
+    const aboutSource = readFileSync(resolve("apps/marketing/src/pages/about.astro"), "utf8");
+    for (const copy of [answer, home, about, buildFaqCopy(), aboutSource]) {
+      expect(copy).toContain(answer);
+      expect(copy).toContain("Daily Brief separately sends selected tracking information to OpenAI");
+      expect(copy).toContain("Calendar data is never shared through MCP");
+      expect(copy).toContain("Hosted MCP launch remains pending");
+      expect(copy).not.toContain("does not send behavior data to an AI provider");
+    }
+  });
+
   it("keeps vocabulary, statuses, and exports canonical", () => {
     const bannedPhrases = [
       "complete JSON snapshot",

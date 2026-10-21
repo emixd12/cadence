@@ -4,7 +4,8 @@ import { DEFAULT_BRIEFING_CONFIG } from '@cadence/core/services/briefing-config'
 import { briefingFixture } from '@/lib/services/briefing-fixtures';
 import type { BriefingConfig } from '@cadence/core/types/briefing-config';
 
-const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), preferences: vi.fn(), settings: vi.fn(), labels: vi.fn(), capture: vi.fn(), current: vi.fn(), begin: vi.fn(), finish: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spend: vi.fn(), authenticate: vi.fn(), preferences: vi.fn(), settings: vi.fn(), labels: vi.fn(), capture: vi.fn(), current: vi.fn(), begin: vi.fn(), finish: vi.fn() }));
+vi.mock('@/lib/db/travelSpend.repo', () => ({ readTravelMonthSpend: mocks.spend }));
 vi.mock('@/lib/services/google-calendar-request', () => ({ authenticateCalendarRequest: mocks.authenticate,
   calendarResponse: (_request: Request, body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } }),
   calendarPreflight: vi.fn(), readCalendarRequestBody: vi.fn() }));
@@ -26,7 +27,8 @@ function request(overrides = {}, signal?: AbortSignal) { return new Request(`${o
 const output = { text: 'Review your supplied context.', occurrenceRefs: [], suggestions: [] };
 
 beforeEach(() => {
-  vi.resetModules(); vi.resetAllMocks(); vi.stubEnv('NODE_ENV', 'development');
+  vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget")); vi.resetAllMocks(); vi.stubEnv('NODE_ENV', 'development');
+  mocks.spend.mockResolvedValue(125_000);
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-01T12:00:00Z'));
   mocks.authenticate.mockResolvedValue(caller); mocks.preferences.mockResolvedValue(preferences); mocks.settings.mockResolvedValue(settings);
   mocks.labels.mockResolvedValue([{ id: 'owned', title: 'Private Behavior' }]);
@@ -36,6 +38,16 @@ beforeEach(() => {
     configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current }));
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+
+it('explains why a signed-in account cannot use port 3000', async () => {
+  const { readBriefingWorkbenchAccount } = await import('@/lib/services/briefing-workbench.service');
+  const response = await readBriefingWorkbenchAccount(new Request('http://127.0.0.1:3000/api/dev/briefing-comparison', {
+    headers: { 'sec-fetch-site': 'same-origin' },
+  }));
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: 'access_denied', recovery: 'Open this development workbench on localhost port 4321–4330.' });
+  expect(mocks.authenticate).not.toHaveBeenCalled();
+});
 
 it('captures once, freezes planning, narrows each scope and never consumes daily admission', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
@@ -51,7 +63,7 @@ it('captures once, freezes planning, narrows each scope and never consumes daily
   expect(facts[1].context.cadence.history.lookbackDays).toBe(30);
   expect(facts[1].context.cadence.occurrences).toEqual([]); expect(facts[1].context.cadence.history.behaviors).toEqual([]);
   expect(facts[1].context).not.toHaveProperty('connectors');
-  expect(mocks.current).toHaveBeenCalledTimes(5);
+  expect(mocks.current).toHaveBeenCalledTimes(7);
   expect(mocks.begin).not.toHaveBeenCalled(); expect(mocks.finish).not.toHaveBeenCalled();
   expect(response.headers.get('cache-control')).toContain('no-store');
 });
@@ -88,7 +100,7 @@ it('rejects a different owner, disabled consent and stale consent before model s
 it('withholds both results if consent or source changes after the first generation', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
   const { DailyBriefError } = await import('@/lib/services/daily-brief-consumer');
-  mocks.current.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new DailyBriefError('context_changed'));
+  mocks.current.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new DailyBriefError('context_changed'));
   const generate = vi.fn(async () => ({ ...output, text: 'PRIVATE_GENERATED_TEXT' }));
   const response = await runBriefingComparison(request(), generate);
   expect(response.status).toBe(409); expect(await response.text()).not.toMatch(/PRIVATE_GENERATED_TEXT|inspector|cadence/);
@@ -109,7 +121,8 @@ it('loads account labels without capture or generation and hides them when conse
   const { readBriefingWorkbenchAccount } = await import('@/lib/services/briefing-workbench.service');
   const read = () => readBriefingWorkbenchAccount(new Request(`${origin}/api/dev/briefing-comparison`, { headers: { 'sec-fetch-site': 'same-origin' } }));
   const response = await read(); expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ behaviors: [{ ref: 'behavior_owned', title: 'Private Behavior' }] });
+  expect(await response.json()).toMatchObject({ travelSpend: { localMonth: '2026-11-01', reservedMicrodollars: 125_000 }, behaviors: [{ ref: 'behavior_owned', title: 'Private Behavior' }] });
+  expect(mocks.spend).toHaveBeenCalledWith(caller.client, 'owner', '2026-11-01');
   expect(mocks.labels).toHaveBeenCalledWith(caller.client, 'owner'); expect(mocks.capture).not.toHaveBeenCalled();
   mocks.labels.mockClear(); mocks.settings.mockResolvedValue({ ...settings, enabled: false });
   expect(await (await read()).json()).toMatchObject({ behaviors: [] }); expect(mocks.labels).not.toHaveBeenCalled();

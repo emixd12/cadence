@@ -8,6 +8,25 @@ import { runNativeCoverageProbe } from "../apps/desktop/src/native-coverage-prob
 
 afterEach(() => { vi.useRealTimers(); invoke.mockReset(); });
 
+test("capacity probes preserve pending product reminders and refuse to schedule", async () => {
+  const now = Temporal.Instant.from("2026-08-30T12:00:00Z");
+  const pending = [{ id: "cadence.local.00000000-0000-4000-a000-000000000010",
+    title: "Product reminder", body: "Keep this reminder", fireAt: now.add({ hours: 1 }).toString() }];
+  invoke.mockImplementation(async (_command, { request }) => request.operation === "delivered"
+    ? { delivered: [] } : { pending, errors: [] });
+
+  await expect(runNativeCoverageProbe(4, now)).rejects.toThrow("product reminders");
+  expect(invoke.mock.calls.filter(([, { request }]) => request.operation === "schedule")).toHaveLength(0);
+  expect(invoke).toHaveBeenCalledWith("native_notifications", { request: { operation: "cancel", ids: [] } });
+});
+
+test("capacity probes refuse to schedule when cleanup readback is unavailable", async () => {
+  invoke.mockImplementation(async (_command, { request }) => request.operation === "delivered"
+    ? { delivered: [] } : {});
+  await expect(runNativeCoverageProbe(4)).rejects.toThrow("pending notification readback failed");
+  expect(invoke.mock.calls.filter(([, { request }]) => request.operation === "schedule")).toHaveLength(0);
+});
+
 test("coverage repair replaces arbitrary OS survivors with the nearest requests and reports the shorter horizon", async () => {
   const pending = new Map<string, Reminder>();
   invoke.mockImplementation(async (_command, { request }) => {

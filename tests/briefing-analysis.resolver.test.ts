@@ -427,6 +427,21 @@ describe("review fixes", () => {
     });
   });
 
+  it("treats a range ending at midnight as ending the next day, and still ignores next-day marks", () => {
+    // 21:00–00:00 range. Six same-day marks at 23:30 are inside the range: no finding.
+    const inside = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m1", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00", markedAt: `${date}T23:30:00-04:00` }));
+    expect(analyze(source({ occurrences: inside, periods: [period("behavior_m1", "2026-09-01")] }), ["realistic-timing"], 30).findings).toEqual([]);
+    // Six same-day marks at 18:00 are three hours before the range starts.
+    const before = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m2", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00", markedAt: `${date}T18:00:00-04:00` }));
+    expect(analyze(source({ occurrences: before, periods: [period("behavior_m2", "2026-09-01")] }), ["realistic-timing"], 30).findings[0]).toMatchObject({
+      counts: { medianOffsetMinutes: -180 }, proposal: { detail: { direction: "earlier", scheduledTime: "21:00", scheduledEndTime: "00:00" } },
+    });
+    // Marks at 00:30 the next day are logging delay, not timing samples.
+    const nextDay = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m3", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00",
+      markedAt: `${Temporal.PlainDate.from(date).add({ days: 1 }).toString()}T00:30:00-04:00` }));
+    expect(analyze(source({ occurrences: nextDay, periods: [period("behavior_m3", "2026-09-01")] }), ["realistic-timing"], 30).findings).toEqual([]);
+  });
+
   it("ranks findings by strength relative to each lane's threshold, not raw units", () => {
     // Timing: 2-hour offset (1.33× its 1.5-hour threshold). Weekday: 0.82 gap (2.7× its 0.3 threshold).
     const timing = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_t1", date, "completed", { markedAt: `${date}T09:00:00-04:00` }));

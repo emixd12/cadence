@@ -158,7 +158,9 @@ export function scanTextForProjectSecretsWithSyntheticFixtures(text) {
       .replaceAll("credential-shaped-private-value", "test-private-value")
       .replaceAll("another-private-process-value", "test-process-value")
       .replaceAll("credential-shaped-oauth-value", "test-oauth-value")
-      .replaceAll("GOCSPX-abcdefghijklmnopqrstuvwx", "GOCSPX-test-placeholder"),
+      .replaceAll("GOCSPX-abcdefghijklmnopqrstuvwx", "GOCSPX-test-placeholder")
+      // Docker-proxy fixture password published in 9508550 before it was renamed.
+      .replaceAll("_admin:private@", "_admin:synthetic-fixture-password@"),
   );
 }
 

@@ -1,3 +1,4 @@
+import type { BehaviorInput } from "@cadence/core/behavior-store";
 import { reconcileMyDueBehaviorArchives } from "./behavior-lifecycle.service";
 import { assembleBehaviorPageData, toBehaviorView } from "@cadence/core/services/behavior-views";
 import {
@@ -30,6 +31,13 @@ import {
 import { requireCurrentUserId } from "@/lib/auth/current-user";
 export { behaviorErrorToActionState };
 
+export async function getBehaviorReadDataForUser(supabase: AppSupabaseClient, userId: string) {
+  const [behaviors, profileTimezone] = await Promise.all([
+    listUserBehaviors(supabase, userId), getProfileTimezone(supabase, userId),
+  ]);
+  return { behaviors, profileTimezone };
+}
+
 export async function getBehaviorPageData(): Promise<BehaviorPageData> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
@@ -46,28 +54,44 @@ export async function getBehaviorPageData(): Promise<BehaviorPageData> {
 export async function createBehaviorFromFormData(formData: FormData): Promise<BehaviorView> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
+  return toBehaviorView(await createBehaviorForUser(supabase, userId,
+    parseBehaviorFormData(formData, { mode: "create" })));
+}
+
+export async function createBehaviorForUser(
+  supabase: AppSupabaseClient, userId: string, values: BehaviorInput,
+  recordedAt = new Date().toISOString(),
+) {
   const timezone = (await getProfileTimezone(supabase, userId)) ?? DEFAULT_TIMEZONE;
-  const input = parseBehaviorFormData(formData, { mode: "create" });
-  const confirmedBehavior = await createBehavior(createBehaviorStore(supabase, userId), {
-    userId, timezone, values: input, recordedAt: new Date().toISOString(),
+  const confirmed = await createBehavior(createBehaviorStore(supabase, userId), {
+    userId, timezone, values, recordedAt,
   });
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, "create");
-  return toBehaviorView(confirmedBehavior);
+  return confirmed;
 }
 
 export async function updateBehaviorFromFormData(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  const input = parseBehaviorFormData(formData, { mode: "update" });
-  const expectedUpdatedAt = getExpectedUpdatedAtFromFormData(formData);
-  await updateBehavior(createBehaviorStore(supabase, userId), {
-    behaviorId: input.behaviorId, values: input, expectedUpdatedAt,
-    newArchiveNoteId: crypto.randomUUID(),
-    recordedAt: new Date().toISOString(),
+  const values = parseBehaviorFormData(formData, { mode: "update" });
+  await updateBehaviorForUser(supabase, userId, {
+    behaviorId: values.behaviorId, values,
+    expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
+  });
+}
+
+export async function updateBehaviorForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { behaviorId: string; values: BehaviorInput; expectedUpdatedAt: string },
+  recordedAt = new Date().toISOString(),
+) {
+  const updated = await updateBehavior(createBehaviorStore(supabase, userId), {
+    ...input, newArchiveNoteId: crypto.randomUUID(), recordedAt,
   });
   invalidateBehaviorData(userId);
   await syncBehaviorGraphForUser(supabase, userId, "update");
+  return updated;
 }
 
 function getExpectedUpdatedAtFromFormData(formData: FormData): string {
@@ -83,27 +107,33 @@ function getExpectedUpdatedAtFromFormData(formData: FormData): string {
 export async function archiveBehaviorFromFormData(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await setBehaviorActive(createBehaviorStore(supabase, userId), {
+  await setBehaviorActiveForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData), active: false,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
-    newArchiveNoteId: crypto.randomUUID(),
     archiveNote: getArchiveNoteFromFormData(formData),
-    recordedAt: new Date().toISOString(),
   });
-  invalidateBehaviorData(userId);
-  await syncBehaviorGraphForUser(supabase, userId, "archive");
 }
 
 export async function restoreBehaviorFromFormData(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
-  await setBehaviorActive(createBehaviorStore(supabase, userId), {
+  await setBehaviorActiveForUser(supabase, userId, {
     behaviorId: getBehaviorIdForArchive(formData), active: true,
     expectedUpdatedAt: getExpectedUpdatedAtFromFormData(formData),
-    recordedAt: new Date().toISOString(),
+  });
+}
+
+export async function setBehaviorActiveForUser(
+  supabase: AppSupabaseClient, userId: string,
+  input: { behaviorId: string; active: boolean; expectedUpdatedAt: string; archiveNote?: string },
+  recordedAt = new Date().toISOString(),
+) {
+  const updated = await setBehaviorActive(createBehaviorStore(supabase, userId), {
+    ...input, ...(!input.active ? { newArchiveNoteId: crypto.randomUUID() } : {}), recordedAt,
   });
   invalidateBehaviorData(userId);
-  await syncBehaviorGraphForUser(supabase, userId, "restore");
+  await syncBehaviorGraphForUser(supabase, userId, input.active ? "restore" : "archive");
+  return updated;
 }
 
 export async function updateBehaviorArchiveNoteFromFormData(formData: FormData): Promise<void> {
@@ -119,7 +149,7 @@ export async function updateBehaviorArchiveNoteFromFormData(formData: FormData):
   invalidateBehaviorData(userId);
 }
 
-async function syncBehaviorGraphForUser(
+export async function syncBehaviorGraphForUser(
   supabase: AppSupabaseClient,
   userId: string,
   operation: "create" | "update" | "archive" | "restore",

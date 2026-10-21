@@ -240,10 +240,14 @@ to Ticket 113. Native rollback tests remain current evidence. The first future
 schema-changing update must upgrade an older installed version through the real
 updater after a protected database backup.
 
-Ticket 115 owns Apple Developer Program access, Developer ID signing,
+Ticket 115 has confirmed Apple Developer Program access. Developer ID signing,
 notarization, stapled app/DMG verification, quarantined notarized-DMG Gatekeeper
-acceptance, and Apple Silicon macOS 14 execution. These remain deferred, not
-passed. Marketing must not claim notarized or generally available distribution.
+acceptance, and installed acceptance on the current Apple Silicon host remain
+open, not passed. The owner deferred macOS 14 runtime acceptance on
+September 27 without changing the compiled minimum. Record each candidate's
+exact tested macOS version and build. Marketing must not claim notarized or
+generally available distribution before Ticket 115 passes, or compatibility
+with any untested macOS version.
 
 ## Verification boundary
 
@@ -304,3 +308,12 @@ Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390p
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 `docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+
+## Hosted client access (Ticket 227)
+
+OAuth consent and Connected apps are web-only in v1. Grants live on the hosted
+account, so desktop implementation is not applicable. Manage access in the web
+Settings screen. Linked desktop data becomes readable after synchronization;
+account-free local data never reaches this server. Marketing and future mobile
+are not applicable to this ticket. The interaction registry and design-system
+surface catalog carry the same platform decision.

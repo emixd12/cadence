@@ -1,4 +1,30 @@
-# Briefing bench refactor and stored daily brief — execution plan
+# Briefing bench refactor and stored daily brief — historical plan
+
+## Historical record; current execution lives in Tickets 175–185
+
+Reconciled October 21, 2026. Preserve the September 27 owner statements below as
+history. This document is not the current execution checklist.
+
+- `2026-09-27-briefing-bench-review.md` replaces the proposed workbench sequence.
+  Tickets 175–177 implement comparison, local reviews and feedback. Tickets
+  182–183 implement historical exploration and sequence evaluation. Ticket 184
+  owns evaluation and promotion; Ticket 185 owns the stored-production-brief
+  lifecycle. Tickets 178–181 now belong to signed desktop release work.
+- Historical account reads are Retrospective, not exact reconstruction of what
+  Cadence knew at 07:00. Missing history stays unknown. Current consent fences
+  every account model submission; only the owner runs private comparisons.
+- The local workbench has its own 100-call hourly ceiling and retained local
+  review files. Those features do not persist or reopen production Daily Briefs.
+- The September 27 record below confirms a 07:00 first-open cutoff. The later
+  `2026-09-28-briefing-owner-review.md` packet still lists that cutoff as pending.
+  This is an unresolved documentation conflict, not evidence that the owner
+  revoked the earlier instruction. Reconcile Ticket 185 before implementing it.
+  Retention, expiry, refresh, revocation and cross-device behavior still need
+  their recorded lifecycle decisions. No release authority follows from this
+  historical plan.
+
+Use `STATUS.md`, `docs/TICKETS.md` and the later owner-review packet for current
+implementation and acceptance state. The sections below describe September 27.
 
 Prepared September 27, 2026 for an executing agent. The owner reviewed a first
 draft in conversation and answered its open questions; this document records

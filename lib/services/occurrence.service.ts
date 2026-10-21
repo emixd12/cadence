@@ -592,91 +592,6 @@ export async function processOccurrenceSyncHorizons(
   );
 }
 
-export async function syncBehaviorOccurrences(
-  supabase: AppSupabaseClient,
-  userId: string,
-  behavior: Behavior | BehaviorWithCategory,
-  options: SyncBehaviorOccurrencesOptions = {},
-): Promise<OccurrenceGenerationPlan> {
-  const now = options.now ?? Temporal.Now.instant();
-  const currentBehavior = await getBehaviorById(
-    supabase,
-    userId,
-    behavior.id,
-  );
-
-  if (!currentBehavior) {
-    throw new Error("Behavior not found for occurrence generation.");
-  }
-
-  const generationWindow = resolveGenerationWindow({
-    now,
-    timezone: currentBehavior.timezone,
-    behaviorEndDate: currentBehavior.end_date,
-    horizonDays: options.horizonDays,
-  });
-  const [existingOccurrences, schedules] = await Promise.all([
-    listBehaviorOccurrencesFrom(
-      supabase,
-      userId,
-      currentBehavior.id,
-      generationWindow.rangeStart.toString(),
-    ),
-    resolveBehaviorSchedulesForGeneration(supabase, userId, currentBehavior),
-  ]);
-  const timeSessionOccurrenceIds = new Set(
-    await listOccurrenceIdsWithTimeSessions(supabase, {
-      userId,
-      occurrenceIds: existingOccurrences.map((occurrence) => occurrence.id),
-    }),
-  );
-  const plan = planOccurrenceGeneration({
-    behavior: {
-      id: currentBehavior.id,
-      userId,
-      configurationEventId:
-        requireCurrentConfigurationEventId(currentBehavior),
-      recurrenceRule: normalizeRecurrenceRule(currentBehavior.recurrence_rule),
-      schedules,
-      scheduleSlots: schedules.flatMap((schedule) => schedule.timeEntries),
-      timezone: currentBehavior.timezone,
-      active: currentBehavior.active,
-      endDate: currentBehavior.end_date,
-      createdAt: currentBehavior.created_at,
-    },
-    existingOccurrences: existingOccurrences.map(
-      (occurrence) =>
-        toExistingOccurrenceForGeneration(
-          occurrence,
-          timeSessionOccurrenceIds,
-        ),
-    ),
-    now,
-    horizonDays: options.horizonDays,
-  });
-
-  await applyOccurrenceGenerationPlan(supabase, {
-    userId,
-    behaviorId: currentBehavior.id,
-    expectedConfigurationEventId:
-      requireCurrentConfigurationEventId(currentBehavior),
-    now: now.toString(),
-    plan,
-  });
-  const mutatedOccurrences =
-    plan.create.length > 0 ||
-    plan.updateUnresolved.length > 0 ||
-    plan.deleteUnresolved.length > 0;
-
-  await syncReminderDeliveriesForBehavior(supabase, userId, currentBehavior, {
-    scheduledFrom: generationWindow.rangeStart.toString(),
-    occurrences: mutatedOccurrences ? undefined : existingOccurrences,
-    now,
-  });
-
-  return plan;
-}
-
 export async function markOccurrenceStatusFromFormData(
   formData: FormData,
 ): Promise<void> {
@@ -698,6 +613,7 @@ export async function applyOccurrenceStatusTransition(
     expectedStatus?: OccurrenceStatus;
     nextStatus: OccurrenceStatus;
     now: Temporal.Instant;
+    sourceCaptureMethod?: "manual_tap" | "manual_text";
   },
 ): Promise<ApplyOccurrenceStatusTransitionRpcResult> {
   const { result, timezone } = await applySharedStatusTransition({
@@ -712,7 +628,10 @@ export async function applyOccurrenceStatusTransition(
         timezone: occurrence.behavior?.timezone ?? DEFAULT_TIMEZONE,
       } : null;
     },
-    applyStatusTransition: (plan) => applyOccurrenceStatusTransitionRpc(supabase, plan),
+    applyStatusTransition: (plan) => applyOccurrenceStatusTransitionRpc(supabase, {
+      ...plan,
+      event: plan.event ? { ...plan.event, sourceCaptureMethod: input.sourceCaptureMethod ?? "manual_tap" } : null,
+    }),
   }, input);
 
   if (
@@ -729,7 +648,7 @@ export async function applyOccurrenceStatusTransition(
   return result;
 }
 
-async function repairClearedDecisionReminderCoverage(
+export async function repairClearedDecisionReminderCoverage(
   supabase: AppSupabaseClient,
   userId: string,
   input: {
@@ -795,10 +714,13 @@ export async function updateOccurrenceNote(
     expectedNote: string;
     note: string;
     usedShortcut?: boolean;
+    persistNote?: (plan: { occurrenceId: string; expectedNote: string | null; note: string | null }) => Promise<Occurrence | null>;
   },
 ): Promise<Occurrence> {
   return updateSharedOccurrenceNote({
-    updateOccurrenceNote: (plan) => updateOccurrenceNoteIfExpected(supabase, { userId, ...plan }),
+    updateOccurrenceNote: input.persistNote ?? ((plan) => updateOccurrenceNoteIfExpected(supabase, {
+      userId, ...plan,
+    })),
   }, input);
 }
 

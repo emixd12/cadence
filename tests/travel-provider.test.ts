@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TravelRouteRequest } from "@cadence/core/types/travel";
-import { computeGoogleRoute, geocodeGoogleAddress, readTravelProviderConfig } from "@/lib/services/travel-provider";
+import { computeGoogleRoute, geocodeGoogleAddress, readTravelProviderConfig, travelRouteMicrodollars } from "@/lib/services/travel-provider";
 import { TravelRoutingError, routeTravelLegs } from "@/lib/services/travel-routing.service";
 
 const NOW = Temporal.Instant.from("2026-09-22T12:00:00Z");
@@ -217,16 +217,28 @@ describe("travel provider", () => {
     ] }] }] }));
     await expect(computeGoogleRoute({ ...REQUEST, mode: "transit", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } }, { config: APPROVED, now: NOW, fetch })).resolves.toMatchObject({ durationSeconds: 1200, departureAt: "2026-09-22T12:03:00Z", arrivalAt: "2026-09-22T12:23:00Z" });
     expect(JSON.parse(fetch.mock.calls[0]![1].body)).toMatchObject({ travelMode: "TRANSIT", arrivalTime: "2026-09-22T13:00:00Z" });
-    const driving = vi.fn()
-      .mockResolvedValueOnce(Response.json({ routes: [{ duration: "600s", warnings: ["first"] }] }))
-      .mockResolvedValueOnce(Response.json({ routes: [{ duration: "660s", warnings: ["refined"] }] }));
-    const fence = vi.fn(async () => undefined);
-    const drivingResult = await computeGoogleRoute({ ...REQUEST, mode: "driving", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } }, { config: APPROVED, now: NOW, fetch: driving, assertCurrent: fence, signal: new AbortController().signal });
-    expect(JSON.parse(driving.mock.calls[0]![1].body)).toMatchObject({ departureTime: "2026-09-22T13:00:00Z" });
+    const driving = vi.fn().mockResolvedValue(Response.json({ routes: [{ duration: "600s", warnings: ["traffic"] }] }));
+    const drivingResult = await computeGoogleRoute({ ...REQUEST, mode: "driving", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } }, { config: APPROVED, now: NOW, fetch: driving });
+    // One traffic-aware call from the earliest possible start; no refinement call (Ticket 214).
+    expect(driving).toHaveBeenCalledOnce();
+    expect(JSON.parse(driving.mock.calls[0]![1].body)).toMatchObject({ departureTime: "2026-09-22T12:00:10Z", routingPreference: "TRAFFIC_AWARE_OPTIMAL" });
     expect(JSON.parse(driving.mock.calls[0]![1].body)).not.toHaveProperty("arrivalTime");
-    expect(JSON.parse(driving.mock.calls[1]![1].body)).toMatchObject({ departureTime: "2026-09-22T12:50:00Z" });
-    expect(drivingResult.warnings).toEqual(["refined"]);
-    expect(fence).toHaveBeenCalledOnce();
+    expect(drivingResult).toMatchObject({ departureAt: "2026-09-22T12:50:00Z", arrivalAt: "2026-09-22T13:00:00Z", warnings: ["traffic"] });
+  });
+
+  it("uses static Essentials routing for driving legs beyond the traffic window", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ routes: [{ duration: "900s" }] }));
+    const later = { ...REQUEST, mode: "driving" as const, timing: { kind: "arrive_by" as const, at: "2026-09-22T18:00:00Z" } };
+    await expect(computeGoogleRoute(later, { config: APPROVED, now: NOW, fetch })).resolves.toMatchObject({ departureAt: "2026-09-22T17:45:00Z", arrivalAt: "2026-09-22T18:00:00Z" });
+    const body = JSON.parse(fetch.mock.calls[0]![1].body);
+    expect(body).toMatchObject({ travelMode: "DRIVE", routingPreference: "TRAFFIC_UNAWARE" });
+    expect(body).not.toHaveProperty("departureTime");
+    expect(body).not.toHaveProperty("arrivalTime");
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(travelRouteMicrodollars(later, NOW)).toBe(5_000);
+    expect(travelRouteMicrodollars({ ...later, timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } }, NOW)).toBe(10_000);
+    expect(travelRouteMicrodollars({ ...REQUEST, mode: "transit" }, NOW)).toBe(10_000);
+    expect(travelRouteMicrodollars(REQUEST, NOW)).toBe(5_000);
   });
 
   it("rejects ambiguous or coarse geocodes", async () => {
@@ -260,40 +272,31 @@ describe("travel provider", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects a result after the grant or source fence changes", async () => {
-    let checks = 0;
-    const assertCurrent = vi.fn(async () => {
-      checks += 1;
-      if (checks === 4) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-    });
+  it("makes no provider call when the budget refuses the batch reservation", async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ routes: [{ duration: "600s" }] }));
-    await expect(routeTravelLegs({
-      routes: [{ id: "outbound", request: REQUEST }], provider: APPROVED,
-      quota: { consume: async () => ({ allowed: true, retryAfterSeconds: 0 }) }, assertCurrent, now: NOW, fetch,
-    })).rejects.toMatchObject({ failure: { code: "context_changed" } });
-    expect(fetch).toHaveBeenCalledOnce();
+    const reserve = vi.fn(async () => { throw new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" }); });
+    await expect(routeTravelLegs({ routes: [{ id: "outbound", request: REQUEST }], provider: APPROVED, reserve, now: NOW, fetch }))
+      .rejects.toMatchObject({ failure: { code: "quota_exceeded", resetsAt: "2026-10-01T04:00:00Z" } });
+    expect(reserve).toHaveBeenCalledWith(5_000);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("bounds eight driving legs and a failed refinement retry to 18 charged calls", async () => {
-    let failedRefinement = false;
-    const fetch = vi.fn(async (_url: unknown, init: RequestInit | undefined) => {
-      const body = JSON.parse(String(init?.body));
-      if (!failedRefinement && body.departureTime !== "2026-09-22T13:00:00Z") {
-        failedRefinement = true;
-        return new Response(null, { status: 503 });
-      }
+  it("makes one call per driving leg and reserves the single batch retry before it runs", async () => {
+    let failed = false;
+    const fetch = vi.fn(async () => {
+      if (!failed) { failed = true; return new Response(null, { status: 503 }); }
       return Response.json({ routes: [{ duration: "600s" }] });
     });
-    const consume = vi.fn(async () => ({ allowed: true, retryAfterSeconds: 0 }));
-    await routeTravelLegs({
+    const reserve = vi.fn(async () => undefined);
+    const results = await routeTravelLegs({
       routes: Array.from({ length: 8 }, (_, index) => ({ id: `leg-${index}`, request: {
         ...REQUEST, mode: "driving", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" },
       } })),
-      provider: APPROVED, quota: { consume }, assertCurrent: async () => undefined, now: NOW, fetch,
+      provider: APPROVED, reserve, now: NOW, fetch,
     });
-    expect(fetch).toHaveBeenCalledTimes(18);
-    expect(consume).toHaveBeenCalledOnce();
-    expect(19 * 0.005 + fetch.mock.calls.length * 0.015).toBeLessThan(0.50);
+    expect(fetch).toHaveBeenCalledTimes(9);
+    expect(reserve.mock.calls).toEqual([[80_000], [10_000]]);
+    expect(results.every((result) => result.estimate)).toBe(true);
   });
 
   it("evaluates driving departures at the requested time rather than the ready time", async () => {
@@ -303,15 +306,12 @@ describe("travel provider", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
-  it.each(["2026-09-22T12:05:00Z", "2026-09-22T12:10:00Z"])("evaluates an already-late driving candidate from a fresh departure: %s", async (at) => {
+  it.each(["2026-09-22T12:05:00Z", "2026-09-22T12:10:00Z"])("reports an already-late driving trip from a fresh departure: %s", async (at) => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ routes: [{ duration: "600s" }] }));
-    const fence = async () => { vi.mocked(Temporal.Now.instant).mockReturnValue(NOW.add({ seconds: 20 })); };
-    const result = await computeGoogleRoute({ ...REQUEST, mode: "driving", timing: { kind: "arrive_by", at } }, {
-      config: APPROVED, now: NOW, fetch, assertCurrent: fence, signal: new AbortController().signal,
-    });
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).departureTime).toBe("2026-09-22T12:00:30Z");
-    expect(result).toMatchObject({ departureAt: "2026-09-22T12:00:30Z", arrivalAt: "2026-09-22T12:10:30Z" });
+    const result = await computeGoogleRoute({ ...REQUEST, mode: "driving", timing: { kind: "arrive_by", at } }, { config: APPROVED, now: NOW, fetch });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).departureTime).toBe("2026-09-22T12:00:10Z");
+    expect(result).toMatchObject({ departureAt: "2026-09-22T12:00:10Z", arrivalAt: "2026-09-22T12:10:10Z" });
   });
 
   it("advances stale immediate driving departures without inventing on-time arrival", async () => {

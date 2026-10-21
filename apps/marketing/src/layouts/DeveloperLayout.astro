@@ -1,0 +1,68 @@
+---
+import { createSatteriMarkdownProcessor } from "@astrojs/markdown-satteri";
+import BaseLayout from "./BaseLayout.astro";
+import { marketingRoutes, type MarketingRoute } from "../data/routes";
+import reference from "../data/developer-reference.json";
+import "../styles/developers.css";
+
+type Props = { route: MarketingRoute };
+const { route } = Astro.props;
+const pages = marketingRoutes.filter((page) => page.path.startsWith("/developers"));
+const index = pages.findIndex((page) => page.path === route.path);
+const previous = pages[index - 1];
+const next = pages[index + 1];
+const renderer = await createSatteriMarkdownProcessor({ syntaxHighlight: false });
+const rendered = await renderer.render(route.markdown);
+const contents = rendered.metadata.headings.filter((heading) => heading.depth === 2);
+---
+<BaseLayout route={route}>
+  <div class="developer-shell">
+    <aside class="developer-sidebar">
+      <a class="developer-home" href="/developers">Cadence developers</a>
+      <details class="developer-navigation" open>
+        <summary>Documentation</summary>
+        <nav aria-label="Developer documentation">
+          {pages.map((page) => <a href={page.path} aria-current={page.path === route.path ? "page" : undefined}>{page.navLabel}</a>)}
+        </nav>
+      </details>
+    </aside>
+    <div class="developer-body">
+      <div class="developer-meta"><span>Contract {reference.version} · Local preview</span><a href={route.markdownPath}>Read Markdown</a></div>
+      <article class="developer-prose" set:html={rendered.code.replaceAll("<table>", '<table tabindex="0">')} />
+      <p class="developer-copy-status" role="status" aria-live="polite"></p>
+      <nav class="developer-pagination" aria-label="Documentation pages">
+        {previous ? <a href={previous.path}><span>Previous</span>{previous.navLabel}</a> : <span />}
+        {next && <a href={next.path}><span>Next</span>{next.navLabel}</a>}
+      </nav>
+    </div>
+    <aside class="developer-contents">
+      <nav aria-label="On this page"><p>On this page</p>{contents.map((heading) => <a href={`#${heading.slug}`}>{heading.text}</a>)}</nav>
+    </aside>
+  </div>
+</BaseLayout>
+<script>
+  const status = document.querySelector<HTMLElement>(".developer-copy-status");
+  document.querySelectorAll<HTMLPreElement>(".developer-prose pre").forEach((pre, index) => {
+    const code = pre.querySelector("code");
+    if (!code) return;
+    pre.tabIndex = 0;
+    pre.setAttribute("aria-label", `Code example ${index + 1}`);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "developer-copy";
+    button.textContent = "Copy code";
+    button.setAttribute("aria-label", `Copy code example ${index + 1}`);
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(code.textContent ?? "");
+        button.textContent = "Copied";
+        if (status) status.textContent = `Code example ${index + 1} copied.`;
+      } catch {
+        button.textContent = "Copy code";
+        if (status) status.textContent = "Copy failed. Select the code and copy it manually.";
+        pre.focus();
+      }
+    });
+    pre.before(button);
+  });
+</script>

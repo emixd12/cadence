@@ -509,6 +509,14 @@ time history, and resolved Occurrences. SQLite applies child deletion first and
 rejects orphan-producing plans atomically. Hosted apply uses the same final-graph
 guard. A failed apply leaves the saved baseline and pending outbox unchanged.
 
+Independent offline generation can create different UUIDs for one schedule
+identity. The planner reuses the hosted Occurrence only when the extra local row
+is new since the baseline, unresolved, and has no Note, history, tracked time,
+reminder, import reference, or Note shortcut exclusion. SQLite removes validated
+disposable Occurrences before inserting their replacements in the same atomic
+apply. Any duplicate with existing data stops synchronization for review.
+
+
 Recovery fails closed if a crash leaves a reserved staging file before its
 identity reaches the durable marker. Cadence preserves that file and stops before
 cleanup. Operator inspection is required; Cadence never adopts an unproven file.

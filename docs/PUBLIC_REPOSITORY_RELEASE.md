@@ -336,3 +336,19 @@ Keep CodeQL, Dependabot, secret scanning, and push protection enabled. When an
 API cannot expose a safe aggregate, the snapshot records Unavailable. The
 workflow never publishes raw alerts, scanner matches, advisory notes,
 repository administration payloads, credentials, or production user data.
+
+## Ticket 186 rename preparation — October 7, 2026
+
+The owner authorized renaming the existing repository to `emixd12/cadence`.
+Repository ID `1261353608`, release assets, desktop identity, and production
+domains must remain unchanged. The user-site archive preserves historical
+Pages evidence. Plan: `docs/plans/2026-10-07-cadence-project-rename.md`;
+execution evidence: `docs/qa/cadence-project-rename.md`. Historical acceptance
+above is unchanged.
+
+Completed October 8, 2026 at 20:56 UTC. The repository is `emixd12/cadence` with
+the same ID. Settings, refs and releases are unchanged, and the old repository
+URLs redirect. `emixd12.github.io` serves all 76 historical Trust evidence files
+at their original `/habit-tracking-app/trust/` URLs with identical bytes. New
+evidence publishes under `https://emixd12.github.io/cadence/trust/`. Never
+create a repository named `habit-tracking-app`; it would end GitHub's redirects.

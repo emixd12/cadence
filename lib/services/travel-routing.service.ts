@@ -5,12 +5,13 @@ import {
   TravelProviderError,
   assertTravelProviderReady,
   computeGoogleRoute,
+  travelRouteMicrodollars,
   type TravelProviderConfig,
 } from "./travel-provider";
 
 export const TRAVEL_ROUTING_LIMITS = {
   legs: 8,
-  concurrency: 2,
+  concurrency: 4,
   batchDeadlineMs: 45_000,
 } as const;
 
@@ -18,6 +19,8 @@ export type TravelRoutingFailure = Readonly<{
   code: TravelProviderError["code"] | "quota_exceeded" | "context_changed";
   retryable: boolean;
   retryAfterSeconds: number | null;
+  /** Set for quota_exceeded: when the refused budget renews. */
+  resetsAt?: string | null;
 }>;
 
 export type TravelRoutingResult = Readonly<{
@@ -33,17 +36,19 @@ export class TravelRoutingError extends Error {
   }
 }
 
+/** Reserves list-price spend before provider calls; throws TravelRoutingError("quota_exceeded") when refused. */
+export type TravelSpendReservation = (microdollars: number) => Promise<void>;
+
 /**
- * This service never stores inputs or provider output. Callers supply a fresh
- * owner/grant/source fence and an atomic distributed quota before any fetch.
+ * This service never stores inputs or provider output. The caller fences source
+ * revisions before and after the batch; this service reserves spend before every
+ * provider call, including the single batch retry.
  */
 export async function routeTravelLegs(
   input: Readonly<{
     routes: readonly Readonly<{ id: string; request: TravelRouteRequest }>[];
     provider: TravelProviderConfig;
-    quota: { consume: () => Promise<Readonly<{ allowed: boolean; retryAfterSeconds: number }>> };
-    quotaAlreadyConsumed?: boolean;
-    assertCurrent: (signal: AbortSignal) => Promise<void>;
+    reserve: TravelSpendReservation;
     now: Temporal.Instant;
     fetch?: typeof fetch;
     signal?: AbortSignal;
@@ -55,34 +60,25 @@ export async function routeTravelLegs(
   }
   const deadline = AbortSignal.timeout(TRAVEL_ROUTING_LIMITS.batchDeadlineMs);
   const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
-  await input.assertCurrent(signal);
-  if (!input.quotaAlreadyConsumed) {
-    const admission = await input.quota.consume();
-    if (!admission.allowed) {
-      throw new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: Number.isInteger(admission.retryAfterSeconds) && admission.retryAfterSeconds > 0 ? admission.retryAfterSeconds : 1 });
-    }
-  }
-  await input.assertCurrent(signal);
+  await input.reserve(input.routes.reduce((sum, route) => sum + travelRouteMicrodollars(route.request, input.now), 0));
 
   let retried = false;
   return boundedMap(input.routes, TRAVEL_ROUTING_LIMITS.concurrency, async (route) => {
     for (;;) {
       try {
-        await input.assertCurrent(signal);
         const estimate = await computeGoogleRoute(route.request, {
           config: input.provider,
           now: input.now,
           fetch: input.fetch,
           signal,
           maxRetries: 0,
-          assertCurrent: input.assertCurrent,
         });
-        await input.assertCurrent(signal);
         return { id: route.id, estimate, failure: null };
       } catch (error) {
         if (error instanceof TravelRoutingError) throw error;
         if (error instanceof TravelProviderError && error.retryable && !retried) {
           retried = true;
+          await input.reserve(travelRouteMicrodollars(route.request, input.now));
           continue;
         }
         if (error instanceof TravelProviderError) {
@@ -102,7 +98,8 @@ export async function routeTravelLegs(
   });
 }
 
-async function boundedMap<T, U>(values: readonly T[], limit: number, map: (value: T) => Promise<U>): Promise<U[]> {
+/** Maps values with at most `limit` in flight, preserving input order. */
+export async function boundedMap<T, U>(values: readonly T[], limit: number, map: (value: T) => Promise<U>): Promise<U[]> {
   const results = new Array<U>(values.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(limit, values.length) }, async () => {

@@ -1,0 +1,118 @@
+{
+  "operation": "set_occurrence_status",
+  "valid_inputs": [
+    {
+      "name": "complete with guard",
+      "value": {
+        "occurrence_id": "00000004-1111-4111-8111-000000000004",
+        "status": "completed",
+        "expected_status": "unresolved",
+        "idempotency_key": "claude-7f3a-0001"
+      }
+    },
+    {
+      "name": "back to unresolved",
+      "value": {
+        "occurrence_id": "00000005-1111-4111-8111-000000000005",
+        "status": "unresolved"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "missed status",
+      "value": {
+        "occurrence_id": "00000004-1111-4111-8111-000000000004",
+        "status": "missed"
+      },
+      "code": "invalid_input",
+      "path": "$.status"
+    },
+    {
+      "name": "display label instead of stored status",
+      "value": {
+        "occurrence_id": "00000004-1111-4111-8111-000000000004",
+        "status": "Not Completed"
+      },
+      "code": "invalid_input",
+      "path": "$.status"
+    },
+    {
+      "name": "short idempotency key",
+      "value": {
+        "occurrence_id": "00000004-1111-4111-8111-000000000004",
+        "status": "completed",
+        "idempotency_key": "abc"
+      },
+      "code": "invalid_input",
+      "path": "$.idempotency_key"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "changed",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3"
+        },
+        "previous_status": "unresolved",
+        "changed": true
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing changed",
+      "value": {
+        "occurrence": {
+          "id": "00000005-1111-4111-8111-000000000005",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "behavior_title": "Morning walk",
+          "category_name": "Fitness",
+          "local_date": "2026-10-18",
+          "timezone": "America/New_York",
+          "scheduled_for": "2026-10-18T11:30:00Z",
+          "schedule": {
+            "kind": "exact",
+            "preset": null,
+            "start_time": "07:30",
+            "end_time": null,
+            "label": "7:30 AM"
+          },
+          "status": "completed",
+          "status_label": "Completed",
+          "needs_decision": false,
+          "completed_at": "2026-10-18T11:41:00Z",
+          "status_marked_at": "2026-10-18T11:41:00Z",
+          "note": "Felt good.\nCold out.",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "o1.3"
+        },
+        "previous_status": "unresolved"
+      },
+      "code": "internal_error",
+      "path": "$.changed"
+    }
+  ]
+}

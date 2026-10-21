@@ -59,7 +59,12 @@ async function checkBuiltOutput() {
 
   const manifest = JSON.parse(read("data/route-manifest.json"));
   assert(Array.isArray(manifest.routes), "Route manifest must contain routes array.");
-  assert(manifest.routes.length === 5, "Route manifest should expose 5 public routes.");
+  const { module: routeSource } = await runnerImport("./apps/marketing/src/data/routes.ts", { root: repositoryRoot, configFile: false });
+  assert(manifest.routes.length === routeSource.marketingRoutes.length, "Built route manifest must match the current source.");
+  const htmlFiles = manifest.routes.map((route) => new URL(route.url).pathname === "/" ? "index.html" : `${new URL(route.url).pathname.slice(1)}/index.html`);
+  const markdownFiles = manifest.routes.filter((route) => route.include_in_markdown_mirror).map((route) => new URL(route.markdown_url).pathname.slice(1));
+  for (const file of [...htmlFiles, ...markdownFiles]) assert(existsSync(join(dist, file)), `Missing route artifact: ${file}`);
+  if (failures.length) return;
 
   for (const route of manifest.routes) {
     assert(route.is_public === true, `Route ${route.route_id} must be public.`);
@@ -71,12 +76,16 @@ async function checkBuiltOutput() {
     assert(Boolean(route.last_modified), `Route ${route.route_id} missing last_modified.`);
   }
 
+  for (const route of manifest.routes.filter((route) => route.include_in_llms)) {
+    assert(read("llms.txt").includes(new URL(route.markdown_url).pathname), `llms.txt omits ${route.route_id}`);
+  }
+  assert(statSync(join(dist, "llms-full.txt")).size <= 100_000, "Full guide text must stay under 100 KB; link separate tool mirrors.");
   const llmsSize = statSync(join(dist, "llms.txt")).size;
   assert(llmsSize > 0, "llms.txt must not be empty.");
   assert(llmsSize < 50_000, "llms.txt must stay under 50 KB.");
   assertSameOriginLlmsLinksExist(read("llms.txt"));
 
-  for (const markdownFile of ["index.md", "examples.md", "docs.md", "about.md", "faq.md"]) {
+  for (const markdownFile of markdownFiles) {
     const size = statSync(join(dist, markdownFile)).size;
     assert(size <= 100_000, `${markdownFile} must stay at or below 100 KB.`);
     const content = read(markdownFile);
@@ -95,13 +104,7 @@ async function checkBuiltOutput() {
     assert(sitemap.includes(`<lastmod>${route.last_modified}</lastmod>`), `sitemap.xml missing lastmod for ${route.route_id}.`);
   }
 
-  for (const htmlFile of [
-    "index.html",
-    "examples/index.html",
-    "docs/index.html",
-    "about/index.html",
-    "faq/index.html",
-  ]) {
+  for (const htmlFile of htmlFiles) {
     const html = read(htmlFile);
     assert(hasMainLandmark(html), `${htmlFile} missing main landmark.`);
     assert(html.includes('rel="canonical"'), `${htmlFile} missing canonical link.`);

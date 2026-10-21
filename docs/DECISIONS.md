@@ -509,6 +509,18 @@ update must upgrade an older installed version through the real updater after a
 protected database backup. Do not create a disposable migration build or a
 separate migration ticket now.
 
+## macOS 14 runtime acceptance deferral
+
+Decision date: 2026-09-27. Ticket: 115.
+
+The owner deferred macOS 14 runtime acceptance. It no longer blocks Ticket 115.
+Keep the declared and compiled macOS 14 deployment target unchanged. Run the
+production acceptance matrix on the current Apple Silicon host and record the
+exact tested macOS version and build for each candidate. Do not claim macOS 14
+compatibility or support for untested newer versions. Developer ID signing,
+notarization, stapled app/DMG verification, quarantined downloaded-DMG
+Gatekeeper launch, production Keychain, and upgrade acceptance remain gates.
+
 ## Desktop native reminder horizon
 
 Decision date: 2026-08-30. Tickets: 108 and 112.
@@ -579,6 +591,9 @@ for future consumers. `docs/EXTERNAL_EVENT_CONTRACT.md` defines acceptance.
 Use MCP's schema/capability ideas without adding an MCP server or generic plugin
 framework. Dynamic rearranging, model invocation, and Calendar writes remain
 deferred. Ticket 137 verifies interface documentation alongside the combined release.
+
+Superseded in part on 2026-10-18: the "no MCP server" line no longer applies.
+See "2026-10-18: Cadence MCP server and AI plugins" below.
 
 ## 2026-09-18: Cadence Daily Brief selected as the first external consumer
 
@@ -768,6 +783,14 @@ Implementation decisions, recorded for owner review:
 
 ## 2026-09-27: Replay-based briefing bench and stored daily brief
 
+Historical decision record, reconciled October 21, 2026. The later workbench
+execution uses Tickets 175–177 and 182–184; Tickets 178–181 belong to desktop
+release work. Ticket 185 remains the stored-brief lifecycle gate. Its later
+packet calls the 07:00 cutoff pending despite the confirmation recorded below;
+reconcile that discrepancy without assuming the owner withdrew the instruction.
+This entry preserves the original direction and does not activate storage or
+supersede current consent, privacy, deployment or acceptance gates.
+
 The owner asked to test the advisor across many days and all lanes on their own
 dogfooded account, with less clutter, and consented to using their data (including
 model transmission) for this evaluation. They decided: the day's brief is the first
@@ -783,3 +806,147 @@ pain points, current system, conflicts to resolve and phases (proposed Tickets
 interpretation: the first opening at or after 7:00 AM local generates and stores the
 day's brief; earlier openings show none. Past Calendar reads under Google
 verification remain to be confirmed before their phase.
+
+## 2026-09-27: Briefing workbench saves reviews locally, including account captures
+
+The owner asked to implement Phases 0–2 of the briefing-bench audit
+(`docs/plans/2026-09-27-briefing-bench-review.md`) as Tickets 175–177, and authorized
+full account capture for the development workbench.
+
+- The complete rendered brief is the review unit. The editorial target is a roughly
+  45-second read: one or two planning points and at most one supported observation.
+  80–120 visible words is a working range, not a validated formula.
+- The workbench saves cases, candidates, runs, prose feedback, agent proposals and
+  owner decisions under `.local/briefing-bench/`. This replaces the earlier rule that
+  private comparison output stays in memory and clears when the tab is hidden.
+  Account cases save the captured inputs once so they can be rerun exactly. Storage
+  is owner-partitioned, 0700/0600, expires after 30 days and supports deletion.
+  Expiry blocks reads and writes. Physical cleanup runs when the local workbench
+  accesses expired cases; no background deletion runs while the workbench is closed.
+  `.gitignore` only prevents commits; it is not access control.
+- A saved case reruns on its captured clock. Reruns still need current consent: same
+  owner, enabled briefing, captured sources still disclosed, and captured Behaviors
+  still active. A deleted or archived Behavior withdraws the case from reruns.
+- Feedback becomes a proposal through a Markdown packet read by an existing coding
+  agent. No agent framework or embedded chat is added. Proposals are validated and
+  displayed, never executed, and never become production rules; promotion stays a
+  reviewed repository change.
+- Model-weight training, historical reconstruction (Phase 3), batch and lane-preview
+  review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
+  are not implemented.
+
+
+## 2026-09-30: Daily Brief evaluation criteria and versioned coverage profiles
+
+The owner supplied Ticket 184's evaluation criteria before reviewing candidate outputs.
+
+- Useful briefs provide actionable adherence insights through behavioral analysis
+  and planning for the day's Behaviors and outside connector events. Use available
+  evidence within existing authorization, disclosure and evidence-quality limits.
+- The complete brief has a general one-minute reading cap. Prefer concise, precise
+  wording. This supersedes the earlier 45-second evaluation target. A configurable
+  reading length remains a possible future setting, not an implemented feature.
+- Quiet days prioritize supported longitudinal insights over day-management tips.
+- Prefer different analysis lanes across days, while revisiting persistent patterns
+  of high importance or impact when useful. Wording variation may help presentation;
+  it does not itself remove substantive repetition.
+- The initial coverage is six tuning cases, ten reserved evaluation cases and one
+  seven-day sequence. Name it `daily-brief-balanced@1`. Support distinct coverage
+  profiles and retain their revisions and evaluation iterations separately.
+
+`docs/plans/2026-09-28-briefing-owner-review.md` defines this first profile and its
+frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
+acceptance, promotion, deployment and stored-brief decisions remain separate.
+This is an evaluation direction; runtime policy and production presets are unchanged.
+
+## 2026-10-08: Rename the repository to emixd12/cadence
+
+Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,
+history, releases and settings. This supersedes the source URL in "Marketing
+content, retention, and legal publication": Cadence's public MIT source is
+`https://github.com/emixd12/cadence`. The name `habit-tracking-app` must stay
+unused so GitHub keeps redirecting old links and installed desktop update feeds.
+Historical Trust evidence stays at its original Pages URLs through the
+`emixd12.github.io` archive. The local Supabase project ID `habit-tracking-app`,
+package names, desktop identity and production domains are unchanged.
+
+## 2026-10-18: Cadence MCP server and AI plugins
+
+Decision date: 2026-10-18. Tickets: 220–232. Brief: `docs/MCP_INTEGRATION.md`.
+Operation contract: `docs/MCP_CONTRACT.md` (Ticket 221).
+
+The owner directed Cadence to ship one remote MCP server plus Claude and ChatGPT
+plugins. A connected AI client may read all of the user's tracking data and make a
+small set of scoped writes that the user confirms in that client. Wave 1 is
+Tickets 220–223.
+
+Owner decisions:
+
+1. **Sign-in model.** Cadence runs its own OAuth 2.1 authorization server. It
+   issues opaque access and refresh tokens. Tokens are bound to the MCP URL
+   (audience), stored only as hashes, and revocable at once. Refresh tokens
+   rotate, and reuse revokes the token family.
+2. **Write tools.** Occurrence status, Occurrence notes, create Behavior, edit
+   Behavior, and archive and restore a Behavior. No deletes. Categories,
+   settings, timezone, and the account stay unchanged through MCP.
+3. **Facets readiness.** Foundations only: client attribution, retry-safe
+   (idempotent) writes, external record links, and "changed since" reads. Facets
+   sync, a REST API, and webhooks are follow-ups in `docs/FUTURE_UPDATES.md`.
+4. **Developer docs.** A `/developers` section on cadence-me.com, inside
+   `apps/marketing`.
+
+Authorization rationale. Supabase's OAuth server was rejected. Its OAuth tokens
+are standard Supabase JWTs with `role: authenticated`. Existing RLS policies and
+authenticated RPCs would admit them for the same `sub`, and no documented control
+blocks the Supabase Auth user API. Revoking a grant also does not invalidate an
+issued JWT before `exp`. `docs/qa/advisor-auth-isolation.md` records these
+findings. Cadence-owned opaque tokens avoid all three problems: the token is
+useless outside `/mcp`, and every request checks the live grant. Server code then
+acts as the user through normal RLS with a short-lived internal token (Ticket
+223). The service role is limited to token-endpoint functions.
+
+Separate read and write grants. `cadence.read` is required. The write scopes
+`cadence.occurrences.write` and `cadence.behaviors.write` are separate grants. The
+user can switch either off on the consent screen. A read grant never authorizes a
+write, as `docs/INTEGRATION_PLAYBOOK.md` requires.
+
+Facets boundary. Cadence tracks Completed and Not Completed adherence for
+routines that may be created elsewhere, such as in Facets. Doses, amounts,
+refills, inventory, and medication metadata stay outside Cadence. The
+"Medication tracking" decision above is unchanged.
+
+AI scope. Outside AI clients may call scoped Cadence tools at the user's
+direction. Cadence still ships no general AI coaching or chat and no server-side
+autonomous execution. The in-app Daily Brief stays read-only (Tickets 146–148).
+
+Conflicts this decision resolves:
+
+- "2026-09-16: Day-progress UI accepted" said to use MCP's ideas "without adding
+  an MCP server." That line is superseded. The external-event contract is
+  unchanged.
+- `docs/FUTURE_UPDATES.md` deferred the MCP transport and required "a scoped
+  ticket and privacy review" before MCP tools. Tickets 220–232 are that ticket
+  set, and Ticket 231 is the privacy review. The deferral is removed.
+- `docs/qa/advisor-auth-isolation.md` says a custom OAuth or opaque-token
+  framework "would violate the ticket's stated constraint." That constraint
+  belonged to Ticket 147. This decision adopts a Cadence-owned OAuth server for
+  MCP. The QA record stays as dated history, and the advisor endpoint stays
+  fail-closed.
+- `AGENTS.md` listed "General AI coaching/chat and autonomous execution" as out
+  of scope. It now states that outside clients calling scoped tools at the user's
+  direction are in scope.
+- `AGENTS.md` says Cadence is "not a medical dosing app." That stays true. The
+  Facets foundations are adherence-only.
+- `docs/INTEGRATION_PLAYBOOK.md` allows no connector SDK or provider registry
+  before a second accepted integration. The integration operations layer is one
+  transport adapter over one contract. It is not a registry or SDK.
+
+Platform impact: web hosts the OAuth server, consent screen, Connected apps, and
+MCP endpoint. Desktop gets no code in v1; linked desktop sees MCP-made changes
+through existing sync, and account-free desktop data is unreachable. Marketing
+hosts developer docs and listing disclosures. Future mobile is not applicable;
+a later client can reuse the contract.
+
+This decision authorizes the tickets. It authorizes no hosted migration push,
+signing-key import, deployment, legal publication, or directory submission. Those
+remain owner-only actions.
