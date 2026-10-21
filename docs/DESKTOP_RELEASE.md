@@ -403,7 +403,10 @@ macOS disk-image service must still be available to the build process.
 Standalone `verify` records frontend configuration as not verified by that command.
 It checks the app identifier/version/architecture, signing authority, hardened
 runtime, code signatures,
-Gatekeeper acceptance, and stapled notarization for the app and DMG. It decodes
+Gatekeeper acceptance, and stapled notarization for the app and DMG. For production,
+`verify-entitlements.py` requires the signed entitlements to equal
+`src-tauri/Entitlements.plist` exactly. The embedded provisioning profile must belong
+to the same team, be unexpired, and authorize every entitlement. It decodes
 Tauri's public-key/signature envelopes and asks Minisign to verify the updater
 archive. It compares every file's bytes and permissions, directory, and symlink
 target with the verified app. It rejects missing, surplus, duplicate, unsafe,
@@ -492,6 +495,19 @@ Ticket 115 evidence; do not weaken the production checks.
 
 Production publication requires the owner's release instruction. Passing the
 local helper does not publish or satisfy Ticket 115.
+
+Signed builds use the stable feed
+`https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json`,
+chosen by the owner on October 19, 2026. Supply it as `CADENCE_UPDATER_ENDPOINT`.
+Previews keep the `desktop-preview` feed. At publication, that feed also names the
+signed release, so preview users can move to it. Candidate `0.1.1` and its packet:
+[2026-10-19 release packet](qa/2026-10-19-desktop-0.1.1-release-packet.md).
+
+Xcode 27.1 `strip` corrupts release proc-macro dylibs built with the macOS 14.0
+deployment target, and dyld then refuses to load them. `src-tauri/Cargo.toml` keeps
+`[profile.release.build-override] strip = false`; do not remove it while that
+toolchain is in use. Clean release builds compile every helper again, so the
+failure only shows in a fresh checkout.
 
 The [2026-08-30 asset checklist](qa/2026-08-30-desktop-asset-provenance.md)
 records the six image/audio files, hashes, and owner authorization. Bundled

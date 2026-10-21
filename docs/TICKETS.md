@@ -12874,6 +12874,11 @@ authenticated adapter contract and 92 RLS ownership checks passed. Temporary use
 were removed, loopback bindings verified, and the isolated stack stopped while
 preserving existing volumes. The RLS smoke fixture now includes location-aware
 configuration history; no product schema changed. See the existing Apple QA record.
+October 19: final candidate `0.1.1` built from `95a6c64`, notarized, stapled and
+verified, with the `desktop-stable` update feed. All 86 migrations replayed cleanly
+with the contract and 92 RLS checks passing. Ticket 178 checks, quarantined download,
+preview.50 updater run and publication remain open. Packet:
+`docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
 Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
 Maps-handoff outcomes separately; no location-success claim while that gate is open.
 

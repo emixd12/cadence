@@ -26,6 +26,15 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   inherited `behavior-end-date-lifecycle-smoke.sql:138` failure is a stale test
   fixed on main by PR #110. Everything disposable was removed; retained
   databases were not touched. No hosted migration push or deployment.
+- Merge of `origin/main` at `7cb8133` (signed desktop 0.1.1 work, Tickets 115
+  and 178–181), October 20, 2026: no new migrations and no ticket-number overlap.
+  Conflicts in STATUS, TICKETS and two desktop tests kept both sides. All seven
+  required checks plus core, design-system, load manifest, desktop
+  typecheck/build/parity and marketing build/check pass. The two-worker suite
+  passed 3,434 tests (94 skipped); only `tests/desktop-release-cli.test.ts`
+  failed, on 5-second timeouts. Run alone it still times out; with
+  `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
+  broken, and it also fails on the pre-change commit.
 
 - Ticket 233 is documentation-complete and independently approved at `668a4cd`.
   It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
@@ -332,6 +341,42 @@ observations only; no credential or provider record was recorded.
 - Pending owner action: remove "Cadence Calendar" and the probe apps at
   account.live.com/consent for the personal Microsoft account (the site was in
   maintenance at the time of testing).
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+
+In progress; not published. Candidate `0.1.1` is built from
+`95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
+accepted app and DMG notarization; both are stapled. All 14 artifact checks pass,
+including signed entitlements and the embedded provisioning profile. The app
+checks the new `desktop-stable` feed, the owner's choice on October 19. A clean
+replay of all 86 migrations in the separate local project `cadence-release-20261019`
+passed the authenticated contract and 92 RLS ownership checks; it left no data.
+
+Xcode 27.1 `strip` broke release proc-macro dylibs under the macOS 14.0 deployment
+target. `[profile.release.build-override] strip = false` fixes the build; the
+shipped executable is unaffected.
+
+Open before publication: Ticket 178 installed checks on this build, a quarantined
+browser download of this DMG, an updater run from preview.50, merging the version
+and build-fix commits, and the owner's publish instruction. Packet, hashes, feed
+entry, release notes and rollback: `docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
+
+## Signed-release tooling on main — October 19, 2026
+
+Ticket 181 preparation. The signed-release work behind rc.1–rc.4 existed only on
+unmerged branch `claude/tickets-169-173-advisor-analysis` (commit `9508550`). Main
+lacked the Developer ID entitlements, provisioning-profile embedding, DMG
+notarization and stapling, the production Keychain guard and the Ticket 180
+reminder fixes. This change applies `9508550` and `12ea89a` to current main.
+Four conflicts came from the Ticket 186 rename; each keeps `emixd12/cadence`.
+The Daily Brief smoke keeps main's key-tolerant default check.
+
+Release records also move to main: Tickets 178–181, the Ticket 115 and 165 status,
+`docs/qa/2026-09-27-apple-distribution.md`, the September 27 execution plan and the
+signed-native travel evidence. Briefing and Calendar-agent work on that branch is
+excluded. The final `0.1.1` candidate is built from main after this change merges.
+No build, notarization, publication or hosted change ran. Ticket 178 session
+renewal and replay/expiry checks and Ticket 181 publication remain open.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
