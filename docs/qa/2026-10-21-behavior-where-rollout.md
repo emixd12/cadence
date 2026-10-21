@@ -8,6 +8,13 @@ migration 0018 and the updated sync payload fails closed for Behavior writes
 after the hosted migration; local data remains local. The earlier signed 0.1.3
 artifact is not a compatible Where release.
 
+The independent session hotfix may ship as 0.1.4 before Where. The Where
+candidate must use a version newer than every already-published desktop
+release. Use 0.1.4 only while it remains unpublished and newer than the current
+published version. If 0.1.4 has shipped, advance the version, for example to
+0.1.5, or higher if another release already exists. Never replace published
+0.1.4 artifacts or reuse that updater version for different application code.
+
 The previous web graph writers are deliberately supported during a
 migration-first deployment. This compatibility does not extend the desktop
 sync contract. A title-only edit preserves Home or Anywhere, while a legacy
