@@ -1,5 +1,26 @@
 # Implementation Status
 
+## Native desktop dependency validation — October 21, 2026
+
+PR #118 review identified that the existing `verify` job built the desktop
+frontend without compiling the Rust application. A separate path-filtered
+`Desktop native` workflow now runs the locked Apple Silicon Cargo check and
+native library tests on macOS 15, using Rust 1.97.1 and the macOS 14 deployment
+target. It builds the real frontend assets first and records the runner and
+toolchain versions. See `docs/DESKTOP_BUILD.md#native-dependency-ci`.
+
+This adds repeatable compilation and synthetic native-test coverage. Signed
+artifact publication, installed updater/Keychain acceptance, and macOS 14
+runtime testing retain their existing gates. No credentials, hosted changes,
+or release artifacts are part of this workflow. Platform impact: desktop CI
+only; web, marketing, and future mobile have no runtime change.
+
+Local verification passed: actionlint 1.7.12, YAML and shell syntax checks,
+`npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check`, and `npm run desktop:build`. Native Cargo execution
+still requires the macOS CI run; this Linux review environment cannot verify
+the Apple frameworks or native library tests.
+
 ## Tickets 178 and 181: callback review correction, 0.1.4 source — October 21, 2026
 
 Merge-readiness review reproduced one remaining false-revocation path: an
