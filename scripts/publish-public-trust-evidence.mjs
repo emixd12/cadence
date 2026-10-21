@@ -4,11 +4,29 @@ import { pathToFileURL } from "node:url";
 
 import { validatePublicTrustEvidence } from "../lib/resolvers/public-trust-evidence.resolver.ts";
 import { isPrivateHostname } from "./public-trust-http.mjs";
+import developerReference from "../apps/marketing/src/data/developer-reference.json" with { type: "json" };
+
+const publicToolPaths = new Set(developerReference.tools.flatMap(({ slug }) => [`/developers/${slug}`, `/developers/${slug}.md`]));
 
 export function validatePublicTrustDetails(details, subject) {
   const json = JSON.stringify(details);
   if (!details || details.schema !== "cadence.public-trust-details" || details.source_commit !== subject.source_commit || details.application_deployment_id !== subject.application_deployment.id || details.marketing_deployment_id !== subject.marketing_deployment.id) throw new Error("Publication refused invalid Trust details.");
-  if (/(?:secret(?!_scanning)|token|password|authorization|cookie|headers?|scanner_(?:match|finding)|user_(?:email|id)|behavior_content|occurrence_content|notes?|provider_payload|private_|bearer\s+|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(json)) throw new Error("Publication refused prohibited Trust detail content.");
+  // Catalog paths name public documentation, not payloads; screen every other byte unchanged.
+  const screened = structuredClone(details);
+  const marketing = screened.routes?.marketing;
+  if (Array.isArray(marketing?.observed)) {
+    for (const route of marketing.observed) {
+      if (route && publicToolPaths.has(route.path)) route.path = "/public-tool-reference";
+    }
+  }
+  if (Array.isArray(marketing?.failures)) {
+    marketing.failures = marketing.failures.map((failure) => {
+      if (typeof failure !== "string") return failure;
+      const separator = failure.indexOf(": ");
+      return separator >= 0 && publicToolPaths.has(failure.slice(0, separator)) ? `/public-tool-reference${failure.slice(separator)}` : failure;
+    });
+  }
+  if (/(?:secret(?!_scanning)|token|password|authorization|cookie|headers?|scanner_(?:match|finding)|user_(?:email|id)|behavior_content|occurrence_content|notes?|provider_payload|private_|bearer\s+|@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/i.test(JSON.stringify(screened))) throw new Error("Publication refused prohibited Trust detail content.");
   for (const match of json.matchAll(/https:\/\/[^"\\\s]+/g)) {
     if (isPrivateHostname(new URL(match[0]).hostname)) throw new Error("Publication refused a private Trust detail hostname.");
   }

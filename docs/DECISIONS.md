@@ -509,6 +509,18 @@ update must upgrade an older installed version through the real updater after a
 protected database backup. Do not create a disposable migration build or a
 separate migration ticket now.
 
+## macOS 14 runtime acceptance deferral
+
+Decision date: 2026-09-27. Ticket: 115.
+
+The owner deferred macOS 14 runtime acceptance. It no longer blocks Ticket 115.
+Keep the declared and compiled macOS 14 deployment target unchanged. Run the
+production acceptance matrix on the current Apple Silicon host and record the
+exact tested macOS version and build for each candidate. Do not claim macOS 14
+compatibility or support for untested newer versions. Developer ID signing,
+notarization, stapled app/DMG verification, quarantined downloaded-DMG
+Gatekeeper launch, production Keychain, and upgrade acceptance remain gates.
+
 ## Desktop native reminder horizon
 
 Decision date: 2026-08-30. Tickets: 108 and 112.
