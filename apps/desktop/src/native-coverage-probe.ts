@@ -5,7 +5,7 @@ import {
 } from "../../../lib/resolvers/native-reminder.resolver";
 import { assertProbeCount, cancelProbes, notifications } from "./native-spike";
 
-// Operator-only probe. The application scheduler will use the same pure planning rules.
+// Operator-only probe. The application scheduler uses the same pure planning rules.
 export async function runNativeCoverageProbe(count: number, now = Temporal.Now.instant()) {
   assertProbeCount(count);
   const targetThrough = now.add({ hours: 30 * 24 });

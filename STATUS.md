@@ -17,6 +17,28 @@ instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
 Platform impact: desktop authentication only; web, marketing and future mobile
 have no implementation change. No schema or hosted configuration changes.
 
+## PR 83 integration review — October 21, 2026
+
+Reconciled the briefing workbench branch with current main `d598afc`. The original
+Tickets 169–174 are already on main; the remaining changes provide the local
+Compare/Review/Days workbench, historical and sequence evaluation, a shared
+comparison budget, saved-review retention, pure bubble presentation, repository
+cleanup and the bounded Search Console CLI. There are no main-relative database
+migrations or production preset changes.
+
+The cleanup had removed `requireCurrentUser`, which current main's OAuth consent
+and Connected apps service imports. Restored that helper and retained the monthly
+travel-spend readback with its DOM regression while resolving the stale branch.
+Current MCP/OAuth, travel-budget and desktop-release changes remain present.
+
+Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+shared core, desktop TypeScript and both frontend builds pass. The full suite
+passed 2,965 tests with 165 skipped; its 20 sandbox-blocked socket/subprocess
+failures passed in an elevated rerun of all ten affected files (86 tests).
+The 173 focused workbench tests also pass. No hosted deployment, database replay,
+private-account model run or installed native acceptance was performed. Details:
+`docs/qa/briefing-workbench.md`.
+
 ## Tickets 178 and 181: 0.1.3 passes installed acceptance — October 21, 2026
 
 Historical, superseded by the 0.1.4 correction above. Candidate `0.1.3` from
@@ -225,6 +247,40 @@ Its job is to answer:
 - The other files under `docs/` for product, data, recurrence, notification, export, UI, and user-flow contracts.
 - `STATUS.md` only for implementation state and handoff continuity.
 
+## Tickets 182–185 briefing exploration and owner decisions — September 28, 2026
+
+Tickets 182–183 are implemented in the existing development workbench. Historical
+inspection defaults to 14 prior days, caps target ranges at 90 days, and labels
+current retained account rows Retrospective. Reconstruction remains unavailable.
+Missing records, original completion counts, elapsed history, Notes and reminder
+state remain unknown. Historical planning cannot infer free time from retained rows.
+Optional past Calendar uses live authorization and stays separate from pattern history.
+
+Days supports saved-day A/B review, no-model selection simulation, diagnostic lane
+previews, explicit call budgets and cancellation with retained partial output.
+All workbench tabs share at most two active calls and a default 100-call rolling-hour
+budget. Failed and dispatched cancelled calls count; queued cancellation releases
+reservations. Local reports preserve complete visible text and exact feedback.
+Production admission, tip history, storage policy and presets remain unchanged.
+
+Ticket 184's owner criteria were recorded September 30, 2026: actionable adherence
+analysis and day planning, a general one-minute read, longitudinal quiet-day insights,
+and varied lanes with justified repeats for important patterns. Initial coverage is
+`daily-brief-balanced@1`: six tuning cases, ten reserved cases and a seven-day sequence.
+Profile revisions and evaluation iterations are recorded separately in the packet
+and existing QA record. Iteration 1 has not run. Private comparisons, quality
+acceptance, candidate promotion, rollback execution and release gates remain open.
+Ticket 185 has a concrete lifecycle proposal; every product decision remains pending.
+Owner packet: `docs/plans/2026-09-28-briefing-owner-review.md`.
+Implementation and verification: `docs/qa/briefing-workbench.md`.
+Existing desktop release work and prior briefing changes remain intact.
+Verification: 2,519 tests pass with 29 opt-in skips using two workers and a
+30-second test timeout for existing desktop subprocess checks. Governance,
+core/design-system, lint, web/desktop TypeScript and web/desktop builds pass.
+Browser QA verifies 390 px and 1440 px layouts, no-model planning and draft retention.
+Fresh independent read-only review returned `ship` after correcting the source freeze
+and two Days state defects. Three regression tests cover the UI corrections.
+
 ## Remaining signed-release tickets — September 28, 2026
 
 The owner requested explicit tickets for the remaining release work. Tickets
@@ -319,6 +375,49 @@ Fresh independent review of the exact QA endpoint allowlist and seven RLS fixtur
 corrections returned `ship` with no findings on September 28. Installed updater
 acceptance subsequently passed under Ticket 180 on September 29.
 
+## Tickets 175–177 briefing review workbench — September 28, 2026
+
+Owner-requested review corrections pass automated checks. Fresh independent read-only
+review returned `ship` with no actionable findings after correcting its first three findings.
+Confirmed fixes cover saved-rerun consent, retention, storage errors, candidate
+lineage, anchored feedback, stale reads, unsaved rerun visibility, and reading/quotation
+consistency. Tickets 182–184 cover remaining bench phases. Ticket 185 owns the
+separate stored-brief product decision. Parallel Ticket 115 work remains separate.
+
+Review verification: agents, interactions, resolvers, core, design-system, lint,
+TypeScript, desktop typecheck/build and web build pass. The full suite passes
+2,467 tests with 29 skipped using two workers. The initial default-worker run had
+one timeout in a parallel desktop release test; that file passed separately.
+The workbench has 40 passing DOM tests. Browser checks at 1440 px and
+390 px confirm equal/stacked columns, closed configuration controls, keyboard editing,
+long-text wrapping and visible unconfigured-provider errors. No private capture,
+provider generation, schema change or deployment ran during this review.
+The shared bubble now uses consistent en-US times in the briefing timezone so
+rendered quotations match server validation. Actual prose quality still needs owner
+review; the production preset remains unchanged.
+
+The owner asked to implement Phases 0–2 of `docs/plans/2026-09-27-briefing-bench-review.md`
+and authorized full account capture for local reviews. Tickets 175–177 are complete in
+source. Their initial implementation added the shared `realistic-timing` fix, which
+only matters once `advisor-analysis` is promoted. The review also aligns shared time
+formatting as described above; production generation policy remains unchanged.
+
+- 175: midnight-ending ranges end the next day in `realistic-timing`; plain-language lane,
+  state and tip-decision labels; reading-burden, repetition and internal-term warnings
+  (`packages/core/src/services/briefing-review.ts`).
+- 176: the workbench opens on Compare with Saved reviews. Cases, candidates, runs and
+  prose feedback persist under `.local/briefing-bench/` (0700/0600, 30-day retention,
+  delete). Account cases keep captured inputs for exact reruns.
+- 177: review packets for coding agents, validated proposal files, owner decisions, and
+  candidate-only reruns on a saved case's captured clock after current consent checks.
+
+Verification: agents, interactions, resolvers, core, design-system, lint, TypeScript,
+tests (2,435 passed, 29 skipped) and build pass. An earlier full run failed
+`tests/desktop-release-acceptance.test.ts` once under load; it is under the parallel
+Ticket 115 edits and passed alone and on the final run. Browser QA ran one synthetic
+comparison. See `docs/qa/briefing-workbench.md`. Remaining: owner review of
+real account comparisons; Phases 3–5 are now tracked by Tickets 182–184.
+
 ## Ticket 115 execution — September 27, 2026
 
 The owner authorized every step of the Apple Developer execution plan, including
@@ -382,6 +481,63 @@ No credential creation, build, installation, Apple submission, or publication ra
 Planning verification passed: `npm run agents:check`, `npm run interactions:check`,
 and `git diff --check`. Runtime tests and builds were not run for these documentation
 changes. No ticket is marked complete by this planning pass.
+
+## Daily Brief web production deployment — September 26, 2026
+
+Deployed application commit `9eda5c039bbf1c6e306a40a2a720f8d0cb02c43a`
+to the existing Vercel `cadence` project and promoted Ready deployment
+`dpl_9u3Ki7ZjgCnHwGiL9FTVBGNhFt1n` to `https://app.cadence-me.com`.
+The owner explicitly requested application deployment after the hosted migrations.
+The CLI uploaded a clean `git archive HEAD`; Vercel's `sourceCommit` metadata
+matches that commit. Local migration evidence and SQL smoke edits were not part
+of the application source archive.
+
+Vercel's production build and TypeScript checks passed. Inspection of the
+production domain resolves to the new Ready deployment. Eleven unauthenticated
+route checks passed: Login, Privacy and Terms return 200; Timeline, Behaviors,
+Settings, Export and Analytics redirect to Login; Daily Brief preferences,
+Daily Brief POST and reminder processing reject missing authentication with 401.
+Daily Brief GET correctly returns 405 because the endpoint requires POST.
+The deployment error-log query returned zero records during the release window.
+
+Rollback target: `dpl_EySiseVj858i81TyfRuYjz8qY6pt`. Both new database
+migrations remain applied if the application needs rollback. No provider gates,
+Daily Brief preset, marketing deployment or native package changed. Owner-run
+private comparisons, authenticated acceptance and installed-desktop acceptance
+remain open under Ticket 174. This release does not establish fresh Trust Passed
+evidence. Prior local source checks and full build remain applicable.
+
+## Daily Brief hosted migrations — September 26, 2026
+
+Applied `20260926150000_daily_brief_bounded_recovery.sql` and
+`20260926170000_daily_brief_analysis_sources.sql` to the linked Cadence project
+`qjodzutjxtmtzczbloxa` under the owner's migration request. Hosted history now
+matches all 76 repository migrations. Read-only catalog checks confirmed the
+three new columns, forced tip-table RLS, denied direct authenticated table reads,
+and authenticated-only analysis RPC access. Generated hosted public-schema types
+match the checked-in public-schema types exactly; no type change was needed.
+
+Local verification replayed all 76 migration files against disposable Supabase
+Postgres 17.6.1.159 with the real GoTrue v2.195.0 Auth schema. No application-data
+stubs were used. The container published only `127.0.0.1:55322`. CLI `db reset`
+was attempted but requires its managed stack; this was a direct ordered SQL replay,
+not a successful CLI reset. The npm CLI wrapper has an invalid macOS signature,
+including after reinstalling the exact 2.105.0 package. The package's working
+`supabase-go` backend performed history, dry-run, push and type generation.
+
+Updated `tests/sql/ticket-147-daily-brief-smoke.sql` for current preference defaults
+and completed-attempt retries. Its rollback-only smoke passes recovery limits,
+Calendar fencing, session revocation/expiry, optional-source disclosure,
+snapshot revision matching, old-client disclosure revocation, lease-bound tip
+records and deletion on disable. Hosted checks read catalogs only; no private
+account comparison or synthetic hosted user was created.
+
+Verification: 50 targeted tests pass; agents, interactions, resolvers, lint and
+typecheck pass. Full tests report 2,315 passed and 29 skipped, with five sandbox
+localhost-bind failures; all seven tests in that file pass outside the sandbox.
+The production build passes. Fixture rollback left zero Auth users; the disposable
+container and its volume were removed. Application deployment, owner-run comparisons,
+and installed-desktop acceptance remain open under Ticket 174.
 
 ## Tickets 169–174 advisor analysis, tips and travel — September 26, 2026
 
@@ -1375,6 +1531,12 @@ September 26 scheduled follow-up could not independently repeat that pane check:
 the Identity Scaffolding Chrome session is unavailable, and automatic approval
 review blocked broad Claude inspection. The recorded September 26 result above
 is preserved; this automation obtained no new provider decision.
+September 27 and 28 scheduled follow-ups: the Identity Scaffolding Chrome session remains
+unavailable. Today's provider status is not verified. The recorded September 26
+approval evidence remains the latest; post-approval smoke checks remain outstanding.
+September 28: the owner requested disabling the Google review follow-up automation.
+`cadence-google-review-follow-up` is now paused. Google approval remains recorded;
+Ticket 141 still requires the one-time post-approval web/native smoke checks.
 Unrelated working-tree changes were excluded from the isolated releases.
 
 Ticket 138: Cloudflare's initially empty `cadence-me.com` zone now has two

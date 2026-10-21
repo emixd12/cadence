@@ -23,7 +23,7 @@ sprawl.
 The web app supports independent users with Google auth. Tickets 107–114
 implement local-first macOS tracking with one local profile and no login.
 Ticket 115 defers Apple-trusted desktop distribution acceptance.
-Tickets 116–122 plan optional use of the same Google account with offline-
+Tickets 116–122 implement optional use of the same Google account with offline-
 capable desktop synchronization. Tickets 146–148 implement an in-app read-only daily
 briefing in the Timeline horse's text bubble. Billing, native mobile, general AI
 chat/coaching, and audio speech remain future scope.
@@ -679,6 +679,21 @@ labeled as calculated, withdrawn at expiry, and never passed to the model.
 
 Ticket 174 verifies useful wording, supported timing and reliable delivery on web
 and linked desktop. Native mobile and marketing implementation remain out of scope.
+
+### Owner evaluation target (Ticket 184)
+
+The September 30 criteria define candidate evaluation, not current production acceptance.
+Daily Brief should provide actionable adherence analysis and day planning from
+available authorized evidence, with a general one-minute cap on the complete read.
+Quiet days prioritize supported longitudinal insights. Prefer varied lanes across
+days; persistent high-impact patterns may warrant repeated advice. Keep wording
+concise and precise. A future reading-length setting remains unimplemented.
+
+Evaluation uses named coverage profiles with retained revisions and separate run
+iterations. The initial `daily-brief-balanced@1` has six tuning cases, ten reserved
+cases and one seven-day sequence. See the owner packet and existing workbench QA
+record for exact cases, criteria and iteration state. Existing consent, evidence,
+read-only and production-promotion boundaries still apply.
 
 ### Internal recipe workbench (Tickets 151–158)
 

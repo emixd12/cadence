@@ -12104,7 +12104,7 @@ The owner clarified that routing includes both travel timing and fitting Behavio
 around Calendar events. Occasional adherence tips should use defined analysis lanes
 inspired by `packages/core/src/export-prompts.ts`.
 
-Source of truth: `docs/PRODUCT_SPEC.md#planned-advisor-improvements-tickets-168174`,
+Source of truth: `docs/PRODUCT_SPEC.md#advisor-improvements-tickets-168174`,
 `docs/plans/first-external-consumer.md`, and the September 26 decision in
 `docs/DECISIONS.md`. These tickets extend the existing Daily Brief recipe, shared
 horse bubble, server pipeline and workbench. They add no general chat, autonomous
@@ -12503,8 +12503,9 @@ Scope and acceptance:
   server success without delivery, refresh, expiry, manual retry, parallel tabs,
   revoked consent and account changes. Record latency by phase and result code without
   private content. Demonstrate bounded loading and recovery on actual release targets.
-- Preserve owner-clicked private comparisons, frozen-snapshot comparisons, memory-only
-  private output and allowance separation. Record authorized synthetic-provider,
+- Preserve owner-clicked private comparisons, frozen-snapshot comparisons and allowance
+  separation. Ticket 176 replaces memory-only private output with owner-authorized
+  local case storage (Decision 2026-09-27). Record authorized synthetic-provider,
   owner-account, deployed-web and installed-desktop evidence separately.
 - Release 168 independently when its checks pass. Promote later evidence/prose changes
   through the existing reviewed preset/policy mechanism. Preserve existing consent,
@@ -12533,6 +12534,146 @@ Platform impact:
 Verification: all shared checks, the expanded deterministic/DOM fixture suites,
 reviewed live outputs under existing authority, hosted and installed acceptance,
 and rollback. Record actual pass/fail results, remaining gates and reviewer findings.
+
+## Ticket 175: Trustworthy briefing review baseline
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 0 of the
+briefing-bench audit (`docs/plans/2026-09-27-briefing-bench-review.md`).
+Dependencies: Tickets 169–174.
+
+Goal: make each observation's origin readable and define the editorial target before
+comparing prose.
+
+Scope and acceptance:
+
+- `realistic-timing` treats a range ending at or before its start as ending the next
+  day, matching the planner (21:00–00:00 ends at midnight). Same-day marks remain the
+  lane's rule; next-day marks stay excluded. Regression tests cover both sides.
+- The workbench shows plain-language lane names, lane states, unavailable reasons and
+  tip decisions with Behavior titles (`packages/core/src/services/briefing-review.ts`).
+- Editorial target, stated in `docs/qa/briefing-workbench.md`: open with what matters
+  today; usually one or two planning points; at most one supported historical
+  observation; a next step only when evidence supports it; quiet days stay short.
+  Start with 80–120 visible words, a working range rather than a validated formula.
+- The Compare view counts every rendered word (evidence, limitation, option, travel and
+  status lines) and warns about five-word phrases repeated between the overview,
+  suggestions and tip, and about internal vocabulary. A term inside a Behavior title
+  is not flagged. Warnings never reject or rewrite output; production validation,
+  tip provenance and tip-history semantics are unchanged.
+
+Implementation references: `packages/core/src/resolvers/briefing-analysis.resolver.ts`,
+`packages/core/src/services/briefing-review.ts`, `app/design-system/BriefingReview.tsx`,
+`tests/briefing-analysis.resolver.test.ts`, `tests/briefing-review.test.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Resolver fix affects Daily Brief tips when the `advisor-analysis` preset is promoted; review warnings are workbench-only. |
+| Desktop | The resolver fix reaches linked desktop through shared core; no desktop UI change. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable: shared core only; native mobile remains deferred. |
+
+Verification: resolver, core review and workbench DOM tests; all required checks.
+
+## Ticket 176: Compare view with saved results and anchored prose feedback
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 1 of the
+briefing-bench audit. Dependencies: Ticket 175.
+
+Goal: make reading two complete briefs and commenting in prose the primary workbench
+task, and keep that work across reloads.
+
+Scope and acceptance:
+
+- `/design-system?preview=briefing-workbench` opens on Compare, with a Saved reviews
+  view. Compare shows A (baseline) and B (candidate) in equal columns using the
+  production bubble, with evidence, differences and configuration collapsed below.
+  Narrow screens stack A above B.
+- Run new comparison saves a case, both candidates and every run, including withheld
+  output, failures and cancellations, under `.local/briefing-bench/v1/<partition>/`.
+  Cancelling keeps runs that finished first. A failed write shows "Not saved" and
+  keeps the visible result.
+- Configuration edits no longer erase results; a column notes when its draft changed
+  since the run. Drafts and unsaved feedback survive view switches.
+- Feedback saves the exact comment, an optional judgment (Prefer A, Prefer B, Both
+  work, Neither works), an optional quotation that must come from the linked output,
+  and optional replacement wording, all linked to run and candidate IDs.
+- Owner-authorized storage policy (Decision 2026-09-27): synthetic and My account cases
+  persist locally. Account cases save the minimal captured inputs once per case so
+  they can be rerun exactly; the reviews API never returns those inputs to the
+  browser. Directories are 0700, files 0600, cases expire after 30 days and can be
+  deleted from Saved reviews. Each account has its own partition.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`app/design-system/BriefingReview.tsx`, `lib/services/briefing-bench-store.ts`,
+`lib/services/briefing-review.service.ts`, `lib/services/briefing-workbench.service.ts`,
+`app/api/dev/briefing-reviews/route.ts`, `interaction-registry.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only workbench and loopback routes; production returns 404. |
+| Desktop | Not applicable: the workbench is not a desktop feature. |
+| Marketing | Not applicable: no public surface or claim changes. |
+| Future mobile | Responsive stacked columns verified at 375 px; native mobile remains deferred. |
+
+Verification: `tests/briefing-bench-review.test.ts`, `tests/briefing-bench-account.test.ts`,
+`tests/briefing-workbench.dom.test.tsx`, browser QA on port 4321, all required checks.
+
+## Ticket 177: Turn feedback into reviewable candidates
+
+Status: completed September 28, 2026. Filed September 27, 2026 from Phase 2 of the
+briefing-bench audit. Dependencies: Ticket 176.
+
+Goal: connect one prose comment to one specific, testable change and its rerun.
+
+Scope and acceptance:
+
+- Write review packet produces `review-packet.md` in the case directory: candidates,
+  configuration differences, every run with versions, reading warnings, evidence
+  lines and lane decisions, exact feedback, earlier proposals, and the proposal
+  schema. An existing coding agent reads it; no agent framework runs in Cadence.
+- An agent writes `proposals/<id>.json` naming the interpreted problem, its owner
+  (configuration, prompt, resolver, presentation or evidence), the change, expected
+  effect, possible regression and cases to rerun. The workbench validates and lists
+  proposals, ignores malformed files by name, and never executes them.
+- Configuration proposals load into candidate B with their lineage. Repository
+  proposals change code on a branch; each run records model, prompt revision
+  (`DAILY_BRIEF_PROMPT_REVISION`), configuration revision and pipeline version, so
+  before/after differences stay visible.
+- Rerun candidate on this case reruns only B on the saved case's inputs and captured
+  clock; the baseline output stays pinned. Synthetic reruns require unchanged fixture
+  versions. Account reruns require the same signed-in owner, enabled briefing, the
+  sources the case captured, a connected Calendar when captured, and every captured
+  Behavior still active. A configuration needing inputs the case did not capture is
+  refused (`input_not_captured`). Production freshness checks are unchanged.
+- The owner records Accept, Needs correction (with a note) or Reject per proposal.
+  Feedback and proposals never become production rules; promotion stays a reviewed
+  repository change.
+
+Remaining plan work: Tickets 182–184 own historical days, sequence and lane-preview
+batches, and promotion. Ticket 185 owns the separate stored-brief product decision.
+
+Implementation references: `lib/services/briefing-review.service.ts`,
+`lib/services/briefing-workbench.service.ts`, `lib/services/daily-brief-consumer.ts`,
+`app/design-system/BriefingReview.tsx`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only workbench; production Daily Brief is unchanged. |
+| Desktop | Not applicable: no desktop surface; promoted changes reach desktop through their own tickets. |
+| Marketing | Not applicable: no public claim changes. |
+| Future mobile | Not applicable beyond the responsive workbench. |
+
+Verification: packet, proposal validation, disposition, same-case rerun, account rerun
+authorization and refusal tests; all required checks.
+
+
+
 
 ## Remaining Apple-trusted release work: Tickets 178–181
 
@@ -12749,6 +12890,7 @@ authenticated adapter contract and 92 RLS ownership checks passed. Temporary use
 were removed, loopback bindings verified, and the isolated stack stopped while
 preserving existing volumes. The RLS smoke fixture now includes location-aware
 configuration history; no product schema changed. See the existing Apple QA record.
+
 October 19: final candidate `0.1.1` built from `95a6c64`, notarized, stapled and
 verified, with the `desktop-stable` update feed. All 86 migrations replayed cleanly
 with the contract and 92 RLS checks passing. Ticket 178 checks, quarantined download,
@@ -12813,6 +12955,243 @@ Platform impact:
 Verification: all execution-plan release checks, exact-artifact quarantine/runtime
 evidence, clean local adapter contracts, reviewed publication packet and post-publication
 download/feed checks. Record remaining failures instead of marking the release complete.
+
+## Ticket 182: Explore historical days with explicit evidence limits
+
+Status: implemented September 28, 2026. Source and synthetic verification are recorded
+in `docs/qa/briefing-workbench.md`; live private-account acceptance remains owner-run. Phase 3 of
+`docs/plans/2026-09-27-briefing-bench-review.md`. Dependencies: Tickets 175–177.
+
+Goal: find useful comparison cases without presenting today's records as facts known
+on a past morning. Use Ticket 184's current owner-approved editorial criteria as
+the review target.
+
+Scope and acceptance:
+
+- Add a day/range selector and no-model analysis grid to the existing workbench.
+  Default to 14 days; bound the target range at 90 days where coverage permits.
+  Show one selected day's text and evidence at a time. Keep Compare first, A pinned,
+  and exact prose feedback attached to its runs. Use Behavior titles and plain labels.
+- Distinguish Captured, Reconstructed, and Retrospective cases in selection, saved
+  records, packets and reports. Label limits per source. Unknown history stays unknown;
+  it must not silently become Unresolved, zero duration, or an empty Calendar.
+- Define a selected logical clock (including any proposed 07:00 default) and timezone.
+  Specify inclusive/exclusive cutoffs, stable event ordering, revision chains, and
+  effective, recorded and ingestion times. Apply the rules to the target day and its
+  lookback. Imported/backfilled records and later corrections cannot leak into an
+  earlier reconstructed snapshot.
+- Inspect retained evidence before promising reconstruction. Document limitations for
+  schedule changes, deleted/archived Behaviors, late-created Occurrences, elapsed
+  durations, timezone changes, Notes and reminder status. Omit unsupported sources or
+  label the case Retrospective. Current Note text is not historical Note state.
+- Keep optional past Calendar reads separate and currently authorized. A fetched past
+  day is Retrospective unless an actual retained capture establishes its history.
+  It does not enable the historical Calendar-pattern lane by itself.
+- Support the lookback needed for each target day; a 90-day target range with a 90-day
+  lookback can need roughly 180 days of records. Disclose pagination, caps and gaps.
+  Do not label a truncated sample complete.
+- Use live time for authentication, expiry, cancellation and current source access.
+  Use replay time only for evaluation. Preserve production freshness and admission.
+  Recheck owner, consent, Calendar selection/connection and retained Behavior access
+  before transmission. Keep production tip history untouched.
+- Reuse the existing case store and pipeline. Extend their schema only as needed;
+  preserve old cases as readable or explicitly Review only. New database access must
+  retain authenticated ownership and RLS. A loopback route does not secure an exposed
+  hosted RPC. Any schema change needs a new migration and the existing workflow.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`lib/services/briefing-workbench.service.ts`, `lib/services/briefing-bench-store.ts`,
+`lib/services/briefing-account-context.service.ts`, `lib/db/advisor-analysis.repo.ts`,
+`packages/core/src/resolvers/briefing-analysis.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only historical selectors and evaluation adapters; reuse the workbench exclusion in `interaction-registry.json` and existing design-system catalog. |
+| Desktop | No new desktop surface. Shared source/core changes require desktop typecheck, build and relevant adapter tests. |
+| Marketing | Not applicable: development evaluation adds no public product claim. |
+| Future mobile | Verify responsive web selection and comparison at 390 px; native mobile remains deferred. |
+
+Verification: hand-counted historical fixtures for late ingestion, imports, revisions,
+deleted records, source gaps, DST/midnight and lookback edges; no-model selection,
+authorization and retention tests; saved-case compatibility; all required checks.
+Record actual coverage rather than claiming exact historical mornings generally.
+
+## Ticket 183: Review consecutive days and diagnostic lane previews
+
+Status: implemented September 28, 2026. Source, mocked-provider and browser
+verification are recorded in `docs/qa/briefing-workbench.md`. Model prose quality
+and live private-account acceptance remain owner-run. Phase 4 of the briefing-bench plan.
+Dependencies: Tickets 176–177 and 182.
+
+Goal: let the owner compare accumulated reading burden and repetitive advice across
+days, then diagnose the responsible lane without losing the complete daily brief.
+
+Scope and acceptance:
+
+- Add a Days view for a small chronological comparison sequence. Compare remains the
+  default. Keep A/B aligned on the same case and clock, with saved results and prose
+  feedback per pair. Preserve drafts when moving between days and views.
+- Keep Generate daily brief separate from Preview each lane. Lane previews may bypass
+  ranking or cooldown only with an explicit diagnostic label. Never bypass evidence
+  sufficiency, source consent, grounding, output validation or current authorization.
+  Derive eligible lanes from contracts; do not hardcode an eight-lane count.
+- Run a no-model chronological selection simulation before generation. Initialize
+  stable fingerprints, warm-up history and spacing explicitly. Label its assumption
+  that selected tips were delivered. Model runs track only retained, successful tips
+  in isolated evaluation history. Neither path writes production tip history.
+- Reserve a configurable provider-call budget before dispatch. Start with the proposed
+  100-call ceiling and at most two concurrent calls across workbench tabs, subject to
+  the existing provider limits. Replace conflicting comparison-count limits explicitly;
+  keep production admissions separate. Show the planned call count before starting.
+- Count every dispatched call, including failures, retries and dispatched cancellation.
+  Undispatched cancellation releases its reservation. Cancellation stops queued work,
+  keeps completed outputs and their feedback, and does not promise a provider refund.
+  Count calls separately from tokens or monetary cost; report unavailable usage honestly.
+- Save partial, cancelled, rejected and failed runs. A storage failure keeps output
+  visible as Not saved. Retry creates a new attempt and cannot overwrite reviewed text.
+- Produce a short local review report with per-day outputs, reading burden, repeated
+  themes, preferences, failures and unresolved concerns. Preserve Captured,
+  Reconstructed and Retrospective distinctions. Lane-level success is not daily-brief
+  quality acceptance. No automatic promotion or embedded agent chat.
+
+Implementation references: `app/design-system/DailyBriefBench.tsx`,
+`app/design-system/BriefingReview.tsx`, `lib/services/briefing-workbench.service.ts`,
+`lib/services/briefing-bench-store.ts`, `lib/services/briefing-review.service.ts`,
+`packages/core/src/resolvers/briefing-analysis.resolver.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Development-only Days and diagnostic views; update existing registry exclusions and bench evidence. |
+| Desktop | Not applicable: no native batch-generation surface; shared logic changes still require portability checks. |
+| Marketing | Not applicable: evaluation tooling has no public surface. |
+| Future mobile | Stack A above B and verify keyboard, day navigation and cancellation at 390 px; native mobile remains deferred. |
+
+Verification: exact call accounting under concurrency, timeout, retry, cancellation
+and storage failure; chronological cooldown/retained-tip fixtures; consent revocation
+between jobs; partial-result and draft retention; all required checks and browser QA.
+
+## Ticket 184: Evaluate and promote an owner-reviewed briefing candidate
+
+Status: evaluation criteria and initial coverage accepted September 30, 2026.
+The criteria and versioned profile `daily-brief-balanced@1` live in
+`docs/plans/2026-09-28-briefing-owner-review.md`. Coverage is six tuning cases,
+ten reserved cases and one seven-day sequence. Evaluation iteration 1 has not run;
+quality acceptance, promotion and rollback execution remain open. Phase 5 of the
+briefing-bench plan.
+Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
+174; do not duplicate or silently close their outstanding gates.
+
+Goal: improve daily understanding through the owner's comparison and prose feedback,
+then promote one evidenced candidate through an ordinary repository change.
+
+Scope and acceptance:
+
+- Curate ordinary, quiet, conflict, overnight, missing-input and repetitive-pattern
+  cases. Group coverage into named profiles with immutable revisions and separately
+  numbered evaluation iterations. Preserve their definitions, lineage and results.
+  Reserve held-out cases before tuning. Keep authorized private cases in the
+  local store; record only non-private identifiers and decisions in repository QA.
+- Freeze the evaluation set, clock, input coverage and baseline. Record recoverable
+  prompt/reference/configuration versions, model identity and source revision. Show
+  differences for prompt, resolver, pipeline and presentation changes, not only tone
+  settings. Version changes must not silently rewrite existing cases or reviewed runs.
+- Turn exact feedback into bounded proposals using Ticket 177. Rerun the same cases
+  and review complete rendered text. Ask what matters today, and what was unclear,
+  repetitive or unnecessary. Include consecutive-day review for fatigue.
+- Record wins, ties, losses, withheld/failed outputs and unresolved concerns, with
+  evidence type and sample size. A schema pass, word-count target or attractive single
+  generation is insufficient. Factual, privacy and delivery failures are release
+  blockers; never average them into a favorable quality score.
+- Before evaluation, record the owner's acceptance criteria for this candidate.
+  Require an explicit owner acceptance of the resulting comparisons, including quiet
+  days without tips. An absent response is not acceptance. Model-weight training is
+  outside this ticket; prompt/configuration/rule tuning remains the current approach.
+- Promote only through a reviewed repository change to the existing preset/policy
+  mechanism. Record the candidate, baseline, relevant versions, release commit and
+  rollback. Keep authorized deployment and hosted/installed acceptance as distinct
+  release steps. Preserve consent, admission, dismissal and tracking records.
+- Demonstrate rollback to the prior approved configuration. Verify that rollback
+  stops newly enabled optional transmissions without deleting Behavior history.
+
+Implementation references: `packages/core/src/data/briefing-presets.json`,
+`lib/services/daily-brief-consumer.ts`, `lib/services/briefing-pipeline.ts`,
+`docs/qa/briefing-workbench.md`, `docs/qa/in-app-daily-brief.md`,
+`docs/qa/travel-release.md`, `interaction-registry.json`, `design-system.manifest.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing hosted Daily Brief and 390 px acceptance; update existing QA and interaction evidence for changed behavior. |
+| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. |
+| Marketing | No automatic copy change. Review existing claims only if the accepted production behavior changes them. |
+| Future mobile | Responsive web acceptance only; native mobile remains deferred. |
+
+Verification: all required checks plus core/design-system/desktop checks where affected;
+owner-reviewed outputs, ordinary-use and consecutive-day evidence; authorized rollout
+and rollback records. Leave unexecuted acceptance gates open.
+
+## Ticket 185: Decide the stored Daily Brief product contract
+
+Status: proposal prepared; awaiting recorded owner decisions September 28, 2026.
+See `docs/plans/2026-09-28-briefing-owner-review.md`. Separate product track from the
+briefing-bench plan. It authorizes proposal preparation only. Implementation and
+deployment remain gated on the owner's recorded product decisions.
+Dependencies: existing Daily Brief contracts (Tickets 146–148, 155) and the findings
+in `docs/plans/2026-09-27-briefing-bench-review.md`.
+
+Goal: decide whether reopening a stored brief improves the daily experience without
+presenting expired timing advice as current.
+
+Scope and acceptance:
+
+- Present concrete first-open, reopen, refresh, expired-advice and disabled states
+  using the existing bubble and interaction registry. Keep this decision independent
+  from bench replay and local review storage.
+- Resolve the attachment's proposed 07:00 cutoff, first-open generation and day key
+  across timezone changes. Explain that first open still waits for generation;
+  storage only accelerates later opens unless a separate generation policy is approved.
+- Resolve whether reopening shows the first brief or latest valid refresh. Evaluate
+  the plan's recommendation of the latest valid revision without a history browser.
+  Preserve current withdrawal of expired timing claims until the owner approves an
+  explicit replacement. A displayed timestamp alone does not establish freshness.
+- Specify account/day generation claims for concurrent devices, idempotency, partial
+  failures and refresh. Existing per-installation admission does not prove account/day
+  uniqueness. Keep content retention separate from timing validity.
+- Resolve retention and disclosure. If a two-day retention promise is accepted, require
+  scheduled deletion for inactive accounts, not deletion on the next opening alone.
+  Specify disablement, account deletion, revoked optional-source access, pending-write
+  races and retrieval authorization. Keep authenticated ownership and RLS.
+- Record accepted decisions and update governing product, privacy, data and route
+  contracts before implementation. File the resulting implementation/release tickets
+  with migration, type, cleanup and lifecycle tests. Use new migrations; never rewrite
+  applied migrations to remove the former storage policy.
+- If the owner declines stored briefs, close this proposal with that decision. The
+  bench comparison and tuning workflow remains independently useful.
+
+Implementation references for the proposal: `lib/services/daily-brief.service.ts`,
+`lib/db/daily-brief.repo.ts`, `components/briefing/DailyBriefLauncher.tsx`,
+`components/briefing/DailyBriefBubble.tsx`, `docs/PRODUCT_SPEC.md`, `docs/DATA_MODEL.md`,
+`docs/UI_SPEC.md`, `docs/INTERACTION_REGISTRY.md`, `docs/ROUTE_MAP.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Proposal for hosted storage and reopening; implementation requires follow-up tickets after the decision. |
+| Desktop | Proposal must cover linked-account cross-device claims and offline/unsynced behavior; local-mode AI remains outside scope. |
+| Marketing | Review published privacy wording if storage is accepted; file copy follow-up before release. |
+| Future mobile | Include responsive web reopening states and reusable service contract; native mobile implementation remains deferred. |
+
+Verification: review concrete examples and a lifecycle matrix covering concurrent
+devices, refresh, expiry, timezone change, disablement, revocation and deletion.
+Decision completion is not implementation, migration, deployment or release acceptance.
+
+
 
 ## Ticket 186: Rename Cadence project folder and GitHub repository
 

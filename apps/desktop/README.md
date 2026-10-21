@@ -41,7 +41,7 @@ the app can adopt the earlier `app.cadence.desktop-spike/cadence.sqlite3`
 database without removing or overwriting it. The native bench keeps its
 synthetic values in a separate `native-boundary-spike.sqlite3` file within the
 application-data directory. Never use that bench file as a Behavior database.
-The app does not read web accounts.
+The native bench does not read web accounts.
 
 ## Native acceptance procedure
 
@@ -71,9 +71,9 @@ Cancel every pending and delivered test notification before ending an authorized
 test. Capacity tests must never use short delays or be left unattended. No
 permission request or notification is sent automatically on launch.
 
-`npm run desktop:parity:check` intentionally fails until the real tracking
-implementation and interaction evidence exist. Developer bench references
-cannot satisfy that gate. Current native evidence is recorded in
+`npm run desktop:parity:check` verifies tracking implementation and required
+interaction evidence. Developer bench references cannot satisfy that gate.
+Native boundary evidence is recorded in
 `docs/qa/2026-08-30-desktop-native-boundary.md`.
 
 ## Shared tracking runtime
