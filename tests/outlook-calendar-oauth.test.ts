@@ -65,12 +65,12 @@ describe("state, PKCE, and authorization URL", () => {
     for (const bad of ["", web.slice(1), `x${web.slice(1)}`, `${web}A`, web.slice(0, -1), `w${"!".repeat(43)}`, 42, null]) expect(parseOutlookState(bad)).toBeNull();
   });
 
-  it("requests only openid, offline_access, and Calendars.ReadBasic with S256 PKCE and a derived nonce", () => {
+  it("requests only openid, offline_access, and Calendars.Read with S256 PKCE and a derived nonce", () => {
     const verifier = createOutlookVerifier();
     const state = createOutlookState("web");
     const url = new URL(createOutlookAuthorizationUrl(CONFIG, state, verifier));
     expect(url.origin + url.pathname).toBe("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
-    expect(url.searchParams.get("scope")).toBe("openid offline_access Calendars.ReadBasic");
+    expect(url.searchParams.get("scope")).toBe("openid offline_access Calendars.Read");
     expect(url.searchParams.get("code_challenge")).toBe(createHash("sha256").update(verifier).digest("base64url"));
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("nonce")).toBe(outlookNonce(verifier));
@@ -123,7 +123,7 @@ describe("ID token validation", () => {
 
 describe("token endpoint", () => {
   const verifier = createOutlookVerifier();
-  const good = { access_token: "synthetic-access", token_type: "Bearer", refresh_token: "synthetic-refresh-1", scope: "openid profile email offline_access https://graph.microsoft.com/Calendars.ReadBasic" };
+  const good = { access_token: "synthetic-access", token_type: "Bearer", refresh_token: "synthetic-refresh-1", scope: "openid profile email offline_access https://graph.microsoft.com/Calendars.Read" };
 
   it("redeems the code with the verifier and returns the validated identity", async () => {
     const fetch = vi.fn(async () => tokenResponse({ ...good, id_token: idToken(claims(verifier)) }));
@@ -139,7 +139,12 @@ describe("token endpoint", () => {
 
   it.each([
     ["Calendars.ReadBasic Calendars.Read openid", "consent_denied"],
-    ["Calendars.ReadBasic User.Read openid", "consent_denied"],
+    ["Calendars.ReadBasic openid offline_access", "consent_denied"],
+    ["https://graph.microsoft.com/Calendars.ReadBasic", "consent_denied"],
+    ["Calendars.Read Calendars.ReadWrite openid", "consent_denied"],
+    ["Calendars.Read Calendars.Read.Shared openid", "consent_denied"],
+    ["Calendars.Read User.Read openid", "consent_denied"],
+    ["Calendars.Read Mail.Read", "consent_denied"],
     ["openid offline_access", "consent_denied"],
     [null, "consent_denied"],
     ["", "consent_denied"],
@@ -148,13 +153,33 @@ describe("token endpoint", () => {
     await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch, nowSeconds: NOW })).rejects.toThrow(code);
   });
 
+  it.each([
+    "Calendars.Read",
+    "https://graph.microsoft.com/Calendars.Read offline_access",
+    "openid profile email offline_access https://graph.microsoft.com/calendars.read",
+  ])("accepts the single Graph data permission Calendars.Read (%s)", async (scope) => {
+    const fetch = vi.fn(async () => tokenResponse({ ...good, scope, id_token: idToken(claims(verifier)) }));
+    await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch, nowSeconds: NOW })).resolves.toMatchObject({ accessToken: "synthetic-access" });
+    const refresh = vi.fn(async () => tokenResponse({ access_token: "synthetic-access", token_type: "Bearer", scope }));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: refresh })).resolves.toMatchObject({ accessToken: "synthetic-access" });
+  });
+
+  it("refuses a refresh that still carries only the earlier Calendars.ReadBasic grant", async () => {
+    const stale = vi.fn(async () => tokenResponse({ access_token: "a", token_type: "Bearer", scope: "https://graph.microsoft.com/Calendars.ReadBasic offline_access" }));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: stale })).rejects.toThrow("consent_denied");
+    const unconsented = vi.fn(async () => tokenResponse({ error: "invalid_grant", error_description: "AADSTS65001 consent required" }, 400));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: unconsented })).rejects.toThrow("reconnect_required");
+    const consentRequired = vi.fn(async () => tokenResponse({ error: "consent_required" }, 400));
+    await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: consentRequired })).rejects.toThrow("reconnect_required");
+  });
+
   it("treats an omitted scope as the requested scopes on connect and refresh (Microsoft v2 auth-code flow)", async () => {
     const connect = vi.fn(async () => tokenResponse({ ...good, scope: undefined, id_token: idToken(claims(verifier)) }));
     await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch: connect, nowSeconds: NOW }))
       .resolves.toMatchObject({ refreshToken: "synthetic-refresh-1", identity: { subject: "pairwise-subject-1" } });
     const refresh = vi.fn(async () => tokenResponse({ access_token: "synthetic-access", token_type: "Bearer" }));
     await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: refresh })).resolves.toMatchObject({ accessToken: "synthetic-access", refreshToken: null });
-    const broadened = vi.fn(async () => tokenResponse({ access_token: "a", token_type: "Bearer", scope: "https://graph.microsoft.com/Calendars.ReadBasic https://graph.microsoft.com/User.Read" }));
+    const broadened = vi.fn(async () => tokenResponse({ access_token: "a", token_type: "Bearer", scope: "https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/User.Read" }));
     await expect(refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: broadened })).rejects.toThrow("consent_denied");
   });
 
@@ -201,6 +226,6 @@ describe("token endpoint", () => {
     expect(await refreshOutlookToken(CONFIG, "synthetic-refresh-1", { fetch: kept })).toMatchObject({ refreshToken: null });
     const body = new URLSearchParams((rotated.mock.calls[0] as unknown as [string, RequestInit])[1].body as URLSearchParams);
     expect(body.get("grant_type")).toBe("refresh_token");
-    expect(body.get("scope")).toBe("offline_access Calendars.ReadBasic");
+    expect(body.get("scope")).toBe("offline_access Calendars.Read");
   });
 });

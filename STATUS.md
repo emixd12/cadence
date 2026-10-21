@@ -22,9 +22,10 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   two-worker suite passed 3,432 tests (94 skipped) with no timeout. A disposable
   `cadence-merge-replay` project applied all 88 migrations; its CLI start
   published ports on `0.0.0.0` briefly, so the containers were stopped at once
-  and smokes ran in a port-less container. 20 of 21 `tests/sql` smokes pass; the
-  inherited `behavior-end-date-lifecycle-smoke.sql:138` failure is a stale test
-  fixed on main by PR #110. Everything disposable was removed; retained
+  and smokes ran in a port-less container. 20 of 21 `tests/sql` smokes passed then; the
+  inherited `behavior-end-date-lifecycle-smoke.sql:138` failure was a stale test,
+  fixed on main by PR #110 and merged here on October 21 (all 21 pass; see
+  Ticket 242). Everything disposable was removed; retained
   databases were not touched. No hosted migration push or deployment.
 - Merge of `origin/main` at `7cb8133` (signed desktop 0.1.1 work, Tickets 115
   and 178–181), October 20, 2026: no new migrations and no ticket-number overlap.
@@ -36,6 +37,27 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
   broken, and it also fails on the pre-change commit.
 
+- Ticket 242 (Outlook `Calendars.Read`, October 21, 2026): in progress; local
+  implementation complete, live retest pending. Merged `origin/main` at
+  `d598afc` (PR #110 SQL smoke fix), no conflicts. The connector now requests
+  `openid offline_access Calendars.Read` for every Microsoft account. Granted-scope
+  validation accepts exactly one Graph permission, `Calendars.Read`; write,
+  shared, `User.Read` and leftover `Calendars.ReadBasic` grants fail as
+  `consent_denied`. A ReadBasic-only connection fails its next refresh and moves to
+  `reconnect_required` without a Graph call. Every Graph request, including
+  provider next links, keeps the contract `$select` and no `$expand`; a next link
+  that broadens either is refused before the token is sent, and one without
+  `$select` gets the list appended without re-encoding the skip token. Failing-first
+  tests cover these; a response-field test confirmed the adapter already dropped
+  body, attachments, extensions and other fields. Settings disclosure, Privacy
+  (updated October 21), marketing FAQ, contract, playbook, operations and
+  `.env.example` describe the broader Microsoft permission. Node 24.22.0: all
+  seven required checks plus core, design-system, load manifest, developers,
+  desktop typecheck/build/parity and marketing build/check pass. The two-worker
+  suite passed 3,455 tests (94 skipped); only `tests/desktop-release-cli.test.ts`
+  failed on timeouts and passed 25/25 with `--testTimeout=60000`. A disposable
+  loopback-only stack `cadence-live-242` replayed all 88 migrations and passed
+  all 21 `tests/sql` smokes.
 - Ticket 233 is documentation-complete and independently approved at `668a4cd`.
   It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
   `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
@@ -159,8 +181,9 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   preserves approved runtime logic, and does not authorize release.
 - Reused evidence: unchanged native sources retain 114 passing Rust tests;
   unchanged migrations retain the disposable 82-migration replay and 16/17 SQL
-  smoke results. The inherited failure remains
-  `tests/sql/behavior-end-date-lifecycle-smoke.sql:138`. Prior desktop acceptance
+  smoke results. The inherited failure
+  `tests/sql/behavior-end-date-lifecycle-smoke.sql:138` was fixed by PR #110
+  (merged October 21). Prior desktop acceptance
   test timeouts passed unchanged reruns; their cause and a base-CI failure are
   not proven. Final Ticket 241 tests had no timeout. Retained local databases
   were not touched.

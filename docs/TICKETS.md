@@ -14493,7 +14493,8 @@ Platform impact:
 
 ## Ticket 242: Outlook Calendar personal-account support via Calendars.Read
 
-Status: approved by the owner on 2026-10-21; not started.
+Status: approved by the owner on 2026-10-21; in progress. Local implementation
+and checks complete (see `STATUS.md`); live retest pending.
 
 Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
 personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:

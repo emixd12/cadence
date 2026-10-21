@@ -136,6 +136,7 @@ const ms = {
   stepMs: 0,
   time: NOW_MS,
   onView: null as null | (() => void),
+  refreshScope: null as string | null,
 };
 function idToken(nonce: string) {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -143,7 +144,7 @@ function idToken(nonce: string) {
   return `${encode({ alg: "RS256" })}.${encode({ aud: CLIENT_ID, iss: `https://login.microsoftonline.com/${ms.identity.tid}/v2.0`, tid: ms.identity.tid,
     sub: ms.identity.sub, ver: "2.0", nonce, iat: seconds, exp: seconds + 3600 })}.sig`;
 }
-const SCOPE = "openid offline_access Calendars.ReadBasic";
+const SCOPE = "openid offline_access Calendars.Read";
 const fetcher = vi.fn(async (input: string | URL, init?: RequestInit) => {
   const url = new URL(input.toString());
   const body = init?.body ? new URLSearchParams(init.body as URLSearchParams) : null;
@@ -160,7 +161,7 @@ const fetcher = vi.fn(async (input: string | URL, init?: RequestInit) => {
     if (!ms.validRefresh.has(presented)) return Response.json({ error: "invalid_grant" }, { status: 400 });
     const next = ms.rotateTo;
     if (next) { ms.validRefresh.add(next); ms.rotateTo = null; }
-    return Response.json({ access_token: `access-for-${presented}`, token_type: "Bearer", scope: SCOPE, ...(next ? { refresh_token: next } : {}) });
+    return Response.json({ access_token: `access-for-${presented}`, token_type: "Bearer", scope: ms.refreshScope ?? SCOPE, ...(next ? { refresh_token: next } : {}) });
   }
   if (url.hostname === "graph.microsoft.com") {
     if (ms.graph) return ms.graph(url);
@@ -184,7 +185,7 @@ beforeEach(() => {
     if (!header?.startsWith("Bearer ")) throw new ConnectorError("unauthenticated");
     return caller(header.slice(7));
   });
-  Object.assign(ms, { identity: { tid: OUTLOOK_PERSONAL_TENANT_ID, sub: "subject-a" }, rotateTo: null, calls: [], graph: null, stepMs: 0, time: NOW_MS, onView: null });
+  Object.assign(ms, { identity: { tid: OUTLOOK_PERSONAL_TENANT_ID, sub: "subject-a" }, rotateTo: null, calls: [], graph: null, stepMs: 0, time: NOW_MS, onView: null, refreshScope: null });
   ms.validRefresh.clear(); fetcher.mockClear();
   vi.stubEnv("CONNECTOR_CREDENTIAL_ENCRYPTION_KEY", Buffer.alloc(32, 9).toString("base64")); vi.stubEnv("CONNECTOR_CREDENTIAL_KEY_ID", "c1");
   vi.stubEnv("CONNECTOR_CREDENTIAL_DECRYPTION_KEYS", "");
@@ -383,6 +384,18 @@ describe("reads, rotation, and fences", () => {
     expect(db.connections.get(key(OWNER, "outlook_calendar"))!.status).toBe("reconnect_required");
     expect(db.credentials.has(key(OWNER, "outlook_calendar"))).toBe(false);
     expect(db.connections.get(key(OWNER, "hevy"))).toMatchObject({ status: "connected", generation: 3 });
+  });
+
+  it("moves an existing Calendars.ReadBasic-only connection to reconnect_required on its next read without a Graph call", async () => {
+    await connectAndSelect();
+    ms.refreshScope = "https://graph.microsoft.com/Calendars.ReadBasic offline_access";
+    const graphCalls = () => ms.calls.filter((call) => call.url.hostname === "graph.microsoft.com").length;
+    const before = graphCalls();
+    await expect(getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", options)).rejects.toThrow("reconnect_required");
+    expect(graphCalls()).toBe(before);
+    expect(db.connections.get(key(OWNER, "outlook_calendar"))!.status).toBe("reconnect_required");
+    expect(db.credentials.has(key(OWNER, "outlook_calendar"))).toBe(false);
+    await expect(listOutlookCalendarsForCaller(caller(OWNER), options)).rejects.toThrow("reconnect_required");
   });
 
   it("spends one 25-second deadline across token refresh, listing, and calendar reads", async () => {

@@ -1543,14 +1543,21 @@ App registration steps (owner-run, not authorized in local work):
 1. Register one multitenant app that also accepts personal Microsoft accounts
    (authority `common`), with the exact web redirect URI above.
 2. Under API permissions, keep only the delegated Microsoft Graph
-   `Calendars.ReadBasic` permission. Remove the default `User.Read` that the portal
-   adds to new registrations. Add no application permissions and no
-   `Calendars.Read`, `profile`, or `email`.
+   `Calendars.Read` permission (Ticket 242). Remove the default `User.Read` that the
+   portal adds to new registrations. Add no application permissions and no
+   `Calendars.ReadBasic`, write, shared-calendar, `profile`, or `email` permission.
+   Graph rejects personal-account tokens that carry only `Calendars.ReadBasic`
+   (401, empty body), so that permission cannot serve personal accounts.
 3. Create a client secret and store it only in the server environment.
 
 The token check refuses any present Graph permission other than
-`Calendars.ReadBasic`, so a leftover `User.Read` makes every connect fail as
-`consent_denied`. An omitted `scope` in the token response is accepted because
+`Calendars.Read`, so a leftover `User.Read` or `Calendars.ReadBasic` makes every
+connect fail as `consent_denied`. A connection created before Ticket 242 with only
+`Calendars.ReadBasic` moves to `reconnect_required` on its next read; the user
+reconnects and grants `Calendars.Read`. `Calendars.Read` allows reading event
+details, so data minimization is in the adapter: every Graph request, including
+provider next links, selects only contract fields and never bodies, attachments, or
+extensions. An omitted `scope` in the token response is accepted because
 Microsoft documents that it then covers the requested scopes. Status reports `not_configured` until both these values and the
 connector keyring are present. Disconnect deletes Cadence's sealed refresh token
 only. Microsoft documents no app-side revocation for these scopes, so Settings
@@ -1585,7 +1592,8 @@ This is not live-provider, installed-desktop, hosted-deployment or public-releas
 acceptance. Do not use real provider credentials, publish, deploy, or change hosted
 configuration as part of this verification pass.
 
-Outlook uses only delegated `Calendars.ReadBasic` plus identity/offline scopes.
+Outlook uses only delegated `Calendars.Read` plus identity/offline scopes
+(Ticket 242), with explicit field selection.
 Live personal and work/school accounts, tenant policy and publisher verification
 remain unverified. Hevy requires Pro. Its key has no documented read-only scope;
 the adapter permits only account verification, count and workout-list GETs.

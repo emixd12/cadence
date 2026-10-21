@@ -7,9 +7,12 @@ import { ConnectorError } from "@/lib/types/connectors";
 // login hint, or Supabase provider session is used. The connection binds to the
 // Cadence account that started the attempt and to the validated ID-token
 // `tid` plus `sub` pair. Email and preferred_username never identify.
-export const OUTLOOK_CALENDAR_SCOPES = ["openid", "offline_access", "Calendars.ReadBasic"] as const;
+// Ticket 242: Calendars.Read for every Microsoft account. Graph rejects personal-account
+// tokens that carry only Calendars.ReadBasic. Data minimization is enforced by the
+// provider adapter's explicit $select lists, not by this permission.
+export const OUTLOOK_CALENDAR_SCOPES = ["openid", "offline_access", "Calendars.Read"] as const;
 /** The only Graph permission the access token may carry. */
-const GRAPH_SCOPE = "calendars.readbasic";
+const GRAPH_SCOPE = "calendars.read";
 /** OpenID Connect scopes Microsoft may echo; they grant no Graph access. */
 const OIDC_SCOPES = new Set(["openid", "offline_access", "profile", "email"]);
 const AUTHORITY = "https://login.microsoftonline.com/common/oauth2/v2.0";
@@ -106,14 +109,16 @@ async function readBoundedText(response: Response, limit: number, signal: AbortS
 /**
  * Microsoft's v2 token response `scope` is optional; when omitted, the token is
  * for the scopes requested on the initial leg (Cadence requests only
- * Calendars.ReadBasic). A present value is checked strictly.
+ * Calendars.Read). A present value is checked strictly.
  */
 function grantedScopesOk(value: unknown): boolean {
   if (value === undefined) return true;
   if (typeof value !== "string" || value.length > 4096) return false;
   const scopes = value.split(" ").filter(Boolean).map((scope) => scope.toLowerCase().replace(/^https:\/\/graph\.microsoft\.com\//, ""));
-  // Exactly one Graph permission, Calendars.ReadBasic. Broader grants (for example
-  // Calendars.Read or User.Read from a misconfigured registration) are refused.
+  // Exactly one Graph permission, Calendars.Read. Write, shared-calendar, User.Read,
+  // or leftover Calendars.ReadBasic grants are refused. A refresh of an earlier
+  // ReadBasic-only connection therefore fails here and the service marks it
+  // reconnect_required.
   return scopes.includes(GRAPH_SCOPE) && scopes.every((scope) => scope === GRAPH_SCOPE || OIDC_SCOPES.has(scope));
 }
 
@@ -197,6 +202,6 @@ export async function exchangeOutlookCode(config: OutlookOAuthConfig, code: stri
 export async function refreshOutlookToken(config: OutlookOAuthConfig, refreshToken: string,
   options: { fetch?: OutlookFetch; signal?: AbortSignal } = {}): Promise<OutlookTokens> {
   const token = await tokenRequest(config, { grant_type: "refresh_token", refresh_token: refreshToken,
-    scope: "offline_access Calendars.ReadBasic" }, options);
+    scope: "offline_access Calendars.Read" }, options);
   return { accessToken: token.access_token as string, refreshToken: typeof token.refresh_token === "string" ? token.refresh_token : null, identity: null };
 }
