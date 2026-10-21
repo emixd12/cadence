@@ -256,7 +256,7 @@ export function Product() {
   const restartUpdate = (discard = false) => {
     setRestartError("");
     if (syncRunning.current || accountBusy || hasPendingLocalCommands() || hasPendingDesktopWrites()) {
-      setRestartError("Wait for the current save or synchronization to finish before restarting.");
+      setRestartError("Cadence is still saving or synchronizing. Try Restart again in a moment, or quit and reopen Cadence to finish the update.");
       return;
     }
     if (discard && !discardUnsavedDesktopDrafts()) return;
@@ -265,7 +265,7 @@ export function Product() {
     void desktopUpdater.restart();
   };
   const restartActions = { onRestart: () => restartUpdate(), onDiscardAndRestart: () => restartUpdate(true),
-    onCancelRestart: () => setRestartBlocked(false), restartBlocked };
+    onCancelRestart: () => setRestartBlocked(false), restartBlocked, restartError };
   const profile = bundle?.timeline.profile;
   useEffect(() => {
     if (!profile || !auth.current) { setFirstLink(null); setSyncReady(false); return; }
@@ -479,7 +479,6 @@ export function Product() {
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
     <DesktopUpdateNotice required={syncStatus.state === "update_required"} {...restartActions} />
-    {restartError ? <p role="status" className="px-4 py-3 text-sm text-accent">{restartError}</p> : null}
     {loading ? <p role="status" className="p-8">Opening local tracking data…</p> : null}
     {error ? <div role="alert" className="m-6 border border-line p-4"><p>{error}</p>
       <button className="product-action product-action-primary mt-3" onClick={refresh}>Try again</button></div> : null}

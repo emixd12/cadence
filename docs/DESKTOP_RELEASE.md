@@ -500,8 +500,13 @@ Signed builds use the stable feed
 `https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json`,
 chosen by the owner on October 19, 2026. Supply it as `CADENCE_UPDATER_ENDPOINT`.
 Previews keep the `desktop-preview` feed. At publication, that feed also names the
-signed release, so preview users can move to it. Candidate `0.1.1` and its packet:
-[2026-10-19 release packet](qa/2026-10-19-desktop-0.1.1-release-packet.md).
+signed release, so preview users can move to it. Current source targets `0.1.4`;
+it needs a new signed build and installed acceptance:
+[0.1.4 preparation](qa/2026-10-21-desktop-0.1.4-preparation.md).
+Do not publish the superseded `0.1.3`
+([2026-10-21 packet](qa/2026-10-21-desktop-0.1.3-release-packet.md)), `0.1.2`
+([2026-10-20 packet](qa/2026-10-20-desktop-0.1.2-release-packet.md)) and `0.1.1`
+([2026-10-19 packet](qa/2026-10-19-desktop-0.1.1-release-packet.md)).
 
 Xcode 27.1 `strip` corrupts release proc-macro dylibs built with the macOS 14.0
 deployment target, and dyld then refuses to load them. `src-tauri/Cargo.toml` keeps
