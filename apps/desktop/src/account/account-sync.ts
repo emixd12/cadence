@@ -60,6 +60,13 @@ async function readAccountSyncInputsWithin(profileId: string, client: SupabaseCl
   };
 }
 
+// Supabase drops a revoked session after its refresh fails, so the next request runs
+// unauthenticated and PostgREST answers 401. Keep that status so the failure reads as
+// "revoked" (Reconnect account) instead of a raw permission error.
+function withSessionStatus<T extends object>(error: T, status: number): T {
+  return status === 401 ? Object.assign(error, { status }) : error;
+}
+
 export async function readHostedAccountSyncEnvelope(client: SupabaseClient, signal?: AbortSignal): Promise<HostedEnvelope> {
   if (!signal) {
     const controller = new AbortController();
@@ -67,8 +74,8 @@ export async function readHostedAccountSyncEnvelope(client: SupabaseClient, sign
   }
   let request = client.rpc("read_account_sync_snapshot");
   request = request.abortSignal(signal);
-  const { data, error } = await request;
-  if (error) throw error;
+  const { data, error, status } = await request;
+  if (error) throw withSessionStatus(error, status);
   const envelope = hostedEnvelope(data);
   if (accountSyncFingerprint(envelope) !== envelope.fingerprint) throw new Error("The hosted account snapshot fingerprint is invalid.");
   await localCommand("validateAccountSyncSnapshot", { entities: envelope.entities });
@@ -91,7 +98,7 @@ export async function applyHostedAccountSync(client: SupabaseClient, inputs: Acc
   const syncPayload = { schemaVersion: 1, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
       localFingerprint: plan.fingerprints.local, hostedFingerprint: plan.fingerprints.hosted, planFingerprint: sha256(canonicalJson(rpcPlan)), plan: rpcPlan, attemptedAt };
   const applied = await client.rpc("apply_account_sync_plan", { sync_payload: syncPayload });
-  if (applied.error) throw applied.error;
+  if (applied.error) throw withSessionStatus(applied.error, applied.status);
   const result = applied.data;
   if (!isRecord(result) || result.status !== "applied" || typeof result.fingerprint !== "string") throw new Error("Hosted account synchronization returned an invalid result.");
   const snapshot = hostedEnvelope(result.snapshot);
