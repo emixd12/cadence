@@ -286,7 +286,11 @@ observations only; no credential or provider record was recorded.
   restored. Disconnect showed the Microsoft account / My Apps instruction. It
   deleted the credential (0 rows) and moved the connection to `disconnected`
   (generation 4), and later reads returned `not_connected`. Limits: home tenant
-  only, so cross-tenant user consent, `admin_approval_required` and the
+  only, and the app already had tenant-wide admin consent. One
+  `oauth2PermissionGrant` existed (`consentType` AllPrincipals, scope
+  `openid offline_access Calendars.ReadBasic`), which explains the missing
+  consent screen. The coordinator deleted that grant after the test (0 remain).
+  User consent, cross-tenant consent, `admin_approval_required` and the
   unverified-publisher block were not exercised; wrong-account reconnect was not
   live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
   list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
