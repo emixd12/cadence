@@ -71,8 +71,14 @@ manual dispatch. It tests GitHub's PR merge commit, records exact source identit
 replays the tracked migrations through the existing loopback Docker proxy, and
 runs the existing SQL, RLS, account-sync and authenticated BehaviorStore checks.
 This branch currently contains 89 migrations and 22 SQL fixtures; the workflow
-derives its inventory from the tested tree. Actual Docker/database execution is
-pending on GitHub; local YAML/shell/proxy validation does not close that gate.
+derives its inventory from the tested tree. The first GitHub rehearsal
+([run 39571395076](https://github.com/emixd12/cadence/actions/runs/39571395076))
+replayed all 89 migrations and passed 22 SQL fixtures and 92 authenticated RLS
+checks. Account-sync smoke then failed on the pre-existing timezone-only profile
+fixture; authenticated BehaviorStore checks and the final zero-user check were
+not reached. [PR #121](https://github.com/emixd12/cadence/pull/121) corrects the
+smoke helper. A complete successful rerun remains required; latest exact-source
+CI evidence is tracked on [PR #112](https://github.com/emixd12/cadence/pull/112).
 YAML parsing, actionlint and Bash syntax checks pass; the existing fake-daemon
 proxy suite passes all 20 tests with temporary Unix-socket access.
 No runtime source, schema, provider scope or hosted configuration changed.
@@ -80,10 +86,16 @@ The Outlook support decision, signed installed desktop and coordinated rollout
 gates below remain open. See the disposable rehearsal section in
 `docs/OPERATIONS.md`.
 
-Current main is integrated. The lifecycle SQL smoke preserves both
-`location_text` and `where_kind`. The refreshed source passes 2,897 tests
+Native CI
+([run 39571395232](https://github.com/emixd12/cadence/actions/runs/39571395232))
+passed the locked macOS Cargo check and all 115 library tests for PR head
+`ab7591f6` against base `2901cdba`. Compilation and library tests do not establish
+signed artifact or installed desktop acceptance; those gates remain open.
+
+Earlier local review integrated main and confirmed that the lifecycle SQL smoke
+preserves both `location_text` and `where_kind`. That source passed 2,897 tests
 (167 skipped), the web and desktop builds, typechecks, registry checks, lint
-and Design System Bench verification. This Linux review did not rerun the
+and Design System Bench verification. That Linux review did not rerun the
 earlier Postgres or Rust acceptance recorded in the PR.
 
 Hosted rollout remains blocked on an ordered migration plan and a compatible,
@@ -94,9 +106,9 @@ Behavior synchronization after the hosted migration. Build and verify the
 replacement before changing hosted schema. The signed 0.1.3 artifact does not
 cover this contract. See `docs/qa/2026-10-21-behavior-where-rollout.md`.
 
-Reviewed PR #111 (`e9c2dc6`) is now integrated. The desktop Timeline retains
+An earlier review integrated PR #111 (`e9c2dc6`). The desktop Timeline retains
 Google, Outlook and iCloud events, their freshness, and Hevy activity while
-using Apple Maps. Travel stays Google-only. The combined source passes 366
+using Apple Maps. Travel stays Google-only. That combined source passed 366
 focused tests (one local-database test skipped), registry/design checks, lint,
 web/desktop typechecks, core portability and desktop parity. Deployment and
 installed acceptance remain gated by the rollout plan.
