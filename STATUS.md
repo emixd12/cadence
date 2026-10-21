@@ -245,7 +245,11 @@ observations only; no credential or provider record was recorded.
   Outlook panel kept its connected view after a reconnect-required list or
   refresh, so no Reconnect button appeared. It now switches state like the
   iCloud panel, and Disconnect stays available. Two failing-first DOM tests
-  cover it.
+  cover it. A retry on 2026-10-21, about 44 hours after app creation, failed
+  identically (all four contrast reads returned 401), so slow propagation of a
+  new app is unlikely. That retry also showed the "connected" callback message
+  persisting after the server reported `reconnect_required`. The panel now
+  drops that message when the server state differs (failing-first DOM test).
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 

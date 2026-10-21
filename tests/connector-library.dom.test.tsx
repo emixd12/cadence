@@ -14,7 +14,7 @@ import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
 import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
 import { RecordedActivityList, workoutDuration } from "@/components/timeline/RecordedActivityList";
 import type { ConnectorConnectionView } from "@/lib/types/connectors";
-import { ConnectorClientError, type HevyCoordinator, type IcloudCalendarCoordinator, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
+import { ConnectorClientError, outlookCallbackMessage, type HevyCoordinator, type IcloudCalendarCoordinator, type OutlookCalendarCoordinator } from "@/lib/ui/connectors";
 import outlookFixture from "./fixtures/external-event-snapshot.outlook.valid.json";
 import hevyFixture from "./fixtures/recorded-activity-snapshot.valid.json";
 
@@ -182,6 +182,15 @@ describe("OutlookCalendarPanel reconnect recovery", () => {
     await act(() => button("Disconnect Outlook Calendar").click());
     expect(source.disconnect).toHaveBeenCalled();
     expect(container.textContent).toContain("Cadence deleted its saved Microsoft access");
+  });
+
+  it("does not keep a connected callback message once the server reports reconnect_required", async () => {
+    const source = outlookCoordinator({ getConnection: vi.fn(async () => view("outlook_calendar", { status: "reconnect_required" })) });
+    await act(() => root.render(<OutlookCalendarPanel coordinator={source} callbackMessage={outlookCallbackMessage("connected")}
+      refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
+    await vi.waitFor(() => expect(button("Reconnect Outlook Calendar")).toBeDefined());
+    expect(container.textContent).not.toContain("Outlook Calendar connected.");
+    expect(container.textContent).toContain("Outlook Calendar needs reconnection.");
   });
 
   it("offers Reconnect when a manual refresh reports reconnect_required", async () => {

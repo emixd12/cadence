@@ -9,6 +9,7 @@ import type { CalendarPreferences } from "@/lib/types/google-calendar";
 import {
   CONNECTOR_REVOCATION_COPY,
   connectorErrorCode,
+  outlookCallbackMessage,
   type ConnectorCalendarEntry,
   type ConnectorEventRange,
   type OutlookCalendarCoordinator,
@@ -34,7 +35,8 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
     let active = true;
     void coordinator.getConnection().then(async (view) => {
       if (!active) return;
-      setMessage(callbackMessage ?? null);
+      // A "connected" callback no longer applies once the server reports another state.
+      setMessage(view.status !== "connected" && callbackMessage === outlookCallbackMessage("connected") ? null : callbackMessage ?? null);
       setConnection(view);
       setPreferences(view.preferences);
       if (view.status === "connected") {
