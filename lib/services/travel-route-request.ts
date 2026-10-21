@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 export type TravelRouteRefreshRequest = Readonly<{
+  scope: "timeline" | "day";
   startLocalDate: string;
   endLocalDate: string;
   device: Readonly<{
@@ -19,12 +20,14 @@ export type TravelRouteRefreshRequest = Readonly<{
 
 export function parseTravelRouteRefreshRequest(value: unknown): TravelRouteRefreshRequest {
   if (!record(value)) throw new TypeError("Travel route request must be an object.");
+  const scope = value.scope ?? "timeline";
+  if (scope !== "timeline" && scope !== "day") throw new TypeError("Travel route scope is invalid.");
   const startLocalDate = localDate(value.startLocalDate);
   const endLocalDate = localDate(value.endLocalDate);
   if (Temporal.PlainDate.compare(Temporal.PlainDate.from(endLocalDate), Temporal.PlainDate.from(startLocalDate)) < 0 ||
       Temporal.PlainDate.from(startLocalDate).until(Temporal.PlainDate.from(endLocalDate)).days > 1) throw new TypeError("Travel route range must cover one or two adjacent local days.");
   const corrections = value.corrections === undefined ? [] : correctionArray(value.corrections);
-  return { startLocalDate, endLocalDate, device: device(value.device), corrections };
+  return { scope, startLocalDate, endLocalDate, device: device(value.device), corrections };
 }
 
 function device(value: unknown): TravelRouteRefreshRequest["device"] {

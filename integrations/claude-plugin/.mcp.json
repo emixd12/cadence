@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cadence": {
+      "type": "http",
+      "url": "https://app.cadence-me.com/mcp"
+    }
+  }
+}

@@ -20,6 +20,7 @@ pub enum NotificationRequest {
     Delivered {},
     Schedule { reminders: Vec<Reminder> },
     Cancel { ids: Vec<String> },
+    CancelPending { ids: Vec<String> },
 }
 
 fn validate(request: &NotificationRequest) -> Result<(), String> {
@@ -37,7 +38,9 @@ fn validate(request: &NotificationRequest) -> Result<(), String> {
             }
             reminders.iter().map(|reminder| &reminder.id).collect()
         }
-        NotificationRequest::Cancel { ids } => ids.iter().collect(),
+        NotificationRequest::Cancel { ids } | NotificationRequest::CancelPending { ids } => {
+            ids.iter().collect()
+        }
         _ => return Ok(()),
     };
     if ids.len() > 4096
@@ -168,6 +171,26 @@ mod tests {
         ] {
             assert!(serde_json::from_str::<NotificationRequest>(input).is_err());
         }
+    }
+
+    #[test]
+    fn pending_cancellation_preserves_the_owned_identifier_boundary() {
+        let request = serde_json::from_str::<NotificationRequest>(
+            r#"{"operation":"cancelPending","ids":["cadence.local.00000000-0000-4000-a000-000000000010"]}"#,
+        ).unwrap();
+        assert!(matches!(request, NotificationRequest::CancelPending { .. }));
+        assert!(validate(&request).is_ok());
+        for ids in [
+            vec!["other-app.id".into()],
+            vec!["cadence-spike.same".into(); 2],
+            vec!["cadence-spike.too-many".into(); 4097],
+        ] {
+            assert!(validate(&NotificationRequest::CancelPending { ids }).is_err());
+        }
+        assert!(serde_json::from_str::<NotificationRequest>(
+            r#"{"operation":"cancelPending","ids":[],"reminders":[]}"#,
+        )
+        .is_err());
     }
 
     #[test]

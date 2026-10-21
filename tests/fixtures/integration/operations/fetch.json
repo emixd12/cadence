@@ -1,0 +1,60 @@
+{
+  "operation": "fetch",
+  "valid_inputs": [
+    {
+      "name": "behavior id",
+      "value": {
+        "id": "behavior:00000001-1111-4111-8111-000000000001"
+      }
+    },
+    {
+      "name": "occurrence id",
+      "value": {
+        "id": "occurrence:00000005-1111-4111-8111-000000000005"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "bare uuid",
+      "value": {
+        "id": "00000001-1111-4111-8111-000000000001"
+      },
+      "code": "invalid_input",
+      "path": "$.id"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "occurrence",
+      "value": {
+        "id": "occurrence:00000005-1111-4111-8111-000000000005",
+        "title": "Morning walk on 2026-10-18",
+        "text": "Status: Completed\nNote: \"Felt good.\"",
+        "url": "https://app.cadence-me.com/timeline?date=2026-10-18&occurrence=00000005-1111-4111-8111-000000000005",
+        "metadata": {
+          "kind": "occurrence",
+          "behavior_id": "00000001-1111-4111-8111-000000000001",
+          "local_date": "2026-10-18",
+          "status": "completed"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing text",
+      "value": {
+        "id": "behavior:00000001-1111-4111-8111-000000000001",
+        "title": "Morning walk",
+        "url": "https://app.cadence-me.com/behaviors",
+        "metadata": {
+          "kind": "behavior",
+          "behavior_id": "00000001-1111-4111-8111-000000000001"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.text"
+    }
+  ]
+}

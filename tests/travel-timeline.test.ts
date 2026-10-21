@@ -40,7 +40,7 @@ describe("shared Timeline travel occupancy", () => {
 
 describe("Timeline travel status line", () => {
   const routesView: TravelRoutesView = { accountId: "a", mode: "walking", navigationPreference: "google_maps", settingsRevision: "r", expiresAt: null, evidence: { ...travel, modelProjection: undefined } as never };
-  const status = (value: Partial<TravelState>): TravelState => ({ view: null, message: null, stale: false, pending: false, observedAt: null, refresh: () => undefined, ...value });
+  const status = (value: Partial<TravelState>): TravelState => ({ view: null, message: null, stale: false, pending: false, observedAt: null, resumesAt: null, refresh: () => undefined, ...value });
   const render = (value: TravelState | null) => renderToStaticMarkup(createElement(TravelStatusLine, { status: value, timezone: "America/New_York" }));
   it("shows the observation time with a refresh link", () => {
     const html = render(status({ view: routesView, observedAt: "2026-09-21T18:52:30Z" }));
@@ -55,12 +55,20 @@ describe("Timeline travel status line", () => {
     expect(render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", pending: true }))).toContain("disabled");
   });
   it("shows a failure message with the link, and hides the link for provider review", () => {
-    const quota = render(status({ message: "Today’s travel refresh limit is reached. Estimates return tomorrow." }));
-    expect(quota).toContain("limit is reached");
-    expect(quota).toContain("Refresh travel");
+    const unavailable = render(status({ message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
+    expect(unavailable).toContain("unavailable right now");
+    expect(unavailable).toContain("Refresh travel");
     const review = render(status({ message: TRAVEL_CLEARANCE_MESSAGE }));
     expect(review).toContain("provider review");
     expect(review).not.toContain("Refresh travel");
+  });
+  it("names the renewal date in the user's timezone and hides the link while the budget is used up", () => {
+    const resumes = render(status({ resumesAt: "2026-10-01T04:00:00Z" }));
+    expect(resumes).toContain("Travel estimates resume on October 1.");
+    expect(resumes).not.toContain("Refresh travel");
+    const kept = render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, resumesAt: "2026-10-01T04:00:00Z" }));
+    expect(kept).toContain("Travel estimates from 2:52 PM may be stale. Travel estimates resume on October 1.");
+    expect(kept).not.toContain("tomorrow");
   });
   it("renders nothing without a view or message", () => {
     expect(render(status({}))).toBe("");
@@ -76,6 +84,18 @@ describe("travel sourceKey", () => {
     const second = { fetchedAt: "2026-09-21T12:05:00Z", events: [{ ...event, calendarId: "c", title: "refetched" }] };
     expect(travelSourceKey(second.events as never, timeline)).toBe(travelSourceKey(first.events as never, timeline));
     expect(travelSourceKey([{ ...event, location: "2 St" }] as never, timeline)).not.toBe(travelSourceKey(first.events as never, timeline));
+  });
+  it("ignores Calendar metadata but reacts to attendance and times", () => {
+    const before = travelSourceKey([event] as never, timeline);
+    expect(travelSourceKey([{ ...event, revision: { providerEtag: "2" }, title: "new title" }] as never, timeline)).toBe(before);
+    expect(travelSourceKey([{ ...event, currentUserResponse: "declined" }] as never, timeline)).not.toBe(before);
+    expect(travelSourceKey([{ ...event, startAt: "2026-09-21T14:00:00Z" }] as never, timeline)).not.toBe(before);
+  });
+  it("is unchanged by a status change so marking a Behavior makes no provider call", () => {
+    const resolved = { daySections: [{ occurrences: [{ id: "o", status: "completed", scheduledFor: "2026-09-21T15:00:00Z" }] }], durationEstimates: { b: { kind: "known", seconds: 600 } } } as never;
+    expect(travelSourceKey([event] as never, resolved)).toBe(travelSourceKey([event] as never, timeline));
+    const moved = { daySections: [{ occurrences: [{ id: "o", status: "unresolved", scheduledFor: "2026-09-21T16:00:00Z" }] }], durationEstimates: {} } as never;
+    expect(travelSourceKey([event] as never, moved)).not.toBe(travelSourceKey([event] as never, timeline));
   });
   it("changes when the owning Behavior location changes", () => {
     const withBehavior = { daySections: [{ occurrences: [{ id: "o", behaviorId: "b", status: "unresolved", scheduledFor: "2026-09-21T15:00:00Z" }] }], durationEstimates: {} } as never;

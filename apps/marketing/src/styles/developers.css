@@ -1,0 +1,36 @@
+.developer-shell { display: grid; grid-template-columns: 15rem minmax(0, 48rem) 12rem; gap: 2.5rem; max-width: 1440px; margin: auto; padding: 3rem var(--page-gutter) 5rem; align-items: start; }
+.developer-sidebar, .developer-contents { position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; scrollbar-gutter: stable; }
+.developer-home { display: block; font-size: 1rem; margin-bottom: 1rem; }
+.developer-navigation summary { cursor: pointer; padding: .75rem 0; }
+.developer-sidebar nav, .developer-contents nav { display: grid; }
+.developer-sidebar nav a { padding: .55rem .75rem; font-size: .875rem; overflow-wrap: anywhere; text-decoration: none; min-height: 44px; display: flex; align-items: center; }
+.developer-sidebar nav a:hover, .developer-sidebar nav a[aria-current="page"] { background: var(--primary-soft); }
+.developer-sidebar nav a[aria-current="page"] { font-weight: 500; color: var(--foreground); }
+.developer-contents { font-size: .875rem; }
+.developer-contents p { font-weight: 500; margin-bottom: .5rem; }
+.developer-contents a { padding: .5rem 0; overflow-wrap: anywhere; }
+.developer-body { min-width: 0; }
+.developer-meta { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .875rem; margin-bottom: 1.5rem; color: var(--muted-readable); }
+.developer-prose { overflow-wrap: anywhere; }
+.developer-prose h1 { max-width: none; font-size: 2rem; line-height: 1.2; margin: 0 0 1.5rem; letter-spacing: 0; }
+.developer-prose h2 { font-size: 1.5rem; line-height: 1.3; margin: 2.75rem 0 1rem; scroll-margin-top: 5rem; }
+.developer-prose h3 { font-size: 1.125rem; margin: 1.5rem 0 .75rem; }
+.developer-prose p, .developer-prose ul, .developer-prose ol { margin: 0 0 1rem; max-width: 72ch; }
+.developer-prose li + li { margin-top: .5rem; }
+.developer-prose a, .developer-meta a, .developer-pagination a { text-decoration: underline; text-underline-offset: .18em; }
+.developer-prose code { font-family: var(--font-mono); font-size: .8em; }
+.developer-prose pre { background: var(--surface); border: 1px solid var(--line); padding: 1rem; overflow: auto; max-height: 36rem; margin: 0 0 1.5rem; white-space: pre; }
+.developer-prose pre code { font-size: .8125rem; overflow-wrap: normal; }
+.developer-copy { display: block; margin-left: auto; min-height: 44px; padding: .5rem .75rem; border: 0; background: transparent; color: var(--foreground); text-decoration: underline; cursor: pointer; }
+.developer-copy-status { font-size: .875rem; }
+.developer-prose table { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; font-size: .875rem; margin: 1.5rem 0; }
+.developer-prose th, .developer-prose td { padding: .75rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); min-width: 6rem; }
+.developer-prose td:first-child { min-width: 10rem; }
+.developer-prose th:last-child, .developer-prose td:last-child { min-width: 20rem; }
+.developer-prose th { font-weight: 500; }
+.developer-pagination { display: flex; justify-content: space-between; gap: 1.5rem; border-top: 1px solid var(--line); margin-top: 3rem; padding-top: 1.5rem; }
+.developer-pagination a { min-height: 44px; overflow-wrap: anywhere; }
+.developer-pagination span { display: block; color: var(--muted-readable); font-size: .875rem; }
+.developer-pagination a:last-child { text-align: right; }
+@media (max-width: 1200px) { .developer-shell { grid-template-columns: 13rem minmax(0, 1fr); gap: 2rem; } .developer-contents { position: static; grid-column: 2; grid-row: 1; max-height: none; } .developer-sidebar { grid-row: 1 / span 2; } .developer-body { grid-column: 2; } }
+@media (max-width: 760px) { .developer-shell { display: flex; flex-direction: column; gap: 1.5rem; padding-top: 1.5rem; } .developer-sidebar, .developer-contents, .developer-body { position: static; width: 100%; max-height: none; } .developer-navigation nav { max-height: 16rem; overflow: auto; border-bottom: 1px solid var(--line); } .developer-contents { order: 0; } .developer-body { order: 1; } .developer-prose h1 { max-width: none; font-size: 1.75rem; } }

@@ -8291,8 +8291,8 @@ foreign-key checks. The running process started at 00:26:20, after the decision;
 the reopened native UI retained Completed before cleanup. Network disconnection
 was owner-confirmed, not independently observed. Evidence:
 `docs/qa/2026-08-30-desktop-lifecycle-release.md#offline-launch-and-persistence-passed`.
-Ticket 113's preview milestone later completed. Ticket 115 owns deferred Apple-
-trusted distribution requirements.
+Ticket 113's preview milestone later completed. Ticket 115 owns Apple-trusted
+distribution requirements and is in progress.
 
 Acceptance criteria:
 
@@ -8463,12 +8463,24 @@ Only synthetic local data was used. No deployment or hosted data operation ran.
 
 ## Ticket 115: Apple-trusted macOS distribution acceptance
 
-Current state (2026-08-31): deferred. The owner cannot currently access the
-Apple Developer Program or an Apple Silicon Mac running macOS 14. Ticket 113's
-completed unnotarized preview and updater acceptance do not satisfy this ticket.
+Current state (2026-09-27): in progress. The owner authorized every execution step.
+The owner's account page confirms Apple Developer Program membership. The Developer
+ID identity and matching profile are installed; Apple accepted the notarization
+credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
+artifact verification pass; installed acceptance remains open. The owner deferred macOS 14 runtime acceptance without changing
+the declared and compiled minimum. Ticket 113's completed preview does not
+satisfy this ticket. See
+`docs/plans/2026-09-27-apple-developer-unblocked-work.md` for ordered work and
+linked production Keychain, Calendar, and location acceptance.
 
-Dependencies: completed Tickets 107–114, Apple Developer Program access, and a
-suitable macOS 14 Apple Silicon test system.
+September 28 continuation: Tickets 178–181 split the remaining acceptance and
+publication work into executable milestones. Ticket 115 remains the umbrella and
+stays in progress. rc.3 app/DMG notarization, native test-account login and restart,
+Calendar selection/refresh/disconnection, copied-primary launch preservation, and
+closed-app reminder delivery now pass. See `docs/qa/2026-09-27-apple-distribution.md`
+for candidate-specific evidence. Ticket 165 retains location/navigation ownership.
+
+Dependencies: completed Tickets 107–114 and Apple Developer Program access.
 
 Acceptance criteria:
 
@@ -8480,8 +8492,9 @@ Acceptance criteria:
 - Verify stapled notarization for both the app and DMG.
 - Download the notarized DMG, retain quarantine, and pass Gatekeeper installation
   and launch without disabling Gatekeeper or removing quarantine.
-- Execute the production artifact and acceptance matrix on Apple Silicon running
-  macOS 14. A declared or compiled minimum alone does not establish compatibility.
+- Execute the production artifact and acceptance matrix on the current Apple
+  Silicon host. Record the candidate's exact tested macOS version and build.
+  A declared or compiled minimum alone does not establish compatibility.
 - Keep `node apps/desktop/scripts/release.mjs check` and artifact verification
   strict. Do not add a preview bypass or weaken Apple validation.
 - Do not claim notarized or generally available distribution before every item
@@ -8512,10 +8525,16 @@ Platform impact:
 | Marketing | Do not claim notarized or generally available distribution until Ticket 115 passes |
 | Future mobile | Not applicable: macOS distribution does not implement mobile distribution |
 
-Deferred blockers: Apple Developer Program access, Developer ID Application
-certificate/signing identity, notarization credentials, and an Apple Silicon
-Mac running macOS 14. Do not purchase, enroll, generate credentials, notarize,
-publish, or change the existing preview release while this ticket is deferred.
+Membership, Developer ID identity, provisioning, and credential setup are resolved.
+The signed native Keychain probe and final artifact verification pass. Initial
+installed production authentication passes on rc.3; its remaining lifecycle gates
+are in Ticket 178. Quarantined download launch passes on rc.2, not yet on the final
+publication artifact. Tickets 180–181 retain upgrade and final-download acceptance.
+macOS 14 runtime testing is deferred and does not block Ticket 115. Do not
+claim macOS 14 compatibility or support for an untested newer macOS version.
+The September 27 follow-up authorizes plan execution, including credential setup,
+notarization, installed acceptance, and publication after the required gates pass.
+Preserve tool-required credential handoffs and all production acceptance requirements.
 
 ---
 
@@ -8921,7 +8940,7 @@ data preservation, configured-state, and secret acceptance.
 Prove the schema-changing account-sync release through the real updater and a
 multi-client acceptance matrix before making availability claims.
 
-Dependencies: Tickets 117–121. Ticket 115 remains independent and deferred;
+Dependencies: Tickets 117–121. Ticket 115 remains independent and in progress;
 this ticket does not weaken Apple-trusted distribution gates.
 
 Acceptance criteria:
@@ -8944,7 +8963,7 @@ Acceptance criteria:
   owner authorization and through the documented workflows.
 - Update public and marketing copy only after the product matrix passes. State
   eventual synchronization and offline/closed-app limits plainly. Do not claim
-  notarization or general availability while Ticket 115 remains deferred.
+  notarization or general availability while Ticket 115 remains incomplete.
 - Record immutable versions, hashes, updater feed, test systems, backup path,
   hosted migration boundary, and remaining limitations in QA evidence.
 
@@ -11853,16 +11872,17 @@ preserved, and unchanged status/schedule/dismissal flows.
 
 ## Ticket 165: Travel provider and cross-platform release acceptance
 
-Status: in progress; two installed-macOS gates remain. Repository, local database,
+Status: in progress; native device location remains open. Repository, local database,
 public-landmark, deployed-web and private-account acceptance pass (PRs #58–#65,
 September 22–23). Installed macOS passed cold start, account sync, restart
 preservation and a hosted route request on preview.45. Open: native device location
-(Core Location on the owner's Mac silently refuses the ad hoc and self-signed
-Cadence builds as new clients while serving already-authorized Chrome; a machine-level
-condition and an Apple-trusted signing requirement both remain open until a second Mac
-or a Developer ID build under Ticket 115 discriminates them) and native
-navigation handoff (opening a route destination in the selected maps app from the
-installed app is not yet verified). Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.
+(first-Mac rc.2/rc.3 timeout and absent first permission prompt remain unresolved).
+September 29: clean second-Mac rc.3 acquired a current position after the owner
+manually enabled Cadence in Location Services. Initial prompt did not appear.
+Manual grant/retry and foreground acquisition pass; automatic prompting does not. Signed rc.3
+Google Maps search handoff passed September 28: the timed test Calendar event
+opened Central Park in Chrome. Search has no transport mode; directions remain
+unverified. Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.
 Filed September 21, 2026. Reviews begin alongside Tickets 162–164; release follows them.
 
 Goal: establish provider-use, disclosure and runtime evidence for the accepted travel feature.
@@ -11916,13 +11936,23 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | `docs/qa/travel-release.md` records synthetic, hosted runtime and private-account acceptance; Daily Brief stays independent. |
-| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45; native device location and navigation handoff remain open. |
+| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45; native device location remains open; signed Google Maps search handoff passed September 28. |
 | Marketing | `components/settings/LegalContent.tsx` and `docs/user-guide/travel.md` disclose the disabled rollout; public claims need deployed evidence. |
 | Future mobile | Not applicable to native release: native app remains deferred. Mobile-web evidence belongs to web acceptance. |
 
 Verification: required repository checks and applicable platform builds; reviewed
 provider/disclosure evidence; separately authorized live tests; spend/rollback checks.
 Filing this ticket does not create credentials, deploy, read location or transmit private data.
+
+September 28 remaining work: reproduce the signed location request on a second Mac
+or an owner-arranged isolated macOS account. Do not reset TCC or treat the dedicated
+Google test identity as OS isolation. Record permission, denial, timeout and success
+separately without coordinate logs; fix only a demonstrated defect. For navigation,
+use an authorized located Calendar event with a visible Search or Directions action
+and verify its destination/mode in the selected Maps app. A located local Behavior
+without a navigation action is not handoff evidence. Preserve the saved-location
+fallback and record results in `docs/qa/travel-release.md`. Coordinate installed
+access with Tickets 178–181; this remains travel acceptance, not Apple review.
 
 ## Ticket 166: Travel refresh quota, failure messages and device-location onboarding
 
@@ -12504,6 +12534,259 @@ Verification: all shared checks, the expanded deterministic/DOM fixture suites,
 reviewed live outputs under existing authority, hosted and installed acceptance,
 and rollback. Record actual pass/fail results, remaining gates and reviewer findings.
 
+## Remaining Apple-trusted release work: Tickets 178–181
+
+Filed September 28, 2026. These tickets decompose Ticket 115; they add no product
+features or new execution authority. Existing completed evidence remains valid only
+for its tested candidate and scenario. Reuse retained rc.3 unless a demonstrated
+defect or the release version requires a new immutable candidate. macOS 14 runtime
+acceptance remains owner-deferred and does not block Ticket 115.
+
+Tickets 178 and 179 can prepare independently. Only one operator may control the
+installed app; serialize live tests and protect the entire primary working directory
+and rollback app. Ticket 180 follows account-transition acceptance. Ticket 181 follows
+178–180 and reconciles the separately owned travel gates in 165. Use existing QA
+records, `interaction-registry.json`, and `docs/DESKTOP_PARITY.md`; do not create a
+second acceptance inventory. Filing these tickets performs no release or live test.
+
+## Ticket 178: Signed account and Calendar lifecycle acceptance
+
+Status: in progress September 28. The dedicated test Calendar contains a
+timed public-landmark fixture with no guests or notifications. The owner selected
+Chrome and confirmed the test account is signed in. Native lifecycle execution
+resumed with isolated data. Notification-independent account checks now pass:
+actual Chrome callback cancellation, Calendar pending-state restart/cleanup,
+timed event rendering, wrong-account rejection, same-account reconnection and
+restart persistence. Classified data preservation passed independent review.
+September 29: the owner passed clean second-Mac offline creation/status/Note,
+restart persistence and reconnection. Chrome showed exactly one matching Behavior
+and matching Completed status and Note. Session renewal and explicit replay/expiry
+remain open.
+Original preview.45, the complete primary directory and reminders were restored.
+Dependencies: Ticket 115's retained notarized candidate; existing
+account-sync and Calendar contracts in Tickets 118–122 and 137.
+
+Goal: prove that the signed app retains account data through reconnection, offline
+use, session renewal, and interrupted Calendar authorization.
+
+Scope and acceptance:
+
+- Carry forward rc.3 login, quit/relaunch persistence, Calendar selection/refresh,
+  disconnection, and sign-out evidence. Do not repeat passed checks without a change
+  that invalidates them.
+- Test preview-to-signed same-account reconnection using protected copied data.
+  Verify stable profile, Notes, statuses, histories, timers, pending writes, cursors,
+  and baselines. A missing production Keychain session must not discard linked data
+  or turn it into an unrelated import. Verify another account cannot take ownership.
+- Verify offline launch and a synthetic offline write, restart, reconnection and
+  synchronization without duplication. Observe session renewal and revoked-session
+  recovery; do not substitute unit mocks for installed lifecycle evidence.
+- Verify Google login cancel/replay handling and the actual browser callback path.
+  Use the owner's selected Chrome browser for test-account login; record any native
+  system-browser limitation explicitly rather than claiming direct handoff passed.
+- Exercise Calendar authorization cancel, app restart while pending, callback
+  replay/expiry, and production Keychain pending-state cleanup. Verify an authorized
+  timed test event renders; an empty calendar range is insufficient evidence.
+- Restore the original app/data and primary reminders after isolated acceptance.
+  Keep credentials out of SQLite, exports, logs and QA notes. Fix only demonstrated
+  defects, then rerun the affected installed checks on the replacement candidate.
+
+References: `docs/qa/2026-09-27-apple-distribution.md`,
+`docs/qa/2026-08-31-desktop-authentication.md`,
+`docs/qa/2026-09-01-desktop-account-sync-release-acceptance.md`,
+`docs/qa/google-calendar-capabilities.md`, `scripts/desktop-release-acceptance.mjs`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing hosted Auth/Calendar services supply test sessions; no web feature change. |
+| Desktop | Installed account/Calendar acceptance under the QA records above. |
+| Marketing | Not applicable: no public claims change; Ticket 181 owns release copy. |
+| Future mobile | Not applicable: native mobile remains deferred. |
+
+Verification: dated installed outcomes with candidate hash, OS/build and cleanup;
+focused auth/Calendar/upgrade regressions for any fix, plus required repository checks.
+Unobserved refresh, replay or offline cases remain open.
+
+## Ticket 179: Signed notification activation and sleep/wake acceptance
+
+Status: complete September 28 on signed rc.3. Notification Center click launched
+Cadence and expanded the exact 15:00 Occurrence. Actual sleep/wake passed with
+process continuity and reconciliation before focus. Permission revocation/recovery,
+truthful limited coverage and synthetic request cleanup passed. Original preview.45,
+the entire primary directory and original settings were restored. Primary OS
+readback verified 96 retained of 433 eligible with the shorter horizon disclosed.
+The owner did not see the initial banner; Notification Center activation is proven.
+Dependency: Ticket 115's retained notarized candidate.
+
+Goal: prove that notification clicks reach the correct Occurrence and real system
+wake renews the reminder schedule accurately.
+
+Scope and acceptance:
+
+- Carry forward rc.3 closed-app delivery and archived-Behavior cancellation evidence.
+  Delivery alone does not establish activation or correct-Occurrence targeting.
+- Schedule a harmless synthetic Occurrence in isolated QA data. Verify its exact
+  OS request, quit Cadence, then click the delivered notification before manually
+  launching Cadence. Verify launch and the correct Occurrence. Coordinate the owner
+  click when Notification Center is unavailable to computer-use tools.
+- Keep Cadence running through owner-coordinated system sleep/wake. Record actual
+  power-event times and process continuity. Inspect reconciliation before focus or
+  manual Refresh can mask a failed wake handler; then verify Settings OS readback.
+- Verify denied/revoked notification permission behavior and truthful limited
+  coverage. A shorter disclosed horizon may pass; inaccurate coverage fails.
+- Archive/cancel only synthetic requests, verify cleanup, and restore primary
+  reminders. Do not run a capacity probe against daily-use requests or consume
+  Product's activation event buffer from a parallel probe.
+
+References: `docs/qa/2026-09-27-apple-distribution.md`,
+`docs/qa/travel-release.md` signed native test procedure, `docs/DESKTOP_BUILD.md`,
+`apps/desktop/src/native-coverage-probe.ts`, `apps/desktop/src/native-spike.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: browser push and email reminders are unchanged. |
+| Desktop | Existing native reminder lifecycle and Occurrence activation; references above. |
+| Marketing | Not applicable: Ticket 181 owns evidence-backed release claims. |
+| Future mobile | Not applicable: native mobile reminders remain deferred. |
+
+Verification: real quit/click and system sleep/wake evidence, OS readback, cleanup,
+and focused lifecycle regressions plus required checks if implementation changes.
+
+## Ticket 180: Real preview-to-signed updater acceptance
+
+Status: complete September 29, 2026. The real ad hoc preview.46→signed rc.3
+updater passed discovery, Install, separate Restart, safe same-account reconnection
+and strict domain preservation. Signed preview.47→rc.4 additionally passed observable
+partial-download failure, Retry, Install and separate Restart on macOS 27.0 build
+26A428 (arm64). All 30 tables pass strict same-schema preservation; three pending
+outbox rows retain every value. Seven reminder identifiers and fire times survive
+the real signed-build updater unchanged. Wrong-signature, tampered-archive and
+unavailable-download cases failed safely in the earlier controlled stages.
+
+Historical source withdrawal confirmed and resolved cross-build capacity competition
+in the protected migration test. Preview.46 subsequently had zero pending requests;
+no unperformed withdrawal is credited. The pending-only cleanup fix passes regression
+review and installed rc.4 checks: closed-app delivery survives reconciliation and
+unverified pending cleanup; resolving the synthetic Occurrence retires only its
+notification. Original delivered history remains intact.
+
+Both new app/DMG candidates pass notarization and all 12 artifact checks. Required
+repository checks, 2,521 default tests, 110 native tests and 20 SQLite contracts pass;
+29 opt-in cases remain skipped. Schema remains 17, so no migration was manufactured.
+The exact original preview.45 app and complete primary data are restored and verified.
+Account data is current, automatic downloads are enabled, and native readback is
+100/434 with no temporary signed requests. All 56 delivered identifiers protected
+at the final test checkpoint remain. The QA feed is restored byte-for-byte to rc.3;
+the public desktop-preview feed never changed. No owner action remains for Ticket 180.
+Evidence: `docs/qa/2026-09-27-apple-distribution.md`, especially the final acceptance
+matrix and protected `acceptance-0.1.1-rc.4/installed-updater-20260929` receipts.
+Final artifact publication remains Ticket 181; broader account lifecycle remains 178.
+
+Dependencies:
+Ticket 178's account-transition evidence and the existing signing/updater keys.
+
+Goal: prove that the actual updater installs a trusted release, preserves data,
+and recovers safely from download or signature failure.
+
+Scope and acceptance:
+
+- The last inspected public feed advertises preview.24, older than preview.45 and
+  rc.3. Prepare a reviewed controlled HTTPS feed and version-compatible signed target
+  through the existing release workflow. Do not replace the public feed merely to
+  make a test discoverable, bypass version comparison, or weaken signature checks.
+- Protect a consistent database snapshot, the complete working directory, and the
+  original app. Exercise the real installed updater from the chosen supported source
+  version; archive extraction/manual replacement is not updater acceptance.
+- Verify update discovery, user-controlled installation and separate restart, then
+  compare profile/content/history, pending outbox/cursors/baselines and reminder
+  reconciliation. Prove safe same-account reconnection if the Keychain path changes.
+- Verify tampered archive/wrong signature rejection and unavailable/interrupted
+  download recovery on controlled assets. The original app/data must remain usable.
+- Record source/target versions, hashes, feed provenance, exact OS/build, preservation
+  report and rollback. Exercise a real migration only if the chosen release changes
+  schema; do not manufacture a schema change for this ticket.
+
+References: `docs/DESKTOP_RELEASE.md`, `apps/desktop/scripts/release.mjs`,
+`scripts/desktop-release-acceptance.mjs`, `tests/desktop-release-signature.test.ts`,
+`docs/qa/2026-09-27-apple-distribution.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable to app behavior; controlled HTTPS artifact hosting only. |
+| Desktop | Existing updater/release workflow and preservation checker above. |
+| Marketing | Not applicable: public download/feed promotion belongs to Ticket 181. |
+| Future mobile | Not applicable: this is the macOS updater. |
+
+Verification: actual updater discovery/install/restart, failure paths, strict artifact
+and crypto checks, database comparison and restoration. Apply required checks to fixes.
+
+## Ticket 181: Final signed-release acceptance and publication
+
+Status: verification in progress September 28; publication remains gated.
+All 76 current migrations replayed cleanly in a separate local project. The real
+authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
+were removed, loopback bindings verified, and the isolated stack stopped while
+preserving existing volumes. The RLS smoke fixture now includes location-aware
+configuration history; no product schema changed. See the existing Apple QA record.
+October 19: final candidate `0.1.1` built from `95a6c64`, notarized, stapled and
+verified, with the `desktop-stable` update feed. All 86 migrations replayed cleanly
+with the contract and 92 RLS checks passing. Ticket 178 checks, quarantined download,
+preview.50 updater run and publication remain open. Packet:
+`docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
+Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
+Maps-handoff outcomes separately; no location-success claim while that gate is open.
+
+Goal: publish only the exact signed artifact whose installation, runtime, update,
+and rollback evidence is complete and whose limitations are accurately disclosed.
+
+Scope and acceptance:
+
+- Select the final immutable version/source revision and exclude unrelated working
+  changes. If code, configuration or version changes require rebuilding, repeat
+  signing, app/DMG notarization, stapling and affected installed checks. Reuse valid
+  evidence deliberately; rc.2 quarantined launch does not prove a different artifact.
+- Download the final DMG through a browser, retain quarantine, and verify normal
+  installation/Gatekeeper launch without Open Anyway or quarantine removal. Record
+  whether the test uses protected current-account data or a genuinely fresh macOS
+  user. Do not claim OS isolation from a different Google account.
+- Complete strict repository/native/parity/crypto checks from the existing execution
+  plan. Replay the current migrations and real adapter contracts in an isolated local
+  Supabase environment; preserve existing volumes. The retained 74-migration result
+  does not prove clean replay of the current schema. Never substitute hosted data.
+- Reconcile every required gate against existing QA records and interaction evidence.
+  Keep macOS 14 testing deferred without claiming compatibility. Record unresolved
+  optional-feature limitations and their owning tickets; do not silently waive a
+  required distribution gate or claim notarization fixes location.
+- Prepare exact release notes, asset hashes, feed change, download/marketing copy,
+  rollback and supported/tested OS statements. Apply the existing publication
+  authorization only after its gates pass; filing this ticket does not publish it.
+- Publish the reviewed packet through the existing workflow, verify public HTTPS
+  downloads/signatures/feed and normal installed behavior, then close Ticket 115
+  with the matching evidence. Keep completed preview tickets closed.
+
+References: `docs/DESKTOP_RELEASE.md`, `docs/DESKTOP_PARITY.md`,
+`docs/plans/2026-09-27-apple-developer-unblocked-work.md`,
+`docs/qa/2026-09-27-apple-distribution.md`, `docs/SUPABASE_WORKFLOW.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Existing public download/user-guide surfaces only; no hosted tracking behavior change. |
+| Desktop | Final signed artifact and publication acceptance through the release workflow. |
+| Marketing | Update existing `apps/marketing` download claims only after matching release evidence. |
+| Future mobile | Not applicable: no native mobile release or compatibility claim. |
+
+Verification: all execution-plan release checks, exact-artifact quarantine/runtime
+evidence, clean local adapter contracts, reviewed publication packet and post-publication
+download/feed checks. Record remaining failures instead of marking the release complete.
+
 ## Ticket 186: Rename Cadence project folder and GitHub repository
 
 Status: completed October 9, 2026. Local (October 7) and GitHub (October 8) cutovers,
@@ -12530,3 +12813,885 @@ Platform impact:
 | Future mobile | Not applicable: no mobile implementation or identifiers change. |
 
 Execution evidence: `docs/qa/cadence-project-rename.md`.
+
+## Ticket 212: Home address and usual travel in first-run onboarding
+
+Status: filed October 17, 2026 from owner direction during the travel review; planned,
+not started. Numbered after the iOS plan's proposed 189–211 range to avoid collisions.
+Owner direction (October 17): onboarding scope includes the user's home address and how
+they usually travel. These are two of the three inputs the simplified travel design keeps
+in Settings; the third is the travel toggle.
+
+Goal: a new user can give Cadence their home address and usual way of travelling during
+first-run setup, so travel estimates work later without a visit to Travel settings.
+
+Scope and acceptance:
+
+- Add one optional item, "Home and travel", to the shared first-run onboarding model
+  (`lib/services/onboarding-model.ts`). Like import, it never blocks setup completion.
+  It is complete when the saved base address and travel mode both exist.
+- The item routes to the existing Travel settings section, which gains a `travel` anchor
+  (`/settings#travel`). Onboarding reuses the existing controls and adds no wizard step.
+- Saving either value sends nothing to Google, requests no device location and does not
+  enable routing. Routing still requires the travel toggle and its disclosure. This keeps
+  the current rule that saving a location alone enables nothing.
+- Show the item only when the deployment reports travel routing as configured. Do not
+  ask for a home address that no feature can use yet.
+- The onboarding state read adds base-present and mode-present flags from the owner's
+  travel settings. It does not expose the address text to the onboarding model.
+- Copy states the purpose in one sentence: Cadence uses these to estimate travel time to
+  and from located Behaviors and Calendar events.
+- Update `docs/USER_FLOWS.md`, `docs/UI_SPEC.md`, `interaction-registry.json` and
+  onboarding model tests in the implementing change.
+
+Dependency: the travel routing budget is exhausted in production (see `STATUS.md`,
+October 17). The onboarding item adds no provider cost, but it is only useful after the
+travel redesign restores routing.
+
+Platform impact:
+- Web: `lib/services/onboarding-model.ts`, `lib/services/onboarding.service.ts`, the
+  first-run setup pop-up and `components/settings/TravelSettingsPanel.tsx`.
+- Desktop: `apps/desktop/src/onboarding-guide.tsx` shares the onboarding model. Local mode
+  saves the address and mode offline; hosted estimates still need a linked account.
+- Marketing: not applicable; travel has no public copy before release acceptance.
+- Future mobile: carry the same item into the iOS plan's Settings and onboarding
+  milestone (proposed Ticket 196).
+
+## Travel redesign: Tickets 213–219
+
+Filed October 17, 2026 after the travel review found hosted routing stopped since
+September 25 (`STATUS.md`, October 17). The owner made three decisions the same day
+(`docs/DECISIONS.md`, 2026-10-17):
+
+1. Budget: travel spend has an absolute ceiling of US$5 per user per month at Google
+   list price. The ceiling is permissive. The design should spend well below it.
+2. Behavior Where: optional. Cadence may suggest a value from completion place labels
+   stored on opt-in. A suggestion never changes a Behavior on its own.
+3. Model input: the advisor receives slow-changing travel facts, learned travel habits
+   and a weather outlook. Exact leave-by times stay in the calculated line beside the brief.
+
+On October 18 the owner limited Google route data in model input to Cadence's own
+deterministic conclusions and accepted the remaining risk (`docs/LEGAL.md` L-001). The
+owner also selected Open-Meteo for weather (`docs/DECISIONS.md`, 2026-10-18).
+
+Assumption, not confirmed by the owner: the US$5 ceiling applies per user per calendar
+month in the user's timezone and covers Google Maps calls only. Hosting, the Daily
+Brief model and weather are tracked separately in `docs/COSTS.md`.
+
+End state: each located Calendar event and each Behavior with a Where gets a travel
+estimate from the user's current position or previous stop. Estimates refresh when
+places, times or position change, never on a status change. Travel Settings keep three
+inputs: the travel toggle with its disclosure, Home and usual travel. Ticket 212 asks
+for the same two inputs during onboarding.
+
+Storage boundary for every ticket below:
+
+| Stored with the account: synced, exportable, editable | Temporary: expires, never synced, exported or backed up |
+|---|---|
+| Home and saved places: typed text and place ID | Device position |
+| Behavior Where | Route estimates |
+| Usual mode per place, get-ready time, arrival buffer, feedback taps | Weather forecasts |
+| Completion place labels, only after opt-in (Ticket 216) | Place coordinates: server cache, at most 30 days |
+
+The advisor reads stored preferences when it writes a brief. It never writes memory.
+Cadence's own rules turn feedback into preferences. Google terms allow place IDs to be
+stored indefinitely and coordinates for 30 days; route durations may not be kept and
+reused (`docs/COSTS.md`, caching terms).
+
+| Ticket | Delivery slice | Dependencies |
+|---|---|---|
+| 213 | Renewable US$5 monthly travel budget and accurate limit messages | Existing 163 and 166 quota function |
+| 214 | Places looked up once, change-driven refresh and a faster server path | 213; ship the refresh triggers with 213 |
+| 215 | Three-input travel Settings and optional Behavior Where | 214; Ticket 212 reuses its controls |
+| 216 | Completion place labels and Where suggestions | 215 |
+| 217 | Learned travel habits: mode per place, get-ready time, arrival buffer | 215 |
+| 218 | Weather provider selection and travel margin | Open-Meteo selected; 217 for margin |
+| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure gate (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+
+These tickets supersede Ticket 166's 24-per-day owner limit and Ticket 167's refresh
+policy (213–214), Ticket 162's Settings layout (215) and the disabled travel model
+projection in Tickets 164 and 170 once Ticket 219's gates pass. Ticket 165 keeps the
+native location and navigation gates. Desktop device location stays blocked until
+Ticket 115 provides Developer ID signing.
+
+The shared verification and authorization rules for Tickets 168–174 apply. Filing
+these tickets grants no provider spending, hosted migration, deployment, private-data
+transmission or new provider account.
+
+## Ticket 213: Renewable monthly travel budget and accurate limit messages
+
+Status: completed October 18, 2026 with Ticket 214. Hosted migrations, approved
+privacy text, bounded production QA and installed preview.50 acceptance pass.
+Restores hosted routing.
+Evidence: `docs/qa/travel-release.md`, October 18.
+Dependencies: existing quota function `consume_travel_route_quota()`
+(`supabase/migrations/20260922200000_travel_route_quota_admissions.sql`).
+
+Goal: replace the nonrenewing 40-refresh pilot budget with a per-user monthly
+allowance capped at US$5, and tell the user when estimates actually return.
+
+Scope and acceptance:
+
+- Reserve each provider call's list price before it runs: US$0.005 per geocode or
+  Compute Routes Essentials call and US$0.010 per Compute Routes Pro call. Store
+  amounts in integer microdollars. Take prices from `docs/COSTS.md`; a price change
+  needs a migration.
+- The owner ledger resets on the first day of the user's local month. Refuse a call
+  that would take the month above US$5.00. Refused calls cost nothing. Failed calls
+  keep their reservation.
+- Keep a deployment-wide daily circuit breaker against defects. Set it from the expected
+  user count and record the value in `docs/COSTS.md`. Keep the Google Cloud budget alert.
+- Keep the September 22–25 global rows as history. They no longer limit admission.
+- When the allowance is used up, keep the day's last plan visible, stop live updates and
+  show "Travel estimates resume on {date}." The server returns the reset instant.
+  Remove "Estimates return tomorrow."
+- Report month-to-date use in operator readback and the private workbench, not in Settings.
+- Include migration, `docs/DATA_MODEL.md`, generated types, clean local replay and
+  owner-isolation tests. Test month rollover in the user's timezone, refusal at the
+  ceiling and concurrent reservations.
+- Ship with Ticket 214's refresh triggers. Under the current triggers one user can
+  reach the ceiling within days (`docs/COSTS.md`, current code).
+
+Platform impact:
+- Web: quota migration, `lib/db/travelRouteQuota.repo.ts`,
+  `lib/services/travel-routing.service.ts`, `lib/services/travel-route-refresh.service.ts`
+  and the messages in `lib/ui/travel.ts`.
+- Desktop: shares the hosted route and `lib/ui/travel.ts`; no native change.
+- Marketing: not applicable; travel has no public copy.
+- Future mobile: inherits the hosted budget.
+
+## Ticket 214: Places looked up once, change-driven refresh and a faster server path
+
+Status: completed October 18, 2026. Installed preview.50 synchronization,
+Calendar context, foreground activation and Refresh travel pass.
+Whole-day routing runs once per generated Daily Brief within the existing eight-leg
+safety bound. Four two-leg production samples measured p50 3.3562 s and p95 3.5984 s.
+Six-leg and before/after performance remain unmeasured; the old exhausted pilot
+could not provide a successful baseline. Evidence: `docs/qa/travel-release.md`,
+October 18.
+Dependencies: 213. The refresh-trigger change ships with 213.
+
+Goal: a refresh pays only for route legs that need travel and returns quickly.
+
+Scope and acceptance:
+
+- Add an owner-scoped place cache keyed by normalized typed text. Store the place ID
+  indefinitely. Routing uses place IDs directly; no Google coordinates are fetched
+  or stored. Any later coordinate cache must expire within 30 days (L-002/L-003).
+  Home, Behavior locations and Calendar locations use it. A Calendar location is looked
+  up once per new text, not once per refresh.
+- Request routes only when an input changes: an event's time, location or attendance;
+  a Behavior's Where or scheduled time; a device position more than 500 m from the last
+  one used; a Timeline open with no current estimate; or Refresh travel.
+- A status change, Note edit, window focus or Calendar poll with no relevant change
+  makes no provider call. Remove occurrence status from the travel source key. A status
+  change recomputes the plan from current estimates in core.
+- On a Timeline open, route only legs departing in the next three hours. Route the whole
+  day once when the Daily Brief is generated.
+- Skip legs for Anywhere and Not set Behaviors (Ticket 215), remote events and
+  consecutive stops at the same place.
+- Driving: use traffic-aware Pro routing only for departures within about one hour; use
+  Essentials otherwise. Make one call per leg.
+- Revalidate inputs once before the first provider call and once before returning,
+  not around each call. Read Google Calendar once per refresh plus the final revision
+  check. Run lookups in parallel with bounded concurrency.
+- Record server refresh duration p50 and p95 on the owner account before and after.
+  Target: p95 under 5 seconds for a day with up to six legs.
+- Tests: no provider call on status, Note, focus or unchanged poll; one lookup per new
+  text; revalidation count; the 500 m threshold; three-hour window. Update measured
+  calls per refresh in `docs/COSTS.md`.
+
+Platform impact:
+- Web: `lib/services/travel-route-refresh.service.ts`, `travel-routing.service.ts`,
+  `travel-provider.ts`, `lib/ui/travel.ts` and a place-cache migration.
+- Desktop: shares the hook and hosted route. Native device position stays gated by
+  Tickets 115 and 165; saved places and Calendar legs still work.
+- Marketing: not applicable.
+- Future mobile: inherits the hosted behavior.
+
+## Ticket 215: Three-input travel Settings and optional Behavior Where
+
+Status: filed October 17, 2026; planned.
+Dependencies: 214. Ticket 212 reuses these controls in onboarding.
+
+Goal: make travel setup short and let each Behavior say where it happens.
+
+Scope and acceptance:
+
+- Travel Settings shows three inputs: a travel toggle with the Google disclosure
+  beside it, Home (optional) and usual travel (walking, cycling, transit, driving).
+  Turning the toggle on records routing consent and requests foreground location in
+  the same click, as Ticket 166 does today.
+- Remove the separate consent checkbox, the "saved base" wording, the map-app selector
+  and the "Check device location permission" button. Navigation links follow the
+  platform: Apple Maps on Apple devices, Google Maps elsewhere.
+- The Behavior form gains an optional Where with four states: Not set (default),
+  Anywhere, Home and A place. A place is typed and stored as a saved place.
+- Not set differs from Anywhere. Not set requests no route, and the advisor receives
+  "location not set". Anywhere requests no route and fits wherever the user is.
+  Home routes home when the user is away. A place routes to that place.
+- The form shows one hint: travel estimates and scheduling advice work better when
+  Where is set.
+- Existing Behavior location text becomes Where = A place with the same text. Lookups
+  happen on the next refresh; the migration spends nothing.
+- Where joins Behavior configuration history. Full JSON export includes it; other
+  formats omit place text, as today.
+- Update `interaction-registry.json` (`INT-TRAVEL-*`), the design-system catalog,
+  `docs/user-guide/travel.md`, `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`,
+  `docs/DATA_MODEL.md` and `docs/DESKTOP_DATA_MODEL.md`.
+
+Platform impact:
+- Web: `components/settings/TravelSettingsPanel.tsx`, the Behavior form, Behavior
+  repositories and a migration.
+- Desktop: shares the Settings panel and Behavior form. Add Where to the SQLite schema
+  and the account synchronization contract.
+- Marketing: not applicable.
+- Future mobile: inherits the same Settings and Where model.
+
+## Ticket 216: Completion place labels and Where suggestions
+
+Status: filed October 17, 2026; planned. Window and threshold numbers are proposals
+for owner confirmation.
+Dependencies: 215.
+
+Goal: suggest a Behavior's Where from where the user actually completes it, without
+storing raw positions.
+
+Scope and acceptance:
+
+- Labels need a separate opt-in, off by default: save where I complete Behaviors.
+  Turning it off deletes all labels. Settings has a delete control.
+- When the user marks an occurrence Completed, read the device position once in the
+  foreground, only if location permission is already granted. Never prompt at
+  completion time.
+- On the device, compare that position with Home and saved places. Store one label:
+  `home`, `saved_place:<id>` or `elsewhere`. Discard the coordinates immediately.
+  Never store or sync raw coordinates.
+- Proposed position rules: use a sample at most two minutes old with accuracy of
+  100 m or better. Within 150 m of Home or a saved place gives that label; the nearest
+  wins. More than 400 m from every saved place gives `elsewhere`. Between 150 m and
+  400 m, store no label.
+- Proposed qualifying window: the completion is marked on this device, on the
+  occurrence's local date. Exact-time occurrences qualify from 30 minutes before to two
+  hours after the scheduled time. Range occurrences qualify from 30 minutes before the
+  range starts to one hour after it ends. Needs decision resolutions, imports, synced
+  marks from other devices and later status edits never qualify.
+- Proposed suggestion rule, fixed and without a model: at least six qualifying labels
+  in the last 60 days.
+  - One label at 80% or more: suggest Home or that saved place.
+  - `elsewhere` at 80% or more: suggest adding the place; Cadence cannot name it.
+  - Two or more labels at 25% or more each, none at 80%: suggest Anywhere.
+  - Otherwise: no suggestion.
+- When Where is already set, suggest a change only when the rule disagrees with it.
+  A dismissed suggestion returns only after six more qualifying completions, and only
+  if the rule still holds.
+- Retention: 90 days, rolling. Changing a status away from Completed deletes that
+  occurrence's label.
+- Export: recommended to include labels in Full JSON only and exclude them from CSV,
+  JSONL and BehaviorLog. The owner confirms before implementation.
+- The device needs saved-place coordinates for the comparison. They come from the
+  30-day coordinate cache. Verify the Geocoding policy on coordinate caching first.
+- The radius comparison needs Google coordinates. Cadence holds none today; it stores
+  place IDs only. Comparing a position with Google coordinates may conflict with Maps
+  Terms 3.2.3(c)(iv). See `docs/LEGAL.md` L-003 (open); resolve it before
+  implementation. No design change yet.
+- Model use: the advisor may receive per-Behavior Where values and label counts, for
+  example "logged at home 9 of 10 times". Never coordinates, addresses or place IDs.
+  This waits for Ticket 219's disclosure.
+- Privacy and docs: this changes the promise that device samples are never stored.
+  Update `docs/user-guide/travel.md`, `docs/PRODUCT_SPEC.md`, `docs/DATA_MODEL.md` and
+  the privacy content. Add a migration with RLS for label storage.
+- Expected cost: near zero. Labels need no Google call and a few bytes per completion.
+  Behaviors learned as Anywhere skip route calls entirely.
+
+Platform impact:
+- Web: implement.
+- Desktop: same design. Location reads stay blocked until Ticket 115 provides Developer
+  ID signing. Behaviors with a manually set Where still work.
+- Marketing: not applicable unless the privacy page describes location handling.
+  Check it before release.
+- Future mobile: inherits the design with a native foreground location read.
+- Verify whether iPhone Safari re-prompts for location at completion time.
+
+## Ticket 217: Learned travel habits
+
+Status: filed October 17, 2026; planned. Defaults and step sizes are proposals for
+owner confirmation.
+Dependencies: 215.
+
+Goal: estimates match how the user actually travels, learned only from what the user
+tells Cadence.
+
+Scope and acceptance:
+
+- Learn only from user input. No continuous or background location tracking. Never
+  store Google route durations to build history.
+- Usual mode per place: event details and located Behavior details offer a mode choice
+  for that journey. Cadence remembers the last choice or correction per saved place and
+  falls back to usual travel.
+- Get-ready time: the time the user needs before leaving. Proposed default: 10 minutes.
+  It occupies time before departure in Timeline spans and fit checks.
+- Arrival buffer: the resolver's existing `arrivalSeconds`. Proposed default: 5 minutes.
+  Keep `exitSeconds` and `settlingSeconds` at zero until evidence shows a need.
+- The resolver has no buffer before a leg that starts at Home or the current position.
+  Add `preparationSeconds` beside the three existing buffers for get-ready time.
+- Replace production `ZERO_BUFFERS` in `lib/services/travel-route-refresh.service.ts`
+  with the learned values.
+- Feedback: after an event with a routed outbound leg, the next Timeline view that day
+  asks once: "Your leave time was too early / about right / too late." Too late adds
+  5 minutes to the arrival buffer; too early removes 5; the range is 0–30 minutes.
+  Ask at most once a day. Dismissing records nothing.
+- Travel Settings shows the learned values in plain words that the user can edit, for
+  example "You usually need 15 minutes to get ready." These replace buffer settings.
+  Add no new settings fields.
+- Store per-place modes, get-ready time, arrival buffer and feedback taps with the
+  account. Taps hold an event reference, the answer and a time; no location.
+- Add the feedback tap, mode choice and inline edits to `interaction-registry.json`.
+  Include migration, `docs/DATA_MODEL.md` and resolver tests for the new buffer.
+
+Platform impact:
+- Web: travel resolver, refresh service, event details, Travel Settings and a migration.
+- Desktop: shares the components and resolver. Add the preferences to SQLite and the
+  synchronization contract.
+- Marketing: not applicable.
+- Future mobile: inherits the preferences and feedback tap.
+
+## Ticket 218: Weather provider selection and travel margin
+
+Status: filed October 17, 2026; planned. The owner selected Open-Meteo on October 18,
+2026 (`docs/DECISIONS.md`). The plan choice stays open (`docs/LEGAL.md` L-008).
+Dependencies: 217 for the travel margin.
+Provider comparison: `docs/plans/2026-10-17-weather-provider-comparison.md` (October 17,
+2026). Its open legal questions moved to `docs/LEGAL.md`.
+
+Goal: weather adjusts the travel margin and the mode suggestion.
+
+Scope and acceptance:
+
+- Compare the National Weather Service API, the Google Weather API, Open-Meteo and at
+  least two others. Compare price at expected volume, coverage outside the US,
+  hourly resolution, attribution, caching and sharing terms, and whether the terms allow
+  derived facts in model input. Record the choice in `docs/COSTS.md` and
+  `docs/DECISIONS.md`. Done: compared October 17, Open-Meteo recorded October 18.
+- Request weather for a coarse area and an hour only. Cache one forecast per area per
+  hour, shared across users, if the chosen provider's terms allow it. Never store
+  forecasts per user. Open-Meteo's CC BY 4.0 licence allows the shared cache.
+- Derive the area from the device position only. Cadence holds no Google coordinates
+  today, and sending them to a non-Google provider is an open question
+  (`docs/LEGAL.md` L-002).
+- Weather rules live in core: precipitation, snow or extreme heat in a departure window
+  add margin and may suggest another mode, such as transit instead of cycling. Rules are
+  deterministic and tested; the model never invents them.
+- The margin and the mode suggestion are fixed rules that do not depend on route
+  duration: a fixed number of minutes for a weather condition, never a share of the
+  trip time. Because they reveal no route duration, they may reach the model under
+  `docs/LEGAL.md` L-001.
+- The Google Weather API conflicts with that regime: its forecast facts would be Google
+  content in model input (`docs/LEGAL.md` L-004).
+- Update the privacy content, Open-Meteo attribution (`docs/LEGAL.md` L-011),
+  `docs/PRODUCT_SPEC.md` and `docs/COSTS.md`.
+
+Platform impact:
+- Web: a weather adapter in `lib/services`, rules in `packages/core`.
+- Desktop: shares the hosted adapter through the linked account; no local provider call.
+- Marketing: review privacy claims before release.
+- Future mobile: inherits the hosted adapter.
+
+## Ticket 219: Travel, habit and weather facts in Daily Brief model input
+
+Status: filed October 17, 2026; planned. Blocked on a disclosure update. Google terms:
+accepted risk since October 18, 2026 (`docs/LEGAL.md` L-001).
+Dependencies: 215 and 217; 216 for label counts; 218 for weather.
+
+Goal: the advisor tells the user how far ahead to prepare, for example: "Rain is
+expected before your 3 PM. Leave about 10 minutes earlier, or take transit instead
+of cycling." The 10 minutes is Ticket 218's fixed weather margin, not a route duration.
+
+Scope and acceptance:
+
+- Core calculates all travel timing. The model never calculates times.
+- Google route data reaches the model only as Cadence's own deterministic conclusions
+  (`docs/LEGAL.md` L-001). Never send route durations, rounded trip lengths, leave-by
+  times, or anything from which a route duration can be recovered. A departure time
+  next to an event time, for example, reveals the duration. Tests prove that no
+  duration-bearing value reaches model input.
+- The model receives slow-changing facts only:
+  - the usual travel mode for each place
+  - the learned get-ready time
+  - the weather outlook
+  - fit conclusions, such as "run fits before the afternoon trip: yes", "travel day" or
+    "the Home Behavior does not fit today because of travel"
+  - Behavior Where values, "location not set", and label counts from Ticket 216
+- Exact leave-by times stay in the calculated line beside the brief. That line refreshes
+  and expires. Travel changes never regenerate the brief or reset its dismissal.
+- Never send addresses, coordinates, place IDs or raw provider responses.
+- Extend `TravelTimingModelProjection` and `projectBriefingContext`. Unknown legs stay
+  unknown in model input; they never become zero travel.
+- Update the Daily Brief model-data disclosure to cover travel and weather facts.
+  Existing users consent again.
+- Google terms for route-derived facts in model input: accepted risk under the regime
+  above (`docs/LEGAL.md` L-001). Asking Google in writing stays open. Section
+  3.2.3(c)(vii) prohibits using Maps content to train, test or validate models. The
+  private briefing workbench evaluates model output, so it keeps synthetic travel facts.
+- Update `interaction-registry.json` for the disclosure control, workbench fixtures and
+  `docs/AGENT_RESOLVERS.md`.
+
+Platform impact:
+- Web: briefing pipeline, Daily Brief Settings disclosure and privacy content.
+- Desktop: a linked desktop shares hosted generation and the Settings disclosure; no
+  travel facts leave the device in account-free mode.
+- Marketing: review AI and privacy claims, including the public no-AI disclosure
+  conflict recorded under Ticket 187.
+- Future mobile: inherits hosted generation.
+
+## Cadence MCP server and AI plugins: Tickets 220–232
+
+Filed October 18, 2026. The owner directed Cadence to ship one remote MCP server
+plus Claude and ChatGPT plugins, with full tracking-data read and scoped,
+user-confirmed writes. The owner made four decisions the same day
+(`docs/DECISIONS.md`, 2026-10-18):
+
+1. Sign-in: a Cadence-run OAuth server with opaque, audience-bound, revocable tokens.
+2. Writes: Occurrence status, Occurrence notes, create Behavior, edit Behavior,
+   archive and restore. No deletes.
+3. Facets readiness: foundations only (client attribution, retry-safe writes,
+   external record links, "changed since" reads). Facets sync, REST, and webhooks
+   are follow-ups.
+4. Developer docs: a `/developers` section in `apps/marketing`.
+
+Brief: `docs/MCP_INTEGRATION.md`. Contract: `docs/MCP_CONTRACT.md` (Ticket 221).
+Planned routes: `docs/ROUTE_MAP.md`. Layer ownership: `docs/AGENT_RESOLVERS.md`.
+
+Scopes: `cadence.read` (required), `cadence.occurrences.write`, and
+`cadence.behaviors.write`. Excluded data classes: Google Calendar events and
+connection, travel settings, routes, and device location, Daily Brief text and
+preferences, reminder delivery logs, push subscriptions, import-run internals,
+credentials and tokens, and the email address.
+
+| Ticket | Delivery slice | Wave | Dependencies |
+|---|---|---:|---|
+| 220 | MCP direction and integration brief (docs only) | 1 | None |
+| 221 | Versioned MCP operation contract | 1 | None |
+| 222 | OAuth and integration persistence | 1 | None |
+| 223 | RLS-scoped request context for integrations | 1 | None |
+| 224 | Integration read operations | 2 | 221, 223 |
+| 225 | Integration write operations | 2 | 221, 222, 223 |
+| 226 | OAuth authorization server endpoints | 2 | 222 |
+| 227 | Consent screen and Connected apps settings | 3 | 222, 226 |
+| 228 | MCP endpoint | 3 | 221–226 |
+| 229 | Developer documentation | 4 | 221, 228 |
+| 230 | Claude and ChatGPT plugin packages | 4 | 221, 228 |
+| 231 | Privacy disclosure and directory submission packet | 4 | 227, 228 |
+| 232 | Staging deployment and live client acceptance | 5 | 226–231; owner authorization |
+
+Shared rules: integration operations call existing services, never tables or
+resolvers directly. The service role never reads or writes user data; it is
+limited to token-endpoint functions. Never log tokens or note text. Never start,
+reset, or stop the default local Supabase project. A verifier re-runs the
+`AGENTS.md` check list after every wave. Filing these tickets authorizes no
+hosted migration push, signing-key import, deployment, legal publication, or
+directory submission.
+
+## Ticket 220: Record the MCP direction and integration brief
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: align governance docs with the owner's MCP direction before runtime work.
+
+Scope and acceptance:
+
+- `docs/DECISIONS.md`: a dated 2026-10-18 entry with the four owner decisions, the
+  rejection of Supabase's OAuth server (citing `docs/qa/advisor-auth-isolation.md`),
+  separate read and write grants, the Facets adherence-only boundary, and the
+  superseded "no MCP server" lines.
+- `AGENTS.md`: MCP server and plugins in scope; outside clients may call scoped
+  tools at the user's direction; no general AI coaching or server-side autonomous
+  execution; deferred follow-ups listed.
+- `docs/FUTURE_UPDATES.md`: MCP transport removed from "still deferred"; follow-ups
+  added (MCP Apps widgets, REST/webhook adapter, Facets sync, local stdio server,
+  per-event client provenance, MCP prompts/resources, reviewer sign-in).
+- `docs/MCP_INTEGRATION.md`: the completed playbook brief with dated research.
+- `docs/ROUTE_MAP.md`: planned MCP, OAuth, discovery, challenge, Connected apps, and
+  `/developers` routes.
+- Pointers in `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  and `docs/AGENT_RESOLVERS.md` (integration operations caller category).
+- This ticket group and the `STATUS.md` section. Dated historical records stay intact.
+- Verification: `npm run agents:check`, `npm run interactions:check`; `git diff --stat`
+  shows documentation only.
+
+| Platform | Impact |
+|---|---|
+| Web | Documentation only. |
+| Desktop | Documentation only. |
+| Marketing | Documentation only. |
+| Future mobile | Documentation only. |
+
+## Ticket 221: Versioned MCP operation contract
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none. The only wave-1 ticket allowed to add a dependency.
+
+Goal: one machine-readable source of truth for every MCP operation, read by the
+endpoint, handlers, tests, plugins, and developer docs.
+
+Scope and acceptance:
+
+- `packages/core/src/integration/`: operation registry for every catalog tool,
+  scope constants, stable error codes with retry meaning, limits, TypeScript types,
+  JSON Schema 2020-12 inputs and outputs, runtime validators, contract version
+  `1.0.0`, and a compatibility policy (published tool names never change).
+- One schema source only. Respect `npm run core:check`.
+- Output conventions: Cadence domain terms; `local_date` plus IANA timezone plus
+  UTC instants; `revision` on editable records; pairwise account id only; Needs
+  decision derived; adherence excludes Unresolved; no streaks.
+- Descriptions say what each tool does, with no instructions to the model. Every
+  tool has `title` and accurate `readOnlyHint`, `destructiveHint`,
+  `idempotentHint`, and `openWorldHint: false`.
+- Write inputs: optional `idempotency_key`, `expected_status`, `expected_revision`,
+  and `external_ref` on create.
+- Fixtures in `tests/fixtures/integration/`, `tests/integration-contract.test.ts`,
+  and `docs/MCP_CONTRACT.md` with a drift check against the registry.
+- Verification: `npm run core:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Consumed by Tickets 224–228; no web change in this ticket. |
+| Desktop | Not applicable: shared core only; desktop has no MCP surface in v1. |
+| Marketing | Consumed by Ticket 229's generated tool reference; no change here. |
+| Future mobile | Not applicable yet; a future client can reuse the contract. |
+
+## Ticket 222: OAuth and integration persistence
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: database objects for the authorization server and integration bookkeeping.
+
+Scope and acceptance:
+
+- Migrations in a private schema the Data API does not expose: OAuth clients (DCR
+  and cached CIMD metadata, verified flag), authorization codes (hash, PKCE,
+  resource, scopes, redirect, at most 10 minutes, single use), grants, access and
+  refresh token hashes with rotation families and reuse detection, integration
+  activity (no free text, 90-day retention), idempotency records (24 hours), and
+  external references (hosted only, never synced).
+- Rate-limit actions for MCP reads, writes, and client registration.
+- Token-endpoint functions (`SECURITY DEFINER`, pinned `search_path`, executable
+  only by `service_role`); user-session functions with `auth.uid()` owner checks;
+  an incident function that revokes every grant.
+- Account deletion removes all grants, tokens, codes, and activity.
+- `docs/DATA_MODEL.md`, regenerated types, `lib/db/` repositories, SQL smoke tests,
+  and the RLS registry test. No synced table changes.
+- Verification: isolated-project `db reset`, the SQL smoke, `npm run smoke:rls:local`,
+  `npm run test`, `npm run typecheck`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Hosted database objects and repositories. |
+| Desktop | Not applicable: no synced table changes; recorded in `docs/DATA_MODEL.md`. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 223: RLS-scoped request context for integrations
+
+Status: filed October 18, 2026; in progress (wave 1).
+Dependencies: none.
+
+Goal: let server code act as a verified grant's user through normal RLS, without
+cookies or the service role.
+
+Scope and acceptance:
+
+- `lib/integrations/request-context.ts`: `IntegrationContext` (client, user id,
+  injected `now`, actor with channel, client id, grant id, client label, scopes)
+  and a factory from a verified grant.
+- Internal ES256 token minting with Node `crypto`: `kid` of an imported Supabase
+  signing key, `role` and `aud` `authenticated`, at most 5 minutes, Cadence grant
+  claims. Never leaves the server; never logged.
+- Server-only key variables in `.env.example`; local steps and the hosted import
+  runbook in `docs/SUPABASE_WORKFLOW.md`. No hosted key import.
+- Unit tests for claims, expiry, and `kid`; an opt-in local two-user isolation test.
+- Verification: `npm run test`, `npm run smoke:rls:local`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Server-only request context. |
+| Desktop | Not applicable: hosted server path only. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 224: Integration read operations
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 221, 223.
+
+Goal: transport-independent read handlers that return contract-valid results
+through existing services.
+
+Scope and acceptance:
+
+- `lib/integrations/operations/read/` exporting `readOperationHandlers`: account
+  context, list and get Behaviors, list categories, Timeline view, list and get
+  Occurrences (bounded ranges, cursor pagination, `updated_since`), adherence
+  summary, and `search` and `fetch` in OpenAI's standard shapes.
+- Read services expose injected-client functions; existing page functions become
+  thin wrappers. No duplicated resolver logic.
+- Run the same Occurrence freshness maintenance as the web Timeline; never change
+  statuses, notes, or definitions.
+- Never return an excluded data class. Over-limit requests fail with stable errors.
+- Tests: midnight and DST boundaries, Needs decision, archived Behaviors, stable
+  pagination, limits, excluded-field assertions, opt-in two-user isolation.
+- Verification: `npm run resolvers:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Server read handlers; web pages behave as before. |
+| Desktop | Not applicable: hosted data only; account-free data is unreachable. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 225: Integration write operations
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 221, 222, 223.
+
+Goal: scoped, retry-safe, concurrency-safe write handlers on the web app's write paths.
+
+Scope and acceptance:
+
+- `lib/integrations/operations/write/` exporting `writeOperationHandlers`.
+- `set_occurrence_status` through `applyOccurrenceStatusTransition` with optional
+  `expected_status`; `update_occurrence_note` through `updateOccurrenceNote`;
+  `create_behavior` and `update_behavior` through core `createBehavior` and
+  `updateBehavior` with the web form's validation; `archive_behavior` and
+  `restore_behavior` through `setBehaviorActive`.
+- Optional `idempotency_key` on every write; replay returns the stored result.
+- Existing provenance vocabularies only; client attribution in hosted activity.
+  Vocabulary changes need owner approval and a desktop impact note.
+- `external_ref` on create. Scope check again at handler entry.
+- Tests: status transitions and corrections, stale `expected_status`, note
+  concurrency, validation errors, idempotent replay, scope denial, two-user
+  isolation, and row parity with the web app.
+- Verification: `npm run resolvers:check`, `npm run test`, `npm run typecheck`,
+  `npm run lint`, `npm run agents:check`, and `npm run smoke:account-sync:local` where feasible.
+
+| Platform | Impact |
+|---|---|
+| Web | Server write handlers. |
+| Desktop | Linked desktop receives these changes through existing sync; verify row shapes. No desktop code. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 226: OAuth authorization server endpoints
+
+Status: filed October 18, 2026; planned (wave 2).
+Dependencies: 222.
+
+Goal: a standards-compliant OAuth 2.1 authorization server for Claude, Claude Code,
+and ChatGPT that issues opaque tokens bound to the MCP URL.
+
+Scope and acceptance:
+
+- Discovery: RFC 8414 authorization-server metadata and RFC 9728 protected-resource
+  metadata at both `.well-known` paths.
+- Metadata: PKCE S256, `none` auth method, CIMD supported, `iss` in every
+  authorization response (RFC 9207), `offline_access` in the authorization server's
+  `scopes_supported`.
+- `/oauth/authorize` validation and hand-off to consent; `/oauth/token` with PKCE,
+  refresh rotation, reuse detection, and `invalid_grant`; `/oauth/register`
+  (RFC 7591, rate-limited); `/oauth/revoke` (RFC 7009).
+- SSRF-protected CIMD fetches; exact redirect match plus port-agnostic loopback.
+- Token verification service for `/mcp`. One server-only kill switch, documented
+  in `docs/OPERATIONS.md`.
+- Tests for every endpoint and error path, plus a scripted code flow on `next dev`.
+- Updates `docs/MCP_INTEGRATION.md`, `docs/ROUTE_MAP.md`, and `.env.example`.
+- Verification: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`; `curl` the discovery endpoints.
+
+| Platform | Impact |
+|---|---|
+| Web | OAuth and discovery routes. |
+| Desktop | Not applicable: desktop uses its existing Supabase session, not this server. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 227: Consent screen and Connected apps settings
+
+Status: filed October 18, 2026; planned (wave 3).
+Dependencies: 222, 226.
+
+Goal: let users approve, narrow, review, and revoke AI client access.
+
+Scope and acceptance:
+
+- Consent page behind `/oauth/authorize`: Cadence sign-in required; client name,
+  logo, redirect host, verified or unverified label, account; read required and
+  each write scope switchable; Allow and Deny; CSRF protection.
+- Settings → Connected apps: grants with permissions, dates, last use, recent
+  activity; Disconnect revokes at once.
+- Sparse, mobile-responsive, accessible UI. Impeccable workflow first; the
+  design-system-bench skill for reusable UI; register intents in
+  `interaction-registry.json`; update `docs/UI_SPEC.md`, `docs/USER_FLOWS.md`, and
+  `DESIGN.md`; add `/oauth/:path*` to `proxy.ts`.
+- Record the desktop decision in `docs/DESKTOP_PARITY.md`.
+- Verification: `npm run interactions:check`, `npm run design-system:check`,
+  `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`; screenshots at 390 px and 1440 px.
+
+| Platform | Impact |
+|---|---|
+| Web | Consent page and Settings section. |
+| Desktop | Not applicable in v1: grants are hosted; recorded in `docs/DESKTOP_PARITY.md`. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 228: MCP endpoint
+
+Status: implemented locally October 18, 2026 (wave 3); awaiting independent review.
+Inspector OAuth and all 16 tool happy paths pass; its error-display limitation is
+recorded in `docs/qa/mcp-server.md`.
+Dependencies: 221–226.
+
+Goal: ship the remote MCP server at the planned `https://app.cadence-me.com/mcp`.
+
+Scope and acceptance:
+
+- `app/mcp/route.ts` and `lib/mcp/`: stateless Streamable HTTP with
+  pinned `@modelcontextprotocol/server@2.3.1` and dev-only
+  `@modelcontextprotocol/client@2.3.1`; protocol 2026-07-28 plus documented older versions;
+  deterministic `tools/list`.
+- 401 with `resource_metadata` and `scope`; 403 `insufficient_scope`; ChatGPT
+  `_meta["mcp/www_authenticate"]`; only tokens for this resource.
+- Tools from the Ticket 221 registry with schemas, annotations, and
+  `securitySchemes`; `structuredContent` plus short text; stable tool errors.
+  Omit optional `openai/profile`: its strict identity-only schema conflicts with
+  the approved account-context schema. Preserve all 16 tools and schemas.
+- Pipeline: verify → context → scope → rate limit → handler → output validation →
+  activity → monitoring. Honors the kill switch. Origin validation, body limit,
+  timeouts, credential-free CORS.
+- SDK client tests and a documented MCP Inspector run in `docs/qa/mcp-server.md`.
+- Verification: `npm run test`, `npm run resolvers:check`, `npm run typecheck`,
+  `npm run lint`, `npm run build`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | `/mcp` route and transport. |
+| Desktop | Not applicable: linked desktop sees MCP writes through sync. |
+| Marketing | Not applicable. |
+| Future mobile | Not applicable. |
+
+## Ticket 229: Developer documentation
+
+Status: implemented locally October 18, 2026 (wave 4); awaiting independent review.
+Dependencies: 221, 228.
+
+Goal: public developer docs for every feature of the Cadence MCP server.
+
+Scope and acceptance:
+
+- A `/developers` section in `apps/marketing` with docs layout, Markdown mirrors,
+  `llms.txt` entries, route manifest, and sitemap.
+- Overview, quickstarts, concepts, authentication and permissions, one generated
+  page per tool, errors, limits, idempotency and concurrency, data and privacy,
+  building integrations (Facets labeled as foundations), plugins, versioning, and
+  troubleshooting.
+- A generator and drift check (one npm script). Claim only verified behavior.
+- A Developers link in marketing navigation or footer.
+- Verification: `npm run marketing:build`, `npm run marketing:check`, the drift
+  script, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | `components/settings/ConnectedAppsPanel.tsx` links to the docs. |
+| Desktop | Not applicable: public documentation adds no desktop interface or data access. |
+| Marketing | `apps/marketing/src/layouts/DeveloperLayout.astro` and the route manifest provide `/developers`; catalog and interactions updated. |
+| Future mobile | Not applicable: native mobile remains deferred. |
+
+## Ticket 230: Claude and ChatGPT plugin packages
+
+Status: implemented locally October 18, 2026; awaiting independent wave-4 review.
+Dependencies: 221, 228.
+
+Goal: installable plugins that bundle Cadence skills with the remote MCP server.
+
+Scope and acceptance:
+
+- Read and cite the current Claude and OpenAI plugin docs in `docs/MCP_INTEGRATION.md`.
+- `integrations/skills/`: daily check-in, weekly review, and routine setup skills.
+  Skills never tell the model to skip host confirmations.
+- `integrations/claude-plugin/` with plugin manifest, `.mcp.json`, skills, and a
+  marketplace manifest; `integrations/chatgpt-plugin/` in OpenAI's current format
+  with a packaging script writing to a git-ignored folder. No secrets.
+- Both standalone packages contain byte-identical shared skills. Root Claude marketplace; OpenAI portable Agent Plugins format with OAuth metadata.
+- `node scripts/check-plugins.mjs` validates manifests and assets; `node scripts/package-plugins.mjs` writes reproducible ignored ZIPs.
+- `tests/plugins.test.ts` checks registry tool references, the structured input example, archives, metadata and copy drift. No publishing or live-install claim.
+- Verification: plugin validators, `npm run test`, `npm run lint`, `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Not applicable: distribution artifacts only. |
+| Desktop | Not applicable. |
+| Marketing | Linked from Ticket 229 docs. |
+| Future mobile | Not applicable. |
+
+## Ticket 231: Privacy disclosure and directory submission packet
+
+Status: filed October 18, 2026; planned (wave 4).
+Dependencies: 227, 228.
+
+Goal: legal drafts, the OpenAI challenge route, and the directory submission packet.
+
+Scope and acceptance:
+
+- Draft Privacy and Terms changes: disclosure to connected AI clients at the user's
+  direction, shared data classes, permissions, activity retention, revocation, no
+  sale, Calendar never shared through MCP. Owner approves before publication.
+- `/.well-known/openai-apps-challenge` from a server-only variable; 404 when unset.
+- `docs/qa/mcp-directory-submission.md`: listing copy, data-handling answers,
+  test cases, reviewer instructions, demo script, release notes, and the reviewer
+  account options (no production reviewer login without owner approval).
+- Owner-only action list with exact steps.
+- Verification: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+  `npm run agents:check`.
+
+| Platform | Impact |
+|---|---|
+| Web | Legal page drafts and the challenge route. |
+| Desktop | Not applicable. |
+| Marketing | Listing copy and disclosures after owner approval. |
+| Future mobile | Not applicable. |
+
+## Ticket 232: Production deployment and live client acceptance
+
+Status: filed October 18, 2026; production preparation only (wave 5); awaiting owner approval.
+Dependencies: 226–231 and explicit owner authorization for every provider step.
+
+Goal: prove the deployed server works in real Claude and ChatGPT clients.
+
+The owner selected existing production for planning on October 18, 2026.
+Preparation permits bounded read-only metadata checks, not hosted changes or
+live account operations. No staging project will be provisioned. The review
+packet lives in the Ticket 232 workspace note and shared PR Context.
+
+Scope and acceptance:
+
+- With authorization: hosted migration push, signing-key import, Vercel variables,
+  and deployment per `docs/VERCEL_WORKFLOW.md`.
+- Live acceptance with a test account: Claude custom connector (consent with a write
+  scope off, every tool, Disconnect then failure), Claude Code, ChatGPT developer
+  mode, MCP Inspector, two-account isolation, and a linked desktop showing an
+  MCP-made change after sync.
+- Evidence with playbook labels in `docs/qa/mcp-server.md`; `STATUS.md` updated.
+- Clean up test grants, data, and accounts, and read back the cleanup.
+- Verification: the live checks; `npm run agents:check` after doc updates.
+
+| Platform | Impact |
+|---|---|
+| Web | Deployed server and acceptance evidence. |
+| Desktop | Linked-desktop sync check only; no desktop code. |
+| Marketing | Deploy Ticket 229 developer docs through existing `cadence-marketing`; verify public links and Trust provenance. |
+| Future mobile | Not applicable. |

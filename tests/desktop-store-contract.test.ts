@@ -282,7 +282,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
         pending.delete(item.id); pending.set(item.id, item);
         while (pending.size > 3) pending.delete(pending.keys().next().value!);
       }
-      if (request.operation === "cancel" && !cancellationFails) for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation) && !cancellationFails) for (const id of request.ids ?? []) pending.delete(id);
       return { pending: [...pending.values()] };
     };
     const limited = await reconcileLocalReminders(NOW.add({ seconds: 3 }));
@@ -330,10 +330,10 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       const request = value as { operation: string; reminders?: Request[]; ids?: string[] };
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered };
-      if (request.operation === "cancel") {
+      if (["cancel", "cancelPending"].includes(request.operation)) {
         cancelled.push(...request.ids ?? []);
         for (const id of request.ids ?? []) pending.delete(id);
-        delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
+        if (request.operation === "cancel") delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
       }
       if (request.operation === "schedule") {
         scheduled = true;
@@ -372,7 +372,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered: [] };
       if (request.operation === "schedule") for (const row of request.reminders ?? []) pending.set(row.id, row);
-      if (request.operation === "cancel") for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation)) for (const id of request.ids ?? []) pending.delete(id);
       return { pending: [...pending.values()] };
     };
     await reconcileLocalReminders(NOW);
@@ -419,7 +419,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       operations.push(request.operation);
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered: [] };
-      if (request.operation === "cancel") for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation)) for (const id of request.ids ?? []) pending.delete(id);
       if (request.operation === "schedule") for (const item of request.reminders ?? []) pending.set(item.id, item);
       return { pending: [...pending.values()] };
     };

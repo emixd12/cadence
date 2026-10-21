@@ -50,14 +50,43 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
-Device samples, provider geocodes and route results remain transient. Exclude them
-from account sync, exports, backups, logs and analytics. Shared resolvers derive
+Device samples and route results remain transient. Exclude them from account sync,
+exports, backups, logs and analytics. Since Ticket 214, a provider geocode persists
+only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive
 travel occupancy and collisions without changing scheduled times or statuses.
 Each leg carries its own endpoints, timing, mode, provenance and freshness so one
 unknown leg does not discard known legs. Current device position overrides a
 predicted scheduled origin for the immediate departure. Input changes invalidate
 affected legs; no automatic base detour is inserted between successive events.
 See `plans/travel-departure-discovery.md` for retention and disclosure boundaries.
+
+Migration `20261017150000_travel_monthly_budget.sql` (Ticket 213) replaces the
+pilot allowance below. `travel_spend_owner_month` keeps one row per owner and
+owner-local month; `travel_spend_global_day` keeps one row per UTC day. Both hold
+reserved list-price microdollars only. Authenticated callers reserve through the
+security-definer `reserve_travel_provider_spend(requested_microdollars)` before
+every provider call, including retries. The function locks the owner row, then the
+global row, and refuses a request that would exceed US$5.00 for the owner's local
+month or US$10.00 across all owners for the UTC day. A refusal reserves nothing
+and returns the renewal instant. Reservations are never refunded. Owners may read
+their own month rows; nobody but the function writes either table, and clients
+cannot read the global table. The pilot tables and `consume_travel_route_quota()`
+remain as history; the application no longer calls them.
+
+Migration `20261017150100_travel_place_cache.sql` (Ticket 214) adds
+`travel_place_cache`: owner, a 43-character base64url SHA-256 of the normalized
+typed location text, the lookup outcome (`resolved`, `unresolved` or `ambiguous`),
+a place ID for resolved rows only, and the lookup time. It stores no location
+text, coordinates or route content. Google permits storing place IDs indefinitely.
+The refresh service reuses resolved rows for 365 days and other outcomes for 30
+days. Owner RLS permits select, insert, update and delete. A trigger deletes the
+owner's rows when `travel_settings.enabled` changes to false, whether Settings or
+desktop account sync wrote the change. Account deletion cascades. The cache is
+excluded from account sync, exports and backups.
+Migration `20261018051402_fence_travel_place_cache_consent.sql` serializes cache
+writes with the owner's travel-settings row. A late lookup cannot repopulate the
+cache after travel is disabled. The trigger rejects foreign ownership and skips
+writes without current routing consent.
 
 Migration `20260922013000_add_travel_route_quota.sql` keeps owner-local-day and
 global UTC-day counters. Authenticated callers consume quota through one
@@ -68,8 +97,10 @@ provider call. Failed and partial refreshes retain their reservation. Existing
 six-per-owner-day and 100-per-global-day caps still apply. Never prune global
 rows or reset the allowance without explicit owner authorization.
 
-One refresh makes at most 19 non-retried geocodes and 18 route calls, including
-driving refinement and one batch retry. At verified September 22, 2026 USA list
+Under the pilot, one refresh made at most 19 non-retried geocodes and 18 route calls,
+including driving refinement and one batch retry. Since Ticket 214, a refresh looks up
+at most nine places not yet stored and makes at most eight route calls plus one retry,
+one call per leg. At verified September 22, 2026 USA list
 prices, their upper bound is US$0.365 before tax and without free credits.
 The US$0.50 reservation leaves US$0.135 per refresh for margin; it is not a
 measurement of billed cost. Recheck pricing and call bounds before changing
@@ -1411,6 +1442,18 @@ Service-role access is reserved for narrow server-only maintenance,
 scheduled-processing, or deletion workflows. It must not become the normal path
 for user-facing reads or writes.
 
+OAuth and integration records (Ticket 222) live in the non-exposed
+`cadence_oauth_private` schema. Its tables enable RLS and grant nothing to
+`public`, `anon`, `authenticated`, or `service_role`. The only new
+service-role boundary is the token-endpoint function set: client registration
+and lookup, code exchange, refresh rotation, access-token verification, token
+revocation, OAuth rate limits, retention purge, and the incident revoke-all
+function. Those functions read and write only OAuth records, never Cadence
+product rows. Consent, Connected apps, and integration bookkeeping functions
+are `authenticated`-only and check `auth.uid()`. Integration operations reach
+product data through the user's RLS with the internal token from Ticket 223.
+See [OAuth and integration persistence](#oauth-and-integration-persistence-ticket-222).
+
 ## Abuse and public-product protections
 
 Before broad public launch, add standard protections around sensitive routes
@@ -1932,3 +1975,281 @@ unmigrated environments as `source_unavailable`, never invented finish-time data
 Shared summaries use `docs/DATETIME_STRATEGY.md`; no raw private mark timestamps
 enter the model or inspector. The SQL function signature still returns JSON, so
 public generated database types have no new columns or RPC arguments.
+
+## OAuth and integration persistence (Ticket 222)
+
+Migration `20261018160000_add_oauth_integration_persistence.sql` adds the
+database objects for Cadence's OAuth authorization server and MCP integration
+bookkeeping. It changes no existing product table. Forward migration
+`20261018164000_expand_integration_replay_capacity.sql` raises the private
+idempotency result bound without changing columns, RPC signatures, or grants.
+
+Platform impact: hosted web database only. Desktop: not applicable. No synced
+table changes, and these records never enter account-sync snapshots, desktop
+SQLite, exports, BehaviorLog bundles, or backups made by Cadence. Marketing and
+future mobile: not applicable.
+
+### Schema and access
+
+All tables are in `cadence_oauth_private`, which the Data API does not expose.
+Every table enables RLS without policies. `public`, `anon`, `authenticated`, and
+`service_role` have no schema usage and no table grants. Clients reach the data
+only through the `SECURITY DEFINER` functions below. Each pins
+`search_path = ''` and uses fully qualified names.
+
+| Table | Contents | Owner link |
+|---|---|---|
+| `clients` | DCR registrations and cached CIMD metadata: `client_id`, `registration_type` (`dcr` or `cimd`), name, client and logo URIs, redirect URIs (1–10; HTTPS or loopback HTTP, no fragments), `application_type`, bounded metadata JSON, `verified_client`, CIMD `metadata_expires_at`, DCR `registration_expires_at`, `disabled_at` | Not user data |
+| `grants` | One active grant per user, client, and resource: granted scopes, created, updated, last used, revoked time and reason | `user_id` cascade |
+| `authorization_codes` | Code SHA-256 hash, grant, client, redirect URI, PKCE S256 challenge, resource, scopes, expiry at most 10 minutes after creation, `consumed_at`, issued `family_id` | `user_id` cascade |
+| `token_families` | One family per code exchange; absolute expiry; revoked time and reason | `user_id` cascade |
+| `tokens` | Access and refresh token SHA-256 hashes, type, family, grant, scopes, resource, expiry, refresh `rotated_at`, `revoked_at` | `user_id` cascade |
+| `activity` | Grant, client, operation name, up to 25 target UUIDs, outcome, error code, time. No free text or payloads | `user_id` cascade |
+| `idempotency_records` | User + client + key, operation, request hash, `pending` or `completed`, stored result (at most 512 KiB of `jsonb::text`), 24-hour expiry | `user_id` cascade |
+| `external_references` | User + client + entity type + entity id + external id (Facets foundations). Unique per user and client on both the external id and the entity. v1 supports `behavior` only and cascades from `behaviors` | `user_id` cascade |
+| `rate_limit_counters` | Fixed-window counters for `mcp_read` and `mcp_write` per grant, and `client_registration` per SHA-256 source hash | Grant cascade |
+
+Scopes are exactly `cadence.read` (always required), `cadence.occurrences.write`,
+and `cadence.behaviors.write`. `verified_client` (`claude`, `claude_code`,
+`chatgpt`) is accepted only for the exact known identity. A check constraint
+enforces it: Claude Code's CIMD URL, ChatGPT's CIMD URL or `chatgpt.com`
+connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback.
+
+`launch_rate_limits` is not reused. It is keyed by account and requires a user,
+while client registration happens before sign-in and MCP limits apply per grant.
+
+### Retry result size
+
+The contract still caps outputs at 100,000 UTF-8 bytes of compact
+`JSON.stringify(value)`. Existing output notes remain untruncated; the
+2,000-code-point note limit applies only to MCP inputs. PostgreSQL measures
+storage with `octet_length(result::text)`, including JSONB separator whitespace
+and numeric exponent expansion. A 100,000-byte storage bound is therefore too
+small. Even 256 KiB can reject a contract-valid Behavior with many schedules
+whose recurrence intervals use large exponents.
+
+The 512 KiB bound remains unchanged. The original projected-JSON storage tests
+still cover JSONB numeric expansion and the independent 524,288/524,289-byte
+storage boundary. Ticket 225 now stores only `{version: 2, output_json: string}`,
+where `output_json` is the exact compact public response, capped at 100,000 UTF-8
+bytes inside the product transaction. It does not store raw rows or a second
+copy of the response. JSONB string escaping adds at most one byte per input byte
+(the JSON text contains no raw control characters), plus fewer than 100 fixed
+wrapper bytes. Thus every accepted response uses at most 200,100 bytes, below
+524,288, regardless of Unicode, escapes, schedule count or exponent-form numbers.
+Numbers remain inside the string and never expand into PostgreSQL numeric text.
+Revisit this proof if the receipt shape or wire cap changes. Existing version-1
+receipts remain readable for their original 24-hour window; new writes never
+produce them. Storage capacity does not replace precommit response validation.
+
+`tests/integration-idempotency.local-integration.test.ts` validates both direct
+projected JSON and the minimal version-2 receipt through real authenticated
+begin/complete/replay RPCs. It covers long notes, exact wire limits, Unicode,
+escapes and large exponent-form numbers. Set `CADENCE_LOCAL_SUPABASE_DB_URL` only
+to an isolated loopback database; each SQL case rolls back. The write-handler
+live suite also proves 99,999/100,000-byte acceptance and 100,001-byte rollback.
+
+Deployment evidence: repository and workspace records report no hosted push of
+Ticket 222. Hosted state was not queried during this correction; no hosted action
+was authorized. The forward migration supports both clean resets and databases
+that already applied the original migration. Regenerated public database types
+remain unchanged because this migration changes only a private check constraint.
+
+### Lifetimes
+
+| Record | Lifetime |
+|---|---|
+| Authorization code | 10 minutes, single use |
+| Access token | Up to 1 hour, capped by the family's 90-day absolute expiry |
+| Refresh token | 30 days idle, capped by the family's 90-day absolute expiry |
+| Unused DCR registration | 24 hours until its first consent |
+| CIMD metadata cache | Caller-supplied, at most 24 hours |
+| Idempotency record | 24 hours; a `pending` claim older than 2 minutes can be reclaimed |
+| Activity | 90 days |
+| Rate-limit windows | `mcp_read` 120 per 60 s, `mcp_write` 30 per 60 s, `client_registration` 10 per hour |
+
+The functions fix these values; callers cannot choose them.
+
+### Token-endpoint functions (`service_role` only)
+
+- `oauth_register_client(...)` inserts a DCR client or upserts cached CIMD
+  metadata. It rejects a CIMD refresh that collides with a DCR id.
+- `oauth_get_client(client_id)` returns client metadata, or null for unknown,
+  disabled, or expired unused clients. `metadata_stale` tells the caller to
+  refetch CIMD metadata.
+- `oauth_exchange_authorization_code(...)` locks the code, burns it on any
+  failed check (expiry, client, exact redirect URI, resource, PKCE S256, revoked
+  grant), and issues one access and one refresh token in a new family. A second
+  use of a consumed code revokes the family issued from it.
+- `oauth_rotate_refresh_token(...)` rotates a refresh token. It may narrow
+  scopes but never widen them. Reuse of a rotated token revokes the whole
+  family, including the newest access and refresh tokens. Both new token expiries
+  are capped by the family's absolute deadline.
+- `oauth_verify_access_token(hash, resource)` checks type, expiry, revocation,
+  family, grant, client, and exact resource. It returns the user, grant,
+  client, and effective scopes: the token's scopes intersected with the
+  grant's. It rejects a family at or after its absolute deadline, even for
+  previously issued overlong tokens, and returns the earlier token/family expiry.
+  It updates `last_used_at` at most once a minute.
+- `oauth_revoke_token(hash, client_id)` implements RFC 7009. A refresh token
+  revokes its family; an access token revokes itself.
+- `oauth_consume_rate_limit(action, grant_id, source_hash)` returns `allowed`,
+  `limit_count`, `remaining`, `reset_at`, and `retry_after_seconds`.
+- `oauth_purge_expired()` deletes expired codes, access tokens, families past
+  absolute expiry, unused DCR clients, idempotency records, activity older than
+  90 days, and idle counters. Run it from scheduled maintenance.
+- `oauth_revoke_all_grants()` is the incident function. It revokes every active
+  grant with its families, tokens, and unconsumed codes.
+
+Migration `20261019025157_enforce_oauth_family_deadline.sql` replaces only
+`oauth_rotate_refresh_token` and `oauth_verify_access_token`. It preserves their
+signatures, service-role execution grants, SECURITY DEFINER and empty search
+path. It changes no rows or table shapes. New code exchanges already create a
+fresh 90-day family with one-hour access and thirty-day refresh expiries.
+The local regression `tests/sql/ticket-232-oauth-family-deadline.sql` covers
+existing overlong tokens, expired/equal/future deadlines and ordinary issuance.
+
+Token-endpoint functions that can revoke return `{ ok: false, error }` instead of
+raising. Raising would roll back the reuse revocation.
+
+### User-session functions (`authenticated` only)
+
+- `oauth_approve_consent(...)` validates the client, the redirect URI (exact, or
+  port-agnostic for loopback), the scopes, and the resource. It creates or
+  updates the caller's grant, clears the client's unused-registration expiry,
+  and stores a 10-minute code hash. Re-consent replaces the grant's scopes.
+- `oauth_list_grants()` lists the caller's active grants for Connected apps.
+- `oauth_revoke_grant(grant_id)` revokes the caller's grant, all of its tokens,
+  and its pending codes. The next token check fails.
+- `oauth_list_activity(limit, before)` returns the caller's last 90 days of
+  activity (operation, outcome, error code, time), at most 100 rows a page.
+
+### Integration-session functions (`authenticated` with `cadence_grant_id`)
+
+These require the internal token's `cadence_grant_id` claim for a grant the
+caller owns. Ordinary web sessions lack the claim and are rejected. Client
+attribution comes from the grant, never from arguments.
+
+- `integration_record_activity(operation, target_ids, outcome, error_code)`
+  also deletes the caller's activity older than 90 days.
+- `integration_idempotency_begin(key, operation, request_hash)` returns
+  `started`, `replay` with the stored result, `mismatch`, or `in_progress`.
+  `integration_idempotency_complete` stores the result.
+  `integration_idempotency_release` drops a pending claim after a failed write.
+  The claim and the product write are separate calls, so a crash between them
+  leaves a pending claim that expires after 2 minutes.
+- `integration_link_external_reference(entity_type, entity_id, external_id)`
+  returns `linked`, `existing`, or `conflict`. It requires a caller-owned
+  Behavior. `integration_find_external_reference` and
+  `integration_list_external_references` (at most 200 ids) read links for the
+  current client.
+
+### Account deletion
+
+Deleting the Auth user cascades through grants, codes, families, tokens,
+activity, idempotency records, external references, and per-grant counters.
+DCR and CIMD client rows are not user data and remain until purge.
+
+Repositories: `lib/db/oauth.repo.ts` (token endpoint, consent, Connected apps)
+and `lib/db/integration.repo.ts` (integration session). Local verification:
+`tests/sql/ticket-222-oauth-persistence-smoke.sql`.
+
+### OAuth pending authorization (Ticket 226)
+
+Migration `20261018170000_oauth_authorization_requests.sql` adds private
+`pending_authorizations`. This is pre-login protocol state, not a user-owned
+tracking table. It stores a random request UUID, SHA-256 browser-secret hash,
+client ID, exact redirect URI, S256 challenge, resource, requested tracking
+scopes, `offline_access`, client state, and a ten-minute expiry. RLS is enabled;
+no API role has direct table access. Expired rows are removed at creation and by
+`oauth_purge_expired`. A request becomes account-bound only through explicit
+consent with the signed-in user's database client.
+
+`oauth_create_pending` is service-role-only. Authenticated
+`oauth_read_pending` and `oauth_finish_pending` require the browser-secret hash.
+The finish function locks and consumes the request in the same transaction as
+`oauth_approve_consent`; it accepts only a subset of requested tracking scopes.
+A null scope list denies and consumes without creating a grant. The server
+also requires a same-origin POST and a matching HttpOnly cookie. Neither the
+browser secret nor the client state appears in the consent URL.
+
+Codes and token families gain an `offline_access` boolean, separate from the
+three data-access scopes. Token responses include that permission when approved.
+The existing one-hour access, thirty-day refresh idle and ninety-day absolute
+family lifetimes remain. PKCE and browser-secret checks compare fixed-size
+hashes without a data-dependent early exit. Token lookup remains an indexed
+SHA-256 hash lookup. OAuth admission adds `oauth_request` (60/minute per source)
+and `oauth_global` (600/minute across sources) to the existing private counters.
+Registration additionally retains its 10/hour source limit and 24-hour unused
+registration expiry. Tracking tables and desktop sync contracts do not change.
+
+## Integration write transactions (Ticket 225)
+
+Migration `20261018180000_integration_atomic_writes.sql` adds two authenticated
+integration functions. Neither grants direct access to the private schema or
+adds columns to synced tables.
+
+- `integration_lock_write(key, operation, hash)` validates the active grant,
+  authenticated owner, and operation scope. Its privileged work is limited to
+  private replay bookkeeping. It holds an advisory lock and a replay-row lock
+  until the calling transaction finishes.
+- `integration_apply_write(operation, key, hash, rpc, args, as_of, external_ref)`
+  runs as the authenticated caller under RLS. A fixed allowlist routes resolver
+  plans to the existing status and Behavior graph transactions. Notes use the
+  same normalized, expected-note update as the web service, with an additional
+  `updated_at` check. Behavior reads share the existing configuration-writer
+  advisory lock; no direct Behavior UPDATE privilege is added.
+
+Forward migration `20261018190000_validate_integration_write_results.sql`
+replaces the initial raw-snapshot receipt with a validated public response.
+The public RPC signature and caller-RLS boundary remain unchanged. Pure helper
+functions live in the unexposed `cadence_private` schema with pinned empty
+search paths and authenticated-only execution.
+
+Preparation runs the existing product RPC in a PL/pgSQL exception block. A
+private SQLSTATE rolls back every product, event, reminder and link write while
+retaining the local response-source value. TypeScript runs the same public
+serializers and contract schema validator against that actual prospective row.
+No business rules move into SQL. This adds one RPC round trip and one rolled-back
+execution per new write; completed retries skip preparation.
+
+Commit reruns the same resolver plan under the existing row/advisory locks.
+It compares a SHA-256 fingerprint of the actual response-source data with the
+prepared fingerprint before persisting anything. All serializer inputs,
+including account timezone, derived-state clock, category and note text,
+participate. A concurrent change that affects the response returns `conflict`
+and rolls back the complete write. Only database-generated UUIDs and the root
+revision timestamp are excluded: fixed, typed output paths receive their actual
+committed values. Schedule metadata unused by serializers is omitted. UUIDs
+remain valid UUID strings; timestamps use the same UTC fractional formatting
+as Temporal. No user-authored field or derived label is patched.
+
+The JSON patch helper preserves JavaScript number/string encoding and object
+order. SQL measures the exact final compact UTF-8 text after scalar replacement;
+anything above 100,000 bytes raises `limit_exceeded` before commit. The schema
+validated by TypeScript therefore still applies to the committed response,
+including at the exact byte boundary. A defensive response check remains in the
+service, but it is no longer the write admission check.
+
+Only `{version: 2, output_json}` persists in the retry record. Identifiers and
+status needed for repair come from that output. The response retains its original
+revision, timezone and derived day state across later edits. External references,
+product rows, history, reminder cancellation, the receipt and successful activity
+commit together. Any conflict, output failure or receipt failure rolls them back.
+The handler releases its pending claim on rejection and records a failed attempt;
+a process interruption leaves only the normal expiring pending claim. Successful
+lost-response retries repair the usual occurrence/reminder work and web caches.
+
+Status writes keep `explicit_user_mark` / `explicit_user_correction`, confidence
+`high`, and use the already-supported `manual_text` capture method. The existing
+status RPC now accepts `manual_text` alongside `manual_tap`. Behavior definition
+and configuration events retain `manual` and the existing reason codes. No
+vocabulary or desktop migration changes. Linked desktop receives ordinary
+Behavior, Occurrence, and event rows through existing synchronization.
+Marketing and future mobile have no implementation changes.
+
+Verification: `tests/integration-write.test.ts` and opt-in
+`tests/integration-write.local-integration.test.ts` cover validation, permission
+checks, concurrency, exact replay, rollback, ownership, and web/desktop row
+compatibility. Use only an isolated loopback database and the local integration
+test environment documented in `docs/SUPABASE_WORKFLOW.md`.

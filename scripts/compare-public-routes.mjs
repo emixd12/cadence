@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import { boundedFetch } from "./public-trust-http.mjs";
 
-const MAX_ROUTES = 32;
+const MAX_ROUTES = 96;
 
 function canonicalFromHtml(html, finalUrl) {
   const match = /<link\s+[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*>/i.exec(html)

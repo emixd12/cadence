@@ -1,0 +1,320 @@
+{
+  "operation": "list_behaviors",
+  "valid_inputs": [
+    {
+      "name": "defaults",
+      "value": {}
+    },
+    {
+      "name": "filters and page",
+      "value": {
+        "state": "archived",
+        "category_id": "00000003-1111-4111-8111-000000000003",
+        "updated_since": "2026-10-01T00:00:00-04:00",
+        "page_size": 100,
+        "cursor": "eyJvIjo1MH0"
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "page too large",
+      "value": {
+        "page_size": 101
+      },
+      "code": "invalid_input",
+      "path": "$.page_size"
+    },
+    {
+      "name": "bad state",
+      "value": {
+        "state": "deleted"
+      },
+      "code": "invalid_input",
+      "path": "$.state"
+    },
+    {
+      "name": "bad cursor characters",
+      "value": {
+        "cursor": "abc/=="
+      },
+      "code": "invalid_input",
+      "path": "$.cursor"
+    },
+    {
+      "name": "bad updated_since",
+      "value": {
+        "updated_since": "yesterday"
+      },
+      "code": "invalid_input",
+      "path": "$.updated_since"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "active and archived",
+      "value": {
+        "behaviors": [
+          {
+            "id": "00000001-1111-4111-8111-000000000001",
+            "title": "Morning walk",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          },
+          {
+            "id": "00000002-1111-4111-8111-000000000002",
+            "title": "Vitamin D",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": null,
+            "state": "archived",
+            "archived_at": "2026-10-01T14:00:00Z",
+            "auto_archived_at": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "daily",
+                  "interval": 1
+                },
+                "recurrence_summary": "Daily",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "09:00",
+                    "end_time": null,
+                    "label": "9:00 AM"
+                  }
+                ],
+                "time_summary": "9:00 AM"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [
+              {
+                "id": "00000009-1111-4111-8111-000000000009",
+                "archived_at": "2026-10-01T14:00:00Z",
+                "note": "Doctor said to stop.",
+                "updated_at": "2026-10-01T14:00:00Z"
+              }
+            ],
+            "external_ref": "facets:rec_42",
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          }
+        ],
+        "next_cursor": null
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing revision",
+      "value": {
+        "behaviors": [
+          {
+            "id": "00000001-1111-4111-8111-000000000001",
+            "title": "Morning walk",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "active",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z"
+          }
+        ],
+        "next_cursor": null
+      },
+      "code": "internal_error",
+      "path": "$.behaviors[0].revision"
+    },
+    {
+      "name": "stored missed status word as state",
+      "value": {
+        "behaviors": [
+          {
+            "id": "00000001-1111-4111-8111-000000000001",
+            "title": "Morning walk",
+            "description": "Twenty minutes outside.",
+            "location_text": null,
+            "category": {
+              "id": "00000003-1111-4111-8111-000000000003",
+              "name": "Fitness"
+            },
+            "state": "missed",
+            "archived_at": null,
+            "auto_archived_at": null,
+            "end_date": null,
+            "default_duration_minutes": 20,
+            "timezone": "America/New_York",
+            "schedules": [
+              {
+                "id": "00000006-1111-4111-8111-000000000006",
+                "recurrence": {
+                  "frequency": "weekly",
+                  "interval": 1,
+                  "days_of_week": [
+                    "monday",
+                    "thursday"
+                  ]
+                },
+                "recurrence_summary": "Weekly on Monday and Thursday",
+                "time_entries": [
+                  {
+                    "id": "00000007-1111-4111-8111-000000000007",
+                    "kind": "exact",
+                    "preset": null,
+                    "start_time": "07:30",
+                    "end_time": null,
+                    "label": "7:30 AM"
+                  },
+                  {
+                    "id": "00000008-1111-4111-8111-000000000008",
+                    "kind": "range",
+                    "preset": "evening",
+                    "start_time": "18:00",
+                    "end_time": "00:00",
+                    "label": "Evening"
+                  }
+                ],
+                "time_summary": "7:30 AM, Evening"
+              }
+            ],
+            "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+            "reminders": {
+              "browser_enabled": true,
+              "email_enabled": false,
+              "offset_minutes": 0,
+              "summary": "Browser reminder at the scheduled time"
+            },
+            "archive_notes": [],
+            "external_ref": null,
+            "created_at": "2026-09-01T12:00:00Z",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "b1.2026-10-18T13:00:00Z"
+          }
+        ],
+        "next_cursor": null
+      },
+      "code": "internal_error",
+      "path": "$.behaviors[0].state"
+    }
+  ]
+}

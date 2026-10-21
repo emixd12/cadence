@@ -103,3 +103,120 @@ describe("RLS policy registry", () => {
     }
   });
 });
+
+// Ticket 222: OAuth and integration records live in a non-exposed private
+// schema. The only service-role boundary is the token-endpoint function set.
+const OAUTH_MIGRATION_SQL = readFileSync(
+  join(MIGRATION_DIR, "20261018160000_add_oauth_integration_persistence.sql"),
+  "utf8",
+).replace(/\s+/g, " ");
+
+const OAUTH_PRIVATE_TABLES = [
+  "clients",
+  "grants",
+  "authorization_codes",
+  "token_families",
+  "tokens",
+  "activity",
+  "idempotency_records",
+  "external_references",
+  "rate_limit_counters",
+] as const;
+
+const OAUTH_SERVICE_ROLE_FUNCTIONS = [
+  "oauth_register_client(text, text, text, text, text, text[], text, jsonb, text, timestamptz)",
+  "oauth_get_client(text)",
+  "oauth_exchange_authorization_code(text, text, text, text, text, text, text)",
+  "oauth_rotate_refresh_token(text, text, text, text[], text, text)",
+  "oauth_verify_access_token(text, text)",
+  "oauth_revoke_token(text, text)",
+  "oauth_consume_rate_limit(text, uuid, text)",
+  "oauth_purge_expired()",
+  "oauth_revoke_all_grants()",
+] as const;
+
+const OAUTH_AUTHENTICATED_FUNCTIONS = [
+  "oauth_approve_consent(text, text, text, text, text[], text)",
+  "oauth_list_grants()",
+  "oauth_revoke_grant(uuid)",
+  "oauth_list_activity(integer, timestamptz)",
+  "integration_record_activity(text, uuid[], text, text)",
+  "integration_idempotency_begin(text, text, text)",
+  "integration_idempotency_complete(text, text, jsonb)",
+  "integration_idempotency_release(text, text)",
+  "integration_link_external_reference(text, uuid, text)",
+  "integration_find_external_reference(text, text)",
+  "integration_list_external_references(text, uuid[])",
+] as const;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+describe("OAuth private-schema registry (Ticket 222)", () => {
+  it("keeps the schema and every table unreachable for API roles", () => {
+    expect(OAUTH_MIGRATION_SQL).toContain(
+      "revoke all on schema cadence_oauth_private from public, anon, authenticated, service_role;",
+    );
+    expect(OAUTH_MIGRATION_SQL).toContain(
+      "revoke all on all tables in schema cadence_oauth_private from public, anon, authenticated, service_role;",
+    );
+    expect(OAUTH_MIGRATION_SQL).not.toMatch(
+      /grant [^;]* on (table )?cadence_oauth_private\./,
+    );
+    for (const table of OAUTH_PRIVATE_TABLES) {
+      expect(OAUTH_MIGRATION_SQL).toContain(
+        `alter table cadence_oauth_private.${table} enable row level security`,
+      );
+    }
+  });
+
+  it("ties every user-owned OAuth record to its Auth owner with a cascade", () => {
+    for (const table of OAUTH_PRIVATE_TABLES.filter(
+      (name) => name !== "clients" && name !== "rate_limit_counters",
+    )) {
+      expect(OAUTH_MIGRATION_SQL).toMatch(
+        new RegExp(
+          `create table cadence_oauth_private\\.${table} \\([^;]*user_id uuid not null references auth\\.users\\(id\\) on delete cascade`,
+        ),
+      );
+    }
+  });
+
+  it("limits token-endpoint functions to service_role", () => {
+    for (const signature of OAUTH_SERVICE_ROLE_FUNCTIONS) {
+      const escaped = escapeRegExp(signature);
+      expect(OAUTH_MIGRATION_SQL).toMatch(
+        new RegExp(`revoke all on function public\\.${escaped} from public, anon, authenticated;`),
+      );
+      expect(OAUTH_MIGRATION_SQL).toMatch(
+        new RegExp(`grant execute on function public\\.${escaped} to service_role;`),
+      );
+    }
+  });
+
+  it("limits user-session functions to authenticated callers", () => {
+    for (const signature of OAUTH_AUTHENTICATED_FUNCTIONS) {
+      const escaped = escapeRegExp(signature);
+      expect(OAUTH_MIGRATION_SQL).toMatch(
+        new RegExp(`revoke all on function public\\.${escaped} from public, anon, service_role;`),
+      );
+      expect(OAUTH_MIGRATION_SQL).toMatch(
+        new RegExp(`grant execute on function public\\.${escaped} to authenticated;`),
+      );
+    }
+  });
+
+  it("defines every public OAuth function as SECURITY DEFINER with an empty search_path", () => {
+    const definitions = OAUTH_MIGRATION_SQL.match(
+      /create function public\.[a-z_]+\([\s\S]*?as \$\$/g,
+    );
+    expect(definitions).toHaveLength(
+      OAUTH_SERVICE_ROLE_FUNCTIONS.length + OAUTH_AUTHENTICATED_FUNCTIONS.length,
+    );
+    for (const definition of definitions ?? []) {
+      expect(definition).toContain("security definer");
+      expect(definition).toContain("set search_path = ''");
+    }
+  });
+});
