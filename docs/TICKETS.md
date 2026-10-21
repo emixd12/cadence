@@ -14235,6 +14235,8 @@ planned `/api/hevy/workouts`. `applyHevyActivityRefresh` in `hevy.service.ts` is
 the cache rule for Ticket 238: a complete refresh replaces the snapshot, and an
 incomplete, older-fetch, or older-generation result never erases known records.
 
+Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Hevy Pro key. Sealed intake; a complete 31-day read (44 workouts, 5/5 pages, before/after counts equal); timing-only fields; Timeline showed a logged workout with time and duration only; disconnect deleted the key and fenced reads. Not live-testable with this account: over 500 workouts and non-Pro rejection.
+
 Goal: show recorded Hevy workout timing from today and up to 30 prior days.
 
 Acceptance: follow the Hevy brief exactly. Only the three allowlisted `GET` calls
@@ -14270,6 +14272,8 @@ Desktop completion is `PUT /api/outlook-calendar/connection` with the desktop
 session and Keychain client state; the desktop client itself belongs to Ticket 238.
 App registration, live personal or work/school access and publisher verification
 remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
+
+Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, which had tenant-wide admin consent (since removed): series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: user or cross-tenant consent, `admin_approval_required`, the unverified-publisher block, and wrong-account reconnect.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -14310,6 +14314,8 @@ Ticket 239 supplies separate Daily Brief disclosure. Not verified: live Microsof
 Apple or Hevy accounts,
 installed desktop deep links and Keychain, deployment.
 
+Live acceptance (local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): web Settings and Timeline **passed** for Hevy, iCloud and Outlook work/school: source labels, recorded-activity list, all-day toggles, revocation copy. Two Outlook panel defects found live were fixed (`facf67d`: a missing Reconnect/Disconnect after a reconnect-required read; `417d1ed`: a stale "connected" callback message). Installed desktop (Keychain, `cadence://` deep links, cache cleanup) is **blocked by Ticket 115**: no signed installed build with the connector code exists.
+
 Goal: one Settings connector library and Timeline presentation for all sources.
 
 Acceptance:
@@ -14349,6 +14355,8 @@ Platform impact:
 ## Ticket 239: Separately approved connector context in Daily Brief
 
 Status: locally verified and independently approved.
+
+Live acceptance: Daily Brief connector disclosure was checked only as default-off (`includeHevy` false with Hevy connected). A live brief with a disclosed source was **not run**; it needs owner approval for paid model calls.
 
 Goal: let Daily Brief use each new source only after its own disclosure.
 
@@ -14421,6 +14429,8 @@ Implementation (October 19, 2026):
 Status: locally verified and independently approved at `40b1dc2`, including
 F1–F8 and the final DAV metadata correction. Live acceptance remains unverified.
 
+Live acceptance (2026-10-19, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): **passed** with the owner's Apple Account and an app-specific password. Sealed intake; 5 calendars; server-expanded recurrence; all-day and other-zone events correct; all-day toggle; disconnect cleanup; the owner revoked the password. Finding: iCloud collections report full VTIMEZONE definitions, so floating events would quarantine by design. Not live-tested: wrong-principal reconnect.
+
 Goal: show selected iCloud calendars on web and linked desktop through a hosted
 CalDAV connector.
 
@@ -14454,6 +14464,8 @@ Platform impact:
 Status: independently approved at `a10b461` for local implementation and
 synthetic verification. Live providers, installed desktop, iCloud
 custody acceptance and release remain open.
+
+Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with a disclosed source was not run; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
 Goal: independently verify 221–227 and align public and in-app disclosures.
 

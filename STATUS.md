@@ -295,6 +295,16 @@ observations only; no credential or provider record was recorded.
   live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
   list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
   This likely explains the owner's empty first load.
+- Daily Brief connector disclosure (Ticket 239): only the default-off state was
+  live-checked (`includeHevy` false while Hevy was connected). A live brief with
+  a disclosed source was not run, pending owner approval for paid model calls.
+- Installed desktop (Ticket 238 desktop items: Keychain, `cadence://` deep
+  links, per-source cache cleanup): **blocked by Ticket 115**. No signed
+  installed build containing the connector code exists, so this step was not
+  simulated.
+- Pending owner action: remove "Cadence Calendar" and the probe apps at
+  account.live.com/consent for the personal Microsoft account (the site was in
+  maintenance at the time of testing).
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
