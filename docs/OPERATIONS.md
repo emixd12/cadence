@@ -1239,6 +1239,22 @@ deployment through the deployment's Vercel alias inventory before fetching it.
 The daily schedule resolves the latest Ready Production deployments. It reuses
 an unexpired RLS result only while all three release subjects still match.
 
+The collection job grants `GITHUB_TOKEN` `security-events: read` for CodeQL
+alerts and `vulnerability-alerts: read` for Dependabot alerts, following
+[GitHub's workflow permission reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
+Secret-scanning alerts require a separate GitHub App or personal access token;
+the current workflow has neither and reports that result as Unavailable. A
+permission declaration does not establish a Passed result: verify the collected
+evidence in Preview before Production publication.
+
+Alert counts represent a complete observed pagination walk, using at most ten
+pages of 100 alerts each. A further page, failed request, malformed response, or
+inconsistent pagination makes that provider aggregate Unavailable rather than
+publishing a partial count. Provider APIs do not give an atomic snapshot across
+pages. Secret-scanning requests preserve `hide_secret=true`, and the collector
+returns only aggregate data; alert contents and provider error bodies are not
+included in logs or public evidence.
+
 The protected environments own `VERCEL_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
 `SUPABASE_SERVICE_ROLE_KEY`. Environment variables own both Vercel project

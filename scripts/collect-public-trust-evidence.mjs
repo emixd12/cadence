@@ -11,6 +11,8 @@ import { collectRouteCandidates, collectRoutes, marketingContracts } from "./com
 import { boundedFetch } from "./public-trust-http.mjs";
 
 const ROOT = new URL("..", import.meta.url);
+const GITHUB_ALERT_PAGE_SIZE = 100;
+const GITHUB_ALERT_PAGE_LIMIT = 10;
 
 export function aggregateAudit(audit) {
   const counts = audit?.metadata?.vulnerabilities;
@@ -85,20 +87,65 @@ export function buildSnapshot(input) {
   return result.value;
 }
 
-async function githubFacts(input) {
+export async function githubFacts(input, options = {}) {
   if (input.fixture?.github) return input.fixture.github;
-  const headers = { authorization: `Bearer ${process.env.GITHUB_TOKEN}`, accept: "application/vnd.github+json" };
+  const fetcher = options.fetcher ?? fetch;
+  const token = options.token ?? process.env.GITHUB_TOKEN;
+  const origin = "https://api.github.com";
+  const repositoryUrl = `${origin}/repos/${input.repository}/`;
+  const headers = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json" };
   const get = async (path) => {
-    const response = await fetch(`https://api.github.com/repos/${input.repository}/${path}`, { headers, signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) return null;
-    return response.json();
+    try {
+      const { response, body } = await boundedFetch(origin, new URL(path, repositoryUrl).toString(), {
+        followRedirects: false,
+        fetcher: (url, init) => fetcher(url, { ...init, headers: { ...init.headers, ...headers } }),
+      });
+      if (response.status !== 200) return null;
+      return { data: JSON.parse(body.toString("utf8")), link: response.headers.get("link") };
+    } catch { return null; }
   };
-  const [code, checks, secrets, dependabot, repo] = await Promise.all([get("code-scanning/alerts?state=open&per_page=1"), get(`commits/${input.source_commit}/check-runs?per_page=100`), get("secret-scanning/alerts?state=open&per_page=1"), get("dependabot/alerts?state=open&per_page=1"), get("")]);
-  const codeqlComplete = codeqlAnalysisComplete(checks?.check_runs);
+  const repo = await get("");
+  const countAlerts = async (path) => {
+    const endpoint = new URL(path, repositoryUrl);
+    endpoint.searchParams.set("state", "open");
+    endpoint.searchParams.set("per_page", String(GITHUB_ALERT_PAGE_SIZE));
+    const paths = new Set([endpoint.pathname]);
+    if (Number.isSafeInteger(repo?.data?.id) && repo.data.id > 0) paths.add(`/repositories/${repo.data.id}/${path.split("?", 1)[0]}`);
+    const queryKeys = new Set([...endpoint.searchParams.keys(), "page", "before", "after"]);
+    const alertNumbers = new Set();
+    let url = endpoint;
+    for (let page = 0; page < GITHUB_ALERT_PAGE_LIMIT; page += 1) {
+      const result = await get(url);
+      if (!Array.isArray(result?.data) || result.data.length > GITHUB_ALERT_PAGE_SIZE) return null;
+      for (const alert of result.data) {
+        if (!Number.isSafeInteger(alert?.number) || alert.number < 1 || alertNumbers.has(alert.number)) return null;
+        alertNumbers.add(alert.number);
+      }
+      const links = result.link ? result.link.split(",").map((link) => /^<([^>]+)>;\s*rel="([^"]+)"$/i.exec(link.trim())) : [];
+      if (links.some((link) => link === null)) return null;
+      const next = links.filter((link) => link[2].toLowerCase().split(/\s+/).includes("next"));
+      if (next.length === 0) return alertNumbers.size;
+      if (next.length !== 1) return null;
+      try { url = new URL(next[0][1], url); } catch { return null; }
+      if (url.origin !== origin || url.username || url.password || url.hash || !paths.has(url.pathname)) return null;
+      const keys = [...url.searchParams.keys()];
+      if (new Set(keys).size !== keys.length || keys.some((key) => !queryKeys.has(key))) return null;
+      if ([...endpoint.searchParams].some(([key, value]) => url.searchParams.get(key) !== value)) return null;
+    }
+    // A truncated walk cannot be published as an exact open-alert count.
+    return null;
+  };
+  const [code, checks, secrets, dependabot] = await Promise.all([
+    countAlerts("code-scanning/alerts"),
+    get(`commits/${input.source_commit}/check-runs?per_page=100`),
+    countAlerts("secret-scanning/alerts?hide_secret=true"),
+    countAlerts("dependabot/alerts"),
+  ]);
+  const codeqlComplete = codeqlAnalysisComplete(checks?.data?.check_runs);
   return {
-    code_scanning: code === null || checks === null ? null : { open: code.length, analysis_complete: codeqlComplete },
-    dependabot: dependabot === null ? null : { open: dependabot.length },
-    secret_scanning: secrets === null ? null : { open: secrets.length, enabled: repo?.security_and_analysis?.secret_scanning?.status === "enabled", push_protection: repo?.security_and_analysis?.secret_scanning_push_protection?.status === "enabled" },
+    code_scanning: code === null || checks === null ? null : { open: code, analysis_complete: codeqlComplete },
+    dependabot: dependabot === null ? null : { open: dependabot },
+    secret_scanning: secrets === null || repo === null ? null : { open: secrets, enabled: repo.data?.security_and_analysis?.secret_scanning?.status === "enabled", push_protection: repo.data?.security_and_analysis?.secret_scanning_push_protection?.status === "enabled" },
   };
 }
 
@@ -113,13 +160,13 @@ export function codeqlAnalysisComplete(checkRuns) {
 }
 
 function safeCountFact(value, scope, tool) {
-  if (!value) return { status: "unavailable", scope, tool, summary: "The provider did not expose a safe aggregate result.", unavailable_reason: "The workflow token could not read this aggregate provider result." };
+  if (!value) return { status: "unavailable", scope, tool, summary: "The provider did not expose a safe aggregate result.", unavailable_reason: "The collector could not read a complete aggregate provider result." };
   const passed = value.open === 0 && value.enabled !== false && value.push_protection !== false;
   return { status: passed ? "passed" : "failed", scope, tool, summary: passed ? "The configured provider check reported zero open results." : "The configured provider check reported an adverse aggregate result.", unavailable_reason: null };
 }
 
 export function codeScanningFact(value, scope, tool) {
-  if (!value) return { status: "unavailable", scope, tool, summary: "The provider did not expose a safe aggregate result.", unavailable_reason: "The workflow token could not read the aggregate alert and commit analysis results." };
+  if (!value) return { status: "unavailable", scope, tool, summary: "The provider did not expose a safe aggregate result.", unavailable_reason: "The collector could not read complete aggregate alert and commit analysis results." };
   if (!value.analysis_complete) return { status: "not_run", scope, tool, summary: "CodeQL has not completed successfully for the named source commit.", unavailable_reason: null };
   return { status: value.open === 0 ? "passed" : "failed", scope, tool, summary: value.open === 0 ? "CodeQL completed for the named commit and reported zero open repository alerts." : "CodeQL completed for the named commit and the repository has an adverse aggregate result.", unavailable_reason: null };
 }
@@ -211,7 +258,7 @@ async function liveFacts(input) {
   const tool = (name, version = "1") => ({ name, version });
   const facts = {
     source_to_deployment_provenance: { status: provenance?.passed ? "passed" : "failed", scope: "Both named Ready Vercel deployments and their public Git commit metadata.", tool: tool("Vercel REST API"), summary: provenance?.passed ? "Both Ready deployments name the expected source commit." : "The named deployments are not both Ready from the expected source commit." },
-    production_dependency_vulnerabilities: { status: auditCounts.total === 0 && github.dependabot?.open === 0 ? "passed" : github.dependabot ? "failed" : "unavailable", scope: "Production dependencies declared by the lockfile, npm advisory data, and Dependabot status.", tool: tool("npm audit", process.env.npm_config_user_agent?.split("/")[1]?.split(" ")[0] ?? "unknown"), summary: `SBOM has ${sbomSummary.components} components with SHA-256 ${sbomSummary.sha256}; audit totals: ${auditCounts.total} (${auditCounts.critical} critical, ${auditCounts.high} high, ${auditCounts.moderate} moderate, ${auditCounts.low} low); Dependabot ${github.dependabot ? `open aggregate ${github.dependabot.open}` : "aggregate unavailable"}.`, unavailable_reason: github.dependabot ? null : "The workflow token could not read the Dependabot aggregate result." },
+    production_dependency_vulnerabilities: { status: auditCounts.total === 0 && github.dependabot?.open === 0 ? "passed" : github.dependabot ? "failed" : "unavailable", scope: "Production dependencies declared by the lockfile, npm advisory data, and Dependabot status.", tool: tool("npm audit", process.env.npm_config_user_agent?.split("/")[1]?.split(" ")[0] ?? "unknown"), summary: `SBOM has ${sbomSummary.components} components with SHA-256 ${sbomSummary.sha256}; audit totals: ${auditCounts.total} (${auditCounts.critical} critical, ${auditCounts.high} high, ${auditCounts.moderate} moderate, ${auditCounts.low} low); Dependabot ${github.dependabot ? `open aggregate ${github.dependabot.open}` : "aggregate unavailable"}.`, unavailable_reason: github.dependabot ? null : "The collector could not read a complete Dependabot aggregate result." },
     code_scanning: codeScanningFact(github.code_scanning, "Configured GitHub code-scanning analyzers for the named public repository and source commit.", tool("GitHub CodeQL")),
     secret_scanning: safeCountFact(github.secret_scanning, "GitHub secret scanning and push protection for the named public repository.", tool("GitHub secret scanning")),
     public_artifact_integrity: { status: integrity.status, scope: `${integrity.entries.length} allowlisted public application and marketing assets.`, tool: tool("SHA-256"), summary: `${integrity.entries.filter((entry) => entry.ok).length} of ${integrity.entries.length} public assets matched status, type, size, and digest bounds.` },

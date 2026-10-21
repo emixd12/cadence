@@ -1,5 +1,52 @@
 # Implementation Status
 
+## Public Trust aggregate correction — October 21, 2026
+
+Merge-readiness follow-up found that the collector requested one alert per
+provider and exposed that page length as the open-alert count. It now counts
+complete observed pagination walks for CodeQL, Dependabot, and secret scanning,
+bounded to 100 alerts per page and ten pages. Failed, malformed, inconsistent,
+or truncated reads remain Unavailable. Secret-scanning requests preserve secret
+redaction, and only aggregate counts and status booleans leave the collector.
+
+The collection job also declares GitHub's dedicated
+`vulnerability-alerts: read` permission for Dependabot; CodeQL retains
+`security-events: read`. Secret scanning still requires separate provider
+access. The public schemas and existing all-scope Dependabot semantics are
+unchanged. See `docs/OPERATIONS.md` for the permission and collection boundaries.
+
+Verification: 29 new pagination/privacy regressions and 100 focused Trust and
+integrity tests covered passing, with lint, typecheck, governance checks, and
+fixture-only collector/schema validation. Fresh PR CI remains the merge gate;
+Preview collection must verify the actual provider access before Production
+evidence is refreshed. This source correction does not establish current
+deployment provenance or replace the separate protected-environment binding
+and publication steps. Platform impact: collection tooling and its eventual
+public aggregate output; no application schema or desktop contract changes.
+
+## Native desktop dependency validation — October 21, 2026
+
+PR #118 review identified that the existing `verify` job built the desktop
+frontend without compiling the Rust application. A separate path-filtered
+`Desktop native` workflow now runs the locked Apple Silicon Cargo check and
+native library tests on macOS 15, using Rust 1.97.1 and the macOS 14 deployment
+target. It builds the real frontend assets first and records the runner and
+toolchain versions. See `docs/DESKTOP_BUILD.md#native-dependency-ci`.
+
+This adds repeatable compilation and synthetic native-test coverage. Signed
+artifact publication, installed updater/Keychain acceptance, and macOS 14
+runtime testing retain their existing gates. No credentials, hosted changes,
+or release artifacts are part of this workflow. Platform impact: desktop CI
+only; web, marketing, and future mobile have no runtime change.
+
+Local verification passed: actionlint 1.7.12, YAML and shell syntax checks,
+`npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check`, and `npm run desktop:build`. The
+[first macOS CI run](https://github.com/emixd12/cadence/actions/runs/39569333024)
+then passed the locked Cargo check and all 111 native library tests on PR #118
+head `c06292ca174558e7ab86dcc4948e4a09d92be933`. The existing `verify` job and
+both Vercel previews also passed before #118 merged as `ba31ea06`.
+
 ## Tickets 178 and 181: callback review correction, 0.1.4 source — October 21, 2026
 
 Merge-readiness review reproduced one remaining false-revocation path: an
@@ -8912,10 +8959,13 @@ a current immutable snapshot and `latest.json` for commit
   commit. Provenance, CodeQL, public-artifact integrity, application routes,
   marketing routes, the hosted migration boundary, and the 92-check RLS smoke
   passed. The RLS smoke removed all temporary users.
-- The dependency audit reported zero vulnerabilities. Dependabot aggregation
-  and secret-scanning aggregation remain explicitly Unavailable because the
-  workflow token cannot read those provider aggregates. This matches the
-  settled provider-unavailability contract and does not infer a Passed result.
+- At that publication, the dependency audit reported zero vulnerabilities;
+  Dependabot and secret-scanning aggregation were explicitly Unavailable.
+  The October 21, 2026 follow-up adds the collection job's dedicated
+  `vulnerability-alerts: read` permission for Dependabot. Preview verification
+  and refreshed Production evidence are pending. Secret-scanning aggregation
+  still requires a separate credential and remains Unavailable; the permission
+  correction does not infer a Passed result or change published evidence.
 - The exact default Turbopack build remains environment-blocked by the same
   internal helper-port `EPERM`; the Webpack production build passed under
   Ticket 101.

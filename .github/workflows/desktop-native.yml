@@ -1,0 +1,65 @@
+name: Desktop native
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/desktop-native.yml
+      - apps/desktop/src-tauri/**
+      - apps/desktop/package.json
+      - package.json
+      - package-lock.json
+      - public/icons/cadence-notification-icon.png
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/desktop-native.yml
+      - apps/desktop/src-tauri/**
+      - apps/desktop/package.json
+      - package.json
+      - package-lock.json
+      - public/icons/cadence-notification-icon.png
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Native macOS check and tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CADENCE_RUST_TOOLCHAIN: "1.97.1"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+      - name: Install release Rust toolchain
+        run: rustup toolchain install "$CADENCE_RUST_TOOLCHAIN" --profile minimal --no-self-update --target aarch64-apple-darwin
+      - name: Record native build environment
+        run: |
+          test "$(uname -m)" = arm64
+          sw_vers
+          xcodebuild -version
+          rustc +"$CADENCE_RUST_TOOLCHAIN" --version --verbose
+          cargo +"$CADENCE_RUST_TOOLCHAIN" --version
+      - run: npm ci
+      - name: Build desktop frontend assets
+        run: npm run desktop:build
+      - name: Check native application
+        run: cargo +"$CADENCE_RUST_TOOLCHAIN" check --locked --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Run native unit tests
+        run: cargo +"$CADENCE_RUST_TOOLCHAIN" test --locked --lib --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
