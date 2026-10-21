@@ -250,6 +250,17 @@ observations only; no credential or provider record was recorded.
   new app is unlikely. That retry also showed the "connected" callback message
   persisting after the server reported `reconnect_required`. The panel now
   drops that message when the server state differs (failing-first DOM test).
+  Root-cause evidence (2026-10-21): the coordinator registered a separate public
+  client in the same tenant, never consented by the personal account. Using
+  authority `/consumers` and requesting only `Calendars.ReadBasic`, it received
+  an opaque token for `Calendars.ReadBasic`. Graph returned 401 with an empty
+  body for both `/me/calendars` and `/me/calendarView`. A ReadBasic-only token
+  for a personal account is therefore rejected by Graph regardless of Cadence's
+  client, consent state, or request code, despite Microsoft's permission tables
+  listing it for personal accounts. With the same Cadence app and scope, the
+  work/school account received a Graph-audience JWT and was accepted. Whether a
+  broader scope works for personal accounts is being probed outside Cadence.
+  Any change to Cadence's scope set is an owner contract decision.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
