@@ -37,7 +37,7 @@ try {
 
   const profile = snapshotA.entities.find((row) => row.kind === "profile");
   assert(profile, "profile snapshot");
-  const nextProfile = { ...profile, value: { timezone: "Europe/London" } };
+  const nextProfile = { ...profile, value: { ...profile.value, timezone: "Europe/London" } };
   const merged = snapshotA.entities.map((row) => row.kind === "profile" ? nextProfile : row);
   const mergedFingerprint = entityDigest(merged);
   const write = { kind: "profile", id: "profile", operation: "upsert", expected: profile.value, value: nextProfile.value };
@@ -46,6 +46,9 @@ try {
   const replay = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: request }));
   assert(JSON.stringify(first) === JSON.stringify(replay), "receipt replay equality");
   assert(first.fingerprint === mergedFingerprint, "merged fingerprint binding");
+  const returnedProfile = first.snapshot.entities.find((row) => row.kind === "profile");
+  assert(returnedProfile, "updated profile snapshot");
+  assert(entityDigest([returnedProfile]) === entityDigest([nextProfile]), "timezone update preserves remaining profile fields");
   const category = first.snapshot.entities.find((row) => row.kind === "category");
   assert(category, "timestamp roundtrip category");
   const timestampValue = { ...category.value, name: "Timestamp roundtrip", description: "Synced category context", updated_at: "2026-09-01T06:00:00.123457Z" };
@@ -190,7 +193,7 @@ try {
   const sameAccountProfile = sameAccountBase.entities.find((row) => row.kind === "profile");
   assert(sameAccountProfile, "same-account race profile");
   const sameAccountRequests = ["Asia/Tokyo", "Europe/Paris"].map((timezone, index) => {
-    const value = { timezone };
+    const value = { ...sameAccountProfile.value, timezone };
     const entities = sameAccountBase.entities.map((row) => row.kind === "profile" ? { ...row, value } : row);
     return payload(sameAccountBase, [{ kind: "profile", id: "profile", operation: "upsert", expected: sameAccountProfile.value, value }], entityDigest(entities), (index ? "d" : "c").repeat(64));
   });
