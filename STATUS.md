@@ -66,6 +66,20 @@ have no implementation change. No schema or hosted configuration changes.
 
 ## Ticket 215 merge review and rollout boundary — October 21, 2026
 
+Added a disposable local Supabase rehearsal workflow for relevant PR changes and
+manual dispatch. It tests GitHub's PR merge commit, records exact source identity,
+replays the tracked migrations through the existing loopback Docker proxy, and
+runs the existing SQL, RLS, account-sync and authenticated BehaviorStore checks.
+This branch currently contains 89 migrations and 22 SQL fixtures; the workflow
+derives its inventory from the tested tree. Actual Docker/database execution is
+pending on GitHub; local YAML/shell/proxy validation does not close that gate.
+YAML parsing, actionlint and Bash syntax checks pass; the existing fake-daemon
+proxy suite passes all 20 tests with temporary Unix-socket access.
+No runtime source, schema, provider scope or hosted configuration changed.
+The Outlook support decision, signed installed desktop and coordinated rollout
+gates below remain open. See the disposable rehearsal section in
+`docs/OPERATIONS.md`.
+
 Current main is integrated. The lifecycle SQL smoke preserves both
 `location_text` and `where_kind`. The refreshed source passes 2,897 tests
 (167 skipped), the web and desktop builds, typechecks, registry checks, lint

@@ -1,0 +1,77 @@
+name: Local Supabase rehearsal
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/supabase-rehearsal.yml
+      - supabase/**
+      - scripts/supabase-rehearsal.sh
+      - scripts/supabase-docker-proxy.mjs
+      - scripts/supabase-rls-smoke.mjs
+      - scripts/account-sync-rpc-smoke.mjs
+      - tests/sql/**
+      - tests/behavior-store-supabase.contract.test.ts
+      - tests/supabase-docker-proxy.test.ts
+      - tests/helpers/**
+      - tests/fixtures/**
+      - lib/db/**
+      - lib/supabase/**
+      - lib/types/**
+      - lib/services/behaviorlog*
+      - lib/services/export.service.ts
+      - lib/services/occurrence.service.ts
+      - lib/services/time-tracking.service.ts
+      - lib/services/zip.ts
+      - packages/core/**
+      - package.json
+      - package-lock.json
+      - vitest.config.*
+      - tsconfig.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUPABASE_TELEMETRY_DISABLED: "1"
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Record source identity
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          {
+            printf 'Checked commit: `%s`\n\n' "$(git rev-parse HEAD)"
+            printf 'Checked tree: `%s`\n\n' "$(git rev-parse HEAD^{tree})"
+            if [[ -n "$PR_HEAD_SHA" ]]; then
+              printf 'PR head: `%s`\n\n' "$PR_HEAD_SHA"
+              printf 'PR base: `%s`\n\n' "$PR_BASE_SHA"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+      - run: npm ci
+      - name: Verify the existing Docker proxy
+        run: npx vitest run tests/supabase-docker-proxy.test.ts
+      - name: Replay migrations and run local contracts
+        run: bash scripts/supabase-rehearsal.sh
