@@ -290,14 +290,33 @@ observations only; no credential or provider record was recorded.
   `oauth2PermissionGrant` existed (`consentType` AllPrincipals, scope
   `openid offline_access Calendars.ReadBasic`), which explains the missing
   consent screen. The coordinator deleted that grant after the test (0 remain).
-  User consent, cross-tenant consent, `admin_approval_required` and the
-  unverified-publisher block were not exercised; wrong-account reconnect was not
+  User consent was exercised later (see below). Cross-tenant consent,
+  `admin_approval_required` and a tenant that blocks unverified apps were not
+  exercised; wrong-account reconnect was not
   live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
   list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
   This likely explains the owner's empty first load.
-- Daily Brief connector disclosure (Ticket 239): only the default-off state was
-  live-checked (`includeHevy` false while Hevy was connected). A live brief with
-  a disclosed source was not run, pending owner approval for paid model calls.
+- Daily Brief connector disclosure (Ticket 239): **live pass** (owner-approved
+  paid call, 2026-10-21). Disclosures were default-off (`includeHevy` false while
+  Hevy was connected). After the Outlook work account was reconnected, a
+  seven-key save enabled Daily Brief with only `includeOutlookCalendar`
+  (`connectorSources.outlookCalendar` true, no attention state). One live brief
+  read today's Outlook data (token refresh, list, calendarView 200) and made one
+  model call, which returned `ready` with `complete` coverage. A counts-only
+  audit of the model request found 0 event titles and no `description`,
+  `location` or attendee fields. The account had no Behaviors, so the brief
+  reported no schedule issue. Turning Daily Brief off revoked the disclosure.
+  The settings save, brief request and disconnect used the app's own API as the
+  test user; the in-app browser's Settings panel did not hydrate reliably.
+- Outlook work/school user consent (Ticket 237), 2026-10-21: after the
+  tenant-wide grant was removed, reconnecting showed Microsoft's user-consent
+  screen. It marked "Cadence Calendar" as **unverified** ("not published by
+  Microsoft"; no terms links) and listed "Maintain access to data you have given
+  it access to", "Read basic details of your calendars" and "View your basic
+  profile". As an admin, the owner also saw "Consent on behalf of your
+  organization" (left unticked). User consent then succeeded in the home tenant.
+  Disconnect deleted the credential again (generation 6). Pending owner action:
+  remove the user grant at My Apps.
 - Installed desktop (Ticket 238 desktop items: Keychain, `cadence://` deep
   links, per-source cache cleanup): **blocked by Ticket 115**. No signed
   installed build containing the connector code exists, so this step was not

@@ -14273,7 +14273,7 @@ session and Keychain client state; the desktop client itself belongs to Ticket 2
 App registration, live personal or work/school access and publisher verification
 remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
 
-Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, which had tenant-wide admin consent (since removed): series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: user or cross-tenant consent, `admin_approval_required`, the unverified-publisher block, and wrong-account reconnect.
+Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then through the user-consent screen, which marked the app unverified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -14356,7 +14356,7 @@ Platform impact:
 
 Status: locally verified and independently approved.
 
-Live acceptance: Daily Brief connector disclosure was checked only as default-off (`includeHevy` false with Hevy connected). A live brief with a disclosed source was **not run**; it needs owner approval for paid model calls.
+Live acceptance (2026-10-21, owner-approved paid call): **passed**. Disclosures were default-off. With only the Outlook disclosure enabled, one live brief read today's Outlook data and returned `ready` with `complete` coverage. A counts-only audit of the model request found no event titles and no description, location or attendee fields. Turning Daily Brief off revoked the disclosure.
 
 Goal: let Daily Brief use each new source only after its own disclosure.
 
@@ -14465,7 +14465,7 @@ Status: independently approved at `a10b461` for local implementation and
 synthetic verification. Live providers, installed desktop, iCloud
 custody acceptance and release remain open.
 
-Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with a disclosed source was not run; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
+Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
 Goal: independently verify 221–227 and align public and in-app disclosures.
 
