@@ -113,6 +113,7 @@ import {
   type OutlookServiceOptions,
 } from "@/lib/services/outlook-calendar.service";
 import { ConnectorError } from "@/lib/types/connectors";
+import * as connectorRepo from "@/lib/db/connectors.repo";
 import * as connectionRoute from "@/app/api/outlook-calendar/connection/route";
 import * as eventsRoute from "@/app/api/outlook-calendar/events/route";
 import * as callbackRoute from "@/app/auth/outlook-calendar/callback/route";
@@ -423,6 +424,48 @@ describe("reads, rotation, and fences", () => {
     for (const body of bad) await expect(updateOutlookCalendarPreferences(caller(OWNER), body, options)).rejects.toThrow("invalid_request");
     const view = await updateOutlookCalendarPreferences(caller(OWNER), { selectedSourceIds: ["calendar-2", "calendar-1"], hiddenSourceIds: ["calendar-2"], visible: false, showAllDay: true }, options);
     expect(view.preferences).toEqual({ selectedSourceIds: ["calendar-2", "calendar-1"], hiddenSourceIds: ["calendar-2"], visible: false, showAllDay: true });
+  });
+
+  it("cannot restore a selection after disconnect wins the write race", async () => {
+    await connectAndSelect();
+    const original = connectorRepo.saveConnectorPreferences;
+    vi.spyOn(connectorRepo, "saveConnectorPreferences").mockImplementationOnce(async (...args) => {
+      await disconnectOutlookCalendar(caller(OWNER));
+      return original(...args);
+    });
+    await expect(updateOutlookCalendarPreferences(caller(OWNER), {
+      selectedSourceIds: ["calendar-2"], hiddenSourceIds: [], visible: true, showAllDay: true,
+    }, options)).rejects.toMatchObject({ code: "connection_changed" });
+    expect(db.preferences.get(key(OWNER, "outlook_calendar"))!.selected_source_ids).toEqual([]);
+  });
+
+  it.each(["credential", "final fence"])("bounds a stalled %s read and discards late completion", async (stage) => {
+    await connectAndSelect();
+    ms.calls = [];
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    if (stage === "credential") {
+      const original = connectorRepo.readConnectorCredential;
+      vi.spyOn(connectorRepo, "readConnectorCredential").mockImplementation(async (connection) => {
+        await pending;
+        return original(connection);
+      });
+    } else {
+      const original = connectorRepo.readConnectorConnection;
+      let reads = 0;
+      vi.spyOn(connectorRepo, "readConnectorConnection").mockImplementation(async (...args) => {
+        if (++reads === 2) await pending;
+        return original(...args);
+      });
+    }
+    const result = getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-01", { ...options, deadlineMs: 20 });
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
+    const calls = ms.calls.length;
+    expect(calls).toBe(stage === "credential" ? 0 : 3);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(ms.calls).toHaveLength(calls);
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
   });
 });
 

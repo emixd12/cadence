@@ -194,6 +194,19 @@ describe("intake and sealing", () => {
 });
 
 describe("listing, selection, and reads", () => {
+  it("cannot restore a selection after disconnect wins the write race", async () => {
+    const homeId = await connectAndSelect();
+    const original = connectorRepo.saveConnectorPreferences;
+    vi.spyOn(connectorRepo, "saveConnectorPreferences").mockImplementationOnce(async (...args) => {
+      await disconnectIcloudCalendar(caller(OWNER));
+      return original(...args);
+    });
+    await expect(updateIcloudCalendarPreferences(caller(OWNER), {
+      selectedSourceIds: [homeId], hiddenSourceIds: [], visible: true, showAllDay: true,
+    }, options)).rejects.toMatchObject({ code: "connection_changed" });
+    expect(db.preferences.get(key(OWNER, "icloud_calendar"))!.selected_source_ids).toEqual([]);
+  });
+
   it("lists opaque calendar IDs and saves only current VEVENT selections with an exact body", async () => {
     await connect();
     const { calendars } = await listIcloudCalendarsForCaller(caller(OWNER), options);

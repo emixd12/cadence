@@ -17,7 +17,8 @@ import {
   withConnectorCredential,
   type ConnectorCaller,
 } from "./connector-credentials";
-import { HevyProviderError, readHevyWorkouts, verifyHevyApiKey, type HevyRequestOptions } from "./hevy-provider";
+import { HEVY_READ_DEADLINE_MS, HevyProviderError, readHevyWorkouts, verifyHevyApiKey, type HevyRequestOptions } from "./hevy-provider";
+import { assertConnectorReadActive, withConnectorReadDeadline } from "./connector-read-deadline";
 
 // Ticket 236 Hevy orchestration. Credentials stay inside the Ticket 235
 // lifecycle; this service exposes status, explicit connect or reconnect with a
@@ -69,17 +70,25 @@ export type HevyActivityReadOptions = HevyServiceOptions & Readonly<{
  */
 export async function getHevyActivities(caller: ConnectorCaller, start: string, end: string,
   options: HevyActivityReadOptions = {}): Promise<RecordedActivitySnapshotV1> {
+  return withConnectorReadDeadline(options, HEVY_READ_DEADLINE_MS, (bounded, deadlineAt) =>
+    readActivities(caller, start, end, bounded, deadlineAt));
+}
+
+async function readActivities(caller: ConnectorCaller, start: string, end: string,
+  options: HevyActivityReadOptions, deadlineAt: number): Promise<RecordedActivitySnapshotV1> {
   const clock = options.clock ?? Date.now;
-  const timezone = await profileTimezone(caller);
+  const timezone = await profileTimezone(caller, options.signal);
+  assertConnectorReadActive(options, deadlineAt);
   const range = validateRange(start, end, timezone, Temporal.Instant.fromEpochMilliseconds(clock()));
   return withConnectorCredential(caller, "hevy", async (credential, connection) => {
+    assertConnectorReadActive(options, deadlineAt);
     if (credential.provider !== "hevy") throw new ConnectorError("reconnect_required");
     if (options.expectedConnectionGeneration !== undefined && options.expectedConnectionGeneration !== connection.generation) {
       throw new ConnectorError("connection_changed");
     }
     let snapshot: RecordedActivitySnapshotV1;
     try {
-      snapshot = await readHevyWorkouts({ ...options, clock, apiKey: credential.apiKey, accountId: caller.user.id,
+      snapshot = await readHevyWorkouts({ ...options, clock, deadlineMs: deadlineAt - clock(), apiKey: credential.apiKey, accountId: caller.user.id,
         connectionGeneration: connection.generation, range });
     } catch (error) {
       throw connectorError(error);
@@ -100,8 +109,9 @@ export async function getHevyActivities(caller: ConnectorCaller, start: string, 
 export type HevyActivityRefresh = RecordedActivityRefresh;
 export const applyHevyActivityRefresh = applyRecordedActivityRefresh;
 
-async function profileTimezone(caller: ConnectorCaller): Promise<string> {
-  const { data, error } = await caller.client.from("profiles").select("timezone").eq("id", caller.user.id).single();
+async function profileTimezone(caller: ConnectorCaller, signal?: AbortSignal): Promise<string> {
+  const query = caller.client.from("profiles").select("timezone").eq("id", caller.user.id);
+  const { data, error } = await (signal && query.abortSignal ? query.abortSignal(signal) : query).single();
   if (error || !data || typeof data.timezone !== "string") throw new ConnectorError("provider_unavailable");
   return data.timezone;
 }

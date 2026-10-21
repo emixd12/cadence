@@ -55,10 +55,12 @@ export async function readConnectorConnection(client: AppSupabaseClient, userId:
   return connection.data ? toConnection(connection.data, preferences.data ?? undefined) : null;
 }
 
-export async function saveConnectorPreferences(client: AppSupabaseClient, userId: string, provider: ConnectorProvider, preferences: ConnectorPreferences): Promise<void> {
+/** Disconnect and every preference write advance the revision; stale requests cannot restore an older selection. */
+export async function saveConnectorPreferences(client: AppSupabaseClient, userId: string, provider: ConnectorProvider,
+  preferences: ConnectorPreferences, expectedSelectionRevision: number): Promise<void> {
   const { data, error } = await client.from("connector_preferences").update({ selected_source_ids: preferences.selectedSourceIds,
     hidden_source_ids: preferences.hiddenSourceIds, visible: preferences.visible, show_all_day: preferences.showAllDay })
-    .eq("user_id", userId).eq("provider", provider).select("user_id").maybeSingle();
+    .eq("user_id", userId).eq("provider", provider).eq("selection_revision", expectedSelectionRevision).select("user_id").maybeSingle();
   if (error || !data) throw new ConnectorError("connection_changed");
 }
 

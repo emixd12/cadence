@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 import type { User } from "@supabase/supabase-js";
 import { saveConnectorPreferences } from "@/lib/db/connectors.repo";
+import { assertConnectorReadActive, withConnectorReadDeadline } from "./connector-read-deadline";
 import {
   ConnectorError,
   DEFAULT_CONNECTOR_PREFERENCES,
@@ -56,7 +57,7 @@ const PROVIDER = "outlook_calendar" as const;
 const CLIENT_STATE = /^[a-zA-Z0-9_-]{32,128}$/;
 
 /** Test seams only; production uses global fetch and the system clock. */
-export type OutlookServiceOptions = Readonly<{ fetch?: OutlookFetch & OutlookGraphFetch; clock?: () => number; signal?: AbortSignal;
+export type OutlookServiceOptions = Readonly<{ fetch?: OutlookFetch & OutlookGraphFetch; clock?: () => number; signal?: AbortSignal; deadlineMs?: number;
   sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void> }>;
 
 function config(requestOrigin?: string): OutlookOAuthConfig {
@@ -173,6 +174,7 @@ async function withOutlookAccess<T>(caller: ConnectorCaller, deadlineAt: number,
   const settings = config();
   const clock = options.clock ?? Date.now;
   return withConnectorCredential(caller, PROVIDER, async (credential, connection) => {
+    assertConnectorReadActive(options, deadlineAt);
     if (credential.provider !== PROVIDER) throw new ConnectorError("reconnect_required");
     const remaining = deadlineAt - clock();
     if (remaining <= 0) throw new ConnectorError("timeout");
@@ -188,10 +190,11 @@ async function withOutlookAccess<T>(caller: ConnectorCaller, deadlineAt: number,
       throw error;
     }
     // A refresh that completes after the absolute deadline is discarded before use or rotation.
-    if (clock() >= deadlineAt) throw new ConnectorError("timeout");
+    assertConnectorReadActive(options, deadlineAt);
     if (tokens.refreshToken && tokens.refreshToken !== credential.refreshToken) {
       await rotateConnectorCredential(connection, { provider: PROVIDER, refreshToken: tokens.refreshToken });
     }
+    assertConnectorReadActive(options, deadlineAt);
     return read(tokens.accessToken, connection);
   });
 }
@@ -210,9 +213,9 @@ function graphOptions(accessToken: string, deadlineAt: number, options: OutlookS
 }
 
 export async function listOutlookCalendarsForCaller(caller: ConnectorCaller, options: OutlookServiceOptions = {}): Promise<{ calendars: OutlookCalendar[] }> {
-  const deadlineAt = (options.clock ?? Date.now)() + OUTLOOK_READ_DEADLINE_MS;
-  return withOutlookAccess(caller, deadlineAt, options, async (accessToken, connection) =>
-    ({ calendars: await providerCall(connection, () => listOutlookCalendars(graphOptions(accessToken, deadlineAt, options))) }));
+  return withConnectorReadDeadline(options, OUTLOOK_READ_DEADLINE_MS, (bounded, deadlineAt) =>
+    withOutlookAccess(caller, deadlineAt, bounded, async (accessToken, connection) =>
+      ({ calendars: await providerCall(connection, () => listOutlookCalendars(graphOptions(accessToken, deadlineAt, bounded))) })));
 }
 
 function idList(value: unknown): string[] {
@@ -230,15 +233,15 @@ export async function updateOutlookCalendarPreferences(caller: ConnectorCaller, 
   if (typeof body.visible !== "boolean" || typeof body.showAllDay !== "boolean" || hiddenSourceIds.some((id) => !selectedSourceIds.includes(id))) {
     throw new ConnectorError("invalid_request");
   }
+  const before = await getOutlookCalendarConnection(caller);
   const { calendars } = await listOutlookCalendarsForCaller(caller, options);
   if (selectedSourceIds.some((id) => !calendars.some((calendar) => calendar.id === id))) throw new ConnectorError("invalid_request");
-  await saveConnectorPreferences(caller.client, caller.user.id, PROVIDER, { selectedSourceIds, hiddenSourceIds, visible: body.visible, showAllDay: body.showAllDay });
+  await saveConnectorPreferences(caller.client, caller.user.id, PROVIDER,
+    { selectedSourceIds, hiddenSourceIds, visible: body.visible, showAllDay: body.showAllDay }, before.selectionRevision);
   return getOutlookCalendarConnection(caller);
 }
 
 export type OutlookEventsOptions = OutlookServiceOptions & Readonly<{
-  /** Daily Brief passes its smaller remaining budget; interactive reads use 25 s. */
-  deadlineMs?: number;
   authorizedCalendarIds?: readonly string[];
   expectedConnectionGeneration?: number;
   expectedSelectionRevision?: number;
@@ -251,10 +254,15 @@ export type OutlookCalendarRead = Readonly<{ connection: ConnectorConnection; re
  * listing, every selected calendar, every page, and every retry.
  */
 export async function getOutlookCalendarEventsForCaller(caller: ConnectorCaller, start: string, end: string, options: OutlookEventsOptions = {}): Promise<OutlookCalendarRead> {
+  return withConnectorReadDeadline(options, OUTLOOK_READ_DEADLINE_MS, (bounded, deadlineAt) =>
+    readEventsForCaller(caller, start, end, bounded, deadlineAt));
+}
+
+async function readEventsForCaller(caller: ConnectorCaller, start: string, end: string, options: OutlookEventsOptions, deadlineAt: number): Promise<OutlookCalendarRead> {
   const clock = options.clock ?? Date.now;
-  if (options.deadlineMs !== undefined && (!Number.isFinite(options.deadlineMs) || options.deadlineMs <= 0)) throw new ConnectorError("timeout");
-  const deadlineAt = clock() + Math.min(OUTLOOK_READ_DEADLINE_MS, options.deadlineMs ?? OUTLOOK_READ_DEADLINE_MS);
-  const { data: profile, error } = await caller.client.from("profiles").select("timezone").eq("id", caller.user.id).single();
+  const query = caller.client.from("profiles").select("timezone").eq("id", caller.user.id);
+  const { data: profile, error } = await (options.signal && query.abortSignal ? query.abortSignal(options.signal) : query).single();
+  assertConnectorReadActive(options, deadlineAt);
   if (error || !profile) throw new ConnectorError("provider_unavailable");
   let first: Temporal.PlainDate; let last: Temporal.PlainDate;
   try { first = Temporal.PlainDate.from(start); last = Temporal.PlainDate.from(end); }

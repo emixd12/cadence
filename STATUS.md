@@ -10,6 +10,30 @@ The integrated baseline `d7af234` was independently approved.
 Renumbered from 220–228 on 2026-10-19 to avoid collision with main's MCP
 Tickets 220–232; earlier commits and approvals cite the old numbers.
 
+- PR #111 review, October 21, 2026: fixed Outlook and Hevy service reads that
+  could wait past their deadline on database queries or the final credential
+  fence. All three new connectors now use one shared deadline helper, and late
+  database completion cannot start provider work after timeout. Fixed Outlook
+  and iCloud selection saves that could restore selected calendars after a
+  concurrent disconnect; writes now compare the previously read selection
+  revision. Eight failing-first regressions reproduced both defects. No schema,
+  provider permission, or disclosure changed. Hosted migration, personal Outlook
+  scope approval, and installed/deployed acceptance remain separate gates.
+  Verification: all seven required checks pass; the full suite passed 3,384
+  tests with 165 skipped after an elevated rerun for loopback/subprocess fixtures.
+  The web build passed on an elevated retry after an initial generic webpack
+  failure that did not identify its cause. Core, desktop
+  typecheck/build/parity, design-system and load-manifest checks also pass.
+  This Linux review environment has no Docker or Rust toolchain, so it did not
+  repeat migration replay or native tests.
+
+- Review stack integration, October 21, 2026: merged reviewed PR #83 and current
+  main `d598afc`, including #110's corrected SQL smoke. Connector behavior,
+  disclosure defaults, `requireCurrentUser`, monthly travel-spend readback and
+  its unavailable fallback remain present. This merge changes documentation
+  and a SQL smoke fixture, without changing application runtime code; migration
+  replay still requires the separate local database environment.
+
 - Merge of `origin/main` at `c42ca9e` (MCP Tickets 220–232), October 19, 2026:
   connector migrations were renamed to `20261019040000_connector_lifecycle.sql`
   and `20261019041000_daily_brief_connector_disclosure.sql` so they sort after
@@ -342,6 +366,28 @@ observations only; no credential or provider record was recorded.
   account.live.com/consent for the personal Microsoft account (the site was in
   maintenance at the time of testing).
 
+## PR 83 integration review — October 21, 2026
+
+Reconciled the briefing workbench branch with current main `d598afc`. The original
+Tickets 169–174 are already on main; the remaining changes provide the local
+Compare/Review/Days workbench, historical and sequence evaluation, a shared
+comparison budget, saved-review retention, pure bubble presentation, repository
+cleanup and the bounded Search Console CLI. There are no main-relative database
+migrations or production preset changes.
+
+The cleanup had removed `requireCurrentUser`, which current main's OAuth consent
+and Connected apps service imports. Restored that helper and retained the monthly
+travel-spend readback with its DOM regression while resolving the stale branch.
+Current MCP/OAuth, travel-budget and desktop-release changes remain present.
+
+Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+shared core, desktop TypeScript and both frontend builds pass. The full suite
+passed 2,965 tests with 165 skipped; its 20 sandbox-blocked socket/subprocess
+failures passed in an elevated rerun of all ten affected files (86 tests).
+The 173 focused workbench tests also pass. No hosted deployment, database replay,
+private-account model run or installed native acceptance was performed. Details:
+`docs/qa/briefing-workbench.md`.
+
 ## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
 
 In progress; not published. Candidate `0.1.1` is built from
@@ -377,6 +423,15 @@ signed-native travel evidence. Briefing and Calendar-agent work on that branch i
 excluded. The final `0.1.1` candidate is built from main after this change merges.
 No build, notarization, publication or hosted change ran. Ticket 178 session
 renewal and replay/expiry checks and Ticket 181 publication remain open.
+## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
+
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with
+"Configuration event plan does not match behavior state." The smoke predates
+migration `20260922010000_add_travel_settings.sql`, which added `location_text`
+to the Behavior configuration snapshot and baseline changed fields. The smoke's
+baseline plan now includes `location_text`; no schema or runtime change. A
+disposable Postgres replay of all 86 migrations passes all 19 SQL smokes.
+Retained local and hosted databases were not touched.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
