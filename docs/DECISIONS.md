@@ -781,6 +781,84 @@ Implementation decisions, recorded for owner review:
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
 
+## 2026-09-27: Replay-based briefing bench and stored daily brief
+
+Historical decision record, reconciled October 21, 2026. The later workbench
+execution uses Tickets 175–177 and 182–184; Tickets 178–181 belong to desktop
+release work. Ticket 185 remains the stored-brief lifecycle gate. Its later
+packet calls the 07:00 cutoff pending despite the confirmation recorded below;
+reconcile that discrepancy without assuming the owner withdrew the instruction.
+This entry preserves the original direction and does not activate storage or
+supersede current consent, privacy, deployment or acceptance gates.
+
+The owner asked to test the advisor across many days and all lanes on their own
+dogfooded account, with less clutter, and consented to using their data (including
+model transmission) for this evaluation. They decided: the day's brief is the first
+run at or after 7:00 AM local, stored so later openings and a reopen after dismissal
+show it without a new model run; the workbench budget rises to 100 model calls per
+hour; workbench runs are saved with their settings in compact, git-ignored local
+storage; replay reads Google Calendar for past dates.
+
+This reverses the documented "no stored briefing text" and "do not reopen dismissed
+output" rules once implemented. `docs/plans/briefing-bench-refactor.md` records the
+pain points, current system, conflicts to resolve and phases (proposed Tickets
+175–181). No code changed with this decision. The owner confirmed the 7:00 AM
+interpretation: the first opening at or after 7:00 AM local generates and stores the
+day's brief; earlier openings show none. Past Calendar reads under Google
+verification remain to be confirmed before their phase.
+
+## 2026-09-27: Briefing workbench saves reviews locally, including account captures
+
+The owner asked to implement Phases 0–2 of the briefing-bench audit
+(`docs/plans/2026-09-27-briefing-bench-review.md`) as Tickets 175–177, and authorized
+full account capture for the development workbench.
+
+- The complete rendered brief is the review unit. The editorial target is a roughly
+  45-second read: one or two planning points and at most one supported observation.
+  80–120 visible words is a working range, not a validated formula.
+- The workbench saves cases, candidates, runs, prose feedback, agent proposals and
+  owner decisions under `.local/briefing-bench/`. This replaces the earlier rule that
+  private comparison output stays in memory and clears when the tab is hidden.
+  Account cases save the captured inputs once so they can be rerun exactly. Storage
+  is owner-partitioned, 0700/0600, expires after 30 days and supports deletion.
+  Expiry blocks reads and writes. Physical cleanup runs when the local workbench
+  accesses expired cases; no background deletion runs while the workbench is closed.
+  `.gitignore` only prevents commits; it is not access control.
+- A saved case reruns on its captured clock. Reruns still need current consent: same
+  owner, enabled briefing, captured sources still disclosed, and captured Behaviors
+  still active. A deleted or archived Behavior withdraws the case from reruns.
+- Feedback becomes a proposal through a Markdown packet read by an existing coding
+  agent. No agent framework or embedded chat is added. Proposals are validated and
+  displayed, never executed, and never become production rules; promotion stays a
+  reviewed repository change.
+- Model-weight training, historical reconstruction (Phase 3), batch and lane-preview
+  review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
+  are not implemented.
+
+
+## 2026-09-30: Daily Brief evaluation criteria and versioned coverage profiles
+
+The owner supplied Ticket 184's evaluation criteria before reviewing candidate outputs.
+
+- Useful briefs provide actionable adherence insights through behavioral analysis
+  and planning for the day's Behaviors and outside connector events. Use available
+  evidence within existing authorization, disclosure and evidence-quality limits.
+- The complete brief has a general one-minute reading cap. Prefer concise, precise
+  wording. This supersedes the earlier 45-second evaluation target. A configurable
+  reading length remains a possible future setting, not an implemented feature.
+- Quiet days prioritize supported longitudinal insights over day-management tips.
+- Prefer different analysis lanes across days, while revisiting persistent patterns
+  of high importance or impact when useful. Wording variation may help presentation;
+  it does not itself remove substantive repetition.
+- The initial coverage is six tuning cases, ten reserved evaluation cases and one
+  seven-day sequence. Name it `daily-brief-balanced@1`. Support distinct coverage
+  profiles and retain their revisions and evaluation iterations separately.
+
+`docs/plans/2026-09-28-briefing-owner-review.md` defines this first profile and its
+frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
+acceptance, promotion, deployment and stored-brief decisions remain separate.
+This is an evaluation direction; runtime policy and production presets are unchanged.
+
 ## 2026-10-08: Rename the repository to emixd12/cadence
 
 Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,

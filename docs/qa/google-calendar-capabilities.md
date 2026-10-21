@@ -1012,9 +1012,11 @@ Ticket 140 is complete. Ticket 141 remains in progress until Google's decision
 covers the actual client/scopes and post-approval web/native smoke checks pass.
 Owner Privacy approval, technical acceptance, and provider approval remain distinct.
 Emiliano Bache Rodriguez monitors info@identityscaffolding.com. Task heartbeat
-`cadence-google-review-follow-up` checks Verification Center daily at 09:00 local,
-notifies only for meaningful changes or required participation, and does not read
-or monitor that inbox. Private reviewer correspondence must stay out of git.
+`cadence-google-review-follow-up` previously checked Verification Center daily at
+09:00 local. The owner requested disabling it on September 28 after Google approval;
+the app confirmed `PAUSED`. It did not read or monitor that inbox. Ticket 141's
+one-time post-approval web/native smoke checks remain outstanding. Private reviewer
+correspondence must stay out of git.
 
 Final documentation checks passed: `agents:check`, `interactions:check`,
 `resolvers:check`, and `git diff --check`. No new runtime change required another
@@ -1093,6 +1095,14 @@ approval review blocked selecting Claude Desktop because it could expose unrelat
 private content. No alternate route was used to bypass that rejection. The existing
 September 26 provider evidence above is preserved; this automation obtained no new
 provider decision and changed no configuration, scopes, callbacks, or rollout gates.
+
+September 27 and 28 scheduled follow-ups: Computer Use again reported the Identity
+Scaffolding Chrome session unavailable; the browser inventory contained no matching
+profile. Today's provider status is not verified. The recorded September 26 check
+remains the latest provider evidence. The existing request to open the signed-in
+Chrome profile remains outstanding. No configuration, scopes, callbacks, or rollout
+gates changed. No inbox was read and no correspondence was sent. Ticket 141 remains
+in progress pending post-approval smoke checks. `git diff --check` passed.
 
 Data Access lists `calendar.events.readonly` with **This scope is verified**.
 The unchanged non-sensitive declarations are `calendar.calendarlist.readonly`

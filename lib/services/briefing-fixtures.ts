@@ -5,9 +5,9 @@ import type { AdvisorCalendarEvent, AdvisorDayContextV1 } from "@cadence/core/ty
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import base from "../../tests/fixtures/advisor-day-context.valid.json";
 
-export const BRIEFING_FIXTURE_VERSION = "synthetic-2026-09-22.2";
+export const BRIEFING_FIXTURE_VERSION = "synthetic-2026-09-28.1";
 export const BRIEFING_FIXTURE_IDS = ["sparse", "dense", "incomplete_history", "calendar_absent", "calendar_partial", "hostile", "no_feasible",
-  "overlap", "tight_transition", "supported_gap", "missing_duration", "completed", "uneventful"] as const;
+  "overlap", "tight_transition", "supported_gap", "missing_duration", "completed", "uneventful", "overnight"] as const;
 export type BriefingFixtureId = typeof BRIEFING_FIXTURE_IDS[number];
 
 /** Builds synthetic history from daily records before aggregation. No account/provider reads. */
@@ -36,6 +36,9 @@ export function briefingFixture(id: BriefingFixtureId, config: BriefingConfig): 
   if (connector.state !== "not_requested" && id === "calendar_partial") connectors[0] = { ...connector, state: "incomplete", complete: false, events: [], coverage: connector.coverage.map((row) => ({ ...row, paginationComplete: false })), failure: { code: "incomplete_pagination", retryable: true, retryAfterSeconds: null } };
   if (connector.state !== "not_requested" && id === "no_feasible") connectors[0] = { ...connector, events: [{ ...connector.events[0], interval: { kind: "all_day", startLocalDate: context.localDate, endLocalDate: today.add({ days: 1 }).toString(), duration: { kind: "calendar_days", days: 1 } } }] };
   if (connector.state !== "not_requested") {
+    if (id === "overnight") connectors[0] = { ...connector, events: [
+      timedEvent(connector.events[0], "event_overnight", "2026-11-02T04:00:00Z", "2026-11-02T07:00:00Z"),
+    ] };
     if (["missing_duration", "completed", "uneventful"].includes(id)) connectors[0] = { ...connector, events: [] };
     if (id === "tight_transition") connectors[0] = { ...connector, events: [
       timedEvent(connector.events[0], "event_tight_transition", "2026-11-01T17:55:00Z", "2026-11-01T18:55:00Z"),

@@ -1,5 +1,5 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 declare global {
@@ -18,7 +18,7 @@ type Pending = { state: string; createdAt: number };
 export type DesktopAccountState =
   | { status: "local" }
   | { status: "waiting" }
-  | { status: "linked"; userId: string; email: string | null; name?: string | null }
+  | { status: "linked"; userId: string; email: string | null; name?: string | null; notice?: string }
   | { status: "error"; message: string };
 
 type SecureStorage = {
@@ -100,8 +100,11 @@ function client(config: { url: string; key: string }): SupabaseClient {
 
 export class DesktopAuth {
   private readonly supabase: SupabaseClient;
-  constructor(config: { url: string; key: string }, private readonly changed: (state: DesktopAccountState) => void) {
+  private readonly changed: (state: DesktopAccountState) => void;
+  private current: DesktopAccountState | null = null;
+  constructor(config: { url: string; key: string }, changed: (state: DesktopAccountState) => void) {
     this.supabase = client(config);
+    this.changed = (state) => { this.current = state; changed(state); };
   }
 
   async initialize(): Promise<() => void> {
@@ -170,18 +173,29 @@ export class DesktopAuth {
     return invoke("auth_first_link_baseline");
   }
 
+  // A stray, replayed or expired callback is rejected without replacing a working linked state.
+  private rejectCallback(message: string): void {
+    const current = this.current;
+    this.changed(current?.status === "linked" ? { ...current, notice: message } : { status: "error", message });
+  }
+
   private async completeCallbacks(urls: string[]): Promise<void> {
     for (const value of urls) if (isDesktopAuthCallback(value)) await this.complete(value);
   }
 
   private async complete(value: string): Promise<void> {
     const flow = await pending("get");
-    if (!flow) { this.changed({ status: "error", message: "This sign-in callback was already used or cancelled." }); return; }
+    if (!flow) { this.rejectCallback("This sign-in callback was already used or cancelled."); return; }
     const result = parseDesktopAuthCallback(value, flow.state, Date.now(), flow.createdAt);
     await pending("remove"); // Consume before exchange. Supabase authorization codes are single-use.
-    if ("error" in result) { await invoke("auth_secret_remove", { name: "supabase-pkce" }); this.changed({ status: "error", message: result.error }); return; }
+    if ("error" in result) { await invoke("auth_secret_remove", { name: "supabase-pkce" }); this.rejectCallback(result.error); return; }
     const current = await this.supabase.auth.getSession();
-    if (current.data.session) { await invoke("auth_secret_remove", { name: "supabase-pkce" }); this.changed({ status: "error", message: "Disconnect the current account before signing in with a different account." }); return; }
+    if (current.data.session) {
+      await invoke("auth_secret_remove", { name: "supabase-pkce" });
+      this.changed(accountStateFromSession(current.data.session,
+        "Disconnect the current account before signing in with a different account."));
+      return;
+    }
     const metadata = await this.metadata();
     const { data, error } = await this.supabase.auth.exchangeCodeForSession(result.code);
     if (error || !data.session) { this.changed({ status: "error", message: "Google sign-in could not be completed. Start again." }); return; }
@@ -238,10 +252,9 @@ export async function reconnectDesktopAccount(clearLocalSession: () => Promise<v
   await beginOAuth();
 }
 
-export function accountStateFromSession(session: Session | null): DesktopAccountState {
+export function accountStateFromSession(session: Session | null, notice?: string): DesktopAccountState {
   const metadata = session?.user.user_metadata;
   const name = [metadata?.full_name, metadata?.name].find((value) => typeof value === "string" && value.trim());
-  return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null } : { status: "local" };
+  return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null,
+    ...(notice ? { notice } : {}) } : { status: "local" };
 }
-
-export function desktopAuthAvailable(): boolean { return isTauri() && readDesktopAuthConfig() !== null; }
