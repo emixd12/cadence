@@ -258,9 +258,15 @@ observations only; no credential or provider record was recorded.
   for a personal account is therefore rejected by Graph regardless of Cadence's
   client, consent state, or request code, despite Microsoft's permission tables
   listing it for personal accounts. With the same Cadence app and scope, the
-  work/school account received a Graph-audience JWT and was accepted. Whether a
-  broader scope works for personal accounts is being probed outside Cadence.
-  Any change to Cadence's scope set is an owner contract decision.
+  work/school account received a Graph-audience JWT and was accepted. The same
+  fresh probe app then requested `Calendars.Read` and was granted
+  `Calendars.Read Calendars.ReadBasic`, still with an opaque token. Graph returned
+  200 for `/me/calendars` and `/me/calendarView`. Root cause: Graph accepts a
+  personal-account calendar token only when it carries `Calendars.Read` or a
+  broader scope, and rejects a ReadBasic-only one. That contradicts Microsoft's
+  permission tables. A Cadence fix would need `Calendars.Read`, which exposes
+  bodies and attachments that the brief excludes. That is an owner contract
+  decision; Cadence's scope set is unchanged.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 
