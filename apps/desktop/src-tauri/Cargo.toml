@@ -32,3 +32,9 @@ rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
 chrono = "=0.4.45"
 icu_normalizer = { version = "=2.3.0", default-features = false, features = ["compiled_data", "utf8_iter"] }
 sha2 = "=0.10.9"
+
+# Xcode 27.1 strip leaves release proc-macro dylibs that dyld refuses to load
+# ("mis-aligned LINKEDIT string pool") when MACOSX_DEPLOYMENT_TARGET is set.
+# Build scripts and proc macros never ship, so keep only them unstripped.
+[profile.release.build-override]
+strip = false
