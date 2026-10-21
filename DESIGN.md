@@ -314,6 +314,12 @@ This system is flat by default. Depth is created with borders, spacing, surface 
 
 **The One-Line-Per-Boundary Rule.** Any boundary between two neighbors is drawn exactly once. Stacked page sections take a single divider between them (`divide-y` on the stack, or `border-t` on every section after the first), never per-section `border-y`, which doubles the line across the gap. A nested container never redraws its parent's boundary: a list inside a section uses inner `divide-y` only, with no outer border, and inline status text does not carry its own `border-t`.
 
+Occurrence Note feedback uses the existing Timeline strong/error text roles,
+with foreground/accent fallbacks outside a Timeline row. Both roles become
+white on Completed and Not Completed fills. Feedback has no divider and aligns
+with Save note on desktop. Expanded rows match bottom and horizontal insets:
+12px on mobile and 16px from the small breakpoint.
+
 **The Spacing Scale.** Vertical space encodes hierarchy on a fixed ladder, and parallel objects always share the same value:
 
 | Boundary | Space | Owner |
@@ -658,3 +664,27 @@ availability. Live provider and installed native acceptance remain separate.
 The briefing workbench reuses its native checkbox/Definition-link row for
 Historical completion times. The control replaces the disabled timestamp row;
 geometry, spacing, typography, square borders and responsive columns are unchanged.
+
+
+## Travel budget readback (Tickets 213–214)
+
+The private briefing workbench adds one text line to its existing account-access
+panel for the local month and reserved travel spend. It uses existing typography
+and wraps at 390px. No new control, token or Settings field is added.
+
+## OAuth consent and Connected apps (Ticket 227)
+
+`ConsentForm` uses one max-width column, native write-permission checkboxes,
+plain required-read disclosure, and the existing underlined Allow/Deny actions.
+Client names, account addresses, and redirect hosts wrap on narrow screens.
+Optional logos load directly in the browser without a referrer. No new token,
+modal, or navigation item is added.
+
+`ConnectedAppsPanel` reuses `SettingsPanel`, divider-led grant rows, account-
+timezone dates, app-named Disconnect buttons, and a closed native Recent activity
+disclosure. Loading failures, empty grants, pending actions, and action results
+have separate text. Controls preserve 44px targets and semantic live feedback.
+
+## Developer documentation (Ticket 229)
+
+The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.

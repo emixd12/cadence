@@ -156,51 +156,43 @@ export async function computeGoogleRoute(
     timeoutMs?: number;
     maxRetries?: number;
     expiresAfterSeconds?: number;
-    assertCurrent?: (signal: AbortSignal) => Promise<void>;
   }>,
 ): Promise<TravelRouteEstimate> {
   assertTravelProviderReady(options.config);
   const timingAt = instantString(request.timing.at);
-  const drivingAt = request.mode === "driving" ? drivingDeparture(timingAt, request.readyAt) : timingAt;
-  let response = await routeResponse(request, options, request.mode === "transit"
+  const trafficAware = drivingTrafficAware(request, options.now);
+  // One call per leg (Ticket 214). Routes API accepts arrivalTime for TRANSIT only.
+  // Traffic-aware driving evaluates departure from the earliest possible start; later
+  // driving, walking and cycling use static durations without an arrivalTime request.
+  const drivingAt = request.mode !== "driving" ? timingAt
+    : drivingDeparture(trafficAware && request.timing.kind === "arrive_by" ? options.now.toString() : timingAt, request.readyAt);
+  const response = await routeResponse(request, options, request.mode === "transit"
     ? request.timing
     : request.mode === "driving"
-      ? { kind: "depart_at", at: drivingAt }
-      : request.timing.kind === "depart_at" ? request.timing : null);
+      ? trafficAware ? { kind: "depart_at", at: drivingAt } : null
+      : request.timing.kind === "depart_at" ? request.timing : null, trafficAware);
   const route = objectArray(response.routes)[0];
   if (!route || typeof route.duration !== "string") throw new TravelProviderError("malformed_provider_response", false);
-  const routeDurationSeconds = parseDurationSeconds(route.duration);
-  let durationSeconds = routeDurationSeconds;
-  let departureAt = request.timing.kind === "depart_at"
-    ? drivingAt
-    : Temporal.Instant.from(timingAt).subtract({ seconds: routeDurationSeconds }).toString();
-  let arrivalAt = request.timing.kind === "arrive_by"
-    ? timingAt
-    : Temporal.Instant.from(drivingAt).add({ seconds: routeDurationSeconds }).toString();
+  let durationSeconds = parseDurationSeconds(route.duration);
+  let departureAt: string;
+  let arrivalAt: string;
+  if (request.timing.kind === "depart_at") {
+    departureAt = drivingAt;
+    arrivalAt = Temporal.Instant.from(drivingAt).add({ seconds: durationSeconds }).toString();
+  } else {
+    const candidate = Temporal.Instant.from(timingAt).subtract({ seconds: durationSeconds });
+    // A traffic-aware departure cannot precede the earliest possible start; a late trip
+    // reports its evaluated late arrival.
+    departureAt = trafficAware && Temporal.Instant.compare(candidate, Temporal.Instant.from(drivingAt)) < 0
+      ? drivingAt : candidate.toString();
+    arrivalAt = Temporal.Instant.from(departureAt).add({ seconds: durationSeconds }).toString();
+  }
   if (request.mode === "transit") {
     const transit = transitJourney(objectArray(route.legs));
     if (!transit) throw new TravelProviderError("malformed_provider_response", false);
     durationSeconds = transit.durationSeconds;
     departureAt = transit.departureAt;
     arrivalAt = transit.arrivalAt;
-  }
-  // Routes API accepts arrivalTime for TRANSIT only. For driving, estimate the
-  // candidate departure from a future arrival-time probe, then evaluate traffic
-  // once at that departure. readyAt may already be past after geocoding. Walking and
-  // cycling use the returned static duration without an arrivalTime request.
-  if (request.mode === "driving" && request.timing.kind === "arrive_by") {
-    if (options.assertCurrent && options.signal) await options.assertCurrent(options.signal);
-    const candidateDeparture = drivingDeparture(
-      Temporal.Instant.from(timingAt).subtract({ seconds: routeDurationSeconds }).toString(),
-      request.readyAt,
-    );
-    const refined = await routeResponse(request, options, { kind: "depart_at", at: candidateDeparture });
-    const refinedRoute = objectArray(refined.routes)[0];
-    if (!refinedRoute || typeof refinedRoute.duration !== "string") throw new TravelProviderError("malformed_provider_response", false);
-    durationSeconds = parseDurationSeconds(refinedRoute.duration);
-    response = refined;
-    departureAt = candidateDeparture;
-    arrivalAt = Temporal.Instant.from(candidateDeparture).add({ seconds: durationSeconds }).toString();
   }
   const observedAt = options.now.toString();
   const expiresAt = options.now.add({ seconds: boundedExpiry(options.expiresAfterSeconds) }).toString();
@@ -216,6 +208,29 @@ export async function computeGoogleRoute(
   };
 }
 
+/** Driving uses traffic-aware (Pro) routing only when departure is near; later legs use static (Essentials) routing. */
+export const DRIVING_TRAFFIC_WINDOW_SECONDS = 60 * 60;
+/** Assumed longest trip when judging whether an arrive-by driving leg departs within the traffic window. */
+const DRIVING_TRAFFIC_ARRIVAL_ALLOWANCE_SECONDS = 60 * 60;
+
+export function drivingTrafficAware(request: Pick<TravelRouteRequest, "mode" | "timing">, now: Temporal.Instant): boolean {
+  if (request.mode !== "driving") return false;
+  const window = DRIVING_TRAFFIC_WINDOW_SECONDS + (request.timing.kind === "arrive_by" ? DRIVING_TRAFFIC_ARRIVAL_ALLOWANCE_SECONDS : 0);
+  return Temporal.Instant.compare(Temporal.Instant.from(request.timing.at), now.add({ seconds: window })) <= 0;
+}
+
+/**
+ * List prices in microdollars, checked 2026-10-16 (docs/COSTS.md). The budget reserves
+ * them before each call. Transit's SKU is unconfirmed, so it reserves the Pro rate.
+ */
+export const TRAVEL_GEOCODE_MICRODOLLARS = 5_000;
+const ROUTES_ESSENTIALS_MICRODOLLARS = 5_000;
+const ROUTES_PRO_MICRODOLLARS = 10_000;
+
+export function travelRouteMicrodollars(request: Pick<TravelRouteRequest, "mode" | "timing">, now: Temporal.Instant): number {
+  return request.mode === "transit" || drivingTrafficAware(request, now) ? ROUTES_PRO_MICRODOLLARS : ROUTES_ESSENTIALS_MICRODOLLARS;
+}
+
 function drivingDeparture(at: string, readyAt: string): string {
   // Read the live service clock after geocoding/fencing. Leave two call timeouts
   // for provider receipt; a late trip reports the evaluated late arrival.
@@ -229,6 +244,7 @@ async function routeResponse(
   request: TravelRouteRequest,
   options: Parameters<typeof computeGoogleRoute>[1],
   timing: TravelRouteRequest["timing"] | null,
+  trafficAware: boolean,
 ): Promise<Record<string, unknown>> {
   assertTravelProviderReady(options.config);
   const hosted = options.config.authMode === "workload_identity";
@@ -243,7 +259,7 @@ async function routeResponse(
       body: JSON.stringify({
         origin: waypoint(request.origin), destination: waypoint(request.destination), travelMode: googleMode(request.mode),
         ...(timing?.kind === "arrive_by" ? { arrivalTime: instantString(timing.at) } : timing ? { departureTime: instantString(timing.at) } : {}),
-        ...(request.mode === "driving" ? { routingPreference: "TRAFFIC_AWARE_OPTIMAL" } : {}), computeAlternativeRoutes: false,
+        ...(request.mode === "driving" ? { routingPreference: trafficAware ? "TRAFFIC_AWARE_OPTIMAL" : "TRAFFIC_UNAWARE" } : {}), computeAlternativeRoutes: false,
       }),
     },
   });

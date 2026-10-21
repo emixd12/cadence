@@ -259,4 +259,10 @@ export type TravelEvidenceResult = Readonly<{
   completeTrip: boolean;
   finalAvailabilityAt: string | null;
   modelProjection: TravelTimingModelProjection | null;
+  /** Snapshot of future Behaviors, including resolved stops omitted from this plan. */
+  behaviorSources?: readonly Readonly<{
+    ref: string; behaviorId: string; unresolved: boolean;
+    /** Only exact schedules depend on learned duration. */
+    durationSeconds?: number | null;
+  }>[];
 }>;

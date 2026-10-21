@@ -573,3 +573,98 @@ Imprint. The owner chose to remove Popmelt instead of migrating it.
 - `app.cadence-me.com` → `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV`; `cadence-me.com` →
   `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw`. `/login`, `/trust`, the Trust API, marketing
   `/` and `/about` return 200. Neither served page references Popmelt.
+
+## Task 10: residual-reference classification (October 9)
+
+Final tracked-file search on `main` after `610e938` plus this change: every
+remaining `habit-tracking-app` match is classified below. No active dependency
+remains unexplained.
+
+| Category | Files | Reason kept |
+| --- | --- | --- |
+| Infrastructure identity | `supabase/config.toml` (`project_id`), `tests/sql/ticket-165-travel-budget-smoke.sql` (container name) | The local Supabase project ID, Docker labels and volumes are preserved by design. |
+| Tool-managed name | `.codex/environments/environment.toml` (`name`) | Codex generates this file; change it only through Codex settings. Not a path dependency. |
+| Archive compatibility | `scripts/download-public-trust-history.mjs` | Accepts the exact legacy evidence prefix only for the `/cadence/` root. |
+| Regression fixtures | `tests/fixtures/public-trust-*`, `tests/public-trust-*.test.ts` | Explicit legacy-URL cases for history retention and rejection. |
+| Historical records | `STATUS.md` ledger entries, `docs/qa/*`, `docs/plans/*`, completed tickets in `docs/TICKETS.md`, the Ticket 100 completion boundary in `docs/PUBLIC_REPOSITORY_RELEASE.md`, the completed desktop milestone in `docs/DESKTOP_RELEASE.md`/`docs/DESKTOP_BUILD.md`, the Ticket 106 decision in `docs/DECISIONS.md` | Dated observations; superseded where needed by new dated text instead of rewrites. |
+
+Updated as current references in this change:
+
+- `docs/DESKTOP_BUILD.md`, `docs/DESKTOP_RELEASE.md`: the opening note now
+  records the completed rename and old-feed redirect behavior.
+- `docs/PUBLIC_REPOSITORY_RELEASE.md`: the Ticket 186 section records completion.
+- `docs/DECISIONS.md`: new 2026-10-08 entry supersedes the Ticket 106 source URL
+  and forbids reusing the old name.
+- `docs/VERCEL_WORKFLOW.md`: step 5 records the required post-merge
+  marketing-ID update and app redeploy.
+- `docs/TICKETS.md`: Ticket 186 status reflects completed cutovers.
+
+The old absolute path appears only in the rename plan. The working branch
+`claude/tickets-169-173-advisor-analysis` received the same rename through the
+October 9 merge; its branch-only QA-feed reference was updated then.
+
+### Retention and cleanup criteria (nothing deleted)
+
+- Keep `emixd12/emixd12.github.io` indefinitely; it serves the legacy evidence URLs.
+- Never create a repository named `habit-tracking-app`.
+- Keep the `/Users/emi/Coding Projects/habit-tracking-app` symlink until no
+  running tool or saved configuration uses that path. Known remaining users:
+  open Codex chats with the old sandbox root and the generated Codex environment.
+- Keep `/Users/emi/Coding Projects/.cadence-rename-backup-20261007` (mode 0700,
+  including the Popmelt archive and pre-change Codex config) until native
+  updater acceptance and one successful scheduled Trust run are recorded; then
+  the owner decides on deletion.
+- Disposable after Ticket 186 closes: `/private/tmp/cadence-rename-release`
+  worktree (remove with `git worktree remove`), `/private/tmp/cadence-rename-20261007`
+  logs and baselines, and the session scratch clone used for staging.
+
+## Native updater acceptance (October 9)
+
+Harness: a throwaway Rust binary outside the repository, built against the app's
+own `Cargo.lock` (`tauri` 2.11.5, `tauri-plugin-updater` 2.10.1, `reqwest`
+0.13.4). It creates a Tauri mock app, configures the updater with the public key
+embedded in the installed `/Applications/Cadence.app` (key ID
+`A305E094044E04A`), points `executable_path` at a fake `.app` in the scratch
+directory, forces `version_comparator` to offer the feed version, then calls the
+plugin's own `check()` and `download()`. `download()` verifies the Minisign
+signature before returning bytes. `install()` is never called.
+
+| Feed URL | Version | Bytes | SHA-256 matches baseline | Signature |
+| --- | --- | --- | --- | --- |
+| `…/habit-tracking-app/releases/download/desktop-preview/latest.json` (installed app's endpoint) | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/cadence/releases/download/desktop-preview/latest.json` | `0.1.1-preview.24` | 7,971,850 | yes | verified |
+| `…/habit-tracking-app/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+| `…/cadence/releases/download/desktop-updater-qa-20260928/latest.json` | `0.1.1-rc.3` | 8,242,757 | yes | verified |
+
+Both feeds still advertise download URLs under the old repository name; the
+plugin's HTTP client followed GitHub's redirects for feed and archive.
+
+Negative control: a freshly generated, unrelated Minisign public key made
+`download()` fail with `Minisign(UnexpectedKeyId)`. The temporary key was deleted.
+
+The installed app's file-tree SHA-256 was identical before and after
+(`8bf6c05925112b0e…`). No update was installed, no app data was touched, and no
+release or feed changed. The installed app (`0.1.1-preview.45`) is newer than
+both feeds, so its own check reports no update; the forced comparator exercised
+the download path. Native updater acceptance passes.
+
+## Scheduled Trust run and closure (October 9)
+
+Scheduled run `37943471227` started 2026-10-09T14:20:45Z on `main` at
+`74c8d4f`. Both `collect` and `publish` succeeded; no adverse-evidence gate
+fired. Snapshot:
+`https://emixd12.github.io/cadence/trust/37943471227/dpl_J3LeAsvAZBFAU34FQPrQ29ZszpBR/dpl_9iPg2pJGY6ZyP7mbcLNtppAzjqNL/20261009T142157Z-74c8d4f833b7.json`.
+
+- History: the index holds 40 entries, 37 legacy URLs plus 3 `/cadence/trust/`
+  snapshots. All 37 legacy snapshots and their details files match the archive
+  bytes (SHA-256, zero mismatches). All new snapshots and details are reachable.
+- Checks: source-to-deployment provenance, code scanning, public artifact
+  integrity, both live route comparisons and `hosted_migration_boundary`
+  (`20260927173716`, after PR #100) pass. Dependency and secret scanning remain
+  `unavailable` for token-scope reasons; the RLS smoke is `not_run` by design.
+- The live app Trust feed reports the same states.
+
+Every plan gate is closed. Ticket 186 is complete. Retention and cleanup
+criteria in the Task 10 section remain in force: keep the archive site, never
+reuse `habit-tracking-app`, keep the old-path symlink while tools use it, and
+keep the private backup until the owner decides to delete it.

@@ -582,3 +582,352 @@ that the check did not save or send the position. Coordinates were not collected
 proactive travel stayed off. This passes manual grant/retry and foreground location
 acquisition. It does not establish automatic first-prompt behavior or resolve the
 first Mac's timeout. The exact rc.3 candidate was unchanged.
+
+## Tickets 213–214: monthly budget and efficient refresh — October 18, 2026
+
+Implemented in source; not deployed. Hosted routing has refused every request
+since September 25 because the pilot's 40 lifetime refreshes were used.
+
+What changed:
+
+- `20261017150000_travel_monthly_budget.sql` adds `reserve_travel_provider_spend`.
+  Each provider call reserves its list price first: US$0.005 for a geocode or a
+  Routes Essentials call, US$0.010 for Routes Pro or transit. The owner ceiling is
+  US$5.00 per local month; a US$10.00 per UTC day circuit breaker covers all owners.
+  Refusals reserve nothing and return the renewal instant.
+- `20261017150100_travel_place_cache.sql` stores a text fingerprint and place ID per
+  looked-up location. Turning travel off deletes the rows through a trigger.
+- The refresh service looks up only places not stored, fences sources once before
+  the first paid call and once before returning, routes only legs leaving or
+  arriving within three hours, and runs lookups four at a time.
+- Driving uses one call per leg. Traffic-aware (Pro) routing applies only to legs
+  departing within about an hour; later legs use static Essentials routing.
+- The resolver skips legs between consecutive stops at the same place ID.
+- The client no longer refreshes on status, Note or duration-history changes. On a
+  Timeline open with a current view, one silent foreground read requests again only
+  after more than 500 m of movement beyond both accuracy radii.
+- When the budget is used up, the Timeline keeps the last plan as stale, says
+  "Travel estimates resume on {date}." and hides Refresh travel.
+
+Local evidence: a transaction applying both migrations and
+`tests/sql/ticket-213-travel-monthly-budget-smoke.sql` passed against the existing
+local schema and rolled back. A clean `db reset` through the reviewed Docker proxy
+then applied all migrations and the seed; the smoke passed again. The reset's final
+storage health request failed because the stale local API gateway container was
+not running; this is unrelated to the schema. The local database held only two
+`example.invalid` test accounts before the reset. Type generation was refused by
+the proxy's unnamed-container rule, which was not widened; information-schema
+readback matched the hand-written types. All published bindings stayed on
+`127.0.0.1`, and the Cadence containers were stopped afterward.
+
+Remaining gates, in order:
+
+1. Deploy the owner-approved privacy and terms text (approved October 18, 2026;
+   `docs/LEGAL.md` L-012) with or before Tickets 213–214. The draft in
+   `components/settings/LegalContent.tsx` adds Google's required Maps notice and links
+   to the Terms, names Google Maps Platform as a processor, and discloses place-ID
+   storage, foreground location reads and the monthly limit. Set the page and
+   retention-table dates to the deployment date if it is not October 18, 2026.
+2. Owner-authorized hosted `db push` of both migrations, then deployment.
+3. Owner web re-acceptance with `CADENCE_PERF_LOG=1`: record calls per refresh and
+   refresh p50/p95 from `travel.refresh`, `travel.place_lookups` and
+   `travel.route_legs`, and compare Cloud Monitoring geocode and Routes counts.
+4. Google Cloud quotas: Geocoding v4 reads 120/day and 30/minute. Place storage
+   reduces lookups, but more users will need higher quotas.
+5. Installed desktop re-acceptance inherits the hosted route.
+6. Whole-day Daily Brief routing is implemented in the completion pass below.
+
+
+### October 18 completion pass: local acceptance
+
+Tickets 213–214 remain open for release acceptance. Source implementation is complete.
+
+- The shared launcher requests day scope once per generated Daily Brief. The shared
+  travel hook queues it behind an active Timeline request, fences account/date,
+  deduplicates remounts, and retains consent, foreground and budget checks. The
+  day scope retains the existing eight-leg safety bound. No route value enters
+  model input. Web and desktop callers both pass the current linked account.
+- Foreground movement checks run every minute with existing permission only.
+  Stationary and background checks make no routing request. The threshold remains
+  more than 500 m beyond both accuracy radii.
+- Calendar title/etag-only changes do not refresh routes. Status/Note writes during
+  a request no longer discard its paid work. Core removes affected legs and
+  occupancy after a manual decision without inventing a replacement route. Returning
+  to Unresolved can reuse the original page-memory estimates.
+- Budget refusals apply across source changes, preserve the last same-day plan as
+  stale and unlock Refresh travel at the reset instant without a reload.
+- The private workbench's existing account-access read reports the local month and
+  reserved list-price spend. Failed readback says unavailable instead of zero.
+- `20261018051402_fence_travel_place_cache_consent.sql` prevents late lookup writes
+  from restoring place IDs after travel is disabled. Deploy this third migration
+  together with the two October 17 migrations.
+- Generated local TypeScript types match the new tables and RPC. No Google
+  coordinates are fetched or stored; routing uses place IDs directly.
+- Vitest, ESLint and TypeScript now exclude `.claude/**`, which contains an unrelated
+  nested checkout. Before this exclusion, that checkout ran stale tests against
+  this checkout's aliases and made lint inspect its generated bundles.
+
+A clean local reset through the reviewed Docker proxy returned zero after starting
+the pre-existing stopped Cadence gateway, REST and test-mail containers. It applied
+all migrations through `20261018051402` and the seed. Published bindings remained
+`127.0.0.1`. The SQL smoke passed after replay. The opt-in contract passed concurrent
+reservations at both ceilings and the October-to-November local-midnight boundary.
+The contract uses only synthetic accounts and rolls back its injected clock; final
+Auth-user count is zero. Reproduce it with:
+
+```sh
+CADENCE_TRAVEL_SQL_CONTRACT=1 npm run test -- tests/travel-budget.contract.test.ts
+psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -X -v ON_ERROR_STOP=1 -f tests/sql/ticket-213-travel-monthly-budget-smoke.sql
+```
+
+Operator readback, using an explicitly selected owner and a read-only session:
+
+```sql
+select local_month, reserved_microdollars,
+       reserved_microdollars / 1000000.0 as reserved_usd
+from public.travel_spend_owner_month
+where user_id = :'owner_id'::uuid
+order by local_month desc;
+```
+
+Browser QA used `127.0.0.1:4321`. A synthetic account response showed US$0.125 for
+October in the actual workbench account-access panel at 1280px and 390px. Neither
+viewport overflowed horizontally. The response interception and viewport override
+were removed. No account comparison or paid provider call ran. Authenticated
+Timeline, production provider p50/p95 and installed-desktop acceptance remain open.
+
+Release sequence: apply all three migrations, deploy the matching app and approved
+legal text, verify schema/application parity, then run bounded owner acceptance
+with performance timing enabled. Keep the feature's existing provider-clearance
+gate. The old production budget is exhausted, so a successful before-change latency
+baseline is not available from a fresh old-code request; retain any existing timing
+logs and label that limit explicitly. Do not substitute synthetic timing for production.
+
+
+Final checks: `agents:check`, `interactions:check`, `resolvers:check`, lint, web and
+desktop typecheck, `design-system:check`, web build, desktop build and `git diff
+--check` passed. The full suite passed 2,599 tests with 31 skips; the two opt-in SQL
+contract tests passed separately. Lint reported two existing warnings (the workbench
+purity suppression and the unused `_omitted` fixture binding). Desktop bundling
+reported existing dependency `use client` directive warnings. No hosted migration,
+production deployment, Google Cloud change, paid route or model request ran.
+
+
+## October 18 production release and bounded owner QA
+
+The owner authorized the three migrations, production deployment, and Google Maps QA
+with saved and Calendar locations, capped at US$0.50. The release branch
+`codex/travel-monthly-budget-release` starts at production `9bf1194`, preserving
+the September CPU fix and excluding the advisor branch's unreleased changes.
+PR: https://github.com/emixd12/cadence/pull/107. Initial release commit: `b97ecd6`.
+
+All three migrations deployed to the existing linked project. Migration history
+reads back through `20261018051402`. Hosted-generated table and RPC definitions
+match the release types; only generator helper parentheses and hosted PostgREST
+version metadata differ. Both new spend ledgers and the place cache started empty.
+No old pilot counter was reset or removed.
+
+Production deployment `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` reached READY at
+05:28:14 UTC. Both `app.cadence-me.com` and the legacy Vercel alias serve it.
+The clean CLI upload contains the reviewed release worktree at `b97ecd6`;
+the CLI deployment omits Git metadata. Approved October 18 Privacy and Terms
+content is live, including Google Maps Platform, the Maps end-user terms link,
+place-ID storage, foreground reads, and retention disclosures. L-012 is closed.
+Login, Privacy and Terms return 200. Protected screens redirect unauthenticated
+requests; both travel APIs return 401.
+
+The sampling deployment overrides only `CADENCE_PERF_LOG=1`. Project environment
+values remain unchanged. Deployment `dpl_6FfpW18n8tTRaJUVckLKJLvqkN3j` reached READY at
+05:44:15 UTC without that override, restoring existing project configuration.
+Its metadata records `7db9e3c696b3315bbf641320fcd838001060394c`.
+The new `.vercelignore` excludes local desktop artifacts, signing state, private
+exports and linked-provider metadata from CLI uploads. A dry-run manifest verified
+those exclusions. The intermediate artifact-bearing upload was canceled before
+promotion; its app source was unchanged and contained no signing secret.
+
+### Provider and cost evidence
+
+QA used the signed-in owner's existing consent, saved base, selected Transit mode,
+and Calendar locations. Direct acceptance requests used `device: null`.
+The original Calendar strings contain clinic/room descriptions. Five initial
+lookups produced one resolved, two ambiguous and two unresolved results; Cadence
+correctly withheld routes. Temporary request-only corrections used the street-address
+portions of two existing Calendar locations. No Calendar or saved-place record changed.
+
+The first corrected refresh looked up two new strings and returned two current
+transit estimates, each attributed to Google Maps. Three repetitions used the
+place cache and made no geocoding calls. The observed durations were 2,338 and
+734 seconds; route data remained transient and outside model input.
+
+| Sample | New geocodes | Routes | Server refresh ms | Browser elapsed ms |
+|---|---:|---:|---:|---:|
+| Original Calendar text | 5 | 0 | 3806.4 | 4347 |
+| Street-address corrections | 2 | 2 | 3598.4 | 3802 |
+| Cached repeat 1 | 0 | 2 | 3480.4 | 3607 |
+| Cached repeat 2 | 0 | 2 | 3232.0 | 3415 |
+| Cached repeat 3 | 0 | 2 | 2972.9 | 3169 |
+
+Four successful two-leg samples: median server duration 3356.2 ms; nearest-rank
+p95 3598.4 ms. This passes the five-second target for this owner scenario.
+This small sample does not establish six-leg or multi-user load performance.
+The exhausted old pilot prevents a fresh successful before-change baseline;
+no retained successful baseline was available. Two operator probe errors
+(a future start date and an object instead of a revision string) failed before
+any reservation; they are excluded from latency statistics.
+
+Cloud Monitoring independently reports seven GeocodeAddress and eight ComputeRoutes
+calls, all HTTP 200, in the bounded window starting 05:27 UTC. The owner ledger
+reserves US$0.115: 7 × US$0.005 plus 8 × US$0.010. Transit stays conservatively
+reserved at Pro list price. This is reserved list-price usage, not an invoice.
+Provider quota readback remains 120/day and 30/minute for Geocoding v4 and Routes;
+no quota or billing configuration changed.
+
+Web Timeline at 390px has equal viewport and document widths. It shows
+`Travel as of` and Refresh travel. Manual refresh completes. Opening the current
+Timeline and manual refresh add no Google spend because all relevant locations
+are cached and no leg is due in the three-hour window. Existing browser location
+permission caused normal UI requests to include a device sample; no Google route
+call used it in this window. Direct route acceptance did not request location.
+
+### Release verification and desktop
+
+The production-based candidate passes 2,365 tests, with 31 skips. Agent,
+interaction, resolver, design-system, lint, web/desktop type checks, and both
+frontend builds pass. The two SQL contracts passed separately before rollout.
+GitHub verify and CodeQL pass.
+
+A matching local desktop candidate, `0.1.1-preview.47`, passed strict app signing,
+read-only DMG comparison, updater-signature verification and archive comparison.
+It is an ad hoc preview, not Apple-notarized distribution. Source: `b97ecd6`;
+artifact hashes are in its ignored `artifact-verification.json`.
+macOS 27's Rust proc-macro stripping issue initially prevented compilation;
+build-only `CARGO_PROFILE_RELEASE_STRIP=none`,
+`CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=none` and
+`CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=2` resolved it. No source change
+or security exception was required. Upstream:
+https://github.com/rust-lang/rust/issues/157750.
+
+The verified candidate replaced installed preview.45 after an online SQLite
+backup and retained app rollback under the private Cadence Release directory.
+The current host is Apple Silicon, macOS 27.0.1 (26A434). The process launches,
+but `SecItemCopyMatching` waits for macOS Keychain approval while reading the
+existing account session. Installed UI acceptance remains pending that owner
+action. Do not treat the frontend build or app process as runtime acceptance.
+No credential, private location, raw route response or database backup is
+included in this public evidence.
+
+Read-only installed-data verification compares all 30 SQLite tables with the
+pre-install backup: zero changed, new or removed tables; quick_check passes and
+foreign-key violations are zero. The preview.45 rollback ZIP was extracted,
+compared file-by-file including permissions and symlinks, and signature-verified
+before its redundant unpacked copies were removed. The native Keychain prompt
+requires owner input; Computer Use refuses SecurityAgent interaction.
+
+### Release review corrections — October 18
+
+The response now includes the decision and duration basis for future Behaviors,
+including resolved occurrences omitted from the route. Shared core withdraws the
+cached trip if a newly Unresolved stop was omitted or its learned duration changed.
+Both clients offer manual Refresh travel. These changes make no provider call.
+Resolved stops still filter locally; an unchanged estimate or range schedule keeps
+its cached guidance. Regressions cover the resolver, service and rendered controls.
+
+Duration history now participates in both database fences. Calendar intentionally
+keeps Ticket 214's two reads: the initial snapshot and final revision check.
+A Calendar change during this bounded window can still consume reservations before
+the final check rejects the trip. Eliminating that window would require another
+Calendar read and still could not make an external provider transaction atomic.
+No stale trip is delivered. The review's proposed third read was not adopted.
+
+### Final production readback
+
+Deployment `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` is READY and owns both production
+aliases. It contains review commit `f239e72c0f32a4e46721dfa4e4e5776ace6da404`.
+A final saved/Calendar-location request returned 200, two current attributed legs,
+29 Behavior source records and no provider place IDs. Browser duration: 4.159 s;
+server timing was not sampled. Total reserved QA spend: US$0.135 of US$0.50.
+Cloud Monitoring confirms seven geocodes and ten routes, all 200. Final Timeline
+status says Travel as of; the 390px viewport has no horizontal overflow. The
+bounded deployment log scan returned no error records.
+
+All required local checks and both frontend builds pass at the review commit:
+2,370 tests passed, 31 skipped. Preview.48 matches that source and passed all
+artifact checks. It remains staged under the ignored release directory; installed
+preview.47 still waits for the owner's Keychain password and Allow action.
+Tickets and PR #107 remain open for installed runtime acceptance. The final
+candidate still needs installation and runtime verification after that prompt.
+
+### Installed acceptance follow-up
+
+Owner Keychain approval allowed preview.47 to open. Runtime inspection found the
+local build helper had omitted `VITE_CALENDAR_BROKER_ORIGIN`; preview.48 therefore
+was not installed. Preview.49 includes the existing production connector origin,
+passes artifact verification, and loads the linked account and selected Calendar
+in the installed app.
+
+Synchronization then exposed an existing account-sync defect: 229 freshly
+generated, untouched local Occurrences duplicated hosted schedule identities.
+All 229 have no Notes, decisions, time sessions, reminders or imported
+interventions. No private database repair was applied. A shared planner correction
+retains hosted identities for only new, unreferenced, unresolved duplicates.
+Native atomic apply frees their unique schedule slots before inserting hosted
+rows. Protected duplicates fail closed. The correction includes resolver and real
+SQLite regressions; 2,378 TypeScript tests and 110 native tests pass.
+
+Platform impact: desktop uses the shared planner and native transaction ordering;
+web tracking is unchanged and hosted data keeps its identities. Marketing is not
+applicable. Future mobile inherits the planner rule. Installed verification of
+the corrected candidate remains in progress.
+
+
+Preview.50 is installed from source commit `ce7d671`. Artifact checks verify the
+app, archive, updater signature, DMG and minimum-target metadata. The private
+pre-install SQLite backup is retained. The changed native binary triggered
+another macOS Keychain prompt while reading the existing session. A process
+sample confirms `SecItemCopyMatching` in `auth_secret_get`; Computer Use cannot
+operate this security prompt. Runtime convergence and protected-data preservation
+checks remain pending owner action. No manual database repair was applied.
+
+The final source passes agent, interaction and resolver checks, lint, web and
+desktop type checks, 2,378 TypeScript tests (31 skipped), 110 native tests, and
+both frontend builds. Native formatting check reports existing formatting drift
+in unrelated files; no repository-wide formatting was applied.
+
+A read-only selected-Calendar check found 13 events across October 19–23, with
+10 location fields. This does not establish six route legs on one day. No extra
+Maps call was made for that check. The two-leg timing sample remains the only
+live performance evidence; six-leg and before/after comparisons remain unverified.
+
+
+### Final installed acceptance — October 18, 2026
+
+The owner cleared the second Keychain prompt. Installed preview.50 completed
+normal synchronization and displayed “Account data is current.” The account-sync
+cursor advanced to `2026-10-18T06:34:26.509Z`; no outbox mutations remain pending.
+Read-only comparison with the pre-install backup confirmed:
+
+- All 1,456 existing status events and 13 time sessions are byte-for-byte intact.
+- All 34 existing Notes remain intact. No prior resolved Occurrence was removed
+  or changed to another status.
+- All import mappings, imported Notes, imported interventions, Behavior definition
+  events and Behavior configuration events remain intact. Hosted history was added.
+- The planner removed 229 untouched independently generated duplicates. Normal
+  hosted reconciliation also removed three older untouched Occurrences. None
+  contained a Note, decision, status history or completed timestamp.
+- SQLite quick-check is `ok`, foreign-key errors are zero, and no duplicate
+  schedule identities remain. No private database repair was applied.
+
+The native app loaded selected Calendar context. Raising its window activated
+foreground travel and displayed “Travel as of 2:35 AM” with Refresh travel.
+Refresh travel disabled while pending, then completed and re-enabled. The
+current three-hour window contained no route legs, so these native checks made
+no Google Maps call. The cumulative reserved QA cost remains US$0.135. The
+production owner-account two-leg runs above cover actual saved/Calendar routing.
+No tracking decision, Note, saved address or Calendar event was edited for QA.
+
+Tickets 213–214 functional acceptance is complete. The measured performance
+claim is limited to four two-leg samples. Six-leg and pre-change comparisons
+remain unmeasured; the exhausted old pilot could not supply a successful
+baseline. Current-device native location and Apple-trusted distribution remain
+separate Tickets 115/165 gates. The main promotion follows PR #107 and the
+existing matching-marketing-deployment procedure.

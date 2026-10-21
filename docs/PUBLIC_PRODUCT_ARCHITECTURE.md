@@ -34,8 +34,11 @@ acceptance and is in progress.
 Tickets 116–122 implement optional Google account linking and offline-capable
 desktop synchronization. Tickets 146–148 implement the in-app read-only daily briefing
 in the existing horse bubble on web and linked desktop, using server-side model
-generation and existing sign-in. General AI chat/coaching, audio speech, billing,
-and native mobile remain future scope. Marketing claims require separate acceptance.
+generation and existing sign-in. Tickets 220–232 plan a remote MCP server with a
+Cadence-owned OAuth server, Claude and ChatGPT plugins, and a `/developers` docs
+section in `apps/marketing`; see `docs/MCP_INTEGRATION.md`. General AI
+chat/coaching, audio speech, billing, and native mobile remain future scope.
+Marketing claims require separate acceptance.
 
 ## Surface model
 
@@ -251,16 +254,19 @@ The approved public retention schedule is:
   day and Supabase API and database logs retained seven days;
 - security-incident records: up to 90 days or until the investigation
   concludes when an investigation requires preservation;
-- backups: no more than seven days;
-- deleted-account live data: immediately when deletion succeeds, with backup
-  remnants aging out within seven days;
+- backups: Supabase maintains database backups; deleted records may remain in
+  copies until Supabase removes them under its backup lifecycle;
+- deleted-account live data: immediately when deletion succeeds; live-record
+  deletion does not immediately erase existing backups;
 - browser-push payloads: no more than 24 hours;
 - support messages: 12 months after resolution.
 
 Specific records may be retained longer only for security investigations,
 fraud prevention, or legal preservation. The owner confirmed verification of
-the active settings against this schedule on 2026-08-31. Sanitized evidence and
-the completion attestation live in `docs/OPERATIONS.md`.
+the then-active settings against the earlier schedule on 2026-08-31. Sanitized evidence and
+the completion attestation live in `docs/OPERATIONS.md`. Ticket 232 supersedes
+the former strict seven-day backup deadline with owner-approved lifecycle
+wording locally; it does not verify physical cleanup timing or authorize publication.
 
 ## Marketing content and legal contract
 
@@ -270,10 +276,21 @@ license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
 
-Cadence provides prepared prompts, but the user exports data and chooses any
-external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides exports and prepared prompts for services the user chooses.
+Opt-in Daily Brief separately discloses selected tracking information to OpenAI;
+Calendar timing and other optional sources require separate choices. Authorized
+MCP clients receive tracking records and may make scoped changes the user directs
+and confirms. Calendar data remains excluded from MCP.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
+
+Ticket 232 implements owner-approved Privacy, Terms and matching marketing copy
+locally, including a separate Daily Brief disclosure. Hosted MCP launch and
+publication remain pending. Existing policy dates stay during local review;
+before separately authorized publication, set both dates and the retention
+caption to the actual publication date in America/New_York. Do not compute a
+new date on each page load. Removal of the unsupported provider-verification
+sentence does not verify inherited provider or legal facts.
 
 The public legal entity is Identity Scaffolding LLC, a Wyoming limited
 liability company assumed authorized in New York. Its public address is 30 N
@@ -417,6 +434,12 @@ operations docs.
 General AI coaching/chat and audio speech remain future scope. The September 20
 product-direction update scopes the in-app read-only horse briefing under
 Tickets 146–148. It does not enable autonomous execution or broader AI features.
+
+Tickets 220–232 let outside AI clients, such as Claude and ChatGPT, call scoped
+Cadence MCP tools at the user's direction. Cadence runs no AI for those calls and
+adds no server-side autonomous execution. The integration operations layer is
+one transport adapter over one contract (`docs/MCP_CONTRACT.md`), not a connector
+SDK or provider registry.
 
 ## Source documents affected
 

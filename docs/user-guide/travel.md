@@ -54,15 +54,28 @@ journey corrections.
 
 ## Refresh travel estimates
 
-Estimates refresh when you open the Timeline without a current estimate, when your
-schedule or locations change, or when you choose Refresh travel. Cadence keeps the
-latest estimate for this browser session only and marks it as possibly stale after
-five minutes. Returning to the window does not request again. Select Refresh travel on the Timeline status line to request new
-estimates. Device position is read only during a refresh.
+Estimates refresh when you open the Timeline without a current estimate, when an
+event's time, location or attendance changes, when a Behavior's location or time
+changes, when your device has moved more than about 500 m since the last estimate,
+or when you choose Refresh travel. Marking a Behavior, editing a Note or returning
+to the window does not request again. Cadence keeps the latest estimate for this
+browser session only and marks it as possibly stale after five minutes.
+
+Each refresh estimates trips that leave, or must arrive, within the next three
+hours. Later trips say "estimated within 3 hours of departure" until then. Driving
+uses live traffic only for trips leaving within about an hour.
+
+On opening the Timeline with a current estimate, Cadence reads your device
+position once, without asking, to check whether you have moved. Device position is
+read only on that open and during a refresh. Cadence never tracks in the background.
 
 The status line shows Travel as of and the time the estimates were observed. After
 the estimates expire, the line says they may be stale and keeps them visible until
 you refresh. When a refresh fails, the line shows the reason instead.
+
+Travel estimates have a monthly limit per account. When it is used up, the
+Timeline keeps the last estimates, marked as possibly stale, and says on which date
+estimates resume. Refresh travel is hidden until then.
 
 ## Open navigation
 
@@ -76,7 +89,10 @@ link sends the source location only when clicked; search does not verify route t
 Reviewed routing sends endpoints, chosen mode and relevant times to Google Maps.
 It does not send Calendar titles, notes, account IDs or Calendar credentials.
 Cadence keeps device samples and route results in temporary memory and excludes
-them from sync, exports, backups and telemetry. Google retention follows its own
+them from sync, exports, backups and telemetry. To avoid paying Google again for
+the same place, Cadence stores Google's place identifier for each looked-up
+location with your account, keyed by a one-way fingerprint of the typed text.
+It never stores the text or coordinates there. Turning travel off deletes them. Google retention follows its own
 terms. Cadence cannot erase a request already processed by Google.
 
 Raw locations and route results are not sent to the Daily Brief model. Deterministic
@@ -86,3 +102,15 @@ regenerates an attempted briefing or resets its dismissal state.
 Desktop saves user-entered locations offline. Hosted estimates require a linked,
 synchronized account and connectivity. Provider, deployed-web and installed-macOS
 acceptance remain separate release gates in `docs/qa/travel-release.md`.
+
+
+A new Daily Brief also prepares travel estimates for the rest of today, within
+Cadence's eight-leg limit. These estimates appear in Cadence's calculated travel
+line; they are not sent to the model. While the Timeline is visible, Cadence checks
+an already-allowed device position once per minute. Only movement beyond 500 m,
+allowing for position accuracy, requests new routes. Marking an Occurrence removes
+its affected travel from the display without buying new estimates.
+
+When clearing a decision adds a stop absent from the cached trip, Cadence hides the
+old guidance and offers Refresh travel. A changed duration estimate does the same.
+Neither change calls Google Maps automatically.

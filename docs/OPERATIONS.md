@@ -1223,6 +1223,12 @@ deployment, then deploy the application. Dispatch Production evidence against
 the resulting merge commit and both Ready deployment IDs. Until that snapshot
 is public, the consumer must show older Passed results as Stale.
 
+Trust detail sanitization recognizes exact tool-reference paths from the checked-in
+developer catalog only in marketing route observations and failure prefixes.
+It still screens failure reasons, other fields and original URLs. Validation
+does not rewrite published details or restored history bytes. A validator fix
+is a new evidence-code revision; do not claim it shares a deployed source SHA.
+
 Run `.github/workflows/public-trust-evidence.yml` manually against Preview
 first. Name the exact source commit, Ready application deployment, and Ready
 marketing deployment. Select `run_rls` only when the owner authorizes
@@ -1813,3 +1819,99 @@ Travel remains excluded pending its existing release gates.
 No new control, database migration, provider authority or automatic rerun is added.
 Existing configuration revision fencing covers the new planner and policy versions.
 Ticket 161 still owns model-quality review, owner-run private comparisons and rollout.
+
+## OAuth authorization server (Ticket 226)
+
+OAuth and discovery fail closed unless server-only `CADENCE_MCP_ENABLED=true`.
+Set it to `false` to disable `/oauth/*` and the three discovery endpoints.
+Ticket 228 must call the same `requireOAuthEnabled` gate for `/mcp`.
+Environment changes require the hosting platform to restart affected instances;
+this setting is not a database switch or a promise of instantaneous propagation.
+An incident can additionally call existing `oauth_revoke_all_grants` through the
+restricted token-endpoint client. Do not roll back the additive schema.
+
+`CADENCE_OAUTH_ISSUER` defaults to `https://app.cadence-me.com`. It must be an
+exact HTTPS origin without a trailing slash. The resource is exactly its `/mcp`
+URL. Only non-production development permits HTTP localhost/127.0.0.1 on ports
+4321–4330. Host and forwarded headers never select the issuer. Apply the tracked
+migration before enabling the endpoints. Existing server-only Supabase service
+credentials call only OAuth RPCs; tracking data always uses the separate RLS path.
+
+Access tokens expire after one hour. Refresh tokens rotate on every use, expire
+after thirty idle days, and cannot outlive their ninety-day family. Reused codes
+or refresh tokens revoke their entire family. Grant revocation applies on the
+next verification; last-used writes occur at most once per minute. Codes and
+browser-bound pending requests expire after ten minutes. Unused DCR registrations
+expire after 24 hours. Ticket 232 calls `oauth_purge_expired` from the existing
+00:05 UTC `/api/occurrences/sync` schedule through
+`lib/services/oauth-maintenance.service.ts`. After scheduler authentication,
+maintenance runs independently of occurrence work and MCP enablement. The route
+awaits both paths, including breaker-open and early occurrence failures. The
+occurrence breaker still skips occurrence work and returns its existing
+503/Retry-After. Purge failure does not change the occurrence response.
+The route observes rejected maintenance immediately and still awaits settlement.
+Even if both maintenance reporting attempts throw, the occurrence response or
+original exception survives. Missing success events do not advance freshness.
+
+Maintenance propagates an eight-second AbortSignal into the Supabase RPC and
+awaits transport settlement. It clears the timer on every exit, rejects malformed
+raw counts, and never retries immediately. HTTP cancellation does not establish
+PostgreSQL cancellation; failures/timeouts have unknown database outcome.
+Verify the target's database-side statement/lock bounds and route duration budget
+before activation. Additional bounds require separate schema/config approval.
+
+`oauth_maintenance_completed` records seven nonnegative integer deletion counts
+using fixed labels: codes, access, families, clients, retries, activity and
+counters, each suffixed `_deleted`. Its platform timestamp is last-success
+freshness. `oauth_maintenance_failed` and `oauth_maintenance_timed_out` contain
+no exception payloads or success counts and do not advance freshness. Check
+successful-run age within 26 hours; stale or failing maintenance holds activation
+and requires operator attention. Automated alerts are not implemented.
+
+Healthy daily runs physically delete expired rows within roughly one extra day;
+failures extend retention. Expired credentials already fail validation. Backup
+retention is separate. Used DCR and CIMD registrations do not expire; retain
+shared metadata. Dedicated test registration deletion needs separately approved
+ID-bound cleanup, or owner-accepted retention.
+
+Prefer observing the scheduled run. A manual call also performs all-account due
+archive processing, occurrence generation and reminder planning. It is not a
+synthetic-only maintenance probe and needs authority for those side effects.
+
+CIMD fetches use HTTPS on port 443, approved DNS addresses pinned to the TLS
+connection, at most two redirects, a five-second total network deadline, a
+16 KiB response limit, and JSON content-type checks. Private, loopback,
+link-local, multicast, reserved and transition addresses fail closed. Metadata
+cache freshness follows max-age up to one hour; no-cache/no-store lasts at most
+one second. Client names and links remain untrusted; Ticket 227 displays an
+unverified label and redirect host. It must not fetch client logos server-side.
+
+Every protocol endpoint uses durable 600/minute global and 60/minute source
+admission; registration also uses 10/hour per source. Only Vercel's overwritten
+`x-vercel-forwarded-for` header identifies sources on Vercel. Other hosting and
+local development share the `unattributed` bucket, preventing spoofed headers
+from creating unlimited buckets. A different trusted proxy needs an explicit
+adapter before raising limits. Request bodies cap at 16 KiB and two seconds;
+OAuth database calls share an eight-second deadline. Public metadata, token,
+register and revoke responses allow credential-free CORS and prohibit caching.
+
+Monitoring uses endpoint HTTP status and private rate-limit counts. Do not log
+request bodies, query strings, cookies, Authorization headers, client state,
+OAuth codes, tokens, note text, or database exception payloads. Disable request
+query/header capture in hosting and error-reporting tools before rollout. The
+service returns fixed OAuth errors instead of underlying exception messages.
+
+Local synthetic verification: start only `cadence-mcp-226` using the isolated
+workdir and loopback Docker proxy in PR Context, then run:
+
+```bash
+CADENCE_OAUTH_TEST_WORKDIR=/tmp/oauth226/sb CADENCE_SUPABASE_CLI=/opt/homebrew/bin/supabase node scripts/smoke-oauth-local.mjs
+```
+
+The script accepts only API port 56721, starts `next dev` on the first free
+loopback port from 4321–4330, checks discovery with HTTP and curl, and exercises
+code exchange, refresh, revocation and error paths. It uses the authenticated
+consent RPC in place of Ticket 227's future UI. It deletes its synthetic user
+and registrations and stops its own development server. It never reads or
+copies `.env.local`; local Supabase keys enter the child environment in memory.
+A clean isolated database reset and generated-type comparison remain required.

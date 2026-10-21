@@ -185,6 +185,11 @@ Normal production deployment is via the Git integration:
 2. Confirm the production deployment is `READY`.
 3. Confirm deployment metadata points at the intended commit.
 4. Inspect build logs for warnings or failures.
+5. Set the application's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to
+   the new marketing deployment ID, then redeploy the application deployment
+   (`vercel redeploy <app-deployment> --target production`). Both projects
+   rebuild on every `main` push, so the previous value no longer names the live
+   marketing deployment, and Trust provenance fails until the app is redeployed.
 
 If using the Vercel CLI locally, link to the existing project only:
 

@@ -1,0 +1,126 @@
+{
+  "operation": "get_adherence_summary",
+  "valid_inputs": [
+    {
+      "name": "year",
+      "value": {
+        "start_local_date": "2025-10-19",
+        "end_local_date": "2026-10-18"
+      }
+    },
+    {
+      "name": "filtered",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-18",
+        "behavior_ids": [
+          "00000001-1111-4111-8111-000000000001",
+          "00000002-1111-4111-8111-000000000002"
+        ]
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "range over limit",
+      "value": {
+        "start_local_date": "2025-10-01",
+        "end_local_date": "2026-10-18"
+      },
+      "code": "limit_exceeded",
+      "path": "$.end_local_date",
+      "semantic": true
+    },
+    {
+      "name": "empty behavior filter",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-18",
+        "behavior_ids": []
+      },
+      "code": "invalid_input",
+      "path": "$.behavior_ids"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "overall and per behavior",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-18",
+        "timezone": "America/New_York",
+        "adherence_definition": "Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved.",
+        "overall": {
+          "completed": 8,
+          "not_completed": 2,
+          "unresolved": 3,
+          "needs_decision": 1,
+          "adherence_rate": 0.8
+        },
+        "behaviors": [
+          {
+            "behavior_id": "00000001-1111-4111-8111-000000000001",
+            "behavior_title": "Morning walk",
+            "state": "active",
+            "completed": 8,
+            "not_completed": 2,
+            "unresolved": 3,
+            "needs_decision": 1,
+            "adherence_rate": 0.8
+          },
+          {
+            "behavior_id": "00000002-1111-4111-8111-000000000002",
+            "behavior_title": "Vitamin D",
+            "state": "archived",
+            "completed": 0,
+            "not_completed": 0,
+            "unresolved": 2,
+            "needs_decision": 2,
+            "adherence_rate": null
+          }
+        ]
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "streak field",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-18",
+        "timezone": "America/New_York",
+        "adherence_definition": "Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved.",
+        "overall": {
+          "completed": 8,
+          "not_completed": 2,
+          "unresolved": 3,
+          "needs_decision": 1,
+          "adherence_rate": 0.8,
+          "current_streak": 4
+        },
+        "behaviors": []
+      },
+      "code": "internal_error",
+      "path": "$.overall.current_streak"
+    },
+    {
+      "name": "rate above one",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-18",
+        "timezone": "America/New_York",
+        "adherence_definition": "Adherence is Completed divided by Completed plus Not Completed. Unresolved Occurrences, including Needs decision, are excluded. It is null when nothing is resolved.",
+        "overall": {
+          "completed": 8,
+          "not_completed": 2,
+          "unresolved": 3,
+          "needs_decision": 1,
+          "adherence_rate": 1.5
+        },
+        "behaviors": []
+      },
+      "code": "internal_error",
+      "path": "$.overall.adherence_rate"
+    }
+  ]
+}

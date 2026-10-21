@@ -1,3 +1,4 @@
+import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { TravelSettingsBench } from "./TravelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
@@ -1884,6 +1885,8 @@ const previewFactories: Record<
     <ProductPreview><CategoryPanel categories={[{ id: "health", name: "Health", description: "Movement and rest", sort_order: 0, updated_at: "2026-09-05T00:00:00Z" }]} assignments={[]}
       action={async () => { "use server"; return { status: "error", message: "Preview only. Your draft remains available." }; }} /></ProductPreview>
   ),
+  "flow.consent-form": () => <ProductPreview><ConsentBench /></ProductPreview>,
+  "module.connected-apps-panel": () => <ProductPreview><ConnectedAppsBench /></ProductPreview>,
   "module.timezone-panel": () => (
       <ProductPreview>
         <TimezonePanel

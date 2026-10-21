@@ -366,3 +366,12 @@ These are proposals, not observed behavior or accepted scope:
 
 Do not add a connector SDK, generic provider registry, or common event envelope
 until a second accepted integration proves matching semantics.
+
+## Cadence MCP server (Tickets 220–232)
+
+`docs/MCP_INTEGRATION.md` is the completed brief for the remote MCP server and
+the Claude and ChatGPT plugins. Its operation contract is `docs/MCP_CONTRACT.md`
+(Ticket 221). The integration operations layer is one transport adapter (MCP)
+over one versioned contract. It is not a connector SDK, provider registry, or
+common event envelope, so the rule above still holds. A later REST or webhook
+adapter would reuse the same contract under its own ticket.

@@ -41,7 +41,7 @@ admin, preview, staging, or private paths in robots rules.
 The Public Trust route collector is not a crawler. It requests only the
 generated marketing manifest, the explicit application route registry, and
 the bounded machine-route and negative candidate registries under `config/`.
-It permits at most 32 route contracts, three same-origin redirects, two
+It permits at most 96 route contracts (including developer HTML and Markdown pairs), three same-origin redirects, two
 megabytes per response, and ten seconds per request. It never follows links
 discovered in a response. Any cross-origin redirect fails.
 Loopback, private, link-local, `.local`, and `.internal` hosts fail before a

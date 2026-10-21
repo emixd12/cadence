@@ -1,33 +1,147 @@
 # Implementation Status
 
-## Ticket 186: Cadence project and repository rename — October 7–9, 2026
+## PR 83 integration review — October 21, 2026
 
-In progress; local and remote cutovers are done.
+Reconciled the briefing workbench branch with current main `d598afc`. The original
+Tickets 169–174 are already on main; the remaining changes provide the local
+Compare/Review/Days workbench, historical and sequence evaluation, a shared
+comparison budget, saved-review retention, pure bubble presentation, repository
+cleanup and the bounded Search Console CLI. There are no main-relative database
+migrations or production preset changes.
+
+The cleanup had removed `requireCurrentUser`, which current main's OAuth consent
+and Connected apps service imports. Restored that helper and retained the monthly
+travel-spend readback with its DOM regression while resolving the stale branch.
+Current MCP/OAuth, travel-budget and desktop-release changes remain present.
+
+Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+shared core, desktop TypeScript and both frontend builds pass. The full suite
+passed 2,965 tests with 165 skipped; its 20 sandbox-blocked socket/subprocess
+failures passed in an elevated rerun of all ten affected files (86 tests).
+The 173 focused workbench tests also pass. No hosted deployment, database replay,
+private-account model run or installed native acceptance was performed. Details:
+`docs/qa/briefing-workbench.md`.
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+
+In progress; not published. Candidate `0.1.1` is built from
+`95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
+accepted app and DMG notarization; both are stapled. All 14 artifact checks pass,
+including signed entitlements and the embedded provisioning profile. The app
+checks the new `desktop-stable` feed, the owner's choice on October 19. A clean
+replay of all 86 migrations in the separate local project `cadence-release-20261019`
+passed the authenticated contract and 92 RLS ownership checks; it left no data.
+
+Xcode 27.1 `strip` broke release proc-macro dylibs under the macOS 14.0 deployment
+target. `[profile.release.build-override] strip = false` fixes the build; the
+shipped executable is unaffected.
+
+Open before publication: Ticket 178 installed checks on this build, a quarantined
+browser download of this DMG, an updater run from preview.50, merging the version
+and build-fix commits, and the owner's publish instruction. Packet, hashes, feed
+entry, release notes and rollback: `docs/qa/2026-10-19-desktop-0.1.1-release-packet.md`.
+
+## Signed-release tooling on main — October 19, 2026
+
+Ticket 181 preparation. The signed-release work behind rc.1–rc.4 existed only on
+unmerged branch `claude/tickets-169-173-advisor-analysis` (commit `9508550`). Main
+lacked the Developer ID entitlements, provisioning-profile embedding, DMG
+notarization and stapling, the production Keychain guard and the Ticket 180
+reminder fixes. This change applies `9508550` and `12ea89a` to current main.
+Four conflicts came from the Ticket 186 rename; each keeps `emixd12/cadence`.
+The Daily Brief smoke keeps main's key-tolerant default check.
+
+Release records also move to main: Tickets 178–181, the Ticket 115 and 165 status,
+`docs/qa/2026-09-27-apple-distribution.md`, the September 27 execution plan and the
+signed-native travel evidence. Briefing and Calendar-agent work on that branch is
+excluded. The final `0.1.1` candidate is built from main after this change merges.
+No build, notarization, publication or hosted change ran. Ticket 178 session
+renewal and replay/expiry checks and Ticket 181 publication remain open.
+## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
+
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with
+"Configuration event plan does not match behavior state." The smoke predates
+migration `20260922010000_add_travel_settings.sql`, which added `location_text`
+to the Behavior configuration snapshot and baseline changed fields. The smoke's
+baseline plan now includes `location_text`; no schema or runtime change. A
+disposable Postgres replay of all 86 migrations passes all 19 SQL smokes.
+Retained local and hosted databases were not touched.
+
+## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
+
+Owner direction (2026-10-18): Cadence ships one remote MCP server plus Claude and
+ChatGPT plugins, with full tracking-data read and scoped writes. Decisions and
+superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets:
+`docs/TICKETS.md`. Each ticket agent edits only its own line below.
+
+- Ticket 220 (MCP direction and integration brief): docs complete October 18, 2026; awaiting wave-1 verification. Decisions, AGENTS.md scope, `docs/MCP_INTEGRATION.md`, planned routes, follow-ups, and Tickets 220–232 recorded.
+- Ticket 221 (versioned MCP operation contract): complete October 18, 2026; awaiting wave-1 verification. `packages/core/src/integration/` defines all 16 tools (scopes, annotations, JSON Schema 2020-12 inputs and outputs, validator, error codes, limits, version `1.0.0`); `docs/MCP_CONTRACT.md` is drift-checked by `tests/integration-contract.test.ts`.
+- Ticket 222 (OAuth and integration persistence): reopened and corrected October 18, 2026 after wave-1 verification; awaiting independent re-verification. Forward migration `20261018164000_expand_integration_replay_capacity.sql` raises bounded JSONB retry storage to 512 KiB; the 100,000-byte wire cap and long output notes remain unchanged. Contract-to-RPC boundary regression, isolated clean reset (82 migrations), SQL smoke, and all repository gates including core passed. Generated types are unchanged. Migration `20261018160000_add_oauth_integration_persistence.sql` adds the private `cadence_oauth_private` schema (clients, grants, codes, token families, tokens, activity, idempotency records, external references, rate-limit counters), service-role token-endpoint functions, and authenticated consent and integration functions. Repositories `lib/db/oauth.repo.ts` and `lib/db/integration.repo.ts`; smoke `tests/sql/ticket-222-oauth-persistence-smoke.sql`. Local only; not pushed to hosted. `smoke:rls` fails on baseline `041546e` at smoke Behavior creation (pre-existing).
+- Ticket 223 (RLS-scoped request context for integrations): implementation complete October 18, 2026; awaiting wave-1 verification. ES256 internal tokens (Node crypto, 5-minute expiry) and `lib/integrations/request-context.ts`; local two-user RLS isolation passed in `cadence-mcp-223`. Hosted signing-key import remains an owner action (`docs/SUPABASE_WORKFLOW.md`).
+- Ticket 224 (integration read operations): implemented October 18, 2026 at `8c2f325`; ready for independent wave-2 verification. Ten scoped read handlers, explicit output allowlists, query-bound pagination, freshness, and injected read services. Focused tests (64), isolated two-user reads (3), full tests, lint, typecheck, build, agent, resolver, interaction and core checks pass. Web server only; desktop, marketing and mobile not applicable.
+- Ticket 225 (integration write operations): review corrections implemented October 18, 2026; awaiting independent re-verification. Forward migration `20261018190000_validate_integration_write_results.sql` validates prepared outputs, fences concurrent changes, checks actual committed output bytes, and stores only bounded public replay JSON. All repository gates pass (2,712 tests, 79 skipped); 31 live writes, 25 focused/boundary checks, SQL222/225 and clean reset pass. Public types unchanged. Account-sync smoke retains its verified pre-wave-2 profile-validation failure. Web server; linked desktop row shapes unchanged; marketing/mobile not applicable. No hosted changes.
+- Ticket 226 (OAuth authorization server endpoints): implemented locally October 18, 2026; awaiting independent wave-2 verification. Discovery, public-client code/refresh/revoke/register endpoints, SSRF-protected CIMD, browser-bound single-use pending consent, and MCP token verification. Migration `20261018170000_oauth_authorization_requests.sql`; all repository gates pass (2,712 tests, 56 skipped), 63 focused OAuth tests, isolated clean reset, repeated next-dev code-flow smoke, and browser/curl discovery pass. Synthetic consent RPC substitutes for Ticket 227 UI. Web only; desktop, marketing and mobile not applicable. No hosted changes or live client acceptance.
+- Ticket 227 (consent screen and Connected apps settings): implemented locally October 18, 2026; awaiting independent review. Browser-bound consent supports individual write permissions, safe denial, and Google-login return. Settings lists grants and metadata-only activity; Disconnect rejects the next token check and refresh. All repository gates pass (2,758 tests, 91 skipped); synthetic browser flow and screenshots at 390/1440 px verified. Web only; hosted grants make desktop, marketing and mobile not applicable. No hosted changes.
+- Ticket 228 (MCP endpoint): implemented locally October 18, 2026; awaiting independent review. Official SDK stateless transport supports 2026-07-28 and five legacy versions. All 16 tools pass Inspector OAuth/browser calls and two-mode authenticated local tests; second-user isolation, 401/403/429 and precommit output rejection pass. Repository gates pass (2,758 tests, 91 skipped). Inspector 2.11.0 mislabels structured tool errors; official SDK returns their stable codes. Optional incompatible OpenAI profile marker omitted. Disposable stack and credentials removed. Web only; linked desktop sync unchanged; marketing/mobile not applicable. No hosted changes.
+- Ticket 229 (developer documentation): review corrections implemented October 18, 2026; awaiting independent wave-4 re-review. Literal constraint rendering and nullable nested tables now have rendered-DOM regressions. Marketing `/developers` includes guides, generated references for all 16 tools, fixture-validated examples, Markdown mirrors and discovery outputs. Web Settings links to the docs; desktop and future mobile add no interface. Node 26 repository and marketing checks pass. Hosted launch and live-client acceptance remain pending.
+- Ticket 230 (Claude and ChatGPT plugin packages): implemented locally October 18, 2026; awaiting independent wave-4 review. Three shared skills, standalone Claude/OpenAI packages, root marketplace and reproducible ignored ZIPs. Claude strict validation, manifest/schema checks, registry-reference tests and all repository gates pass on Node 26. Distribution only; marketing links in Ticket 229; web, desktop and mobile not applicable. OpenAI portal scans, legal approval, publication and live installation remain unverified/owner-gated.
+- Ticket 231 (privacy disclosure and directory submission packet): review correction implemented October 18, 2026; awaiting independent re-review. Reviewer instructions now separate identical-input replay, changed-input key reuse rejection, and new-key stale-revision conflict; focused integration-write tests pass. `docs/qa/mcp-directory-submission.md` contains unpublished Privacy/Terms drafts, listing copy, reviewer-account options, test cases, recording script and owner release steps. OpenAI challenge route returns exact plain text or 404; focused tests, full tests, build, lint and drift checks pass. Typecheck passes after Ticket 230's shared-file correction; independent compiler recheck passes. Served legal pages unchanged. Web route and marketing listing copy; desktop/mobile not applicable. Legal approval, health-data eligibility, reviewer access and hosted acceptance remain owner gates; no hosted actions.
+- Ticket 232 (production deployment and live client acceptance): disabled release deployed October 18, 2026 from PR108 merge 280b6eacc9ebcabbd9c5b675c67adf1c01870c8d (reviewed tree 81eface). Six approved migrations are deployed; hosted history is 86 and the family-deadline function hashes/permissions match review. Both Node24 production sites are Ready; final web redeploy binds the Ready marketing deployment. MCP/OAuth/discovery return 503, challenge returns 404, and approved Privacy/Terms/marketing text and October18 dates match. Public Trust correctly marks prior-release evidence Stale; its Preview refresh exposed a validator collision with a public tool-reference path. A local field-scoped correction is under review; publication remains paused. Scheduled maintenance and live-client acceptance remain unverified. No public activation, signing-key change, manual scheduler invocation or live account test occurred. Web/marketing released; desktop sync acceptance remains separately gated and future mobile deferred.
+
+## Tickets 213–214 completed — October 18, 2026
+
+All three migrations deployed and read back. Production serves the approved
+Google Maps notices and routing implementation from focused release commit
+`f239e72` (PR #107). Owner QA reserved US$0.135 of US$0.50; Cloud Monitoring
+confirms seven geocodes and ten routes. Four two-leg samples measured server
+p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
+Web narrow-layout and Refresh travel checks pass. Review fixes withdraw cached
+guidance for reopened stops and changed durations, and check duration history
+before reserving spend.
+
+Installed preview.50 passes linked-account synchronization, selected-Calendar
+loading, foreground travel activation and Refresh travel. The shared planner
+safely reconciles independently generated untouched Occurrences with hosted
+identities. Native apply preserves the unique schedule constraint atomically.
+All 1,456 prior status events, 13 time sessions, 34 Notes and import records
+remain intact. The outbox is empty; SQLite integrity and foreign-key checks pass.
+No manual private database repair was applied.
+
+Validation: 2,378 TypeScript tests passed (31 skipped), 110 native tests passed;
+required checks and both frontend builds pass. Production deployment before the
+PR's main promotion is `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
+Six-leg and before/after performance remain unmeasured. Native current-device
+position and Apple-trusted distribution retain Tickets 115/165 gates.
+See `docs/qa/travel-release.md` for evidence and measurement limits.
+
+## Ticket 186: Cadence project and repository rename — completed October 9, 2026
+
+Completed. The local folder and GitHub repository are renamed to `cadence`
+without losing work, history, deployment identities or installed-client access.
 
 - Local: the physical folder is `/Users/emi/Coding Projects/cadence`; the old path
-  is a compatibility symlink. Codex uses the new root under the same project ID;
-  the owner confirmed fresh sessions work. Both Codex automations remain PAUSED.
-- GitHub: `emixd12/habit-tracking-app` is now `emixd12/cadence` (same ID
-  `1261353608`); settings, refs and releases are unchanged and old links redirect.
-  All 76 legacy Trust evidence files serve identical bytes from `emixd12.github.io`.
-- Production: PR #92 merged `main` with the already-deployed `9eda5c0` history.
-  After PR #94 (`610e938`), app `dpl_CzeNWirHRMwgWGNuK4VzXwStiQRV` and marketing
-  `dpl_2U3cA6da16hVJisjr9pqeJhU8Agw` serve the production domains. Each merge to
-  `main` requires updating the app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and
-  redeploying the app.
-- Trust: publishes from `https://emixd12.github.io/cadence/` with 37 legacy plus
-  new snapshots. Provenance passes again. `hosted_migration_boundary` fails
-  because unmerged branch `codex/fix-daily-brief-cpu-retries` applied hosted
-  migration `20260927173716`; this predates the rename.
-- Updater: feeds, archives and signatures pass through old and new URLs.
-- Task 9: production screens, local Supabase data and builds from the new folder
-  pass. Popmelt was removed on October 9 after the move changed its path-derived
-  project ID; its data is archived in the private rename backup.
-- `main` was merged into `claude/tickets-169-173-advisor-analysis` on October 9.
+  remains a compatibility symlink while open tools still use it. Codex uses the new
+  root under the same project ID. Both Codex automations remain PAUSED.
+- GitHub: `emixd12/cadence` keeps repository ID `1261353608`, settings, refs and
+  releases; old links redirect. Never create a repository named `habit-tracking-app`.
+- Evidence: all 76 legacy Trust files serve identical bytes from `emixd12.github.io`;
+  new evidence publishes under `https://emixd12.github.io/cadence/trust/`. Scheduled
+  run `37943471227` (October 9) kept all 37 legacy entries and passed provenance and
+  `hosted_migration_boundary`.
+- Production: after PR #100 (`74c8d4f`), app `dpl_J3LeAsvAZBFAU34FQPrQ29ZszpBR` and
+  marketing `dpl_9iPg2pJGY6ZyP7mbcLNtppAzjqNL` serve the production domains. After
+  each `main` merge, update the app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and
+  redeploy the app (`docs/VERCEL_WORKFLOW.md`).
+- Desktop: the real `tauri-plugin-updater` 2.10.1 check and download verify
+  signatures through old and new feed URLs; installed clients keep working.
+- Popmelt was removed (PR #94) after the move changed its path-derived project ID;
+  its data is archived in the private rename backup.
+- Retention: keep the archive site and old-path symlink as described; the private
+  backup `/Users/emi/Coding Projects/.cadence-rename-backup-20261007` stays until the
+  owner deletes it.
 
-Open: native updater acceptance, the next scheduled Trust run and Task 10
-residual-reference classification. Evidence: `docs/qa/cadence-project-rename.md`;
-plan: `docs/plans/2026-10-07-cadence-project-rename.md`.
+Evidence: `docs/qa/cadence-project-rename.md`; plan:
+`docs/plans/2026-10-07-cadence-project-rename.md`.
 
 ## Function
 
@@ -433,6 +547,46 @@ The loading diagnosis remains based on source inspection, not a new live reprodu
 This task changes documentation only. Verification: `agents:check`,
 `interactions:check`, `resolvers:check` and `git diff --check` pass. Runtime tests,
 builds, provider requests and deployments were not run for this ticket-filing task.
+
+## Supabase CPU alert production fix — September 27, 2026
+
+The owner authorized immediate remediation. Supabase applied migration
+`20260927173716_fix_daily_brief_nonretryable_conflicts` at 13:37 New York time.
+Readback confirms exactly three error-code changes and preserved function
+bodies, owners and grants. PostgREST sessions are idle; an 80.7-second observation
+recorded 53 commits, zero rollbacks, and no active Daily Brief sessions. No
+restart, compute resize, account-data or consent change was needed. CPU percentage
+was not directly measured. Calendar disclosure must still be renewed deliberately
+in Settings if the owner wants to resume Calendar-inclusive briefs.
+
+The fix branch records the already-applied PR #82/#83 migrations byte-for-byte,
+their related public RPC types, and the new migration's actual provider-assigned
+version. Hosted statements match all three files. Application PR integration
+and full Docker/Supabase replay remain separate work. Detailed evidence:
+`docs/qa/2026-09-27-supabase-cpu.md`.
+
+October 9, 2026: the fix branch merged into `main`. The repository migration boundary
+(`20260927173716`) now matches hosted history, which Trust's
+`hosted_migration_boundary` check compares. Function source in the September 26
+migrations still raises `40001`; any future redefinition must use `55000`.
+
+## Supabase CPU alert initial investigation — September 27, 2026
+
+Investigation found a continuing Daily Brief `40001` retry storm: 8,638,404
+Calendar-disclosure errors on September 25 and 359,874 in a September 27 hour.
+The prepared migration replaces three application-conflict error codes with
+`55000`, preserving consent, grants and admission behavior. Existing adapters
+already return `context_changed` / HTTP 409. It preserves both main and the newer
+hosted writer definitions. Web and linked desktop share the fix; local-only
+desktop and marketing are unaffected; native mobile remains deferred.
+
+Repository checks, production build and 2,211 tests pass (40 skipped). A local PGlite SQL regression
+fails before the migration and passes afterward for both writer versions,
+including privilege preservation and rejected-write rollback. Full Supabase
+replay is blocked by denied Docker socket access. Hosted rollout remains open:
+production has PR #82/#83 migrations absent from main, which must be reconciled
+before the new migration deploys. No hosted mutation or CPU recovery is claimed.
+Evidence, SQL smoke and owner actions: `docs/qa/2026-09-27-supabase-cpu.md`.
 
 ## Security alert triage — September 26, 2026
 

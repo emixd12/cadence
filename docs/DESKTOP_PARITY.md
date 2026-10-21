@@ -308,3 +308,12 @@ Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390p
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 `docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+
+## Hosted client access (Ticket 227)
+
+OAuth consent and Connected apps are web-only in v1. Grants live on the hosted
+account, so desktop implementation is not applicable. Manage access in the web
+Settings screen. Linked desktop data becomes readable after synchronization;
+account-free local data never reaches this server. Marketing and future mobile
+are not applicable to this ticket. The interaction registry and design-system
+surface catalog carry the same platform decision.

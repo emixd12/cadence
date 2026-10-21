@@ -1,0 +1,88 @@
+{
+  "operation": "get_account_context",
+  "valid_inputs": [
+    {
+      "name": "empty object",
+      "value": {}
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "unknown field",
+      "value": {
+        "user_id": "x"
+      },
+      "code": "invalid_input",
+      "path": "$.user_id"
+    },
+    {
+      "name": "not an object",
+      "value": [],
+      "code": "invalid_input",
+      "path": "$"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "read-only connection",
+      "value": {
+        "account_ref": "pw_9f8e7d6c5b4a3f2e1d0c",
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "local_time": "11:56",
+        "now": "2026-10-18T15:56:42Z",
+        "granted_scopes": [
+          "cadence.read"
+        ],
+        "contract_version": "1.0.0",
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "leaks email",
+      "value": {
+        "account_ref": "pw_9f8e7d6c5b4a3f2e1d0c",
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "local_time": "11:56",
+        "now": "2026-10-18T15:56:42Z",
+        "granted_scopes": [
+          "cadence.read"
+        ],
+        "contract_version": "1.0.0",
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        },
+        "email": "a@example.com"
+      },
+      "code": "internal_error",
+      "path": "$.email"
+    },
+    {
+      "name": "non-UTC instant",
+      "value": {
+        "account_ref": "pw_9f8e7d6c5b4a3f2e1d0c",
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "local_time": "11:56",
+        "now": "2026-10-18T11:56:42-04:00",
+        "granted_scopes": [
+          "cadence.read"
+        ],
+        "contract_version": "1.0.0",
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.now"
+    }
+  ]
+}

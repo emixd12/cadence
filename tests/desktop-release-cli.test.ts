@@ -18,7 +18,7 @@ describe.skipIf(process.platform !== "darwin" || process.arch !== "arm64")("desk
     mkdirSync(path.join(desktop, "src-tauri"));
     mkdirSync(path.join(directory, "scripts"));
     mkdirSync(path.join(directory, "bin"));
-    for (const file of ["release.mjs", "release-config.mjs", "verify-updater-signature.mjs", "verify-updater-archive.py", "verify-dmg.py"]) {
+    for (const file of ["release.mjs", "release-config.mjs", "verify-updater-signature.mjs", "verify-updater-archive.py", "verify-dmg.py", "verify-entitlements.py"]) {
       cpSync(path.join("apps/desktop/scripts", file), path.join(desktop, "scripts", file));
     }
     writeFileSync(path.join(desktop, "src-tauri", "tauri.conf.json"), JSON.stringify({ version: "0.1.0",
@@ -182,6 +182,12 @@ if(tool==='npm') {
     expect(commands.findIndex(({ tool, args }) => tool === "npm" && args[0] === "exec")).toBeLessThan(notaryIndex);
     expect(commands.findIndex(({ tool, args }) => tool === "codesign" && args[0] === "--display")).toBeGreaterThan(notaryIndex + 1);
     expect(commands.filter(({ tool, args }) => tool === "xcrun" && args[0] === "stapler" && args[1] === "validate")).toHaveLength(2);
+    const entitlementChecks = commands.filter(({ tool, args }) => tool === "python3" && args[0]?.endsWith("verify-entitlements.py"));
+    expect(entitlementChecks).toHaveLength(1);
+    expect(entitlementChecks[0].args.slice(1)).toEqual([
+      path.join(path.dirname(dmg), "..", "macos", "Cadence.app"),
+      path.join(realpathSync(desktop), "src-tauri", "Entitlements.plist"),
+    ].map((file) => path.resolve(file)));
     expect(existsSync(path.join(desktop, ".release", "artifact-verification.json"))).toBe(true);
     const report = JSON.parse(readFileSync(path.join(desktop, ".release", "artifact-verification.json"), "utf8"));
     expect(report.frontendPublicConfiguration).toEqual({ source: "fresh frontend before Tauri build",
@@ -260,6 +266,7 @@ if(tool==='npm') {
     expect(calls().some(({ tool, args }) => tool === "xcrun" && args.includes("stapler"))).toBe(false);
     expect(calls().some(({ tool, args }) => tool === "xcrun" && args[0] === "notarytool")).toBe(false);
     expect(calls().filter(({ tool, args }) => tool === "python3" && args[0]?.endsWith("verify-dmg.py"))).toHaveLength(2);
+    expect(calls().some(({ tool, args }) => tool === "python3" && args[0]?.endsWith("verify-entitlements.py"))).toBe(false);
     expect(calls().filter(({ tool, args }) => tool === "python3" && args[0]?.endsWith("verify-updater-archive.py"))).toHaveLength(5);
     const recheck = run(["preview-verify", "0.1.1-preview.2", path.join(previewPath("0.1.1-preview.2"), "bundle")]);
     expect(recheck.status, recheck.stderr).toBe(0);

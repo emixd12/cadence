@@ -1,5 +1,42 @@
 # Briefing workbench verification — Tickets 151–155
 
+## Current-main integration review — October 21, 2026
+
+PR #83 now integrates main `d598afc`; its original advisor-analysis title and
+stacked base no longer describe its remaining changes. Main already contains
+Tickets 169–174 and signed-release tooling. The remaining scope is the local
+Compare/Review/Days workbench and its retained review/history/sequence services,
+shared provider budget, pure bubble presentation, repository export cleanup and
+Search Console tooling. No database migration or production preset change is
+introduced relative to main. PR #111 contains the old #83 head and should follow
+the reviewed workbench integration.
+
+Integration corrected one build-blocking regression: the dead-export cleanup
+removed `requireCurrentUser`, but main's OAuth consent and Connected apps service
+uses it. The current helper is restored. The merged account bench also preserves
+main's monthly travel-spend readback and its DOM regression. Current main's OAuth,
+travel-budget and signed-desktop-release behavior remains present.
+
+Validation on Node 24:
+
+- Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+  shared-core portability, desktop TypeScript, desktop build and web build pass.
+- The focused workbench, history, sequence, budget, review and shared-bubble set
+  passes 173 tests across 12 files.
+- The full suite passes 2,965 tests and skips 165; 20 socket/subprocess tests fail
+  under the execution sandbox. Rerunning all ten affected files with the required
+  local execution access passes all 86 tests. Together the runs validate all
+  2,985 non-skipped tests; this is not a claim of one uninterrupted green run.
+- The web build passes with network-enabled execution. The initial sandboxed
+  build exited with a generic webpack error; that log did not identify a cause.
+
+The development-only loopback gate, same-origin checks, current account consent,
+shared 100-call hourly limit and 30-day local review retention remain enforced.
+Historical evaluation remains retrospective rather than exact as-of replay.
+No private-account model comparison, live Search Console action, schema replay,
+hosted deployment, installed native acceptance or new visual browser pass was
+performed in this review. Existing owner and release gates remain open.
+
 ## Owner-clicked account output — September 21, 2026
 
 The owner ran two comparisons during monitored troubleshooting. Both requests

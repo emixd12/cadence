@@ -8,6 +8,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     ".agents/**",
     ".local/**",
+    ".claude/**",
     ".astro/**",
     "**/.astro/**",
     ".next/**",

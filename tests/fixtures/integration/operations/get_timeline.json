@@ -1,0 +1,180 @@
+{
+  "operation": "get_timeline",
+  "valid_inputs": [
+    {
+      "name": "defaults",
+      "value": {}
+    },
+    {
+      "name": "a week without needs decision",
+      "value": {
+        "start_local_date": "2026-10-19",
+        "days": 7,
+        "include_needs_decision": false
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "too many days",
+      "value": {
+        "days": 15
+      },
+      "code": "invalid_input",
+      "path": "$.days"
+    },
+    {
+      "name": "impossible date",
+      "value": {
+        "start_local_date": "2026-02-30"
+      },
+      "code": "invalid_input",
+      "path": "$.start_local_date"
+    },
+    {
+      "name": "datetime instead of date",
+      "value": {
+        "start_local_date": "2026-10-18T00:00:00Z"
+      },
+      "code": "invalid_input",
+      "path": "$.start_local_date"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "today with needs decision",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": {
+          "occurrences": [
+            {
+              "id": "00000004-1111-4111-8111-000000000004",
+              "behavior_id": "00000001-1111-4111-8111-000000000001",
+              "behavior_title": "Morning walk",
+              "category_name": "Fitness",
+              "local_date": "2026-10-16",
+              "timezone": "America/New_York",
+              "scheduled_for": "2026-10-16T11:30:00Z",
+              "schedule": {
+                "kind": "exact",
+                "preset": null,
+                "start_time": "07:30",
+                "end_time": null,
+                "label": "7:30 AM"
+              },
+              "status": "unresolved",
+              "status_label": "Unresolved",
+              "needs_decision": true,
+              "completed_at": null,
+              "status_marked_at": null,
+              "note": null,
+              "updated_at": "2026-10-18T13:00:00Z",
+              "revision": "o1.3"
+            }
+          ],
+          "total_count": 1,
+          "truncated": false,
+          "lookback_start_local_date": "2026-07-20"
+        },
+        "days": [
+          {
+            "local_date": "2026-10-18",
+            "is_today": true,
+            "occurrences": [
+              {
+                "id": "00000005-1111-4111-8111-000000000005",
+                "behavior_id": "00000001-1111-4111-8111-000000000001",
+                "behavior_title": "Morning walk",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:30:00Z",
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                "status": "completed",
+                "status_label": "Completed",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:41:00Z",
+                "status_marked_at": "2026-10-18T11:41:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3"
+              }
+            ]
+          }
+        ],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    },
+    {
+      "name": "needs decision omitted",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": null,
+        "days": [],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "wrong status label",
+      "value": {
+        "timezone": "America/New_York",
+        "today_local_date": "2026-10-18",
+        "needs_decision": null,
+        "days": [
+          {
+            "local_date": "2026-10-18",
+            "is_today": true,
+            "occurrences": [
+              {
+                "id": "00000005-1111-4111-8111-000000000005",
+                "behavior_id": "00000001-1111-4111-8111-000000000001",
+                "behavior_title": "Morning walk",
+                "category_name": "Fitness",
+                "local_date": "2026-10-18",
+                "timezone": "America/New_York",
+                "scheduled_for": "2026-10-18T11:30:00Z",
+                "schedule": {
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                "status": "completed",
+                "status_label": "Done",
+                "needs_decision": false,
+                "completed_at": "2026-10-18T11:41:00Z",
+                "status_marked_at": "2026-10-18T11:41:00Z",
+                "note": "Felt good.\nCold out.",
+                "updated_at": "2026-10-18T13:00:00Z",
+                "revision": "o1.3"
+              }
+            ]
+          }
+        ],
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.days[0].occurrences[0].status_label"
+    }
+  ]
+}

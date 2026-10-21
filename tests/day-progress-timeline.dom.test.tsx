@@ -75,6 +75,25 @@ describe("DayProgressTimeline", () => {
     expect(timing?.textContent).toContain("Available again");
     expect(timing?.textContent).toContain("Google Maps");
   });
+  it("withdraws omitted-stop guidance and offers manual refresh after clearing a decision", async () => {
+    const input = props();
+    const evidence = { ...travelBenchEvidence("occurrence-1", true),
+      behaviorSources: [{ ref: "occurrence-1", behaviorId: "behavior-1", unresolved: false }] };
+    const refresh = vi.fn();
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input}
+      context={{ ...input.context, events: [], travel: evidence, travelStatus: {
+        view: { accountId: "owner", evidence, mode: "walking", navigationPreference: "google_maps", settingsRevision: "one", expiresAt: null },
+        message: null, stale: false, pending: false, observedAt: "2026-09-16T14:00:00Z", resumesAt: null, refresh,
+      } }} /></RefreshProvider>));
+    expect(container.textContent).toContain("Travel changed. Refresh travel to update estimates.");
+    const toggle = container.querySelector<HTMLElement>('article[data-occurrence-id="occurrence-1"] summary');
+    await act(() => toggle!.click());
+    expect(container.querySelector('[aria-label="Travel timing"]')).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+    await act(() => button("Refresh travel").click());
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
   it("names untitled events in accessible previews and details", async () => {
     const input = props();
     input.context.events[0]!.title = "";

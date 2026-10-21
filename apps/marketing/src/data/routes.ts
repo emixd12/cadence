@@ -1,3 +1,4 @@
+import { developerPages } from "./developers";
 import { buildFaqMarkdown } from "./faq";
 import { siteConfig } from "./site";
 import { exportFormats, statusDefinitions } from "./vocabulary";
@@ -22,6 +23,7 @@ export type MarketingRoute = {
   includeInLlms: boolean;
   includeInMarkdownMirror: boolean;
   markdown: string;
+  sourcePath?: string;
 };
 
 export const marketingRoutes = [
@@ -56,7 +58,7 @@ Cadence deliberately has no streaks, badges, points, or guilt mechanics. Streaks
 
 Interfaces are no longer fixed: in the agentic era, an AI tool can read a personal history and build whatever View or coaching layer its owner prefers. Cadence therefore invests in the data backbone, a factual and portable Record, rather than a prescribed interface.
 
-Cadence provides prepared prompts, but it does not send behavior data to an AI provider. The user exports data and chooses any external AI service.
+Cadence provides exports and prepared prompts for services you choose. When enabled, Daily Brief separately sends selected tracking information to OpenAI; Calendar timing and other optional sources require separate choices. MCP lets a connected AI client read tracking records and make permitted changes you direct and confirm. Calendar data is never shared through MCP. Hosted MCP launch remains pending.
 
 ## Time Tracking
 
@@ -188,7 +190,7 @@ A Behavior can change over time. Cadence keeps its Schedule, Occurrences, Decisi
 
 Cadence is a single-player web app for Behavior creation, recurring Schedules, a timeline of Occurrences, explicit Decisions, notes, reminders, basic Adherence review, elapsed-time capture, and portable exports. It is not a social tracker, collaboration product, medical dosing app, payment system, or AI coach.
 
-Cadence provides prepared prompts, but the user exports data and chooses any external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides exports and prepared prompts for services you choose. When enabled, Daily Brief separately sends selected tracking information to OpenAI; Calendar timing and other optional sources require separate choices. MCP lets a connected AI client read tracking records and make permitted changes you direct and confirm. Calendar data is never shared through MCP. Hosted MCP launch remains pending.
 
 ## Cadence and BehaviorLog
 
@@ -202,6 +204,21 @@ Cadence is the application where a user creates and reviews a Record. BehaviorLo
 - Privacy: ${siteConfig.cadenceAppUrl}/privacy
 `,
   },
+  ...developerPages.map((page): MarketingRoute => ({
+    routeId: `developers/${page.slug || "overview"}`,
+    path: page.slug ? `/developers/${page.slug}` : "/developers",
+    markdownPath: page.slug ? `/developers/${page.slug}.md` : "/developers.md",
+    type: "documentation",
+    title: page.title,
+    navLabel: page.title,
+    description: page.description,
+    lastModified: "2026-10-18",
+    includeInSitemap: true,
+    includeInLlms: true,
+    includeInMarkdownMirror: true,
+    markdown: page.markdown,
+    sourcePath: page.slug.startsWith("tools/") ? "src/data/developer-reference.json" : "src/data/developers.ts",
+  })),
 ] as const satisfies MarketingRoute[];
 
 export type MarketingRouteId = (typeof marketingRoutes)[number]["routeId"];
@@ -236,7 +253,7 @@ export function getRouteManifest() {
     include_in_llms: route.includeInLlms,
     include_in_feed: false,
     include_in_markdown_mirror: route.includeInMarkdownMirror,
-    source_path: `src/pages${route.path === "/" ? "/index" : route.path}.astro`,
+    source_path: (route as MarketingRoute).sourcePath ?? `src/pages${route.path === "/" ? "/index" : route.path}.astro`,
   }));
 }
 
@@ -248,7 +265,7 @@ export function markdownWithFrontmatter(route: MarketingRoute): string {
     `canonical_url: ${getCanonicalUrl(route.path)}`,
     `last_updated: ${route.lastModified}`,
     "status: stable",
-    `source: src/pages${route.path === "/" ? "/index" : route.path}.astro`,
+    `source: ${route.sourcePath ?? `src/pages${route.path === "/" ? "/index" : route.path}.astro`}`,
     "---",
     "",
     route.markdown.trim(),

@@ -38,6 +38,14 @@ export async function getAnalyticsPageData(
 ): Promise<AnalyticsView> {
   const supabase = await createClient();
   const userId = await requireUserId(supabase);
+  return getAnalyticsPageDataForUser(supabase, userId, options);
+}
+
+export async function getAnalyticsPageDataForUser(
+  supabase: AppSupabaseClient,
+  userId: string,
+  options: GetAnalyticsPageDataOptions = {},
+): Promise<AnalyticsView> {
   const now = options.now ?? Temporal.Now.instant();
   await reconcileMyDueBehaviorArchives(supabase, userId);
   const [profileTimezone, behaviors, syncState] = await Promise.all([

@@ -46,4 +46,12 @@ describe("in-app briefing routes", () => {
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "https://attacker.invalid" } })).status).toBe(403);
     expect(OPTIONS(new Request("https://cadence.example/api/advisor/brief", { method: "OPTIONS", headers: { origin: "tauri://localhost" } })).status).toBe(204);
   });
+  it("returns a context conflict without encouraging automatic retries", async () => {
+    mocks.generate.mockRejectedValue(new DailyBriefStorageError("context_changed"));
+    const result = await POST(new Request("https://cadence.example/api/advisor/brief", { method: "POST", body: "{}" }));
+    expect(result.status).toBe(409);
+    expect(await result.json()).toEqual({ error: "context_changed" });
+    expect(result.headers.get("retry-after")).toBeNull();
+    expect(mocks.generate).toHaveBeenCalledTimes(1);
+  });
 });

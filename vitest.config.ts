@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: [...configDefaults.exclude, ".local/**"],
+    exclude: [...configDefaults.exclude, ".local/**", ".claude/**"],
     environment: "node",
     globals: true,
   },

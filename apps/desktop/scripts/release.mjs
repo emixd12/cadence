@@ -95,6 +95,8 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
   if (!/minos\s+14\.0(?:\s|$)/.test(capture("xcrun", ["vtool", "-show-build", executable]))) throw new Error("The executable does not declare macOS 14.0 minimum.");
   run("codesign", ["--verify", "--deep", "--strict", app]);
   if (!preview) {
+    // Production Keychain access depends on these signed entitlements and the profile that authorizes them.
+    run("python3", [path.join(desktop, "scripts", "verify-entitlements.py"), app, path.join(native, "Entitlements.plist")]);
     run("codesign", ["--verify", "--deep", "--strict", dmg]);
     for (const artifact of [app, dmg]) run("xcrun", ["stapler", "validate", artifact]);
     run("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
@@ -108,7 +110,7 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
   return { milestone: preview ? "unnotarized preview" : "production candidate", identifier: RELEASE_IDENTIFIER, version, target: RELEASE_TARGET, checkedAt: new Date().toISOString(),
     frontendPublicConfiguration: frontendPublicConfiguration ?? "not verified by this command",
     checks: ["strict codesign", "hardened runtime", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "read-only DMG contents match app", "updater signature", "updater archive contents match app",
-      ...(preview ? ["ad hoc app signature", "legacy macOS login Keychain"] : ["Developer ID authority", "Gatekeeper", "stapled notarization"])],
+      ...(preview ? ["ad hoc app signature", "legacy macOS login Keychain"] : ["Developer ID authority", "signed entitlements match Entitlements.plist", "embedded provisioning profile authorizes entitlements", "Gatekeeper", "stapled notarization"])],
     artifacts: [dmg, archive, signatureFile].map((file) => ({ file, sha256: createHash("sha256").update(fs.readFileSync(file)).digest("hex") })),
     binarySha256: createHash("sha256").update(fs.readFileSync(executable)).digest("hex"),
     appleTrust: preview ? "Developer ID, notarization, and Gatekeeper acceptance deferred; not verified" : "artifact checks passed; downloaded launch remains unverified",

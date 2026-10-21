@@ -7,6 +7,7 @@ node_modules/
 out/
 
 # Build outputs
+/integrations/.artifacts/
 dist/
 build/
 coverage/
@@ -46,6 +47,8 @@ pnpm-debug.log*
 
 # Supabase local
 .supabase/
+# Local JWT signing keys (Ticket 223). Never commit private keys.
+supabase/signing_keys*.json
 
 # Vercel local project link
 .vercel/

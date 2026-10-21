@@ -104,6 +104,20 @@ export function resolveAnalytics(input: ResolveAnalyticsInput): AnalyticsView {
   };
 }
 
+/** Counts a caller-selected range without the web page's range presets or backlog summary. */
+export function resolveAdherenceCounts(input: {
+  occurrences: Array<Pick<AnalyticsOccurrenceInput, "status" | "localDate">>;
+  todayLocalDate: string;
+}) {
+  const counts = countOccurrences(input.occurrences);
+  return {
+    ...toAnalyticsSummary(counts),
+    needsDecisionCount: input.occurrences.filter((row) =>
+      row.status === "unresolved" && compareLocalDate(row.localDate, input.todayLocalDate) < 0,
+    ).length,
+  };
+}
+
 export function resolveAnalyticsDateRange(input: {
   now: Temporal.Instant;
   timezone?: string;
@@ -426,7 +440,7 @@ function statusLabel(status: AnalyticsStatus): string {
 }
 
 function countOccurrences(
-  occurrences: AnalyticsOccurrenceInput[],
+  occurrences: Array<Pick<AnalyticsOccurrenceInput, "status">>,
 ): AnalyticsStatusCounts {
   const counts = emptyCounts();
 
