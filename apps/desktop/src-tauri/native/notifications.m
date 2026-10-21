@@ -228,9 +228,9 @@ static NSDictionary *execute(NSDictionary *input) {
     }
     if ([operation isEqualToString:@"pending"]) return pendingResult(center, nil, nil);
     if ([operation isEqualToString:@"delivered"]) return deliveredResult(center);
-    if ([operation isEqualToString:@"cancel"]) {
+    if ([operation isEqualToString:@"cancel"] || [operation isEqualToString:@"cancelPending"]) {
         [center removePendingNotificationRequestsWithIdentifiers:input[@"ids"]];
-        [center removeDeliveredNotificationsWithIdentifiers:input[@"ids"]];
+        if ([operation isEqualToString:@"cancel"]) [center removeDeliveredNotificationsWithIdentifiers:input[@"ids"]];
         return pendingResult(center, nil, nil);
     }
     if (![operation isEqualToString:@"schedule"]) return @{ @"error": @"Unknown native operation." };

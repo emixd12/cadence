@@ -170,6 +170,43 @@ describe("desktop updater controller", () => {
     expect(candidate!.download).toHaveBeenCalledTimes(2);
   });
 
+  it("retries an interrupted download from zero without exposing a partial candidate for installation", async () => {
+    const { candidate, controller, transport } = fixture();
+    let interrupt!: () => void;
+    vi.mocked(candidate!.download).mockImplementationOnce((onEvent) => new Promise<void>((_resolve, reject) => {
+      onEvent({ event: "started", contentLength: 10 });
+      onEvent({ event: "progress", chunkLength: 4 });
+      interrupt = () => reject(new Error("connection closed during download"));
+    }));
+    const downloading = controller.check();
+    await vi.waitFor(() => expect(controller.getSnapshot()).toMatchObject({ phase: "downloading", downloadedBytes: 4, totalBytes: 10 }));
+    await controller.install();
+    await controller.retry();
+    expect(candidate!.install).not.toHaveBeenCalled();
+    expect(candidate!.download).toHaveBeenCalledOnce();
+
+    interrupt();
+    await downloading;
+    expect(controller.getSnapshot()).toMatchObject({ phase: "error", version: candidate!.version });
+    await controller.install();
+    expect(candidate!.install).not.toHaveBeenCalled();
+
+    const progress: number[] = [];
+    const unsubscribe = controller.subscribe(() => {
+      const state = controller.getSnapshot();
+      if (state.phase === "downloading") progress.push(state.downloadedBytes!);
+    });
+    await controller.retry();
+    unsubscribe();
+    expect(progress).toEqual([0, 0, 4, 10]);
+    expect(controller.getSnapshot()).toMatchObject({ phase: "downloaded", downloadedBytes: 10, totalBytes: 10 });
+    expect(candidate!.download).toHaveBeenCalledTimes(2);
+    expect(candidate!.close).not.toHaveBeenCalled();
+    expect(candidate!.install).not.toHaveBeenCalled();
+    expect(transport.check).toHaveBeenCalledOnce();
+    expect(transport.restart).not.toHaveBeenCalled();
+  });
+
   it("does not report installation after an install failure and releases only after success", async () => {
     const { candidate, controller } = fixture();
     vi.mocked(candidate!.install).mockRejectedValueOnce(new Error("install failed"));

@@ -1,9 +1,10 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Operational JavaScript module intentionally has no declarations.
-import { stagePublicTrustSite } from "../scripts/publish-public-trust-evidence.mjs";
+import { stagePublicTrustSite, validatePublicTrustDetails } from "../scripts/publish-public-trust-evidence.mjs";
 // @ts-expect-error Operational JavaScript module intentionally has no declarations.
 import { downloadPublicTrustHistory } from "../scripts/download-public-trust-history.mjs";
 // @ts-expect-error Operational JavaScript module intentionally has no declarations.
@@ -24,6 +25,7 @@ describe("public Trust publication", () => {
     const origin = "https://emixd12.github.io/cadence/";
     const { input, snapshot: legacy } = await validSubject();
     const details = { schema: "cadence.public-trust-details", source_commit: input.source_commit, application_deployment_id: input.application_deployment.id, marketing_deployment_id: input.marketing_deployment.id };
+    Object.assign(details, { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note", ok: true, reason: "" }] } } });
     const legacyBytes = JSON.stringify(legacy, null, "\t");
     const detailBytes = JSON.stringify(details);
     let published = path.join(root, "seed");
@@ -108,6 +110,59 @@ describe("public Trust publication", () => {
     await writeFile(path.join(output, "trust/latest.json"), "previous\n");
     await expect(stagePublicTrustSite({ snapshot: { secret: "canary" }, details: {}, outputDirectory: output })).rejects.toThrow();
     await expect(readFile(path.join(output, "trust/latest.json"), "utf8")).resolves.toBe("previous\n");
+  });
+
+  it.each(["/developers/tools/update_occurrence_note", "/developers/tools/update_occurrence_note.md"])("allows a declared public tool path in observed routes and failure prefixes: %s", async (route) => {
+    const { input, snapshot } = await validSubject();
+    const details = {
+      schema: "cadence.public-trust-details", source_commit: input.source_commit,
+      application_deployment_id: input.application_deployment.id, marketing_deployment_id: input.marketing_deployment.id,
+      routes: { marketing: { observed: [{ path: route, ok: false, reason: "stable page marker missing" }], failures: [`${route}: stable page marker missing`] } },
+    };
+    const original = JSON.stringify(details);
+    expect(() => validatePublicTrustDetails(details, snapshot)).not.toThrow();
+    expect(JSON.stringify(details)).toBe(original);
+  });
+
+  it("accepts collector route details through the workflow validation command", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "cadence-trust-cli-"));
+    const { input, snapshot } = await validSubject();
+    const details = { schema: "cadence.public-trust-details", source_commit: input.source_commit,
+      application_deployment_id: input.application_deployment.id, marketing_deployment_id: input.marketing_deployment.id,
+      routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note", ok: true, reason: "" }], failures: [] } } };
+    await writeFile(path.join(directory, "snapshot.json"), JSON.stringify(snapshot));
+    await writeFile(path.join(directory, "details.json"), JSON.stringify(details));
+    const result = spawnSync(process.execPath, ["--experimental-strip-types", "scripts/validate-public-trust-snapshot.mjs", path.join(directory, "snapshot.json"), path.join(directory, "details.json")], { encoding: "utf8" });
+    expect(result.stderr).not.toContain("Error:");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("schema and sanitization passed");
+  });
+
+  it.each([
+    { routes: { application: { observed: [{ path: "/developers/tools/update_occurrence_note" }] } } },
+    { path: "/developers/tools/update_occurrence_note" },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note?token=canary" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note#canary" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/../update_occurrence_note" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note/extra" }] } } },
+    { routes: { marketing: { observed: [{ path: "https://evil.example/developers/tools/update_occurrence_note" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/unknown_note" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note", reason: "note text canary" }] } } },
+    { routes: { marketing: { observed: [{ path: "/developers/tools/update_occurrence_note", authorization: "canary" }] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_note: token canary"] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_note: note text canary"] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_noteX"] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_note: /developers/tools/update_occurrence_note"] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_note: https://127.0.0.1/path"] } } },
+    { routes: { marketing: { failures: ["/developers/tools/update_occurrence_note: user@example.com"] } } },
+    { routes: { marketing: { observed: [{ path: { note: "canary" } }] } } },
+    { notes: "private text" }, { token: "canary" }, { cookie: "canary" }, { headers: {} },
+    { summary: "Bearer canary" }, { summary: "provider_payload canary" },
+  ])("rejects sensitive content or paths outside the exact public field boundary: %j", async (payload) => {
+    const { input, snapshot } = await validSubject();
+    const details = { schema: "cadence.public-trust-details", source_commit: input.source_commit,
+      application_deployment_id: input.application_deployment.id, marketing_deployment_id: input.marketing_deployment.id, ...payload };
+    expect(() => validatePublicTrustDetails(details, snapshot)).toThrow(/prohibited|private/);
   });
 
   it("rejects a synthetic secret canary before writing latest", async () => {

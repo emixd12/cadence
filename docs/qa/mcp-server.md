@@ -405,3 +405,35 @@ hosted approval. PR108 remains held; hosted history is85 and MCP stays disabled.
 This server-only correction changes no desktop, marketing or mobile interface.
 Retained evidence: `.intent/artifacts/deadline232/` (red/green SQL, reset, generated
 types, guarded Node24 gates, function diff, preservation hashes and readback).
+
+## Disabled production release — October 18, 2026
+
+PR108 merged as `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`; its tree is identical
+to independently reviewed `81eface`. All ten final-head checks passed. The owner
+approved the sixth migration separately; its singleton dry-run and hash matched,
+and hosted history is now 86. Both function source hashes, ownership, ACLs and
+search paths match local review. Private-schema access/RLS and the shared status
+function remain unchanged.
+
+Production web `dpl_FEE1Gx6cxsArYoHGM7DGRJGamiaD` and marketing
+`dpl_5p4dy9uHvwFcf2gkhr6moDhw1cRP` are Ready at that merge source. Web was
+redeployed after binding the Ready marketing ID. Both retain Node24 and their
+existing roots/domains. Production MCP is false and issuer is canonical.
+MCP/OAuth/discovery return503/no-store; the unconfigured challenge returns404.
+Public Privacy/Terms match215 approved text fields, including October18 dates;
+About/FAQ match the approved Daily Brief/MCP wording. Public Trust serves its
+prior snapshot with mismatched Passed results correctly marked Stale; this is
+not a fresh Trust Passed claim. Provider-unavailable checks and unrun RLS remain
+explicit in that feed.
+
+Evidence lives in `.intent/artifacts/deploy232-expiry/`: migration preflight,
+dry-run/apply/readback, final deployment metadata, all-three-setting assertion,
+public-copy and disabled-route results. Public HTTP/DOM assertions used the host
+Node22 client after Node26 fetch intermittently returned compressed bytes as text;
+this is separate from the guarded Node24 build/test evidence and deployed Node24.
+No product or dependency change was needed for that inspection-client issue.
+
+Normal00:05UTC maintenance still needs scheduled observation. No manual cron,
+purge, account fixture, live tracking write, signing-key change, activation or
+directory submission occurred. Live Claude/ChatGPT/desktop acceptance remains
+separately gated; Ticket232 is not complete.
