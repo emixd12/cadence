@@ -190,7 +190,12 @@ export class DesktopAuth {
     await pending("remove"); // Consume before exchange. Supabase authorization codes are single-use.
     if ("error" in result) { await invoke("auth_secret_remove", { name: "supabase-pkce" }); this.rejectCallback(result.error); return; }
     const current = await this.supabase.auth.getSession();
-    if (current.data.session) { await invoke("auth_secret_remove", { name: "supabase-pkce" }); this.changed({ status: "error", message: "Disconnect the current account before signing in with a different account." }); return; }
+    if (current.data.session) {
+      await invoke("auth_secret_remove", { name: "supabase-pkce" });
+      this.changed(accountStateFromSession(current.data.session,
+        "Disconnect the current account before signing in with a different account."));
+      return;
+    }
     const metadata = await this.metadata();
     const { data, error } = await this.supabase.auth.exchangeCodeForSession(result.code);
     if (error || !data.session) { this.changed({ status: "error", message: "Google sign-in could not be completed. Start again." }); return; }
@@ -247,10 +252,11 @@ export async function reconnectDesktopAccount(clearLocalSession: () => Promise<v
   await beginOAuth();
 }
 
-export function accountStateFromSession(session: Session | null): DesktopAccountState {
+export function accountStateFromSession(session: Session | null, notice?: string): DesktopAccountState {
   const metadata = session?.user.user_metadata;
   const name = [metadata?.full_name, metadata?.name].find((value) => typeof value === "string" && value.trim());
-  return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null } : { status: "local" };
+  return session ? { status: "linked", userId: session.user.id, email: session.user.email ?? null, name: name?.trim() ?? null,
+    ...(notice ? { notice } : {}) } : { status: "local" };
 }
 
 export function desktopAuthAvailable(): boolean { return isTauri() && readDesktopAuthConfig() !== null; }

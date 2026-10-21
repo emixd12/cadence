@@ -1,8 +1,25 @@
 # Implementation Status
 
+## Tickets 178 and 181: callback review correction, 0.1.4 source — October 21, 2026
+
+Merge-readiness review reproduced one remaining false-revocation path: an
+unexpired pending callback arriving while a session is already linked changed
+the Account state to an error. The callback now preserves the existing session,
+shows the account-switch notice, and never exchanges the incoming code. The
+regression fails on the 0.1.3 source and passes with the fix.
+
+Version `0.1.4` is source only. The signed 0.1.3 candidate is superseded and must
+not be published. Its recorded acceptance remains historical evidence, not
+acceptance of this change. Tickets 178 and 181 need a new signed build, artifact
+verification, installed callback/session checks and the owner's publication
+instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+
+Platform impact: desktop authentication only; web, marketing and future mobile
+have no implementation change. No schema or hosted configuration changes.
+
 ## Tickets 178 and 181: 0.1.3 passes installed acceptance — October 21, 2026
 
-Not published; waiting on the owner's publish instruction. Candidate `0.1.3` from
+Historical, superseded by the 0.1.4 correction above. Candidate `0.1.3` from
 `dcefe7e` is notarized (app `ac2067a7`, DMG `618874b4`), stapled, and passes all 14
 artifact checks. A Gatekeeper check on a quarantined download passes, and
 `syspolicy_check distribution` reports it ready for distribution. Its files and the
@@ -21,7 +38,7 @@ twice through Screen Sharing:
 Sign-in renewal passed on the owner Mac: the same 0.1.2 process synced 11 hours after
 launch. Every Ticket 178 gate now has installed or test evidence; Calendar expiry is
 covered by a unit test, because the hosted broker completes the Google connection.
-Open: merge PR #115, then publication under Ticket 181. Packet:
+The packet below records the earlier candidate; it is not for publication:
 `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 
 ## Ticket 178: revoked-session fix, 0.1.3 replaces 0.1.2 — October 20, 2026
@@ -102,6 +119,15 @@ signed-native travel evidence. Briefing and Calendar-agent work on that branch i
 excluded. The final `0.1.1` candidate is built from main after this change merges.
 No build, notarization, publication or hosted change ran. Ticket 178 session
 renewal and replay/expiry checks and Ticket 181 publication remain open.
+## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
+
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with
+"Configuration event plan does not match behavior state." The smoke predates
+migration `20260922010000_add_travel_settings.sql`, which added `location_text`
+to the Behavior configuration snapshot and baseline changed fields. The smoke's
+baseline plan now includes `location_text`; no schema or runtime change. A
+disposable Postgres replay of all 86 migrations passes all 19 SQL smokes.
+Retained local and hosted databases were not touched.
 
 ## Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026
 

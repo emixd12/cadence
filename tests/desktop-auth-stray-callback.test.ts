@@ -82,4 +82,18 @@ describe("stray desktop sign-in callbacks", () => {
     expect(native.exchanged).toBe(0);
     await finish();
   });
+
+  it("keeps the linked session when a pending callback arrives after sign-in", async () => {
+    const { states, finish } = await start(true);
+    native.secrets.set("pending-state", JSON.stringify({ state: "late-flow", createdAt: Date.now() }));
+    native.secrets.set("supabase-pkce", "synthetic-verifier");
+    native.callback!([`${DESKTOP_AUTH_CALLBACK}?state=late-flow&code=late-code`]);
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ status: "linked", userId: "hosted-one",
+      notice: "Disconnect the current account before signing in with a different account." }));
+    expect(native.secrets.has("pending-state")).toBe(false);
+    expect(native.secrets.has("supabase-pkce")).toBe(false);
+    expect(native.secrets.has("supabase-session")).toBe(true);
+    expect(native.exchanged).toBe(0);
+    await finish();
+  });
 });

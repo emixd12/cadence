@@ -12573,6 +12573,10 @@ remote sign-out showed the revoked state with Reconnect account, and reconnectin
 synced with no lost data. Sign-in renewal passed over 11 hours on the owner Mac.
 Calendar expiry is covered by a unit test. Every Ticket 178 gate has evidence; see
 `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+October 21 merge review: reopened for the 0.1.4 correction. A callback with a
+valid pending state could still unset a linked session. The failing-first
+regression now passes; repeat installed acceptance on the rebuilt artifact.
+The 0.1.3 evidence remains historical and does not authorize its publication.
 Original preview.45, the complete primary directory and reminders were restored.
 Dependencies: Ticket 115's retained notarized candidate; existing
 account-sync and Calendar contracts in Tickets 118–122 and 137.
@@ -12758,6 +12762,10 @@ October 21: 0.1.2 is also superseded. Candidate `0.1.3` from `dcefe7e` is notari
 stapled and verified, and passes installed acceptance. Gatekeeper on a quarantined
 download and `syspolicy_check distribution` pass. Merging PR #115 and the owner's
 publish instruction remain. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+October 21 merge review: 0.1.3 is superseded by the callback correction in 0.1.4
+source. Build, sign, notarize and verify a new immutable candidate, then repeat
+installed acceptance before requesting publication. No new artifact exists yet;
+see `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
 Dependencies: Tickets 178–180. Reconcile Ticket 165's location and
 Maps-handoff outcomes separately; no location-success claim while that gate is open.
 
