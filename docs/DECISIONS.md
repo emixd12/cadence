@@ -781,6 +781,32 @@ Implementation decisions, recorded for owner review:
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
 
+## 2026-09-27: Replay-based briefing bench and stored daily brief
+
+Historical decision record, reconciled October 21, 2026. The later workbench
+execution uses Tickets 175–177 and 182–184; Tickets 178–181 belong to desktop
+release work. Ticket 185 remains the stored-brief lifecycle gate. Its later
+packet calls the 07:00 cutoff pending despite the confirmation recorded below;
+reconcile that discrepancy without assuming the owner withdrew the instruction.
+This entry preserves the original direction and does not activate storage or
+supersede current consent, privacy, deployment or acceptance gates.
+
+The owner asked to test the advisor across many days and all lanes on their own
+dogfooded account, with less clutter, and consented to using their data (including
+model transmission) for this evaluation. They decided: the day's brief is the first
+run at or after 7:00 AM local, stored so later openings and a reopen after dismissal
+show it without a new model run; the workbench budget rises to 100 model calls per
+hour; workbench runs are saved with their settings in compact, git-ignored local
+storage; replay reads Google Calendar for past dates.
+
+This reverses the documented "no stored briefing text" and "do not reopen dismissed
+output" rules once implemented. `docs/plans/briefing-bench-refactor.md` records the
+pain points, current system, conflicts to resolve and phases (proposed Tickets
+175–181). No code changed with this decision. The owner confirmed the 7:00 AM
+interpretation: the first opening at or after 7:00 AM local generates and stores the
+day's brief; earlier openings show none. Past Calendar reads under Google
+verification remain to be confirmed before their phase.
+
 ## 2026-09-27: Briefing workbench saves reviews locally, including account captures
 
 The owner asked to implement Phases 0–2 of the briefing-bench audit
