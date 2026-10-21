@@ -1,5 +1,22 @@
 # Implementation Status
 
+## Tickets 178 and 181: callback review correction, 0.1.4 source — October 21, 2026
+
+Merge-readiness review reproduced one remaining false-revocation path: an
+unexpired pending callback arriving while a session is already linked changed
+the Account state to an error. The callback now preserves the existing session,
+shows the account-switch notice, and never exchanges the incoming code. The
+regression fails on the 0.1.3 source and passes with the fix.
+
+Version `0.1.4` is source only. The signed 0.1.3 candidate is superseded and must
+not be published. Its recorded acceptance remains historical evidence, not
+acceptance of this change. Tickets 178 and 181 need a new signed build, artifact
+verification, installed callback/session checks and the owner's publication
+instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+
+Platform impact: desktop authentication only; web, marketing and future mobile
+have no implementation change. No schema or hosted configuration changes.
+
 ## Tickets 233–241 connector expansion — October 18, 2026
 
 The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
@@ -388,7 +405,74 @@ The 173 focused workbench tests also pass. No hosted deployment, database replay
 private-account model run or installed native acceptance was performed. Details:
 `docs/qa/briefing-workbench.md`.
 
-## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+## Tickets 178 and 181: 0.1.3 passes installed acceptance — October 21, 2026
+
+Historical, superseded by the 0.1.4 correction above. Candidate `0.1.3` from
+`dcefe7e` is notarized (app `ac2067a7`, DMG `618874b4`), stapled, and passes all 14
+artifact checks. A Gatekeeper check on a quarantined download passes, and
+`syspolicy_check distribution` reports it ready for distribution. Its files and the
+QA feed are on the QA prerelease.
+
+Installed acceptance on the test Mac ran over Tailscale SSH, with the owner signing in
+twice through Screen Sharing:
+- 0.1.3 installed from the verified DMG, and the test account reconnected.
+- With explicit owner authorization, the account's only hosted session was deleted
+  through the linked Supabase CLI.
+- After the access token expired, the running app showed "The account session
+  expired or was revoked" with Reconnect account, not "permission denied".
+- Reconnect synced. Compared with the baseline, no table lost rows; integrity was
+  `ok` and the schema stayed at 17.
+
+Sign-in renewal passed on the owner Mac: the same 0.1.2 process synced 11 hours after
+launch. Every Ticket 178 gate now has installed or test evidence; Calendar expiry is
+covered by a unit test, because the hosted broker completes the Google connection.
+The packet below records the earlier candidate; it is not for publication:
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+
+## Ticket 178: revoked-session fix, 0.1.3 replaces 0.1.2 — October 20, 2026
+
+In progress; not published. **0.1.2 is superseded; do not publish it.** On installed
+0.1.2 the owner confirmed the stray-callback fix: a replayed sign-in callback left the
+account signed in with a notice and sync current. Calendar callback replay changed
+nothing. Calendar expiry cannot be observed on the Mac, because the hosted broker
+completes the Google connection and the Mac then shows that server state; a unit test
+covers the 5-minute local callback rejection.
+
+Remote sign-out found a third defect. Deleting the test account's sessions made
+**Sync now** show "permission denied for function read_account_sync_snapshot" instead
+of the revoked state with **Reconnect account**. Supabase drops the session after the
+refresh fails, so the next RPC runs unauthenticated and PostgREST answers 401 with
+`42501`, but the sync adapter threw the error without that status. A Claude Code
+read-only comparison on the test Mac found no lost rows, schema 17 and an integrity
+check of `ok` before and after.
+
+The fix keeps a 401 status on sync RPC errors so they map to "revoked"; a signed-in
+403 still reports its message. A regression test fails on the previous code. Version
+`0.1.3` replaces 0.1.2. Open: the signed 0.1.3 build and notarization, a remote
+sign-out recheck on 0.1.3, the owner Mac's one-hour renewal result, merging PR #115
+and the publish instruction.
+
+## Tickets 178 and 181: 0.1.2 replaces the 0.1.1 candidate — October 20, 2026 (superseded by 0.1.3)
+
+In progress; not published. The 0.1.1 candidate below is **superseded; do not
+publish it.** Installed acceptance on 0.1.1 passed on the second Mac: quarantined
+browser download and normal first open. On the owner Mac, the preview.51 → 0.1.1
+update preserved every Behavior, Occurrence, status, Note, session and import record;
+only sync and reminder bookkeeping changed. Two defects were found:
+
+- A replayed sign-in callback replaced a working linked state with an error, so sync
+  reported "revoked" and Calendar actions did nothing until relaunch.
+- A refused restart showed its reason far from the Restart button.
+
+`4d9526f` (PR #115) fixes both and sets version `0.1.2`. Candidate `0.1.2` is built
+from that commit, notarized (the DMG on resubmission, after Apple left the first
+submission in progress for two hours), stapled, and passes all 14 artifact checks.
+Its files and the QA feed are on the QA prerelease. Open: the quarantined download,
+callback replay, Calendar expiry, revoked-session and one-hour renewal checks on
+0.1.2, merging PR #115, and the publish instruction. Packet:
+`docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026 (superseded by 0.1.2)
 
 In progress; not published. Candidate `0.1.1` is built from
 `95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
