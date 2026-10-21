@@ -1,0 +1,655 @@
+{
+  "operation": "create_behavior",
+  "valid_inputs": [
+    {
+      "name": "minimal daily",
+      "value": {
+        "title": "Drink water",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "09:00"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "full",
+      "value": {
+        "title": "Pay rent",
+        "description": "Transfer before noon.",
+        "location_text": "Home office",
+        "category_id": "00000003-1111-4111-8111-000000000003",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "reminders": {
+          "browser_enabled": true,
+          "email_enabled": true,
+          "offset_minutes": 4320
+        },
+        "default_duration_minutes": 10,
+        "end_date": "2027-06-01",
+        "external_ref": "facets:rec_42",
+        "idempotency_key": "chatgpt-create-0001"
+      }
+    },
+    {
+      "name": "every other week",
+      "value": {
+        "title": "Laundry",
+        "category_id": null,
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "weekly",
+              "interval": 2,
+              "days_of_week": [
+                "sunday"
+              ]
+            },
+            "time_entries": [
+              {
+                "kind": "range",
+                "preset": "afternoon"
+              }
+            ]
+          },
+          {
+            "recurrence": {
+              "frequency": "interval_days",
+              "interval_days": 10
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "20:00"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "blank title",
+      "value": {
+        "title": "  ",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.title"
+    },
+    {
+      "name": "title too long",
+      "value": {
+        "title": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.title"
+    },
+    {
+      "name": "no schedules",
+      "value": {
+        "title": "Walk",
+        "schedules": []
+      },
+      "code": "invalid_input",
+      "path": "$.schedules"
+    },
+    {
+      "name": "natural-language recurrence",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": "every weekday",
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence"
+    },
+    {
+      "name": "cron recurrence",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "cron",
+              "expression": "0 7 * * *"
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence"
+    },
+    {
+      "name": "day of month 32",
+      "value": {
+        "title": "Rent",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 32
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence.day_of_month"
+    },
+    {
+      "name": "interval over limit",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1000
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence.interval"
+    },
+    {
+      "name": "weekly without days",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "weekly",
+              "interval": 1,
+              "days_of_week": []
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence.days_of_week"
+    },
+    {
+      "name": "bad weekday",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "weekly",
+              "interval": 1,
+              "days_of_week": [
+                "mon"
+              ]
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].recurrence.days_of_week[0]"
+    },
+    {
+      "name": "12-hour time",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "7:00 AM"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].time_entries[0].start_time"
+    },
+    {
+      "name": "zero-length custom range",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "range",
+                "start_time": "07:00",
+                "end_time": "07:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].time_entries[0].end_time",
+      "semantic": true
+    },
+    {
+      "name": "too many time entries",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "daily",
+              "interval": 1
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "00:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "01:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "02:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "03:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "04:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "05:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "06:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "07:00"
+              },
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              }
+            ]
+          }
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.schedules[0].time_entries"
+    },
+    {
+      "name": "unsupported reminder offset",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "reminders": {
+          "offset_minutes": 30
+        }
+      },
+      "code": "invalid_input",
+      "path": "$.reminders.offset_minutes"
+    },
+    {
+      "name": "duration over a day",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "default_duration_minutes": 1441
+      },
+      "code": "invalid_input",
+      "path": "$.default_duration_minutes"
+    },
+    {
+      "name": "timezone not settable",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "timezone": "Europe/Paris"
+      },
+      "code": "invalid_input",
+      "path": "$.timezone"
+    },
+    {
+      "name": "dose field",
+      "value": {
+        "title": "Pill",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "dose_mg": 5
+      },
+      "code": "invalid_input",
+      "path": "$.dose_mg"
+    },
+    {
+      "name": "external_ref with spaces",
+      "value": {
+        "title": "Walk",
+        "schedules": [
+          {
+            "recurrence": {
+              "frequency": "monthly",
+              "interval": 1,
+              "day_of_month": 31
+            },
+            "time_entries": [
+              {
+                "kind": "exact",
+                "start_time": "08:00"
+              },
+              {
+                "kind": "range",
+                "preset": "evening"
+              },
+              {
+                "kind": "range",
+                "start_time": "22:00",
+                "end_time": "01:00"
+              }
+            ]
+          }
+        ],
+        "external_ref": "rec 42"
+      },
+      "code": "invalid_input",
+      "path": "$.external_ref"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "created",
+      "value": {
+        "behavior": {
+          "id": "00000001-1111-4111-8111-000000000001",
+          "title": "Morning walk",
+          "description": "Twenty minutes outside.",
+          "location_text": null,
+          "category": {
+            "id": "00000003-1111-4111-8111-000000000003",
+            "name": "Fitness"
+          },
+          "state": "active",
+          "archived_at": null,
+          "auto_archived_at": null,
+          "end_date": null,
+          "default_duration_minutes": 20,
+          "timezone": "America/New_York",
+          "schedules": [
+            {
+              "id": "00000006-1111-4111-8111-000000000006",
+              "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "days_of_week": [
+                  "monday",
+                  "thursday"
+                ]
+              },
+              "recurrence_summary": "Weekly on Monday and Thursday",
+              "time_entries": [
+                {
+                  "id": "00000007-1111-4111-8111-000000000007",
+                  "kind": "exact",
+                  "preset": null,
+                  "start_time": "07:30",
+                  "end_time": null,
+                  "label": "7:30 AM"
+                },
+                {
+                  "id": "00000008-1111-4111-8111-000000000008",
+                  "kind": "range",
+                  "preset": "evening",
+                  "start_time": "18:00",
+                  "end_time": "00:00",
+                  "label": "Evening"
+                }
+              ],
+              "time_summary": "7:30 AM, Evening"
+            }
+          ],
+          "schedule_summary": "Weekly on Monday and Thursday at 7:30 AM and Evening",
+          "reminders": {
+            "browser_enabled": true,
+            "email_enabled": false,
+            "offset_minutes": 0,
+            "summary": "Browser reminder at the scheduled time"
+          },
+          "archive_notes": [],
+          "external_ref": null,
+          "created_at": "2026-09-01T12:00:00Z",
+          "updated_at": "2026-10-18T13:00:00Z",
+          "revision": "b1.2026-10-18T13:00:00Z"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "missing behavior",
+      "value": {},
+      "code": "internal_error",
+      "path": "$.behavior"
+    }
+  ]
+}

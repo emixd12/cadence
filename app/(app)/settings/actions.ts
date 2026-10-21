@@ -14,6 +14,18 @@ import {
 } from "@/lib/services/settings.service";
 import type { AccountDeletionActionState } from "@/lib/types/account";
 import type { TimezoneActionState } from "@/lib/types/settings";
+import { disconnectOAuthApp } from "@/lib/services/oauth-ui.service";
+import type { OAuthActionState } from "@/lib/types/oauth-ui";
+
+export async function disconnectAppAction(_previous: OAuthActionState, form: FormData): Promise<OAuthActionState> {
+  try {
+    await disconnectOAuthApp(form);
+  } catch {
+    return { status: "error", message: "The app could not be disconnected. Reload Settings and try again." };
+  }
+  revalidatePath("/settings");
+  return { status: "success", message: "App disconnected. Its access has stopped." };
+}
 
 export async function deleteAccountAction(
   _previousState: AccountDeletionActionState,

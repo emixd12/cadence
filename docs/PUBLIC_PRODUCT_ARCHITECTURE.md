@@ -29,12 +29,16 @@ The final product posture is:
 The first public-product implementation steps are now present: the current
 authenticated web app has been hardened for many independent users, and the
 Astro marketing site exists as a sibling app. Tickets 107–114 implement the
-local-first macOS desktop track. Ticket 115 defers Apple-trusted distribution.
+local-first macOS desktop track. Ticket 115 now owns Apple-trusted distribution
+acceptance and is in progress.
 Tickets 116–122 implement optional Google account linking and offline-capable
 desktop synchronization. Tickets 146–148 implement the in-app read-only daily briefing
 in the existing horse bubble on web and linked desktop, using server-side model
-generation and existing sign-in. General AI chat/coaching, audio speech, billing,
-and native mobile remain future scope. Marketing claims require separate acceptance.
+generation and existing sign-in. Tickets 220–232 plan a remote MCP server with a
+Cadence-owned OAuth server, Claude and ChatGPT plugins, and a `/developers` docs
+section in `apps/marketing`; see `docs/MCP_INTEGRATION.md`. General AI
+chat/coaching, audio speech, billing, and native mobile remain future scope.
+Marketing claims require separate acceptance.
 
 ## Surface model
 
@@ -64,7 +68,7 @@ Preferred sequencing:
 4. Extract `packages/ui` as tokens and primitives first, not full product
    components.
 5. Maintain the completed desktop track under Tickets 107–114 and 116–122;
-   keep Ticket 115 and mobile deferred.
+   complete Ticket 115's Apple-trusted release gates separately. Keep mobile deferred.
 
 Use npm workspaces first unless build orchestration becomes painful. Turborepo
 may be added later if caching and multi-app task orchestration become
@@ -250,16 +254,19 @@ The approved public retention schedule is:
   day and Supabase API and database logs retained seven days;
 - security-incident records: up to 90 days or until the investigation
   concludes when an investigation requires preservation;
-- backups: no more than seven days;
-- deleted-account live data: immediately when deletion succeeds, with backup
-  remnants aging out within seven days;
+- backups: Supabase maintains database backups; deleted records may remain in
+  copies until Supabase removes them under its backup lifecycle;
+- deleted-account live data: immediately when deletion succeeds; live-record
+  deletion does not immediately erase existing backups;
 - browser-push payloads: no more than 24 hours;
 - support messages: 12 months after resolution.
 
 Specific records may be retained longer only for security investigations,
 fraud prevention, or legal preservation. The owner confirmed verification of
-the active settings against this schedule on 2026-08-31. Sanitized evidence and
-the completion attestation live in `docs/OPERATIONS.md`.
+the then-active settings against the earlier schedule on 2026-08-31. Sanitized evidence and
+the completion attestation live in `docs/OPERATIONS.md`. Ticket 232 supersedes
+the former strict seven-day backup deadline with owner-approved lifecycle
+wording locally; it does not verify physical cleanup timing or authorize publication.
 
 ## Marketing content and legal contract
 
@@ -269,10 +276,21 @@ license. The application origin is the only canonical host for `/trust`,
 `/privacy`, and `/terms`; the Astro marketing site must link to those routes
 and must not publish copies.
 
-Cadence provides prepared prompts, but the user exports data and chooses any
-external AI service. Cadence does not send behavior data to an AI provider.
+Cadence provides exports and prepared prompts for services the user chooses.
+Opt-in Daily Brief separately discloses selected tracking information to OpenAI;
+Calendar timing and other optional sources require separate choices. Authorized
+MCP clients receive tracking records and may make scoped changes the user directs
+and confirms. Calendar data remains excluded from MCP.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
+
+Ticket 232 implements owner-approved Privacy, Terms and matching marketing copy
+locally, including a separate Daily Brief disclosure. Hosted MCP launch and
+publication remain pending. Existing policy dates stay during local review;
+before separately authorized publication, set both dates and the retention
+caption to the actual publication date in America/New_York. Do not compute a
+new date on each page load. Removal of the unsupported provider-verification
+sentence does not verify inherited provider or legal facts.
 
 The public legal entity is Identity Scaffolding LLC, a Wyoming limited
 liability company assumed authorized in New York. Its public address is 30 N
@@ -349,9 +367,12 @@ IDs so an older Passed result cannot describe a newer release.
 
 `docs/DESKTOP_BUILD.md` records completed Tickets 107–114. Desktop targets
 Apple Silicon with macOS 14 as its declared minimum, using Tauri v2, Vite,
-React, and SQLite. Ticket 115 defers actual macOS 14 compatibility and Apple-
-trusted distribution. Tracking works without login or network under one stable
-local profile. Tickets 116–122 add optional use of the existing Google account;
+React, and SQLite. The owner deferred macOS 14 runtime acceptance; the declared
+and compiled minimum does not establish compatibility. Ticket 115 now owns
+Apple-trusted distribution and installed acceptance on the current Apple Silicon
+host. Record each candidate's exact tested macOS version and build. Tracking
+works without login or network under one stable local profile. Tickets 116–122
+add optional use of the existing Google account;
 SQLite remains the offline working copy. `docs/DESKTOP_PARITY.md` records the
 current tracking baseline and verification state.
 
@@ -394,7 +415,7 @@ RLS. SQLite stays authoritative for the device working copy and keeps atomic
 domain mutation, tombstone, and outbox writes. Credentials and device-specific
 notification state do not enter the synchronized account snapshot. Ticket 122
 accepted the current account-sync preview. Marketing must still identify it as
-an unnotarized preview while Ticket 115 remains deferred.
+an unnotarized preview while Ticket 115 remains incomplete.
 
 ## Pricing and future AI
 
@@ -413,6 +434,12 @@ operations docs.
 General AI coaching/chat and audio speech remain future scope. The September 20
 product-direction update scopes the in-app read-only horse briefing under
 Tickets 146–148. It does not enable autonomous execution or broader AI features.
+
+Tickets 220–232 let outside AI clients, such as Claude and ChatGPT, call scoped
+Cadence MCP tools at the user's direction. Cadence runs no AI for those calls and
+adds no server-side autonomous execution. The integration operations layer is
+one transport adapter over one contract (`docs/MCP_CONTRACT.md`), not a connector
+SDK or provider registry.
 
 ## Source documents affected
 

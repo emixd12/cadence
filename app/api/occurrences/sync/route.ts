@@ -16,6 +16,7 @@ import {
   LaunchCircuitBreakerOpenError,
 } from "@/lib/security/launch-circuit-breakers";
 import { processOccurrenceSyncHorizons } from "@/lib/services/occurrence.service";
+import { runOAuthMaintenance } from "@/lib/services/oauth-maintenance.service";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,21 @@ async function processOccurrenceSyncRequest(request: NextRequest) {
 
   occurrenceSyncAuthFailureLimiter.reset(rateLimitKey);
 
+  const maintenance = runOAuthMaintenance().catch(() => {
+    try {
+      reportMonitoringEvent({ name: "oauth_maintenance_failed", severity: "error", context: { outcome: "unknown" } });
+    } catch {
+      // A failed monitoring sink must not replace the occurrence result or error.
+    }
+  });
+  try {
+    return await processAuthenticatedOccurrenceSyncRequest(request);
+  } finally {
+    await maintenance;
+  }
+}
+
+async function processAuthenticatedOccurrenceSyncRequest(request: NextRequest) {
   try {
     assertLaunchCircuitBreakerClosed("occurrence_sync_batches");
   } catch (error) {

@@ -1,0 +1,187 @@
+{
+  "operation": "list_occurrences",
+  "valid_inputs": [
+    {
+      "name": "range with filters",
+      "value": {
+        "start_local_date": "2026-08-01",
+        "end_local_date": "2026-10-31",
+        "statuses": [
+          "unresolved",
+          "not_completed"
+        ],
+        "behavior_ids": [
+          "00000001-1111-4111-8111-000000000001"
+        ],
+        "page_size": 25
+      }
+    },
+    {
+      "name": "single day",
+      "value": {
+        "start_local_date": "2026-10-18",
+        "end_local_date": "2026-10-18",
+        "needs_decision_only": true
+      }
+    }
+  ],
+  "invalid_inputs": [
+    {
+      "name": "missing end",
+      "value": {
+        "start_local_date": "2026-10-01"
+      },
+      "code": "invalid_input",
+      "path": "$.end_local_date"
+    },
+    {
+      "name": "range over limit",
+      "value": {
+        "start_local_date": "2026-08-01",
+        "end_local_date": "2026-11-01"
+      },
+      "code": "limit_exceeded",
+      "path": "$.end_local_date",
+      "semantic": true
+    },
+    {
+      "name": "end before start",
+      "value": {
+        "start_local_date": "2026-10-10",
+        "end_local_date": "2026-10-01"
+      },
+      "code": "invalid_input",
+      "path": "$.end_local_date",
+      "semantic": true
+    },
+    {
+      "name": "missed status",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-02",
+        "statuses": [
+          "missed"
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.statuses[0]"
+    },
+    {
+      "name": "duplicate statuses",
+      "value": {
+        "start_local_date": "2026-10-01",
+        "end_local_date": "2026-10-02",
+        "statuses": [
+          "completed",
+          "completed"
+        ]
+      },
+      "code": "invalid_input",
+      "path": "$.statuses"
+    }
+  ],
+  "valid_outputs": [
+    {
+      "name": "page",
+      "value": {
+        "timezone": "America/New_York",
+        "occurrences": [
+          {
+            "id": "00000004-1111-4111-8111-000000000004",
+            "behavior_id": "00000001-1111-4111-8111-000000000001",
+            "behavior_title": "Morning walk",
+            "category_name": "Fitness",
+            "local_date": "2026-10-16",
+            "timezone": "America/New_York",
+            "scheduled_for": "2026-10-16T11:30:00Z",
+            "schedule": {
+              "kind": "exact",
+              "preset": null,
+              "start_time": "07:30",
+              "end_time": null,
+              "label": "7:30 AM"
+            },
+            "status": "unresolved",
+            "status_label": "Unresolved",
+            "needs_decision": true,
+            "completed_at": null,
+            "status_marked_at": null,
+            "note": null,
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "o1.3"
+          },
+          {
+            "id": "00000005-1111-4111-8111-000000000005",
+            "behavior_id": "00000001-1111-4111-8111-000000000001",
+            "behavior_title": "Morning walk",
+            "category_name": "Fitness",
+            "local_date": "2026-10-18",
+            "timezone": "America/New_York",
+            "scheduled_for": "2026-10-18T11:30:00Z",
+            "schedule": {
+              "kind": "exact",
+              "preset": null,
+              "start_time": "07:30",
+              "end_time": null,
+              "label": "7:30 AM"
+            },
+            "status": "completed",
+            "status_label": "Completed",
+            "needs_decision": false,
+            "completed_at": "2026-10-18T11:41:00Z",
+            "status_marked_at": "2026-10-18T11:41:00Z",
+            "note": "Felt good.\nCold out.",
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "o1.3"
+          }
+        ],
+        "next_cursor": "eyJvIjoyfQ",
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      }
+    }
+  ],
+  "invalid_outputs": [
+    {
+      "name": "bad local_date",
+      "value": {
+        "timezone": "America/New_York",
+        "occurrences": [
+          {
+            "id": "00000004-1111-4111-8111-000000000004",
+            "behavior_id": "00000001-1111-4111-8111-000000000001",
+            "behavior_title": "Morning walk",
+            "category_name": "Fitness",
+            "local_date": "10/16/2026",
+            "timezone": "America/New_York",
+            "scheduled_for": "2026-10-16T11:30:00Z",
+            "schedule": {
+              "kind": "exact",
+              "preset": null,
+              "start_time": "07:30",
+              "end_time": null,
+              "label": "7:30 AM"
+            },
+            "status": "unresolved",
+            "status_label": "Unresolved",
+            "needs_decision": true,
+            "completed_at": null,
+            "status_marked_at": null,
+            "note": null,
+            "updated_at": "2026-10-18T13:00:00Z",
+            "revision": "o1.3"
+          }
+        ],
+        "next_cursor": null,
+        "freshness": {
+          "as_of": "2026-10-18T15:56:42Z",
+          "occurrences_generated_through": "2026-11-17"
+        }
+      },
+      "code": "internal_error",
+      "path": "$.occurrences[0].local_date"
+    }
+  ]
+}

@@ -87,7 +87,7 @@ Do not create `/dashboard` in v1. The locked primary route is `/timeline`.
 |---|---:|---|---|
 | `/api/push/subscribe` | implemented in 009; auth-failure rate limit added in 029; current-account ownership verification added after the 2026-07-22 interaction audit | Store browser push subscriptions and verify the exact current-device subscription belongs to the signed-in account | `POST` validates and stores a subscription. `PUT` validates the browser's endpoint and key material, then checks one active current-user row through the authenticated Supabase client and RLS. Both methods rate-limit repeated unauthenticated attempts and call the push subscription service/repository. |
 | `/api/reminders/process` | implemented in 010; Vercel Cron GET support added in 013; auth-failure rate limit and bounded `limit` added in 029; browser-push sending added after notification troubleshooting | Protected process route for due reminder deliveries | Route validates `REMINDER_PROCESS_SECRET` or `CRON_SECRET`, supports Vercel Cron `GET` and manual protected `POST`, rate-limits repeated auth failures, bounds batch size, and calls `reminder.service.ts` for email and browser-push channels. Ticket 067 can stop the batch, email sends, or browser-push sends independently before any delivery claim. An open batch breaker returns `503` plus `Retry-After`. |
-| `/api/occurrences/sync` | implemented in 038 | Protected process route for daily occurrence horizon extension | Route validates `REMINDER_PROCESS_SECRET` or `CRON_SECRET`, supports Vercel Cron `GET` and manual protected `POST`, rate-limits repeated auth failures, bounds batch size, and calls `occurrence.service.ts` to keep generated occurrence horizons fresh. Ticket 067 can stop the batch before product writes; the route returns `503` plus `Retry-After`. |
+| `/api/occurrences/sync` | implemented in 038 | Protected process route for daily occurrence horizon extension | Route validates `REMINDER_PROCESS_SECRET` or `CRON_SECRET`, supports Vercel Cron `GET` and manual protected `POST`, rate-limits repeated auth failures, bounds batch size, and calls `occurrence.service.ts` to keep generated occurrence horizons fresh. Ticket 067 can stop the batch before product writes; the route returns `503` plus `Retry-After`. Ticket 232 starts OAuth expiry maintenance after authentication, independently of the occurrence branch, and awaits it on every exit. Purge still runs with the occurrence breaker open or MCP disabled; purge failure preserves the occurrence response. |
 | `/api/export/jsonl` | implemented in 012 | JSONL export | Route calls export service/resolver. The proxy refreshes cookie-backed Supabase sessions without changing the route's JSON `401` contract. Ticket 067 applies one atomic account-scoped six-per-minute limit and a separate export breaker before export reads; limited requests return `429` plus `Retry-After` without a partial artifact. |
 | `/api/export/csv` | implemented in 012 | CSV export | Uses the same authenticated distributed limit and circuit-breaker contract as JSONL. |
 | `/api/export/json` | implemented in 012 | Full JSON backup | Uses the same authenticated distributed limit and circuit-breaker contract as JSONL. |
@@ -205,7 +205,8 @@ Synthetic mode uses no account reads. Neither mode uses daily generation admissi
 `GET /api/travel/routes` authenticates the current account and returns only whether
 the operator clearance and server credential are configured. Clients must check it
 before requesting a device location. `POST /api/travel/routes` is `no-store` and
-accepts a one- or two-local-day range, one bounded transient device sample, and up
+accepts a one- or two-local-day range, `scope: timeline|day` (default `timeline`),
+one bounded transient device sample, and up
 to eight corrected Calendar-event facts. The server derives the owner, settings,
 optional Calendar snapshot, Behavior occurrences, source revisions, selected mode,
 and endpoints. It rejects a
@@ -216,4 +217,71 @@ chosen fallback mode. It returns the account-bound mode, navigation preference,
 settings revision, earliest expiry, and endpoint-free travel evidence. The service
 rechecks settings, Behavior and Occurrence revisions, and Calendar connection and
 event revisions before and after provider work. It makes no tracking, Calendar, Behavior, Occurrence, or
-Daily Brief mutation.
+Daily Brief mutation. A generated brief requests day scope once through the shared
+client; estimates remain display-only and never enter model input. Timeline scope
+routes only the next three hours. Both scopes retain the eight-leg safety bound.
+
+## MCP server and OAuth authorization server (Tickets 220–232)
+
+OAuth (226) and MCP (228) routes are implemented locally; hosted acceptance
+remains Ticket 232. `docs/MCP_INTEGRATION.md` owns the
+boundary and `docs/MCP_CONTRACT.md` (Ticket 221) owns the operation contract.
+The planned MCP URL is `https://app.cadence-me.com/mcp`, and the planned OAuth
+issuer is `https://app.cadence-me.com` (assumptions pending owner confirmation).
+All routes honor one server-only kill switch (Ticket 226). Tokens never appear in
+URLs or logs. Protocol responses use `Cache-Control: no-store`.
+
+| Route | Methods | Owner ticket | Purpose |
+|---|---|---:|---|
+| `/mcp` | POST, OPTIONS; authenticated GET/DELETE return 405 | 228 | Remote MCP endpoint. Requires a Cadence-issued opaque Bearer token for this resource. Missing or invalid tokens get 401 with `resource_metadata`; a missing write scope gets 403 `insufficient_scope`. Calls integration operations only. |
+| `/.well-known/oauth-protected-resource` | GET | 226 | RFC 9728 protected-resource metadata. |
+| `/.well-known/oauth-protected-resource/mcp` | GET | 226 | RFC 9728 metadata for the `/mcp` resource; `resource` equals the exact MCP URL. |
+| `/.well-known/oauth-authorization-server` | GET | 226 | RFC 8414 authorization-server metadata (PKCE S256, public clients, CIMD, `iss` in responses). |
+| `/oauth/authorize` | GET, POST | 226, 227 | Validates the authorization request, then shows the signed-in consent screen (Ticket 227). Read is required; each write scope can be switched off. |
+| `/oauth/token` | POST | 226 | Authorization-code exchange with PKCE and refresh-token rotation with reuse detection. |
+| `/oauth/register` | POST | 226 | RFC 7591 dynamic client registration for public clients; rate-limited. |
+| `/oauth/revoke` | POST | 226 | RFC 7009 token revocation. |
+| `/.well-known/openai-apps-challenge` | GET | 231 | Plain-text OpenAI domain-verification token from a server-only variable; 404 when unset. |
+| `/settings` → Connected apps | page section | 227 | Lists grants with permissions, connected date, last use, and recent activity; Disconnect revokes the grant and its tokens at once. Adds no navigation route. |
+
+Planned marketing routes (Ticket 229): a `/developers` section in `apps/marketing`
+with an overview, quickstarts, concepts, authentication and permissions, one
+reference page per tool (`/developers/tools/*`), errors, limits, idempotency and
+concurrency, data and privacy, building integrations, plugins, versioning, and
+troubleshooting. Each page gets a Markdown mirror and route-manifest entry.
+
+`proxy.ts` must add `/oauth/:path*` for cookie refresh on the consent screen
+(Ticket 227). `/mcp`, `/oauth/token`, `/oauth/register`, `/oauth/revoke`, and the
+`.well-known` routes use no cookie session.
+
+### Implemented OAuth transport (Ticket 226)
+
+| Route | Method | Service and boundary |
+|---|---|---|
+| `/.well-known/oauth-authorization-server` | GET, OPTIONS | `lib/services/oauth/server.ts`; RFC 8414 metadata |
+| `/.well-known/oauth-protected-resource` | GET, OPTIONS | RFC 9728 metadata for the exact `/mcp` URL |
+| `/.well-known/oauth-protected-resource/mcp` | GET, OPTIONS | Same protected-resource metadata, path-specific discovery |
+| `/oauth/authorize` | GET | Client/redirect/resource/state/scopes/S256 validation; ten-minute browser-bound pending request; redirects to Ticket 227's `/oauth/consent?request=<uuid>` |
+| `/oauth/token` | POST, OPTIONS | Form-urlencoded authorization-code exchange and refresh rotation |
+| `/oauth/register` | POST, OPTIONS | Bounded public-client RFC 7591 registration |
+| `/oauth/revoke` | POST, OPTIONS | RFC 7009 token revocation |
+
+These Node route handlers call services, never tracking repositories. Native
+`.well-known` segments need no rewrites. All endpoints fail closed under
+`CADENCE_MCP_ENABLED`; all responses prohibit caching. Consent UI and Settings
+remain Ticket 227. `getOAuthConsent` and `completeOAuthConsent` in
+`lib/services/oauth/consent.ts` take a signed-in user client and enforce browser
+binding; completion additionally requires a same-origin POST. Ticket 228 calls
+`verifyMcpAccessToken` before creating its RLS integration context.
+
+
+### Implemented MCP transport (Ticket 228)
+
+`app/mcp/route.ts` calls `lib/mcp/server.ts` on the Node runtime with a 60-second
+Vercel maximum. The official SDK handles stateless Streamable HTTP, discovery,
+version negotiation and JSON-RPC. No MCP session, subscriptions, prompts or
+resources persist. `OPTIONS` is credential-free browser preflight; every other
+request verifies a Cadence Bearer token before protocol handling. Cookie sessions
+never authorize MCP. Scope/rate admission calls the shared integration operation
+layer; user data remains RLS-scoped. Transport limits and verified protocol versions
+are recorded in `MCP_INTEGRATION.md` and `qa/mcp-server.md`.

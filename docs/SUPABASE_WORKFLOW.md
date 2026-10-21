@@ -86,6 +86,105 @@ configuration records and IDs after restore. Passive imported observations
 accepted the canonical channel/status vocabulary without creating operational
 reminders. Final aggregate cleanup again found no user or application data.
 
+### Reproducible local contract proxy — September 27, 2026
+
+`scripts/supabase-docker-proxy.mjs` replaces the missing temporary create proxy.
+It supports this repository's installed `supabase-go` 2.105.0 backend. Its
+service images and three initialization commands come from that version's
+[Dockerfile](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/pkg/config/templates/Dockerfile)
+and [schema initialization](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/internal/db/start/start.go).
+Review those pins before using a different CLI version. Do not widen the
+unnamed-job rule merely to bypass a rejected request.
+
+The proxy requires both exact project labels, project `habit-tracking-app`,
+and network `cadence-local`. It rewrites every explicit published binding to
+`127.0.0.1`. It rejects implicit publishing, host mounts, host namespaces,
+privileged configuration, unknown creates, and other-project mutations.
+Only the three exact Auth, Storage, and Realtime initialization jobs may omit
+a name. Their database host must be `supabase_db_habit-tracking-app` on port
+5432. The proxy never prints request bodies, environments, or daemon errors.
+
+The proxy reads ownership before container or volume lifecycle mutations.
+It requires the existing loopback bridge network and never changes networks.
+It supports normal HTTP response streaming, including Docker's raw log frames.
+It rejects exec, attach/hijack, global prune, build, and settings operations.
+CLI 2.105.0 starts and resets this stack through container lifecycle calls,
+log reads, and PostgreSQL connections; these operations do not need Docker exec.
+Stop the local stack through explicit project container lifecycle commands.
+Do not run `supabase stop` through this proxy because its prune calls are rejected.
+
+Run the focused fake-daemon tests before operator review:
+
+```bash
+npx vitest run tests/supabase-docker-proxy.test.ts
+```
+
+Use Node 24. The tests use fake Unix sockets and never contact Docker.
+Actual stack start, reset, binding readback, and authenticated contract remain
+separate acceptance gates. Do not count fake-daemon tests as those gates.
+
+After reviewing the proxy, inspect the existing network and start the proxy:
+
+```bash
+docker network inspect cadence-local --format '{{json .Options}}'
+CADENCE_DOCKER_PROXY_DIR="$(mktemp -d /private/tmp/cadence-docker-proxy.XXXXXX)"
+mkdir -p "$CADENCE_DOCKER_PROXY_DIR/work/supabase"
+cp supabase/config.toml supabase/seed.sql "$CADENCE_DOCKER_PROXY_DIR/work/supabase/"
+cp -R supabase/migrations "$CADENCE_DOCKER_PROXY_DIR/work/supabase/"
+CADENCE_DOCKER_DAEMON="$(docker context inspect --format '{{(index .Endpoints "docker").Host}}')"
+node scripts/supabase-docker-proxy.mjs \
+  "$CADENCE_DOCKER_PROXY_DIR/docker.sock" "${CADENCE_DOCKER_DAEMON#unix://}" &
+CADENCE_DOCKER_PROXY_PID=$!
+```
+
+The network inspection must show `com.docker.network.bridge.host_binding_ipv4`
+equal to `127.0.0.1`. Wait for `Cadence Docker proxy ready.` before continuing.
+The socket uses mode 0600 inside the new private directory. The proxy refuses
+an existing socket; it never replaces another process's socket.
+
+The temporary workdir intentionally omits `.temp`, linked-project metadata,
+credentials, and cached hosted image versions. CLI 2.105.0's `start` checks
+hosted service versions when the workdir contains a project link and CLI
+credentials. Always pass the unlinked temporary workdir below. The copied
+config preserves the same local project ID; no hosted query is needed.
+
+Use the installed Go backend through the npm shim. This avoids the invalid
+signature on the native launcher and also reaches the contract's internal
+`npm run supabase -- status -o env` reader:
+
+```bash
+export SUPABASE_TELEMETRY_DISABLED=1
+export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-darwin-arm64/bin/supabase-go"
+export DOCKER_HOST="unix://$CADENCE_DOCKER_PROXY_DIR/docker.sock"
+npm run supabase -- start --workdir "$CADENCE_DOCKER_PROXY_DIR/work" --network-id cadence-local \
+  --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
+  >/dev/null 2>&1
+```
+
+The excluded services do not participate in the adapter contract. Studio,
+Edge Runtime, and Vector otherwise mount host files or the Docker socket.
+The start command discards provider output because it contains local keys.
+Require a zero exit status. Do not enable debug logging or save status output.
+
+Inspect only labels, port bindings, network membership, and service health.
+Every published binding must show `127.0.0.1`; stop Cadence's affected container
+immediately if any binding shows `0.0.0.0`, `::`, or an empty address. Before a
+destructive local reset, confirm the disposable local database contains no
+owner data. Then replay and run the existing authenticated contract:
+
+```bash
+npm run supabase -- db reset --local --workdir "$CADENCE_DOCKER_PROXY_DIR/work" \
+  --network-id cadence-local >/dev/null 2>&1
+CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+```
+
+Require a zero reset exit status and repeat binding and health readback after
+the reset. The contract captures CLI keys internally. Its synthetic account
+cleanup must succeed. After local acceptance, stop only the Cadence containers,
+preserve named volumes, and end this proxy with `kill "$CADENCE_DOCKER_PROXY_PID"`.
+Do not reset or delete other projects, change Docker defaults, or substitute
+hosted account data.
+
 ## Schema change workflow
 
 All schema work must be represented by migration files under `supabase/migrations/`.
@@ -692,3 +791,156 @@ time only while the source commit and both deployment IDs remain identical.
 Subject mismatch makes the result Not run. Deadline expiry makes it Stale.
 The smoke reports success only after all three temporary users delete
 successfully. Cleanup failure is Failed and blocks a Passed release.
+
+## Integration request tokens (Ticket 223)
+
+Integration operations (the MCP server, Tickets 224–228) run as the grant's
+user through normal RLS. They never use cookies or the service role. After the
+caller verifies an opaque Cadence access token and an active grant,
+`createIntegrationContext` in `lib/integrations/request-context.ts` mints an
+internal Supabase access token with `lib/supabase/integration-token.ts`. The
+context's Supabase client sends that token with the publishable key.
+
+The internal token:
+
+- is an ES256 JWT whose header `kid` matches a signing key Supabase trusts;
+- carries `sub` (user id), `role: "authenticated"`, `aud: "authenticated"`,
+  `iat`, `exp`, `jti`, `cadence_channel`, `cadence_grant_id`, and
+  `cadence_client_id`;
+- expires in at most 5 minutes from the injected `now`;
+- never leaves the server and is never logged, stored, or returned to a client.
+
+The client uses the supabase-js `accessToken` option, which disables
+`supabase.auth`. The token therefore cannot reach the Auth user API through the
+context client. Requests reuse `fetchWithJwtIssuedAtFutureRetry` for
+`JWT issued at future` clock skew.
+
+### Key custody
+
+- `CADENCE_INTEGRATION_JWT_SIGNING_KEY` holds the private ES256 JWK, including
+  its `kid`. It is server-only: never prefix it with `NEXT_PUBLIC_` or `VITE_`,
+  and never put it in desktop bundles, logs, notes, or commits.
+- The variable accepts one JWK, the JSON array that `supabase gen signing-key`
+  writes, or a `{ "keys": [...] }` set. The first key is used.
+- A blank variable makes `createIntegrationContext` throw. Integration routes
+  must treat that as unavailable.
+- Anyone holding this key can act as any Cadence user through the Data API.
+  Store it only in local private env files and the hosted deployment's secret
+  store. Rotate it if it is exposed.
+
+### Local setup
+
+The committed `supabase/config.toml` keeps `signing_keys_path` commented out.
+TOML offers no optional path, and enabling it in the committed config would
+make the default local start depend on an untracked key file. Enable it only
+in an isolated project's temporary config copy. `supabase gen signing-key`
+with the path set needs the file to exist, so create an empty array first:
+
+```bash
+WORKDIR="$(mktemp -d)"
+mkdir -p "$WORKDIR/supabase"
+cp supabase/config.toml supabase/seed.sql "$WORKDIR/supabase/"
+cp -R supabase/migrations "$WORKDIR/supabase/"
+# In the copy: set a unique project_id and ports, then uncomment
+# signing_keys_path = "./signing_keys.json" under [auth].
+echo '[]' > "$WORKDIR/supabase/signing_keys.json"
+chmod 600 "$WORKDIR/supabase/signing_keys.json"
+supabase gen signing-key --algorithm ES256 --append --workdir "$WORKDIR"
+supabase start --workdir "$WORKDIR" --network-id cadence-local
+```
+
+The local Auth server then signs sessions with that key, and its JWKS
+(`/auth/v1/.well-known/jwks.json`) publishes the matching public key, so local
+PostgREST accepts minted tokens. Confirm the published ports bind to
+`127.0.0.1` before continuing (see "Local environment lifecycle"). Never copy
+the key file into `supabase/`; `.gitignore` excludes
+`supabase/signing_keys*.json` as a backstop.
+
+For the app or tests, pass the file contents as the JWK value without printing
+them:
+
+```bash
+CADENCE_INTEGRATION_JWT_SIGNING_KEY="$(cat "$WORKDIR/supabase/signing_keys.json")"
+```
+
+The opt-in RLS test `tests/integration-request-context.local-integration.test.ts`
+runs only when all of these are set, and refuses non-loopback URLs:
+`CADENCE_LOCAL_SUPABASE_URL`, `CADENCE_LOCAL_SUPABASE_SERVICE_KEY` (creates
+and deletes the two test users only), `CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY`,
+and `CADENCE_LOCAL_INTEGRATION_SIGNING_KEY`. It proves that user A's minted
+context reads A's rows, cannot read or write user B's profile, categories,
+Behaviors, or Occurrences, and that expired or untrusted-key tokens get 401.
+It creates Behaviors through the existing core `createBehavior` service and web
+Behavior store, unchanged.
+
+### Hosted import runbook (owner action)
+
+Importing a hosted signing key requires explicit owner authorization. Agents
+write this runbook only. Supabase's
+[signing keys guide](https://supabase.com/docs/guides/auth/signing-keys)
+documents these states (read 2026-10-18):
+
+| Key state | Data API accepts its tokens | Auth signs new sessions with it |
+|---|---|---|
+| Standby | No ("current key only") | No |
+| Current (in use) | Yes | Yes |
+| Previously used | Yes, until revoked | No |
+| Revoked | No | No |
+
+A freshly imported key starts in **standby**, which the Data API does not
+accept. Minted tokens work only after the key is **current** or **previously
+used**. Hosted acceptance has not been verified. On October 18, 2026, the owner
+selected existing production for Ticket 232 planning only. Execution still
+requires approval of the target-specific release packet.
+
+1. Generate the key on a trusted machine:
+   `supabase gen signing-key --algorithm ES256`. Keep the output out of shells
+   with history, logs, and chat.
+2. If the project still uses the legacy JWT secret, first complete Supabase's
+   migration to signing keys (Dashboard → JWT signing keys → Migrate JWT
+   secret), and confirm the app does not verify JWTs with the legacy secret.
+3. Dashboard → JWT signing keys → create a standby key → import the private
+   JWK. Record the `kid` that Supabase shows; it must equal the JWK's `kid`.
+4. Set `CADENCE_INTEGRATION_JWT_SIGNING_KEY` in the target deployment's
+   server-only environment (owner action under `docs/VERCEL_WORKFLOW.md`).
+5. Wait for JWKS caches (Supabase's edge caches the discovery endpoint for 10
+   minutes), then **Rotate keys** so the imported key becomes current. Supabase
+   Auth then signs new sessions with it too; existing sessions stay valid
+   because the previous key becomes previously used.
+6. After approval, verify with a dedicated synthetic account in the selected
+   environment: an integration request reads only that
+   account's rows. Do not revoke the previous key until all of its sessions
+   expire (at least the JWT expiry plus 15 minutes).
+7. Key state changes are throttled for about 5 minutes. Record the date, `kid`,
+   and resulting states in `STATUS.md`, never the key.
+
+Rollback: set `CADENCE_MCP_ENABLED=false`, restart/redeploy and verify protocol
+and discovery readback. Prefer the reviewed disabled candidate so approved legal
+disclosures and expiry maintenance remain available. Removing
+`CADENCE_INTEGRATION_JWT_SIGNING_KEY` only prevents new internal token minting
+after restart; it does not disable OAuth/discovery or revoke issued tokens.
+Grant-wide revocation needs separate incident authority. Preserve current and
+previous signing-key trust while sessions and caches expire; key rotation and
+revocation require their own approval. App rollback leaves shared status SQL
+from migration `20261018180000` intact; correct it through a reviewed forward
+migration. An older-code recovery build must preserve maintenance/disclosures
+and pass review before use. Never automatically restore backups or reset data.
+
+### Tables and RPCs reachable with the internal token
+
+The token has the same database privileges as the user's web session. RLS and
+function checks bind every row to `auth.uid()`. The integration operations
+planned in Tickets 224–225 are expected to reach these objects through
+existing repositories; those tickets confirm the final list.
+
+| Use | Tables | RPCs |
+|---|---|---|
+| Account context | `profiles` | — |
+| Behaviors, schedules, categories | `behaviors`, `behavior_schedules`, `behavior_schedule_slots`, `categories`, `behavior_definition_events`, `behavior_configuration_events` | `create_behavior_with_schedule_graph`, `update_behavior_with_schedule_graph`, `create_behavior_with_definition_event`, `update_behavior_with_definition_event`, `archive_my_due_behaviors` |
+| Occurrences and timeline | `occurrences`, `occurrence_status_events`, `occurrence_sync_state` | `apply_occurrence_status_transition`, `update_occurrence_note_with_shortcut`, `apply_occurrence_generation_plan`, `mark_occurrence_sync_fresh_if_configuration_current` |
+| Time sessions | `occurrence_time_sessions` | `list_my_occurrence_time_sessions`, `list_my_occurrence_time_session_history` |
+
+Tickets 222 and 224–228 must not grant this token anything beyond the user's
+own web-session privileges. Excluded data classes (Calendar, travel, Daily
+Brief, reminder deliveries, push subscriptions) stay readable under RLS to the
+same user, so the operations layer must not query them.

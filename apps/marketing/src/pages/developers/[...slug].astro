@@ -1,0 +1,11 @@
+---
+import type { GetStaticPaths } from "astro";
+import DeveloperLayout from "../../layouts/DeveloperLayout.astro";
+import { marketingRoutes } from "../../data/routes";
+
+export const getStaticPaths = (() => marketingRoutes
+  .filter((route) => route.path.startsWith("/developers"))
+  .map((route) => ({ params: { slug: route.path.slice("/developers/".length) || undefined }, props: { route } }))) satisfies GetStaticPaths;
+const { route } = Astro.props;
+---
+<DeveloperLayout route={route} />

@@ -1070,3 +1070,22 @@ History days scopes its samples. Existing spacing, typography, surfaces and
 responsive columns remain. The inspector shows selected summary counts, ranges,
 mark-time semantics and exclusions; deselection removes timing facts. Actual
 finish capture remains unsupported and no generation occurs when toggling.
+
+## OAuth consent and Connected apps (Ticket 227)
+
+`/oauth/authorize` validates the client request and redirects to the protected
+`/oauth/consent` page. The page uses a single narrow column, native checkboxes,
+and existing underlined Allow and Deny actions. It displays the client name,
+browser-loaded logo when supplied, verified/unverified label, redirect host,
+and signed-in account. Read is required; each requested write permission can
+be switched off independently. Read disclosure includes sensitive notes and
+names excluded Calendar, travel, Daily Brief, and email data. Persistent access
+is disclosed when requested. Errors ask the user to restart from the client.
+
+Settings includes `ConnectedAppsPanel` at `#connected-apps`, reusing the
+single-column `SettingsPanel` stack. Grant rows show the client, verification,
+plain-language permissions, connected date, and last use in the user's timezone.
+Disconnect has an app-specific accessible name and announces success or failure.
+A closed native Recent activity disclosure shows the latest twenty operations,
+times, and outcomes without payloads. Empty and failed loads have distinct text.
+Controls have 44px minimum targets; long client names and hosts wrap at 390px.

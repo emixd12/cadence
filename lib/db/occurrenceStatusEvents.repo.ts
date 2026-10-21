@@ -23,7 +23,7 @@ export type ApplyOccurrenceStatusTransitionRpcInput = {
     statusSemantics: "explicit_user_mark" | "explicit_user_correction";
     recordedAt: string;
     effectiveAt: string | null;
-    sourceCaptureMethod: "manual_tap";
+    sourceCaptureMethod: "manual_tap" | "manual_text";
     sourceConfidence: "high";
   } | null;
 };
@@ -51,7 +51,7 @@ type OccurrenceStatusTransitionRpcClient = {
         | null;
       planned_event_recorded_at: string | null;
       planned_event_effective_at: string | null;
-      planned_event_source_capture_method: "manual_tap" | null;
+      planned_event_source_capture_method: "manual_tap" | "manual_text" | null;
       planned_event_source_confidence: "high" | null;
       planned_cancel_pending_reminders: boolean;
     },
