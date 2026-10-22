@@ -74,8 +74,10 @@ verified tenant domain, and now lists privacy (`https://app.cadence-me.com/priva
 terms (`https://app.cadence-me.com/terms`) and homepage (`https://cadence-me.com`)
 links. Owner decision: Identity Scaffolding is the publishing entity; the
 verified-publisher line will read Identity Scaffolding under the Cadence app
-name. Pending owner action: Microsoft AI Cloud Partner Program enrollment and
-legal-entity verification, then linking the Partner ID to the app. The app has
+name. Deferred by the owner on October 22: Partner Program enrollment waits for
+a company-registration issue to be resolved. Until then the app stays
+unverified: personal accounts and work tenants that allow user consent to
+unverified apps can connect; other tenants need an administrator. The app has
 no verified publisher yet.
 
 The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
