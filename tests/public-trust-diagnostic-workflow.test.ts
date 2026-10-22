@@ -19,14 +19,14 @@ it("pins trusted diagnostic code separately from the deployed subject without pu
   expect(job.environment).toBe("public-trust-preview");
   expect(job.permissions).toEqual({ contents: "read" });
   expect(job.steps).toHaveLength(4);
-  expect(job.steps[0].with).toEqual({ ref: "eb60072a639399a7b4e056b8cd00912da44a1376", "persist-credentials": false });
+  expect(job.steps[0].with).toEqual({ ref: "8892fc4b377f864d4573f4fdabba042e782f5446", "persist-credentials": false });
   expect(job.steps[1].with).toEqual({ "node-version": "24.x" });
   expect(diagnostic.env).toEqual({
-    TRUST_SOURCE_COMMIT: "c42ca9e8a54b3e114df4107d5953bed2205d9e86",
-    TRUST_APPLICATION_DEPLOYMENT_ID: "dpl_EaYktaEGaEus5tnFYfzHNmteXHWg",
-    TRUST_APPLICATION_DEPLOYMENT_URL: "https://cadence-qg4m7u5fo-emis-projects-4c886aeb.vercel.app",
-    TRUST_MARKETING_DEPLOYMENT_ID: "dpl_5EPSFodVy4tkiDtYSx2MFDcxuZEk",
-    TRUST_MARKETING_DEPLOYMENT_URL: "https://cadence-marketing-48i0s990p-emis-projects-4c886aeb.vercel.app",
+    TRUST_SOURCE_COMMIT: "b9012fc1948af44bb1bdac6994771ef7a3e38dba",
+    TRUST_APPLICATION_DEPLOYMENT_ID: "dpl_EvVtMmLeDbY84mGmLYYiFuXSJnQC",
+    TRUST_APPLICATION_DEPLOYMENT_URL: "https://cadence-5xgfxe4ea-emis-projects-4c886aeb.vercel.app",
+    TRUST_MARKETING_DEPLOYMENT_ID: "dpl_H7zpHzDXNF6v9mTCj2pkqZbhfY3u",
+    TRUST_MARKETING_DEPLOYMENT_URL: "https://cadence-marketing-pd3kiacp7-emis-projects-4c886aeb.vercel.app",
     TRUST_PAGES_ORIGIN: "https://emixd12.github.io/cadence/",
     VERCEL_APPLICATION_PROJECT_ID: "prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs",
     VERCEL_MARKETING_PROJECT_ID: "prj_BLlsxoaz1wSvWuK7xcZLLkHglQcR",
@@ -42,10 +42,14 @@ it("pins trusted diagnostic code separately from the deployed subject without pu
 
 it.each([
   [0, "", "Preview access diagnostic succeeded; private input removed.\n"],
-  [1, "Unable to create a temporary Preview access boundary (HTTP 403).", "403\n"],
-  [1, "Unable to create a temporary Preview access boundary (HTTP 429).", "429\n"],
+  [1, "Unable to create a temporary Preview access boundary for application (HTTP 403).", "application 403\n"],
+  [1, "Unable to create a temporary Preview access boundary for marketing (HTTP 429).", "marketing 429\n"],
+  [1, "Unable to create a temporary Preview access boundary for application (HTTP 409).", "application 409\n"],
+  [1, "Unable to create a temporary Preview access boundary for marketing (HTTP 409).", "marketing 409\n"],
+  [1, "Unable to create a temporary Preview access boundary for private-token (HTTP 409).", "Preview access diagnostic failed without an HTTP status.\n"],
+  [1, "Unable to create a temporary Preview access boundary for application (HTTP 999).", "Preview access diagnostic failed without an HTTP status.\n"],
   [7, "private-token in arbitrary provider error", "Preview access diagnostic failed without an HTTP status.\n"],
-  [1, "Unable to create a temporary Preview access boundary (HTTP 403).\nprivate-token", "Preview access diagnostic failed without an HTTP status.\n"],
+  [1, "Unable to create a temporary Preview access boundary for application (HTTP 403).\nprivate-token", "Preview access diagnostic failed without an HTTP status.\n"],
 ])("runs once, preserves exit %s and removes private files", async (code, message, expected) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "cadence-trust-job-"));
   const runner = path.join(root, "runner");
