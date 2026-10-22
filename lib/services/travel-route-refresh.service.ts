@@ -3,35 +3,37 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import { resolveBehaviorDurationEstimate } from "@cadence/core/resolvers/timeline-context.resolver";
+import {
+  TRAVEL_LEG_OUTSIDE_WINDOW,
+  normalizeTravelPlaceText,
+  partitionTravelLegsByWindow,
+  travelPlaceLookupReusable,
+} from "@cadence/core/services/travel-refresh-policy";
 import type { BehaviorDurationHistoryOccurrence, BehaviorDurationEstimate } from "@cadence/core/types/day-progress";
-import type { TravelCollisionCandidate, TravelCommitment, TravelEndpoint } from "@cadence/core/types/travel";
-import { consumeTravelRouteQuota } from "@/lib/db/travelRouteQuota.repo";
+import type { TravelCollisionCandidate, TravelCommitment, TravelEndpoint, TravelPoint } from "@cadence/core/types/travel";
+import { reserveTravelProviderSpend } from "@/lib/db/travelSpend.repo";
+import { readTravelPlaceCache, writeTravelPlaceCache, type TravelPlaceCacheRow } from "@/lib/db/travelPlaceCache.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
 import { getProfileTimezone, listUserBehaviors } from "@/lib/db/behaviors.repo";
 import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
+import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/services/travel-display.service";
-import { assertTravelProviderReady, geocodeGoogleAddress, type TravelProviderConfig } from "@/lib/services/travel-provider";
-import { TravelRoutingError, routeTravelLegs } from "@/lib/services/travel-routing.service";
+import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAddress, type TravelProviderConfig } from "@/lib/services/travel-provider";
+import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { readTravelRouteSource } from "@/lib/services/travel-settings.service";
 
 const ZERO_BUFFERS = { arrivalSeconds: 0, exitSeconds: 0, settlingSeconds: 0 } as const;
+const PLACE_LOOKUP_CONCURRENCY = 4;
 
-// Enabled September 24, 2026 after the Geocoding policy check in docs/qa/travel-release.md; only place-ID endpoints are reused.
-const BASE_GEOCODE_REUSE_ENABLED = true;
-const BASE_GEOCODE_REUSE_MS = 30 * 24 * 60 * 60 * 1000;
-const BASE_GEOCODE_REUSE_CAP = 500;
-let baseGeocodeReuseEnabled = BASE_GEOCODE_REUSE_ENABLED;
-/** Per-instance, in-memory only: place-id points for a saved base, never coordinates or text. */
-const baseGeocodeReuse = new Map<string, { point: TravelEndpoint["point"]; expiresAt: number }>();
+type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">; placeText: string | null; endpointSource: TravelEndpoint["source"] }>;
 
-/** Test-only toggle for the base geocode reuse branch. */
-export function setBaseGeocodeReuseForTest(enabled: boolean): void {
-  baseGeocodeReuseEnabled = enabled;
-  baseGeocodeReuse.clear();
-}
-
+/**
+ * Ticket 214 refresh: reuse stored place lookups, fence the sources once before the
+ * first paid call and once before returning, and route only legs in the window.
+ * Ticket 213: every provider call reserves its list price first.
+ */
 export async function refreshTravelRoutes(
   caller: CalendarCaller,
   raw: unknown,
@@ -48,14 +50,6 @@ export async function refreshTravelRoutes(
   const snapshot = calendar.status === "connected"
     ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate)
     : null;
-  let admitted = false;
-  let admitting: Promise<void> | null = null;
-  // Admit only when a provider call is about to happen; later calls reuse the first admission.
-  const ensureAdmitted = () => admitting ??= (async () => {
-    const admission = await consumeTravelRouteQuota(caller.client);
-    if (!admission.allowed) throw new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: admission.retryAfterSeconds || 1 });
-    admitted = true;
-  })();
   const [behaviorOccurrences, behaviors, timezone] = await Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
     listUserBehaviors(caller.client, caller.user.id),
@@ -69,40 +63,64 @@ export async function refreshTravelRoutes(
   ]);
   const [historyOccurrences, historySessions] = await readDurationHistory();
   const durationEstimates = behaviorDurationEstimates(historyOccurrences, historySessions, behaviors, now, timezone);
-  const occurrenceRevisions: [string, string][] = behaviorOccurrences.map((occurrence) => [occurrence.id, occurrence.updated_at]);
+  const occurrenceRevisions = occurrenceRouteRevision(behaviorOccurrences);
   const durationRevision = historyRevision(historyOccurrences, historySessions);
   const deadline = AbortSignal.timeout(45_000);
-  const assertCurrent = async (signal: AbortSignal) => {
-    if (signal.aborted) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-    const current = await readTravelRouteSource(caller.client, caller.user.id);
-    const currentCalendar = await getCalendarConnection(caller);
+  const changed = () => new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
+  // Database inputs are fenced before spending and before delivery. Calendar has one initial read and one final check.
+  const assertSourcesCurrent = async () => {
+    if (deadline.aborted) throw changed();
+    const [current, currentCalendar, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions]] = await Promise.all([
+      readTravelRouteSource(caller.client, caller.user.id),
+      getCalendarConnection(caller),
+      listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
+      readDurationHistory(),
+    ]);
     if (current.settingsRevision !== source.settingsRevision || current.settings.enabled !== source.settings.enabled ||
       current.settings.mode !== source.settings.mode || current.settings.routingConsentAt !== source.settings.routingConsentAt ||
       currentCalendar.status !== calendar.status || currentCalendar.generation !== calendar.generation || currentCalendar.selectionRevision !== calendar.selectionRevision ||
-      !sameBehaviors(current.behaviors, source.behaviors) ||
-      !sameOccurrences(await listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate), occurrenceRevisions)) {
-      throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
+      !sameBehaviors(current.behaviors, source.behaviors) || !sameOccurrences(currentOccurrences, occurrenceRevisions) ||
+      historyRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
+      throw changed();
     }
-    const [currentHistoryOccurrences, currentHistorySessions] = await readDurationHistory();
-    if (historyRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
-      throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-    }
-    if (snapshot) {
-      const currentEvents = await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate);
-      if (!sameCalendarRevisions(snapshot.events, currentEvents.events)) {
-        throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-      }
-    }
-    if (signal.aborted) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
   };
-  await assertCurrent(deadline);
-  const calendarCommitmentsValue = await calendarCommitments(snapshot?.events ?? [], request, source.settingsRevision, config, now, assertCurrent, ensureAdmitted, deadline);
-  const behaviorCommitmentsValue = await behaviorCommitments(behaviorOccurrences, source.behaviors, durationEstimates, timezone, config, now, assertCurrent, ensureAdmitted, deadline);
-  const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, durationEstimates, timezone, now);
-  const allCommitments = [...calendarCommitmentsValue, ...behaviorCommitmentsValue].sort((left, right) => compareInstants(left.startAt, right.startAt));
+  // Calendar event revisions are checked once more before returning.
+  const assertAllCurrent = async () => {
+    await assertSourcesCurrent();
+    const currentEvents = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
+    if (snapshot && (!currentEvents || !sameCalendarRevisions(snapshot.events, currentEvents.events))) throw changed();
+    if (deadline.aborted) throw changed();
+  };
+  let fenced = false;
+  const beforeFirstProviderCall = async () => {
+    if (fenced) return;
+    fenced = true;
+    await assertSourcesCurrent();
+  };
+  const reserve: TravelSpendReservation = async (microdollars) => {
+    const decision = await reserveTravelProviderSpend(caller.client, microdollars);
+    if (!decision.allowed) {
+      throw new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: decision.retryAfterSeconds || 1, resetsAt: decision.resetsAt });
+    }
+  };
+
+  const drafts = [
+    ...calendarCommitmentDrafts(snapshot?.events ?? [], request, now),
+    ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, durationEstimates, timezone, now),
+  ].sort((left, right) => compareInstants(left.commitment.startAt, right.commitment.startAt));
   // Keep one unrouteable boundary commitment when the bounded source window truncates.
-  const commitments = allCommitments.length > 9 ? [...allCommitments.slice(0, 8), { ...allCommitments[8]!, endpoint: null, attendance: "unknown" as const }] : allCommitments;
-  const base = commitments.length ? await baseEndpoint(caller.user.id, source.settings.baseLocationText, source.settingsRevision, config, now, assertCurrent, ensureAdmitted, deadline) : null;
+  const bounded = drafts.length > 9
+    ? [...drafts.slice(0, 8), { ...drafts[8]!, commitment: { ...drafts[8]!.commitment, attendance: "unknown" as const }, placeText: null }]
+    : drafts;
+  const baseText = bounded.length ? source.settings.baseLocationText : null;
+  const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve);
+  const commitments: TravelCommitment[] = bounded.map(({ commitment, placeText, endpointSource }) => {
+    const point = placeText ? places.get(placeText) ?? null : null;
+    return { ...commitment, endpoint: point ? { ref: commitment.ref, point, source: endpointSource, sourceRevision: commitment.revision, observedAt: now.toString() } : null } as TravelCommitment;
+  });
+  const basePoint = baseText ? places.get(baseText) ?? null : null;
+  const base: TravelEndpoint | null = basePoint ? { ref: "base", point: basePoint, source: "saved_base", sourceRevision: source.settingsRevision, observedAt: now.toString() } : null;
+  const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, durationEstimates, timezone, now);
   const device = request.device ? endpointForDevice(request.device, source.settingsRevision) : null;
   const journeyRevision = revision(source.settingsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections);
   const plan = resolveTravelPlan({
@@ -118,45 +136,85 @@ export async function refreshTravelRoutes(
     commitments,
     buffers: ZERO_BUFFERS,
   });
-  if (!plan.legs.length) {
-    await assertCurrent(deadline);
-    const evidence = resolveTravelEvidence({ plan, results: [], collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
-    return response(caller.user.id, source, projectTravelRouteDisplay(evidence));
+  const { due, later } = request.scope === "day"
+    ? { due: plan.legs, later: [] }
+    : partitionTravelLegsByWindow(plan.legs, now);
+  let routed: Awaited<ReturnType<typeof routeTravelLegs>> = [];
+  if (due.length) {
+    await beforeFirstProviderCall();
+    routed = await measurePerformanceSpan({ span: "travel.route_legs", counts: { routed_legs: due.length, later_legs: later.length } },
+      () => routeTravelLegs({ routes: due.map((leg) => ({ id: leg.id, request: leg.request })), provider: config, reserve, now, signal: deadline }));
   }
-  const routed = await routeTravelLegs({
-    routes: plan.legs.map((leg) => ({ id: leg.id, request: leg.request })),
-    provider: config,
-    quota: { consume: () => consumeTravelRouteQuota(caller.client) },
-    quotaAlreadyConsumed: admitted,
-    assertCurrent,
-    now,
-    signal: deadline,
-  });
-  await assertCurrent(deadline);
-  const finalSnapshot = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
-  if (deadline.aborted || (snapshot && (!finalSnapshot || !sameCalendarRevisions(snapshot.events, finalSnapshot.events)))) {
-    throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-  }
-  const results = routed.map((result) => ({
-    legId: result.id,
-    provenance: plan.legs.find((leg) => leg.id === result.id)!.provenance,
-    estimate: result.estimate,
-    unavailableReason: result.failure?.code,
-  }));
+  await assertAllCurrent();
+  const provenance = new Map(plan.legs.map((leg) => [leg.id, leg.provenance]));
+  const results = [
+    ...routed.map((result) => ({ legId: result.id, provenance: provenance.get(result.id)!, estimate: result.estimate, unavailableReason: result.failure?.code })),
+    ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
+  ];
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
-  return response(caller.user.id, source, projectTravelRouteDisplay(evidence));
+  return response(caller.user.id, source, { ...projectTravelRouteDisplay(evidence),
+    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
+      const duration = durationEstimates.get(occurrence.behavior_id);
+      return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
+        ...(occurrence.schedule_kind === "exact" ? { durationSeconds: duration?.kind === "known" ? duration.seconds : null } : {}) };
+    }),
+  });
 }
 
-async function calendarCommitments(
-  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"],
-  request: TravelRouteRefreshRequest,
-  settingsRevision: string,
+/**
+ * Resolves typed locations to place IDs, reusing stored lookups. One reservation covers
+ * every new lookup. Paid results are stored even when another lookup fails.
+ */
+async function resolvePlaces(
+  caller: CalendarCaller,
+  texts: readonly (string | null)[],
   config: TravelProviderConfig,
   now: Temporal.Instant,
-  assertCurrent: (signal: AbortSignal) => Promise<void>,
-  ensureAdmitted: () => Promise<void>,
   signal: AbortSignal,
-): Promise<TravelCommitment[]> {
+  beforeFirstProviderCall: () => Promise<void>,
+  reserve: TravelSpendReservation,
+): Promise<ReadonlyMap<string, TravelPoint | null>> {
+  const keyByText = new Map(texts.flatMap((text) => text ? [[text, placeTextKey(text)] as const] : []));
+  if (!keyByText.size) return new Map();
+  const stored = await readTravelPlaceCache(caller.client, caller.user.id, [...new Set(keyByText.values())]);
+  const reusable = new Map(stored.filter((row) => travelPlaceLookupReusable(row, now)).map((row) => [row.textKey, row]));
+  // One lookup per distinct key, even when differently typed texts normalize alike.
+  const missing = [...new Map([...keyByText].filter(([, key]) => !reusable.has(key)).map(([text, key]) => [key, text])).entries()];
+  if (missing.length) {
+    await beforeFirstProviderCall();
+    await reserve(missing.length * TRAVEL_GEOCODE_MICRODOLLARS);
+    const lookedUp = await measurePerformanceSpan({ span: "travel.place_lookups", counts: { place_lookups: missing.length, cached_places: reusable.size } },
+      () => boundedMap(missing, PLACE_LOOKUP_CONCURRENCY, async ([key, text]) => {
+        try { return { key, result: await geocodeGoogleAddress(text, { config, signal, maxRetries: 0 }), error: null }; }
+        catch (error) { return { key, result: null, error }; }
+      }));
+    const rows: TravelPlaceCacheRow[] = lookedUp.flatMap(({ key, result }) => result ? [{
+      textKey: key,
+      outcome: result.kind,
+      placeId: result.kind === "resolved" && result.point.kind === "place_id" ? result.point.placeId : null,
+      lookedUpAt: now.toString(),
+    } as TravelPlaceCacheRow] : []);
+    // A failed cache write costs a repeat lookup later; it must not discard this refresh.
+    await writeTravelPlaceCache(caller.client, caller.user.id, rows).catch(() => undefined);
+    for (const row of rows) reusable.set(row.textKey, row);
+    const failed = lookedUp.find((item) => item.error);
+    if (failed) throw failed.error;
+  }
+  return new Map([...keyByText].map(([text, key]) => {
+    const row = reusable.get(key);
+    return [text, row?.outcome === "resolved" && row.placeId ? { kind: "place_id" as const, placeId: row.placeId } : null];
+  }));
+}
+
+function placeTextKey(text: string): string {
+  return createHash("sha256").update(normalizeTravelPlaceText(text)).digest("base64url");
+}
+
+function calendarCommitmentDrafts(
+  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"],
+  request: TravelRouteRefreshRequest,
+  now: Temporal.Instant,
+): CommitmentDraft[] {
   const correctionById = new Map(request.corrections.map((correction) => [correction.eventId, correction]));
   const allTimed = events.filter((event) => event.kind === "timed");
   for (const correction of request.corrections) {
@@ -167,68 +225,59 @@ async function calendarCommitments(
     .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && afterNow(event.startAt, now) && correctionById.get(event.id)?.attendance !== "remote")
     .sort((left, right) => compareInstants(left.startAt, right.startAt));
   const timed = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
-  const commitments: TravelCommitment[] = [];
-  for (const [index, event] of timed.entries()) {
+  return timed.map((event, index) => {
     const correction = correctionById.get(event.id);
     const locationText = correction?.locationText ?? (event.location || null);
     const overflow = prospective.length > 9 && index === 8;
     const attendance = overflow ? "unknown" : correction?.attendance ?? (locationText ? (event.conference ? "hybrid" : "physical") : "unknown");
-    commitments.push({
-      ref: event.id,
-      revision: eventRevision(event),
-      kind: "calendar",
-      startAt: event.startAt,
-      endAt: event.endUnspecified ? null : event.endAt,
-      attendance,
-      endpoint: attendance === "physical"
-        ? await endpointForText(locationText, event.id, correction ? "correction" : "calendar", correction?.revision ?? eventRevision(event), config, now, assertCurrent, ensureAdmitted, signal)
-        : null,
-      mode: null,
-      excluded: event.state === "cancelled" || event.currentUserResponse === "declined",
-    } as TravelCommitment);
-  }
-  return commitments;
+    return {
+      commitment: {
+        ref: event.id,
+        revision: eventRevision(event),
+        kind: "calendar",
+        startAt: event.startAt,
+        endAt: event.endUnspecified ? null : event.endAt,
+        attendance,
+        mode: null,
+        excluded: event.state === "cancelled" || event.currentUserResponse === "declined",
+      } as Omit<TravelCommitment, "endpoint">,
+      placeText: attendance === "physical" ? locationText : null,
+      endpointSource: correction ? "correction" : "calendar",
+    };
+  });
 }
 
-async function behaviorCommitments(
+function behaviorCommitmentDrafts(
   occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>,
   behaviors: readonly { id: string; locationText: string | null; updatedAt: string }[],
   durations: ReadonlyMap<string, BehaviorDurationEstimate>,
   timezone: string,
-  config: TravelProviderConfig,
   now: Temporal.Instant,
-  assertCurrent: (signal: AbortSignal) => Promise<void>,
-  ensureAdmitted: () => Promise<void>,
-  signal: AbortSignal,
-): Promise<TravelCommitment[]> {
+): CommitmentDraft[] {
   const behaviorById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   const prospective = occurrences
     .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now) && !!behaviorById.get(occurrence.behavior_id)?.locationText)
     .sort((left, right) => compareInstants(left.scheduled_for, right.scheduled_for));
   const candidates = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
-  const commitments: TravelCommitment[] = [];
-  for (const [index, occurrence] of candidates.entries()) {
+  return candidates.flatMap((occurrence, index) => {
     const behavior = behaviorById.get(occurrence.behavior_id);
-    if (!behavior?.locationText) continue;
-    const endAt = behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone);
-    const isExcluded = false;
+    if (!behavior?.locationText) return [];
     const overflow = prospective.length > 9 && index === 8;
-    const endpoint = !overflow
-      ? await endpointForText(behavior.locationText, occurrence.id, "behavior", `${behavior.updatedAt}:${occurrence.updated_at}`, config, now, assertCurrent, ensureAdmitted, signal)
-      : null;
-    commitments.push({
-      ref: occurrence.id,
-      revision: `${behavior.updatedAt}:${occurrence.updated_at}`,
-      kind: "behavior",
-      startAt: occurrence.scheduled_for,
-      endAt,
-      attendance: overflow ? "unknown" : "physical",
-      endpoint,
-      mode: null,
-      excluded: isExcluded,
-    });
-  }
-  return commitments;
+    return [{
+      commitment: {
+        ref: occurrence.id,
+        revision: `${behavior.updatedAt}:${occurrence.updated_at}`,
+        kind: "behavior",
+        startAt: occurrence.scheduled_for,
+        endAt: behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone),
+        attendance: overflow ? "unknown" : "physical",
+        mode: null,
+        excluded: false,
+      } as Omit<TravelCommitment, "endpoint">,
+      placeText: overflow ? null : behavior.locationText,
+      endpointSource: "behavior",
+    }];
+  });
 }
 
 function behaviorOccupancyCandidates(
@@ -265,32 +314,6 @@ function behaviorEndAt(
   return null;
 }
 
-async function baseEndpoint(userId: string, text: string | null, settingsRevision: string, config: TravelProviderConfig, now: Temporal.Instant, assertCurrent: (signal: AbortSignal) => Promise<void>, ensureAdmitted: () => Promise<void>, signal: AbortSignal): Promise<TravelEndpoint | null> {
-  if (!baseGeocodeReuseEnabled || !text) return endpointForText(text, "base", "saved_base", settingsRevision, config, now, assertCurrent, ensureAdmitted, signal);
-  const key = `${userId}:${settingsRevision}`;
-  const hit = baseGeocodeReuse.get(key);
-  if (hit && hit.expiresAt > now.epochMilliseconds) {
-    await assertCurrent(signal);
-    return { ref: "base", point: hit.point, source: "saved_base", sourceRevision: settingsRevision, observedAt: now.toString() };
-  }
-  baseGeocodeReuse.delete(key);
-  const endpoint = await endpointForText(text, "base", "saved_base", settingsRevision, config, now, assertCurrent, ensureAdmitted, signal);
-  if (endpoint && endpoint.point.kind === "place_id") {
-    baseGeocodeReuse.set(key, { point: endpoint.point, expiresAt: now.epochMilliseconds + BASE_GEOCODE_REUSE_MS });
-    while (baseGeocodeReuse.size > BASE_GEOCODE_REUSE_CAP) baseGeocodeReuse.delete(baseGeocodeReuse.keys().next().value!);
-  }
-  return endpoint;
-}
-
-async function endpointForText(text: string | null, ref: string, source: TravelEndpoint["source"], sourceRevision: string, config: TravelProviderConfig, now: Temporal.Instant, assertCurrent: (signal: AbortSignal) => Promise<void>, ensureAdmitted: () => Promise<void>, signal: AbortSignal): Promise<TravelEndpoint | null> {
-  if (!text) return null;
-  await assertCurrent(signal);
-  await ensureAdmitted();
-  const result = await geocodeGoogleAddress(text, { config, signal, maxRetries: 0 });
-  await assertCurrent(signal);
-  return result.kind === "resolved" ? { ref, point: result.point, source, sourceRevision, observedAt: now.toString() } : null;
-}
-
 function endpointForDevice(device: NonNullable<TravelRouteRefreshRequest["device"]>, grantRevision: string): TravelEndpoint {
   return { ref: "device", point: { kind: "coordinates", latitude: device.latitude, longitude: device.longitude }, source: "device", sourceRevision: device.sampledAt, observedAt: device.sampledAt, accuracyMeters: device.accuracyMeters, grantRevision };
 }
@@ -308,8 +331,13 @@ function sameBehaviors(left: readonly { id: string; locationText: string | null;
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function sameOccurrences(current: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>, expected: readonly (readonly [string, string])[]): boolean {
-  return JSON.stringify(current.map((occurrence) => [occurrence.id, occurrence.updated_at])) === JSON.stringify(expected);
+function occurrenceRouteRevision(occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>): string {
+  return JSON.stringify(occurrences.map(occurrence => [occurrence.id, occurrence.behavior_id, occurrence.scheduled_for,
+    occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time]));
+}
+
+function sameOccurrences(current: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>, expected: string): boolean {
+  return occurrenceRouteRevision(current) === expected;
 }
 
 function sameCalendarRevisions(left: Awaited<ReturnType<typeof getCalendarEvents>>["events"], right: Awaited<ReturnType<typeof getCalendarEvents>>["events"]): boolean {

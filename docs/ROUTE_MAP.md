@@ -213,7 +213,8 @@ Synthetic mode uses no account reads. Neither mode uses daily generation admissi
 `GET /api/travel/routes` authenticates the current account and returns only whether
 the operator clearance and server credential are configured. Clients must check it
 before requesting a device location. `POST /api/travel/routes` is `no-store` and
-accepts a one- or two-local-day range, one bounded transient device sample, and up
+accepts a one- or two-local-day range, `scope: timeline|day` (default `timeline`),
+one bounded transient device sample, and up
 to eight corrected Calendar-event facts. The server derives the owner, settings,
 optional Calendar snapshot, Behavior occurrences, source revisions, selected mode,
 and endpoints. It rejects a
@@ -224,7 +225,9 @@ chosen fallback mode. It returns the account-bound mode, navigation preference,
 settings revision, earliest expiry, and endpoint-free travel evidence. The service
 rechecks settings, Behavior and Occurrence revisions, and Calendar connection and
 event revisions before and after provider work. It makes no tracking, Calendar, Behavior, Occurrence, or
-Daily Brief mutation.
+Daily Brief mutation. A generated brief requests day scope once through the shared
+client; estimates remain display-only and never enter model input. Timeline scope
+routes only the next three hours. Both scopes retain the eight-leg safety bound.
 
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 

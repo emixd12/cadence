@@ -7,6 +7,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigation";
+import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelCorrection } from "@/lib/ui/travel";
 
 import styles from "./day-progress-timeline.module.css";
@@ -192,8 +193,8 @@ export function renderTravelTiming({ eventId, travel, timezone, compact = false 
   const label = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const originLabels = { device: "current device position", saved_base: "saved base", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
-    {legs.map(({ leg, state, estimate }) => <p key={leg.id}>
-      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return to saved base" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(estimate.departureAt)}, arrive ${label(estimate.arrivalAt)}` : "timing unavailable"}.
+    {legs.map(({ leg, state, estimate, reason }) => <p key={leg.id}>
+      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return to saved base" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(estimate.departureAt)}, arrive ${label(estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
       {!compact ? ` Origin: ${(leg.originCommitmentRef ? "planned prior stop" : originLabels[leg.provenance.originSource])}.` : ""}
     </p>)}
     {!travel?.completeTrip ? <p>Full-trip availability is unknown. Known travel spans still apply.</p> : travel.finalAvailabilityAt ? <p>Available again {label(travel.finalAvailabilityAt)}.</p> : null}

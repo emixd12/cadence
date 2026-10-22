@@ -677,3 +677,10 @@ It omits Timeline display controls and explains the separate model-data disclosu
 Recipe 1.1 briefs keep the bubble's sections and tokens. Option lines read "Suggested time".
 Logging-lane tips use the "Logging tip" label. The evidence line sits under the tip with a
 1px `border-line` left border and 12px indent. `DailyBriefBubbleBench` shows this state.
+
+
+## Travel budget readback (Tickets 213–214)
+
+The private briefing workbench adds one text line to its existing account-access
+panel for the local month and reserved travel spend. It uses existing typography
+and wraps at 390px. No new control, token or Settings field is added.

@@ -829,3 +829,61 @@ The owner supplied Ticket 184's evaluation criteria before reviewing candidate o
 frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
 acceptance, promotion, deployment and stored-brief decisions remain separate.
 This is an evaluation direction; runtime policy and production presets are unchanged.
+
+## 2026-10-17: Travel redesign budget, Behavior Where and model input
+
+The travel review found hosted routing stopped since September 25 because the
+nonrenewing 40-refresh pilot budget ran out. The owner decided:
+
+- Travel spend has an absolute ceiling of US$5 per user per month at Google list
+  price. The ceiling is permissive; the design should spend well below it.
+- Behavior Where is optional: Not set, Anywhere, Home or a saved place. Not set
+  differs from Anywhere. Cadence may suggest a Where from completion place labels
+  stored only after a separate opt-in. A suggestion never changes a Behavior.
+- The Daily Brief model receives slow-changing travel facts, learned travel habits
+  and a weather outlook. Core calculates all times. Exact leave-by times stay in the
+  calculated line beside the brief. Addresses, coordinates, place IDs and raw
+  provider responses never reach the model.
+- Travel Settings shrink to the toggle with its disclosure, Home and usual travel.
+  Learned values replace buffer settings.
+
+Tickets 213–219 record the scope. This decision approves product direction only.
+It grants no provider spending, migration, deployment, new provider or model-data
+transmission. The disclosure update and the Google terms review gate model input.
+
+## 2026-10-18: Google route data in model input; legal register
+
+The owner set a risk regime for Google Maps data in Daily Brief model input:
+
+- Cadence may send the model only its own deterministic conclusions derived from
+  Google route data. Examples: "run fits before the afternoon trip: yes", "travel
+  day", "the Home Behavior does not fit today because of travel".
+- It never sends route durations, rounded trip lengths, leave-by times, or anything
+  from which a route duration can be recovered. A departure time shown next to an
+  event time, for example, reveals the duration.
+- Exact timing stays in the calculated line beside the brief.
+- The owner accepts this as a business risk without asking Google first. Asking Google
+  in writing stays an open item.
+
+This replaces the Google terms review gate from the 2026-10-17 decision. The
+disclosure update still gates model input.
+
+The owner also created one legal register, [`docs/LEGAL.md`](LEGAL.md), for all legal
+matters and questions. Entry L-001 records this regime. Open questions from
+`docs/plans/2026-10-17-weather-provider-comparison.md` moved there.
+
+## 2026-10-18: Weather provider is Open-Meteo
+
+The owner selected Open-Meteo as Ticket 218's weather provider, as recommended in
+`docs/plans/2026-10-17-weather-provider-comparison.md`. Its CC BY 4.0 licence allows
+caching one forecast per area per hour, sharing it across users and sending derived
+facts to the model. It covers the world with hourly forecasts.
+
+- `docs/COSTS.md` assumes the API Standard plan at US$29 per month. The plan choice
+  stays open in `docs/LEGAL.md` entry L-008.
+- The weather area comes from the device position (`docs/LEGAL.md` entry L-002).
+- The Google Weather API would conflict with the regime above, because its forecast
+  facts would be Google content in model input.
+
+This selects the provider. Buying the plan and creating the API key wait for the
+owner's authorization when Ticket 218 is implemented.

@@ -43,22 +43,25 @@ These costs do not grow with each user.
 | Apple Developer Program | US$99 per year | US$8.25 | Apple, not rechecked | — | Required for signed macOS builds. |
 | Domain `cadence-me.com` | About US$10–11 per year | About US$0.90 | Cloudflare Registrar, not verified | — | Replace with the renewal invoice amount. |
 | Sequenzy | Plan not recorded; public free allowance 2,500 emails per month | Unknown | [Sequenzy pricing](https://www.sequenzy.com/pricing) | 2026-08-01 | `docs/SEQUENZY_WORKFLOW.md` requires the owner to record the plan. |
-| **Total known** | | **About US$54** | | | |
+| Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$29, planned | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18; not subscribed. Plan confirmation open (`docs/LEGAL.md` L-008). |
+| **Total known** | | **About US$54 today; about US$83 with planned weather** | | | |
 
 Fixed cost per user: about US$5.42 at 10 users, US$0.54 at 100 users and
-US$0.05 at 1,000 users.
+US$0.05 at 1,000 users. With planned weather: about US$8.30, US$0.83 and US$0.08.
 
 ## Variable costs per user per month
 
 ### Summary
 
-Figures use the efficient travel design described below, not the current code.
+Figures use the efficient travel design described below. Tickets 213–214
+implement most of it in source; it is not deployed yet.
 
 | Cost | Light | Typical | Heavy | Status |
 | --- | --- | --- | --- | --- |
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
 | Daily Brief model | US$0.06 | US$0.13 | US$0.25 | Live |
+| Weather (Open-Meteo) | US$0 | US$0 | US$0 | Planned (Ticket 218); the fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
@@ -71,6 +74,9 @@ Figures use the efficient travel design described below, not the current code.
 | Travel (transit / driving) | US$0.23 / US$0.37 | US$1.30 / US$2.14 | US$3.45 / US$5.73 |
 | Daily Brief | US$0.06 | US$0.13 | US$0.25 |
 | **Total before payment fees** | **US$0.83–0.97** | **US$1.97–2.81** | **US$4.24–6.52** |
+
+Planned weather adds US$0.29 per user at 100 users: totals become US$1.12–1.26
+(light), US$2.26–3.10 (typical) and US$4.53–6.81 (heavy).
 
 Typical users fit under US$5. Heavy drivers do not, unless a per-user travel
 limit applies (see proposals). Payment processing would take more on top of
@@ -120,7 +126,8 @@ as caching is a legal interpretation this file does not settle.
 
 The general terms also prohibit using Google Maps content to train, test,
 validate or fine-tune machine-learning models (section 3.2.3(c)(vii)). Review this
-before sending travel facts to the Daily Brief model.
+before sending travel facts to the Daily Brief model. On 2026-10-18 the owner
+accepted the model-input risk under a conclusions-only regime (`docs/LEGAL.md` L-001).
 
 ### Efficient design assumptions
 
@@ -148,9 +155,22 @@ before sending travel facts to the Daily Brief model.
 Cost per leg: US$0.005 for walking, cycling and transit. About US$0.0085 for
 driving, assuming half the legs fall within an hour of departure and 10% of calls are retried.
 
-### Current code, for comparison
+### Ticket 214 implementation, in source 2026-10-18
 
-The current code re-geocodes every location except home on every refresh. It
+Implemented: place IDs stored per typed text (`travel_place_cache`), only legs
+leaving or arriving within three hours routed on a Timeline open, no refresh on
+status, Note or focus changes, traffic-aware Pro routing only within about an hour
+of departure, one call per leg, and skipped legs between consecutive stops at the
+same place. A generated Daily Brief requests whole-day routing once within the
+existing eight-leg bound. Foreground position checks run once per minute without
+provider calls unless movement exceeds 500 m beyond both accuracy radii.
+Measured calls per refresh and server duration need production use
+after deployment; enable `CADENCE_PERF_LOG=1` to log `travel.place_lookups` and
+`travel.route_legs` counts and durations.
+
+### Pre-Ticket 214 code, for comparison
+
+The pre-Ticket 214 code re-geocoded every location except home on every refresh. It
 routes every leg and makes two Pro calls per driving leg. A status change
 starts a refresh. On 2026-09-23 the owner account used 24 refreshes in one
 day. At about 5–8 calls per refresh, a user with that pattern would cost
@@ -178,6 +198,27 @@ About US$0.004 per brief. The database allows one completed attempt per
 installation per day. Token counts are not recorded yet; the workbench reports
 usage as `unavailable`. Replace the assumptions with measured usage.
 
+## Weather
+
+Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). Planned plan: API
+Standard, US$29 per month for 1 million calls, checked 2026-10-17 on
+[Open-Meteo pricing](https://open-meteo.com/en/pricing). Not subscribed yet.
+The comparison is in `docs/plans/2026-10-17-weather-provider-comparison.md`.
+
+Cadence requests one forecast per coarse area per clock hour and shares it across
+users. Requests per user before sharing, all assumed:
+
+| Assumption | Light | Typical | Heavy |
+| --- | --- | --- | --- |
+| Daily Briefs × coarse areas per brief | 15 × 1.5 | 30 × 2 | 60 × 3 |
+| Travel days × hours with a Timeline estimate × areas | 8 × 2 × 1 | 20 × 4 × 1.5 | 26 × 6 × 2 |
+| **Requests per month** | **about 40** | **about 180** | **about 490** |
+
+At 1,000 typical users that is about 180,000 requests a month; at 1,000 heavy
+users, about 490,000. Both fit the 1 million call plan, so weather adds no
+variable cost. The free tier allows 10,000 calls a day for non-commercial use only
+(`docs/LEGAL.md` L-008).
+
 ## Payment fees
 
 Payment and subscription infrastructure is out of scope for v1. When it
@@ -188,13 +229,23 @@ arrives, fees reduce the US$5:
 - Mac App Store small-business commission is 15%, US$0.75 per US$5
   (not verified).
 
+## Owner decisions
+
+- 2026-10-17: travel spend has an absolute ceiling of US$5 per user per month
+  at Google list price (Ticket 213). Implemented in source on 2026-10-18 as
+  `reserve_travel_provider_spend`: each call reserves US$0.005 (geocode, Routes
+  Essentials) or US$0.010 (Routes Pro, and transit until its SKU is confirmed)
+  before it runs. A deployment-wide circuit breaker refuses reservations above
+  US$10 per UTC day (assumed for a small user count; raise it as users grow). The ceiling is permissive. The target is
+  the efficient design above, about US$1.30–2.14 for a typical user. Heavy
+  drivers (about US$5.73 estimated) would reach the ceiling before month end.
+  Assumed, not confirmed: the ceiling covers Google Maps calls only.
+- 2026-10-18: Open-Meteo is the weather provider (Ticket 218). This file assumes
+  the API Standard plan, US$29 per month; not subscribed. The plan choice stays open
+  (`docs/LEGAL.md` L-008).
+
 ## Proposals awaiting owner decision
 
-- Replace the lifetime travel budget with a renewable per-user monthly limit.
-  A limit of 300 route calls and 100 place lookups covers a typical driver
-  (about 265 calls) and caps travel at US$3.50 per user, even if every call
-  bills at the Pro rate. After the limit, keep the day's
-  plan visible, stop live updates and show the actual reset date.
 - Keep an account-wide Google Cloud budget alert.
 - Record Sequenzy's plan and per-email price.
 - Record Daily Brief token usage per attempt to replace the assumptions.
@@ -203,3 +254,34 @@ arrives, fees reduce the US$5:
 
 - 2026-10-16: Created. Added fixed costs, travel and Daily Brief estimates,
   and the Routes caching-terms finding.
+- 2026-10-17: Recorded the US$5 per-user monthly travel ceiling (Tickets
+  213–219) and the pending weather provider.
+- 2026-10-18: Tickets 213–214 in source: per-call reservations, the US$10 daily
+  circuit breaker, place-ID storage and the three-hour routing window.
+- 2026-10-18: Recorded Open-Meteo as the weather provider (planned US$29 fixed
+  cost) and linked the model-input risk acceptance in `docs/LEGAL.md`.
+
+
+October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
+refresh makes zero geocodes. Each routed leg makes one Routes call, with at most
+one reserved transient retry across the batch. Title-only Calendar revisions,
+status, Note, focus and stationary position checks make no provider call. These
+are automated fixture counts, not production measurements. The private workbench
+shows the authenticated owner's month-to-date reserved list-price spend; no new
+paid call supports that readback.
+
+### Tickets 213–214 production measurements — October 18, 2026
+
+Owner QA reserved US$0.115 under the approved US$0.50 cap. Cloud Monitoring
+confirms seven geocodes and eight route calls, all 200. Initial Calendar text
+used five geocodes and no routes; two temporary street-address corrections used
+two geocodes and two routes. Each of three identical refreshes then used zero
+geocodes and two routes. Calendar and saved-place records stayed unchanged.
+Four successful two-leg requests measured server p50 3.3562 s and nearest-rank
+p95 3.5984 s. Six-leg and multi-user loads were not measured. See
+`docs/qa/travel-release.md` for sample counts, dates and baseline limits.
+
+Final review-fix verification added two cached-place routes and zero geocodes.
+Total reserved spend is US$0.135; Cloud Monitoring confirms seven geocodes and ten
+routes, all 200. That final request completed in 4.159 s in the browser. Server
+sampling was off, so it is excluded from the server percentiles above.

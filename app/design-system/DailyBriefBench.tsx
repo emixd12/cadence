@@ -9,7 +9,7 @@ import { BRIEFING_REFERENCES } from "@cadence/core/services/briefing-references"
 import { BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "@/lib/services/briefing-fixtures";
 import { BRIEFING_ANALYSIS_FIXTURE_IDS, BRIEFING_ANALYSIS_FIXTURE_VERSION, type BriefingAnalysisFixtureId } from "@/lib/services/briefing-analysis-fixtures";
 import { BRIEFING_ANALYSIS_LANES } from "@cadence/core/resolvers/briefing-analysis.resolver";
-type Account = { settings: DailyBriefSettings; behaviors: { ref: string; title: string }[] };
+type Account = { travelSpend?: { localMonth: string; reservedMicrodollars: number } | null; settings: DailyBriefSettings; behaviors: { ref: string; title: string }[] };
 type Comparison = { mode?: 'account' | 'synthetic' | 'saved'; accountRef?: string; preferenceRevision?: number; capturedAt?: string; expiresAt?: string; model: string; promptRevision?: string; fixtureVersion: string | null; usage: string; results: { state: 'ready' | 'error' | 'cancelled'; briefing?: DailyBriefing; error?: string; inspector: unknown; latencyMs: number; validation: string }[] };
 
 async function fetchAccount(signal: AbortSignal): Promise<Account> {
@@ -462,6 +462,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
       <p>Local-only and unsynced desktop records are absent. Each comparison saves the captured inputs, outputs and your feedback on this computer, so you can reread and rerun it. Reruns check your current Settings first. Save and export of configuration drafts stay in Synthetic mode.</p>
       {accountLoading ? <p role="status">Checking account access…</p> : !account ? accountError && !accountError.startsWith('unauthenticated') ? <p role="alert">Account access unavailable: {accountError}</p> : <a className="mr-4 inline-flex min-h-11 items-center underline" href="/login?next=%2Fdesign-system%3Fpreview%3Dbriefing-workbench">Sign in to My account</a> : <>
         <p>{account.settings.enabled ? `Briefing access enabled · ${account.settings.timezone}` : 'Enable Daily Brief in Settings before comparing account data.'}</p>
+        <p>{account.travelSpend ? `Travel usage for ${account.travelSpend.localMonth.slice(0, 7)}: US$${(account.travelSpend.reservedMicrodollars / 1_000_000).toFixed(3)} reserved at list price (US$5 monthly limit).` : 'Travel usage is unavailable.'}</p>
         {!account.settings.available ? <p>Model generation is not configured on this server.</p> : null}
         <p>{account.settings.includeCalendar ? 'Calendar model-data permission is enabled. Each configuration can exclude it.' : 'Calendar model-data permission is off. Calendar will be excluded.'}</p>
         {configs.some(estimatesDurations) ? <label className="flex min-h-11 items-start gap-2 py-2"><input type="checkbox" className="mt-1" checked={descriptionsConfirmed} onChange={(event) => setDescriptionsConfirmed(event.target.checked)} />

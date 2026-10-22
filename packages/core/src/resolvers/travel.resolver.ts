@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { sha256 } from "../hash";
+import type { BehaviorDurationEstimate } from "../types/day-progress";
+import type { TimelineOccurrenceView } from "../types/timeline";
 
 import type {
   TravelCommitment,
@@ -102,7 +104,9 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
     validateEndpoint(destination);
 
     const role: TravelLegRole = priorCommitment ? "onward" : "outbound";
-    if (!priorEndpoint || !chained) {
+    if (priorEndpoint && chained && samePlace(priorEndpoint.point, destination.point)) {
+      // Consecutive stops at the same place need no travel and no route call (Ticket 214).
+    } else if (!priorEndpoint || !chained) {
       unknownLegs.push(unknownLeg(role, priorCommitment?.ref ?? null, commitment.ref, "origin_unknown"));
     } else if (legs.length >= maxLegs) {
       unknownLegs.push(unknownLeg(role, priorCommitment?.ref ?? null, commitment.ref, "leg_limit"));
@@ -263,6 +267,39 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     finalAvailabilityAt,
     modelProjection,
   };
+}
+
+/** Reuse estimates after manual decisions; never invent a route around a resolved stop. */
+export function resolveTravelAfterDecisions(
+  evidence: Omit<TravelEvidenceResult, "modelProjection">,
+  occurrences: readonly Pick<TimelineOccurrenceView, "id" | "status">[],
+  durationEstimates: Readonly<Record<string, BehaviorDurationEstimate>> = {},
+): Omit<TravelEvidenceResult, "modelProjection"> | null {
+  // An omitted stop or changed duration needs routes we cannot infer from cached estimates.
+  const unresolvedRefs = new Set(occurrences.filter(occurrence => occurrence.status === "unresolved").map(occurrence => occurrence.id));
+  const resolvedRefs = new Set(occurrences.filter(occurrence => occurrence.status !== "unresolved").map(occurrence => occurrence.id));
+  if (evidence.behaviorSources?.some(source => {
+    if (!unresolvedRefs.has(source.ref)) return false;
+    const duration = durationEstimates[source.behaviorId];
+    return !source.unresolved || (source.durationSeconds !== undefined &&
+      source.durationSeconds !== (duration?.kind === "known" ? duration.seconds : null));
+  })) return null;
+  if (!resolvedRefs.size) return evidence;
+  const legs = evidence.legs.filter(({ leg }) =>
+    !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? ""));
+  const legIds = new Set(legs.map(({ leg }) => leg.id));
+  const segments = evidence.segments.filter(segment =>
+    !segment.sourceRefs.some(ref => resolvedRefs.has(ref)) && (!segment.legId || legIds.has(segment.legId)));
+  const segmentById = new Map(segments.map(segment => [segment.id, segment]));
+  const collisions = evidence.collisions.flatMap(collision => {
+    if (resolvedRefs.has(collision.candidateRef)) return [];
+    const segmentIds = collision.segmentIds.filter(id => segmentById.has(id));
+    return segmentIds.length ? [{ ...collision, segmentIds,
+      travelCreated: segmentIds.some(id => segmentById.get(id)!.kind !== "commitment") }] : [];
+  });
+  const changed = legs.length !== evidence.legs.length || segments.length !== evidence.segments.length;
+  return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
+    completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
 }
 
 function selectImmediateOrigin(args: Readonly<{
@@ -558,6 +595,10 @@ function correctionFor(
   return corrections.find((correction) =>
     correction.targetRef === targetRef && correction.appliesToRevision === revision
   ) ?? null;
+}
+
+function samePlace(left: TravelEndpoint["point"], right: TravelEndpoint["point"]): boolean {
+  return left.kind === "place_id" && right.kind === "place_id" && left.placeId === right.placeId;
 }
 
 function readyAfter(commitment: TravelCommitment, exitSeconds: number): string | null {

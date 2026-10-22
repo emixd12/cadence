@@ -395,6 +395,12 @@ async function selectAccount() {
 }
 
 describe("Daily Brief workbench: My account", () => {
+  it("shows reserved monthly travel spend without running a comparison", async () => {
+    server.account = () => Response.json({ ...accountMetadata(), travelSpend: { localMonth: "2026-11-01", reservedMicrodollars: 125000 } });
+    await selectAccount();
+    expect(container.textContent).toContain("Travel usage for 2026-11: US$0.125 reserved at list price (US$5 monthly limit).");
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it("shows account sign-in requirements without generating or persisting anything", async () => {
     server.account = () => Response.json({ error: "unauthenticated" }, { status: 401 });
     await selectAccount();

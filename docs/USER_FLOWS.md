@@ -200,6 +200,9 @@ over the page instead of appearing before the feed. Its actions route to:
 - `/export#behaviorlog-import`
 
 Import is optional and does not block setup completion.
+Planned under Ticket 212: an optional "Home and travel" item routes to
+`/settings#travel` for the home address and usual travel mode. It does not
+block setup completion and appears only where travel routing is configured.
 If browser notifications are denied or already blocked, that permission state
 counts as a completed onboarding decision because the app cannot unblock it from
 inside Cadence. The user can still use the tracker and may re-enable browser
@@ -890,3 +893,17 @@ Approve read-only consent using the same Google account as Cadence. Select calen
 Enable Daily Brief, then enable its Calendar control. Calendar selection changes require renewed disclosure.
 Desktop completes consent in the system browser and receives a purpose-bound callback.
 Disconnect affects that purpose across the account's devices. Timeline consent and sign-in remain separate.
+
+
+### Travel refresh completion (Tickets 213–214)
+
+A delivered Daily Brief requests the day's travel once through the shared web and
+desktop client. Requests still require travel consent and provider clearance.
+The existing eight-leg limit applies. Travel remains outside model input.
+A foreground minute check reads an already-allowed device position; only movement
+beyond 500 m plus both accuracy radii requests routing. Manual decisions reproject
+existing estimates in core. Budget refusals apply across source changes until the
+server's reset instant; the last same-day plan stays marked stale. At renewal,
+Refresh travel becomes available without a reload.
+The private workbench account-access read shows month-to-date reserved travel spend
+without provider calls or generation.

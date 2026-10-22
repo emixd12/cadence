@@ -1,29 +1,30 @@
 # Implementation Status
 
-## Ticket 184 candidate 2 and Ticket 188 — October 16, 2026
+## Tickets 213–214 completed — October 18, 2026
 
-In progress. Iteration 1 tuning pass 1 ran T1–T6 (12 calls, all passed). The owner
-preferred B in T3–T5 and neither in T1 and T6. Feedback and eight proposals are stored
-in the local bench cases; non-private IDs are in `docs/qa/briefing-workbench.md`.
-Candidate 2 is recipe `daily_brief@1.1` in preset `advisor-analysis-2`. It adds default
-same-day movability for unresolved Behaviors, plain wording, quiet-day and repetition
-rules, Logging tip labels and nested evidence. Recipe 1.0 presets and the production
-default are unchanged. Ticket 188 (description duration estimates) is filed and in progress.
-Held-out cases, the seven-day sequence, owner acceptance and promotion remain open.
+All three migrations deployed and read back. Production serves the approved
+Google Maps notices and routing implementation from focused release commit
+`f239e72` (PR #107). Owner QA reserved US$0.135 of US$0.50; Cloud Monitoring
+confirms seven geocodes and ten routes. Four two-leg samples measured server
+p50 3.3562 s and p95 3.5984 s. Cached repetitions made zero geocoding calls.
+Web narrow-layout and Refresh travel checks pass. Review fixes withdraw cached
+guidance for reopened stops and changed durations, and check duration history
+before reserving spend.
 
-## Ticket 187: Isolate agentic Calendar access — October 12, 2026
+Installed preview.50 passes linked-account synchronization, selected-Calendar
+loading, foreground travel activation and Refresh travel. The shared planner
+safely reconciles independently generated untouched Occurrences with hosted
+identities. Native apply preserves the unique schedule constraint atomically.
+All 1,456 prior status events, 13 time sessions, 34 Notes and import records
+remain intact. The outbox is empty; SQLite integrity and foreign-key checks pass.
+No manual private database repair was applied.
 
-In progress: source implemented and locally verified; release acceptance remains open.
-Daily Brief and private workbench reads now require a separate agent grant.
-Standard Calendar grants and sign-in remain unchanged. The migration withdraws
-prior Calendar disclosure and requires fresh consent. Agent setup requires a
-separate Google project to isolate revocation. Independent review, provider
-classification/configuration, hosted deployment, and installed acceptance remain open.
-Evidence and remaining gates: `docs/qa/2026-10-12-agentic-calendar.md`.
-Plan: `docs/plans/2026-10-12-google-agentic-oauth-review.md`.
-Cloud rollout scope: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
-Planning found a public no-AI disclosure conflict and an unproven cutover barrier.
-Both are required release gates. No provider or deployment changes occurred during planning.
+Validation: 2,378 TypeScript tests passed (31 skipped), 110 native tests passed;
+required checks and both frontend builds pass. Production deployment before the
+PR's main promotion is `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
+Six-leg and before/after performance remain unmeasured. Native current-device
+position and Apple-trusted distribution retain Tickets 115/165 gates.
+See `docs/qa/travel-release.md` for evidence and measurement limits.
 
 ## Ticket 186: Cadence project and repository rename — October 7–9, 2026
 

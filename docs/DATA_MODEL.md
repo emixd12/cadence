@@ -50,14 +50,43 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
-Device samples, provider geocodes and route results remain transient. Exclude them
-from account sync, exports, backups, logs and analytics. Shared resolvers derive
+Device samples and route results remain transient. Exclude them from account sync,
+exports, backups, logs and analytics. Since Ticket 214, a provider geocode persists
+only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive
 travel occupancy and collisions without changing scheduled times or statuses.
 Each leg carries its own endpoints, timing, mode, provenance and freshness so one
 unknown leg does not discard known legs. Current device position overrides a
 predicted scheduled origin for the immediate departure. Input changes invalidate
 affected legs; no automatic base detour is inserted between successive events.
 See `plans/travel-departure-discovery.md` for retention and disclosure boundaries.
+
+Migration `20261017150000_travel_monthly_budget.sql` (Ticket 213) replaces the
+pilot allowance below. `travel_spend_owner_month` keeps one row per owner and
+owner-local month; `travel_spend_global_day` keeps one row per UTC day. Both hold
+reserved list-price microdollars only. Authenticated callers reserve through the
+security-definer `reserve_travel_provider_spend(requested_microdollars)` before
+every provider call, including retries. The function locks the owner row, then the
+global row, and refuses a request that would exceed US$5.00 for the owner's local
+month or US$10.00 across all owners for the UTC day. A refusal reserves nothing
+and returns the renewal instant. Reservations are never refunded. Owners may read
+their own month rows; nobody but the function writes either table, and clients
+cannot read the global table. The pilot tables and `consume_travel_route_quota()`
+remain as history; the application no longer calls them.
+
+Migration `20261017150100_travel_place_cache.sql` (Ticket 214) adds
+`travel_place_cache`: owner, a 43-character base64url SHA-256 of the normalized
+typed location text, the lookup outcome (`resolved`, `unresolved` or `ambiguous`),
+a place ID for resolved rows only, and the lookup time. It stores no location
+text, coordinates or route content. Google permits storing place IDs indefinitely.
+The refresh service reuses resolved rows for 365 days and other outcomes for 30
+days. Owner RLS permits select, insert, update and delete. A trigger deletes the
+owner's rows when `travel_settings.enabled` changes to false, whether Settings or
+desktop account sync wrote the change. Account deletion cascades. The cache is
+excluded from account sync, exports and backups.
+Migration `20261018051402_fence_travel_place_cache_consent.sql` serializes cache
+writes with the owner's travel-settings row. A late lookup cannot repopulate the
+cache after travel is disabled. The trigger rejects foreign ownership and skips
+writes without current routing consent.
 
 Migration `20260922013000_add_travel_route_quota.sql` keeps owner-local-day and
 global UTC-day counters. Authenticated callers consume quota through one
@@ -68,8 +97,10 @@ provider call. Failed and partial refreshes retain their reservation. Existing
 six-per-owner-day and 100-per-global-day caps still apply. Never prune global
 rows or reset the allowance without explicit owner authorization.
 
-One refresh makes at most 19 non-retried geocodes and 18 route calls, including
-driving refinement and one batch retry. At verified September 22, 2026 USA list
+Under the pilot, one refresh made at most 19 non-retried geocodes and 18 route calls,
+including driving refinement and one batch retry. Since Ticket 214, a refresh looks up
+at most nine places not yet stored and makes at most eight route calls plus one retry,
+one call per leg. At verified September 22, 2026 USA list
 prices, their upper bound is US$0.365 before tax and without free credits.
 The US$0.50 reservation leaves US$0.135 per refresh for margin; it is not a
 measurement of billed cost. Recheck pricing and call bounds before changing

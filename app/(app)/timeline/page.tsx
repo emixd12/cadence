@@ -90,7 +90,7 @@ async function TimelineContent({
 
   return (
     <>
-      <DailyBriefLauncher sourceKey={timelineBriefKey(timeline)} />
+      <DailyBriefLauncher travelAccountId={userId} sourceKey={timelineBriefKey(timeline)} />
       <FirstRunOnboardingPanel onboarding={onboarding} />
       <Timeline
         key={userId}
