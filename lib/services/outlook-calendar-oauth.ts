@@ -13,6 +13,8 @@ import { ConnectorError } from "@/lib/types/connectors";
 export const OUTLOOK_CALENDAR_SCOPES = ["openid", "offline_access", "Calendars.Read"] as const;
 /** The only Graph permission the access token may carry. */
 const GRAPH_SCOPE = "calendars.read";
+/** Narrower permission Microsoft may echo from an earlier consent; allowed only with GRAPH_SCOPE. */
+const GRAPH_SUBSET_SCOPE = "calendars.readbasic";
 /** OpenID Connect scopes Microsoft may echo; they grant no Graph access. */
 const OIDC_SCOPES = new Set(["openid", "offline_access", "profile", "email"]);
 const AUTHORITY = "https://login.microsoftonline.com/common/oauth2/v2.0";
@@ -115,11 +117,12 @@ function grantedScopesOk(value: unknown): boolean {
   if (value === undefined) return true;
   if (typeof value !== "string" || value.length > 4096) return false;
   const scopes = value.split(" ").filter(Boolean).map((scope) => scope.toLowerCase().replace(/^https:\/\/graph\.microsoft\.com\//, ""));
-  // Exactly one Graph permission, Calendars.Read. Write, shared-calendar, User.Read,
-  // or leftover Calendars.ReadBasic grants are refused. A refresh of an earlier
-  // ReadBasic-only connection therefore fails here and the service marks it
-  // reconnect_required.
-  return scopes.includes(GRAPH_SCOPE) && scopes.every((scope) => scope === GRAPH_SCOPE || OIDC_SCOPES.has(scope));
+  // Exactly one Graph data permission, Calendars.Read. Microsoft echoes an earlier
+  // Calendars.ReadBasic consent next to it (live Ticket 242); ReadBasic is a subset of
+  // Read, so it is accepted only alongside Read. Write, shared-calendar and User.Read
+  // grants are refused, and a ReadBasic-only refresh of an earlier connection fails
+  // here so the service marks it reconnect_required.
+  return scopes.includes(GRAPH_SCOPE) && scopes.every((scope) => scope === GRAPH_SCOPE || scope === GRAPH_SUBSET_SCOPE || OIDC_SCOPES.has(scope));
 }
 
 /**

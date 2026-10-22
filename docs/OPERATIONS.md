@@ -1551,8 +1551,10 @@ App registration steps (owner-run, not authorized in local work):
 3. Create a client secret and store it only in the server environment.
 
 The token check refuses any present Graph permission other than
-`Calendars.Read`, so a leftover `User.Read` or `Calendars.ReadBasic` makes every
-connect fail as `consent_denied`. A connection created before Ticket 242 with only
+`Calendars.Read`, so a leftover `User.Read` makes every connect fail as
+`consent_denied`. Microsoft echoes an earlier `Calendars.ReadBasic` consent next to
+`Calendars.Read` (live, October 22, 2026); because it is a subset of `Calendars.Read`,
+it is accepted only alongside it, and a `Calendars.ReadBasic`-only grant is refused. A connection created before Ticket 242 with only
 `Calendars.ReadBasic` moves to `reconnect_required` on its next read; the user
 reconnects and grants `Calendars.Read`. `Calendars.Read` allows reading event
 details, so data minimization is in the adapter: every Graph request, including

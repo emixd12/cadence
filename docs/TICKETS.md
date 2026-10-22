@@ -14516,7 +14516,11 @@ field outside the contract.
 Acceptance:
 
 - `OUTLOOK_CALENDAR_SCOPES` and granted-scope validation accept exactly one
-  Graph data permission, `Calendars.Read`; OIDC scopes may be echoed. A token
+  effective Graph data permission, `Calendars.Read`; OIDC scopes may be echoed,
+  and a co-granted `Calendars.ReadBasic` from earlier consent is accepted (live,
+  October 22, 2026: Microsoft returned `openid Calendars.Read Calendars.ReadBasic`
+  for a personal account that had consented to ReadBasic before; it grants
+  nothing beyond `Calendars.Read`). A token
   whose scope adds write or other Graph permissions is still rejected. An
   existing connection granted only `Calendars.ReadBasic` moves to
   `reconnect_required` on its next read, without crashing.

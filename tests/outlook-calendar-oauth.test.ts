@@ -138,13 +138,13 @@ describe("token endpoint", () => {
   });
 
   it.each([
-    ["Calendars.ReadBasic Calendars.Read openid", "consent_denied"],
     ["Calendars.ReadBasic openid offline_access", "consent_denied"],
     ["https://graph.microsoft.com/Calendars.ReadBasic", "consent_denied"],
     ["Calendars.Read Calendars.ReadWrite openid", "consent_denied"],
     ["Calendars.Read Calendars.Read.Shared openid", "consent_denied"],
     ["Calendars.Read User.Read openid", "consent_denied"],
     ["Calendars.Read Mail.Read", "consent_denied"],
+    ["Calendars.Read Calendars.ReadBasic Calendars.ReadWrite", "consent_denied"],
     ["openid offline_access", "consent_denied"],
     [null, "consent_denied"],
     ["", "consent_denied"],
@@ -157,6 +157,8 @@ describe("token endpoint", () => {
     "Calendars.Read",
     "https://graph.microsoft.com/Calendars.Read offline_access",
     "openid profile email offline_access https://graph.microsoft.com/calendars.read",
+    // Live Ticket 242: Microsoft echoes an earlier ReadBasic consent next to Calendars.Read.
+    "openid Calendars.Read Calendars.ReadBasic",
   ])("accepts the single Graph data permission Calendars.Read (%s)", async (scope) => {
     const fetch = vi.fn(async () => tokenResponse({ ...good, scope, id_token: idToken(claims(verifier)) }));
     await expect(exchangeOutlookCode(CONFIG, "synthetic-code", verifier, { fetch, nowSeconds: NOW })).resolves.toMatchObject({ accessToken: "synthetic-access" });
