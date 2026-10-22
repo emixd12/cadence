@@ -1,5 +1,62 @@
 # Implementation Status
 
+## Ticket 219 stage 1: travel facts in Daily Brief model input — October 22, 2026
+
+Stage 1 is implemented in source on a branch from the Ticket 215 branch (PR #112).
+Nothing is deployed. Stage 2 follows Tickets 216, 217 and 218.
+
+- `TravelTimingModelProjection` 2.0 carries only Cadence's own conclusions: travel
+  day, trips by destination with mode and a current/unknown estimate, and a
+  fits/does_not_fit/unknown conclusion per unresolved Behavior. Version 1.0 carried
+  route timing and was never enabled. Unknown or non-current legs make overlapping
+  fits unknown, never free.
+- The day context gains an optional `travel` block: Behavior Where (`not_set` is
+  "location not set"), routing on/off, usual travel and the route conclusions.
+  The strict validator rejects any instant, duration, extra field or free text.
+  Typed slots wait for Ticket 217 habits, Ticket 218 weather and Ticket 216 label
+  counts.
+- `projectBriefingContext` sends the block to the model only for facts it already
+  receives. Conclusions shaped by a Calendar event need the Calendar source. The
+  planner never sees travel.
+- The live brief now sends Where and usual travel, read without place text and
+  fenced before and after generation. It sends no route conclusions: estimates
+  stay on the client and are never stored, so the server has none. Stage 2 must
+  choose a transport; `docs/TICKETS.md` Ticket 219 records the options.
+- The private workbench adds synthetic `travel_day` and `travel_unknown` fixtures
+  built from invented places and estimates through the real travel resolver.
+- Model instructions gain a travel block only when travel facts are present. The
+  prompt revision changes; the policy version stays 3.0, as in Ticket 239.
+
+Tests prove that no route duration, rounded trip length, departure, arrival,
+leave-by time, place or derived time pair reaches the full model payload.
+Exact leave-by times stay in the calculated line beside the brief. Travel changes
+still never regenerate a brief or reset its dismissal.
+
+Privacy surface entries (owner decision October 22: logged, not blocking; the
+existing Daily Brief model-data toggle stays the only gate):
+1. `components/briefing/DailyBriefSettingsPanel.tsx:141` lists what the brief sends
+   to OpenAI. It must add Behavior Where (Home, a saved place without its address,
+   Anywhere or not set) and usual travel when travel is on.
+2. `components/settings/TravelSettingsPanel.tsx:107` says travel places and route
+   results are not sent to the Daily Brief model. Places and route results remain
+   unsent in stage 1, but usual travel is now sent.
+3. `docs/user-guide/travel.md` says deterministic travel facts stay separate from
+   the briefing. Where and usual travel now reach it; route conclusions follow in
+   stage 2.
+4. When live route conclusions ship, every disclosure above must cover Cadence's
+   conclusions from Google routes and state that no times, durations, addresses or
+   coordinates are sent. Review the privacy policy and the marketing AI claims,
+   including the Ticket 187 no-AI conflict.
+5. Residual inference: a yes/no fit bounds when a trip starts, though it never
+   reveals a duration. This is the regime the owner accepted under L-001; include
+   it in the written question to Google.
+6. Stage 2 adds learned habits, weather (Open-Meteo attribution, L-011) and
+   completion-label counts to the same disclosure.
+
+Platform impact: web briefing pipeline and private workbench; a linked desktop
+shares hosted generation, and account-free desktop sends nothing. Marketing and
+future mobile have no implementation change.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21

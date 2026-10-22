@@ -54,3 +54,16 @@ export async function readTravelBehaviorLocations(
   if (error) throw error;
   return (data ?? []) as { id: string; where_kind: string | null; location_text: string | null; updated_at: string }[];
 }
+
+/** Ticket 219: Where kinds only. Place text stays out of the Daily Brief read. */
+export async function readBehaviorWhereKinds(
+  client: AppSupabaseClient,
+  userId: string,
+): Promise<{ id: string; where_kind: string | null }[]> {
+  const { data, error } = await client.from("behaviors")
+    .select("id,where_kind")
+    .eq("user_id", userId)
+    .order("id");
+  if (error) throw error;
+  return (data ?? []) as { id: string; where_kind: string | null }[];
+}

@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   analysisRevision: vi.fn(),
   outlook: vi.fn(),
   connector: vi.fn(),
+  travelSettings: vi.fn(),
+  whereKinds: vi.fn(),
 }));
+vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readBehaviorWhereKinds: mocks.whereKinds }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
 vi.mock("@/lib/services/connector-credentials", () => ({ getConnectorConnection: mocks.connector }));
 vi.mock("@/lib/db/advisor-analysis.repo", async (original) => ({
@@ -74,8 +77,50 @@ beforeEach(() => {
   mocks.opaque.mockReturnValue((kind: string, value: string) => kind === "revision" ? (value === "raw-revision" ? "revision_cadence" : `revision_${value}`) : `${kind}_${value}`);
   mocks.contexts.mockImplementation(async ({ historyDays }) => historyDays.map((lookbackDays: number) => ({
     ...fixture,
-    cadence: { ...fixture.cadence, history: { ...fixture.cadence.history, lookbackDays } },
+    cadence: { ...fixture.cadence, history: { ...fixture.cadence.history, lookbackDays,
+      startLocalDate: Temporal.PlainDate.from(fixture.localDate).subtract({ days: lookbackDays }).toString() } },
   })));
+  mocks.travelSettings.mockResolvedValue(null);
+  mocks.whereKinds.mockResolvedValue([]);
+});
+
+describe("stored travel facts (Ticket 219)", () => {
+  const travelSettings = { enabled: true, routing_consent_at: "2026-10-01T00:00:00Z", mode: "transit", base_location_text: "1 Main Street",
+    navigation_preference: null, onboarding_completed_at: null, updated_at: "2026-10-01T00:00:00Z" };
+
+  it("adds Where and usual travel for authorized Behaviors in the context, without place text", async () => {
+    mocks.ids.mockResolvedValue(["fixture", "other"]);
+    mocks.travelSettings.mockResolvedValue(travelSettings);
+    mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: "home" }, { id: "other", where_kind: "anywhere" }, { id: "foreign", where_kind: "place" }]);
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+
+    expect(prepared.contexts[0].travel).toEqual({
+      version: "1.0", routing: "on", usualMode: "transit",
+      behaviors: [{ behaviorRef: "behavior_fixture", where: "home" }],
+      route: { state: "unavailable", reason: "not_supplied" },
+    });
+    expect(JSON.stringify(prepared.contexts)).not.toContain("Main Street");
+    await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+
+    mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: null }, { id: "other", where_kind: "anywhere" }]);
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+
+  it("reports routing off and location not set without a travel settings row", async () => {
+    mocks.ids.mockResolvedValue(["fixture"]);
+    mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: null }]);
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+    expect(prepared.contexts[0].travel).toEqual({
+      version: "1.0", routing: "off", usualMode: null,
+      behaviors: [{ behaviorRef: "behavior_fixture", where: "not_set" }],
+      route: { state: "unavailable", reason: "routing_off" },
+    });
+
+    mocks.travelSettings.mockResolvedValue({ ...travelSettings, enabled: false });
+    await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+    mocks.travelSettings.mockResolvedValue(travelSettings);
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
 });
 
 describe("account briefing context", () => {

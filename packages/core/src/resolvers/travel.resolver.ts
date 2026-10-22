@@ -13,6 +13,8 @@ import type {
   TravelJourneyCorrection,
   TravelLegProvenance,
   TravelLegRole,
+  TravelModelFit,
+  TravelModelTrip,
   TravelOccupiedSegment,
   TravelOccupiedSpan,
   TravelPlannedLeg,
@@ -21,9 +23,10 @@ import type {
   TravelPoint,
   TravelResolvedLegEvidence,
   TravelRouteEstimate,
+  TravelTimingModelProjection,
   TravelUnknownLeg,
 } from "../types/travel";
-import { TRAVEL_EVIDENCE_VERSION } from "../types/travel";
+import { TRAVEL_EVIDENCE_VERSION, TRAVEL_MODEL_PROJECTION_VERSION } from "../types/travel";
 
 const DEFAULT_MAX_DEVICE_AGE_SECONDS = 60;
 const DEFAULT_MAX_DEVICE_ACCURACY_METERS = 100;
@@ -233,27 +236,7 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
         .toString()
     : null;
   const modelProjection = input.modelProjection === "enabled" && planRevisionCurrent && grantCurrent
-    ? {
-        version: TRAVEL_EVIDENCE_VERSION,
-        journeyRef: input.plan.journeyRef,
-        legs: legs.flatMap((entry) => entry.state === "current" && entry.estimate
-          ? [{
-              ref: entry.leg.id,
-              role: entry.leg.role,
-              mode: entry.leg.mode,
-              departureAt: entry.estimate.departureAt,
-              arrivalAt: entry.estimate.arrivalAt,
-              durationSeconds: entry.estimate.durationSeconds,
-              fallback: entry.estimate.fallback,
-              observedAt: entry.estimate.observedAt,
-              expiresAt: entry.estimate.expiresAt,
-            }]
-          : []),
-        occupiedSpans,
-        collisions,
-        completeTrip,
-        finalAvailabilityAt,
-      }
+    ? resolveTravelModelProjection(input.plan, legs, segments, input.collisionCandidates)
     : null;
 
   return {
@@ -300,6 +283,122 @@ export function resolveTravelAfterDecisions(
   const changed = legs.length !== evidence.legs.length || segments.length !== evidence.segments.length;
   return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
     completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
+}
+
+type OpenWindow = Readonly<{ startAt: Temporal.Instant | null; endAt: Temporal.Instant | null }>;
+
+type ModelTripAnchor = Readonly<{
+  trip: TravelModelTrip;
+  /** Destination start, or the last stop's end for the trip home. Used for ordering only. */
+  anchor: Temporal.Instant | null;
+  /** Time travel may occupy while its estimate is unknown. A `null` bound is open. */
+  uncertain: OpenWindow | null;
+  /** Attendance may be remote, so the trip is uncertain rather than planned. */
+  possiblyRemote: boolean;
+}>;
+
+/**
+ * Ticket 219: Cadence's own conclusions for model input (`docs/LEGAL.md` L-001).
+ * Instants are compared here and never leave this function. Unknown travel
+ * never becomes free time: it makes an overlapping fit `unknown`.
+ */
+function resolveTravelModelProjection(
+  plan: TravelPlanningResult,
+  legs: readonly TravelResolvedLegEvidence[],
+  segments: readonly TravelOccupiedSegment[],
+  candidates: TravelEvidenceInput["collisionCandidates"],
+): TravelTimingModelProjection {
+  const travelDay = plan.legs.length > 0 ? "yes" as const : plan.unknownLegs.length > 0 ? "unknown" as const : "no" as const;
+  const calendarEvents = plan.commitments.some((commitment) => commitment.kind === "calendar");
+  if (travelDay === "no") return { version: TRAVEL_MODEL_PROJECTION_VERSION, travelDay, calendarEvents, trips: [], fits: [] };
+
+  const commitmentByRef = new Map(plan.commitments.map((commitment) => [commitment.ref, commitment]));
+  const startOf = (ref: string | null) => {
+    const commitment = ref ? commitmentByRef.get(ref) : undefined;
+    return commitment ? instant(commitment.startAt, "Commitment start") : null;
+  };
+  const endOf = (ref: string | null) => {
+    const commitment = ref ? commitmentByRef.get(ref) : undefined;
+    return commitment ? instant(commitment.endAt ?? commitment.startAt, "Commitment end") : null;
+  };
+  const anchorFor = (role: TravelLegRole, originRef: string | null, destinationRef: string | null) =>
+    role === "return" ? endOf(originRef) : startOf(destinationRef);
+
+  const evidenceById = new Map(legs.map((entry) => [entry.leg.id, entry]));
+  const lateArrivals = new Map<string, TravelLegRole>();
+  const tripByLegId = new Map<string, ModelTripAnchor>();
+  const anchors: ModelTripAnchor[] = [];
+  for (const leg of plan.legs) {
+    const entry = evidenceById.get(leg.id);
+    const estimate = entry?.state === "current" ? entry.estimate : null;
+    const value: ModelTripAnchor = {
+      trip: { destinationRef: leg.destinationCommitmentRef, role: leg.role, mode: leg.mode, estimate: estimate ? "current" : "unknown" },
+      anchor: anchorFor(leg.role, leg.originCommitmentRef, leg.destinationCommitmentRef),
+      uncertain: estimate ? null : { startAt: instant(leg.readyAt, "Route ready time"), endAt: startOf(leg.destinationCommitmentRef) },
+      possiblyRemote: false,
+    };
+    tripByLegId.set(leg.id, value);
+    anchors.push(value);
+    const late = estimate && leg.request.timing.kind === "arrive_by" &&
+      Temporal.Instant.compare(instant(estimate.arrivalAt, "Route arrival"), instant(leg.request.timing.at, "Arrival target")) > 0;
+    if (late && leg.destinationCommitmentRef) lateArrivals.set(leg.destinationCommitmentRef, leg.role);
+  }
+  for (const unknown of plan.unknownLegs) {
+    anchors.push({
+      trip: { destinationRef: unknown.destinationCommitmentRef, role: unknown.role, mode: null, estimate: "unknown" },
+      anchor: anchorFor(unknown.role, unknown.originCommitmentRef, unknown.destinationCommitmentRef),
+      uncertain: { startAt: endOf(unknown.originCommitmentRef), endAt: startOf(unknown.destinationCommitmentRef) },
+      possiblyRemote: unknown.reason === "attendance_unknown",
+    });
+  }
+  anchors.sort((left, right) => compareOptionalInstants(left.anchor, right.anchor));
+  const trips = anchors.filter((item) => !item.possiblyRemote);
+  const travelSegments = segments.filter((value) => value.kind !== "commitment" && value.legId);
+
+  const about = (subject: Temporal.Instant, item: ModelTripAnchor | null | undefined, withPosition = true): Pick<TravelModelFit, "trip" | "position"> => {
+    if (!item) return { trip: null, position: null };
+    const position = !withPosition || !item.anchor ? null : Temporal.Instant.compare(subject, item.anchor) < 0 ? "before" : "after";
+    return { trip: { destinationRef: item.trip.destinationRef, role: item.trip.role }, position };
+  };
+  // The next trip after the occurrence starts, otherwise the last trip of the day.
+  const nearest = (subject: Temporal.Instant) =>
+    trips.find((item) => item.anchor && Temporal.Instant.compare(item.anchor, subject) > 0) ?? trips.at(-1);
+
+  const behaviors = [...new Map(candidates.filter((candidate) => candidate.kind === "behavior").map((candidate) => [candidate.ref, candidate])).values()]
+    .sort((left, right) => Temporal.Instant.compare(instant(left.startAt, "Fit start"), instant(right.startAt, "Fit start")) || left.ref.localeCompare(right.ref));
+  const fits = behaviors.map((candidate): TravelModelFit => {
+    const ref = candidate.ref;
+    const from = instant(candidate.startAt, "Fit start");
+    const to = candidate.endAt ? instant(candidate.endAt, "Fit end") : null;
+    const lateRole = lateArrivals.get(ref);
+    if (lateRole) {
+      return { ref, conclusion: "does_not_fit", basis: "late_arrival", trip: { destinationRef: ref, role: lateRole }, position: null };
+    }
+    const crowded = travelSegments.find((value) => !value.sourceRefs.includes(ref) &&
+      overlapsWindow(from, to, { startAt: instant(value.startAt, "Segment start"), endAt: instant(value.endAt, "Segment end") }));
+    if (crowded) return { ref, conclusion: "does_not_fit", basis: "travel_overlap", ...about(from, tripByLegId.get(crowded.legId!), false) };
+    const inbound = anchors.find((item) => item.trip.destinationRef === ref && item.trip.estimate === "unknown");
+    if (inbound) return { ref, conclusion: "unknown", basis: "travel_unknown", trip: { destinationRef: ref, role: inbound.trip.role }, position: null };
+    if (!to) return { ref, conclusion: "unknown", basis: "duration_unknown", ...about(from, nearest(from)) };
+    const uncertain = anchors.find((item) => item.uncertain && overlapsWindow(from, to, item.uncertain));
+    if (uncertain) return { ref, conclusion: "unknown", basis: "travel_unknown", ...about(from, uncertain) };
+    return { ref, conclusion: "fits", basis: "travel_known", ...about(from, nearest(from)) };
+  });
+  return { version: TRAVEL_MODEL_PROJECTION_VERSION, travelDay, calendarEvents, trips: trips.map((item) => item.trip), fits };
+}
+
+/** Half-open overlap. Without an end the occurrence is checked as a point. */
+function overlapsWindow(from: Temporal.Instant, to: Temporal.Instant | null, bounds: OpenWindow): boolean {
+  const afterStart = !bounds.startAt || (to
+    ? Temporal.Instant.compare(to, bounds.startAt) > 0
+    : Temporal.Instant.compare(from, bounds.startAt) >= 0);
+  const beforeEnd = !bounds.endAt || Temporal.Instant.compare(from, bounds.endAt) < 0;
+  return afterStart && beforeEnd;
+}
+
+function compareOptionalInstants(left: Temporal.Instant | null, right: Temporal.Instant | null): number {
+  if (!left || !right) return left ? -1 : right ? 1 : 0;
+  return Temporal.Instant.compare(left, right);
 }
 
 function selectImmediateOrigin(args: Readonly<{
