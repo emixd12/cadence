@@ -1,5 +1,28 @@
 # Implementation Status
 
+## Ticket 232: Astro upgrade test dependency — October 22, 2026
+
+PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
+browser test and two retained QA scripts import esbuild directly. Declare it as
+a root dev dependency matching the existing override, instead of relying on
+Astro to install it. Only that declaration and esbuild lock entries change.
+
+Node 24.22.0 checks pass: clean install, portable browser-hash tests, required
+repository gates, public-source/Trust checks, desktop build, and marketing
+build/check. The full suite reports 3,091 passed and 94 skipped. A process
+preload asserted Node 24 in the actual test/build children.
+
+The current npm audit no longer reports http-cache-semantics on PR #125's
+4.3.0 dependency. GitHub's advisory still lists no patched version; the upstream
+maintainer disputes it. Do not call this a vendor-confirmed security fix or
+waive the open alert. Seven other package findings remain: five high findings
+in the development-only braces/ESLint chain and two moderate Vitest findings.
+Existing PR #126 upgrades Vitest. No production, Trust publication, signing-key
+or activation change occurred. Ticket 232 remains incomplete.
+
+Platform impact: marketing's existing Astro upgrade and test tooling only;
+web and desktop runtime behavior is unchanged. Future mobile is not implemented.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21
