@@ -13614,8 +13614,8 @@ Platform impact:
 
 ## Ticket 219: Travel, habit and weather facts in Daily Brief model input
 
-Status: stage 1 implemented in source October 22, 2026 on the Ticket 215 branch;
-not deployed. Stage 2 follows Tickets 216, 217 and 218. Owner decision (October 22,
+Status: stage 1 implemented in source October 22, 2026 in draft PR #132, based on
+the Ticket 215 branch; not deployed. Stage 2 follows Tickets 216, 217 and 218. Owner decision (October 22,
 2026): disclosure updates, re-consent and marketing language are tracked in the
 privacy surface and do not block development. The existing Daily Brief model-data
 toggle stays the gate; there is no new consent gate. Google terms: accepted risk

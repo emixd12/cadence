@@ -2,8 +2,9 @@
 
 ## Ticket 219 stage 1: travel facts in Daily Brief model input — October 22, 2026
 
-Stage 1 is implemented in source on a branch from the Ticket 215 branch (PR #112).
-Nothing is deployed. Stage 2 follows Tickets 216, 217 and 218.
+Stage 1 is implemented in source in draft
+[PR #132](https://github.com/emixd12/cadence/pull/132), based on the Ticket 215
+branch (PR #112). Nothing is deployed. Stage 2 follows Tickets 216, 217 and 218.
 
 - `TravelTimingModelProjection` 2.0 carries only Cadence's own conclusions: travel
   day, trips by destination with mode and a current/unknown estimate, and a
