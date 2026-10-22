@@ -621,6 +621,48 @@
       "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Synthetic bench never reads location or contacts a provider."
     },
     {
+      "id": "module.completion-places-panel",
+      "name": "CompletionPlacesPanel",
+      "kind": "module",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "CompletionPlacesPanel",
+      "usageNames": [
+        "CompletionPlacesPanel"
+      ],
+      "benchAnchor": "design-system#ds-module-completion-places-panel",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: separate opt-in for completion place labels with a retention choice (90 days default, 1 year, until deleted), label and marker counts, and confirmed delete and turn-off controls. Synthetic bench state; no position read or request."
+    },
+    {
+      "id": "composite.place-marker-control",
+      "name": "PlaceMarkerControl",
+      "kind": "composite",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "PlaceMarkerControl",
+      "usageNames": [
+        "PlaceMarkerControl"
+      ],
+      "benchAnchor": "design-system#ds-composite-place-marker-control",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: I'm here beside Home in Travel Settings and below the Behavior Where field. Records one device position as the place's marker after an explicit tap; hidden while labels are off."
+    },
+    {
+      "id": "composite.behavior-place-assist",
+      "name": "BehaviorPlaceAssist",
+      "kind": "composite",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "BehaviorPlaceAssist",
+      "usageNames": [
+        "BehaviorPlaceAssist"
+      ],
+      "benchAnchor": "design-system#ds-composite-behavior-place-assist",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: one sparse line on a Behavior record, either a Where suggestion (Review Where, Dismiss; carries its rule version) or the first missing-marker prompt (I'm here, Not now). A suggestion only fills the form."
+    },
+    {
       "id": "flow.consent-form",
       "name": "ConsentForm",
       "kind": "flow",

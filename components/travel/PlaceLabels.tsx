@@ -49,6 +49,8 @@ export function PlaceLabelProvider({ client = webPlaceLabelClient, desktop = fal
     setState(next);
     setFailed(false);
   }, []);
+  // Invalidates pending loads; a stale response never replaces newer state.
+  const invalidate = useCallback(() => { sequence.current++; }, []);
   const load = useCallback(async () => {
     const current = ++sequence.current;
     try {
@@ -70,12 +72,12 @@ export function PlaceLabelProvider({ client = webPlaceLabelClient, desktop = fal
     const channel = typeof window.BroadcastChannel === "function" ? new BroadcastChannel("cadence-place-labels") : null;
     channel?.addEventListener("message", reload);
     return () => {
-      sequence.current++;
+      invalidate();
       window.removeEventListener(PLACE_LABELS_CHANGED_EVENT, reload);
       window.removeEventListener("cadence:travel-changed", reload);
       channel?.close();
     };
-  }, [wanted, load]);
+  }, [wanted, load, invalidate]);
   const captureCompletion = useCallback((occurrenceId: string) => {
     void (async () => {
       // Never prompt at completion: without an existing grant, nothing is read or sent.

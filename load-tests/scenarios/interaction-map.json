@@ -1547,6 +1547,56 @@
       "id": "INT-MKT-014",
       "classification": "not_load_bearing",
       "reason": "Static marketing navigation and local clipboard operation have no authenticated data mutations."
+    },
+    {
+      "id": "INT-PLACE-001",
+      "classification": "destructive_serial_only",
+      "reason": "The completion-place opt-in writes settings with owner and revision checks."
+    },
+    {
+      "id": "INT-PLACE-002",
+      "classification": "destructive_serial_only",
+      "reason": "Shortening retention deletes older labels in the same owner-checked save."
+    },
+    {
+      "id": "INT-PLACE-003",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes every completion place label for the owner."
+    },
+    {
+      "id": "INT-PLACE-004",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes every place marker for the owner."
+    },
+    {
+      "id": "INT-PLACE-005",
+      "classification": "destructive_serial_only",
+      "reason": "Turning completion places off deletes labels, markers and dismissals."
+    },
+    {
+      "id": "INT-PLACE-006",
+      "classification": "destructive_serial_only",
+      "reason": "I'm here requests foreground OS location and writes an owner-scoped marker, which needs browser or installed native acceptance."
+    },
+    {
+      "id": "INT-PLACE-007",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes one owner-scoped place marker."
+    },
+    {
+      "id": "INT-PLACE-009",
+      "classification": "destructive_serial_only",
+      "reason": "Dismissal writes an owner-scoped row checked against the opt-in."
+    },
+    {
+      "id": "INT-PLACE-010",
+      "classification": "destructive_serial_only",
+      "reason": "Not now writes the owner's settings with a revision check."
+    },
+    {
+      "id": "INT-PLACE-008",
+      "classification": "browser_only",
+      "reason": "Review Where fills an unsaved Behavior form draft."
     }
   ]
 }
