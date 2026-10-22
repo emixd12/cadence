@@ -37,8 +37,10 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
   broken, and it also fails on the pre-change commit.
 
-- Ticket 242 (Outlook `Calendars.Read`, October 21, 2026): in progress; local
-  implementation complete, live retest pending. Merged `origin/main` at
+- Ticket 242 (Outlook `Calendars.Read`, October 21–22, 2026): implemented,
+  locally verified and **live-verified** for one personal and one work/school
+  account on 2026-10-22 (details under "Owner-run live acceptance"); not
+  independently reviewed, merged or deployed. Merged `origin/main` at
   `d598afc` (PR #110 SQL smoke fix), no conflicts. The connector now requests
   `openid offline_access Calendars.Read` for every Microsoft account. Granted-scope
   validation accepts exactly one Graph permission, `Calendars.Read`; write,
@@ -259,7 +261,58 @@ observations only; no credential or provider record was recorded.
   `disconnected`, generation 2, with the account digest cleared. A later read
   returned `not_connected`. Emi removed the app-specific password at Apple, and
   the test events were deleted.
-- Outlook Calendar, personal Microsoft account (Ticket 237): **failed live**.
+- Ticket 242 live retest, 2026-10-22: **personal and work/school accounts pass**
+  with `Calendars.Read`. Environment: disposable loopback-only stack
+  `cadence-live-242` (all 88 migrations), `next dev` on Node 24.22.0 over HTTPS at
+  `https://localhost:4321` (`[::1]` only), a disposable Cadence test user, and a
+  separate Chrome instance with a temporary profile trusting only the local dev
+  certificate. Agents drove every UI step through a loopback DevTools port; the
+  owner only signed in and clicked Accept/Continue. No credential, token or event
+  record was stored outside the disposable stack; evidence is counts, statuses and
+  screen text.
+  - Personal account: the first consent showed "Cadence Calendar needs your
+    permission to: Read your calendars … will be able to read events in your
+    calendars" (unverified app). Microsoft granted
+    `openid Calendars.Read Calendars.ReadBasic`, echoing the account's earlier
+    ReadBasic consent; the strict check refused it (`consent_denied`, connection
+    stayed `disconnected`, no credential). Fix `06fc275` accepts a co-granted
+    `Calendars.ReadBasic` only alongside `Calendars.Read` (failing-first test).
+    The retry also showed Microsoft's anti-phishing step "Are you trying to sign
+    in to Cadence Calendar? Only continue if you downloaded the app from a store
+    or website that you trust" (the owner clicked Continue). Then: connected
+    (generation 1), refresh granted `Calendars.Read Calendars.ReadBasic` with an
+    opaque token, Graph `/me/calendars` and calendarView returned 200 (the
+    ReadBasic-only failure is resolved). 4 calendars were listed (ID, name and
+    default flag only). Selecting "Cadence Test" in Settings saved. Today's read
+    was `complete`, 0 failures, 2 in-range test events (daily repeat 9–10 a.m.
+    New York; a 10–11 a.m. Los Angeles event at 1–2 p.m. New York), titles and
+    times only; description, location, organizer, attendees, conference and
+    attachments were `unsupported` and empty. Timeline showed both as Outlook
+    Calendar markers on Oct 22. Disconnect in Settings showed the Microsoft
+    removal instruction, deleted the credential (0 rows), moved the connection to
+    `disconnected` (generation 2, digest cleared); a later read returned 409
+    `not_connected`.
+  - Work/school account (identityscaffolding.com, home tenant): the user-consent
+    screen listed "Maintain access to data you have given it access to", "Read
+    your calendars" and "View your basic profile", marked unverified, with
+    "Consent on behalf of your organization" left unticked. Token: Graph-audience
+    JWT, scope `Calendars.Read openid profile email`. Connected (generation 3); 3
+    calendars listed; primary selected in Settings. Today-plus-tomorrow read was
+    `complete`, 0 failures, 4 events: an all-day event kept its own date (Oct 22,
+    one day), the daily repeat on Oct 22 and 23, and the Los Angeles event on
+    Oct 23 at 1–2 p.m. New York; titles and times only. Timeline showed the three
+    timed events as Outlook markers; the all-day item's Timeline display was not
+    re-checked in this run (the Ticket 237 work-account run confirmed it). Disconnect:
+    generation 4, credential deleted, later read `not_connected`. The coordinator
+    confirmed the Cadence Calendar service principal holds exactly one
+    `oauth2PermissionGrant`, `consentType` Principal (per-user), scope
+    `openid offline_access Calendars.Read`. **Per-user consent is verified in the
+    home tenant**; this supersedes the earlier AllPrincipals note below as current
+    evidence. The grant was left in place at the coordinator's request.
+  - Not exercised: cross-tenant consent, a tenant that blocks unverified apps,
+    `admin_approval_required`, wrong-account reconnect, installed desktop.
+- Outlook Calendar, personal Microsoft account (Ticket 237): **failed live**
+  with `Calendars.ReadBasic`; resolved by Ticket 242 (see above).
   Graph returns 401 on every calendar endpoint for a token that carries only
   `Calendars.ReadBasic`. The cause is not yet isolated: either Microsoft-side
   handling of ReadBasic for personal accounts, or the new, unverified Entra app.

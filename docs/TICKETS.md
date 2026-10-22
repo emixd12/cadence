@@ -14279,7 +14279,7 @@ session and Keychain client state; the desktop client itself belongs to Ticket 2
 App registration, live personal or work/school access and publisher verification
 remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
 
-Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
+Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect. Ticket 242 retest (2026-10-22, `Calendars.Read`): personal account **passed** and work/school account **passed** with verified per-user (`Principal`) consent in the home tenant; see Ticket 242 and `STATUS.md`. Still not exercised: cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -14493,8 +14493,14 @@ Platform impact:
 
 ## Ticket 242: Outlook Calendar personal-account support via Calendars.Read
 
-Status: approved by the owner on 2026-10-21; in progress. Local implementation
-and checks complete (see `STATUS.md`); live retest pending.
+Status: approved by the owner on 2026-10-21; implemented and live-verified on
+2026-10-22 on a disposable local stack. A personal account and a work/school
+account (home tenant, per-user `Principal` grant) connected, listed calendars,
+read events with titles and times only, showed them on Timeline and
+disconnected. Live finding: Microsoft co-grants an earlier `Calendars.ReadBasic`
+consent with `Calendars.Read`; it is accepted only alongside `Calendars.Read`
+(`06fc275`). Not exercised: cross-tenant consent, tenants that block unverified
+apps, installed desktop. Details in `STATUS.md`.
 
 Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
 personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
