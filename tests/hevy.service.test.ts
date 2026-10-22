@@ -20,6 +20,8 @@ const life = vi.hoisted(() => ({
   marked: 0,
   verifyResult: null as null | readonly string[],
   onRead: null as null | (() => void),
+  credentialWait: null as Promise<void> | null,
+  fenceWait: null as Promise<void> | null,
 }));
 vi.mock("@/lib/services/connector-credentials", () => {
   const view = () => ({ accountId: OWNER, provider: "hevy", status: life.connection?.status ?? "disconnected",
@@ -47,7 +49,9 @@ vi.mock("@/lib/services/connector-credentials", () => {
       if (!life.connection || life.connection.status === "disconnected") throw new ConnectorError("not_connected");
       if (life.connection.status !== "connected" || !life.credential) throw new ConnectorError("reconnect_required");
       const before = current();
+      await life.credentialWait;
       const result = await run(life.credential, before);
+      await life.fenceWait;
       const after = current();
       if (after.status !== "connected") throw new ConnectorError("reconnect_required");
       if (after.generation !== before.generation || after.accountDigest !== before.accountDigest) throw new ConnectorError("connection_changed");
@@ -85,6 +89,7 @@ const fast = { clock, sleep: async () => undefined, random: () => 0 };
 
 beforeEach(() => {
   life.connection = null; life.credential = null; life.marked = 0; life.verifyResult = null;
+  life.credentialWait = null; life.fenceWait = null;
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -181,6 +186,22 @@ describe("Hevy activity reads", () => {
   it("requires a connection", async () => {
     await disconnectHevy(caller());
     await expect(getHevyActivities(caller(), "2026-10-18", "2026-10-18", { fetch: hevyFetch({}).fetch, ...fast })).rejects.toMatchObject({ code: "not_connected" });
+  });
+
+  it.each(["credential", "final fence"])("bounds a stalled %s read and discards late completion", async (stage) => {
+    const { fetch, calls } = hevyFetch(fixture("workouts-page.json"));
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    if (stage === "credential") life.credentialWait = pending;
+    else life.fenceWait = pending;
+    const result = getHevyActivities(caller(), "2026-10-18", "2026-10-18", { fetch, ...fast, deadlineMs: 20 });
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
+    const count = calls.length;
+    expect(count).toBe(stage === "credential" ? 0 : 3);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls).toHaveLength(count);
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
   });
 });
 

@@ -386,8 +386,9 @@ text, read-only suggestions and trusted source metadata.
 ## Connector expansion ownership (Tickets 233–241)
 
 Planned October 18, 2026. Ticket 234 implemented the shared contracts. Tickets 236
-(Hevy), 224 (Outlook), and 227 (iCloud) implement their provider adapters locally.
-Live iCloud access and installed desktop acceptance remain unverified. No new required resolver module
+(Hevy), 237 (Outlook), and 240 (iCloud) implement their provider adapters locally.
+`STATUS.md` records provider-specific live acceptance and remaining release gates.
+Installed desktop acceptance remains unverified. No new required resolver module
 is added. `packages/core` owns the extended event validator
 (`services/external-event-validation.ts`) and the separate recorded-activity
 types, validation, and normalization (`types/recorded-activity.ts`,
@@ -399,6 +400,13 @@ and `tests/advisor-day-context.test.ts`. Provider adapters
 in `lib/services/<provider>-*.ts` own provider I/O, the method/path allowlists,
 and field discard. Services own credentials, generations, and fences. Repositories
 in `lib/db` own owner-scoped persistence. UI renders validated results only.
+
+`lib/services/connector-read-deadline.ts` bounds Outlook, iCloud and Hevy reads
+from the initial database query through the final credential fence. Late database
+completion cannot start provider work after cancellation. Calendar preference
+writes compare the selection revision captured before provider validation, so a
+concurrent save or disconnect cannot be overwritten. Service tests and
+`tests/connector-service-deadline.test.ts` cover these boundaries.
 
 Ticket 240 uses `icloud-calendar-request.ts` for bounded PROPFIND/REPORT,
 redirect validation and XML parsing; `icloud-calendar-provider.ts` for discovery,

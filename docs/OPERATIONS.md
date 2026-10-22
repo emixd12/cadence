@@ -1239,6 +1239,22 @@ deployment through the deployment's Vercel alias inventory before fetching it.
 The daily schedule resolves the latest Ready Production deployments. It reuses
 an unexpired RLS result only while all three release subjects still match.
 
+The collection job grants `GITHUB_TOKEN` `security-events: read` for CodeQL
+alerts and `vulnerability-alerts: read` for Dependabot alerts, following
+[GitHub's workflow permission reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
+Secret-scanning alerts require a separate GitHub App or personal access token;
+the current workflow has neither and reports that result as Unavailable. A
+permission declaration does not establish a Passed result: verify the collected
+evidence in Preview before Production publication.
+
+Alert counts represent a complete observed pagination walk, using at most ten
+pages of 100 alerts each. A further page, failed request, malformed response, or
+inconsistent pagination makes that provider aggregate Unavailable rather than
+publishing a partial count. Provider APIs do not give an atomic snapshot across
+pages. Secret-scanning requests preserve `hide_secret=true`, and the collector
+returns only aggregate data; alert contents and provider error bodies are not
+included in logs or public evidence.
+
 The protected environments own `VERCEL_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
 `SUPABASE_SERVICE_ROLE_KEY`. Environment variables own both Vercel project
@@ -1588,16 +1604,17 @@ rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
 
 ## Connector expansion acceptance and operation (Tickets 233–241)
 
-Tickets 233–240 have independent local source/synthetic approval through
-`40b1dc2`. Ticket 241 reconciles disclosures and collects final local checks.
-This is not live-provider, installed-desktop, hosted-deployment or public-release
-acceptance. Do not use real provider credentials, publish, deploy, or change hosted
-configuration as part of this verification pass.
+Tickets 233–241 have independent local source/synthetic approval. `STATUS.md`,
+under "Owner-run live acceptance", records the later authorized provider tests.
+Those tests do not establish installed-desktop, hosted-deployment or public-release
+acceptance. Repository review alone does not authorize real provider reads,
+publication, deployment, or hosted configuration changes.
 
 Outlook uses only delegated `Calendars.Read` plus identity/offline scopes
-(Ticket 242), with explicit field selection.
-Live personal and work/school accounts, tenant policy and publisher verification
-remain unverified. Hevy requires Pro. Its key has no documented read-only scope;
+(Ticket 242), with explicit field selection. One personal account and one
+home-tenant work/school account (per-user consent) passed live on 2026-10-22.
+Cross-tenant behavior and publisher verification remain release gates. Hevy
+requires Pro. Its key has no documented read-only scope;
 the adapter permits only account verification, count and workout-list GETs.
 A today-only read still scans global history, up to 500 workouts/50 pages.
 Larger accounts return incomplete without workout page reads. Stable before/after
@@ -1607,8 +1624,9 @@ only timing reaches Timeline or separately authorized Daily Brief.
 
 iCloud uses hosted CalDAV with sealed Apple Account email and app-specific
 password. That password is broader than Calendar. The owner accepted hosted
-custody on 2026-10-19; release remains a separate gate. Live endpoint/authentication and
-recurrence interoperability remain unverified. Unsupported recurrence/timezones
+custody on 2026-10-19; release remains a separate gate. The recorded local live test
+covered discovery, server-expanded recurrence, all-day and cross-zone events.
+Installed and deployed acceptance remain unverified. Unsupported recurrence/timezones
 are quarantined as incomplete; they do not prove an empty calendar. No EventKit
 or local-only Mac Calendar access is implemented.
 
@@ -1631,8 +1649,10 @@ Microsoft, Apple or Hevy access. Direct users to Microsoft app permissions/My Ap
 Apple app-specific-password revocation, or Hevy key removal/regeneration.
 
 Reuse unchanged lifecycle/disclosure migration evidence and native unit-test
-results from the shared PR Context. The inherited
-`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failure remains unresolved.
+results from the shared PR Context. Main's #110 fix for the inherited
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` test failure is included in
+the reviewed PR stack. Repeat the migration smoke suite in a disposable local
+database before hosted rollout.
 Full-suite desktop-release-acceptance tests have intermittently exceeded their
 unchanged five-second timeout, then passed unchanged. No base-SHA CI link proves
 the cause of that timing observation. Never reset retained `habit-tracking-app`.

@@ -338,4 +338,3 @@ Ticket 185 storage choices remain undecided and must precede its implementation.
   `components/briefing/DailyBriefBubble.tsx`.
 - `lib/services/briefing-fixtures.ts`; `lib/services/briefing-analysis-fixtures.ts`;
   `tests/fixtures/advisor-day-context.valid.json`.
-

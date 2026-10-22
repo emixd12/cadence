@@ -38,6 +38,27 @@ releases, desktop email delivery, duplicated public/legal pages, billing, AI
 integrations, and closed-app background synchronization. Keep imported email
 configuration as data without sending.
 
+## Native dependency CI
+
+`.github/workflows/desktop-native.yml` checks changes to native sources,
+Cargo manifests and locks, npm manifests and locks, the bundled icon, and the
+workflow itself. It runs on GitHub's Apple Silicon `macos-15` runner with Node
+24 and Rust `1.97.1`, matching the Rust toolchain recorded in release QA.
+The job builds the real desktop frontend assets, then runs these commands with
+`MACOSX_DEPLOYMENT_TARGET=14.0`:
+
+```bash
+cargo +1.97.1 check --locked --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo +1.97.1 test --locked --lib --target aarch64-apple-darwin --manifest-path apps/desktop/src-tauri/Cargo.toml
+```
+
+The library tests use synthetic data and temporary SQLite databases. The job
+requires no signing keys or account credentials and publishes no artifacts.
+Treat this as native compilation and unit-test evidence for the checked commit.
+Apple signing, notarization, installed updater/Keychain behavior, and runtime
+compatibility on the declared macOS 14 minimum retain their separate release
+acceptance gates in `docs/DESKTOP_RELEASE.md`.
+
 ## Current parity baseline
 
 `docs/DESKTOP_PARITY.md` records the current implementation baseline and its

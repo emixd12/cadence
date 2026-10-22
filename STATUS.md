@@ -1,5 +1,69 @@
 # Implementation Status
 
+## Public Trust aggregate correction — October 21, 2026
+
+Merge-readiness follow-up found that the collector requested one alert per
+provider and exposed that page length as the open-alert count. It now counts
+complete observed pagination walks for CodeQL, Dependabot, and secret scanning,
+bounded to 100 alerts per page and ten pages. Failed, malformed, inconsistent,
+or truncated reads remain Unavailable. Secret-scanning requests preserve secret
+redaction, and only aggregate counts and status booleans leave the collector.
+
+The collection job also declares GitHub's dedicated
+`vulnerability-alerts: read` permission for Dependabot; CodeQL retains
+`security-events: read`. Secret scanning still requires separate provider
+access. The public schemas and existing all-scope Dependabot semantics are
+unchanged. See `docs/OPERATIONS.md` for the permission and collection boundaries.
+
+Verification: 29 new pagination/privacy regressions and 100 focused Trust and
+integrity tests covered passing, with lint, typecheck, governance checks, and
+fixture-only collector/schema validation. Fresh PR CI remains the merge gate;
+Preview collection must verify the actual provider access before Production
+evidence is refreshed. This source correction does not establish current
+deployment provenance or replace the separate protected-environment binding
+and publication steps. Platform impact: collection tooling and its eventual
+public aggregate output; no application schema or desktop contract changes.
+
+## Native desktop dependency validation — October 21, 2026
+
+PR #118 review identified that the existing `verify` job built the desktop
+frontend without compiling the Rust application. A separate path-filtered
+`Desktop native` workflow now runs the locked Apple Silicon Cargo check and
+native library tests on macOS 15, using Rust 1.97.1 and the macOS 14 deployment
+target. It builds the real frontend assets first and records the runner and
+toolchain versions. See `docs/DESKTOP_BUILD.md#native-dependency-ci`.
+
+This adds repeatable compilation and synthetic native-test coverage. Signed
+artifact publication, installed updater/Keychain acceptance, and macOS 14
+runtime testing retain their existing gates. No credentials, hosted changes,
+or release artifacts are part of this workflow. Platform impact: desktop CI
+only; web, marketing, and future mobile have no runtime change.
+
+Local verification passed: actionlint 1.7.12, YAML and shell syntax checks,
+`npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check`, and `npm run desktop:build`. The
+[first macOS CI run](https://github.com/emixd12/cadence/actions/runs/39569333024)
+then passed the locked Cargo check and all 111 native library tests on PR #118
+head `c06292ca174558e7ab86dcc4948e4a09d92be933`. The existing `verify` job and
+both Vercel previews also passed before #118 merged as `ba31ea06`.
+
+## Tickets 178 and 181: callback review correction, 0.1.4 source — October 21, 2026
+
+Merge-readiness review reproduced one remaining false-revocation path: an
+unexpired pending callback arriving while a session is already linked changed
+the Account state to an error. The callback now preserves the existing session,
+shows the account-switch notice, and never exchanges the incoming code. The
+regression fails on the 0.1.3 source and passes with the fix.
+
+Version `0.1.4` is source only. The signed 0.1.3 candidate is superseded and must
+not be published. Its recorded acceptance remains historical evidence, not
+acceptance of this change. Tickets 178 and 181 need a new signed build, artifact
+verification, installed callback/session checks and the owner's publication
+instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+
+Platform impact: desktop authentication only; web, marketing and future mobile
+have no implementation change. No schema or hosted configuration changes.
+
 ## Tickets 233–241 connector expansion — October 18, 2026
 
 The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
@@ -9,6 +73,30 @@ at `041546e` locally on October 18, 2026, before Ticket 234 runtime work.
 The integrated baseline `d7af234` was independently approved.
 Renumbered from 220–228 on 2026-10-19 to avoid collision with main's MCP
 Tickets 220–232; earlier commits and approvals cite the old numbers.
+
+- PR #111 review, October 21, 2026: fixed Outlook and Hevy service reads that
+  could wait past their deadline on database queries or the final credential
+  fence. All three new connectors now use one shared deadline helper, and late
+  database completion cannot start provider work after timeout. Fixed Outlook
+  and iCloud selection saves that could restore selected calendars after a
+  concurrent disconnect; writes now compare the previously read selection
+  revision. Eight failing-first regressions reproduced both defects. No schema,
+  provider permission, or disclosure changed. Hosted migration, personal Outlook
+  scope approval, and installed/deployed acceptance remain separate gates.
+  Verification: all seven required checks pass; the full suite passed 3,384
+  tests with 165 skipped after an elevated rerun for loopback/subprocess fixtures.
+  The web build passed on an elevated retry after an initial generic webpack
+  failure that did not identify its cause. Core, desktop
+  typecheck/build/parity, design-system and load-manifest checks also pass.
+  This Linux review environment has no Docker or Rust toolchain, so it did not
+  repeat migration replay or native tests.
+
+- Review stack integration, October 21, 2026: merged reviewed PR #83 and current
+  main `d598afc`, including #110's corrected SQL smoke. Connector behavior,
+  disclosure defaults, `requireCurrentUser`, monthly travel-spend readback and
+  its unavailable fallback remain present. This merge changes documentation
+  and a SQL smoke fixture, without changing application runtime code; migration
+  replay still requires the separate local database environment.
 
 - Merge of `origin/main` at `c42ca9e` (MCP Tickets 220–232), October 19, 2026:
   connector migrations were renamed to `20261019040000_connector_lifecycle.sql`
@@ -43,8 +131,9 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   independently reviewed, merged or deployed. Merged `origin/main` at
   `d598afc` (PR #110 SQL smoke fix), no conflicts. The connector now requests
   `openid offline_access Calendars.Read` for every Microsoft account. Granted-scope
-  validation accepts exactly one Graph permission, `Calendars.Read`; write,
-  shared, `User.Read` and leftover `Calendars.ReadBasic` grants fail as
+  validation accepts exactly one effective Graph permission, `Calendars.Read`
+  (a co-granted `Calendars.ReadBasic` from earlier consent is accepted, `06fc275`);
+  write, shared, `User.Read` and `Calendars.ReadBasic`-only grants fail as
   `consent_denied`. A ReadBasic-only connection fails its next refresh and moves to
   `reconnect_required` without a Graph call. Every Graph request, including
   provider next links, keeps the contract `$select` and no `$expand`; a next link
@@ -418,7 +507,96 @@ observations only; no credential or provider record was recorded.
   account.live.com/consent for the personal Microsoft account (the site was in
   maintenance at the time of testing).
 
-## Ticket 181: signed 0.1.1 candidate built — October 19, 2026
+## PR 83 integration review — October 21, 2026
+
+Reconciled the briefing workbench branch with current main `d598afc`. The original
+Tickets 169–174 are already on main; the remaining changes provide the local
+Compare/Review/Days workbench, historical and sequence evaluation, a shared
+comparison budget, saved-review retention, pure bubble presentation, repository
+cleanup and the bounded Search Console CLI. There are no main-relative database
+migrations or production preset changes.
+
+The cleanup had removed `requireCurrentUser`, which current main's OAuth consent
+and Connected apps service imports. Restored that helper and retained the monthly
+travel-spend readback with its DOM regression while resolving the stale branch.
+Current MCP/OAuth, travel-budget and desktop-release changes remain present.
+
+Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+shared core, desktop TypeScript and both frontend builds pass. The full suite
+passed 2,965 tests with 165 skipped; its 20 sandbox-blocked socket/subprocess
+failures passed in an elevated rerun of all ten affected files (86 tests).
+The 173 focused workbench tests also pass. No hosted deployment, database replay,
+private-account model run or installed native acceptance was performed. Details:
+`docs/qa/briefing-workbench.md`.
+
+## Tickets 178 and 181: 0.1.3 passes installed acceptance — October 21, 2026
+
+Historical, superseded by the 0.1.4 correction above. Candidate `0.1.3` from
+`dcefe7e` is notarized (app `ac2067a7`, DMG `618874b4`), stapled, and passes all 14
+artifact checks. A Gatekeeper check on a quarantined download passes, and
+`syspolicy_check distribution` reports it ready for distribution. Its files and the
+QA feed are on the QA prerelease.
+
+Installed acceptance on the test Mac ran over Tailscale SSH, with the owner signing in
+twice through Screen Sharing:
+- 0.1.3 installed from the verified DMG, and the test account reconnected.
+- With explicit owner authorization, the account's only hosted session was deleted
+  through the linked Supabase CLI.
+- After the access token expired, the running app showed "The account session
+  expired or was revoked" with Reconnect account, not "permission denied".
+- Reconnect synced. Compared with the baseline, no table lost rows; integrity was
+  `ok` and the schema stayed at 17.
+
+Sign-in renewal passed on the owner Mac: the same 0.1.2 process synced 11 hours after
+launch. Every Ticket 178 gate now has installed or test evidence; Calendar expiry is
+covered by a unit test, because the hosted broker completes the Google connection.
+The packet below records the earlier candidate; it is not for publication:
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+
+## Ticket 178: revoked-session fix, 0.1.3 replaces 0.1.2 — October 20, 2026
+
+In progress; not published. **0.1.2 is superseded; do not publish it.** On installed
+0.1.2 the owner confirmed the stray-callback fix: a replayed sign-in callback left the
+account signed in with a notice and sync current. Calendar callback replay changed
+nothing. Calendar expiry cannot be observed on the Mac, because the hosted broker
+completes the Google connection and the Mac then shows that server state; a unit test
+covers the 5-minute local callback rejection.
+
+Remote sign-out found a third defect. Deleting the test account's sessions made
+**Sync now** show "permission denied for function read_account_sync_snapshot" instead
+of the revoked state with **Reconnect account**. Supabase drops the session after the
+refresh fails, so the next RPC runs unauthenticated and PostgREST answers 401 with
+`42501`, but the sync adapter threw the error without that status. A Claude Code
+read-only comparison on the test Mac found no lost rows, schema 17 and an integrity
+check of `ok` before and after.
+
+The fix keeps a 401 status on sync RPC errors so they map to "revoked"; a signed-in
+403 still reports its message. A regression test fails on the previous code. Version
+`0.1.3` replaces 0.1.2. Open: the signed 0.1.3 build and notarization, a remote
+sign-out recheck on 0.1.3, the owner Mac's one-hour renewal result, merging PR #115
+and the publish instruction.
+
+## Tickets 178 and 181: 0.1.2 replaces the 0.1.1 candidate — October 20, 2026 (superseded by 0.1.3)
+
+In progress; not published. The 0.1.1 candidate below is **superseded; do not
+publish it.** Installed acceptance on 0.1.1 passed on the second Mac: quarantined
+browser download and normal first open. On the owner Mac, the preview.51 → 0.1.1
+update preserved every Behavior, Occurrence, status, Note, session and import record;
+only sync and reminder bookkeeping changed. Two defects were found:
+
+- A replayed sign-in callback replaced a working linked state with an error, so sync
+  reported "revoked" and Calendar actions did nothing until relaunch.
+- A refused restart showed its reason far from the Restart button.
+
+`4d9526f` (PR #115) fixes both and sets version `0.1.2`. Candidate `0.1.2` is built
+from that commit, notarized (the DMG on resubmission, after Apple left the first
+submission in progress for two hours), stapled, and passes all 14 artifact checks.
+Its files and the QA feed are on the QA prerelease. Open: the quarantined download,
+callback replay, Calendar expiry, revoked-session and one-hour renewal checks on
+0.1.2, merging PR #115, and the publish instruction. Packet:
+`docs/qa/2026-10-20-desktop-0.1.2-release-packet.md`.
+
+## Ticket 181: signed 0.1.1 candidate built — October 19, 2026 (superseded by 0.1.2)
 
 In progress; not published. Candidate `0.1.1` is built from
 `95a6c64` (main `e712c14` plus the version bump and an Xcode 27.1 build fix). Apple
@@ -8858,10 +9036,13 @@ a current immutable snapshot and `latest.json` for commit
   commit. Provenance, CodeQL, public-artifact integrity, application routes,
   marketing routes, the hosted migration boundary, and the 92-check RLS smoke
   passed. The RLS smoke removed all temporary users.
-- The dependency audit reported zero vulnerabilities. Dependabot aggregation
-  and secret-scanning aggregation remain explicitly Unavailable because the
-  workflow token cannot read those provider aggregates. This matches the
-  settled provider-unavailability contract and does not infer a Passed result.
+- At that publication, the dependency audit reported zero vulnerabilities;
+  Dependabot and secret-scanning aggregation were explicitly Unavailable.
+  The October 21, 2026 follow-up adds the collection job's dedicated
+  `vulnerability-alerts: read` permission for Dependabot. Preview verification
+  and refreshed Production evidence are pending. Secret-scanning aggregation
+  still requires a separate credential and remains Unavailable; the permission
+  correction does not infer a Passed result or change published evidence.
 - The exact default Turbopack build remains environment-blocked by the same
   internal helper-port `EPERM`; the Webpack production build passed under
   Ticket 101.
