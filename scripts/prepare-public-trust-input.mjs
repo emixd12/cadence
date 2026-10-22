@@ -9,7 +9,7 @@ async function latestDeployment(projectId) {
   return { id: deployment.uid, url: `https://${deployment.url}` };
 }
 
-async function temporaryPreviewBypass(deploymentId) {
+async function temporaryPreviewBypass(deploymentId, operation) {
   const team = process.env.VERCEL_TEAM_ID ? `?teamId=${encodeURIComponent(process.env.VERCEL_TEAM_ID)}` : "";
   const response = await fetch(`https://api.vercel.com/aliases/${encodeURIComponent(deploymentId)}/protection-bypass${team}`, {
     method: "PATCH",
@@ -17,7 +17,7 @@ async function temporaryPreviewBypass(deploymentId) {
     body: JSON.stringify({ ttl: 3600 }),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new Error(`Unable to create a temporary Preview access boundary (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Unable to create a temporary Preview access boundary for ${operation} (HTTP ${response.status}).`);
   const values = Object.keys((await response.json()).protectionBypass ?? {});
   if (values.length !== 1) throw new Error("Vercel did not return one temporary Preview access boundary.");
   return values[0];
@@ -71,8 +71,8 @@ async function main() {
     await verifyDeploymentOwner(application, process.env.VERCEL_APPLICATION_PROJECT_ID);
     await verifyDeploymentOwner(marketing, process.env.VERCEL_MARKETING_PROJECT_ID);
     input.preview_bypass = {
-      application: await temporaryPreviewBypass(application.id),
-      marketing: await temporaryPreviewBypass(marketing.id),
+      application: await temporaryPreviewBypass(application.id, "application"),
+      marketing: await temporaryPreviewBypass(marketing.id, "marketing"),
     };
   }
   await writeFile(value("--output"), `${JSON.stringify(input)}\n`, { mode: 0o600 });
