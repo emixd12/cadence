@@ -9,7 +9,7 @@ import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSetting
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
-import { createLocalTravelSettingsClient } from "./local-travel-settings.service";
+import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { readMacForegroundLocation } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
@@ -506,7 +506,8 @@ export function Product() {
     {bundle && occurrenceActions && behaviorActions ? <>
       {activeScreen === "timeline" ? <DesktopOnboardingGuide key={guideRequest} forceOpen={guideRequest > 0} onDismiss={() => setGuideRequest(0)}
         hasAnyBehavior={bundle.timeline.behaviors.length > 0} hasImportRuns={bundle.hasImportRuns} currentTimezone={bundle.timeline.profile.timezone}
-        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} /> : null}
+        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS}
+        loadTravelSetup={readLocalTravelSetupPresence} readTravelRoutingConfigured={travelClient?.configured ?? null} /> : null}
       {activeScreen === "timeline" ? <TimelineScreen timeline={bundle.timeline.timeline} {...occurrenceActions}
         shortcutsByBehavior={bundle.shortcuts.accepted} dayProgress={calendarContext}
         notificationTarget={notificationTarget}

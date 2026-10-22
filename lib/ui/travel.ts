@@ -87,6 +87,19 @@ export const webTravelClient: TravelClient = {
   readLocation: readBrowserForegroundLocation,
 };
 
+/**
+ * Ticket 212 setup: asks whether this deployment has travel routing configured.
+ * The report makes no provider call. A failed, slow or aborted check returns null.
+ */
+export async function readTravelRoutingReport(
+  readConfigured: TravelClient["configured"],
+  signal: AbortSignal,
+  timeoutMs = 5_000,
+): Promise<boolean | null> {
+  try { return await readConfigured(AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])); }
+  catch { return null; }
+}
+
 export type TravelBehaviorRevision = Readonly<{ id: string; whereKind?: string | null; locationText: string | null; updatedAt: string }>;
 /**
  * Travel inputs only: visible events, occurrence schedule and owning Behavior Where revisions.

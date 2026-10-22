@@ -5,6 +5,11 @@ import type {
   FirstRunOnboardingState,
 } from "@/lib/types/onboarding";
 
+export const FIRST_RUN_IMPORT_DESCRIPTION =
+  "Use this only if you already have a BehaviorLog bundle.";
+export const FIRST_RUN_TRAVEL_DESCRIPTION =
+  "Cadence uses these to estimate travel time to and from located Behaviors and Calendar events.";
+
 export function resolveFirstRunOnboardingModel(
   state: FirstRunOnboardingState,
   client: FirstRunOnboardingClientSnapshot,
@@ -18,6 +23,7 @@ export function resolveFirstRunOnboardingModel(
       actionLabel: state.hasAnyBehavior ? "Open behaviors" : "Create behavior",
       complete: state.hasAnyBehavior,
       optional: false,
+      description: null,
     },
     {
       key: "notifications",
@@ -27,6 +33,7 @@ export function resolveFirstRunOnboardingModel(
       actionLabel: "Open settings",
       complete: notificationComplete(client),
       optional: false,
+      description: null,
     },
     {
       key: "timezone",
@@ -36,6 +43,7 @@ export function resolveFirstRunOnboardingModel(
       actionLabel: "Review timezone",
       complete: timezoneComplete(state.timezone, client.browserTimezone),
       optional: false,
+      description: null,
     },
     {
       key: "import",
@@ -45,8 +53,23 @@ export function resolveFirstRunOnboardingModel(
       actionLabel: "Open import",
       complete: state.hasImportRuns,
       optional: true,
+      description: FIRST_RUN_IMPORT_DESCRIPTION,
     },
   ];
+  // Ticket 212: ask for Home and usual travel only where routing can use them.
+  if (state.travel && client.travelRoutingConfigured === true) {
+    const complete = state.travel.hasHome && state.travel.hasMode;
+    items.push({
+      key: "travel",
+      label: "Home and travel",
+      statusLabel: complete ? "Saved" : "Optional",
+      href: "/settings#travel",
+      actionLabel: "Open travel",
+      complete,
+      optional: true,
+      description: FIRST_RUN_TRAVEL_DESCRIPTION,
+    });
+  }
   const requiredComplete = items
     .filter((item) => !item.optional)
     .every((item) => item.complete);

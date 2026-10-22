@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Ticket 212: Home and travel in first-run setup — October 22, 2026
+
+Implemented in source on the Ticket 215 branch; not deployed. First-run setup gains
+an optional **Home and travel** row. It opens Travel settings at the new
+`/settings#travel` anchor and reuses Ticket 215's Home and usual travel controls.
+It never blocks setup completion and reads Saved once both values exist.
+
+- The row appears only when `GET /api/travel/routes` reports routing configured.
+  That report calls no provider. The pop-up asks only while it will show; a failed
+  or 5-second answer hides the row.
+- The Timeline bundle reads two presence flags through
+  `readTravelSetupPresence`. The Home text never enters onboarding state. A failed
+  read hides the row instead of failing Timeline.
+- Saving from the row's destination sends nothing to Google, requests no device
+  location and leaves the Travel estimates toggle unchanged.
+- Desktop shares the model and reads presence from local SQLite. Only a linked
+  account can ask the deployment, so local mode omits the row (assumption, not
+  owner-confirmed). Travel settings still saves both values offline.
+- Optional rows now take their one-line description from the shared model.
+
+No migration, hosted change, provider call or new data storage. Local checks pass:
+agents, interactions, resolvers and design-system checks, lint, web and desktop
+typecheck, the full Vitest suite and both builds. The `/design-system` preview
+shows the row at desktop width and 390 px without calling `/api/travel/routes`.
+Not exercised: the authenticated Timeline against a real routing report, and the
+installed desktop guide. Both remain open and ship with Ticket 215's rollout.
+Platform impact: web and desktop as above; marketing not applicable; future mobile
+carries the row into the proposed Ticket 196.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21

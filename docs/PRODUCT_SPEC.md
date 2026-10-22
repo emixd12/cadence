@@ -223,6 +223,8 @@ Public launch includes a minimal first-run setup prompt after first login:
 - request browser notification permission
 - import data when import exists
 - point to Settings timezone confirmation when useful
+- optionally save Home and usual travel where travel routing is configured
+  (Ticket 212); saving them enables no routing
 
 The setup prompt is optional, appears as a non-modal pop-up, can be dismissed
 locally, and routes into the existing Behaviors, Settings, and Export controls
@@ -448,7 +450,7 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - JSONL/CSV/full JSON/BehaviorLog export
 - Account deletion with export reminder and typed confirmation
 - Public Terms, Privacy, and Trust routes
-- Simple onboarding for first behavior, notification permission, import, and timezone
+- Simple onboarding for first behavior, notification permission, import, timezone, and optional Home and usual travel
 - Privacy-safe monitoring/error reporting
 - Repeatable many-user RLS smoke QA
 - Public Astro marketing site when explicitly ticketed

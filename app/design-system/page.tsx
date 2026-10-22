@@ -2,6 +2,7 @@ import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
 import { TravelSettingsBench } from "./TravelBench";
+import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -39,7 +40,6 @@ import {
   ScreenContentLoading,
   ScreenFrame,
 } from "@/components/layout/ScreenFrame";
-import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import {
   AccountDeletionPanel,
@@ -88,7 +88,6 @@ import type {
   BehaviorLogRestorePageData,
 } from "@/lib/types/behaviorlog-restore-ui";
 import type { ExportBundle } from "@/lib/types/export";
-import type { FirstRunOnboardingState } from "@/lib/types/onboarding";
 import type { PublicTrustView } from "@/lib/services/public-trust-evidence.service";
 import type {
   OccurrenceActionState,
@@ -1599,10 +1598,7 @@ const previewFactories: Record<
   "flow.first-run-onboarding-panel": () => (
       <ProductPreview maxHeight="28rem">
         <div className="relative min-h-[24rem] bg-background">
-          <FirstRunOnboardingPanel
-            onboarding={onboardingFixture}
-            storageKey="cadence-first-run-bench-dismissed"
-          />
+          <FirstRunOnboardingBench />
         </div>
       </ProductPreview>
     ),
@@ -2034,13 +2030,6 @@ const trustEvidenceFixture: PublicTrustView = {
     freshness_deadline: ["not_run", "unavailable"].includes(status) ? null : "2026-08-28T04:41:10Z",
     evidence_url: "https://example.com/immutable-evidence",
   })),
-};
-
-const onboardingFixture: FirstRunOnboardingState = {
-  hasAnyBehavior: false,
-  hasImportRuns: false,
-  timezone: "America/New_York",
-  vapidPublicKey: "",
 };
 
 const activeBehavior: BehaviorView = {
