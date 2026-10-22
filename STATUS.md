@@ -48,12 +48,26 @@ Post-publication readback:
 - A quarantined download of the public DMG is accepted as notarized Developer ID,
   and its staple validates.
 
-This change points the marketing **Download for Mac** button, the user guide and
-`INT-MKT-012` at the stable DMG. Open: after merge, confirm the production
-marketing deployment serves the new link, then update
-`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app. Restore the QA feed to
-its original `0.1.1-rc.3` bytes. Ticket 115 closes when the website step is
-verified. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+PR #127 (merged as `f661261`) points the marketing **Download for Mac** button, the
+user guide and `INT-MKT-012` at the stable DMG. Afterwards:
+- Production marketing deployment `dpl_97tyj9ksnXCxZTqP3uTcasGFurpx` serves
+  https://cadence-me.com. The home page and FAQ link to
+  `desktop-stable/Cadence_0.1.3_aarch64.dmg`, which resolves.
+- The production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` names that deployment;
+  the readback through `vercel env run` matched.
+- The app redeployed to app.cadence-me.com (`cadence-3z04kh617`). The Trust feed is
+  `live`; its checks show Stale until the next scheduled collection replaces the
+  October 21 snapshot.
+- The QA feed is restored to its original `0.1.1-rc.3` bytes (SHA-256 `2217e401…90b6`).
+
+**Tickets 115, 178 and 181 are complete.** Follow-ups:
+- 0.1.4 ships as the first stable update; see
+  `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+- Remove the QA SSH key from the test Mac when it is no longer needed (command in the
+  0.1.3 packet).
+
+Merging this record rebuilds marketing, so the Trust marketing ID needs the same
+refresh again. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 
 ## Public Trust aggregate correction — October 21, 2026
 
@@ -8820,7 +8834,7 @@ Owner authorization: 2026-08-30. Current requirements live in
 | 112: Native reminder coverage | complete | Product scheduling, coverage readback, cancellation, fully quit delivery, click/focus, and preserved delivery export pass. Precise profile-midnight, DST, and wake/resume tests pass. Actual 2026-08-31 system sleep/wake renewed coverage before GUI inspection. Ticket 111's dependency is complete. |
 | 113: Unnotarized Apple Silicon preview and updater acceptance | complete | The approved preview prerelease is public. Downloaded launch, three updater failure paths, valid .1 to .2 installation, separate restart, and data preservation pass. Both versions use schema 6, so shipped-migration testing is not applicable to this release. |
 | 114: BehaviorLog 0.3 portability parity | complete | Canonical passive observations, retained configuration identity, exact passive replay, and accepted source schedule fingerprints pass real SQLite/SQL and native export/import acceptance. Hosted rollout remains separate. |
-| 115: Apple-trusted macOS distribution acceptance | in progress | Owner authorized all plan steps September 27. Membership confirmed; valid Developer ID identity and provisioning profile installed; notarization credentials accepted. Apple accepted candidate 0.1.1-rc.1 app and DMG notarization; stapling, Gatekeeper, and strict artifact verification pass. Synthetic production Keychain probe passed; installed acceptance remains open. Owner deferred macOS 14 runtime testing. See `docs/plans/2026-09-27-apple-developer-unblocked-work.md`. |
+| 115: Apple-trusted macOS distribution acceptance | complete | Published 0.1.3 on October 22, 2026 (desktop-stable; see the top entry). Earlier history: Owner authorized all plan steps September 27. Membership confirmed; valid Developer ID identity and provisioning profile installed; notarization credentials accepted. Apple accepted candidate 0.1.1-rc.1 app and DMG notarization; stapling, Gatekeeper, and strict artifact verification pass. Synthetic production Keychain probe passed; installed acceptance remains open. Owner deferred macOS 14 runtime testing. See `docs/plans/2026-09-27-apple-developer-unblocked-work.md`. |
 | 116: Desktop account-sync product and architecture contract | complete | `AGENTS.md`, `docs/PRODUCT_SPEC.md`, `docs/DESKTOP_BUILD.md`, `docs/DECISIONS.md`, `docs/FUTURE_UPDATES.md`, `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, `docs/AGENT_RESOLVERS.md`, and `docs/TICKETS.md` define the optional account boundary, 100,000-row/64-MiB/30-second snapshot ceilings, planner and retry ownership, and security rules. `npm run agents:check`, `npm run interactions:check`, `npm run resolvers:check`, and `git diff --check` passed. No runtime, schema, provider, or hosted changes. |
 | 117: Desktop local database controls | complete | Exact Application Support path disclosure, Finder reveal, consistent online backup, protected local-only restore, validation, rollback contracts, and native restart acceptance pass. |
 | 118: Desktop Google authentication and account session | complete | Official Tauri deep-link delivery, query-state validation, exact-once Google PKCE exchange, fixed Keychain storage, distinct SQLite metadata, one-account enforcement, restart persistence, replay rejection, and secret scans pass. Installed preview.15 completed the owner Google round trip through the preview-only legacy login-Keychain path. Production Data Protection Keychain acceptance remains under Apple-signed Ticket 115. See `docs/qa/2026-08-31-desktop-authentication.md`. |
