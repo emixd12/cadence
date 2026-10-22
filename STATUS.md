@@ -23,6 +23,13 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   Developer ID signing" lines in the travel redesign intro, Ticket 214,
   `docs/DESKTOP_PARITY.md` and `docs/user-guide/travel.md`. Ticket 165 handles the
   manual macOS location permission path.
+- Three items that main already cited but never received are restored from local
+  uncommitted work, with the owner's approval: the `docs/DECISIONS.md` entries
+  "2026-10-17: Travel redesign budget, Behavior Where and model input", "2026-10-18:
+  Google route data in model input; legal register" and "2026-10-18: Weather
+  provider is Open-Meteo"; `docs/plans/2026-10-17-weather-provider-comparison.md`;
+  and the `docs/COSTS.md` line in the `AGENTS.md` source-of-truth list (item 28).
+  The October 22 entries and a dated note in the plan record what they supersede.
 
 Checks: `npm run agents:check`, `npm run interactions:check`,
 `npm run resolvers:check` and `git diff --check` pass. Lint is not applicable: the

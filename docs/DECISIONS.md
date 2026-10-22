@@ -951,6 +951,64 @@ This decision authorizes the tickets. It authorizes no hosted migration push,
 signing-key import, deployment, legal publication, or directory submission. Those
 remain owner-only actions.
 
+## 2026-10-17: Travel redesign budget, Behavior Where and model input
+
+The travel review found hosted routing stopped since September 25 because the
+nonrenewing 40-refresh pilot budget ran out. The owner decided:
+
+- Travel spend has an absolute ceiling of US$5 per user per month at Google list
+  price. The ceiling is permissive; the design should spend well below it.
+- Behavior Where is optional: Not set, Anywhere, Home or a saved place. Not set
+  differs from Anywhere. Cadence may suggest a Where from completion place labels
+  stored only after a separate opt-in. A suggestion never changes a Behavior.
+- The Daily Brief model receives slow-changing travel facts, learned travel habits
+  and a weather outlook. Core calculates all times. Exact leave-by times stay in the
+  calculated line beside the brief. Addresses, coordinates, place IDs and raw
+  provider responses never reach the model.
+- Travel Settings shrink to the toggle with its disclosure, Home and usual travel.
+  Learned values replace buffer settings.
+
+Tickets 213–219 record the scope. This decision approves product direction only.
+It grants no provider spending, migration, deployment, new provider or model-data
+transmission. The disclosure update and the Google terms review gate model input.
+
+## 2026-10-18: Google route data in model input; legal register
+
+The owner set a risk regime for Google Maps data in Daily Brief model input:
+
+- Cadence may send the model only its own deterministic conclusions derived from
+  Google route data. Examples: "run fits before the afternoon trip: yes", "travel
+  day", "the Home Behavior does not fit today because of travel".
+- It never sends route durations, rounded trip lengths, leave-by times, or anything
+  from which a route duration can be recovered. A departure time shown next to an
+  event time, for example, reveals the duration.
+- Exact timing stays in the calculated line beside the brief.
+- The owner accepts this as a business risk without asking Google first. Asking Google
+  in writing stays an open item.
+
+This replaces the Google terms review gate from the 2026-10-17 decision. The
+disclosure update still gates model input.
+
+The owner also created one legal register, [`docs/LEGAL.md`](LEGAL.md), for all legal
+matters and questions. Entry L-001 records this regime. Open questions from
+`docs/plans/2026-10-17-weather-provider-comparison.md` moved there.
+
+## 2026-10-18: Weather provider is Open-Meteo
+
+The owner selected Open-Meteo as Ticket 218's weather provider, as recommended in
+`docs/plans/2026-10-17-weather-provider-comparison.md`. Its CC BY 4.0 licence allows
+caching one forecast per area per hour, sharing it across users and sending derived
+facts to the model. It covers the world with hourly forecasts.
+
+- `docs/COSTS.md` assumes the API Standard plan at US$29 per month. The plan choice
+  stays open in `docs/LEGAL.md` entry L-008.
+- The weather area comes from the device position (`docs/LEGAL.md` entry L-002).
+- The Google Weather API would conflict with the regime above, because its forecast
+  facts would be Google content in model input.
+
+This selects the provider. Buying the plan and creating the API key wait for the
+owner's authorization when Ticket 218 is implemented.
+
 ## 2026-10-22: Travel budget posture confirmed
 
 Tickets 213–219. The owner confirmed the posture that the October 17 records marked as
@@ -1023,6 +1081,7 @@ session.
   a share of trip time.
 - Privacy and attribution items are logged as `docs/PRIVACY_CHANGES.md` P-003.
 
+This supersedes the open plan choice in "2026-10-18: Weather provider is Open-Meteo".
 Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
 session.
 
@@ -1030,7 +1089,9 @@ session.
 
 The Daily Brief model-data disclosure, the re-consent for travel, habit and weather
 facts, and the marketing language are logged as `docs/PRIVACY_CHANGES.md` P-004 to
-P-006. They do not block development. The written question to Google about the
-`docs/LEGAL.md` L-001 regime is sent from info@identityscaffolding.com; L-001 stays
-accepted risk. Recorded from the owner's October 22 decisions, relayed by the
-orchestrating agent session.
+P-006. They do not block development. This supersedes, for development, the
+disclosure gate in "2026-10-17: Travel redesign budget, Behavior Where and model
+input" and "2026-10-18: Google route data in model input; legal register". The
+written question to Google about the `docs/LEGAL.md` L-001 regime is sent from
+info@identityscaffolding.com; L-001 stays accepted risk. Recorded from the owner's
+October 22 decisions, relayed by the orchestrating agent session.
