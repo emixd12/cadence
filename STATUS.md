@@ -66,6 +66,15 @@ have no implementation change. No schema or hosted configuration changes.
 
 ## Tickets 233–241 connector expansion — October 18, 2026
 
+Microsoft publisher verification started October 22, 2026 (public-approval
+gate for Ticket 237). The Entra app "Cadence Calendar" (tenant
+identityscaffolding.com) has publisher domain `identityscaffolding.com`, a
+verified tenant domain, and now lists privacy (`https://app.cadence-me.com/privacy`),
+terms (`https://app.cadence-me.com/terms`) and homepage (`https://cadence-me.com`)
+links. Pending owner action: Microsoft AI Cloud Partner Program enrollment and
+legal-entity verification, then linking the Partner ID to the app. The app has
+no verified publisher yet.
+
 The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
 timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
 this branch (`expansion-connectors`, based on `12ea89a`) merged `origin/main`
