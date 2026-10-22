@@ -13240,6 +13240,8 @@ Execution evidence: `docs/qa/cadence-project-rename.md`.
 ## Ticket 187: Isolate agentic Calendar access
 
 Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
+October 22, 2026: recovered from a local backup for owner review; the migration is now
+`20261022180000_separate_agent_calendar_grant.sql` (see `STATUS.md`).
 Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
 Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
 
@@ -13272,6 +13274,9 @@ This ticket supersedes the single Calendar-grant assumption in the Daily Brief p
 ## Ticket 188: Estimate Behavior durations from descriptions
 
 Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
+October 22, 2026: recovered from a local backup for owner review (see `STATUS.md`).
+The unmerged iOS plan also uses the label "Ticket 188" for its activation step; renumber that
+step if the plan lands.
 Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate
 estimate step; add a review surface for iterating on the mechanism; update privacy
 disclosures.

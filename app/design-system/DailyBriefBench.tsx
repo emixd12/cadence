@@ -255,7 +255,6 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
         if (result.mode !== 'account' || current.settings.accountRef !== result.accountRef || current.settings.accountRef !== account?.settings.accountRef ||
             !current.settings.enabled || current.settings.revision !== result.preferenceRevision || current.settings.revision !== account?.settings.revision ||
             current.settings.localDate !== account?.settings.localDate || current.settings.timezone !== account?.settings.timezone ||
-            // eslint-disable-next-line react-hooks/purity -- Runs after the response in an explicit click handler, never during render.
             !result.expiresAt || Date.parse(result.expiresAt) <= Date.now()) throw new Error('context_changed');
       }
       if (result.review?.saved) {

@@ -1,5 +1,43 @@
 # Implementation Status
 
+## Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026
+
+Four commits from October 16 never reached main: PR #83 merged a rewritten
+history without them. This branch cherry-picks them onto main `b9012fc` so the
+owner can decide whether they land. Nothing is deployed.
+
+- Ticket 187: a separate agent Google Calendar grant for Daily Brief and
+  private workbench reads.
+- Ticket 184 candidate 2: gated recipe `daily_brief@1.1` in preset
+  `advisor-analysis-2`, plus the tuning pass 2 record.
+- Ticket 188: description-based duration estimates, opt-in for recipe 1.1 only.
+
+The Ticket 187 migration was never applied to hosted. It is renamed from
+`20261012213059` to `20261022180000`, after hosted history (`20261019025157`)
+and after the timestamps claimed by open travel branches. Its preference-save
+replacement predated `20260927173716` and restored retryable errcode 40001; it
+now keeps 55000. The nonretryable-conflicts SQL smoke test now uses the agent
+Calendar tables. Two lint warnings in the recovered code are fixed.
+
+Verification on isolated local project `cadence-port188` (loopback only, removed
+afterwards): a clean start and `db reset` applied all 87 migrations; generated
+types match `lib/db/database.types.ts`; all 20 `tests/sql` files pass. Agents,
+interactions, resolvers and design-system checks, lint (zero warnings), web and
+desktop TypeScript pass. Vitest: 3,125 passed, 94 skipped.
+Web and desktop builds and the public-source boundary check pass, on Node 24.22.0.
+
+Open, owner-gated: the decision to land; hosted migration; the separate Google
+agent project and client; privacy and no-AI disclosure corrections (187) and
+description disclosure (188); installed acceptance. PR #112 redefines the same
+Daily Brief Calendar fence functions and adds `save_daily_brief_preferences_v3`
+on the standard Calendar tables. Whichever merges second must move v3 and the
+connector fence to the agent grant.
+
+Platform impact: web Calendar services, Settings and Daily Brief generation;
+desktop Calendar broker and Settings (187); development workbench and presets
+only (184, 188). Marketing has no change before release acceptance. Future
+mobile is not applicable.
+
 ## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256

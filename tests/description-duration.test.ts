@@ -20,7 +20,7 @@ describe("description estimate configuration", () => {
     expect(v11.context.duration.includeDescriptionEstimate).toBe(true);
     expect(legacy.context.duration).not.toHaveProperty("includeDescriptionEstimate");
     expect(() => parseBriefingConfig({ ...legacy, context: { ...legacy.context, duration: { ...legacy.context.duration, includeDescriptionEstimate: true } } })).toThrow();
-    const { includeDescriptionEstimate: _omitted, ...duration } = v11.context.duration;
+    const duration = Object.fromEntries(Object.entries(v11.context.duration).filter(([key]) => key !== "includeDescriptionEstimate"));
     expect(() => parseBriefingConfig({ ...v11, context: { ...v11.context, duration } })).toThrow(/includeDescriptionEstimate/);
   });
 });
