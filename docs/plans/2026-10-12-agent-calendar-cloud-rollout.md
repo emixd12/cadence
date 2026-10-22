@@ -255,7 +255,7 @@ Mocks and synthetic UI previews do not establish provider or native acceptance.
 
 **Objective:** Activate the separated grant without exposing production to mixed old/new readers.
 
-**Files:** Existing `supabase/migrations/20261012213059_separate_agent_calendar_grant.sql`, `lib/db/database.types.ts`, `docs/OPERATIONS.md`, `docs/qa/2026-10-12-agentic-calendar.md`, and `STATUS.md`.
+**Files:** Existing `supabase/migrations/20261022180000_separate_agent_calendar_grant.sql`, `lib/db/database.types.ts`, `docs/OPERATIONS.md`, `docs/qa/2026-10-12-agentic-calendar.md`, and `STATUS.md`.
 
 **Decisions:** Package only reviewed Ticket 187 changes and dependencies; preserve unrelated working-tree edits.
 Obtain the independent review still required by the existing acceptance record.

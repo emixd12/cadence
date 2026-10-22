@@ -1960,7 +1960,7 @@ Do not copy standard refresh tokens or change the standard client ID.
 Rollout order:
 1. Confirm both project/client inventories, classification, callbacks, scopes and verification with an authorized Google owner session.
 2. Keep AI Calendar requests unavailable during the migration/application cutover. Do not run old AI readers against newly enabled agent preferences.
-3. Apply `20261012213059_separate_agent_calendar_grant.sql` through the approved Supabase migration workflow, then deploy the matching server source.
+3. Apply `20261022180000_separate_agent_calendar_grant.sql` through the approved Supabase migration workflow, then deploy the matching server source.
 4. Add verified agent configuration. The migration clears old Calendar disclosures and outstanding brief attempts for those accounts only.
 5. Obtain fresh consent in **Google Calendar for Daily Brief**, select calendars, and enable Calendar separately in **Daily Brief**.
 6. Verify web and an installed desktop build with both grants. Disconnect each independently; verify the other still reads Calendar and sign-in works.

@@ -20,7 +20,8 @@ This change follows the conservative agent-separation branch and requires a sepa
 Primary source files: `lib/services/google-calendar-oauth.ts`, `google-calendar.service.ts`,
 `lib/db/google-calendar.repo.ts`, `lib/types/google-calendar.ts`, Calendar API routes,
 briefing context/history/workbench services, Settings panels, and desktop Calendar adapters.
-Migration: `supabase/migrations/20261012213059_separate_agent_calendar_grant.sql`.
+Migration: `supabase/migrations/20261022180000_separate_agent_calendar_grant.sql`
+(renamed October 22, 2026 from `20261012213059_…`; never applied to hosted).
 Generated types: `lib/db/database.types.ts`.
 Interaction variants: INT-CALENDAR-001–004 and INT-BRIEF-004 in the existing registry.
 The existing design-system manifest and usage inventory include the changed controls.

@@ -2256,7 +2256,7 @@ test environment documented in `docs/SUPABASE_WORKFLOW.md`.
 
 ## Agent Calendar grant (Ticket 187)
 
-Migration `20261012213059_separate_agent_calendar_grant.sql` adds independent owner-scoped
+Migration `20261022180000_separate_agent_calendar_grant.sql` adds independent owner-scoped
 `google_calendar_agent_connections` and `google_calendar_agent_preferences` tables.
 Connections add `oauth_client_id`; generation, attempt hash, status and selection revision mirror the standard grant.
 The `cadence_calendar_agent_private` schema stores sealed credentials and five-minute, client-bound attempts.
@@ -2269,3 +2269,7 @@ Daily Brief SQL admission, completion and preference fences now reference the ag
 The migration clears existing Calendar disclosure, increments its preference revision, and removes affected outstanding brief attempts.
 Behavior-only preferences and attempts remain unchanged. Fresh agent consent and model disclosure are required.
 `tests/sql/google-calendar-agent-contract.sql` verifies grant isolation, RLS, replay and disconnect boundaries.
+
+The migration was written October 12, 2026 as `20261012213059_…` and never applied to hosted.
+On October 22 it was renamed to sort after hosted migrations already applied through `20261019025157`.
+Its preference save keeps errcode `55000` for stale revisions, matching `20260927173716_fix_daily_brief_nonretryable_conflicts.sql`.

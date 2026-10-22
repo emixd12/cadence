@@ -173,8 +173,9 @@ begin
   for update;
   current_revision := coalesce(current_revision, 0);
 
+  -- Keep 20260927173716's nonretryable code; PostgREST retries 40001.
   if current_revision <> p_expected_revision or current_revision = 2147483647 then
-    raise exception 'Daily Brief preferences changed.' using errcode = '40001';
+    raise exception 'Daily Brief preferences changed.' using errcode = '55000';
   end if;
 
   if p_include_calendar then
