@@ -1,5 +1,21 @@
 # Implementation Status
 
+## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
+
+Signed Cadence builds enable Hardened Runtime but did not sign the location
+entitlement `com.apple.security.personal-information.location`. That is the
+well-evidenced cause of the missing first macOS location prompt; it is not yet
+verified. Production `Entitlements.plist` now includes it, and
+`verify-entitlements.py` accepts it without provisioning-profile authorization.
+This change is split from Ticket 165's Where-based draft PR #131 so it can ship
+without the held Ticket 215 rollout. Source only: nothing was signed, notarized or
+published. Proposed: ride the 0.1.4 stable update and run the prompt test on the
+0.1.4 candidate before publication. Steps and build commands:
+`docs/qa/2026-10-22-desktop-location-entitlement.md`.
+
+Platform impact: desktop signing only. Web, marketing and future mobile have no
+change. No schema, migration or hosted configuration changed.
+
 ## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
