@@ -67,11 +67,14 @@ have no implementation change. No schema or hosted configuration changes.
 ## Tickets 233–241 connector expansion — October 18, 2026
 
 Microsoft publisher verification started October 22, 2026 (public-approval
-gate for Ticket 237). The Entra app "Cadence Calendar" (tenant
-identityscaffolding.com) has publisher domain `identityscaffolding.com`, a
+gate for Ticket 237). The Entra app, renamed from "Cadence Calendar" to
+"Cadence" with the Cadence logo on October 22 so consent screens show Cadence
+(tenant identityscaffolding.com), has publisher domain `identityscaffolding.com`, a
 verified tenant domain, and now lists privacy (`https://app.cadence-me.com/privacy`),
 terms (`https://app.cadence-me.com/terms`) and homepage (`https://cadence-me.com`)
-links. Pending owner action: Microsoft AI Cloud Partner Program enrollment and
+links. Owner decision: Identity Scaffolding is the publishing entity; the
+verified-publisher line will read Identity Scaffolding under the Cadence app
+name. Pending owner action: Microsoft AI Cloud Partner Program enrollment and
 legal-entity verification, then linking the Partner ID to the app. The app has
 no verified publisher yet.
 
