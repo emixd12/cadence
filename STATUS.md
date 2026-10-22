@@ -1,5 +1,78 @@
 # Implementation Status
 
+## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
+
+PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
+browser test and two retained QA scripts import esbuild directly. Declare it as
+a root dev dependency matching the existing override, instead of relying on
+Astro to install it. PR #126 adds the reviewed Vitest 5.0.5 upgrade. The
+combined lock keeps Astro production dependencies and resolves std-env to
+4.3.0 without marking its production edge development-only.
+
+Node 24.22.0 checks pass: clean install, portable browser-hash tests, required
+repository gates, public-source/Trust checks, desktop build, and marketing
+build/check. The full suite reports 3,091 passed and 94 skipped. A process
+preload asserted Node 24 in the actual test/build children.
+
+The current npm audit no longer reports http-cache-semantics on PR #125's
+4.3.0 dependency. GitHub's advisory still lists no patched version; the upstream
+maintainer disputes it. Do not call this a vendor-confirmed security fix or
+waive the open alert. The combined audit removes both Vitest findings; five
+high package entries remain in the development-only braces/ESLint chain. The
+production-only audit reports zero, but the all-scope audit still fails. No
+suppression, downgrade or security waiver is included. No production, Trust
+publication, signing-key or activation change occurred. Ticket 232 remains
+incomplete.
+
+Platform impact: marketing's existing Astro upgrade and test tooling only;
+web and desktop runtime behavior is unchanged. Future mobile is not implemented.
+
+## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
+
+**Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21
+note that called it superseded by 0.1.4. 0.1.3 is the only artifact with complete
+installed acceptance. The remaining 0.1.4 fix covers an unexpired pending sign-in
+callback that arrives while already signed in, which the app does not normally
+allow; relaunching clears it. 0.1.4 ships later as the first stable update.
+
+Published:
+- The public release
+  [`desktop-stable`](https://github.com/emixd12/cadence/releases/tag/desktop-stable),
+  tagged at source `dcefe7e`. It holds the stapled DMG, the updater archive and
+  signature, `Cadence_0.1.3_verification.json` and `latest.json`.
+- `desktop-preview/latest.json` now names 0.1.3 at the stable URL, so preview
+  installs are offered the signed app. The prior preview.24 feed is retained for
+  rollback.
+
+Post-publication readback:
+- All public files match the verified SHA-256 values.
+- Both feeds report 0.1.3, and their signatures verify against the public archive
+  with the persistent updater key. GitHub briefly served the cached preview.24
+  feed before serving the replacement.
+- A quarantined download of the public DMG is accepted as notarized Developer ID,
+  and its staple validates.
+
+PR #127 (merged as `f661261`) points the marketing **Download for Mac** button, the
+user guide and `INT-MKT-012` at the stable DMG. Afterwards:
+- Production marketing deployment `dpl_97tyj9ksnXCxZTqP3uTcasGFurpx` serves
+  https://cadence-me.com. The home page and FAQ link to
+  `desktop-stable/Cadence_0.1.3_aarch64.dmg`, which resolves.
+- The production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` names that deployment;
+  the readback through `vercel env run` matched.
+- The app redeployed to app.cadence-me.com (`cadence-3z04kh617`). The Trust feed is
+  `live`; its checks show Stale until the next scheduled collection replaces the
+  October 21 snapshot.
+- The QA feed is restored to its original `0.1.1-rc.3` bytes (SHA-256 `2217e401…90b6`).
+
+**Tickets 115, 178 and 181 are complete.** Follow-ups:
+- 0.1.4 ships as the first stable update; see
+  `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+- Remove the QA SSH key from the test Mac when it is no longer needed (command in the
+  0.1.3 packet).
+
+Merging this record rebuilds marketing, so the Trust marketing ID needs the same
+refresh again. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+
 ## Public Trust aggregate correction — October 21, 2026
 
 Merge-readiness follow-up found that the collector requested one alert per
@@ -55,11 +128,13 @@ the Account state to an error. The callback now preserves the existing session,
 shows the account-switch notice, and never exchanges the incoming code. The
 regression fails on the 0.1.3 source and passes with the fix.
 
-Version `0.1.4` is source only. The signed 0.1.3 candidate is superseded and must
-not be published. Its recorded acceptance remains historical evidence, not
-acceptance of this change. Tickets 178 and 181 need a new signed build, artifact
-verification, installed callback/session checks and the owner's publication
-instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+Version `0.1.4` is source only. This entry said the signed 0.1.3 candidate was
+superseded and must not be published; the owner overrode that on October 22 and
+0.1.3 is published (see the entry above). Its recorded acceptance does not cover
+this change. 0.1.4 ships later as the first update through `desktop-stable`, after
+a new signed build, artifact verification, installed callback and session checks,
+and the owner's publication instruction. See
+`docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
 
 Platform impact: desktop authentication only; web, marketing and future mobile
 have no implementation change. No schema or hosted configuration changes.
@@ -138,6 +213,14 @@ Tickets 220–232; earlier commits and approvals cite the old numbers.
   failed, on 5-second timeouts. Run alone it still times out; with
   `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
   broken, and it also fails on the pre-change commit.
+- Merge of `origin/main` at `b9012fc` (desktop 0.1.3 publication, Astro 7.4.0
+  and Vitest 5.0.5 upgrades), October 22, 2026: no new migrations or tickets.
+  The only conflict, the `interaction-registry.json` `updated` date, took main's
+  2026-10-22. After `npm ci`, all seven required checks plus core,
+  design-system, load manifest, desktop typecheck/build/parity and marketing
+  build/check pass. The two-worker suite passed 3,487 tests (94 skipped)
+  excluding `tests/desktop-release-cli.test.ts`, which passed 25/25 alone with
+  `--testTimeout=60000`.
 
 - Ticket 242 (Outlook `Calendars.Read`, October 21–22, 2026): implemented,
   locally verified and **live-verified** for one personal and one work/school
@@ -9220,7 +9303,7 @@ Owner authorization: 2026-08-30. Current requirements live in
 | 112: Native reminder coverage | complete | Product scheduling, coverage readback, cancellation, fully quit delivery, click/focus, and preserved delivery export pass. Precise profile-midnight, DST, and wake/resume tests pass. Actual 2026-08-31 system sleep/wake renewed coverage before GUI inspection. Ticket 111's dependency is complete. |
 | 113: Unnotarized Apple Silicon preview and updater acceptance | complete | The approved preview prerelease is public. Downloaded launch, three updater failure paths, valid .1 to .2 installation, separate restart, and data preservation pass. Both versions use schema 6, so shipped-migration testing is not applicable to this release. |
 | 114: BehaviorLog 0.3 portability parity | complete | Canonical passive observations, retained configuration identity, exact passive replay, and accepted source schedule fingerprints pass real SQLite/SQL and native export/import acceptance. Hosted rollout remains separate. |
-| 115: Apple-trusted macOS distribution acceptance | in progress | Owner authorized all plan steps September 27. Membership confirmed; valid Developer ID identity and provisioning profile installed; notarization credentials accepted. Apple accepted candidate 0.1.1-rc.1 app and DMG notarization; stapling, Gatekeeper, and strict artifact verification pass. Synthetic production Keychain probe passed; installed acceptance remains open. Owner deferred macOS 14 runtime testing. See `docs/plans/2026-09-27-apple-developer-unblocked-work.md`. |
+| 115: Apple-trusted macOS distribution acceptance | complete | Published 0.1.3 on October 22, 2026 (desktop-stable; see the top entry). Earlier history: Owner authorized all plan steps September 27. Membership confirmed; valid Developer ID identity and provisioning profile installed; notarization credentials accepted. Apple accepted candidate 0.1.1-rc.1 app and DMG notarization; stapling, Gatekeeper, and strict artifact verification pass. Synthetic production Keychain probe passed; installed acceptance remains open. Owner deferred macOS 14 runtime testing. See `docs/plans/2026-09-27-apple-developer-unblocked-work.md`. |
 | 116: Desktop account-sync product and architecture contract | complete | `AGENTS.md`, `docs/PRODUCT_SPEC.md`, `docs/DESKTOP_BUILD.md`, `docs/DECISIONS.md`, `docs/FUTURE_UPDATES.md`, `docs/PUBLIC_PRODUCT_ARCHITECTURE.md`, `docs/AGENT_RESOLVERS.md`, and `docs/TICKETS.md` define the optional account boundary, 100,000-row/64-MiB/30-second snapshot ceilings, planner and retry ownership, and security rules. `npm run agents:check`, `npm run interactions:check`, `npm run resolvers:check`, and `git diff --check` passed. No runtime, schema, provider, or hosted changes. |
 | 117: Desktop local database controls | complete | Exact Application Support path disclosure, Finder reveal, consistent online backup, protected local-only restore, validation, rollback contracts, and native restart acceptance pass. |
 | 118: Desktop Google authentication and account session | complete | Official Tauri deep-link delivery, query-state validation, exact-once Google PKCE exchange, fixed Keychain storage, distinct SQLite metadata, one-account enforcement, restart persistence, replay rejection, and secret scans pass. Installed preview.15 completed the owner Google round trip through the preview-only legacy login-Keychain path. Production Data Protection Keychain acceptance remains under Apple-signed Ticket 115. See `docs/qa/2026-08-31-desktop-authentication.md`. |
