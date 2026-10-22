@@ -702,7 +702,9 @@ starting values; a changed value needs a new version.
   get-ready time precedes the weather-adjusted departure when both exist.
 - Every computed margin records `weather-margin@1`.
 - The weather area comes from the device position only, rounded to a 0.1° grid.
-  Google coordinates never become an area (`docs/LEGAL.md` L-002). With no usable
+  Google coordinates never become an area (`docs/LEGAL.md` L-002). Legs that start
+  at another stop use the current area as a proxy; weather at each stop waits on
+  L-002. With no usable
   position there is no weather, and the travel status line says "No weather margin:
   device location is unavailable." A provider failure says the forecast is
   unavailable; travel estimates continue in both cases.

@@ -208,8 +208,7 @@ non-commercial use only; API Standard, US$29 per month for 1 million calls (chec
 before commercial use. Not subscribed. Switching needs only server configuration:
 `CADENCE_WEATHER_BASE_URL` and `CADENCE_WEATHER_API_KEY`. Weather stays off until
 `CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`.
-The comparison is cited as `docs/plans/2026-10-17-weather-provider-comparison.md`;
-that file is not in this branch (checked 2026-10-22).
+The comparison is in `docs/plans/2026-10-17-weather-provider-comparison.md`.
 
 Cadence requests one forecast per coarse area (0.1° grid) per clock hour and shares
 it across users. Each forecast covers 48 hours. The cache lives in server memory, so
@@ -226,8 +225,9 @@ assumed:
 
 At 1,000 typical users that is about 180,000 requests a month; at 1,000 heavy
 users, about 490,000. Both fit the 1 million call plan, so weather adds no
-variable cost. The free tier allows 10,000 calls a day for non-commercial use only
-(`docs/LEGAL.md` L-008); testing stays far below that.
+variable cost. The free tier allows 10,000 calls a day, 5,000 an hour and 300,000 a
+month, for non-commercial use only (`docs/LEGAL.md` L-008); testing stays far below
+that.
 
 ## Payment fees
 

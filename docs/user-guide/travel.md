@@ -114,7 +114,8 @@ adjusted leave time with, for example, "Includes 10 min for rain." The credit
 "Weather data by Open-Meteo.com (CC BY 4.0)" sits beside those lines and links to
 Open-Meteo and the licence.
 
-Weather uses the device position only. Without it there is no weather margin, and
+Weather uses the device position only, so trips that start at another stop use the
+forecast for where you are now. Without a position there is no weather margin, and
 the status line says "No weather margin: device location is unavailable." When the
 forecast cannot be read, it says the forecast is unavailable. Travel estimates
 still work in both cases.
