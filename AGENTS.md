@@ -104,6 +104,7 @@ Product and implementation docs:
 25. `/docs/MCP_INTEGRATION.md`
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
 27. `/docs/PRIVACY_CHANGES.md`
+28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
 
 ## Privacy changes
 
