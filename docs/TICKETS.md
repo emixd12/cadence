@@ -13465,68 +13465,176 @@ Platform impact:
 
 ## Ticket 216: Completion place labels and Where suggestions
 
-Status: filed October 17, 2026; planned. Window and threshold numbers are proposals
-for owner confirmation.
-Dependencies: 215.
+Status: revised October 22, 2026 from the owner's decisions below; implemented in
+source on branch `claude/ticket-216-place-labels-b20c33` (draft PR against Ticket 215's
+branch). Not deployed. Hosted migration `20261022160000_completion_place_labels.sql`,
+SQLite migration 0019, deployment and live device acceptance remain owner-gated.
+Dependencies: 215. Ticket 219 owns label counts in model input.
+
+Owner decisions, October 22, 2026:
+
+1. Place positions come from the user's own device (option B). Cadence never fetches,
+   stores or compares Google coordinates. This resolves `docs/LEGAL.md` L-003 by design;
+   the docs session records the resolution there.
+2. The proposed numbers are confirmed as starting values. Each set is a versioned,
+   auditable rule set in `packages/core`. Changing a value requires a new version.
+3. Retention is the user's choice during setup.
+4. Export is out of scope. The docs session files a backlog ticket for Full JSON and
+   total-export inclusion. Export formats do not change here.
+5. Stored marker positions and labels change current privacy promises. Development does
+   not wait on them; each conflict is listed under Privacy surface entries below.
 
 Goal: suggest a Behavior's Where from where the user actually completes it, without
-storing raw positions.
+storing completion positions.
 
 Scope and acceptance:
 
-- Labels need a separate opt-in, off by default: save where I complete Behaviors.
-  Turning it off deletes all labels. Settings has a delete control.
+Place markers
+
+- A place's reference position is a marker the user records on their own device. While
+  at Home or a saved place, the user selects "I'm here". Cadence records that one
+  foreground device position as the place's marker.
+- Cadence has no saved-places table. A saved place is identified by its place key: the
+  unpadded base64url SHA-256 of the normalized typed text, the same `text_key` that the
+  Ticket 214 place cache uses. Behaviors with the same place text share one marker.
+- Home has one marker. It stores Home's place key at recording time and stops applying
+  when the Home text changes. Settings then asks for a new marker.
+- "I'm here" appears in three places, only while labels are on:
+  - beside Home in Travel Settings;
+  - below the Behavior Where field when Where is Home or A place;
+  - in a sparse prompt on a Behavior whose Where is Home or A place and whose place has
+    no current marker. Only the first Behavior per place shows it. "Not now" turns these
+    prompts off on every device. The two other controls stay.
+- "I'm here" may show the system location prompt, because the user asked for it. It
+  needs a sample that meets the rule set's age and accuracy limits. Otherwise it says why
+  and stores nothing. No modal; no repeated asking.
+- Recording again replaces the marker. Settings deletes all markers on request. Turning
+  labels off deletes them.
+
+Labels
+
+- Labels need a separate opt-in, off by default: "Save where I complete Behaviors".
+  Turning it on asks for retention in the same step. Turning it off deletes all labels,
+  markers and suggestion dismissals. Settings has a Delete labels control.
 - When the user marks an occurrence Completed, read the device position once in the
   foreground, only if location permission is already granted. Never prompt at
   completion time.
-- On the device, compare that position with Home and saved places. Store one label:
-  `home`, `saved_place:<id>` or `elsewhere`. Discard the coordinates immediately.
-  Never store or sync raw coordinates.
-- Proposed position rules: use a sample at most two minutes old with accuracy of
-  100 m or better. Within 150 m of Home or a saved place gives that label; the nearest
-  wins. More than 400 m from every saved place gives `elsewhere`. Between 150 m and
-  400 m, store no label.
-- Proposed qualifying window: the completion is marked on this device, on the
-  occurrence's local date. Exact-time occurrences qualify from 30 minutes before to two
-  hours after the scheduled time. Range occurrences qualify from 30 minutes before the
-  range starts to one hour after it ends. Needs decision resolutions, imports, synced
-  marks from other devices and later status edits never qualify.
-- Proposed suggestion rule, fixed and without a model: at least six qualifying labels
-  in the last 60 days.
+- Qualifying window: the completion is marked on this device, from Unresolved, on the
+  occurrence's local date, within two minutes of the read. Exact-time occurrences
+  qualify from 30 minutes before to two hours after the scheduled time. Range occurrences
+  qualify from 30 minutes before the range starts to one hour after it ends. Needs
+  decision resolutions, imports, synced marks from other devices, MCP marks and later
+  status edits, including Not Completed to Completed, never qualify.
+- On the device, compare the position with the current markers. Within 150 m gives that
+  label; the nearest marker wins and Home wins a tie. More than 400 m from every marker
+  gives `elsewhere`. Between 150 m and 400 m, or with no current marker, store no label.
+  Use a sample at most two minutes old with accuracy of 100 m or better.
+- Store one label per occurrence: `home`, `saved_place:<place key>` or `elsewhere`, with
+  the rule version, Behavior, local date and time. Discard the coordinates immediately.
+- Changing status away from Completed deletes that occurrence's label.
+
+Suggestions
+
+- A fixed rule without a model: at least six labels in the last 60 local days.
   - One label at 80% or more: suggest Home or that saved place.
-  - `elsewhere` at 80% or more: suggest adding the place; Cadence cannot name it.
+  - `elsewhere` at 80% or more: suggest adding a place; Cadence cannot name it.
   - Two or more labels at 25% or more each, none at 80%: suggest Anywhere.
   - Otherwise: no suggestion.
 - When Where is already set, suggest a change only when the rule disagrees with it.
-  A dismissed suggestion returns only after six more qualifying completions, and only
-  if the rule still holds.
-- Retention: 90 days, rolling. Changing a status away from Completed deletes that
-  occurrence's label.
-- Export: recommended to include labels in Full JSON only and exclude them from CSV,
-  JSONL and BehaviorLog. The owner confirms before implementation.
-- The device needs saved-place coordinates for the comparison. They come from the
-  30-day coordinate cache. Verify the Geocoding policy on coordinate caching first.
-- The radius comparison needs Google coordinates. Cadence holds none today; it stores
-  place IDs only. Comparing a position with Google coordinates may conflict with Maps
-  Terms 3.2.3(c)(iv). See `docs/LEGAL.md` L-003 (open); resolve it before
-  implementation. No design change yet.
-- Model use: the advisor may receive per-Behavior Where values and label counts, for
-  example "logged at home 9 of 10 times". Never coordinates, addresses or place IDs.
-  This waits for Ticket 219's disclosure.
-- Privacy and docs: this changes the promise that device samples are never stored.
-  Update `docs/user-guide/travel.md`, `docs/PRODUCT_SPEC.md`, `docs/DATA_MODEL.md` and
-  the privacy content. Add a migration with RLS for label storage.
-- Expected cost: near zero. Labels need no Google call and a few bytes per completion.
-  Behaviors learned as Anywhere skip route calls entirely.
+  Anywhere agrees with "add a place", because `elsewhere` can be many places. A Behavior
+  whose Where is Home or A place without a current marker gets no suggestion; the marker
+  prompt shows instead. A saved place no current marker names gets no suggestion.
+- A dismissed suggestion returns only after six more labels for that Behavior, and only
+  if the rule still produces a suggestion.
+- A suggestion never changes a Behavior. "Review" opens the Behavior's form with Where
+  filled in; the user saves.
+
+Rule versions
+
+- `packages/core/src/resolvers/place-label.resolver.ts` holds `place-label-rules@1`
+  (distances, sample limits, qualifying window, read freshness) and
+  `where-suggestion-rules@1` (counts, shares, window, dismissal).
+- Every stored label and dismissal records the rule version that produced it. Every
+  shown suggestion carries its rule version in the view model and the page markup.
+  Shown suggestions are not logged; a dismissal is the stored record.
+- Changing a value requires a new version. Tests pin each version's values. The
+  database accepts only known versions.
+
+Retention
+
+- Choices: 90 days (default), 1 year, until I delete them. Each shows one plain line on
+  privacy and on how much history suggestions and, after Ticket 219, the advisor can
+  learn from. Longer history allows better insights.
+- Switching to a shorter option deletes older labels in the same save. Hosted labels past
+  the window are deleted daily by the existing occurrence-sync cron; desktop deletes them
+  when it loads labels.
+
+Storage decision
+
+- Markers and labels live with the account: hosted tables with RLS, SQLite tables on
+  desktop, and the account synchronization contract. Reasons: web and desktop compare
+  the same markers and show the same suggestions; the user records each place once;
+  labels from one device still count after switching devices. Local-only desktop keeps
+  them in SQLite until an account is linked.
+- Hosted tables: `place_label_settings` (one row per user), `place_markers`,
+  `completion_place_labels` and `where_suggestion_dismissals`. Owner-only RLS on all four.
+  Triggers enforce the opt-in, the Completed status and known rule versions, and delete
+  labels when status leaves Completed and everything when labels turn off.
+- Marker positions are integer microdegrees and accuracy is whole meters, so hosted and
+  desktop fingerprints match exactly.
+- Account sync adds four entity kinds. Conflicts on these kinds resolve automatically:
+  a deletion wins over an edit, and otherwise the later record wins. The planner drops
+  labels whose occurrence is not Completed and all rows when labels are off, matching the
+  database triggers. Older desktop builds fail closed with "Update Cadence".
+
+Model input
+
+- `projectPlaceLabelCounts` in the same resolver returns per-Behavior counts (at Home, at
+  the Behavior's own place, at another saved place, elsewhere) without place keys,
+  positions or text. Nothing is added to model input; Ticket 219 owns that.
+
+Export
+
+- Out of scope. Labels, markers, settings and dismissals stay out of Full JSON, CSV,
+  JSONL and BehaviorLog. They are in desktop SQLite backups like other account data.
+
+Privacy surface entries (conflicts with current promises, logged, not blocking)
+
+- Privacy content (`components/settings/LegalContent.tsx`): "does not save device
+  locations"; "Device locations and route estimates stay in temporary memory and are
+  excluded from Cadence sync, exports, backups"; the retention table row for device
+  locations. Markers are stored device positions that sync and enter desktop backups.
+- The same content lists foreground reads (permission check, refresh, Timeline open).
+  Completion reads and "I'm here" reads are new read moments.
+- Travel Settings copy "Device positions and route results stay temporary and never
+  enter exports or synced backups" and the user guide's "Recipients and retention".
+  The user guide is updated here; the approved privacy content is not.
+- The storage boundary table in the travel redesign section lists device position as
+  temporary. Markers are a stored exception, and labels are derived location history.
+- MCP exclusions name travel settings and device location. Markers and labels are not
+  exposed through MCP; the privacy content should say so.
+- Marketing privacy claims about location handling need review before release.
+
+Open checks
+
+- Whether iPhone Safari re-prompts for location at completion time when the site's
+  permission reads "granted". Cadence checks the Permissions API first and never asks at
+  completion; Safari's own "Ask" setting reads as not granted, so no read happens.
+- Installed signed desktop: CoreLocation reads for "I'm here" and completion labels.
+  The manual permission path is Ticket 165's.
+- Hosted rollout order: this migration follows `20261019180000_add_behavior_where.sql`.
+  Older desktop builds reject the new entity kinds and must update first.
+
+Expected cost: none. Labels need no Google call and a few bytes per completion.
 
 Platform impact:
-- Web: implement.
-- Desktop: same design. Location reads stay blocked until Ticket 115 provides Developer
-  ID signing. Behaviors with a manually set Where still work.
-- Marketing: not applicable unless the privacy page describes location handling.
-  Check it before release.
+- Web: implement (`components/travel/PlaceLabels.tsx`, the Settings panel, Behavior
+  form and list, `lib/services/place-labels.service.ts`, `app/api/travel/place-labels`).
+- Desktop: implement with the shared components, SQLite migration 0019, native store
+  commands and the sync contract. CoreLocation reads use the published signed build;
+  installed acceptance stays open.
+- Marketing: not applicable for UI. Review privacy claims before release.
 - Future mobile: inherits the design with a native foreground location read.
-- Verify whether iPhone Safari re-prompts for location at completion time.
 
 ## Ticket 217: Learned travel habits
 
