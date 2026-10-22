@@ -31,12 +31,14 @@ repository has no Markdown linter, and no source file changed.
 Platform impact: documentation for web, desktop and marketing; no implementation.
 Future mobile is not applicable.
 
-## Ticket 232: Astro upgrade test dependency — October 22, 2026
+## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
 browser test and two retained QA scripts import esbuild directly. Declare it as
 a root dev dependency matching the existing override, instead of relying on
-Astro to install it. Only that declaration and esbuild lock entries change.
+Astro to install it. PR #126 adds the reviewed Vitest 5.0.5 upgrade. The
+combined lock keeps Astro production dependencies and resolves std-env to
+4.3.0 without marking its production edge development-only.
 
 Node 24.22.0 checks pass: clean install, portable browser-hash tests, required
 repository gates, public-source/Trust checks, desktop build, and marketing
@@ -46,10 +48,12 @@ preload asserted Node 24 in the actual test/build children.
 The current npm audit no longer reports http-cache-semantics on PR #125's
 4.3.0 dependency. GitHub's advisory still lists no patched version; the upstream
 maintainer disputes it. Do not call this a vendor-confirmed security fix or
-waive the open alert. Seven other package findings remain: five high findings
-in the development-only braces/ESLint chain and two moderate Vitest findings.
-Existing PR #126 upgrades Vitest. No production, Trust publication, signing-key
-or activation change occurred. Ticket 232 remains incomplete.
+waive the open alert. The combined audit removes both Vitest findings; five
+high package entries remain in the development-only braces/ESLint chain. The
+production-only audit reports zero, but the all-scope audit still fails. No
+suppression, downgrade or security waiver is included. No production, Trust
+publication, signing-key or activation change occurred. Ticket 232 remains
+incomplete.
 
 Platform impact: marketing's existing Astro upgrade and test tooling only;
 web and desktop runtime behavior is unchanged. Future mobile is not implemented.
