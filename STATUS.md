@@ -11,7 +11,9 @@ Documentation only; no runtime, schema, hosted text or deployment change.
 - `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
   privacy pass, privacy, disclosure and marketing-language conflicts are logged there
   and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
-  219 and 187 and a marketing review. That pass is not yet ticketed.
+  219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
+  and the "saved base" wording that Ticket 215 renamed to Home. Entries use the
+  status "logged". That pass is not yet ticketed.
 - `docs/LEGAL.md`: L-003 resolved by the "I'm here" marker design (option B); L-008
   records the free Open-Meteo plan for development and testing and stays open until
   API Standard is subscribed; L-011 moved to P-003; L-001's written question to

@@ -27,7 +27,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-007` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-010` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -40,7 +40,7 @@ status.
 
 Status values:
 
-- **open**: logged. The current text has not been updated.
+- **logged**: recorded here. The current text has not been updated.
 - **drafted**: replacement text exists for owner review and is not published.
 - **resolved**: the updated text is live, or the change no longer happens. The entry
   says which.
@@ -49,12 +49,15 @@ Status values:
 
 | ID | Change | Status | Tickets | Surfaces |
 | --- | --- | --- | --- | --- |
-| [P-001](#p-001-im-here-place-positions-and-completion-place-labels) | "I'm here" place positions and completion place labels | open | 216, 219, 244 | Privacy, user guide, MCP docs |
-| [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | open | 217, 219 | Privacy, user guide |
-| [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | open | 218, 219 | Privacy, user guide, interface |
-| [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | open | 219, 216, 217, 218 | Privacy, Settings, user guide |
-| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | open | 187 | Trust page, test |
-| [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | open | 219, 165, 187 | Marketing |
+| [P-001](#p-001-im-here-place-positions-and-completion-place-labels) | "I'm here" place positions and completion place labels | logged | 216, 219, 244 | Privacy, user guide, MCP docs |
+| [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, user guide |
+| [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, user guide, interface |
+| [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Settings, user guide |
+| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | logged | 187 | Trust page, test |
+| [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | logged | 219, 165, 187 | Marketing |
+| [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
+| [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
+| [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -97,7 +100,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   options and the delete control. State sync and backup handling, and Full JSON once
   Ticket 244 ships. State whether MCP exposes markers or labels. Add label counts to
   the model-data disclosure (P-004).
-- **Status:** open.
+- **Status:** logged.
 
 ## P-002: Leave-time feedback taps and learned travel habits
 
@@ -121,7 +124,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Update needed:** describe the habits and taps, what a tap contains, how the user
   edits or deletes them, their retention, sync and export handling, and the model
   facts derived from them (P-004).
-- **Status:** open.
+- **Status:** logged.
 
 ## P-003: Open-Meteo recipient, log retention and attribution
 
@@ -152,7 +155,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   Place Open-Meteo attribution next to weather-derived lines in the travel margin line
   and the Daily Brief. The L-011 reading rated the risk medium until the disclosure
   ships.
-- **Status:** open.
+- **Status:** logged.
 
 ## P-004: Daily Brief model-data disclosure and re-consent
 
@@ -180,7 +183,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   what is never sent: addresses, coordinates, place IDs, route durations and raw
   provider responses. Add the re-consent step for existing users. Keep the statement
   that exact leave-by times stay in the calculated line.
-- **Status:** open.
+- **Status:** logged.
 
 ## P-005: Public statement that Cadence sends no behavior data to an AI provider
 
@@ -196,7 +199,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   sentence is limited to exported data, but a reader can take it as a general promise.
 - **Update needed:** rewrite the sentence so that it agrees with the Daily Brief and MCP
   disclosures, and update the test.
-- **Status:** open.
+- **Status:** logged.
 
 ## P-006: Marketing review of AI and travel claims
 
@@ -217,4 +220,55 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     Check against P-001.
 - **Update needed:** align the claims with the updated Privacy page. Add travel copy
   only with deployed evidence, as Ticket 165 requires.
-- **Status:** open.
+- **Status:** logged.
+
+## P-007: First-run setup invites a Home address
+
+- **Change:** Ticket 212 adds an optional "Home and travel" item to first-run setup. It
+  links to Settings, Travel and invites the user to save a Home address and usual
+  travel. Stored data, its use and its recipients are unchanged: saving Home sends
+  nothing to Google, requests no device location and enables no routing.
+- **Affected:** Ticket 212 (draft PR #130). Files: `lib/services/onboarding-model.ts`,
+  `components/settings/LegalContent.tsx` (Privacy, "Travel routing"),
+  `docs/user-guide/navigation-and-setup.md`.
+- **Conflicting current text:** Privacy, "Travel routing": "It uses the selected
+  transport mode, an optional saved base for the final return, and the device's
+  current location". The text treats the base only as a routing input and does not
+  say that setup asks for it.
+- **Update needed:** say that first-run setup offers to save Home and usual travel,
+  that saving them sends nothing to Google, and that routing still needs the Travel
+  estimates toggle and its disclosure.
+- **Status:** logged.
+
+## P-008: Setup purpose line does not name Google Maps
+
+- **Change:** the Ticket 212 setup item says: "Cadence uses these to estimate travel
+  time to and from located Behaviors and Calendar events." It does not name Google
+  Maps. The Google disclosure stays beside the Travel estimates toggle, and saving Home
+  sends nothing to Google.
+- **Affected:** Ticket 212 (draft PR #130). Files: `lib/services/onboarding-model.ts`
+  (`FIRST_RUN_TRAVEL_DESCRIPTION`), `components/settings/LegalContent.tsx` (Privacy,
+  "Travel routing"). Related: `docs/LEGAL.md` L-012 (Google Maps notices).
+- **Conflicting current text:** none contradicts it. The gap is the omission: the
+  purpose line describes travel estimates without naming the provider that computes
+  them.
+- **Update needed:** in the privacy pass, decide whether the setup line names Google
+  Maps or relies on the disclosure beside the toggle, and record the reason.
+- **Status:** logged.
+
+## P-009: Privacy text says "saved base" where the interface says "Home"
+
+- **Change:** Ticket 215 (PR #112) renames the saved base to Home in Travel Settings
+  ("Home (optional)") and replaces Behavior Location with Where. Ticket 212's setup
+  item also says Home. The privacy text and some user-guide pages keep the old words.
+- **Affected:** Tickets 215 and 212. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Travel routing"), `docs/user-guide/data-portability.md`,
+  `docs/user-guide/desktop-local.md`.
+- **Conflicting current text:**
+  - Privacy, "Travel routing": "an optional saved base for the final return" and
+    "user-authored locations, such as Behavior locations and the saved base".
+  - `docs/user-guide/data-portability.md`: "Travel settings and the saved base remain
+    in native database backups".
+  - `docs/user-guide/desktop-local.md`: "Import preserves the saved base".
+- **Update needed:** use Home, Where and usual travel, the words the interface shows.
+- **Status:** logged.
