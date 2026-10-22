@@ -353,7 +353,7 @@ export function resolvePlaceLabelState(input: Readonly<{
   const homePlaceKey = input.homeText?.trim() ? travelPlaceKey(input.homeText) : null;
   if (!input.settings.enabled) {
     return { settings: input.settings, homePlaceKey, homeMarker: null, placeMarkers: [], labelCount: 0,
-      behaviors: input.behaviors.map((behavior) => ({ behaviorId: behavior.id, suggestion: null, markerPrompt: null })) };
+      behaviors: input.behaviors.map((behavior) => ({ behaviorId: behavior.id, suggestion: null, suggestedPlaceText: null, markerPrompt: null })) };
   }
   const home = input.markers.find((marker) => marker.ref === "home") ?? null;
   const current = currentPlaceMarkers(input.markers, homePlaceKey);
@@ -361,6 +361,11 @@ export function resolvePlaceLabelState(input: Readonly<{
   const labelsByBehavior = new Map<string, CompletionPlaceLabel[]>();
   for (const label of input.labels) labelsByBehavior.set(label.behaviorId, [...(labelsByBehavior.get(label.behaviorId) ?? []), label]);
   const dismissals = new Map(input.dismissals.map((dismissal) => [dismissal.behaviorId, dismissal]));
+  const placeTexts = new Map<PlaceRef, string>();
+  for (const behavior of input.behaviors) {
+    const ref = behavior.whereKind === "place" ? placeRefForWhere(behavior) : null;
+    if (ref && !placeTexts.has(ref)) placeTexts.set(ref, behavior.locationText!.trim());
+  }
   const prompted = new Set<PlaceRef>();
   const promptsOn = input.settings.markerPromptDismissedAt === null;
   return {
@@ -375,7 +380,7 @@ export function resolvePlaceLabelState(input: Readonly<{
       const needsMarker = behavior.active && placeRef !== null && !markedPlaces.has(placeRef) && (placeRef !== "home" || homePlaceKey !== null);
       const markerPrompt = promptsOn && needsMarker && placeRef && !prompted.has(placeRef) ? placeRef : null;
       if (markerPrompt) prompted.add(markerPrompt);
-      const suggestion = behavior.active ? resolveWhereSuggestion({
+      const resolved = behavior.active ? resolveWhereSuggestion({
         where: { whereKind: behavior.whereKind, placeRef },
         labels: labelsByBehavior.get(behavior.id) ?? [],
         dismissal: dismissals.get(behavior.id) ?? null,
@@ -383,7 +388,10 @@ export function resolvePlaceLabelState(input: Readonly<{
         today: input.today,
         rules,
       }) : null;
-      return { behaviorId: behavior.id, suggestion, markerPrompt };
+      // A saved place can be suggested only while some Behavior still names it.
+      const suggestedPlaceText = resolved?.kind === "saved_place" ? placeTexts.get(resolved.key as PlaceRef) ?? null : null;
+      const suggestion = resolved?.kind === "saved_place" && !suggestedPlaceText ? null : resolved;
+      return { behaviorId: behavior.id, suggestion, suggestedPlaceText, markerPrompt };
     }),
   };
 }

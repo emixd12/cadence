@@ -6,6 +6,7 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom";
 
 import { BehaviorForm } from "@/components/behaviors/BehaviorForm";
+import { BehaviorPlaceAssist, type WhereDraft } from "@/components/travel/PlaceLabels";
 import { BehaviorReviewTimeReset } from "@/components/behaviors/BehaviorReviewTimeReset";
 import {
   BEHAVIOR_CREATED_EVENT,
@@ -461,6 +462,14 @@ function BehaviorRecord({
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [whereDraft, setWhereDraft] = useState<WhereDraft | null>(null);
+  const settingsRef = useRef<HTMLDetailsElement>(null);
+  const reviewWhere = useCallback((draft: WhereDraft) => {
+    // A suggestion only fills the form; the Behavior changes when the user saves.
+    setWhereDraft(draft);
+    setHasOpenedEdit(true);
+    if (settingsRef.current) settingsRef.current.open = true;
+  }, []);
   const selectedBehaviorDay =
     analytics?.selectedBehaviorDay?.behaviorId === behavior.id
       ? analytics.selectedBehaviorDay
@@ -481,6 +490,11 @@ function BehaviorRecord({
 
           {behavior.active ? (
             <BehaviorOutcomeStats behaviorAnalytics={behaviorAnalytics ?? null} />
+          ) : null}
+
+          {behavior.active ? (
+            <BehaviorPlaceAssist behaviorId={behavior.id}
+              placeText={behavior.whereKind === "place" ? behavior.locationText ?? null : null} onReview={reviewWhere} />
           ) : null}
 
           {!behavior.active ? (
@@ -509,6 +523,7 @@ function BehaviorRecord({
       </div>
 
       <details
+        ref={settingsRef}
         className="group"
         onToggle={(event) => {
           setIsSettingsOpen(event.currentTarget.open);
@@ -541,12 +556,14 @@ function BehaviorRecord({
                 <div className="relative grid gap-4">
                   <BehaviorForm
                     reminderRuntime={reminderRuntime}
-                    key={`${behavior.id}-${behavior.updatedAt}`}
+                    key={`${behavior.id}-${behavior.updatedAt}-${whereDraft ? `${whereDraft.whereKind}:${whereDraft.locationText}` : ""}`}
                     mode="edit"
                     action={updateAction}
                     categories={categories}
                     behavior={behavior}
                     showActiveToggle={false}
+                    whereDraft={whereDraft}
+                    onSuccess={() => setWhereDraft(null)}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   <div className="grid justify-items-end">

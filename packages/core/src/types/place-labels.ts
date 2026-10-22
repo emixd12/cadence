@@ -88,6 +88,8 @@ export type PlaceLabelState = Readonly<{
   behaviors: readonly Readonly<{
     behaviorId: string;
     suggestion: WhereSuggestion | null;
+    /** Typed text of a suggested saved place, from a Behavior that uses it. */
+    suggestedPlaceText: string | null;
     /** The place whose missing marker this Behavior should prompt for, if any. */
     markerPrompt: PlaceRef | null;
   }>[];
@@ -97,4 +99,66 @@ export type PlaceLabelState = Readonly<{
 export type CompletionCapturePlan = Readonly<{
   ruleVersion: string;
   markers: readonly (PlaceMarkerPosition & Readonly<{ ref: PlaceRef }>)[];
+}>;
+
+/** Stored rows, shared by hosted Postgres and desktop SQLite (owner column omitted). */
+export type PlaceLabelSettingsRecord = Readonly<{
+  enabled: boolean;
+  retention: string;
+  enabled_at: string | null;
+  marker_prompt_dismissed_at: string | null;
+  updated_at: string;
+}>;
+export type PlaceMarkerRecord = Readonly<{
+  id: string;
+  place_key: string;
+  latitude_e6: number;
+  longitude_e6: number;
+  accuracy_meters: number;
+  rule_version: string;
+  recorded_at: string;
+}>;
+export type CompletionPlaceLabelRecord = Readonly<{
+  id: string;
+  behavior_id: string;
+  local_date: string;
+  label: string;
+  rule_version: string;
+  recorded_at: string;
+}>;
+export type WhereSuggestionDismissalRecord = Readonly<{
+  id: string;
+  suggestion: string;
+  rule_version: string;
+  dismissed_at: string;
+}>;
+export type PlaceLabelBehaviorRecord = Readonly<{
+  id: string;
+  active: boolean;
+  where_kind: string | null;
+  location_text: string | null;
+}>;
+
+/** Requests every platform accepts. Positions travel only in marker requests. */
+export type PlaceLabelSettingsInput = Readonly<{
+  enabled: boolean;
+  retention: PlaceLabelRetention;
+  markerPromptDismissed: boolean;
+  expectedUpdatedAt: string | null;
+}>;
+export type PlaceMarkerInput = Readonly<{
+  place: Readonly<{ kind: "home" }> | Readonly<{ kind: "saved_place"; text: string }>;
+  position: PlaceMarkerPosition;
+  /** Measured on the device that read the position. */
+  sampleAgeSeconds: number;
+}>;
+export type CompletionLabelInput = Readonly<{
+  occurrenceId: string;
+  label: PlaceLabelValue;
+  ruleVersion: string;
+}>;
+export type WhereSuggestionDismissInput = Readonly<{
+  behaviorId: string;
+  suggestion: WhereSuggestionKey;
+  ruleVersion: string;
 }>;

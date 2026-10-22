@@ -197,6 +197,10 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "imported_intervention", snapshot.importedInterventions);
   add(entities, "reminder_delivery", snapshot.reminderDeliveries ?? []);
   add(entities, "note_shortcut_state", snapshot.noteShortcutStates ?? []);
+  add(entities, "place_label_settings", snapshot.placeLabelSettings ?? []);
+  add(entities, "place_marker", snapshot.placeMarkers ?? []);
+  add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
+  add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
   return entities;
 }
 

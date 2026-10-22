@@ -7,6 +7,7 @@ mod import;
 mod import_write;
 mod note_shortcut;
 mod occurrence;
+mod place_labels;
 mod recovery;
 mod reminder;
 #[cfg(test)]
@@ -289,6 +290,9 @@ pub enum Request {
     ReadNoteShortcutStates {
         profile_id: String,
     },
+    ReadPlaceLabels {
+        profile_id: String,
+    },
     ReadNoteShortcutContext {
         profile_id: String,
         behavior_id: Option<String>,
@@ -429,6 +433,12 @@ pub enum Request {
         expected: note_shortcut::NoteShortcutContext,
         next: NoteShortcutState,
         require_enabled: bool,
+    },
+    CommitPlaceLabels {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        mutation: place_labels::PlaceLabelMutation,
     },
     StartTimeSession {
         profile_id: String,
@@ -709,6 +719,10 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             db::owner(&tx, profile_id)?;
             json!(note_shortcut::read_states(&tx, profile_id)?)
         }
+        Request::ReadPlaceLabels { profile_id } => {
+            db::owner(&tx, profile_id)?;
+            place_labels::read(&tx, profile_id)?
+        }
         Request::ReadNoteShortcutContext {
             profile_id,
             behavior_id,
@@ -823,6 +837,12 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             require_enabled,
             ..
         } => note_shortcut::commit(db, profile_id, now, expected, next, *require_enabled),
+        Request::CommitPlaceLabels {
+            profile_id,
+            now,
+            mutation,
+            ..
+        } => place_labels::commit(db, profile_id, now, mutation),
         Request::StartTimeSession {
             profile_id,
             session,
@@ -937,6 +957,12 @@ impl Request {
                 ..
             }
             | Self::CommitNoteShortcutState {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CommitPlaceLabels {
                 profile_id,
                 mutation_id,
                 now,

@@ -21,6 +21,7 @@ import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShort
 import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
+import { CompletionPlacesPanel } from "@/components/travel/PlaceLabels";
 import { getNoteShortcutViewForCurrentUser } from "@/lib/services/note-shortcut.service";
 import { manageNoteShortcutAction } from "@/app/(app)/note-shortcuts/actions";
 import { getCategorySettings } from "@/lib/services/category.service";
@@ -72,6 +73,8 @@ async function SettingsContent() {
       <WebConnectorLibrary timezone={settings.timezone} />
 
       <TravelSettingsPanel />
+
+      <CompletionPlacesPanel />
 
       <DailyBriefSettingsPanel />
 

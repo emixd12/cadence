@@ -299,8 +299,12 @@ describe("resolvePlaceLabelState", () => {
   it("names suggestions with their rule version", () => {
     const markers = [{ ref: GYM_REF, placeKey: GYM_REF.slice(12), recordedAt: "2026-10-01T00:00:00Z" }];
     const labels = Array.from({ length: 6 }, (_, index) => ({ occurrenceId: `o${index}`, behaviorId: "b1", localDate: "2026-10-20", label: GYM_REF, ruleVersion: "place-label-rules@1", recordedAt: "2026-10-20T12:00:00Z" }));
-    const state = resolvePlaceLabelState({ settings, homeText: null, markers, labels, dismissals: [], behaviors: [{ id: "b1", active: true, whereKind: null, locationText: null }], today });
+    const behaviorsWithGym = [{ id: "b1", active: true, whereKind: null, locationText: null }, { id: "b2", active: true, whereKind: "place" as const, locationText: " 1 Gym Street" }];
+    const state = resolvePlaceLabelState({ settings, homeText: null, markers, labels, dismissals: [], behaviors: behaviorsWithGym, today });
     expect(state.behaviors[0]!.suggestion).toMatchObject({ kind: "saved_place", ruleVersion: "where-suggestion-rules@1" });
+    expect(state.behaviors[0]!.suggestedPlaceText).toBe("1 Gym Street");
+    // Without a Behavior that names the place, Cadence cannot suggest it.
+    expect(resolvePlaceLabelState({ settings, homeText: null, markers, labels, dismissals: [], behaviors: [behaviorsWithGym[0]!], today }).behaviors[0]!.suggestion).toBeNull();
     expect(state.placeMarkers).toEqual([{ placeKey: GYM_REF.slice(12), recordedAt: "2026-10-01T00:00:00Z" }]);
   });
 });
