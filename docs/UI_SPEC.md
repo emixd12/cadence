@@ -266,6 +266,13 @@ settings stores Home and usual travel. A device-location state line and the
 storage note follow. No separate consent checkbox, "saved base" wording, map-app
 selector or permission-check button.
 
+Ticket 165 adds device-location guidance below the state line. It appears only while
+travel is on and device location is not allowed, not yet allowed or timed out, and
+not during the toggle's own first request. Desktop names System Settings › Privacy &
+Security › Location Services and offers Open Location Services; browsers name the
+site setting (Safari Websites on iPhone and iPad). Both offer Check again, disabled
+while a request runs, and state that saved places and Calendar trips keep working.
+
 The Behavior form shows Where after Description: a select with Not set (default),
 Anywhere, Home and A place. A place adds a required Place text field beside it.
 One hint follows: "Travel estimates and scheduling advice work better when Where
@@ -274,8 +281,9 @@ is set." The pair stacks on narrow screens.
 Implementation references: `components/timeline/DayProgressTimeline.tsx`,
 `components/timeline/ExternalEventDetails.tsx`, `components/behaviors/BehaviorForm.tsx`
 and `components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
-`INT-TRAVEL-001` through `INT-TRAVEL-005`; the existing bench includes complete-trip
-and no-base fixtures, the panel before usual travel is chosen and a Home Behavior.
+`INT-TRAVEL-001` through `INT-TRAVEL-007`; the existing bench includes complete-trip
+and no-base fixtures, the panel before usual travel is chosen, the desktop location
+guidance and a Home Behavior.
 Installed acceptance remains in `qa/travel-release.md`.
 
 The current day should be prominent and should begin the forward timeline.

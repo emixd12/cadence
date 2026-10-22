@@ -910,6 +910,10 @@ Travel Settings supersedes steps 1–2 above with three inputs:
    records routing consent and asks for foreground device location. Denied or
    unavailable location leaves Home or the previous stop as the origin. Turning
    the toggle off withdraws consent and clears temporary estimates.
+   While travel is on and location is not allowed, not yet allowed or timed out,
+   Settings explains how to allow it (Ticket 165). On the Mac, macOS may not ask:
+   the user opens Location Services from Settings, turns on Cadence and chooses
+   Check again. Saved places and Calendar trips keep working meanwhile.
 3. In the Behavior form the user chooses Where: Not set (default), Anywhere, Home
    or A place. A place needs typed text. Not set and Anywhere request no route.
    Home routes home when the user is elsewhere and needs a saved Home. A place

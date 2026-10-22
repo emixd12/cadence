@@ -121,12 +121,12 @@ it("keeps journey corrections transient and builds a source-location search link
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 
-async function renderPanel(options: { readLocation: (requestPermission: boolean) => Promise<{ state: "available"; latitude: number; longitude: number; accuracyMeters: number; sampledAt: number } | { state: "prompt" | "denied" | "unavailable"; reason?: string }>; desktop?: boolean; save?: () => Promise<TravelSettings>; settings?: TravelSettings }) {
+async function renderPanel(options: { readLocation: (requestPermission: boolean) => Promise<{ state: "available"; latitude: number; longitude: number; accuracyMeters: number; sampledAt: number } | { state: "prompt" | "denied" | "unavailable"; reason?: string }>; desktop?: boolean; save?: () => Promise<TravelSettings>; settings?: TravelSettings; openLocationSettings?: () => Promise<void> }) {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const settings: TravelSettings = options.settings ?? { enabled: false, baseLocationText: null, mode: "walking", navigationPreference: "google_maps", routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container);
-  await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save: options.save ?? (async () => settings) }} readLocation={options.readLocation} desktop={options.desktop} />));
+  await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save: options.save ?? (async () => settings) }} readLocation={options.readLocation} openLocationSettings={options.openLocationSettings} desktop={options.desktop} />));
   return { container, unmount: async () => { await act(() => root.unmount()); container.remove(); } };
 }
 function mockPermissions(state: PermissionState | null, userAgent = "Mozilla/5.0 (Macintosh) Chrome/140") {
@@ -205,4 +205,108 @@ it("shows a diagnostic reason only when the location request returns one", async
     expect(without.container.textContent).toContain("Location denied.");
     expect(without.container.textContent).not.toContain("Diagnostic:");
   } finally { await without.unmount(); }
+});
+
+const travelOn: TravelSettings = { enabled: true, baseLocationText: null, mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+const desktopSteps = "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again.";
+const fallback = "Saved places and Calendar trips keep working without device location.";
+const buttonNamed = (container: HTMLElement, label: string) => [...container.querySelectorAll("button")].find((button) => button.textContent === label);
+
+it("explains the manual macOS path when travel is on and location is not yet allowed (Ticket 165)", async () => {
+  mockPermissions(null);
+  const readLocation = vi.fn(async (requestPermission: boolean) => requestPermission ? { state: "unavailable" as const, reason: "timeout" } : { state: "prompt" as const });
+  const openLocationSettings = vi.fn(async () => {});
+  const { container, unmount } = await renderPanel({ readLocation, desktop: true, settings: travelOn, openLocationSettings });
+  try {
+    expect(container.textContent).toContain("Device location: not yet allowed.");
+    expect(container.textContent).toContain(desktopSteps);
+    expect(container.textContent).toContain(fallback);
+    expect(container.textContent).not.toContain("Allow it in System Settings");
+    await act(async () => buttonNamed(container, "Open Location Services")!.click());
+    expect(openLocationSettings).toHaveBeenCalledTimes(1);
+    expect(readLocation).not.toHaveBeenCalledWith(true);
+    await act(async () => buttonNamed(container, "Check again")!.click());
+    expect(readLocation).toHaveBeenCalledWith(true);
+    expect(container.textContent).toContain("Diagnostic: timeout.");
+    expect(container.textContent).toContain(desktopSteps);
+  } finally { await unmount(); }
+});
+
+it("keeps the guidance in place and disables Check again while a retry runs", async () => {
+  mockPermissions(null);
+  let finish!: () => void;
+  const readLocation = vi.fn((requestPermission: boolean) => requestPermission
+    ? new Promise<{ state: "available"; latitude: number; longitude: number; accuracyMeters: number; sampledAt: number }>((resolve) => {
+      finish = () => resolve({ state: "available", latitude: 1, longitude: 1, accuracyMeters: 10, sampledAt: Date.now() });
+    })
+    : Promise.resolve({ state: "denied" as const }));
+  const { container, unmount } = await renderPanel({ readLocation, desktop: true, settings: travelOn, openLocationSettings: async () => {} });
+  try {
+    act(() => buttonNamed(container, "Check again")!.click());
+    expect(container.textContent).toContain("Checking device location…");
+    expect(buttonNamed(container, "Check again")!.disabled).toBe(true);
+    await act(async () => { finish(); });
+    expect(container.textContent).toContain("A current position is available. Cadence did not save it.");
+    expect(container.textContent).not.toContain(desktopSteps);
+  } finally { await unmount(); }
+});
+
+it("waits for the toggle's own request before showing the guidance, then shows it after a timeout", async () => {
+  mockPermissions(null);
+  let finish!: () => void;
+  const readLocation = vi.fn((requestPermission: boolean) => requestPermission
+    ? new Promise<{ state: "unavailable"; reason: string }>((resolve) => { finish = () => resolve({ state: "unavailable", reason: "timeout" }); })
+    : Promise.resolve({ state: "unavailable" as const }));
+  const save = vi.fn(async () => travelOn);
+  const { container, unmount } = await renderPanel({ readLocation, desktop: true, save, openLocationSettings: async () => {} });
+  try {
+    expect(container.textContent).not.toContain(desktopSteps);
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    expect(container.textContent).toContain("Checking device location…");
+    expect(container.textContent).not.toContain(desktopSteps);
+    await act(async () => { finish(); });
+    expect(container.textContent).toContain(desktopSteps);
+    expect(container.textContent).toContain(fallback);
+  } finally { await unmount(); }
+});
+
+it("shows no guidance while travel is off or location is allowed", async () => {
+  mockPermissions(null);
+  const off = await renderPanel({ readLocation: vi.fn(async () => ({ state: "denied" as const })), desktop: true, openLocationSettings: async () => {} });
+  try {
+    expect(off.container.textContent).toContain("Device location: blocked. Allow it in System Settings › Privacy & Security › Location Services › Cadence.");
+    expect(buttonNamed(off.container, "Check again")).toBeUndefined();
+  } finally { await off.unmount(); }
+  const allowed = await renderPanel({ readLocation: vi.fn(async () => ({ state: "available" as const, latitude: 1, longitude: 1, accuracyMeters: 10, sampledAt: Date.now() })), desktop: true, settings: travelOn });
+  try {
+    expect(allowed.container.textContent).toContain("Device location: allowed.");
+    expect(buttonNamed(allowed.container, "Check again")).toBeUndefined();
+  } finally { await allowed.unmount(); }
+});
+
+it("reports when System Settings cannot open", async () => {
+  mockPermissions(null);
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "denied" as const })), desktop: true, settings: travelOn,
+    openLocationSettings: vi.fn(async () => { throw new Error("closed"); }) });
+  try {
+    await act(async () => buttonNamed(container, "Open Location Services")!.click());
+    expect(container.textContent).toContain("System Settings could not open. Open it from the Apple menu.");
+  } finally { await unmount(); }
+});
+
+it.each([
+  ["denied", "Mozilla/5.0 (Macintosh) Chrome/140", "Allow location for this site in your browser’s site settings, then choose Check again."],
+  ["prompt", "Mozilla/5.0 (Macintosh) Chrome/140", "Choose Check again and allow location when your browser asks."],
+  ["denied", "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1", "Allow location in Settings › Privacy & Security › Location Services › Safari Websites, then choose Check again."],
+  ["prompt", "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1", "Choose Check again and allow location. To stop Safari asking, tap AA, then Website Settings, then Location, then Allow."],
+] as const)("gives browser guidance for %s (%s)", async (state, userAgent, copy) => {
+  mockPermissions(state, userAgent);
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), settings: travelOn });
+  try {
+    expect(container.textContent).toContain(`Device location: ${state === "denied" ? "blocked" : "not yet allowed"}.`);
+    expect(container.textContent).toContain(copy);
+    expect(container.textContent).toContain(fallback);
+    expect(buttonNamed(container, "Open Location Services")).toBeUndefined();
+    expect(buttonNamed(container, "Check again")).toBeDefined();
+  } finally { await unmount(); }
 });

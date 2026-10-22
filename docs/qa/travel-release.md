@@ -1,6 +1,8 @@
 # Travel routing release evidence
 
-Updated September 22, 2026. Ticket 165 remains open. The owner authorized USA
+Created September 22, 2026; updated October 22, 2026. Ticket 165 remains open.
+Its current gates are listed in "Ticket 165 remaining gates" under the October 22
+section at the end. The owner authorized USA
 billing, the existing Cadence Google Cloud project, an initial US$20 routing
 allowance, credential setup and live testing. This record separates that setup
 from deployed-web and installed-desktop travel acceptance.
@@ -66,6 +68,9 @@ and denied unauthorized resets. No hosted migration has run in this phase.
 | Terms and region | [Maps service terms](https://cloud.google.com/maps-platform/terms/maps-service-terms) apply outside the EEA. [Geocoding policies](https://developers.google.com/maps/documentation/geocoding/policies) state that EEA billing has separate terms. | The owner confirmed USA billing on September 22. The non-EEA deterministic-display boundary is recorded above; model projection remains disabled. |
 
 ## Open operator gates
+
+Historical list from September 22. Later sections record each outcome. The current
+list is "Ticket 165 remaining gates" in the October 22 section at the end.
 
 - Complete private-account Calendar-location and current-device acceptance under
   the separate routing consent. Model projection remains disabled.
@@ -381,6 +386,8 @@ Services entry belongs to an earlier build. The travel code path is exercised
 through the saved base and located commitments; the device-origin path on macOS is
 blocked by the deferred Apple-trusted signing gate (Ticket 115), not by the adapter.
 Web device location on iPhone Safari returned a current position on September 22.
+Superseded: the signing attribution was refuted on September 23 and 27; see the
+October 22 investigation.
 
 Two follow-ups recorded for Ticket 166/167 owners: the browser pane inside the
 desktop host reports `document.hidden` while the user views another pane, so the
@@ -408,7 +415,11 @@ Time restrictions and a reboot on this Mac, a second Mac, and a Developer ID sig
 build once Ticket 115 provides one. The adapter's `reason` codes
 made this attribution possible.
 
-## Native location gate resolved to Apple-trusted signing — September 23, 2026
+## Native location gate attributed to Apple-trusted signing — September 23, 2026 (superseded)
+
+Superseded October 22, 2026: Developer ID builds rc.2 and rc.3 showed the same
+missing prompt on September 27 and 29. Signing was not the gate. The October 22
+investigation below records the missing Hardened Runtime location entitlement.
 
 After a full reboot, the owner clicked the installed check with the Cadence window
 active: `Device location: not yet allowed`, `Diagnostic: timeout`, no prompt. In the
@@ -931,3 +942,200 @@ remain unmeasured; the exhausted old pilot could not supply a successful
 baseline. Current-device native location and Apple-trusted distribution remain
 separate Tickets 115/165 gates. The main promotion follows PR #107 and the
 existing matching-marketing-deployment procedure.
+
+## Ticket 165 permission path, prompt investigation and directions plan — October 22, 2026
+
+Owner decisions on October 22: accept the manual macOS permission path and make it
+clear in the app; investigate why signed Cadence for Mac shows no first prompt; test
+the directions handoff after Ticket 215 deploys. Privacy-policy conflicts are
+logged, not blocking. This work changed source only. It ran no hosted migration,
+deployment, signing, publication or Google Maps call, and it read no device position.
+
+### Signing no longer gates device location
+
+Signed Cadence for Mac 0.1.3 was published October 22, 2026 (Tickets 115, 178 and
+181). Developer ID signing and notarization are available. Device location does not
+wait for them. The Developer ID candidates rc.2 (September 27) and rc.3 (September
+29) already showed the missing prompt, so earlier notes that blame signing are
+superseded.
+
+### Manual permission path in Travel Settings
+
+While travel is on and device location is not allowed, not yet allowed or timed
+out, the Travel Settings panel shows guidance below the device-location line:
+
+- Mac app: "To use your current position, turn on Cadence in System Settings ›
+  Privacy & Security › Location Services, then choose Check again." **Open
+  Location Services** calls the new native command `open_location_settings`. The
+  command opens one fixed URL,
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices`,
+  and accepts no input.
+- Browsers: the existing site-setting guidance, or Safari Websites on iPhone and
+  iPad, followed by Check again.
+- Both: "Saved places and Calendar trips keep working without device location."
+  **Check again** asks for one foreground position and is disabled while a request
+  runs. It does not save or send the position.
+
+The guidance stays hidden during the toggle's own first request, so it never
+competes with an OS prompt. The interactions are `INT-TRAVEL-006` and
+`INT-TRAVEL-007`. DOM tests cover desktop not yet allowed, blocked and timeout,
+retry, opener failure, travel off and four browser cases. The bench shows the desktop
+state; a 375px check found no horizontal overflow.
+
+Not verified: the installed app opening the pane. On this Mac (macOS 27.0.1,
+26A434) the Privacy & Security settings extension declares the legacy identifier
+`com.apple.preference.security` and a `Privacy_LocationServices` anchor. The pane
+was not opened because the owner's System Settings window was in use.
+
+### Missing first prompt: investigation
+
+Finding: signed Cadence builds enable Hardened Runtime but did not sign the
+Hardened Runtime location entitlement. This is a well-evidenced defect. It is not
+yet demonstrated to be the only cause.
+
+Evidence, read-only on the first Mac:
+
+- Installed Developer ID Cadence 0.1.2 reports `flags=0x10000(runtime)` and Team
+  `HK26VT477G`. Its signed entitlements are only the App ID, team and Keychain
+  group. 0.1.3 was built from the same `Entitlements.plist`; its installed
+  signature was not read here.
+- Apple's Hardened Runtime documentation lists
+  `com.apple.security.personal-information.location` under Resource Access. Its
+  entitlement page says to enable Hardened Runtime or App Sandbox and then select
+  Location.
+- Google Chrome on this Mac is Developer ID signed with Hardened Runtime, is
+  authorized for Location Services, and signs this entitlement.
+- Preview builds are ad hoc signed with Hardened Runtime and no entitlements, so the
+  September 22–23 preview results fit the same cause. The September 23 probe's
+  signing flags were not recorded; it neither supports nor refutes the finding.
+- On the second Mac (September 29) Cadence was listed with its switch off and no
+  prompt appeared. Turning it on by hand and retrying returned a position. That fits
+  an entitlement that blocks only the prompt; this reading is not verified.
+- Retained `locationd` logs on this Mac (about five days) contain no Cadence
+  authorization request, so they cannot discriminate.
+
+The native adapter (`apps/desktop/src-tauri/native/location.m`) shows no defect.
+It creates the `CLLocationManager` on the main queue and keeps it alive until
+completion or the 12-second deadline. It calls `requestWhenInUseAuthorization`
+only while Cadence is active and only when the status is not determined. macOS
+reports a grant as `kCLAuthorizationStatusAuthorizedAlways`; the SDK marks
+`kCLAuthorizationStatusAuthorizedWhenInUse` unavailable on macOS, so the handler is
+correct. `Info.plist` carries both `NSLocationUsageDescription` and
+`NSLocationWhenInUseUsageDescription`.
+
+Fix:
+
+- `apps/desktop/src-tauri/Entitlements.plist` adds
+  `com.apple.security.personal-information.location = true` for production builds.
+- `apps/desktop/scripts/verify-entitlements.py` accepts that key without profile
+  authorization and requires it to be `true`. Every other entitlement still needs
+  the profile. The shipped "Cadence Desktop Developer ID" profile grants only the
+  App ID, team and Keychain group, so without this change the next production
+  build would fail verification.
+- Tests: verifier cases for the profile-free location key, a false value and an
+  unlisted runtime exception, plus a check of the repository plists.
+
+Limits: Firefox's macOS geolocation code notes that macOS often does not prompt
+even when it reports that it will. The manual path stays in the app either way.
+Previews keep no entitlements; location on ad hoc previews stays unsupported.
+
+### Owner prompt test (signed build required)
+
+A real prompt test needs a Developer ID build that contains this change, on a
+macOS user where Cadence was never authorized. Do not reset TCC or change global
+location settings.
+
+1. Build and verify the next signed candidate (0.1.5 or later, as the Ticket 215
+   rollout requires) with `node apps/desktop/scripts/release.mjs build` and
+   `verify`. Publication is not needed for this test.
+2. Confirm the entitlement on the built app:
+   `codesign -d --entitlements - --xml <Cadence.app> | plutil -p -` must list
+   `com.apple.security.personal-information.location => true`.
+3. Prepare a never-authorized user: a new standard macOS user on either Mac, or a
+   Mac that has never run Cadence. `locationd` keys its clients by user and
+   bundle, so a new user should be a fresh client (inferred from log keys, not
+   verified). In that user, confirm Location Services is on and Cadence is not
+   listed.
+4. Install the candidate from its DMG and open it. Local mode is enough; no
+   account, Calendar or Google Maps call is needed.
+5. Open Settings, Travel. Choose Walking. Keep Cadence frontmost and turn on
+   Travel estimates. Within 12 seconds record whether macOS asks to allow Cadence
+   to use your location.
+6. If it asks: choose Allow. Record the status line ("A current position is
+   available. Cadence did not save it.") and "Device location: allowed."
+7. If it does not ask: record the status line, the diagnostic and whether Cadence
+   now appears in Location Services. Then choose Open Location Services, confirm
+   the pane opens at Location Services, turn on Cadence, return and choose Check
+   again. Record the result.
+8. Denial: turn Cadence off in Location Services, return and choose Check again.
+   Record "Device location: blocked" and the guidance.
+9. Optional, on the first Mac's main user: install the same candidate and repeat
+   step 5. Record whether a prompt now appears for the existing client entry.
+10. Record the candidate version, `codesign -dv` flags, macOS version, Mac model and
+    whether the user was new. Record no coordinates and no map screenshots. Remove
+    the test user afterwards if wanted.
+
+### Directions handoff test plan — run after Ticket 215 deploys
+
+Do not run this yet. It needs Ticket 215's hosted migration, web deployment and a
+desktop build with SQLite migration 0018, all owner-gated. Directions need a
+current route leg, so each case makes Google Maps calls. Run it under an
+owner-approved spend cap.
+
+Current source rules (`packages/core/src/services/travel-navigation.ts`,
+`lib/ui/navigation-platform.ts`):
+
+- Desktop always uses Apple Maps. Web uses Apple Maps when the platform or user
+  agent names Mac, iPhone, iPad or iPod, and Google Maps elsewhere.
+- Directions replace Search only when the event has a current route leg ending at
+  it and a usual travel mode is set. Otherwise the link says Search.
+- Apple Maps uses `daddr` with `dirflg` `w`, `r` or `d`. Cycling has no flag; the
+  details show "Choose cycling in Apple Maps; this link cannot preselect it."
+  Google Maps uses `/maps/dir/?api=1&destination=…&travelmode=…`, with `bicycling`
+  for cycling.
+- The link carries the user's source text only, never provider route content.
+- Only Calendar event details have a navigation link. A Behavior with Where = A
+  place gets travel timing in its expanded row and no navigation action.
+
+Fixtures, in the dedicated test Calendar and the owner test account:
+
+- E1: a timed event starting one to three hours ahead, inside the three-hour
+  routing window, at a public landmark reachable with the usual travel.
+- B1: a Behavior with Where = A place at a different public landmark, scheduled
+  inside the same window and before E1.
+- Travel on, Home set, usual travel Walking first. Device location allowed on each
+  device, or Home as the origin where it is not.
+
+Matrix. For each row, open Timeline, choose Refresh travel, open E1's details,
+record the link label, then open the link and record the destination and mode
+shown by the Maps app:
+
+| Surface | Expected app | Expected label |
+|---|---|---|
+| Installed Cadence for Mac | Apple Maps app | Directions in Apple Maps |
+| Safari on Mac | Apple Maps | Directions in Apple Maps |
+| Chrome on Mac | Apple Maps | Directions in Apple Maps |
+| Safari on iPhone or iPad | Apple Maps app | Directions in Apple Maps |
+| Chrome on Windows, Linux or Android | Google Maps | Directions in Google Maps |
+
+Mode checks: repeat one Apple row and the Google row with Transit and Driving
+(Pro routing within about an hour). Then run Cycling: Apple rows must show the
+cycling notice and open Apple Maps with no preselected mode; the Google row must
+open with bicycling. Negative checks:
+
+- Before any refresh, or after estimates expire, E1 says Search, not Directions.
+- With travel off, E1 says Search.
+- B1's expanded row shows its travel timing and no Search or Directions link.
+  Record this as current behavior; a Behavior navigation link would be new scope.
+
+Record each row's label, app, destination text and mode. Record no coordinates,
+route durations or provider responses.
+
+### Ticket 165 remaining gates
+
+- Owner prompt test above, on a signed build with the location entitlement.
+- Installed check that Open Location Services opens the pane.
+- Directions handoff matrix above, after Ticket 215 deploys.
+- Search handoff passed on September 28; manual grant, retry and foreground
+  acquisition passed on September 29. They need no rerun unless the native path
+  changes again.

@@ -297,6 +297,8 @@
         "INT-TRAVEL-002",
         "INT-TRAVEL-003",
         "INT-TRAVEL-004",
+        "INT-TRAVEL-006",
+        "INT-TRAVEL-007",
         "INT-CALENDAR-008",
         "INT-CALENDAR-009",
         "INT-CALENDAR-010",
@@ -844,10 +846,12 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-TRAVEL-001",
-        "INT-TRAVEL-002"
+        "INT-TRAVEL-002",
+        "INT-TRAVEL-006",
+        "INT-TRAVEL-007"
       ]
     },
     {
@@ -13678,6 +13682,165 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-006",
+      "name": "Check device location again",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#allow-device-location"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "After allowing location in the browser or System Settings, ask for one foreground device position again without changing travel settings.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Check again"
+        }
+      ],
+      "availability": "Settings, Travel while travel estimates are on and device location is not allowed, not yet allowed or timed out. Disabled while a request is running.",
+      "success_result": "Shows the new device location state. An available position is not saved or sent from this request; the guidance disappears.",
+      "failure_result": "Keeps the guidance and shows the location state with any diagnostic reason. Saved places and Calendar trips keep working.",
+      "effects": [
+        "ui_state",
+        "permission_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelSettingsPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx"
+        ],
+        "notes": "Provider-free DOM tests with simulated location results. Installed macOS permission acceptance remains open under Ticket 165."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelSettingsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; the browser decides whether to show its prompt."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelSettingsPanel.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/foreground-location.ts"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; installed signed-app permission acceptance remains open under Ticket 165."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-007",
+      "name": "Open macOS Location Services",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#allow-device-location"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Open System Settings at Privacy & Security, Location Services so the user can turn on Cadence by hand when macOS does not ask.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Open Location Services"
+        }
+      ],
+      "availability": "Installed macOS app, Settings, Travel while travel estimates are on and device location is not allowed, not yet allowed or timed out.",
+      "success_result": "System Settings opens at Location Services. Cadence changes no setting; the user returns and chooses Check again.",
+      "failure_result": "Shows that System Settings could not open and how to open it from the Apple menu.",
+      "effects": [
+        "native_navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelSettingsPanel.tsx",
+        "apps/desktop/src/foreground-location.ts",
+        "apps/desktop/src-tauri/src/location.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx"
+        ],
+        "notes": "DOM tests cover the control and its failure message with a simulated opener; a native unit test pins the fixed settings URL. Installed launch of the pane is not yet verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Browsers cannot open macOS System Settings; the web panel names the browser setting instead."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/foreground-location.ts",
+            "apps/desktop/src-tauri/src/location.rs"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "The native command opens one fixed System Settings URL and accepts no input. Installed acceptance remains open under Ticket 165."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "macOS System Settings is desktop-specific; native mobile is deferred."
         }
       }
     },

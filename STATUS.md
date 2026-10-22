@@ -1,5 +1,33 @@
 # Implementation Status
 
+## Ticket 165: macOS location permission path and directions plan — October 22, 2026
+
+Ticket 165 stays in progress. Source only, on the Ticket 215 base; not deployed or
+signed. Owner decisions (October 22): accept the manual macOS permission path,
+investigate the missing first prompt, and test directions after Ticket 215.
+
+- Travel Settings now explains how to allow device location while travel is on and
+  location is not allowed, not yet allowed or timed out. Desktop adds Open Location
+  Services (`INT-TRAVEL-007`, fixed-URL native command `open_location_settings`);
+  both platforms add Check again (`INT-TRAVEL-006`). The panel states that saved
+  places and Calendar trips keep working without device location.
+- Investigation: signed builds enable Hardened Runtime but lacked the Hardened
+  Runtime location entitlement `com.apple.security.personal-information.location`.
+  Apple lists it under Hardened Runtime resource access; Chrome, which works on the
+  same Mac, signs it. Production `Entitlements.plist` now includes it, and
+  `verify-entitlements.py` accepts it without provisioning-profile authorization.
+  The native Core Location adapter showed no defect. Whether the entitlement restores
+  the prompt is not yet verified.
+- Device location no longer waits for Developer ID signing: 0.1.3 is published, and
+  signed rc.2 and rc.3 already failed to prompt.
+- Open: owner prompt test on a signed 0.1.5+ build, installed check of Open Location
+  Services, and the directions handoff matrix after Ticket 215 deploys. Steps and
+  plan: `docs/qa/travel-release.md`, October 22.
+
+Platform impact: web shares the panel guidance and Check again; desktop adds the
+settings command and the signing entitlement; marketing is not applicable (no public
+travel copy changed); future mobile inherits the shared guidance pattern.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21
