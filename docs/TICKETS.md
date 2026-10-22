@@ -8463,7 +8463,12 @@ Only synthetic local data was used. No deployment or hosted data operation ran.
 
 ## Ticket 115: Apple-trusted macOS distribution acceptance
 
-Current state (2026-09-27): in progress. The owner authorized every execution step.
+Current state (2026-10-22): complete. Cadence for Mac 0.1.3 is published on the public
+`desktop-stable` release and verified; see Ticket 181 and
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`. macOS 14 runtime testing stays
+owner-deferred. History follows.
+
+Earlier state (2026-09-27): in progress. The owner authorized every execution step.
 The owner's account page confirms Apple Developer Program membership. The Developer
 ID identity and matching profile are installed; Apple accepted the notarization
 credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
@@ -12692,7 +12697,11 @@ second acceptance inventory. Filing these tickets performs no release or live te
 
 ## Ticket 178: Signed account and Calendar lifecycle acceptance
 
-Status: in progress September 28. The dedicated test Calendar contains a
+Status: complete October 21, 2026. Installed acceptance on signed 0.1.3 covered
+sign-in renewal, callback replay, revoked-session recovery and reconnection without
+data loss. Calendar expiry is covered by a unit test; see
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+Earlier status: in progress September 28. The dedicated test Calendar contains a
 timed public-landmark fixture with no guests or notifications. The owner selected
 Chrome and confirmed the test account is signed in. Native lifecycle execution
 resumed with isolated data. Notification-independent account checks now pass:
@@ -12884,12 +12893,12 @@ and crypto checks, database comparison and restoration. Apply required checks to
 
 ## Ticket 181: Final signed-release acceptance and publication
 
-Status: published October 22, 2026. By owner decision, 0.1.3 is live on the public
+Status: complete October 22, 2026. By owner decision, 0.1.3 is live on the public
 `desktop-stable` release, and both update feeds name it. Public download, hash,
-feed-signature and quarantined Gatekeeper readback pass. Open: verify the marketing
-**Download for Mac** link in production, then refresh the app's Trust marketing
-deployment ID. 0.1.4 follows as the first stable update. Packet:
-`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+feed-signature and quarantined Gatekeeper readback pass. Production marketing
+(cadence-me.com) links **Download for Mac** to the stable DMG, and the app's Trust
+marketing deployment ID was refreshed and the app redeployed. 0.1.4 follows as the
+first stable update. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 Earlier status: verification in progress September 28; publication remains gated.
 All 76 current migrations replayed cleanly in a separate local project. The real
 authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
