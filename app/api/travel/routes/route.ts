@@ -2,6 +2,7 @@ import { calendarPreflight, authenticateCalendarRequest, calendarResponse, readC
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { assertTravelProviderReady, readTravelProviderConfig, TravelProviderError } from "@/lib/services/travel-provider";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
+import { readWeatherProviderConfig } from "@/lib/services/weather-provider";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 
 export const runtime = "nodejs";
@@ -42,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
       }, 503);
     }
     const body = await readCalendarRequestBody(request);
-    return calendarResponse(request, await withPerformanceRoute("/api/travel/routes", "travel.refresh", () => refreshTravelRoutes(caller, body, config)));
+    return calendarResponse(request, await withPerformanceRoute("/api/travel/routes", "travel.refresh", () => refreshTravelRoutes(caller, body, config, undefined, readWeatherProviderConfig(process.env))));
   } catch (error) {
     if (error instanceof TravelRoutingError) {
       const status = error.failure.code === "quota_exceeded" ? 429 : error.failure.code === "context_changed" ? 409 : 503;

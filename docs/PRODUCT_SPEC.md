@@ -664,6 +664,65 @@ Provider review, credentials, live acceptance and model projection remain unappr
 See `qa/travel-release.md`. Route expiry clears evidence; the next meaningful
 foreground change can refresh within quota. It never polls or regenerates Daily Brief.
 
+### Weather travel margin (Ticket 218)
+
+Weather adjusts departure timing with a fixed margin and may suggest another mode.
+The owner selected Open-Meteo on October 18, 2026. On October 22 the owner chose the
+free API for development and testing; the paid API Standard plan is required before
+commercial use (`docs/LEGAL.md` L-008). Weather stays off until the operator sets
+`CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`. The base URL and optional key are
+server-only, so the paid endpoint needs no code change.
+
+Rules live in the versioned table `weather-margin@1` in
+`packages/core/src/resolvers/weather-margin.resolver.ts`. The owner may tune the
+starting values; a changed value needs a new version.
+
+| Condition in the departure window | Margin | Mode suggestion |
+|---|---|---|
+| Thunderstorm (WMO 95–99) | +15 min | Transit or driving instead of walking or cycling |
+| Snow (snowfall > 0, or WMO 71–77, 85–86) | +15 min | Transit or driving instead of cycling |
+| Freezing rain or drizzle (WMO 56–57, 66–67) | +15 min | Transit or driving instead of cycling |
+| Heavy rain (rain plus showers ≥ 4 mm/h, or WMO 65, 82) | +15 min | Transit instead of walking or cycling |
+| Rain (rain plus showers ≥ 0.5 mm/h, or probability ≥ 60%) | +10 min | Transit instead of cycling |
+| Extreme heat (apparent temperature ≥ 35 °C) | +5 min | Transit instead of cycling |
+| Strong wind (gusts ≥ 60 km/h) | +5 min | Transit instead of cycling |
+
+- The single largest matching margin applies; margins never stack. A margin applies
+  to every mode; a suggestion appears only for the modes its row names. The first
+  matching row that names the leg's mode supplies the suggestion.
+- The departure window is the two hours before an arrival target, or the two hours
+  after a fixed return departure. It comes from planned timing, never from a route
+  estimate, so a margin never depends on route duration and weather facts reveal
+  none (`docs/LEGAL.md` L-001). Forecast hours that overlap the window count.
+  Missing values never match; a window without reported values is unknown, not clear.
+- The margin is its own resolver input beside the travel buffers. It sits
+  immediately before an arrive-by departure, or after a fixed-departure arrival, as
+  a `weather_margin` occupancy segment. It moves the shown leave time or return time
+  and final availability; the Google estimate itself is unchanged. Ticket 217's
+  get-ready time precedes the weather-adjusted departure when both exist.
+- Every computed margin records `weather-margin@1`.
+- The weather area comes from the device position only, rounded to a 0.1° grid.
+  Google coordinates never become an area (`docs/LEGAL.md` L-002). With no usable
+  position there is no weather, and the travel status line says "No weather margin:
+  device location is unavailable." A provider failure says the forecast is
+  unavailable; travel estimates continue in both cases.
+- One forecast per area per clock hour is shared across users in server memory and
+  expires with its hour. It is never stored per user, synced, exported or backed up.
+  Each server instance keeps its own copy.
+- Travel timing and the Daily Brief travel block show the adjusted time, the margin
+  and any suggestion. Open-Meteo's CC BY 4.0 credit, with site and licence links and
+  a note that Cadence derived the margins, sits beside those lines (`docs/LEGAL.md`
+  L-011).
+- `projectWeatherOutlook` in `packages/core/src/services/weather-outlook.ts`
+  (`weather-outlook@1`) is the model-safe projection for Ticket 219: commitment
+  references, mode, conditions, margin minutes, suggestion and table version. It
+  carries no area, coordinates, times or durations. Nothing sends it to a model
+  until Ticket 219's disclosure gate passes.
+
+Platform impact: web uses the hosted adapter in `lib/services`; a linked desktop
+receives weather through the same travel route and makes no provider call; marketing
+makes no weather claim; future mobile inherits the hosted adapter.
+
 `docs/plans/first-external-consumer.md` retains its filename but now defines this
 in-app contract, daily presentation default, first-party route, limits and data use.
 Ticket 146 is reopened for completion-history projection and first-party fences.
