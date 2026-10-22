@@ -15,8 +15,8 @@ export const siteConfig = {
     env.PUBLIC_CADENCE_APP_URL ?? "https://cadence-blush-three.vercel.app",
   standardUrl: "https://github.com/emixd12/BehaviorLog-Bundle",
   githubUrl: "https://github.com/emixd12/cadence",
-  desktopPreviewUrl:
-    "https://github.com/emixd12/cadence/releases/download/desktop-preview/Cadence_0.1.1-preview.19_aarch64.dmg",
+  desktopDownloadUrl:
+    "https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_0.1.3_aarch64.dmg",
   exampleBundlePath: "/examples/cadence-demo.behaviorlog.zip",
   lastModified: "2026-10-18",
   trustUrl: `${env.PUBLIC_CADENCE_APP_URL ?? "https://cadence-blush-three.vercel.app"}/trust`,
@@ -38,7 +38,7 @@ export const primaryCtas = {
   },
   downloadMac: {
     label: "Download for Mac",
-    href: siteConfig.desktopPreviewUrl,
+    href: siteConfig.desktopDownloadUrl,
   },
   readStandard: {
     label: "Read BehaviorLog",

@@ -3,7 +3,7 @@
   "schema_version": "1.3.0",
   "registry_id": "cadence.user-interactions",
   "product": "Cadence",
-  "updated": "2026-10-19",
+  "updated": "2026-10-22",
   "scope": {
     "unit": "One entry per meaningful user intent; equivalent controls with the same effect are represented as variants or multiple triggers.",
     "includes": [
@@ -2571,11 +2571,11 @@
     },
     {
       "id": "INT-MKT-012",
-      "name": "Download the macOS preview",
+      "name": "Download Cadence for Mac",
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/public-and-sign-in.md#open-the-macos-preview-download"
+          "docs/user-guide/public-and-sign-in.md#download-cadence-for-mac"
         ]
       },
       "status": "implemented",
@@ -2592,7 +2592,7 @@
       "journeys": [
         "J01"
       ],
-      "intent": "Download the disclosed current Cadence desktop preview DMG for macOS.",
+      "intent": "Download the current signed and notarized Cadence DMG for macOS.",
       "triggers": [
         {
           "kind": "activate",
@@ -2600,7 +2600,7 @@
         }
       ],
       "availability": "Available in the marketing header.",
-      "success_result": "Starts the exact current Apple Silicon preview DMG download from the dedicated GitHub prerelease.",
+      "success_result": "Starts the exact current signed Apple Silicon DMG download from the desktop-stable GitHub release.",
       "failure_result": "A blocked or unavailable external download leaves the current marketing page and Cadence data unchanged.",
       "effects": [
         "file_download"
@@ -2616,7 +2616,7 @@
         "references": [
           "tests/marketing-layout.test.ts"
         ],
-        "notes": "The layout test pins the header control and exact current preview DMG destination; browser QA verifies the rendered download link."
+        "notes": "The layout test pins the header control and exact current signed stable DMG destination; browser QA verifies the rendered download link."
       },
       "platforms": {
         "web": {
@@ -2627,7 +2627,7 @@
         "desktop": {
           "applicability": "not_applicable",
           "status": "not_applicable",
-          "reason": "Ticket 113 owns the preview build and release artifacts; the download control lives on marketing."
+          "reason": "Tickets 115 and 181 own the signed build and release artifacts; the download control lives on marketing."
         },
         "marketing": {
           "applicability": "applicable",
