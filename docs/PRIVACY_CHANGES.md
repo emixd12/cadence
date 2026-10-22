@@ -51,8 +51,8 @@ Status values:
 | --- | --- | --- | --- | --- |
 | [P-001](#p-001-im-here-place-positions-and-completion-place-labels) | "I'm here" place positions and completion place labels | logged | 216, 219, 244 | Privacy, user guide, MCP docs |
 | [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, user guide |
-| [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, user guide, interface |
-| [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Settings, user guide |
+| [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, Settings, marketing, user guide, interface |
+| [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Daily Brief and Travel Settings, user guide |
 | [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | logged | 187 | Trust page, test |
 | [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | logged | 219, 165, 187 | Marketing |
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
@@ -128,15 +128,24 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 
 ## P-003: Open-Meteo recipient, log retention and attribution
 
-- **Change:** Ticket 218 sends a coarse area derived from the device position to
-  Open-Meteo and uses its forecasts for a fixed travel margin and a mode suggestion.
-  Ticket 219 sends weather facts to the Daily Brief model. Development and testing use
-  the free Open-Meteo plan (`docs/LEGAL.md` L-008).
+- **Change:** Ticket 218 (draft PR #133) rounds the device position to a 0.1° grid,
+  about 11 km, and sends only that area to Open-Meteo. Open-Meteo's logs may keep the
+  area for 90 days. The forecast sets a fixed travel margin from a versioned table and
+  may suggest another mode. Ticket 219's second stage sends the weather outlook to the
+  Daily Brief model (P-004). Development and testing use the free Open-Meteo plan
+  (`docs/LEGAL.md` L-008).
+- **Fact for the policy text:** the shared forecast cache holds only the area key and
+  the forecast, in server memory. It keeps one forecast per area per clock hour and
+  drops it when the hour ends. It is never tied to a user or account, and it is never
+  synced, exported or backed up (`lib/services/weather-forecast.service.ts` on PR
+  #133).
 - **Question (from L-011):** what must the privacy content and the interface say once
   Cadence sends coarse areas to Open-Meteo and uses its forecasts?
 - **Affected:** Tickets 218 and 219. Files: `components/settings/LegalContent.tsx`
-  (Privacy, "Travel routing" and "Processors"), `docs/user-guide/travel.md`,
-  `docs/PRODUCT_SPEC.md`, the travel margin line and the Daily Brief.
+  (Privacy, "Travel routing" and "Processors"), the Settings travel disclosure in
+  `components/settings/TravelSettingsPanel.tsx`, marketing privacy claims (P-006),
+  `docs/user-guide/travel.md`, `docs/PRODUCT_SPEC.md`, the travel margin line in
+  `components/timeline/TravelWeather.tsx` and the Daily Brief.
 - **Sources** (moved from L-011, checked 2026-10-17):
   - [Open-Meteo terms](https://open-meteo.com/en/terms): logs may contain coordinates
     and are deleted after 90 days.
@@ -148,41 +157,71 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   - Privacy, "Processors" table: Open-Meteo is not listed.
   - Privacy, "Travel routing": Google Maps Platform is the only named recipient of
     location data.
-  - `docs/user-guide/travel.md`, "Recipients and retention": names Google Maps only.
-- **Update needed:** name Open-Meteo as a recipient of coarse areas and state its
-  90-day log retention. Give the advance notice under Maps Platform Terms 4.4(c)(iii);
-  it applies because travel already combines device position with Google routing.
-  Place Open-Meteo attribution next to weather-derived lines in the travel margin line
-  and the Daily Brief. The L-011 reading rated the risk medium until the disclosure
-  ships.
+  - The Settings travel disclosure does not name Open-Meteo.
+  - Marketing privacy claims do not name Open-Meteo.
+  - `docs/user-guide/travel.md`, "Recipients and retention", names Google Maps only.
+    PR #133 adds a "Weather margin" section that names Open-Meteo, the 0.1° area and
+    the 90-day logs. The guide will match once that PR merges; the other surfaces
+    will not.
+- **Update needed:** name Open-Meteo as the recipient of the 0.1° area and state its
+  90-day log retention in the Privacy page, the processors table, the Settings travel
+  disclosure and marketing claims. Describe the shared cache using the fact above.
+  Give the advance notice under Maps Platform Terms 4.4(c)(iii) in the travel
+  disclosure; it applies because travel combines device position with Google routing.
+  PR #133 places "Weather data by Open-Meteo.com (CC BY 4.0)" beside the weather lines.
+  The Daily Brief needs the same credit when weather facts reach it. The L-011 reading
+  rated the risk medium until the disclosure ships.
 - **Status:** logged.
 
 ## P-004: Daily Brief model-data disclosure and re-consent
 
-- **Change:** Ticket 219 sends travel, habit and weather facts to OpenAI as Daily Brief
-  model input. The facts are the usual mode per place, the learned get-ready time, the
-  weather outlook, fit conclusions, Behavior Where values, "location not set" and
-  label counts. Under `docs/LEGAL.md` L-001, Google route data reaches the model only
-  as Cadence's own conclusions. Existing users consent again.
+- **Change:** Ticket 219 adds travel facts to the Daily Brief model input sent to
+  OpenAI, in two stages.
+  - Stage 1 (draft PR #132): Behavior Where, usual travel and Cadence's yes/no travel
+    fit conclusions.
+  - Stage 2: learned habits (usual mode per place and get-ready time), the weather
+    outlook and label counts. Extend this entry when stage 2 is implemented.
+
+  Under `docs/LEGAL.md` L-001, Google route data reaches the model only as Cadence's
+  own conclusions. Route durations, leave-by times, addresses, coordinates and place
+  IDs are never sent. Existing users consent again.
 - **Affected:** Ticket 219, with facts from Tickets 216, 217 and 218. Files:
   `components/settings/LegalContent.tsx` (Privacy, "Optional Daily Brief", "Travel
-  routing" and the OpenAI row of "Processors"), the Daily Brief Settings disclosure,
-  `docs/user-guide/timeline.md`, `docs/user-guide/travel.md`.
+  routing" and the OpenAI row of "Processors"),
+  `components/briefing/DailyBriefSettingsPanel.tsx`,
+  `components/settings/TravelSettingsPanel.tsx`, `docs/user-guide/timeline.md`,
+  `docs/user-guide/travel.md`. Marketing AI claims (P-006) and the Trust statement
+  (P-005) depend on this entry.
 - **Conflicting current text:**
   - Privacy, "Optional Daily Brief": "Cadence sends today's Behavior schedule and
     completion history, including findings calculated from it, to OpenAI." Travel,
     habit and weather facts are not listed.
   - Privacy, "Processors", OpenAI row: lists Behavior, Calendar, reminder and note data
     only.
+  - Daily Brief Settings disclosure (`DailyBriefSettingsPanel.tsx`, about line 141 on
+    PR #132): it opens with the same sentence and names the optional sources. It does
+    not name Behavior Where or usual travel.
+  - Travel Settings (`TravelSettingsPanel.tsx`, about line 107 on PR #132): "Travel
+    places and route results are not sent to the Daily Brief model." This stays true
+    for places and route results, but usual travel is now sent.
   - `docs/user-guide/travel.md`: "Raw locations and route results are not sent to the
-    Daily Brief model. Deterministic travel facts stay separate from the briefing." It
-    also says the day's estimates "are not sent to the model."
+    Daily Brief model. Deterministic travel facts stay separate from the briefing."
+    The second sentence is no longer true. The guide also says the day's estimates
+    "are not sent to the model."
   - `docs/user-guide/timeline.md`, "Daily Brief": lists what Cadence sends to OpenAI
     without travel facts.
-- **Update needed:** list each travel, habit and weather fact sent to OpenAI and state
-  what is never sent: addresses, coordinates, place IDs, route durations and raw
-  provider responses. Add the re-consent step for existing users. Keep the statement
-  that exact leave-by times stay in the calculated line.
+- **Update needed:**
+  - Name Behavior Where, usual travel and the travel fit conclusions in the Daily
+    Brief Settings disclosure, the Privacy page and the OpenAI processor row.
+  - Say in the Travel Settings line that usual travel is sent, while places and route
+    results are not.
+  - Before live route conclusions ship, cover them in every disclosure, the Privacy
+    page and marketing's AI claims (P-005, P-006).
+  - Add the stage 2 facts when they ship.
+  - State what is never sent: addresses, coordinates, place IDs, route durations,
+    leave-by times and raw provider responses.
+  - Add the re-consent step for existing users. Keep the statement that exact
+    leave-by times stay in the calculated line.
 - **Status:** logged.
 
 ## P-005: Public statement that Cadence sends no behavior data to an AI provider
@@ -198,7 +237,8 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   exported behavior data to an AI provider." The test asserts this sentence. The
   sentence is limited to exported data, but a reader can take it as a general promise.
 - **Update needed:** rewrite the sentence so that it agrees with the Daily Brief and MCP
-  disclosures, and update the test.
+  disclosures, and update the test. The rewrite must also cover Ticket 219's travel
+  facts in model input (P-004).
 - **Status:** logged.
 
 ## P-006: Marketing review of AI and travel claims
@@ -218,8 +258,10 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     219 keeps that claim true.
   - `developers.ts`: device coordinates and route computations are excluded from MCP.
     Check against P-001.
-- **Update needed:** align the claims with the updated Privacy page. Add travel copy
-  only with deployed evidence, as Ticket 165 requires.
+- **Update needed:** align the claims with the updated Privacy page. Cover Ticket
+  219's travel conclusions before live route conclusions ship (P-004). Name Open-Meteo
+  in privacy claims (P-003). Add travel copy only with deployed evidence, as Ticket 165
+  requires.
 - **Status:** logged.
 
 ## P-007: First-run setup invites a Home address
