@@ -549,6 +549,8 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
         let payload = serde_json::to_string(&request)
             .map_err(|_| "The local request could not be encoded.")?;
         let note_shortcut_commit = matches!(&request, Request::CommitNoteShortcutState { .. });
+        // Place markers and labels must not outlive opt-out in the mutation journal.
+        let place_label_commit = matches!(&request, Request::CommitPlaceLabels { .. });
         // Full-history restore carries both expected rows and their replacements.
         let payload_limit = if note_shortcut_commit
             || matches!(&request, Request::PrepareBehaviorLogImport { .. })
@@ -564,7 +566,7 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             &request,
             Request::CommitNativeReminderPlan { .. } | Request::RecordNativeReminderCoverage { .. }
         );
-        let journal_payload = if note_shortcut_commit || reminder_commit {
+        let journal_payload = if note_shortcut_commit || reminder_commit || place_label_commit {
             json!(format!("{:x}", Sha256::digest(payload.as_bytes()))).to_string()
         } else {
             payload.clone()
@@ -584,6 +586,9 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             if reminder_commit {
                 return reminder::read(&tx, profile_id);
             }
+            if place_label_commit {
+                return place_labels::read(&tx, profile_id);
+            }
             return serde_json::from_str(&result)
                 .map_err(|_| "The prior mutation result is invalid.".into());
         }
@@ -593,7 +598,7 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             .as_str()
             .ok_or("Missing local operation.")?
             .to_string();
-        let journal_result = if note_shortcut_commit || reminder_commit {
+        let journal_result = if note_shortcut_commit || reminder_commit || place_label_commit {
             "null".into()
         } else {
             result.to_string()

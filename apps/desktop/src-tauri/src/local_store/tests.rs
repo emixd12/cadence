@@ -2142,6 +2142,9 @@ fn place_labels_follow_opt_in_completion_and_opt_out() {
         "next":place_settings(&profile, false),"retentionCutoff":null})), 312).unwrap();
     assert_eq!(fixture.count("completion_place_labels"), 0);
     assert_eq!(fixture.count("place_markers"), 0);
+    // The mutation journal keeps only request hashes, never marker positions.
+    let journal: String = fixture.db.query_row("SELECT group_concat(request_json || result_json) FROM mutation_outbox WHERE operation='commitPlaceLabels'", [], |row| row.get(0)).unwrap();
+    assert!(!journal.contains("41878100") && !journal.contains("latitude"));
     assert!(fixture.run(upsert_marker, 313).unwrap_err().contains("constraint"));
 }
 
