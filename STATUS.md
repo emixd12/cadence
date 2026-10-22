@@ -1,5 +1,36 @@
 # Implementation Status
 
+## Travel decisions and privacy-change log — October 22, 2026
+
+Documentation only; no runtime, schema, hosted text or deployment change.
+
+- The owner's October 22 decisions on Tickets 165 and 216–219, the confirmed travel
+  budget posture and the privacy rule are recorded in `docs/DECISIONS.md`
+  (2026-10-22). The budget posture: US$5 per user per calendar month, in the user's
+  timezone, Google Maps calls only.
+- `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
+  privacy pass, privacy, disclosure and marketing-language conflicts are logged there
+  and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
+  219 and 187 and a marketing review. That pass is not yet ticketed.
+- `docs/LEGAL.md`: L-003 resolved by the "I'm here" marker design (option B); L-008
+  records the free Open-Meteo plan for development and testing and stays open until
+  API Standard is subscribed; L-011 moved to P-003; L-001's written question to
+  Google is sent from info@identityscaffolding.com and stays accepted risk.
+- Backlog Ticket 243 tracks six-leg refresh speed and a before/after comparison at
+  low priority; two-leg speed is confirmed. Backlog Ticket 244 adds place labels and
+  "I'm here" markers to Full JSON and does not block Ticket 216.
+- Signed Cadence for Mac 0.1.3 (published October 22) replaces the "blocked until
+  Developer ID signing" lines in the travel redesign intro, Ticket 214,
+  `docs/DESKTOP_PARITY.md` and `docs/user-guide/travel.md`. Ticket 165 handles the
+  manual macOS location permission path.
+
+Checks: `npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check` and `git diff --check` pass. Lint is not applicable: the
+repository has no Markdown linter, and no source file changed.
+
+Platform impact: documentation for web, desktop and marketing; no implementation.
+Future mobile is not applicable.
+
 ## Ticket 232: Astro upgrade test dependency — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256

@@ -950,3 +950,87 @@ a later client can reuse the contract.
 This decision authorizes the tickets. It authorizes no hosted migration push,
 signing-key import, deployment, legal publication, or directory submission. Those
 remain owner-only actions.
+
+## 2026-10-22: Travel budget posture confirmed
+
+Tickets 213–219. The owner confirmed the posture that the October 17 records marked as
+an assumption. The US$5 travel ceiling applies per user per calendar month, in the
+user's timezone, and covers Google Maps calls only. Hosting, the Daily Brief model and
+weather are tracked separately in `docs/COSTS.md`. This matches the implemented
+monthly ledger in Ticket 213. Recorded from the owner's October 22 decisions, relayed
+by the orchestrating agent session.
+
+## 2026-10-22: Privacy conflicts never block development before launch
+
+Until the pre-launch privacy pass, privacy, disclosure and marketing-language
+conflicts are logged in `docs/PRIVACY_CHANGES.md` and never block development.
+In-progress work proceeds as if no privacy policy constrains it. The pass is not yet
+ticketed. Provider-terms and licence questions stay in `docs/LEGAL.md`; `docs/LEGAL.md`
+L-011 moved to P-003. `AGENTS.md` ("Privacy changes") states the rule. This decision
+changes no hosted text and authorizes no deployment. Recorded from the owner's October
+22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 165 macOS location permission and directions test
+
+Signed Cadence for Mac 0.1.3 was published on October 22, 2026 (Tickets 115, 178 and
+181). In September testing of signed rc.3, macOS did not show the first location
+prompt; enabling Cadence by hand in Location Services worked
+(`docs/qa/travel-release.md`, September 29). That file records no 0.1.3 retest. The
+owner chose both options:
+
+- A: in-app guidance for the manual macOS permission path, System Settings › Privacy &
+  Security › Location Services › Cadence.
+- B: investigate why the first permission prompt does not appear.
+
+The navigation directions test runs after Ticket 215 deploys. Platform impact: desktop
+implements A and B; web, marketing and future mobile are not affected. Recorded from
+the owner's October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 216 "I'm here" place markers and confirmed starting values
+
+The owner chose option B. Place positions come from the user's own device: the user
+records an "I'm here" marker at Home or a saved place, through a UI that asks the user
+to record it. Cadence compares the completion position with those markers. It fetches
+no Google coordinates and compares nothing with them, which resolves `docs/LEGAL.md`
+L-003.
+
+- The distances and suggestion rules in Ticket 216 are confirmed as starting values.
+  They are versioned and auditable, so a later change is traceable.
+- The user chooses label retention from two or three options. This replaces the fixed
+  90-day proposal.
+- Full JSON export of labels and markers moves to backlog Ticket 244. It does not
+  block Ticket 216.
+- Privacy-text changes are logged as `docs/PRIVACY_CHANGES.md` P-001.
+
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 217 starting values confirmed
+
+The owner confirmed Ticket 217's proposed defaults and step sizes as starting values:
+a 10-minute get-ready time, a 5-minute arrival buffer, 5-minute feedback steps within
+0–30 minutes, and at most one leave-time question a day. Privacy-text changes for
+stored habits and feedback taps are logged as `docs/PRIVACY_CHANGES.md` P-002.
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 218 free Open-Meteo plan for testing and a fixed margin table
+
+- Development and testing use the free Open-Meteo plan. The paid API Standard plan is
+  required before commercial use; `docs/LEGAL.md` L-008 stays open until Cadence
+  subscribes.
+- The weather margin is a versioned, fixed table: minutes per weather condition, never
+  a share of trip time.
+- Privacy and attribution items are logged as `docs/PRIVACY_CHANGES.md` P-003.
+
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 219 disclosures logged, not blocking
+
+The Daily Brief model-data disclosure, the re-consent for travel, habit and weather
+facts, and the marketing language are logged as `docs/PRIVACY_CHANGES.md` P-004 to
+P-006. They do not block development. The written question to Google about the
+`docs/LEGAL.md` L-001 regime is sent from info@identityscaffolding.com; L-001 stays
+accepted risk. Recorded from the owner's October 22 decisions, relayed by the
+orchestrating agent session.

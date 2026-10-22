@@ -12267,6 +12267,9 @@ revision races, two-owner isolation and excluded-field absence. Apply shared che
 Status: deterministic display implemented in source September 26, 2026. Model
 projection of travel remains disabled pending provider-use clearance and revised
 disclosure; native and live gates stay with Tickets 165 and 174. Filed September 26, 2026.
+October 22, 2026: Ticket 219 owns travel model projection. Google terms are an accepted
+risk (`docs/LEGAL.md` L-001); the disclosure update is logged as
+`docs/PRIVACY_CHANGES.md` P-004 and does not block development.
 Dependencies: 169 and existing 159, 162–167 implementation. Coordinate with 165 and 174.
 
 Goal: explain departure, onward travel and return constraints alongside feasible
@@ -13295,9 +13298,15 @@ On October 18 the owner limited Google route data in model input to Cadence's ow
 deterministic conclusions and accepted the remaining risk (`docs/LEGAL.md` L-001). The
 owner also selected Open-Meteo for weather (`docs/DECISIONS.md`, 2026-10-18).
 
-Assumption, not confirmed by the owner: the US$5 ceiling applies per user per calendar
-month in the user's timezone and covers Google Maps calls only. Hosting, the Daily
-Brief model and weather are tracked separately in `docs/COSTS.md`.
+Budget posture, confirmed by the owner on October 22, 2026: the US$5 ceiling applies
+per user per calendar month, in the user's timezone, and covers Google Maps calls
+only. Hosting, the Daily Brief model and weather are tracked separately in
+`docs/COSTS.md`.
+
+On October 22 the owner also decided the next steps for Tickets 165 and 216–219
+(`docs/DECISIONS.md`, 2026-10-22). Until the pre-launch privacy pass, privacy,
+disclosure and marketing-language conflicts are logged in `docs/PRIVACY_CHANGES.md`
+and never block development. Backlog Tickets 243 and 244 follow Ticket 219.
 
 End state: each located Calendar event and each Behavior with a Where gets a travel
 estimate from the user's current position or previous stop. Estimates refresh when
@@ -13312,7 +13321,8 @@ Storage boundary for every ticket below:
 | Home and saved places: typed text and place ID | Device position |
 | Behavior Where | Route estimates |
 | Usual mode per place, get-ready time, arrival buffer, feedback taps | Weather forecasts |
-| Completion place labels, only after opt-in (Ticket 216) | Place coordinates: server cache, at most 30 days |
+| Completion place labels, only after opt-in, kept for the period the user chooses (Ticket 216) | Google place coordinates: none fetched (L-002); any later cache at most 30 days |
+| "I'm here" place positions recorded by the device (Ticket 216) | |
 
 The advisor reads stored preferences when it writes a brief. It never writes memory.
 Cadence's own rules turn feedback into preferences. Google terms allow place IDs to be
@@ -13326,14 +13336,17 @@ reused (`docs/COSTS.md`, caching terms).
 | 215 | Three-input travel Settings and optional Behavior Where | 214; Ticket 212 reuses its controls |
 | 216 | Completion place labels and Where suggestions | 215 |
 | 217 | Learned travel habits: mode per place, get-ready time, arrival buffer | 215 |
-| 218 | Weather provider selection and travel margin | Open-Meteo selected; 217 for margin |
-| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure gate (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 218 | Weather provider selection and travel margin | Open-Meteo selected, free plan for development and testing (`docs/LEGAL.md` L-008); 217 for margin |
+| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/PRIVACY_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 243 | Backlog, low priority: six-leg refresh speed and before/after comparison | 214 |
+| 244 | Backlog: place labels and "I'm here" markers in Full JSON | 216 |
 
 These tickets supersede Ticket 166's 24-per-day owner limit and Ticket 167's refresh
 policy (213–214), Ticket 162's Settings layout (215) and the disabled travel model
-projection in Tickets 164 and 170 once Ticket 219's gates pass. Ticket 165 keeps the
-native location and navigation gates. Desktop device location stays blocked until
-Ticket 115 provides Developer ID signing.
+projection in Tickets 164 and 170 once Ticket 219 ships. Ticket 165 keeps the
+native location and navigation gates. Signed Cadence for Mac 0.1.3 was published
+October 22, 2026; the manual macOS location permission path is handled under
+Ticket 165.
 
 The shared verification and authorization rules for Tickets 168–174 apply. Filing
 these tickets grants no provider spending, hosted migration, deployment, private-data
@@ -13388,8 +13401,9 @@ Calendar context, foreground activation and Refresh travel pass.
 Whole-day routing runs once per generated Daily Brief within the existing eight-leg
 safety bound. Four two-leg production samples measured p50 3.3562 s and p95 3.5984 s.
 Six-leg and before/after performance remain unmeasured; the old exhausted pilot
-could not provide a successful baseline. Evidence: `docs/qa/travel-release.md`,
-October 18.
+could not provide a successful baseline. Two-leg speed is confirmed; backlog Ticket
+243 tracks the six-leg and before/after measurements at low priority. Evidence:
+`docs/qa/travel-release.md`, October 18.
 Dependencies: 213. The refresh-trigger change ships with 213.
 
 Goal: a refresh pays only for route legs that need travel and returns quickly.
@@ -13425,8 +13439,9 @@ Scope and acceptance:
 Platform impact:
 - Web: `lib/services/travel-route-refresh.service.ts`, `travel-routing.service.ts`,
   `travel-provider.ts`, `lib/ui/travel.ts` and a place-cache migration.
-- Desktop: shares the hook and hosted route. Native device position stays gated by
-  Tickets 115 and 165; saved places and Calendar legs still work.
+- Desktop: shares the hook and hosted route. Signed Cadence for Mac 0.1.3 was
+  published October 22, 2026; the manual macOS location permission path is handled
+  under Ticket 165. Saved places and Calendar legs still work.
 - Marketing: not applicable.
 - Future mobile: inherits the hosted behavior.
 
@@ -13664,6 +13679,59 @@ Platform impact:
 - Marketing: review AI and privacy claims, including the public no-AI disclosure
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
+
+## Ticket 243: Six-leg travel refresh speed and before/after comparison
+
+Status: filed October 22, 2026 from owner direction; backlog, low priority. Numbered
+after connector Tickets 233–242 on open branches to avoid collisions.
+Dependencies: 214 (complete).
+
+Goal: finish Ticket 214's speed target for larger days. Two-leg speed is already
+confirmed: four production samples measured p50 3.3562 s and p95 3.5984 s on
+October 18 (`docs/COSTS.md`).
+
+Scope and acceptance:
+
+- Measure server refresh duration p50 and p95 on the owner account for a day with up
+  to six legs. Ticket 214's target applies: p95 under 5 seconds.
+- Compare before and after Ticket 214 on the owner account. The exhausted pilot could
+  not provide a successful baseline, so record where the baseline comes from and its
+  limits.
+- Use the existing `CADENCE_PERF_LOG=1` counts and durations. Record sample counts,
+  dates and limits in `docs/qa/travel-release.md`, and update `docs/COSTS.md`.
+- Paid calls run only within a cap the owner approves for this test.
+
+Platform impact:
+- Web: measurement only; no code change is planned.
+- Desktop: not applicable; desktop uses the same hosted route.
+- Marketing: not applicable; no public speed claim.
+- Future mobile: not applicable; mobile would use the same hosted route.
+
+## Ticket 244: Place labels and "I'm here" markers in Full JSON export
+
+Status: filed October 22, 2026 from owner direction; backlog. Not a blocker for
+Ticket 216.
+Dependencies: 216.
+
+Goal: a user's Full JSON export holds the place data Ticket 216 stores with the account.
+
+Scope and acceptance:
+
+- Include completion place labels and "I'm here" place markers in Full JSON.
+- Include them in any total export file that survives the planned export refactor.
+  The repository does not yet document that refactor; confirm the surviving formats
+  first.
+- CSV, JSONL and BehaviorLog keep their current place-text omissions unless the owner
+  decides otherwise.
+- Update `docs/EXPORT_FORMATS.md`, `docs/user-guide/data-portability.md`, export
+  resolver tests and the privacy entry `docs/PRIVACY_CHANGES.md` P-001.
+
+Platform impact:
+- Web: `packages/core/src/resolvers/export.resolver.ts` (re-exported by
+  `lib/resolvers/export.resolver.ts`) and `lib/services/export.service.ts`.
+- Desktop: the shared export path, after Ticket 216 adds the data to SQLite.
+- Marketing: not applicable.
+- Future mobile: inherits the export contract.
 
 ## Cadence MCP server and AI plugins: Tickets 220–232
 
