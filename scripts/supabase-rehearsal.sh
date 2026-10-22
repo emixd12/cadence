@@ -154,12 +154,48 @@ for attempt in {1..100}; do
 done
 test -S "$CADENCE_DOCKER_PROXY_DIR/docker.sock"
 
-begin_phase 'starting the local stack (12-minute limit)'
-# Startup/status output contains local API keys. Never print or upload it.
-timeout --kill-after=5s 12m npm run --silent supabase -- start \
-  --workdir "$SUPABASE_WORKDIR" --network-id cadence-local \
-  --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
-  >/dev/null 2>&1
+# Startup/status output contains local API keys. Never print or upload it. A
+# failed attempt reports only a fixed category from its private output file.
+start_stack() {
+  local output="$CADENCE_DOCKER_PROXY_DIR/start-$1.out" status=0
+  timeout --kill-after=5s 8m npm run --silent supabase -- start \
+    --workdir "$SUPABASE_WORKDIR" --network-id cadence-local \
+    --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
+    > "$output" 2>&1 || status=$?
+  if ((status != 0)); then
+    local category='an unclassified error'
+    if ((status == 124)); then category='the 8-minute limit'
+    elif grep -q 'Cadence Docker request rejected' "$output"; then category='a Docker proxy rejection'
+    elif grep -qiE 'toomanyrequests|rate limit' "$output"; then category='an image registry rate limit'
+    elif grep -qiE 'unhealthy|not healthy|health check' "$output"; then category='a service health check'
+    elif grep -qiE 'deadline exceeded|timed out|timeout' "$output"; then category='a timeout'
+    elif grep -qiE 'SQLSTATE|migration|seed' "$output"; then category='a migration or seed error'
+    elif grep -qiE 'pull|manifest' "$output"; then category='an image pull'
+    fi
+    printf '::warning::Local stack start attempt %s failed with exit %s after %s.\n' "$1" "$status" "$category"
+  fi
+  rm -f "$output"
+  return "$status"
+}
+
+begin_phase 'starting the local stack (2 attempts, 8-minute limit each)'
+# First starts on fresh runners intermittently failed after about three minutes
+# and passed on rerun (October 21-22, 2026). Retry once from a clean stack.
+if ! start_stack 1; then
+  timeout --kill-after=5s 2m npm run --silent supabase -- stop --no-backup \
+    --workdir "$SUPABASE_WORKDIR" >/dev/null 2>&1 || true
+  # The retry must start from empty volumes, exactly like the first attempt.
+  timeout 30s docker volume rm -f \
+    supabase_db_habit-tracking-app supabase_storage_habit-tracking-app >/dev/null 2>&1 || true
+  test -z "$(timeout 10s docker ps -aq "${project_labels[@]}")"
+  if timeout 10s docker volume ls --format '{{.Name}}' |
+    grep -qE '^supabase_(db|storage)_habit-tracking-app$'; then
+    printf '::error::The failed start left Cadence volumes behind.\n'
+    exit 1
+  fi
+  start_stack 2
+  printf 'Local stack start: **passed on the second attempt**.\n\n' >> "$GITHUB_STEP_SUMMARY"
+fi
 verify_stack
 
 # This connection string is the disposable local default, never a hosted target.
