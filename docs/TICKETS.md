@@ -11889,10 +11889,12 @@ already Developer ID signed when the prompt failed. Owner decisions (October 22)
 accept the manual macOS permission path, investigate the prompt, and test directions
 after Ticket 215. Source change in this round: Travel Settings guidance with Open
 Location Services and Check again (`INT-TRAVEL-006`, `INT-TRAVEL-007`), and the
-Hardened Runtime location entitlement, which signed builds lacked. Open gates: an
-owner prompt test on a signed build with the entitlement, an installed check of Open
-Location Services, and the directions handoff matrix after Ticket 215 deploys. The
-steps and plan are in `docs/qa/travel-release.md`, October 22.
+Hardened Runtime location entitlement, which signed builds lacked. The entitlement
+also ships alone from main (PR #134) so it can be tested without the held Where
+rollout. Open gates: an owner prompt test on a main-based signed build, an installed
+check of Open Location Services and Check again after the hosted Where migration,
+and the directions handoff matrix after Ticket 215 deploys. The steps and plan are
+in `docs/qa/travel-release.md`, October 22.
 
 Goal: establish provider-use, disclosure and runtime evidence for the accepted travel feature.
 

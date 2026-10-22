@@ -1041,39 +1041,22 @@ Previews keep no entitlements; location on ad hoc previews stays unsupported.
 
 ### Owner prompt test (signed build required)
 
-A real prompt test needs a Developer ID build that contains this change, on a
-macOS user where Cadence was never authorized. Do not reset TCC or change global
-location settings.
+The entitlement fix ships separately from main in PR #134. Run the prompt test
+on a signed build made from main, not from this branch: a Ticket 215 build carries
+SQLite migration 0018 and the Where synchronization contract, which can break
+Behavior sync for a linked account before the hosted Where migration. Recommended
+build: the 0.1.4 candidate after PR #134 merges; fallback: an unpublished
+`0.1.4-rc.1` from an isolated checkout. The steps, build commands and version
+reasoning are in `docs/qa/2026-10-22-desktop-location-entitlement.md` on main.
 
-1. Build and verify the next signed candidate (0.1.5 or later, as the Ticket 215
-   rollout requires) with `node apps/desktop/scripts/release.mjs build` and
-   `verify`. Publication is not needed for this test.
-2. Confirm the entitlement on the built app:
-   `codesign -d --entitlements - --xml <Cadence.app> | plutil -p -` must list
-   `com.apple.security.personal-information.location => true`.
-3. Prepare a never-authorized user: a new standard macOS user on either Mac, or a
-   Mac that has never run Cadence. `locationd` keys its clients by user and
-   bundle, so a new user should be a fresh client (inferred from log keys, not
-   verified). In that user, confirm Location Services is on and Cadence is not
-   listed.
-4. Install the candidate from its DMG and open it. Local mode is enough; no
-   account, Calendar or Google Maps call is needed.
-5. Open Settings, Travel. Choose Walking. Keep Cadence frontmost and turn on
-   Travel estimates. Within 12 seconds record whether macOS asks to allow Cadence
-   to use your location.
-6. If it asks: choose Allow. Record the status line ("A current position is
-   available. Cadence did not save it.") and "Device location: allowed."
-7. If it does not ask: record the status line, the diagnostic and whether Cadence
-   now appears in Location Services. Then choose Open Location Services, confirm
-   the pane opens at Location Services, turn on Cadence, return and choose Check
-   again. Record the result.
-8. Denial: turn Cadence off in Location Services, return and choose Check again.
-   Record "Device location: blocked" and the guidance.
-9. Optional, on the first Mac's main user: install the same candidate and repeat
-   step 5. Record whether a prompt now appears for the existing client entry.
-10. Record the candidate version, `codesign -dv` flags, macOS version, Mac model and
-    whether the user was new. Record no coordinates and no map screenshots. Remove
-    the test user afterwards if wanted.
+- Main check: a new macOS user, or a Mac that never ran Cadence. Do not reset TCC
+  or change global location settings.
+- Optional: the first Mac's main user, with the main-based candidate only. Main has
+  no desktop migration after 0.1.3, so reinstalling 0.1.3 rolls back.
+
+After the hosted Where migration and a signed build from this branch exist, check
+this branch's own controls on that build: Open Location Services opens System
+Settings at Location Services, and Check again returns the new state.
 
 ### Directions handoff test plan — run after Ticket 215 deploys
 
@@ -1133,8 +1116,10 @@ route durations or provider responses.
 
 ### Ticket 165 remaining gates
 
-- Owner prompt test above, on a signed build with the location entitlement.
-- Installed check that Open Location Services opens the pane.
+- Owner prompt test above, on a main-based signed build with the location
+  entitlement (PR #134).
+- Installed check of Open Location Services and Check again on a signed build from
+  this branch, after the hosted Where migration.
 - Directions handoff matrix above, after Ticket 215 deploys.
 - Search handoff passed on September 28; manual grant, retry and foreground
   acquisition passed on September 29. They need no rerun unless the native path

@@ -20,9 +20,14 @@ investigate the missing first prompt, and test directions after Ticket 215.
   the prompt is not yet verified.
 - Device location no longer waits for Developer ID signing: 0.1.3 is published, and
   signed rc.2 and rc.3 already failed to prompt.
-- Open: owner prompt test on a signed 0.1.5+ build, installed check of Open Location
-  Services, and the directions handoff matrix after Ticket 215 deploys. Steps and
-  plan: `docs/qa/travel-release.md`, October 22.
+- The entitlement and verifier change also ships alone from main in PR #134, so the
+  prompt test can run on a main-based build (recommended: the 0.1.4 candidate)
+  without the held Where rollout.
+- Open: owner prompt test on that main-based build, installed check of Open
+  Location Services and Check again after the hosted Where migration, and the
+  directions handoff matrix after Ticket 215 deploys. Steps and plan:
+  `docs/qa/travel-release.md`, October 22, and
+  `docs/qa/2026-10-22-desktop-location-entitlement.md` (PR #134).
 
 Platform impact: web shares the panel guidance and Check again; desktop adds the
 settings command and the signing entitlement; marketing is not applicable (no public
