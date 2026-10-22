@@ -12884,7 +12884,13 @@ and crypto checks, database comparison and restoration. Apply required checks to
 
 ## Ticket 181: Final signed-release acceptance and publication
 
-Status: verification in progress September 28; publication remains gated.
+Status: published October 22, 2026. By owner decision, 0.1.3 is live on the public
+`desktop-stable` release, and both update feeds name it. Public download, hash,
+feed-signature and quarantined Gatekeeper readback pass. Open: verify the marketing
+**Download for Mac** link in production, then refresh the app's Trust marketing
+deployment ID. 0.1.4 follows as the first stable update. Packet:
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+Earlier status: verification in progress September 28; publication remains gated.
 All 76 current migrations replayed cleanly in a separate local project. The real
 authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
 were removed, loopback bindings verified, and the isolated stack stopped while

@@ -1,5 +1,37 @@
 # Implementation Status
 
+## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
+
+**Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21
+note that called it superseded by 0.1.4. 0.1.3 is the only artifact with complete
+installed acceptance. The remaining 0.1.4 fix covers an unexpired pending sign-in
+callback that arrives while already signed in, which the app does not normally
+allow; relaunching clears it. 0.1.4 ships later as the first stable update.
+
+Published:
+- The public release
+  [`desktop-stable`](https://github.com/emixd12/cadence/releases/tag/desktop-stable),
+  tagged at source `dcefe7e`. It holds the stapled DMG, the updater archive and
+  signature, `Cadence_0.1.3_verification.json` and `latest.json`.
+- `desktop-preview/latest.json` now names 0.1.3 at the stable URL, so preview
+  installs are offered the signed app. The prior preview.24 feed is retained for
+  rollback.
+
+Post-publication readback:
+- All public files match the verified SHA-256 values.
+- Both feeds report 0.1.3, and their signatures verify against the public archive
+  with the persistent updater key. GitHub briefly served the cached preview.24
+  feed before serving the replacement.
+- A quarantined download of the public DMG is accepted as notarized Developer ID,
+  and its staple validates.
+
+This change points the marketing **Download for Mac** button, the user guide and
+`INT-MKT-012` at the stable DMG. Open: after merge, confirm the production
+marketing deployment serves the new link, then update
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` and redeploy the app. Restore the QA feed to
+its original `0.1.1-rc.3` bytes. Ticket 115 closes when the website step is
+verified. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+
 ## Public Trust aggregate correction — October 21, 2026
 
 Merge-readiness follow-up found that the collector requested one alert per
@@ -55,11 +87,13 @@ the Account state to an error. The callback now preserves the existing session,
 shows the account-switch notice, and never exchanges the incoming code. The
 regression fails on the 0.1.3 source and passes with the fix.
 
-Version `0.1.4` is source only. The signed 0.1.3 candidate is superseded and must
-not be published. Its recorded acceptance remains historical evidence, not
-acceptance of this change. Tickets 178 and 181 need a new signed build, artifact
-verification, installed callback/session checks and the owner's publication
-instruction. See `docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
+Version `0.1.4` is source only. This entry said the signed 0.1.3 candidate was
+superseded and must not be published; the owner overrode that on October 22 and
+0.1.3 is published (see the entry above). Its recorded acceptance does not cover
+this change. 0.1.4 ships later as the first update through `desktop-stable`, after
+a new signed build, artifact verification, installed callback and session checks,
+and the owner's publication instruction. See
+`docs/qa/2026-10-21-desktop-0.1.4-preparation.md`.
 
 Platform impact: desktop authentication only; web, marketing and future mobile
 have no implementation change. No schema or hosted configuration changes.
