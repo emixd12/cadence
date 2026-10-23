@@ -41,7 +41,7 @@ describe("trust and legal UI content", () => {
   it("renders Privacy with processor, retention and separate connector disclosures", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="privacy" />);
 
-    expect(html).toContain("October 18, 2026");
+    expect(html).toContain("October 21, 2026");
     expect(html).not.toContain("draft");
     expect(html).not.toContain("not legally approved");
     expect(html).toContain("Cadence service providers and purposes");
@@ -67,6 +67,9 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("not an atomic snapshot");
     expect(html).toContain("Apple does not limit this app-specific password to Calendar");
     expect(html).toContain("does not revoke Outlook, iCloud or Hevy access");
+    expect(html).toContain("separate Microsoft consent with Calendars.Read.");
+    expect(html).toContain("Cadence requests only event titles, times, timezone, availability, response, and calendar names");
+    expect(html).not.toContain("Calendars.ReadBasic");
     expect(html).toContain("Local checks do not establish public availability");
     expect(html).toContain("retains no production prompt or briefing history");
     expect(html).toContain("outside the tracking database, exports, synchronization and user-created backups");
@@ -105,7 +108,7 @@ describe("trust and legal UI content", () => {
       "Failed maintenance can extend storage", "no automatic deletion deadline",
       "does not remove a shared client registration", "live account-owned integration records",
     ]) expect(privacy).toContain(disclosure);
-    expect(LEGAL_PAGES.privacy.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.privacy.updated).toBe("October 21, 2026");
     expect(LEGAL_PAGES.terms.updated).toBe("October 18, 2026");
     expect(LEGAL_PAGES.trust.updated).toBe("August 27, 2026");
     expect(LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.caption)
