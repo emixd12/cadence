@@ -13,7 +13,8 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
   219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
   and the "saved base" wording that Ticket 215 renamed to Home. P-003 and P-004 now
-  also cover the draft Ticket 218 (PR #133) and Ticket 219 stage 1 (PR #132) reports.
+  also cover the draft Ticket 218 (PR #133) and Ticket 219 stage 1 (PR #132) reports;
+  P-001 and P-002 cover the draft Ticket 216 (PR #137) and 217 (PR #136) reports.
   Entries use the status "logged". That pass is not yet ticketed.
 - `docs/LEGAL.md`: L-003 resolved by the "I'm here" marker design (option B); L-008
   records the free Open-Meteo plan for development and testing and stays open until

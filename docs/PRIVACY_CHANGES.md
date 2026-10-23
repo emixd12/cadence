@@ -49,8 +49,8 @@ Status values:
 
 | ID | Change | Status | Tickets | Surfaces |
 | --- | --- | --- | --- | --- |
-| [P-001](#p-001-im-here-place-positions-and-completion-place-labels) | "I'm here" place positions and completion place labels | logged | 216, 219, 244 | Privacy, user guide, MCP docs |
-| [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, user guide |
+| [P-001](#p-001-im-here-place-positions-and-completion-place-labels) | "I'm here" place positions and completion place labels | logged | 216, 219, 244 | Privacy, Travel Settings, user guide, MCP docs, marketing |
+| [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, Travel Settings, user guide |
 | [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, Settings, marketing, user guide, interface |
 | [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Daily Brief and Travel Settings, user guide |
 | [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | logged | 187 | Trust page, test |
@@ -63,19 +63,38 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 
 ## P-001: "I'm here" place positions and completion place labels
 
-- **Change:** Ticket 216 stores two new kinds of data with the account. First, a
-  device-recorded position for Home or a saved place, set when the user marks
-  "I'm here". Second, one completion place label per qualifying Completed occurrence:
-  `home`, `saved_place:<id>` or `elsewhere`. The user chooses how long labels are kept
-  from two or three options. At completion, Cadence reads the device position once in
-  the foreground, only if location permission is already granted. It compares that
-  position with the device-recorded markers, never with Google coordinates
-  (`docs/LEGAL.md` L-003, resolved). Later, Ticket 219 sends label counts to the
-  Daily Brief model, for example "logged at home 9 of 10 times".
-- **Affected:** Tickets 216 and 219; Ticket 244 adds labels and markers to Full JSON.
-  Files: `components/settings/LegalContent.tsx`, `docs/user-guide/travel.md`,
-  `docs/user-guide/data-portability.md`, `docs/PRODUCT_SPEC.md`,
-  `apps/marketing/src/data/developers.ts`.
+- **Change:** Ticket 216 (draft PR #137) stores location-derived data with the
+  account, only after the user turns labels on.
+  - "I'm here" markers: the device position recorded for Home or a saved place when
+    the user selects "I'm here". Positions are stored as integer microdegrees and
+    accuracy as whole meters. Recording again replaces the marker.
+  - Completion place labels: one label per qualifying Completed occurrence, `home`,
+    `saved_place:<id>` or `elsewhere`. Labels are derived location history.
+  - The label setting with its retention choice, and dismissed Where suggestions.
+
+  Hosted tables `place_label_settings`, `place_markers`, `completion_place_labels` and
+  `where_suggestion_dismissals` use owner-only RLS. Desktop keeps the same data in
+  SQLite. Account sync adds four entity kinds, and desktop SQLite backups include the
+  data. Full JSON, CSV, JSONL and BehaviorLog exclude it until Ticket 244. MCP does
+  not expose markers or labels.
+- **New read moments:** at completion, Cadence reads the device position once in the
+  foreground, only if location permission is already granted, and never prompts. When
+  the user selects "I'm here", the system location prompt may appear, because the user
+  asked for it. Cadence compares positions with the device-recorded markers, never with
+  Google coordinates (`docs/LEGAL.md` L-003, resolved).
+- **Retention and deletion:** the user chooses when turning labels on: 90 days (the
+  default), 1 year, or until the user deletes them. A shorter choice deletes older
+  labels in the same save. A daily job deletes hosted labels past the window; desktop
+  deletes them when it loads labels. Changing a status away from Completed deletes that
+  occurrence's label. Settings deletes all markers on request and has a Delete labels
+  control. Turning labels off deletes labels, markers and dismissals.
+- **Model input:** Ticket 219 later sends per-Behavior label counts, for example
+  "logged at home 9 of 10 times", without place keys, positions or text (P-004).
+- **Affected:** Tickets 216, 219 and 244. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/TravelSettingsPanel.tsx`, `docs/user-guide/travel.md`,
+  `docs/user-guide/data-portability.md`, `docs/PRODUCT_SPEC.md`, the travel redesign
+  storage-boundary table in `docs/TICKETS.md`, `apps/marketing/src/data/developers.ts`
+  and marketing privacy claims (P-006).
 - **Conflicting current text:**
   - Privacy, "Travel routing": Cadence reads the device location "only while Cadence
     is open in the foreground: during an explicit permission check, during a travel
@@ -84,46 +103,77 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     is a saved device location.
   - Privacy, "Travel routing": "Device locations and route estimates stay in temporary
     memory and are excluded from Cadence sync, exports, backups, analytics, and logs."
-    Markers and labels sync with the account.
+    Markers and labels sync with the account and enter desktop backups.
   - Privacy, "Retention" table, row "Device locations and route estimates": "Memory for
     the current app session" and "Not saved to Cadence's database, synchronization,
     exports, or backups". No row covers markers or labels.
+  - Travel Settings: "Device positions and route results stay temporary and never
+    enter exports or synced backups."
   - `docs/user-guide/travel.md`, "Recipients and retention": "Cadence keeps device
     samples and route results in temporary memory and excludes them from sync,
     exports, backups and telemetry." "Refresh travel estimates": "Device position is
-    read only on that open and during a refresh."
+    read only on that open and during a refresh." PR #137 updates the user guide; the
+    approved privacy content stays unchanged.
+  - `docs/TICKETS.md`, travel redesign storage-boundary table: it lists device position
+    as temporary. PR #129 adds a marker row, but the table does not mark markers as a
+    stored exception or labels as derived location history.
   - Privacy, "Exports and connected AI clients", and `developers.ts`: MCP "excludes
-    travel settings, route estimates, device location". The text does not say whether
-    markers and labels are excluded.
+    travel settings, route estimates, device location". The text does not say that
+    markers and labels are excluded too.
+  - Marketing privacy claims about location handling need review (P-006).
 - **Update needed:** name markers and labels as stored account data and say what each
-  holds. Describe the completion read and the "I'm here" read. List the retention
-  options and the delete control. State sync and backup handling, and Full JSON once
-  Ticket 244 ships. State whether MCP exposes markers or labels. Add label counts to
-  the model-data disclosure (P-004).
+  holds. Describe both new read moments. List the retention choices and the delete
+  controls. State sync and desktop backup handling, and Full JSON once Ticket 244
+  ships. State that MCP does not expose markers or labels. Correct the Travel Settings
+  line and the storage-boundary table. Add label counts to the model-data disclosure
+  (P-004).
 - **Status:** logged.
 
 ## P-002: Leave-time feedback taps and learned travel habits
 
-- **Change:** Ticket 217 stores, with the account, the usual mode per saved place, the
-  learned get-ready time, the arrival buffer and leave-time feedback taps. A tap holds
-  an event reference, the answer ("too early", "about right" or "too late") and a time;
-  no location. Ticket 219 sends the usual mode per place and the get-ready time to the
-  Daily Brief model.
+- **Change:** Ticket 217 (draft PR #136) stores new account data: the get-ready time,
+  the arrival buffer, a travel mode per place and leave-time answers.
+  - Places: for a Calendar event place, Cadence stores a one-way digest of the location
+    text, the same digest as the place cache. The digest is pseudonymous, not
+    anonymous: a known address can be matched against it.
+  - Leave-time answers: each holds a SHA-256 of the event or occurrence reference, the
+    local date, the answer, the time and the rules version. No title, event time or
+    location.
+  - Storage: columns on `travel_settings` with owner RLS, SQLite migration 0019 on
+    desktop and the profile sync entity. Native desktop backups include the habits.
+
+  Ticket 219 later sends the usual mode per place and the get-ready time to the Daily
+  Brief model (P-004).
+- **Retention and deletion:** Cadence keeps the newest 30 answers and remembers a mode
+  for at most 100 places, dropping the oldest choice. Settings has a forget control
+  for each place. Account deletion removes everything. There is no single "clear
+  learned habits" control. Ticket 217 marks the 30 and 100 limits as Cadence
+  assumptions, not owner-confirmed.
+- **Export:** learned habits, Home and usual travel are not in any export yet. The
+  travel redesign storage-boundary table in `docs/TICKETS.md` nevertheless calls them
+  exportable. Ticket 244 covers only labels and markers; no ticket yet covers habits,
+  Home and usual travel.
 - **Affected:** Tickets 217 and 219. Files: `components/settings/LegalContent.tsx`,
-  `docs/user-guide/travel.md`, `docs/user-guide/data-portability.md`.
+  `components/settings/TravelSettingsPanel.tsx`, `docs/user-guide/travel.md`,
+  `docs/user-guide/data-portability.md`, the storage-boundary table in
+  `docs/TICKETS.md`.
 - **Conflicting current text:**
   - Privacy, "Travel routing": stored travel data is described as user-authored
     locations, Google place identifiers and the monthly usage total. Learned habits and
-    feedback taps are not mentioned.
-  - Privacy, "Retention" table: no row covers learned habits or taps.
+    leave-time answers are not mentioned.
+  - Travel Settings on PR #136 now says "Cadence saves only the places you enter and
+    the travel habits you tell it." Policy text that says Cadence stores only typed
+    places needs the same update.
+  - Privacy, "Retention" table: no row covers learned habits or answers.
   - Privacy, "Optional Google Calendar": "Cadence does not store Google event details in
-    its hosted database." Check whether a tap's event reference counts as an event
-    detail.
+    its hosted database." Cadence now stores a digest of an event's location text and a
+    SHA-256 of the event reference. Check whether the sentence still holds.
   - `docs/user-guide/travel.md`, "Recipients and retention": lists the same stored
-    travel data and omits habits and taps.
-- **Update needed:** describe the habits and taps, what a tap contains, how the user
-  edits or deletes them, their retention, sync and export handling, and the model
-  facts derived from them (P-004).
+    travel data and omits habits and answers.
+- **Update needed:** describe the habits and answers, what an answer contains, the
+  pseudonymous place digest, the per-place forget control, the retention limits,
+  account deletion, sync and desktop backup handling, and the missing export. Describe
+  the model facts derived from them (P-004).
 - **Status:** logged.
 
 ## P-003: Open-Meteo recipient, log retention and attribution
@@ -260,7 +310,8 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     Check against P-001.
 - **Update needed:** align the claims with the updated Privacy page. Cover Ticket
   219's travel conclusions before live route conclusions ship (P-004). Name Open-Meteo
-  in privacy claims (P-003). Add travel copy only with deployed evidence, as Ticket 165
+  in privacy claims (P-003). Review location-handling claims against stored markers
+  and labels (P-001). Add travel copy only with deployed evidence, as Ticket 165
   requires.
 - **Status:** logged.
 
