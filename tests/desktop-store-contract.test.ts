@@ -121,6 +121,39 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     });
   }, 20_000);
 
+  it("persists Behavior Where through SQLite history, restart and Full JSON only (Ticket 215)", async () => {
+    const profile = await localCommand("readProfile", {});
+    const created = await createBehavior(createLocalBehaviorStore(profile.id, NOW), {
+      userId: profile.id, timezone: profile.timezone, recordedAt: NOW.toString(), values: { ...VALUES, whereKind: "home" },
+    });
+    expect(created).toMatchObject({ where_kind: "home", location_text: null });
+    const placed = await updateBehavior(createLocalBehaviorStore(profile.id, NOW.add({ seconds: 1 })), {
+      behaviorId: created.id, expectedUpdatedAt: created.updated_at, recordedAt: NOW.add({ seconds: 1 }).toString(),
+      values: { ...VALUES, whereKind: "place", locationText: " 1 Example Street " },
+    });
+    expect(placed).toMatchObject({ where_kind: "place", location_text: "1 Example Street" });
+    // MCP-style input carries only location text: clearing A place means Not set.
+    const cleared = await updateBehavior(createLocalBehaviorStore(profile.id, NOW.add({ seconds: 2 })), {
+      behaviorId: created.id, expectedUpdatedAt: placed.updated_at, recordedAt: NOW.add({ seconds: 2 }).toString(),
+      values: { ...VALUES, locationText: null },
+    });
+    expect(cleared).toMatchObject({ where_kind: null, location_text: null });
+    await stop(); await start();
+    const [graph] = await localCommand("readBehaviorGraphs", { profileId: profile.id });
+    expect(graph?.behavior).toMatchObject({ where_kind: null, location_text: null });
+    const options = { now: NOW.add({ seconds: 3 }), range: "all" };
+    const bundle = await getLocalExportPageData(profile, options);
+    const events = bundle.jsonBackup.behavior_configuration_events;
+    expect(events.map((event) => [event.next_configuration.where_kind, event.changed_fields.includes("where_kind")]))
+      .toEqual([["home", true], ["place", true], [null, true]]);
+    expect(events[1]!.next_configuration.location_text).toBe("1 Example Street");
+    const behaviorLog = await getLocalExportDownload(profile, "behaviorlog", options);
+    const content = readDesktopZipEntries(behaviorLog.bytes!).map((entry) => entry.content).join("\n");
+    expect(content).not.toContain("1 Example Street");
+    // The portable projection may name a changed field in its notes; no Where value is exported.
+    expect(content).not.toContain('"where_kind":');
+  });
+
   it("preserves a tracking flow through native transactions and a full restart", async () => {
     const profile = await localCommand("readProfile", {});
     expect(await localCommand("readCategories", { profileId: profile.id })).toHaveLength(8);

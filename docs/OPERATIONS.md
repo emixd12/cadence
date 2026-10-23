@@ -106,6 +106,50 @@ downloads; authorized reruns passed. Both requested token scopes reached
 
 ## Standard verification
 
+### Disposable local Supabase rehearsal
+
+`.github/workflows/supabase-rehearsal.yml` runs on relevant pull requests and
+manual dispatch. Pull requests use GitHub's merge commit; the job summary records
+the checked commit/tree and PR head/base. It runs on a fresh `ubuntu-24.04` VM
+with Node 24, read-only repository permission and no hosted secrets or deployment
+environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
+runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
+
+The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
+project-scoped Docker proxy. It pulls the pinned images from `ghcr.io/supabase`
+(`SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`): anonymous `public.ecr.aws` pulls
+were throttled (`toomanyrequests`) on some shared runner addresses. GHCR serves
+the same manifest digests. It copies only config, the empty seed and tracked
+migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
+checks service health before and after `db reset --local`. The tracked migration
+version list must exactly match the applied list; its count is derived from the
+tested tree. All `tests/sql/*.sql` rollback fixtures then run with
+`psql -X -v ON_ERROR_STOP=1`, followed by:
+
+```bash
+npm run smoke:rls:local
+npm run smoke:account-sync:local
+CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+```
+
+Local API credentials stay inside the existing config reader. Startup/reset
+output is suppressed; failures identify the phase and show only container names,
+health, ports and networks. A failed start attempt also reports its exit code and
+one fixed cause category (time limit, rate limit, image pull, health check,
+migration or seed, timeout, proxy rejection). The proxy logs any rejected request
+as method and path only. Startup gets two 8-minute attempts; the second starts
+from a stopped stack with this project's two volumes removed. The 30-minute job
+stops only its Cadence containers before ending the proxy. Docker cleanup is
+limited to the CLI's prunes filtered by this project's label; the shared network
+is never pruned, and nothing touches hosted resources. The runner discards its
+temporary volumes afterward.
+
+A successful run establishes migration replay and local database contracts for
+the recorded source. Provider acceptance, the Outlook support/scope decision,
+installed desktop compatibility and the authorized hosted rollout remain
+separate gates. A workflow definition or fake-daemon proxy test is not a completed
+database rehearsal.
+
 ### Day-progress review bench (Ticket 132)
 
 The development-only `/design-system?preview=day-progress` surface compares

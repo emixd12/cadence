@@ -102,6 +102,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "canonicalize_configuration_location",
         include_str!("../../migrations/0017_canonicalize_configuration_location.sql"),
     ),
+    (
+        18,
+        "behavior_where",
+        include_str!("../../migrations/0018_behavior_where.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {
@@ -749,6 +754,22 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
             && (value["active"] != false || value["archived_at"].is_null())
         {
             return Err("An automatic archive marker requires an archived Behavior.".into());
+        }
+        // A missing Where is a row written before Ticket 215; SQLite triggers
+        // enforce the place-text rule once migration 0018 has run.
+        match value["where_kind"].as_str() {
+            Some("place") if value["location_text"].is_null() => {
+                return Err("A Behavior place needs its text.".into())
+            }
+            Some("anywhere" | "home") if !value["location_text"].is_null() => {
+                return Err("Only a Behavior place keeps place text.".into())
+            }
+            Some("anywhere" | "home" | "place") => {}
+            Some(_) => return Err("A Behavior Where is invalid.".into()),
+            None if !value["where_kind"].is_null() => {
+                return Err("A Behavior Where is invalid.".into())
+            }
+            None => {}
         }
     } else if T::TABLE == "note_shortcut_states" {
         validate_note_shortcut_state(&value)?;

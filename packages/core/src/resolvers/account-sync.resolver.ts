@@ -407,6 +407,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       location_text: null,
       ...value,
     };
+    // Rows written before Ticket 215 carry only location text, which meant A place.
+    if (!("where_kind" in value)) value = { ...value, where_kind: typeof value.location_text === "string" ? "place" : null };
     parseArchiveNotes(value.archive_notes);
     validateBehaviorPersistenceFields(value);
   }
@@ -455,6 +457,11 @@ function validateBehaviorPersistenceFields(value: Record<string, Json | undefine
   if (locationText !== null && (typeof locationText !== "string" || locationText.trim() !== locationText
     || locationText.length < 1 || locationText.length > 500 || /[\u0000-\u001f\u007f]/u.test(locationText))) {
     throw new Error("The account Behavior location is invalid.");
+  }
+  const whereKind = value.where_kind;
+  if (!(whereKind === null || whereKind === "anywhere" || whereKind === "home" || whereKind === "place")
+    || (whereKind === "place") !== (locationText !== null)) {
+    throw new Error("The account Behavior Where is invalid.");
   }
 }
 function normalizeRow(value: Json): Json {
@@ -566,6 +573,7 @@ function same(left: AccountSyncEntity | null, right: AccountSyncEntity | null): 
 // The September 22, 2026 hosted travel migration canonicalized every configuration event:
 // configurations gained `location_text: null` and baseline changed_fields gained "location_text".
 // Compare pre-travel local/baseline rows in that canonical shape; fingerprints keep raw values.
+// Ticket 215 rewrote no history: snapshots without `where_kind` derive it when read.
 function sameShape(entity: AccountSyncEntity): Json {
   const value = entity.value;
   if (entity.kind !== "configuration_event" || !value || Array.isArray(value) || typeof value !== "object") return value;

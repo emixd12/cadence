@@ -19,6 +19,7 @@ import type {
   BehaviorRecurrenceFormDefaults,
   BehaviorRecurrenceKind,
   BehaviorView,
+  BehaviorWhereKind,
   CategoryOption,
 } from "@/lib/types/behavior";
 import {
@@ -82,6 +83,12 @@ const WEEKDAY_OPTIONS: Array<{ value: Weekday; label: string }> = [
   { value: "saturday", label: "Sat" },
   { value: "sunday", label: "Sun" },
 ];
+const WHERE_OPTIONS: Array<{ value: BehaviorWhereKind | ""; label: string }> = [
+  { value: "", label: "Not set" },
+  { value: "anywhere", label: "Anywhere" },
+  { value: "home", label: "Home" },
+  { value: "place", label: "A place" },
+];
 const MAX_SCHEDULE_ROWS = 6;
 const MAX_TIME_ENTRIES_PER_SCHEDULE = 8;
 const COMPACT_UNDERLINED_FIELD_CONTROL_CLASS =
@@ -99,6 +106,7 @@ export function BehaviorForm({
 }: BehaviorFormProps) {
   const planningId = useId();
   const [selectedCategory, setSelectedCategory] = useState(behavior?.categoryId ?? "");
+  const [whereKind, setWhereKind] = useState<BehaviorWhereKind | "">(behavior?.whereKind ?? "");
   const [state, formAction] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
   const [scheduleRows, setScheduleRows] = useState<ScheduleFormRow[]>(() =>
@@ -120,15 +128,15 @@ export function BehaviorForm({
       if (submittedRevisionRef.current === draftRevisionRef.current) {
         setDraftDirty(false);
       }
-      // A changed saved location withdraws cached travel estimates (web and desktop hooks listen).
+      // A changed Where withdraws cached travel estimates (web and desktop hooks listen).
       const submitted = submittedLocationRef.current;
       submittedLocationRef.current = null;
-      if (submitted !== null && submitted !== (behavior?.locationText ?? "").trim() && typeof window !== "undefined") {
+      if (submitted !== null && submitted !== whereSignature(behavior?.whereKind ?? "", behavior?.locationText ?? "") && typeof window !== "undefined") {
         window.dispatchEvent(new Event("cadence:travel-changed"));
       }
       onSuccess?.(state);
     }
-  }, [behavior?.locationText, onSuccess, state]);
+  }, [behavior?.locationText, behavior?.whereKind, onSuccess, state]);
 
   function addScheduleRow() {
     if (scheduleRows.length >= MAX_SCHEDULE_ROWS) {
@@ -236,6 +244,7 @@ export function BehaviorForm({
     submittedRevisionRef.current = null;
     setDraftDirty(false);
     setSelectedCategory(behavior?.categoryId ?? "");
+    setWhereKind(behavior?.whereKind ?? "");
     setScheduleRows((rows) => resetBehaviorScheduleDraft(rows, behavior));
   }, [behavior]);
 
@@ -247,8 +256,10 @@ export function BehaviorForm({
       onReset={resetFormDraft}
       onSubmitCapture={(event) => {
         submittedRevisionRef.current = draftRevisionRef.current;
-        const location = new FormData(event.currentTarget).get("location_text");
-        submittedLocationRef.current = typeof location === "string" ? location.trim() : null;
+        const data = new FormData(event.currentTarget);
+        const where = data.get("where_kind");
+        const location = data.get("location_text");
+        submittedLocationRef.current = whereSignature(typeof where === "string" ? where : "", typeof location === "string" ? location : "");
       }}
       className="grid gap-6"
     >
@@ -302,9 +313,27 @@ export function BehaviorForm({
           defaultValue={behavior?.description ?? ""}
           error={fieldErrors.description}
         />
-        <TextField label="Location (optional)" name="location_text"
-          defaultValue={behavior?.locationText ?? ""} error={fieldErrors.location_text} />
-        <p className="text-sm text-muted-readable">Use a full address for travel planning. Clear the field to remove it. Saving a location does not enable routing.</p>
+        <div className="grid gap-3 sm:grid-cols-[minmax(12rem,20rem)_minmax(0,1fr)] lg:grid-cols-[minmax(14rem,24rem)_minmax(0,1fr)]">
+          <SelectField
+            label="Where"
+            name="where_kind"
+            value={whereKind}
+            onChange={(value) => setWhereKind(value as BehaviorWhereKind | "")}
+            error={fieldErrors.where_kind}
+          >
+            {WHERE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </SelectField>
+          {whereKind === "place" ? (
+            <TextField label="Place" name="location_text"
+              defaultValue={behavior?.whereKind === "place" ? behavior.locationText ?? "" : ""}
+              required error={fieldErrors.location_text} />
+          ) : null}
+        </div>
+        <p className="text-sm text-muted-readable">Travel estimates and scheduling advice work better when Where is set.</p>
       </fieldset>
 
       <fieldset className="grid gap-3 border-0 p-0">
@@ -756,6 +785,11 @@ function TimeEntryEditor({
       ) : null}
     </div>
   );
+}
+
+// Location text only counts for A place, matching the form parser.
+function whereSignature(whereKind: string, locationText: string): string {
+  return whereKind === "place" ? `place:${locationText.trim()}` : whereKind;
 }
 
 function TextField({

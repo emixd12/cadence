@@ -819,6 +819,7 @@ describe("BehaviorLog restore apply service", () => {
         changed_fields: [
           "category_id",
           "location_text",
+          "where_kind",
           "schedule_graph",
           "browser_reminder_enabled",
           "email_reminder_enabled",

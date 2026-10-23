@@ -71,7 +71,7 @@ describe("DayProgressTimeline", () => {
     await act(() => toggle!.click());
     const timing = container.querySelector('[aria-label="Travel timing"]');
     expect(timing?.textContent).toContain("Outbound");
-    expect(timing?.textContent).toContain("Return to saved base");
+    expect(timing?.textContent).toContain("Return home");
     expect(timing?.textContent).toContain("Available again");
     expect(timing?.textContent).toContain("Google Maps");
   });

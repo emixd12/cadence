@@ -22,7 +22,7 @@ import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAd
 import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@/lib/services/google-calendar.service";
-import { readTravelRouteSource } from "@/lib/services/travel-settings.service";
+import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 
 const ZERO_BUFFERS = { arrivalSeconds: 0, exitSeconds: 0, settlingSeconds: 0 } as const;
 const PLACE_LOOKUP_CONCURRENCY = 4;
@@ -106,7 +106,7 @@ export async function refreshTravelRoutes(
 
   const drafts = [
     ...calendarCommitmentDrafts(snapshot?.events ?? [], request, now),
-    ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, durationEstimates, timezone, now),
+    ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now),
   ].sort((left, right) => compareInstants(left.commitment.startAt, right.commitment.startAt));
   // Keep one unrouteable boundary commitment when the bounded source window truncates.
   const bounded = drafts.length > 9
@@ -120,7 +120,7 @@ export async function refreshTravelRoutes(
   });
   const basePoint = baseText ? places.get(baseText) ?? null : null;
   const base: TravelEndpoint | null = basePoint ? { ref: "base", point: basePoint, source: "saved_base", sourceRevision: source.settingsRevision, observedAt: now.toString() } : null;
-  const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, durationEstimates, timezone, now);
+  const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now);
   const device = request.device ? endpointForDevice(request.device, source.settingsRevision) : null;
   const journeyRevision = revision(source.settingsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections);
   const plan = resolveTravelPlan({
@@ -247,21 +247,33 @@ function calendarCommitmentDrafts(
   });
 }
 
+/**
+ * Ticket 215: A place routes to its text and Home routes to the saved Home.
+ * Not set, Anywhere, and Home without a saved Home request no route.
+ */
+function behaviorDestination(behavior: TravelRouteBehavior | undefined, homeText: string | null): Readonly<{ text: string; source: TravelEndpoint["source"] }> | null {
+  if (behavior?.whereKind === "place" && behavior.locationText) return { text: behavior.locationText, source: "behavior" };
+  if (behavior?.whereKind === "home" && homeText) return { text: homeText, source: "saved_base" };
+  return null;
+}
+
 function behaviorCommitmentDrafts(
   occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>,
-  behaviors: readonly { id: string; locationText: string | null; updatedAt: string }[],
+  behaviors: readonly TravelRouteBehavior[],
+  homeText: string | null,
   durations: ReadonlyMap<string, BehaviorDurationEstimate>,
   timezone: string,
   now: Temporal.Instant,
 ): CommitmentDraft[] {
   const behaviorById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   const prospective = occurrences
-    .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now) && !!behaviorById.get(occurrence.behavior_id)?.locationText)
+    .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now) && !!behaviorDestination(behaviorById.get(occurrence.behavior_id), homeText))
     .sort((left, right) => compareInstants(left.scheduled_for, right.scheduled_for));
   const candidates = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
   return candidates.flatMap((occurrence, index) => {
     const behavior = behaviorById.get(occurrence.behavior_id);
-    if (!behavior?.locationText) return [];
+    const destination = behaviorDestination(behavior, homeText);
+    if (!behavior || !destination) return [];
     const overflow = prospective.length > 9 && index === 8;
     return [{
       commitment: {
@@ -274,15 +286,16 @@ function behaviorCommitmentDrafts(
         mode: null,
         excluded: false,
       } as Omit<TravelCommitment, "endpoint">,
-      placeText: overflow ? null : behavior.locationText,
-      endpointSource: "behavior",
+      placeText: overflow ? null : destination.text,
+      endpointSource: destination.source,
     }];
   });
 }
 
 function behaviorOccupancyCandidates(
   occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>,
-  behaviors: readonly { id: string; locationText: string | null; updatedAt: string }[],
+  behaviors: readonly TravelRouteBehavior[],
+  homeText: string | null,
   durations: ReadonlyMap<string, BehaviorDurationEstimate>,
   timezone: string,
   now: Temporal.Instant,
@@ -292,9 +305,9 @@ function behaviorOccupancyCandidates(
     .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now))
     .flatMap((occurrence) => {
       const source = sourceById.get(occurrence.behavior_id);
-      // Located Behaviors already enter the travel plan. A nullable location
-      // still occupies time, but must never break the route chain.
-      if (!source || source.locationText) return [];
+      // Routed Behaviors already enter the travel plan. Not set, Anywhere and
+      // Home without a saved Home still occupy time but never break the route chain.
+      if (!source || behaviorDestination(source, homeText)) return [];
       const endAt = behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone);
       return endAt ? [{ ref: occurrence.id, kind: "behavior" as const, startAt: occurrence.scheduled_for, endAt }] : [];
     });
@@ -327,7 +340,7 @@ function revision(settingsRevision: string, generation: number, selectionRevisio
   return createHash("sha256").update(JSON.stringify({ settingsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, attendance, locationText }) => [eventId, correctionRevision, attendance, locationText]) })).digest("base64url");
 }
 
-function sameBehaviors(left: readonly { id: string; locationText: string | null; updatedAt: string }[], right: readonly { id: string; locationText: string | null; updatedAt: string }[]): boolean {
+function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly TravelRouteBehavior[]): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
