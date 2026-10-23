@@ -16,8 +16,8 @@ It never blocks setup completion and reads Saved once both values exist.
 - Saving from the row's destination sends nothing to Google, requests no device
   location and leaves the Travel estimates toggle unchanged.
 - Desktop shares the model and reads presence from local SQLite. Only a linked
-  account can ask the deployment, so local mode omits the row (assumption, not
-  owner-confirmed). Travel settings still saves both values offline.
+  account can ask the deployment, so local mode omits the row (owner decision,
+  October 23). Travel settings still saves both values offline.
 - Optional rows now take their one-line description from the shared model.
 
 No migration, hosted change, provider call or new data storage. Local checks pass:

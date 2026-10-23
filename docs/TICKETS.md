@@ -13264,9 +13264,9 @@ Implementation notes (October 22):
   returns two booleans. A failed read hides the row instead of failing Timeline.
 - The row is last in the list and reads "Saved" when complete, "Optional" otherwise.
   Optional rows now take their one-line description from the shared model.
-- Assumption, not confirmed by the owner: desktop local mode omits the row. Only a
-  linked account can ask the hosted deployment, and local mode cannot route. The
-  Travel settings panel still saves Home and usual travel offline in local mode.
+- Owner decision (October 23): desktop local mode omits the row. Only a linked
+  account can ask the hosted deployment, and local mode cannot route. The Travel
+  settings panel still saves Home and usual travel offline in local mode.
 
 Platform impact:
 - Web: `lib/services/onboarding-model.ts`, `lib/services/onboarding.service.ts`,
