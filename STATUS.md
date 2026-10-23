@@ -1,5 +1,43 @@
 # Implementation Status
 
+## Connector production secrets and redeploy — October 23, 2026
+
+The owner approved release steps 1–5 at 16:19 UTC. Steps 1–3 (preflight, dry
+run and the hosted push of the three connector and Where migrations) were
+already done by another session; see PR #139. This session did not run
+`supabase link`, `db push` or the hosted RLS smoke. `npm run smoke:rls` was
+skipped because it creates hosted auth users, which was not approved.
+
+- Vercel project `cadence`, Production only. The session added
+  `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (new random 32-byte key, sensitive),
+  `CONNECTOR_CREDENTIAL_KEY_ID`, `OUTLOOK_CALENDAR_CLIENT_ID`,
+  `OUTLOOK_CALENDAR_CALLBACK_URL` and `OUTLOOK_CALENDAR_CLIENT_SECRET`
+  (sensitive). `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS` stays unset. No values
+  were printed, logged or written to disk. `vercel env ls production` lists all
+  five names.
+- Outlook secret: the first `cadence-production` client secret on the Entra app
+  was created, but `vercel env add` did not store it. With coordinator approval
+  the session deleted that unused credential and created a new
+  `cadence-production` secret (expires 2027-10-23), which Vercel stored. The
+  app now holds `cadence-production` and the local test secret
+  `cadence-live-local`.
+- The app redeployed from `dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2` (commit `f922685`)
+  as `dpl_5UTt75NNMvovbABshuusrGkyXNAH`. The live marketing deployment was
+  `dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv` (the `f922685` build), so
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` to that ID; the readback matched. The app
+  was redeployed again as `dpl_4dgT9AH9ZtzPwi2ggfr7ZBxXeqmd`, Ready on
+  app.cadence-me.com at commit `f922685`.
+- An unauthenticated `GET /api/outlook-calendar/connection` returns 401
+  `unauthenticated`. Production logs from 16:24 to 18:50 UTC show no 5xx
+  responses or error-level entries. The coordinator separately observed the
+  expected disabled `/mcp` 503, and `GET` 200 on the Outlook, Hevy and iCloud
+  connection routes at 17:52 UTC.
+
+Still pending: step 6 (production smoke on the owner's accounts, then revoking
+test credentials) and step 7 (public disclosure copy, owner approves the
+wording). Desktop connectors arrive with the next signed release.
+
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
 Signed Cadence builds enable Hardened Runtime but did not sign the location
