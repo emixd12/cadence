@@ -9,6 +9,16 @@ the 0.1.4 session fix (never built or published) and the Ticket 165 location
 entitlement. The owner approved signing and notarizing the candidate; publication
 needs a separate instruction. Nothing was published.
 
+Built from `41e4549` (PR #140). Apple accepted the app and the DMG; both staples,
+Gatekeeper (including a quarantined copy), strict verification and all 14 release
+checks pass. The signed entitlements include the location entitlement with Hardened
+Runtime. The binary embeds schema 18 and only the stable feed. The updater archive
+and signature verify but were not uploaded. DMG SHA-256
+`9518085a0c27e950e709523925144d07a2f697a823bc83f8a5c719ca1c6bc686`.
+Native library tests (115) and repository checks pass. Open: owner install over
+the installed app (this Mac runs 0.1.2, the test Mac 0.1.3), Where sync both ways,
+the location prompt on a never-authorized user, and publication.
+
 Connector gating: production has no `CONNECTOR_CREDENTIAL_*` or
 `OUTLOOK_CALENDAR_*` settings, so Outlook, iCloud and Hevy each show "not configured
 for this Cadence deployment" with no controls. None is usable or broken.
