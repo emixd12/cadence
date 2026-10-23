@@ -88,8 +88,12 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   deletes them when it loads labels. Changing a status away from Completed deletes that
   occurrence's label. Settings deletes all markers on request and has a Delete labels
   control. Turning labels off deletes labels, markers and dismissals.
-- **Model input:** Ticket 219 later sends per-Behavior label counts, for example
-  "logged at home 9 of 10 times", without place keys, positions or text (P-004).
+- **Model input:** Ticket 219 sends per-Behavior label counts, for example "logged at
+  home 9 of 10 times", without place keys, positions or text (P-004). Owner decision,
+  October 23, 2026: the counts cover two periods, labeled separately, the 60-day
+  suggestion window and the user's full retained label history. With the "1 year" or
+  "until I delete them" choice, the model therefore receives counts from up to that
+  whole history.
 - **Affected:** Tickets 216, 219 and 244. Files: `components/settings/LegalContent.tsx`,
   `components/settings/TravelSettingsPanel.tsx`, `docs/user-guide/travel.md`,
   `docs/user-guide/data-portability.md`, `docs/PRODUCT_SPEC.md`, the travel redesign
@@ -231,6 +235,11 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     fit conclusions.
   - Stage 2: learned habits (usual mode per place and get-ready time), the weather
     outlook and label counts. Extend this entry when stage 2 is implemented.
+  - Owner decisions, October 23, 2026 (`docs/DECISIONS.md`): label counts cover both
+    the 60-day suggestion window and the full retained label history, labeled
+    separately. Live route and weather conclusions reach the model through a
+    server-signed conclusions token returned with the brief request, once the
+    server-only secret is provisioned. The token holds only Cadence's conclusions.
 
   Under `docs/LEGAL.md` L-001, Google route data reaches the model only as Cadence's
   own conclusions. Route durations, leave-by times, addresses, coordinates and place
@@ -265,6 +274,10 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     Brief Settings disclosure, the Privacy page and the OpenAI processor row.
   - Say in the Travel Settings line that usual travel is sent, while places and route
     results are not.
+  - Say that label counts cover the full retained history as well as the last 60
+    days.
+  - Say that live route and weather conclusions are sent once the signed token is
+    active.
   - Before live route conclusions ship, cover them in every disclosure, the Privacy
     page and marketing's AI claims (P-005, P-006).
   - Add the stage 2 facts when they ship.

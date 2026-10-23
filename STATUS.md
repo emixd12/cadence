@@ -22,6 +22,10 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   Google is sent from info@identityscaffolding.com and stays accepted risk.
 - October 23: the L-001 question went to Google as Maps Platform support case
   76805292; L-001 awaits the reply and stays accepted risk.
+- October 23: `docs/DECISIONS.md` records two Ticket 219 owner decisions: live route
+  and weather conclusions reach the brief through a server-signed token (Option A),
+  and label counts cover both the 60-day window and the full retained history. P-001
+  and P-004 record the privacy effect.
 - Backlog Ticket 243 tracks six-leg refresh speed and a before/after comparison at
   low priority; two-leg speed is confirmed. Backlog Ticket 244 adds place labels and
   "I'm here" markers to Full JSON and does not block Ticket 216.

@@ -1095,3 +1095,33 @@ input" and "2026-10-18: Google route data in model input; legal register". The
 written question to Google about the `docs/LEGAL.md` L-001 regime is sent from
 info@identityscaffolding.com; L-001 stays accepted risk. Recorded from the owner's
 October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Ticket 219 live conclusions reach the brief through a signed token
+
+The owner chose Option A. The travel routes response carries a server-signed (HMAC)
+token that holds only Cadence's deterministic route and weather conclusions. The
+Daily Brief request returns the token, and the server verifies it before the
+conclusions enter model input. This needs a new server-only secret and makes no
+extra Google calls. Live conclusions reach the model only after the secret is
+provisioned.
+
+Option B, routing the day again during brief generation, was rejected: it adds paid
+calls and breaks Ticket 170's rule against extra paid routing merely to generate
+prose. The `docs/LEGAL.md` L-001 regime still applies, including its open point on
+yes/no conclusions that bound a route duration from one side. Privacy text: P-004 in
+`docs/PRIVACY_CHANGES.md`.
+
+Ticket 219 implements the token on the travel release train (PR #138). Platform
+impact: web hosts the token and its verification; linked desktop uses the same hosted
+routes and brief generation; marketing claims are reviewed under P-006; future
+mobile would use the hosted path. Recorded from the owner's October 23 decisions,
+relayed by the orchestrating agent session.
+
+## 2026-10-23: Place-label counts cover the suggestion window and full history
+
+Daily Brief model input carries per-Behavior place-label counts for two periods,
+labeled separately: the 60-day suggestion window and the user's full retained label
+history. This keeps the retention copy's promise that longer retention lets the
+advisor learn more. Counts carry no place keys, positions or text. Privacy text:
+P-001 and P-004 in `docs/PRIVACY_CHANGES.md`. Recorded from the owner's October 23
+decisions, relayed by the orchestrating agent session.
