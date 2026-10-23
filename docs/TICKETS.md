@@ -13604,8 +13604,13 @@ Scope and acceptance:
 Follow-ups (not in this ticket):
 
 - Exports: learned habits, Home and usual travel are not in any export yet.
-- Ticket 219 reads `resolveTravelHabits` and `rememberedTravelMode` for model facts;
-  Ticket 218 adds its weather margin beside `preparationSeconds`.
+- Ticket 219 reads `resolveTravelHabits` and `rememberedTravelMode` for model facts.
+- Merging with Ticket 218: its weather margin is a separate `TravelEvidenceInput.weather`
+  input, not a buffer, so the APIs sit side by side. One semantic step remains at
+  merge: get-ready time must end at the weather-adjusted departure
+  (`entry.weather?.departureAt ?? estimate.departureAt`), as Ticket 218 does for
+  settling. The refresh service then passes the learned `buffers` and `weather`
+  together and drops `ZERO_BUFFERS`.
 
 Platform impact:
 - Web: travel resolver, refresh service, `/api/travel/habits`, event details, located

@@ -428,11 +428,14 @@ function resolveSegments(
     segments.push(segment(`route:${leg.id}`, "route", estimate.departureAt, estimate.arrivalAt, sourceRefs, leg.id));
 
     // Ticket 217: get-ready time before a leg from Home or the current position.
-    // It occupies the span before departure and never moves the departure itself.
+    // It ends at the departure the user is shown and never moves that departure.
+    // When a weather margin (Ticket 218) moves the departure earlier, get-ready
+    // time ends at that earlier departure, so the two spans never overlap.
     const preparationSeconds = buffers.preparationSeconds ?? 0;
     if (leg.role === "outbound" && preparationSeconds > 0) {
-      const start = instant(estimate.departureAt, "Route departure").subtract({ seconds: preparationSeconds }).toString();
-      segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start, estimate.departureAt, sourceRefs, leg.id));
+      const leaveAt = estimate.departureAt;
+      const start = instant(leaveAt, "Route departure").subtract({ seconds: preparationSeconds }).toString();
+      segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start, leaveAt, sourceRefs, leg.id));
     }
 
     const origin = leg.originCommitmentRef ? commitmentsByRef.get(leg.originCommitmentRef) : null;
