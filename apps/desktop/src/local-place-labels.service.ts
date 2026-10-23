@@ -45,8 +45,9 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
   const profile = () => localCommand("readProfile", {});
   const rows = (profileId: string) => localCommand("readPlaceLabels", { profileId }) as Promise<LocalPlaceLabelRows>;
   const now = () => canonicalTravelInstant(Temporal.Now.instant().toString());
-  const commit = async (profileId: string, mutation: LocalPlaceLabelMutation) => {
-    await localCommand("commitPlaceLabels", { ...localMutation(profileId, now()), mutation });
+  // One instant per commit: the native settings save requires `updated_at` to equal it.
+  const commit = async (profileId: string, mutation: LocalPlaceLabelMutation, at = now()) => {
+    await localCommand("commitPlaceLabels", { ...localMutation(profileId, at), mutation });
     onChanged();
   };
   const today = (timezone: string) => Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate();
@@ -108,7 +109,7 @@ export function createLocalPlaceLabelClient(onChanged: () => void = () => undefi
         enabled_at: input.enabled ? stored?.enabled_at ?? at : null,
         marker_prompt_dismissed_at: input.markerPromptDismissed ? stored?.marker_prompt_dismissed_at ?? at : null,
         updated_at: at,
-      } });
+      } }, at);
       return load();
     },
     async recordMarker(marker) {

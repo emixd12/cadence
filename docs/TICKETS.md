@@ -13466,9 +13466,10 @@ Platform impact:
 ## Ticket 216: Completion place labels and Where suggestions
 
 Status: revised October 22, 2026 from the owner's decisions below; implemented in
-source on branch `claude/ticket-216-place-labels-b20c33` (draft PR against Ticket 215's
-branch). Not deployed. Hosted migration `20261022160000_completion_place_labels.sql`,
-SQLite migration 0019, deployment and live device acceptance remain owner-gated.
+source October 23 on branch `claude/ticket-216-place-labels-b20c33` (draft PR against
+Ticket 215's branch). Not deployed. Hosted migration
+`20261022160000_completion_place_labels.sql`, SQLite migration 0019, deployment and
+live device acceptance remain owner-gated. Verification is in `STATUS.md`.
 Dependencies: 215. Ticket 219 owns label counts in model input.
 
 Owner decisions, October 22, 2026:
