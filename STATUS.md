@@ -1,5 +1,44 @@
 # Implementation Status
 
+## Connector and Where hosted migrations applied — October 23, 2026
+
+PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
+15:58 UTC. Both deployed before their hosted migrations, against the rollout
+order in `docs/qa/2026-10-21-behavior-where-rollout.md`. A read-only Data API
+probe of the linked project `qjodzutjxtmtzczbloxa` showed `behaviors.where_kind`
+missing (42703), and `connector_connections` and `connector_preferences` absent
+(PGRST205). Travel settings, route refresh and the connector Settings panels
+were exposed until the push. Production logs for the prior three hours held 50
+entries, one error and no schema-related failures.
+
+The owner authorized the forward fix and accepted that signed Cadence for Mac
+0.1.3 stops synchronizing Behaviors until a Where-compatible 0.1.5 ships.
+
+- `migration list --linked` matched every hosted version through
+  `20261019025157`, with no hosted-only entries. Exactly three local migrations
+  were pending, and the dry run listed the same three.
+- `db push` applied, in order, `20261019040000_connector_lifecycle.sql`,
+  `20261019041000_daily_brief_connector_disclosure.sql` and
+  `20261019180000_add_behavior_where.sql`. The readback lists all three as
+  applied.
+- Probes after the push: `behaviors.where_kind` returns 200. Both connector
+  tables exist and refuse anonymous reads (42501).
+- The project-local CLI 2.105.0 binary was killed at startup (exit 137) in the
+  operator shell, so the hosted commands used Homebrew CLI 2.109.1.
+- PR #134 (location entitlement) merged at 16:06 UTC as `f922685`. Vercel built
+  no web deployment for it.
+- Trust: the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+  marketing `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` (the PR #112 build), and the
+  readback matched. The app was redeployed as `dpl_A5td86nYSP5Gboe4peeeGif95v3u`
+  on app.cadence-me.com. Provenance shows Stale until the next scheduled
+  collection.
+
+Not verified: an authenticated save of a Behavior's Where and an authenticated
+Travel Settings or connector Settings view on production. The Where backfill
+count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
+Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
+migrations and a signed 0.1.5 before release.
+
 ## Travel decisions and privacy-change log — October 22, 2026
 
 Documentation only; no runtime, schema, hosted text or deployment change.
