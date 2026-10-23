@@ -73,8 +73,8 @@ jobs:
       - name: Diagnose temporary Preview access once
         env:
           TRUST_SOURCE_COMMIT: b9012fc1948af44bb1bdac6994771ef7a3e38dba
-          TRUST_APPLICATION_DEPLOYMENT_ID: dpl_EvVtMmLeDbY84mGmLYYiFuXSJnQC
-          TRUST_APPLICATION_DEPLOYMENT_URL: https://cadence-5xgfxe4ea-emis-projects-4c886aeb.vercel.app
+          TRUST_APPLICATION_DEPLOYMENT_ID: dpl_8LwrwewgTww3HuA9XkuQJtsfvzzB
+          TRUST_APPLICATION_DEPLOYMENT_URL: https://cadence-qkg9dfnlt-emis-projects-4c886aeb.vercel.app
           TRUST_MARKETING_DEPLOYMENT_ID: dpl_H7zpHzDXNF6v9mTCj2pkqZbhfY3u
           TRUST_MARKETING_DEPLOYMENT_URL: https://cadence-marketing-pd3kiacp7-emis-projects-4c886aeb.vercel.app
           TRUST_PAGES_ORIGIN: https://emixd12.github.io/cadence/
