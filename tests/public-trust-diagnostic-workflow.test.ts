@@ -22,11 +22,11 @@ it("pins trusted diagnostic code separately from the deployed subject without pu
   expect(job.steps[0].with).toEqual({ ref: "8892fc4b377f864d4573f4fdabba042e782f5446", "persist-credentials": false });
   expect(job.steps[1].with).toEqual({ "node-version": "24.x" });
   expect(diagnostic.env).toEqual({
-    TRUST_SOURCE_COMMIT: "b9012fc1948af44bb1bdac6994771ef7a3e38dba",
-    TRUST_APPLICATION_DEPLOYMENT_ID: "dpl_8LwrwewgTww3HuA9XkuQJtsfvzzB",
-    TRUST_APPLICATION_DEPLOYMENT_URL: "https://cadence-qkg9dfnlt-emis-projects-4c886aeb.vercel.app",
-    TRUST_MARKETING_DEPLOYMENT_ID: "dpl_H7zpHzDXNF6v9mTCj2pkqZbhfY3u",
-    TRUST_MARKETING_DEPLOYMENT_URL: "https://cadence-marketing-pd3kiacp7-emis-projects-4c886aeb.vercel.app",
+    TRUST_SOURCE_COMMIT: "f92268549739f3056c4770d742b3da6255d875a3",
+    TRUST_APPLICATION_DEPLOYMENT_ID: "dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2",
+    TRUST_APPLICATION_DEPLOYMENT_URL: "https://cadence-5hemp3ze0-emis-projects-4c886aeb.vercel.app",
+    TRUST_MARKETING_DEPLOYMENT_ID: "dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv",
+    TRUST_MARKETING_DEPLOYMENT_URL: "https://cadence-marketing-hrhkbp4x5-emis-projects-4c886aeb.vercel.app",
     TRUST_PAGES_ORIGIN: "https://emixd12.github.io/cadence/",
     VERCEL_APPLICATION_PROJECT_ID: "prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs",
     VERCEL_MARKETING_PROJECT_ID: "prj_BLlsxoaz1wSvWuK7xcZLLkHglQcR",
