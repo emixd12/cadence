@@ -19,9 +19,11 @@ type GoogleCalendarPanelProps = Readonly<{
   wrongAccount?: boolean;
   openExternalUrl?: (url: string) => Promise<void>;
   refreshVersion?: number;
+  /** Renders as one source inside ConnectorLibrary. */
+  nested?: boolean;
 }>;
 
-export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage, wrongAccount = false, openExternalUrl, refreshVersion = 0 }: GoogleCalendarPanelProps) {
+export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage, wrongAccount = false, openExternalUrl, refreshVersion = 0, nested = false }: GoogleCalendarPanelProps) {
   const [connection, setConnection] = useState<CalendarConnectionView | null>(null);
   const [calendars, setCalendars] = useState<readonly CalendarListEntry[] | null>(null);
   const [preferences, setPreferences] = useState<CalendarPreferences | null>(null);
@@ -92,7 +94,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const connectLabel = status === "reconnect_required" ? "Reconnect Google Calendar" : "Connect Google Calendar";
 
   return (
-    <SettingsPanel title="Google Calendar" description="Read-only context from the Google account used for Cadence. Calendar events never change Behavior status or schedules.">
+    <SettingsPanel title="Google Calendar" headingLevel={nested ? 3 : 2} id={nested ? "connector-google_calendar" : undefined} description="Read-only context from the Google account used for Cadence. Calendar events never change Behavior status or schedules.">
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
         <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? statusLabel(status)}</p>
         {wrongAccount ? <p role="status" className="text-muted-readable">
@@ -122,8 +124,12 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   );
 }
 
-function CalendarSelector({ calendars, preferences, onChange, disabled }: Readonly<{
-  calendars: readonly CalendarListEntry[] | null;
+/** Shared calendar choice field; Outlook reuses it with its own selection keys mapped in. */
+export type CalendarChoiceEntry = Pick<CalendarListEntry, "id" | "name" | "primary">;
+
+export function CalendarSelector({ calendars, preferences, onChange, disabled, refreshLabel = "Refresh Calendar" }: Readonly<{
+  calendars: readonly CalendarChoiceEntry[] | null;
+  refreshLabel?: string;
   preferences: CalendarPreferences;
   onChange: (preferences: CalendarPreferences) => void;
   disabled: boolean;
@@ -153,7 +159,7 @@ function CalendarSelector({ calendars, preferences, onChange, disabled }: Readon
         <label htmlFor={searchId}>Search calendars</label>
         <input id={searchId} type="search" value={query} onChange={(event) => setQuery(event.target.value)} className="min-h-11 min-w-0 w-full border border-line bg-background px-3 py-2" />
         <div className="max-h-64 overflow-y-auto overscroll-contain divide-y divide-line">
-          {calendars === null ? <p className="text-muted-readable">Calendar list is not loaded. Try Refresh Calendar.</p>
+          {calendars === null ? <p className="text-muted-readable">Calendar list is not loaded. Try {refreshLabel}.</p>
             : calendars.length === 0 ? <p className="text-muted-readable">No readable calendars are available.</p>
             : matches.length === 0 ? <p className="text-muted-readable">No calendars match your search.</p>
             : matches.map((calendar) => <CalendarChoice key={calendar.id} calendar={calendar} preferences={preferences} onChange={onChange} />)}
@@ -164,7 +170,7 @@ function CalendarSelector({ calendars, preferences, onChange, disabled }: Readon
 }
 
 function CalendarChoice({ calendar, preferences, onChange }: Readonly<{
-  calendar: CalendarListEntry;
+  calendar: CalendarChoiceEntry;
   preferences: CalendarPreferences;
   onChange: (preferences: CalendarPreferences) => void;
 }>) {

@@ -31,9 +31,33 @@ describe("Daily Brief repository", () => {
       calendarSelectionRevision: 11,
       includeReminderHistory: false,
       includeNotes: false,
+      includeOutlookCalendar: false,
+      outlookConnectionGeneration: null,
+      outlookSelectionRevision: null,
+      includeIcloudCalendar: false,
+      icloudConnectionGeneration: null,
+      icloudSelectionRevision: null,
+      includeHevy: false,
+      hevyConnectionGeneration: null,
     });
     expect(rpc).toHaveBeenCalledWith("read_daily_brief_preferences");
     expect(abortSignal).toHaveBeenCalledWith(signal);
+  });
+
+  it("reads connector disclosures with their bound fences and rejects a disclosure without one (Ticket 239)", async () => {
+    const read = (data: unknown) => readDailyBriefPreferences({ rpc: vi.fn().mockResolvedValue({ data, error: null }) } as never);
+    await expect(read({
+      ...preferences, include_outlook_calendar: true, outlook_connection_generation: 4, outlook_selection_revision: 5,
+      include_icloud_calendar: false, icloud_connection_generation: null, icloud_selection_revision: null,
+      include_hevy: true, hevy_connection_generation: 2,
+    })).resolves.toMatchObject({
+      includeCalendar: true, includeOutlookCalendar: true, outlookConnectionGeneration: 4, outlookSelectionRevision: 5,
+      includeIcloudCalendar: false, includeHevy: true, hevyConnectionGeneration: 2,
+    });
+    await expect(read({ ...preferences, include_hevy: true, hevy_connection_generation: null })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, include_outlook_calendar: true, outlook_connection_generation: 4 })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, include_hevy: false, hevy_connection_generation: 2 })).rejects.toThrow("invalid result");
+    await expect(read({ ...preferences, include_hevy: "true", hevy_connection_generation: 2 })).rejects.toThrow("invalid result");
   });
 
   it("saves only the requested controls and expected revision", async () => {
@@ -43,13 +67,24 @@ describe("Daily Brief repository", () => {
       { enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: true },
       2,
     );
-    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences_v2", {
+    expect(rpc).toHaveBeenCalledWith("save_daily_brief_preferences_v3", {
       p_enabled: true,
       p_include_calendar: true,
       p_include_reminder_history: false,
       p_include_notes: true,
+      p_include_outlook_calendar: false,
+      p_include_icloud_calendar: false,
+      p_include_hevy: false,
       p_expected_revision: 2,
     });
+    await saveDailyBriefPreferences(
+      { rpc } as never,
+      { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, includeOutlookCalendar: true, includeHevy: true },
+      3,
+    );
+    expect(rpc).toHaveBeenLastCalledWith("save_daily_brief_preferences_v3", expect.objectContaining({
+      p_include_calendar: false, p_include_outlook_calendar: true, p_include_icloud_calendar: false, p_include_hevy: true, p_expected_revision: 3,
+    }));
   });
 
   it("normalizes acquisition and bounds completion with the supplied signal", async () => {

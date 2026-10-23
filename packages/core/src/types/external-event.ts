@@ -5,11 +5,32 @@ import type {
   ExternalEventResponseStatus,
   ExternalEventRevision,
   ExternalEventState,
+  ExternalEventSource,
   NormalizedExternalEvent,
 } from "./day-progress";
 
+/** Google Calendar wire version. Google responses stay exactly `1.0.0`. */
 export const EXTERNAL_EVENT_SCHEMA_VERSION = "1.0.0" as const;
 export const EXTERNAL_EVENT_ADAPTER_VERSION = "google-calendar-v1" as const;
+/** Wire version for the Outlook and iCloud calendar sources only (Ticket 234). */
+export const EXTERNAL_EVENT_SCHEMA_VERSION_1_1 = "1.1.0" as const;
+export const OUTLOOK_CALENDAR_ADAPTER_VERSION = "outlook-calendar-v1" as const;
+export const ICLOUD_CALENDAR_ADAPTER_VERSION = "icloud-calendar-v1" as const;
+/** Each source accepts exactly one schema/adapter pair. */
+export const EXTERNAL_EVENT_SOURCE_VERSIONS = Object.freeze({
+  google_calendar: Object.freeze({
+    schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION,
+    adapterVersion: EXTERNAL_EVENT_ADAPTER_VERSION,
+  }),
+  outlook_calendar: Object.freeze({
+    schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION_1_1,
+    adapterVersion: OUTLOOK_CALENDAR_ADAPTER_VERSION,
+  }),
+  icloud_calendar: Object.freeze({
+    schemaVersion: EXTERNAL_EVENT_SCHEMA_VERSION_1_1,
+    adapterVersion: ICLOUD_CALENDAR_ADAPTER_VERSION,
+  }),
+} as const);
 export const EXTERNAL_EVENT_MAX_CALENDARS = 32;
 export const EXTERNAL_EVENT_MAX_RANGE_DAYS = 31;
 
@@ -102,6 +123,43 @@ export type ExternalEventSnapshotV1 = Readonly<{
   tombstones: ExternalEventCancellationTombstone[];
 }>;
 
+export type ExternalEventSourceV1_1 = Exclude<ExternalEventSource, "google_calendar">;
+
+export type ExternalEventCancellationTombstoneV1_1 = Omit<
+  ExternalEventCancellationTombstone,
+  "source"
+> & Readonly<{ source: ExternalEventSourceV1_1 }>;
+
+type ExternalEventSnapshotV1_1Body<Source extends ExternalEventSourceV1_1> = Omit<
+  ExternalEventSnapshotV1,
+  "schemaVersion" | "adapterVersion" | "source" | "tombstones"
+> & Readonly<{
+  schemaVersion: typeof EXTERNAL_EVENT_SCHEMA_VERSION_1_1;
+  adapterVersion: (typeof EXTERNAL_EVENT_SOURCE_VERSIONS)[Source]["adapterVersion"];
+  source: Source;
+  tombstones: Array<ExternalEventCancellationTombstoneV1_1 & Readonly<{ source: Source }>>;
+}>;
+
+/** Outlook or iCloud snapshot. Served only by new provider routes. */
+export type ExternalEventSnapshotV1_1 =
+  | ExternalEventSnapshotV1_1Body<"outlook_calendar">
+  | ExternalEventSnapshotV1_1Body<"icloud_calendar">;
+
+export type VersionedExternalEventSnapshot =
+  | ExternalEventSnapshotV1
+  | ExternalEventSnapshotV1_1;
+
+/** Every cache or stored snapshot key binds these facts together. */
+export type ExternalEventSnapshotScope = Readonly<{
+  source: ExternalEventSource;
+  accountId: string;
+  connectionGeneration: number;
+  startLocalDate: string;
+  endLocalDate: string;
+  timezone: string;
+  selectedCalendarIds: readonly string[];
+}>;
+
 export type ExternalEventSchedulingFact = Readonly<{
   id: string;
   providerEventId: string;
@@ -143,4 +201,13 @@ export type ExternalEventSchedulingProjection = Readonly<{
   coverage: ExternalEventCoverage[];
   events: ExternalEventSchedulingFact[];
   tombstones: ExternalEventCancellationTombstone[];
+}>;
+
+export type ExternalEventSchedulingProjectionV1_1 = Omit<
+  ExternalEventSchedulingProjection,
+  "schemaVersion" | "tombstones"
+> & Readonly<{
+  schemaVersion: typeof EXTERNAL_EVENT_SCHEMA_VERSION_1_1;
+  source: ExternalEventSourceV1_1;
+  tombstones: ExternalEventCancellationTombstoneV1_1[];
 }>;

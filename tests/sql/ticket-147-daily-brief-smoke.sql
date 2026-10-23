@@ -28,7 +28,7 @@ declare
   lease uuid;
 begin
   preference := public.read_daily_brief_preferences();
-  if preference - 'include_reminder_history' - 'include_notes' <> '{"enabled":false,"include_calendar":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null}'::jsonb then
+  if preference <> '{"enabled":false,"include_calendar":false,"include_reminder_history":false,"include_notes":false,"revision":0,"calendar_connection_generation":null,"calendar_selection_revision":null,"include_outlook_calendar":false,"outlook_connection_generation":null,"outlook_selection_revision":null,"include_icloud_calendar":false,"icloud_connection_generation":null,"icloud_selection_revision":null,"include_hevy":false,"hevy_connection_generation":null}'::jsonb then
     raise exception 'Daily Brief defaults changed: %', preference;
   end if;
 

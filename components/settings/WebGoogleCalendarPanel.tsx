@@ -6,10 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { GoogleCalendarPanel } from "./GoogleCalendarPanel";
 import { calendarRangeForToday, webGoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 
-export function WebGoogleCalendarPanel({ timezone }: Readonly<{ timezone: string }>) {
+export function WebGoogleCalendarPanel({ timezone, nested = false }: Readonly<{ timezone: string; nested?: boolean }>) {
   const refreshRange = useMemo(() => calendarRangeForToday(timezone), [timezone]);
   const searchParams = useSearchParams();
-  return <GoogleCalendarPanel coordinator={webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={calendarCallbackMessage(searchParams?.get("calendar"))} wrongAccount={searchParams?.get("calendar") === "same_account_required"} />;
+  return <GoogleCalendarPanel coordinator={webGoogleCalendarCoordinator} refreshRange={refreshRange} callbackMessage={calendarCallbackMessage(searchParams?.get("calendar"))} wrongAccount={searchParams?.get("calendar") === "same_account_required"} nested={nested} />;
 }
 
 export function calendarCallbackMessage(code: string | null): string | undefined {

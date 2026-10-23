@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadence.local/schemas/recorded-activity-snapshot-1.0.0.json",
+  "title": "Cadence recorded activity snapshot (Hevy workout timing)",
+  "description": "Actual past workout intervals. Not a scheduled event and not a Cadence completion. Runtime validation adds derived-duration, range, fetch-time, coverage-count, and uniqueness checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "adapterVersion",
+    "source",
+    "accountId",
+    "connectionGeneration",
+    "requestedRange",
+    "fetchedAt",
+    "completeness",
+    "coverage",
+    "failures",
+    "activities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "adapterVersion": { "const": "hevy-workouts-v1" },
+    "source": { "const": "hevy" },
+    "accountId": { "$ref": "#/$defs/nonEmptyString" },
+    "connectionGeneration": { "type": "integer", "minimum": 1 },
+    "requestedRange": { "$ref": "#/$defs/requestedRange" },
+    "fetchedAt": { "$ref": "#/$defs/instant" },
+    "completeness": { "enum": ["complete", "incomplete"] },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "failures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/failure" }
+    },
+    "activities": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/activity" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "instant": { "type": "string", "format": "date-time" },
+    "date": { "type": "string", "format": "date" },
+    "count": { "type": ["integer", "null"], "minimum": 0 },
+    "requestedRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startLocalDate", "endLocalDate", "timezone"],
+      "properties": {
+        "startLocalDate": { "$ref": "#/$defs/date" },
+        "endLocalDate": { "$ref": "#/$defs/date" },
+        "timezone": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pagesRead", "pageCount", "countBefore", "countAfter", "itemCount", "duplicatesRemoved", "paginationComplete"],
+      "properties": {
+        "pagesRead": { "type": "integer", "minimum": 0, "maximum": 50 },
+        "pageCount": { "$ref": "#/$defs/count" },
+        "countBefore": { "$ref": "#/$defs/count" },
+        "countAfter": { "$ref": "#/$defs/count" },
+        "itemCount": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "duplicatesRemoved": { "type": "integer", "minimum": 0 },
+        "paginationComplete": { "type": "boolean" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "retryable", "retryAfterSeconds", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "unauthenticated",
+            "not_connected",
+            "permission_denied",
+            "wrong_account",
+            "reconnect_required",
+            "rate_limited",
+            "provider_unavailable",
+            "timeout",
+            "malformed_provider_response",
+            "incomplete_pagination",
+            "invalid_request",
+            "unsupported_schema_version"
+          ]
+        },
+        "retryable": { "type": "boolean" },
+        "retryAfterSeconds": { "$ref": "#/$defs/count" },
+        "message": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "startAt", "endAt", "duration", "localStartDate", "revision", "fieldAvailability"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^hevy/[0-9a-f]{64}$" },
+        "kind": { "const": "workout" },
+        "startAt": { "$ref": "#/$defs/instant" },
+        "endAt": { "$ref": "#/$defs/instant" },
+        "duration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "seconds"],
+          "properties": {
+            "kind": { "const": "known" },
+            "seconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "localStartDate": { "$ref": "#/$defs/date" },
+        "revision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["availability", "providerUpdatedAt"],
+          "properties": {
+            "availability": { "enum": ["available", "unavailable"] },
+            "providerUpdatedAt": { "oneOf": [{ "$ref": "#/$defs/instant" }, { "type": "null" }] }
+          }
+        },
+        "fieldAvailability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["location", "sourceTimezone"],
+          "properties": {
+            "location": { "const": "unsupported" },
+            "sourceTimezone": { "const": "unsupported" }
+          }
+        }
+      }
+    }
+  }
+}

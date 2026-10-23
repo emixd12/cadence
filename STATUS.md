@@ -16,6 +16,54 @@ published. Proposed: ride the 0.1.4 stable update and run the prompt test on the
 Platform impact: desktop signing only. Web, marketing and future mobile have no
 change. No schema, migration or hosted configuration changed.
 
+## Travel decisions and privacy-change log — October 22, 2026
+
+Documentation only; no runtime, schema, hosted text or deployment change.
+
+- The owner's October 22 decisions on Tickets 165 and 216–219, the confirmed travel
+  budget posture and the privacy rule are recorded in `docs/DECISIONS.md`
+  (2026-10-22). The budget posture: US$5 per user per calendar month, in the user's
+  timezone, Google Maps calls only.
+- `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
+  privacy pass, privacy, disclosure and marketing-language conflicts are logged there
+  and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
+  219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
+  and the "saved base" wording that Ticket 215 renamed to Home. P-003 and P-004 now
+  also cover the draft Ticket 218 (PR #133) and Ticket 219 stage 1 (PR #132) reports;
+  P-001 and P-002 cover the draft Ticket 216 (PR #137) and 217 (PR #136) reports.
+  Entries use the status "logged". That pass is not yet ticketed.
+- `docs/LEGAL.md`: L-003 resolved by the "I'm here" marker design (option B); L-008
+  records the free Open-Meteo plan for development and testing and stays open until
+  API Standard is subscribed; L-011 moved to P-003; L-001's written question to
+  Google is sent from info@identityscaffolding.com and stays accepted risk.
+- October 23: the L-001 question went to Google as Maps Platform support case
+  76805292; L-001 awaits the reply and stays accepted risk.
+- October 23: `docs/DECISIONS.md` records two Ticket 219 owner decisions: live route
+  and weather conclusions reach the brief through a server-signed token (Option A),
+  and label counts cover both the 60-day window and the full retained history. P-001
+  and P-004 record the privacy effect.
+- Backlog Ticket 243 tracks six-leg refresh speed and a before/after comparison at
+  low priority; two-leg speed is confirmed. Backlog Ticket 244 adds place labels and
+  "I'm here" markers to Full JSON and does not block Ticket 216.
+- Signed Cadence for Mac 0.1.3 (published October 22) replaces the "blocked until
+  Developer ID signing" lines in the travel redesign intro, Ticket 214,
+  `docs/DESKTOP_PARITY.md` and `docs/user-guide/travel.md`. Ticket 165 handles the
+  manual macOS location permission path.
+- Three items that main already cited but never received are restored from local
+  uncommitted work, with the owner's approval: the `docs/DECISIONS.md` entries
+  "2026-10-17: Travel redesign budget, Behavior Where and model input", "2026-10-18:
+  Google route data in model input; legal register" and "2026-10-18: Weather
+  provider is Open-Meteo"; `docs/plans/2026-10-17-weather-provider-comparison.md`;
+  and the `docs/COSTS.md` line in the `AGENTS.md` source-of-truth list (item 28).
+  The October 22 entries and a dated note in the plan record what they supersede.
+
+Checks: `npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check` and `git diff --check` pass. Lint is not applicable: the
+repository has no Markdown linter, and no source file changed.
+
+Platform impact: documentation for web, desktop and marketing; no implementation.
+Future mobile is not applicable.
+
 ## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
@@ -154,6 +202,471 @@ and the owner's publication instruction. See
 
 Platform impact: desktop authentication only; web, marketing and future mobile
 have no implementation change. No schema or hosted configuration changes.
+
+## Tickets 233–241 connector expansion — October 18, 2026
+
+Microsoft publisher verification started October 22, 2026 (public-approval
+gate for Ticket 237). The Entra app, renamed from "Cadence Calendar" to
+"Cadence" with the Cadence logo on October 22 so consent screens show Cadence
+(tenant identityscaffolding.com), has publisher domain `identityscaffolding.com`, a
+verified tenant domain, and now lists privacy (`https://app.cadence-me.com/privacy`),
+terms (`https://app.cadence-me.com/terms`) and homepage (`https://cadence-me.com`)
+links. Owner decision: Identity Scaffolding is the publishing entity; the
+verified-publisher line will read Identity Scaffolding under the Cadence app
+name. Deferred by the owner on October 22: Partner Program enrollment waits for
+a company-registration issue to be resolved. Until then the app stays
+unverified: personal accounts and work tenants that allow user consent to
+unverified apps can connect; other tenants need an administrator. The app has
+no verified publisher yet.
+
+The owner approved read-only Outlook Calendar, iCloud Calendar, and Hevy workout
+timing on web and linked desktop. `origin/main` already uses Tickets 187–219;
+this branch (`expansion-connectors`, based on `12ea89a`) merged `origin/main`
+at `041546e` locally on October 18, 2026, before Ticket 234 runtime work.
+The integrated baseline `d7af234` was independently approved.
+Renumbered from 220–228 on 2026-10-19 to avoid collision with main's MCP
+Tickets 220–232; earlier commits and approvals cite the old numbers.
+
+- PR #111 review, October 21, 2026: fixed Outlook and Hevy service reads that
+  could wait past their deadline on database queries or the final credential
+  fence. All three new connectors now use one shared deadline helper, and late
+  database completion cannot start provider work after timeout. Fixed Outlook
+  and iCloud selection saves that could restore selected calendars after a
+  concurrent disconnect; writes now compare the previously read selection
+  revision. Eight failing-first regressions reproduced both defects. No schema,
+  provider permission, or disclosure changed. Hosted migration, personal Outlook
+  scope approval, and installed/deployed acceptance remain separate gates.
+  Verification: all seven required checks pass; the full suite passed 3,384
+  tests with 165 skipped after an elevated rerun for loopback/subprocess fixtures.
+  The web build passed on an elevated retry after an initial generic webpack
+  failure that did not identify its cause. Core, desktop
+  typecheck/build/parity, design-system and load-manifest checks also pass.
+  This Linux review environment has no Docker or Rust toolchain, so it did not
+  repeat migration replay or native tests.
+
+- Review stack integration, October 21, 2026: merged reviewed PR #83 and current
+  main `d598afc`, including #110's corrected SQL smoke. Connector behavior,
+  disclosure defaults, `requireCurrentUser`, monthly travel-spend readback and
+  its unavailable fallback remain present. This merge changes documentation
+  and a SQL smoke fixture, without changing application runtime code; migration
+  replay still requires the separate local database environment.
+
+- Merge of `origin/main` at `c42ca9e` (MCP Tickets 220–232), October 19, 2026:
+  connector migrations were renamed to `20261019040000_connector_lifecycle.sql`
+  and `20261019041000_daily_brief_connector_disclosure.sql` so they sort after
+  main's hosted head `20261019025157`; neither was ever applied on hosted.
+  Seventeen conflicts kept both sides; legal copy keeps main's approved MCP text
+  plus the connector paragraphs. Merge fixes restored `requireCurrentUser` (used
+  by main's OAuth UI) and removed a duplicate `SettingsPanel` `id` prop. Node
+  26.0.0 passed all seven required checks plus core, design-system, load
+  manifest, desktop typecheck/build/parity and marketing build/check. The
+  two-worker suite passed 3,432 tests (94 skipped) with no timeout. A disposable
+  `cadence-merge-replay` project applied all 88 migrations; its CLI start
+  published ports on `0.0.0.0` briefly, so the containers were stopped at once
+  and smokes ran in a port-less container. 20 of 21 `tests/sql` smokes passed then; the
+  inherited `behavior-end-date-lifecycle-smoke.sql:138` failure was a stale test,
+  fixed on main by PR #110 and merged here on October 21 (all 21 pass; see
+  Ticket 242). Everything disposable was removed; retained
+  databases were not touched. No hosted migration push or deployment.
+- Merge of `origin/main` at `7cb8133` (signed desktop 0.1.1 work, Tickets 115
+  and 178–181), October 20, 2026: no new migrations and no ticket-number overlap.
+  Conflicts in STATUS, TICKETS and two desktop tests kept both sides. All seven
+  required checks plus core, design-system, load manifest, desktop
+  typecheck/build/parity and marketing build/check pass. The two-worker suite
+  passed 3,434 tests (94 skipped); only `tests/desktop-release-cli.test.ts`
+  failed, on 5-second timeouts. Run alone it still times out; with
+  `--testTimeout=60000` all 25 tests pass in 122 seconds, so it is slow, not
+  broken, and it also fails on the pre-change commit.
+- Merge of `origin/main` at `b9012fc` (desktop 0.1.3 publication, Astro 7.4.0
+  and Vitest 5.0.5 upgrades), October 22, 2026: no new migrations or tickets.
+  The only conflict, the `interaction-registry.json` `updated` date, took main's
+  2026-10-22. After `npm ci`, all seven required checks plus core,
+  design-system, load manifest, desktop typecheck/build/parity and marketing
+  build/check pass. The two-worker suite passed 3,487 tests (94 skipped)
+  excluding `tests/desktop-release-cli.test.ts`, which passed 25/25 alone with
+  `--testTimeout=60000`.
+
+- Ticket 242 (Outlook `Calendars.Read`, October 21–22, 2026): implemented,
+  locally verified and **live-verified** for one personal and one work/school
+  account on 2026-10-22 (details under "Owner-run live acceptance"); not
+  independently reviewed, merged or deployed. Merged `origin/main` at
+  `d598afc` (PR #110 SQL smoke fix), no conflicts. The connector now requests
+  `openid offline_access Calendars.Read` for every Microsoft account. Granted-scope
+  validation accepts exactly one effective Graph permission, `Calendars.Read`
+  (a co-granted `Calendars.ReadBasic` from earlier consent is accepted, `06fc275`);
+  write, shared, `User.Read` and `Calendars.ReadBasic`-only grants fail as
+  `consent_denied`. A ReadBasic-only connection fails its next refresh and moves to
+  `reconnect_required` without a Graph call. Every Graph request, including
+  provider next links, keeps the contract `$select` and no `$expand`; a next link
+  that broadens either is refused before the token is sent, and one without
+  `$select` gets the list appended without re-encoding the skip token. Failing-first
+  tests cover these; a response-field test confirmed the adapter already dropped
+  body, attachments, extensions and other fields. Settings disclosure, Privacy
+  (updated October 21), marketing FAQ, contract, playbook, operations and
+  `.env.example` describe the broader Microsoft permission. Node 24.22.0: all
+  seven required checks plus core, design-system, load manifest, developers,
+  desktop typecheck/build/parity and marketing build/check pass. The two-worker
+  suite passed 3,455 tests (94 skipped); only `tests/desktop-release-cli.test.ts`
+  failed on timeouts and passed 25/25 with `--testTimeout=60000`. A disposable
+  loopback-only stack `cadence-live-242` replayed all 88 migrations and passed
+  all 21 `tests/sql` smokes.
+- Ticket 233 is documentation-complete and independently approved at `668a4cd`.
+  It updated `AGENTS.md`, `docs/TICKETS.md`, `docs/PRODUCT_SPEC.md`,
+  `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`,
+  `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/DESKTOP_PARITY.md`, and
+  `docs/FUTURE_UPDATES.md`. No runtime code, migration, or provider configuration
+  changed.
+- Ticket 234 is independently approved at `41c4e2c`. It
+  adds the Outlook/iCloud calendar schema `1.1.0`, the separate Hevy
+  recorded-activity contract, and AdvisorDayContext `1.1` validators and
+  projections in `packages/core`. Google `1.0.0` validators, fixtures, routes,
+  and runtime callers are unchanged. No provider adapter, route, migration,
+  consent, or UI changed.
+- Ticket 235 is locally verified and independently approved. Migration
+  `20261019040000_connector_lifecycle.sql` adds one owner-bound connection per
+  provider for Hevy, Outlook, and iCloud, RLS owner metadata, sealed credentials
+  and Outlook attempts in `cadence_calendar_private`, and service-role-only
+  compare-and-swap RPCs. A separate `CONNECTOR_CREDENTIAL_*` keyring seals
+  credentials bound to owner, provider, identity digest, generation, and purpose.
+  Disconnect fences one provider; Auth deletion cascades all connector state.
+  Google storage and wire behavior are unchanged. Evidence is source, synthetic
+  fixtures, and a disposable CLI-pinned local Supabase replay. That lifecycle
+  slice added no provider call, route, UI, consent or desktop
+  cache. Tickets 236–240 now supply those layers. Hosted migration and deployment
+  remain unverified.
+- Ticket 237 (Outlook Calendar) is locally verified and independently approved.
+  Microsoft Graph `calendarView` reads selected calendars with
+  `Calendars.ReadBasic` only, immutable IDs, validated next links, a 20-page
+  bound, and one 25-second deadline across token refresh, listing, pages, and
+  retries. Identity is the ID-token `tid` plus `sub`; web callbacks require the
+  initiating cookie user, and desktop completion requires the initiating Cadence
+  session plus its Keychain client state. All-day dates use the event's own zone
+  through a pinned CLDR 48.2 Windows-zone table; unresolved zones quarantine with
+  a recorded reason. It reuses the Ticket 235 lifecycle; no migration. Evidence
+  is source and synthetic fixtures only. No app registration, live personal or
+  work/school account or publisher verification is verified. Tickets 238–239
+  supply the local UI, desktop client and separate Daily Brief disclosure.
+  Review corrections (verifier findings on `56d8ddf`): every Graph and token
+  fetch plus body read runs inside `runProviderCallWithTimeout`, so unresponsive,
+  stalled, and late responses end as `timeout`; an omitted token `scope` is
+  accepted per Microsoft's documentation; next links compare the decoded calendar
+  ID; `lastModifiedDateTime` is no longer requested through `$select`; read routes
+  forward `request.signal`; app registration must carry only `Calendars.ReadBasic`.
+- Ticket 236 (Hevy) is locally verified and independently approved. Its initial
+  implementation is `abf9938`. Key intake is verified by `user/info` (non-Pro →
+  `permission_denied`; a refused key → `reconnect_required`). A fixed GET
+  allowlist covers `user/info`, `workouts/count`, and
+  `workouts?page=N&pageSize=10`, and redirects are refused. A count preflight
+  above 500 returns `incomplete_pagination` with no page reads. The read covers at
+  most 50 pages, removes duplicates by the latest `updated_at`, and checks count
+  and `page_count` before and after. One absolute 25-second deadline covers every
+  page and retry; `Retry-After` is honored only when it fits. Responses are capped
+  at 2 MB. Only identity, revision and timing fields enter normalized snapshots. The route is
+  `/api/hevy/activities`. Not verified: a live Hevy Pro account and deployment.
+- Ticket 238 (connector library and Timeline) is locally verified and
+  independently approved. Settings lists Google Calendar, Outlook Calendar,
+  iCloud Calendar (integrated under Ticket 240), and Hevy in one `ConnectorLibrary`; each
+  source connects, refreshes, fails, and disconnects on its own. Outlook reuses
+  the Google calendar selector; the Hevy API key field clears on submit and is
+  never stored on the device; Hevy Pro and the 500-workout limit are disclosed.
+  Disconnect and account-deletion copy name each provider's removal step and
+  never claim Cadence revoked access. Timeline markers name their source;
+  current-day Hevy workouts render as a separate recorded-activity list (time and
+  duration only) that never changes an Occurrence or overlap cue. Desktop keeps
+  one disposable cache per source in calendar-cache.sqlite3 (outside
+  `cadence.sqlite3` and backups), keyed by provider, account, generation,
+  selection, range, and timezone, with per-source fences; sign-out, account
+  switch, and disconnect clear it. Desktop Outlook completes only a deep link
+  whose state matches its Keychain attempt, through the authenticated `PUT`.
+  Travel stays Google-only; Daily Brief disclosure is Ticket 239.
+  Review fixes (verifier findings on `e3eb5cb`): desktop Timeline freshness now
+  includes Google only with a snapshot and hides the unused Google line while
+  Outlook is active (`apps/desktop/src/calendar/timeline-freshness.ts`), matching
+  web; the web Outlook cache stores only complete reads, so a partial read never
+  replaces a complete one or skips a refetch, and a kept read retains its fetch
+  time with a stale label. Re-review fix: a connected Google source that cannot
+  read (reconnect required, provider unavailable, or a failed read without saved
+  events) contributes unavailable freshness on web and desktop, so Outlook context
+  never claims no overlap past it; an unused Google source stays excluded.
+  Evidence: source, synthetic fixtures, deterministic benches at 1280px and
+  390px, and native cache unit tests. Not verified: live Microsoft or Hevy
+  accounts, installed desktop deep links or Keychain, deployment.
+- Ticket 239 (separately approved connector context in Daily Brief) is
+  locally verified and independently approved. Outlook Calendar,
+  iCloud Calendar, and Hevy each have a default-off Daily Brief disclosure bound to
+  the connection generation (and calendar selection) it was granted for; migration
+  `20261019041000_daily_brief_connector_disclosure.sql` stores them and fences begin
+  and finish. `includeCalendar` stays Google-only. Older two- and four-key saves
+  turn the new disclosures off, and turning Daily Brief off revokes them. Only the
+  live brief reads a disclosed source: today only, at most 25 seconds and inside the
+  60-second budget less a 10-second generation reserve. Outlook and iCloud events
+  join the planner as fixed blocks; Hevy workouts reach the model only as past
+  recorded timing and never affect availability, durations, or Behavior status.
+  Ticket 240 now connects the iCloud read behind that same disclosure. Review
+  recovery fix: Settings reports per-source `connectorAttention` and offers
+  **Allow <source> again** after a reconnect or reselection; unrelated saves turn
+  off sources that need attention instead of renewing them or failing. Evidence is
+  source, synthetic fixtures, model stubs, a disposable local migration replay, and
+  bench screenshots; no live provider or model call.
+- Ticket 240 is locally verified and independently approved at `40b1dc2`,
+  including all F1–F8 corrections and the final F5 DAV metadata fix. Recovery
+  preserves `e4634b9` and adds web/desktop intake, calendar selection, refresh,
+  disconnect, isolated complete-only caches, offline display choices and Timeline
+  context. Daily Brief reads iCloud only under its separate generation/selection
+  disclosure. CalDAV boundaries reject unsafe URLs/XML, truncate oversized reads,
+  quarantine unsupported recurrence/timezones and conflicting identities, and bound the
+  full service read through the final credential fence. Failed or incomplete refreshes
+  keep cached context stale until a complete read succeeds. Account deletion includes
+  manual Apple password revocation.
+  Synthetic tests and responsive bench evidence cover these paths. Live Apple
+  access and installed acceptance remain open; the owner accepted hosted custody
+  on 2026-10-19.
+- Ticket 241 disclosure/status reconciliation is independently approved at
+  `a10b461` for local implementation and synthetic verification. The final
+  reviewer passed 342 focused tests and governance, design-system and marketing
+  checks, and inspected the full-suite evidence below. Node 24.22.0 passed all
+  seven required checks plus
+  core, design-system, desktop type/build/parity, and marketing build/parity
+  checks. The non-overlapping two-worker test run passed 2,965 tests
+  (31 skipped). Synthetic web and desktop benches and marketing pages passed
+  narrow (390px) and wide (1280px) QA. This pass changes disclosures and evidence,
+  preserves approved runtime logic, and does not authorize release.
+- Reused evidence: unchanged native sources retain 114 passing Rust tests;
+  unchanged migrations retain the disposable 82-migration replay and 16/17 SQL
+  smoke results. The inherited failure
+  `tests/sql/behavior-end-date-lifecycle-smoke.sql:138` was fixed by PR #110
+  (merged October 21). Prior desktop acceptance
+  test timeouts passed unchanged reruns; their cause and a base-CI failure are
+  not proven. Final Ticket 241 tests had no timeout. Retained local databases
+  were not touched.
+- Evidence: public provider documentation read October 18, 2026 (documented
+  support only). No live-provider, installed, deployed, or public-approval
+  evidence exists.
+- Ticket 233 correction pass (verifier findings 1–5): Outlook all-day dates use
+  the event's own zone; provider reads have 25-second deadlines and bounded
+  `Retry-After`; Hevy reads use a count preflight, duplicate removal, and
+  before/after checks without claiming an atomic snapshot; Apple claims are
+  qualified; the iCloud local-work gate is removed.
+- Product decision recorded 2026-10-19: the owner accepted hosted custody of
+  the iCloud app-specific password as documented, although Apple does not limit
+  it to Calendar. No public Apple developer documentation for "supported app"
+  authorization was found on 2026-10-18. Real Apple credentials may now be used
+  in owner-run live tests. Live Apple access, deployment and user release remain
+  separate gates.
+- Follow-up: the existing Google adapter caps `Retry-After` at 300 seconds and
+  does not compare it with the remaining request deadline; a caller abort signal
+  still ends the wait. Its runtime is unchanged in this expansion.
+- Live-access gates: Hevy Pro key, Microsoft app registration and test tenants,
+  and an Apple Account app-specific password. Public-approval gate: Microsoft
+  publisher verification. None blocks source or fixture work.
+
+### Owner-run live acceptance — October 19, 2026
+
+Environment: a disposable local Supabase stack (`cadence-live-connectors`,
+loopback-only ports, all 88 branch migrations replayed, version list identical
+to `supabase/migrations`) and `next dev` on Node 24.22.0 at
+`http://127.0.0.1:4321`. Cadence sessions used development test-login, not
+Google sign-in. The retained local stack was not changed. No hosted migration,
+deployment or hosted data was used. Evidence is counts, statuses and owner
+observations only; no credential or provider record was recorded.
+
+- Hevy (Ticket 236, with 238 and 239): **live pass** with Emi's Hevy Pro key.
+  Intake sealed the key (one `keyId.iv.tag.ciphertext` row, generation 1) and the
+  key field cleared. A 31-day read was `complete`: count 44 before and after,
+  5/5 pages, 44 items, 0 duplicates, 20 in range. Activities carried only ID,
+  kind, start, end, known duration, local date, revision and field availability.
+  A single-day read returned the expected workout; today returned none; a 41-day
+  request returned `invalid_request`. No workout record was stored server-side.
+  Daily Brief `includeHevy` was off by default. On the Timeline, today showed no
+  Hevy line before a workout. After Emi logged one, it showed
+  "Recorded activity · Hevy" with time and duration only, no title. Disconnect
+  showed the Hevy key-removal instruction. It deleted the credential and moved
+  the connection to `disconnected`, generation 2, with the account digest
+  cleared. A later read returned `not_connected`. Emi deleted the key in Hevy.
+  Not live-testable with this account: the over-500-workout path (44 workouts)
+  and non-Pro rejection; fixture evidence only.
+- iCloud Calendar (Ticket 240, with 238): **live pass** with Emi's Apple Account
+  and an app-specific password. Intake sealed both values (generation 1). The
+  calendar list returned 5 VEVENT calendars (ID, name and default flag only), and
+  all 5 were selected. The first 30-day read was `complete` with 0 events. A
+  counts-only local diagnostic confirmed that the account had no events in that
+  range, and that server-side time-range filtering matched older events. Owner-approved test
+  events were then added to one existing calendar. The next read was `complete`:
+  0 failures, 0 quarantined items, recurrence supported, 5 events and 0
+  non-test events. A daily `RRULE COUNT=3` event was expanded by the server
+  into 3 instances (9–10 a.m. New York) sharing one series ID. An all-day event
+  kept its own date (one calendar day). A 10–11 a.m. `America/Los_Angeles`
+  event read as 1–2 p.m. New York with its source zone kept. Only titles were
+  carried; other details were unsupported and empty. No event record was stored
+  server-side. Timeline showed all of them with iCloud labels. Hiding all-day
+  iCloud events removed the all-day event. Emi first missed the Los Angeles
+  marker on a day with three markers. The client validation and layout pipeline,
+  replayed locally on the live response, placed it at 1 p.m. A later look found
+  it, so it is not a defect. Finding: every iCloud collection reports a
+  `calendar-timezone` with a full VTIMEZONE definition, which the adapter marks
+  unsupported by design. Floating-time events would therefore quarantine. Not
+  live-tested: wrong-principal reconnect (one Apple Account) and quarantine of
+  unexpanded series. Disconnect showed the Apple revocation instruction. It
+  deleted the sealed credential (0 rows) and moved the connection to
+  `disconnected`, generation 2, with the account digest cleared. A later read
+  returned `not_connected`. Emi removed the app-specific password at Apple, and
+  the test events were deleted.
+- Ticket 242 live retest, 2026-10-22: **personal and work/school accounts pass**
+  with `Calendars.Read`. Environment: disposable loopback-only stack
+  `cadence-live-242` (all 88 migrations), `next dev` on Node 24.22.0 over HTTPS at
+  `https://localhost:4321` (`[::1]` only), a disposable Cadence test user, and a
+  separate Chrome instance with a temporary profile trusting only the local dev
+  certificate. Agents drove every UI step through a loopback DevTools port; the
+  owner only signed in and clicked Accept/Continue. No credential, token or event
+  record was stored outside the disposable stack; evidence is counts, statuses and
+  screen text.
+  - Personal account: the first consent showed "Cadence Calendar needs your
+    permission to: Read your calendars … will be able to read events in your
+    calendars" (unverified app). Microsoft granted
+    `openid Calendars.Read Calendars.ReadBasic`, echoing the account's earlier
+    ReadBasic consent; the strict check refused it (`consent_denied`, connection
+    stayed `disconnected`, no credential). Fix `06fc275` accepts a co-granted
+    `Calendars.ReadBasic` only alongside `Calendars.Read` (failing-first test).
+    The retry also showed Microsoft's anti-phishing step "Are you trying to sign
+    in to Cadence Calendar? Only continue if you downloaded the app from a store
+    or website that you trust" (the owner clicked Continue). Then: connected
+    (generation 1), refresh granted `Calendars.Read Calendars.ReadBasic` with an
+    opaque token, Graph `/me/calendars` and calendarView returned 200 (the
+    ReadBasic-only failure is resolved). 4 calendars were listed (ID, name and
+    default flag only). Selecting "Cadence Test" in Settings saved. Today's read
+    was `complete`, 0 failures, 2 in-range test events (daily repeat 9–10 a.m.
+    New York; a 10–11 a.m. Los Angeles event at 1–2 p.m. New York), titles and
+    times only; description, location, organizer, attendees, conference and
+    attachments were `unsupported` and empty. Timeline showed both as Outlook
+    Calendar markers on Oct 22. Disconnect in Settings showed the Microsoft
+    removal instruction, deleted the credential (0 rows), moved the connection to
+    `disconnected` (generation 2, digest cleared); a later read returned 409
+    `not_connected`.
+  - Work/school account (identityscaffolding.com, home tenant): the user-consent
+    screen listed "Maintain access to data you have given it access to", "Read
+    your calendars" and "View your basic profile", marked unverified, with
+    "Consent on behalf of your organization" left unticked. Token: Graph-audience
+    JWT, scope `Calendars.Read openid profile email`. Connected (generation 3); 3
+    calendars listed; primary selected in Settings. Today-plus-tomorrow read was
+    `complete`, 0 failures, 4 events: an all-day event kept its own date (Oct 22,
+    one day), the daily repeat on Oct 22 and 23, and the Los Angeles event on
+    Oct 23 at 1–2 p.m. New York; titles and times only. Timeline showed the three
+    timed events as Outlook markers; the all-day item's Timeline display was not
+    re-checked in this run (the Ticket 237 work-account run confirmed it). Disconnect:
+    generation 4, credential deleted, later read `not_connected`. The coordinator
+    confirmed the Cadence Calendar service principal holds exactly one
+    `oauth2PermissionGrant`, `consentType` Principal (per-user), scope
+    `openid offline_access Calendars.Read`. **Per-user consent is verified in the
+    home tenant**; this supersedes the earlier AllPrincipals note below as current
+    evidence. The grant was left in place at the coordinator's request.
+  - Not exercised: cross-tenant consent, a tenant that blocks unverified apps,
+    `admin_approval_required`, wrong-account reconnect, installed desktop.
+- Outlook Calendar, personal Microsoft account (Ticket 237): **failed live**
+  with `Calendars.ReadBasic`; resolved by Ticket 242 (see above).
+  Graph returns 401 on every calendar endpoint for a token that carries only
+  `Calendars.ReadBasic`. The cause is not yet isolated: either Microsoft-side
+  handling of ReadBasic for personal accounts, or the new, unverified Entra app.
+  No scope change was made. Setup: the Entra app "Cadence Calendar" (personal and
+  multitenant, `Calendars.ReadBasic` + `openid` + `offline_access` only,
+  publisher not verified) and the web app over HTTPS on `https://localhost:4321`.
+  Consent, code redemption and refresh all returned 200 with granted scope
+  `Calendars.ReadBasic` and an opaque token of normal shape. Every Graph read
+  returned 401 with an empty body and no `WWW-Authenticate`:
+  `/v1.0/me/calendars` with and without `$select`, `/v1.0/me/calendar`, and
+  `/beta/me/calendars`. The same account and request shape returned 200 through
+  Microsoft's Graph CLI public client, whose token also held `Calendars.ReadWrite`.
+  As designed, Cadence then marked the connection `reconnect_required` and
+  deleted the credential. Live use exposed a UI defect, fixed in `facf67d`: the
+  Outlook panel kept its connected view after a reconnect-required list or
+  refresh, so no Reconnect button appeared. It now switches state like the
+  iCloud panel, and Disconnect stays available. Two failing-first DOM tests
+  cover it. A retry on 2026-10-21, about 44 hours after app creation, failed
+  identically (all four contrast reads returned 401), so slow propagation of a
+  new app is unlikely. That retry also showed the "connected" callback message
+  persisting after the server reported `reconnect_required`. The panel now
+  drops that message when the server state differs (failing-first DOM test).
+  Root-cause evidence (2026-10-21): the coordinator registered a separate public
+  client in the same tenant, never consented by the personal account. Using
+  authority `/consumers` and requesting only `Calendars.ReadBasic`, it received
+  an opaque token for `Calendars.ReadBasic`. Graph returned 401 with an empty
+  body for both `/me/calendars` and `/me/calendarView`. A ReadBasic-only token
+  for a personal account is therefore rejected by Graph regardless of Cadence's
+  client, consent state, or request code, despite Microsoft's permission tables
+  listing it for personal accounts. With the same Cadence app and scope, the
+  work/school account received a Graph-audience JWT and was accepted. The same
+  fresh probe app then requested `Calendars.Read` and was granted
+  `Calendars.Read Calendars.ReadBasic`, still with an opaque token. Graph returned
+  200 for `/me/calendars` and `/me/calendarView`. Root cause: Graph accepts a
+  personal-account calendar token only when it carries `Calendars.Read` or a
+  broader scope, and rejects a ReadBasic-only one. That contradicts Microsoft's
+  permission tables. A Cadence fix would need `Calendars.Read`, which exposes
+  bodies and attachments that the brief excludes. That is an owner contract
+  decision; Cadence's scope set is unchanged.
+- Outlook Calendar, work/school account (Ticket 237, with 238): **live pass**
+  in the app's home tenant (identityscaffolding.com). Connect returned without
+  a consent screen; the token was a Graph-audience JWT with `scp`
+  `Calendars.ReadBasic openid profile email`. `profile` and `email` came from
+  prior tenant consent and were accepted as OIDC scopes. Cadence does not request them.
+  The connection was sealed (generation 3), and 3 calendars were listed. A 7-day
+  read of the primary calendar was `complete` with 0 failures and 6 test events.
+  The daily series was expanded by `calendarView` into 3 instances (9–10 a.m.
+  New York) sharing one series ID. The all-day event kept its own date (event
+  zone Etc/UTC). A 10–11 a.m. Pacific event read as 1–2 p.m. New York, with
+  source zone America/Los_Angeles. Today's event was at 3–3:30 p.m. Only
+  titles, the user's response, and permitted Outlook web links were carried. No
+  event record was stored. Repeated token refreshes succeeded. Agent UI checks
+  in the in-app browser placed all 5 timed markers on the correct days, with the
+  Los Angeles event at 1:00–2:00 PM on Oct 23 and the all-day event in Oct 22's
+  All day area. Hiding all-day Outlook events removed it, and it was then
+  restored. Disconnect showed the Microsoft account / My Apps instruction. It
+  deleted the credential (0 rows) and moved the connection to `disconnected`
+  (generation 4), and later reads returned `not_connected`. Limits: home tenant
+  only, and the app already had tenant-wide admin consent. One
+  `oauth2PermissionGrant` existed (`consentType` AllPrincipals, scope
+  `openid offline_access Calendars.ReadBasic`), which explains the missing
+  consent screen. The coordinator deleted that grant after the test (0 remain).
+  The user-consent screen was shown later (see below). Cross-tenant consent,
+  `admin_approval_required` and a tenant that blocks unverified apps were not
+  exercised; wrong-account reconnect was not
+  live-tested. Observation: one Outlook read takes about 5–7 s (token refresh,
+  list, calendarView). Until it finishes, the Timeline shows no Outlook markers.
+  This likely explains the owner's empty first load.
+- Daily Brief connector disclosure (Ticket 239): **live pass** (owner-approved
+  paid call, 2026-10-21). Disclosures were default-off (`includeHevy` false while
+  Hevy was connected). After the Outlook work account was reconnected, a
+  seven-key save enabled Daily Brief with only `includeOutlookCalendar`
+  (`connectorSources.outlookCalendar` true, no attention state). One live brief
+  read today's Outlook data (token refresh, list, calendarView 200) and made one
+  model call, which returned `ready` with `complete` coverage. A counts-only
+  audit of the model request found 0 event titles and no `description`,
+  `location` or attendee fields. The account had no Behaviors, so the brief
+  reported no schedule issue. Turning Daily Brief off revoked the disclosure.
+  The Daily Brief preference was set through the app API as the test user
+  (`PUT /api/advisor/preferences`), not through the Settings UI. The Daily
+  Brief panel did not hydrate in the in-app browser tab. The brief request and
+  the final disconnect also used the app API.
+- Outlook work/school user consent (Ticket 237), 2026-10-21: after the
+  tenant-wide grant was removed, reconnecting showed Microsoft's user-consent
+  screen. It marked "Cadence Calendar" as **unverified** ("not published by
+  Microsoft"; no terms links) and listed "Maintain access to data you have given
+  it access to", "Read basic details of your calendars" and "View your basic
+  profile". As an admin, the owner also saw "Consent on behalf of your
+  organization", which he reports leaving unticked. The connect then succeeded
+  in the home tenant. The stored result, however, was again a single
+  AllPrincipals (tenant-wide) grant with the same grant ID and scope
+  `openid offline_access Calendars.ReadBasic`, and no per-user grant existed.
+  Recorded as: user-consent screen shown; resulting grant type AllPrincipals;
+  cause unclear (an admin consent path, or an earlier delete that had not
+  propagated). This is not verified per-user consent. Disconnect deleted the
+  credential again (generation 6). The coordinator deleted the grant again and
+  confirmed after 45 s that 0 grants remain and a GET by ID returns 404.
+- Installed desktop (Ticket 238 desktop items: Keychain, `cadence://` deep
+  links, per-source cache cleanup): **blocked by Ticket 115**. No signed
+  installed build containing the connector code exists, so this step was not
+  simulated.
+- Pending owner action: remove "Cadence Calendar" and the probe apps at
+  account.live.com/consent for the personal Microsoft account (the site was in
+  maintenance at the time of testing).
 
 ## PR 83 integration review — October 21, 2026
 
