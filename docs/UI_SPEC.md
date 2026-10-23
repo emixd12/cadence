@@ -1126,6 +1126,9 @@ limitation) and "Travel" (up to four calculated lines: travel-created Behavior
 overlaps, departures, the return or an unknown-return note, then a muted "Calculated
 by Cadence … Not written by the model." line). A hypothetical option that overlaps
 travel adds "This time overlaps planned travel." No new buttons; no apply action.
+When the model's facts held weather trips (Ticket 219 stage 2), a muted Open-Meteo
+credit line ("Weather data by Open-Meteo.com (CC BY 4.0)" with site and licence
+links) follows the text, unless the Travel section already shows it.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):

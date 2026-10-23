@@ -1,5 +1,78 @@
 # Implementation Status
 
+## Travel release train: Tickets 165, 212 and 216–219 on Ticket 215 — October 23, 2026
+
+**Owner decision (October 23):** combine the travel ticket branches into one
+release with one hosted migration window and one signed desktop release newer
+than every published version. Branch `claude/travel-release-train-15ebed`, one
+draft PR with base `claude/unruffled-babbage-e830a5` (PR #112). Not deployed,
+signed or published. The per-ticket sections below keep their own detail.
+
+Included, merged in this order with `--no-ff`: PR #131 (165, location permission
+guidance and entitlement), PR #130 (212, Home and travel in first-run setup),
+PR #136 (217, learned travel habits), PR #133 (218, Open-Meteo weather margin),
+PR #137 (216, completion place labels and Where suggestions) and PR #132 (219
+stage 1). The moved 215 branch was merged again on October 23; the later 216 and
+217 heads only carried that 215 state.
+
+Integration:
+- Hosted migrations, all after `20261019180000_add_behavior_where.sql`:
+  `20261022160000_completion_place_labels.sql` (216), then
+  `20261022170000_travel_habits.sql` (217). Both patch the account-sync RPCs by
+  anchor and compose. 91 tracked migrations in total.
+- SQLite: `0018_behavior_where` (215), `0019_travel_habits` (217),
+  `0020_completion_place_labels` (216, renumbered from 0019). Desktop schema
+  version 20. The desktop release must be 0.1.5 or later: 0.1.3 is published and
+  0.1.4 is the unpublished session hotfix. The source still says 0.1.4; set the
+  version when the owner prepares the release.
+- Departure timing: get-ready time (217) ends at the weather-adjusted departure
+  (218), so it precedes the weather margin. The refresh service passes learned
+  buffers and weather together. Combined resolver tests cover the spans, the fit
+  overlap and unchanged route requests.
+- Travel Settings is one panel: setup with Ticket 212's `travel` anchor, Home with
+  its "I'm here" line, usual travel, the storage notes and Ticket 165's device
+  location guidance, then How you travel (217) and Completion places (216) as
+  ruled subsections. `CompletionPlacesPanel` became `CompletionPlacesSection`.
+  Checked at 390 px and desktop width in the design-system bench.
+- Account sync: the planner and the native apply path take Ticket 217 profile
+  habits beside Ticket 216 place-label rows in one plan. Builds before these
+  tickets fail closed on synchronization.
+
+Ticket 219 stage 2: the Daily Brief context now carries learned habits (get-ready
+minutes and the remembered mode per Behavior place), place label counts and the
+weather outlook with rule conclusions. Live briefs send habits and counts; weather
+and route conclusions stay `not_supplied` until the owner decides how supplied
+evidence reaches the server. A brief that used weather facts shows the Open-Meteo
+credit. Stage 1's yes/no conclusions are unchanged. Open point: the owner waits for
+Google's reply on support case 76805292 before deciding whether to restrict
+conclusions to day-level facts.
+
+Verification (local, October 23; Vitest and ESLint exclude `.claude/**`):
+- Repository and catalog checks pass: agents, interactions, resolvers, core,
+  load-manifest and design-system.
+- Lint, web and desktop typechecks, and the public-source and public-trust checks
+  pass.
+- The full Vitest suite ran 3,731 passed and 99 skipped. Three 5-second timeouts in
+  `tests/desktop-release-acceptance.test.ts` came from load; that file passes 46/46
+  alone.
+- The web, desktop and marketing builds and the marketing check pass.
+- Native: `cargo test --lib` passes 122 tests, and `desktop:contract:test` passes 22
+  with 1 skipped.
+- On the isolated project `cadence-train` (ports 55820–55829, loopback only,
+  stopped afterwards):
+  - all 91 migrations replayed in tracked order;
+  - all 24 SQL fixtures passed;
+  - the RLS smoke (92 checks), the account-sync smoke, the Where, place-label and
+    habit integration tests and the authenticated BehaviorStore contract passed;
+  - generated types matched the checked-in file.
+
+Owner-gated: the decisions above, privacy disclosures (logged on main's PR #129;
+new stage 2 entries in the PR description), the version bump, the hosted
+migration window, web deployment, desktop signing and publication, installed and
+live acceptance, and operator weather clearance. Platform impact: web and desktop
+as in each ticket section; marketing not applicable until privacy claims are
+reviewed; future mobile inherits the shared model and hosted facts.
+
 ## Ticket 165: macOS location permission path and directions plan — October 22, 2026
 
 Ticket 165 stays in progress. Source only, on the Ticket 215 base; not deployed or
