@@ -129,10 +129,14 @@ printed the rejection, hiding the real error. The proxy now forwards only this
 project's label-filtered container and volume prunes. It answers network prunes
 itself, so the shared network is never removed. It also logs every rejected
 request as method and path, and the script reports the most specific cause
-first. In CI no container survived either attempt. Those failures therefore
-happened before the database container existed, most likely while pulling
-images; their exact cause stays unverified until a failing run under the new
-logging.
+first. The first PR run under the new logging
+([run 39959055300](https://github.com/emixd12/cadence/actions/runs/39959055300))
+named the real cause: both attempts hit an image registry rate limit
+(`toomanyrequests` from `public.ecr.aws`), with no proxy rejection. A dispatched
+run on the same commit passed. The rehearsal now pulls from `ghcr.io/supabase`,
+which serves identical manifest digests for all seven pins. Locally the pinned
+CLI pulled all seven from GHCR through the proxy, kept loopback ports, and
+stopped cleanly.
 
 Native CI
 ([run 39571395232](https://github.com/emixd12/cadence/actions/runs/39571395232))

@@ -116,7 +116,10 @@ environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
 runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
 
 The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
-project-scoped Docker proxy. It copies only config, the empty seed and tracked
+project-scoped Docker proxy. It pulls the pinned images from `ghcr.io/supabase`
+(`SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`): anonymous `public.ecr.aws` pulls
+were throttled (`toomanyrequests`) on some shared runner addresses. GHCR serves
+the same manifest digests. It copies only config, the empty seed and tracked
 migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
 checks service health before and after `db reset --local`. The tracked migration
 version list must exactly match the applied list; its count is derived from the
