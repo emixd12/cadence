@@ -19,12 +19,15 @@ Integration:
 - Hosted migrations, all after `20261019180000_add_behavior_where.sql`:
   `20261022160000_completion_place_labels.sql` (216), then
   `20261022170000_travel_habits.sql` (217). Both patch the account-sync RPCs by
-  anchor and compose. 91 tracked migrations in total.
+  anchor and compose. 91 tracked migrations in total. As of October 23,
+  production has `20261019040000`, `20261019041000` and `20261019180000`
+  (Ticket 215 and PR #111, merged to main as PR #112); the train's two are pending.
 - SQLite: `0018_behavior_where` (215), `0019_travel_habits` (217),
   `0020_completion_place_labels` (216, renumbered from 0019). Desktop schema
-  version 20. The desktop release must be 0.1.5 or later: 0.1.3 is published and
-  0.1.4 is the unpublished session hotfix. The source still says 0.1.4; set the
-  version when the owner prepares the release.
+  version 20. The desktop release must be 0.1.6 or later. 0.1.3 is published,
+  0.1.4 is the unpublished session hotfix, and a separate session is building
+  signed 0.1.5 from main (schema 18) to restore Behavior sync. The source still
+  says 0.1.4; set the version when the owner prepares the release.
 - Departure timing: get-ready time (217) ends at the weather-adjusted departure
   (218), so it precedes the weather margin. The refresh service passes learned
   buffers and weather together. Combined resolver tests cover the spans, the fit
