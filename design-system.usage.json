@@ -1694,7 +1694,7 @@
     {
       "componentId": "module.timeline",
       "file": "components/briefing/DailyBriefBubble.tsx",
-      "line": 17,
+      "line": 18,
       "route": null,
       "usageKind": "reference",
       "confidence": "heuristic"
@@ -1890,10 +1890,18 @@
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
+    },
+    {
+      "componentId": "module.travel-settings-panel",
+      "file": "tests/place-labels.dom.test.tsx",
+      "line": 170,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
     }
   ],
   "summary": {
-    "productUsages": 236,
+    "productUsages": 237,
     "benchPreviews": 0
   }
 }
