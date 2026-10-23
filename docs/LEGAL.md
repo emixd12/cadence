@@ -105,10 +105,18 @@ part of L-002.
   - Exact timing stays in the calculated line beside the brief.
   - The owner accepts this as a business risk without asking Google first.
 - **Status:** accepted risk.
-- **Next action (updated 2026-10-22):** the orchestrating agent session drafts the
-  written question to Google on whether the regime complies. Send it from
-  info@identityscaffolding.com (owner decision, October 22, 2026). The question stays
-  open until Google answers; the status stays accepted risk. Ticket 219 must test that
+- **Question to Google (sent 2026-10-23):** Google Maps Platform support case
+  76805292, opened from the Cadence Cloud project (`habit-tracker-498717`) by
+  info@identityscaffolding.com, as the owner decided on October 22. Issue type
+  Technical, priority P4, contact by email. The case asks:
+  - whether sending Cadence's own yes/no travel conclusions to the Daily Brief model,
+    with no durations, distances, leave-by times or place data, complies with Maps
+    Platform Terms 3.2.3(c);
+  - whether Maps Grounding Lite (Service Specific Terms 10.2.1) is the only permitted
+    path;
+  - under what conditions the use would be permitted.
+- **Next action (updated 2026-10-23):** await Google's reply on case 76805292, then
+  record it here. The status stays accepted risk. Ticket 219 must test that
   no duration-bearing value reaches model input. The private briefing workbench keeps
   synthetic travel facts, because example (vii) bars testing or validating models
   with Maps Content.

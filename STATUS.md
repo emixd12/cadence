@@ -19,6 +19,8 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   records the free Open-Meteo plan for development and testing and stays open until
   API Standard is subscribed; L-011 moved to P-003; L-001's written question to
   Google is sent from info@identityscaffolding.com and stays accepted risk.
+- October 23: the L-001 question went to Google as Maps Platform support case
+  76805292; L-001 awaits the reply and stays accepted risk.
 - Backlog Ticket 243 tracks six-leg refresh speed and a before/after comparison at
   low priority; two-leg speed is confirmed. Backlog Ticket 244 adds place labels and
   "I'm here" markers to Full JSON and does not block Ticket 216.
