@@ -1,5 +1,24 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.5 candidate — October 23, 2026
+
+The hosted Where migration (PR #112) went live October 23. Published 0.1.3 does not
+send `where_kind`, so its Behavior sync now fails closed with "Update Cadence".
+Version 0.1.5, built from main, restores sync. It carries SQLite schema 18 (Where),
+the 0.1.4 session fix (never built or published) and the Ticket 165 location
+entitlement. The owner approved signing and notarizing the candidate; publication
+needs a separate instruction. Nothing was published.
+
+Connector gating: production has no `CONNECTOR_CREDENTIAL_*` or
+`OUTLOOK_CALENDAR_*` settings, so Outlook, iCloud and Hevy each show "not configured
+for this Cadence deployment" with no controls. None is usable or broken.
+
+The travel release train (PR #138) moves from 0.1.5 to 0.1.6. Evidence, hashes,
+owner steps and rollback: `docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`.
+
+Platform impact: desktop version and release records only. Web, marketing and
+future mobile have no change. No schema, migration or hosted configuration changed.
+
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
 Signed Cadence builds enable Hardened Runtime but did not sign the location
