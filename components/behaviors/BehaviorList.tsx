@@ -462,14 +462,17 @@ function BehaviorRecord({
 }>) {
   const [hasOpenedEdit, setHasOpenedEdit] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [whereDraft, setWhereDraft] = useState<WhereDraft | null>(null);
+  // A reviewed suggestion fills only the form for the revision it was made for; any
+  // save refreshes the Behavior and drops the draft, even if the form remounts first.
+  const [reviewedWhere, setReviewedWhere] = useState<{ draft: WhereDraft; revision: string } | null>(null);
+  const whereDraft = reviewedWhere?.revision === behavior.updatedAt ? reviewedWhere.draft : null;
   const settingsRef = useRef<HTMLDetailsElement>(null);
   const reviewWhere = useCallback((draft: WhereDraft) => {
     // A suggestion only fills the form; the Behavior changes when the user saves.
-    setWhereDraft(draft);
+    setReviewedWhere({ draft, revision: behavior.updatedAt });
     setHasOpenedEdit(true);
     if (settingsRef.current) settingsRef.current.open = true;
-  }, []);
+  }, [behavior.updatedAt]);
   const selectedBehaviorDay =
     analytics?.selectedBehaviorDay?.behaviorId === behavior.id
       ? analytics.selectedBehaviorDay
@@ -493,7 +496,7 @@ function BehaviorRecord({
           ) : null}
 
           {behavior.active ? (
-            <BehaviorPlaceAssist behaviorId={behavior.id}
+            <BehaviorPlaceAssist behaviorId={behavior.id} whereKind={behavior.whereKind ?? null}
               placeText={behavior.whereKind === "place" ? behavior.locationText ?? null : null} onReview={reviewWhere} />
           ) : null}
 
@@ -563,7 +566,6 @@ function BehaviorRecord({
                     behavior={behavior}
                     showActiveToggle={false}
                     whereDraft={whereDraft}
-                    onSuccess={() => setWhereDraft(null)}
                   />
                   {noteShortcutView && noteShortcutAction ? <NoteShortcutSettings behaviorId={behavior.id} view={noteShortcutView} action={noteShortcutAction} /> : null}
                   <div className="grid justify-items-end">

@@ -26,6 +26,7 @@ type PlaceLabelContextValue = Readonly<{
   state: PlaceLabelState | null;
   failed: boolean;
   request: () => void;
+  reload: () => void;
   adopt: (state: PlaceLabelState) => void;
   captureCompletion: (occurrenceId: string) => void;
   desktop: boolean;
@@ -96,8 +97,9 @@ export function PlaceLabelProvider({ client = webPlaceLabelClient, desktop = fal
     })().catch(() => undefined);
   }, [client, load]);
   const request = useCallback(() => setWanted(true), []);
-  const value = useMemo(() => ({ client, state, failed, request, adopt, captureCompletion, desktop }),
-    [client, state, failed, request, adopt, captureCompletion, desktop]);
+  const reload = useCallback(() => { void load().catch(() => undefined); }, [load]);
+  const value = useMemo(() => ({ client, state, failed, request, reload, adopt, captureCompletion, desktop }),
+    [client, state, failed, request, reload, adopt, captureCompletion, desktop]);
   return <PlaceLabelContext.Provider value={value}>{children}</PlaceLabelContext.Provider>;
 }
 
@@ -202,13 +204,23 @@ export function PlaceMarkerControl({ place }: Readonly<{ place: MarkerPlace }>) 
 export type WhereDraft = Readonly<{ whereKind: BehaviorWhereKind; locationText: string }>;
 
 /** One sparse line on a Behavior record: a Where suggestion, or the first missing-marker prompt. */
-export function BehaviorPlaceAssist({ behaviorId, placeText, onReview }: Readonly<{
+export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, onReview }: Readonly<{
   behaviorId: string;
+  whereKind?: BehaviorWhereKind | null;
   /** The Behavior's own A place text, so its marker key matches the stored Where. */
   placeText: string | null;
   onReview: (draft: WhereDraft) => void;
 }>) {
   const context = usePlaceLabels();
+  // A saved Where changes prompts and suggestions; reload without relying on the form's event.
+  const where = `${whereKind ?? ""}:${placeText ?? ""}`;
+  const shownWhere = useRef(where);
+  const reload = context?.reload;
+  useEffect(() => {
+    if (shownWhere.current === where) return;
+    shownWhere.current = where;
+    reload?.();
+  }, [where, reload]);
   const { busy, message, record } = useRecordMarker(context);
   const [pending, setPending] = useState(false);
   const entry = context?.state?.behaviors.find((item) => item.behaviorId === behaviorId) ?? null;

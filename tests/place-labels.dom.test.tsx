@@ -150,3 +150,13 @@ it("turns marker prompts off with Not now", async () => {
   await act(async () => button("Not now").click());
   expect(fake.saveSettings).toHaveBeenCalledWith({ enabled: true, retention: "90_days", markerPromptDismissed: true, expectedUpdatedAt: "2026-10-22T12:00:00Z" });
 });
+
+it("reloads place state when the Behavior's saved Where changes", async () => {
+  const fake = client(ON);
+  const view = (whereKind: "home" | "place", placeText: string | null) =>
+    <PlaceLabelProvider client={fake}><BehaviorPlaceAssist behaviorId="behavior-1" whereKind={whereKind} placeText={placeText} onReview={vi.fn()} /></PlaceLabelProvider>;
+  await render(view("home", null));
+  const loads = vi.mocked(fake.load).mock.calls.length;
+  await render(view("place", "2 Example Gym"));
+  await vi.waitFor(() => expect(vi.mocked(fake.load).mock.calls.length).toBeGreaterThan(loads));
+});
