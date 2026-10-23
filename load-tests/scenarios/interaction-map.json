@@ -1494,6 +1494,21 @@
       "reason": "Choosing Where is an unsaved Behavior form draft."
     },
     {
+      "id": "INT-TRAVEL-008",
+      "classification": "destructive_serial_only",
+      "reason": "A leave-time answer writes learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
+      "id": "INT-TRAVEL-009",
+      "classification": "destructive_serial_only",
+      "reason": "A travel mode choice writes learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
+      "id": "INT-TRAVEL-010",
+      "classification": "destructive_serial_only",
+      "reason": "Inline habit edits write learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
       "id": "INT-CALENDAR-012",
       "classification": "external_provider",
       "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."

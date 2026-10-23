@@ -9,6 +9,8 @@ import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } fro
 import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigation";
 import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelCorrection } from "@/lib/ui/travel";
+import type { TravelHabitsState } from "@/lib/ui/travel-habits";
+import { TravelModeChoice } from "./TravelModeChoice";
 import { platformNavigationPreference } from "@/lib/ui/navigation-platform";
 
 import styles from "./day-progress-timeline.module.css";
@@ -103,10 +105,12 @@ type ExternalEventDetailsProps = Readonly<{
   navigationPreference?: TravelNavigationPreference | null;
   travelMode?: TravelMode | null;
   onTravelCorrection?: (correction: TravelCorrection) => void;
+  /** Ticket 217: remembered travel per place for this journey's mode choice. */
+  travelHabits?: TravelHabitsState | null;
 }>;
 
 export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventDetailsProps>(
-  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection }, ref) {
+  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection, travelHabits }, ref) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [linkError, setLinkError] = useState(false);
     const openExternal = (url: string) => {
@@ -171,6 +175,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
             </dl>
             {navigation ? <><a href={navigation.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline" onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(navigation.href); } : undefined}>{navigation.label}</a>{navigation.modeNotice ? <p>{navigation.modeNotice}</p> : null}</> : null}
             {renderTravelTiming({ eventId: event.id, travel, timezone })}
+            <TravelModeChoice eventId={event.id} travel={travel} habits={travelHabits} usualMode={travelMode} />
             {onTravelCorrection && event.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt) ? <form key={`${event.id}-${event.revision.providerEtag ?? event.revision.providerUpdatedAt}`} className="grid gap-2 border-t border-line pt-3" onSubmit={(submit) => {
               submit.preventDefault();
               const data = new FormData(submit.currentTarget);

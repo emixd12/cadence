@@ -101,6 +101,47 @@ fn travel_settings_commit_reopens_with_consent_and_outbox() {
 }
 
 #[test]
+fn travel_habits_commit_uses_its_own_revision_and_rejects_invalid_entries() {
+    let mut fixture = Fixture::new();
+    let current = travel::read_value(&fixture.db, &fixture.profile).unwrap();
+    assert_eq!(current["habits"]["updatedAt"], Value::Null);
+    assert_eq!(current["habits"]["placeModes"], json!([]));
+    let place_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    let habits = |preparation: Value, key: &str| json!({
+        "preparationMinutes": preparation,
+        "arrivalBufferMinutes": 10,
+        "placeModes": [{"placeKey": key, "mode": "transit", "chosenAt": HABIT_NOW}],
+        "leaveFeedback": [{"eventRef": "a".repeat(64), "localDate": "2026-08-30", "answer": "too_late",
+            "answeredAt": HABIT_NOW, "rulesVersion": "travel-habit-defaults@1"}],
+        "updatedAt": HABIT_NOW,
+    });
+    let commit = |fixture: &mut Fixture, expected: Value, next: Value, mutation: u32| {
+        let mut request = json!({"operation":"commitTravelHabits","expectedUpdatedAt":expected,"next":next});
+        request["profileId"] = json!(fixture.profile);
+        request["mutationId"] = json!(id(mutation));
+        request["now"] = json!(HABIT_NOW);
+        execute(&mut fixture.db, serde_json::from_value(request).unwrap())
+    };
+    let outbox_before = fixture.count("mutation_outbox");
+    let saved = commit(&mut fixture, Value::Null, habits(json!(15), place_key), 91).unwrap();
+    assert_eq!(saved["habits"]["preparationMinutes"], 15);
+    assert_eq!(saved["habits"]["placeModes"][0]["placeKey"], place_key);
+    assert_eq!(saved["habits"]["updatedAt"], HABIT_NOW);
+    assert_eq!(saved["updatedAt"], current["updatedAt"]);
+    assert_eq!(fixture.count("mutation_outbox"), outbox_before + 1);
+    assert_eq!(
+        commit(&mut fixture, Value::Null, habits(json!(20), place_key), 92).unwrap_err(),
+        "Travel habits changed after they were loaded."
+    );
+    assert!(commit(&mut fixture, json!(HABIT_NOW), habits(json!(90), place_key), 93).is_err());
+    assert!(commit(&mut fixture, json!(HABIT_NOW), habits(json!(20), "1 Gym Street"), 94).is_err());
+    let reopened = Connection::open(fixture.directory.join("data.sqlite3")).unwrap();
+    assert_eq!(travel::read_value(&reopened, &fixture.profile).unwrap()["habits"]["preparationMinutes"], 15);
+    // A habit revision is required for learned values, even through raw SQL.
+    assert!(fixture.db.execute("UPDATE travel_settings SET habits_updated_at = NULL", []).is_err());
+}
+
+#[test]
 fn utc_comparison_preserves_nanoseconds() {
     assert!(
         db::instant_key("2026-08-30T00:00:00Z").unwrap()
@@ -111,6 +152,8 @@ fn utc_comparison_preserves_nanoseconds() {
 }
 
 const NOW: &str = "2026-08-30T12:00:00Z";
+/// Ticket 217 habit writes always carry canonical microsecond instants.
+const HABIT_NOW: &str = "2026-08-30T12:00:00.000000Z";
 fn id(value: u32) -> String {
     format!("00000000-0000-4000-a000-{value:012}")
 }
@@ -1483,6 +1526,7 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
     fixture.db.execute_batch(db::MIGRATIONS[14].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[15].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[17].2).unwrap();
+    fixture.db.execute_batch(db::MIGRATIONS[18].2).unwrap();
     let mut plan = import_plan(&fixture.profile);
     let intervention = imported_intervention(&fixture.profile, 200, "browser_push", "sent");
     plan["importedInterventionWrites"] = json!([{"expected":null,"next":intervention}]);

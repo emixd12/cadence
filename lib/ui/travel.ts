@@ -19,6 +19,8 @@ export type TravelRoutesInput = Readonly<{
 export type TravelRoutesView = Readonly<{
   accountId: string; mode: TravelMode | null; navigationPreference: TravelNavigationPreference | null;
   settingsRevision: string | null; expiresAt: string | null; evidence: Omit<TravelEvidenceResult, "modelProjection"> | null;
+  /** Ticket 217: learned-habit revision; a desktop view waits until its habits have synchronized. */
+  habitsRevision?: string | null;
 }>;
 export type TravelClient = Readonly<{
   settings: TravelSettingsClient;
@@ -278,7 +280,8 @@ export function useTravelContext(input: Readonly<{
             }
           }
           if (!live()) return;
-          if (view.accountId !== accountId || view.settingsRevision !== settings.updatedAt) { settle({}); return; }
+          if (view.accountId !== accountId || view.settingsRevision !== settings.updatedAt
+            || (view.habitsRevision ?? null) !== (settings.habits?.updatedAt ?? null)) { settle({}); return; }
           if (sameEpoch()) cacheTravel(stateKey, { view, message: null, at: Date.now(), device: device ? { latitude: device.latitude, longitude: device.longitude, accuracyMeters: device.accuracyMeters } : null });
           inFlight = false; committed = false;
           if (active) {

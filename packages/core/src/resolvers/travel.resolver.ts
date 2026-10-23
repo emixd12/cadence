@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 import { sha256 } from "../hash";
+import { TRAVEL_PLACE_KEY_PATTERN } from "../services/travel-place-key";
 import type { BehaviorDurationEstimate } from "../types/day-progress";
 import type { TimelineOccurrenceView } from "../types/timeline";
 
@@ -129,6 +130,7 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
           readyAt,
           timing: { kind: "arrive_by", at: arrivalTarget.toString() },
           mode: commitment.mode ?? input.defaultMode,
+          destinationPlaceKey: commitment.placeKey,
         }));
       }
     }
@@ -159,6 +161,8 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
           readyAt,
           timing: { kind: "depart_at", at: readyAt },
           mode: priorCommitment.mode ?? input.defaultMode,
+          // The trip home follows the last stop's mode; it offers no place choice.
+          destinationPlaceKey: priorCommitment.placeKey === undefined ? undefined : null,
         }));
       }
     }
@@ -355,6 +359,7 @@ function plannedLeg(args: Readonly<{
   readyAt: string;
   timing: TravelPlannedLeg["request"]["timing"];
   mode: TravelPlannedLeg["mode"];
+  destinationPlaceKey?: string | null;
 }>): TravelPlannedLeg {
   return {
     id: `travel_${sha256(JSON.stringify([
@@ -377,6 +382,8 @@ function plannedLeg(args: Readonly<{
     journeyRef: args.input.journeyRef,
     originCommitmentRef: args.originCommitmentRef,
     destinationCommitmentRef: args.destinationCommitmentRef,
+    // The place key is display metadata. The mode it selects is already in the leg ID.
+    ...(args.destinationPlaceKey !== undefined ? { destinationPlaceKey: args.destinationPlaceKey } : {}),
     mode: args.mode,
     readyAt: args.readyAt,
     request: {
@@ -419,6 +426,14 @@ function resolveSegments(
     const sourceRefs = [leg.originCommitmentRef, leg.destinationCommitmentRef]
       .filter((ref): ref is string => ref !== null);
     segments.push(segment(`route:${leg.id}`, "route", estimate.departureAt, estimate.arrivalAt, sourceRefs, leg.id));
+
+    // Ticket 217: get-ready time before a leg from Home or the current position.
+    // It occupies the span before departure and never moves the departure itself.
+    const preparationSeconds = buffers.preparationSeconds ?? 0;
+    if (leg.role === "outbound" && preparationSeconds > 0) {
+      const start = instant(estimate.departureAt, "Route departure").subtract({ seconds: preparationSeconds }).toString();
+      segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start, estimate.departureAt, sourceRefs, leg.id));
+    }
 
     const origin = leg.originCommitmentRef ? commitmentsByRef.get(leg.originCommitmentRef) : null;
     if (origin?.endAt && buffers.exitSeconds > 0) {
@@ -536,6 +551,9 @@ function validateCommitments(commitments: TravelCommitment[]): void {
     if (commitment.endAt && Temporal.Instant.compare(start, instant(commitment.endAt, "Commitment end")) > 0) {
       throw new Error("Travel commitment end must not precede its start.");
     }
+    if (commitment.placeKey && !TRAVEL_PLACE_KEY_PATTERN.test(commitment.placeKey)) {
+      throw new Error("Travel commitment place key must be a place key.");
+    }
     if (commitment.endpoint) validateEndpoint(commitment.endpoint);
   }
 }
@@ -572,6 +590,7 @@ function validateBuffers(buffers: TravelEvidenceInput["buffers"]): void {
   nonNegative(buffers.arrivalSeconds, "Arrival buffer");
   nonNegative(buffers.exitSeconds, "Exit buffer");
   nonNegative(buffers.settlingSeconds, "Settling buffer");
+  if (buffers.preparationSeconds !== undefined) nonNegative(buffers.preparationSeconds, "Preparation buffer");
 }
 
 function validCorrections(corrections: TravelJourneyCorrection[], journeyRef: string): TravelJourneyCorrection[] {
@@ -631,6 +650,7 @@ function publicLeg(leg: TravelPlannedLeg): TravelEvidenceLeg {
     journeyRef: leg.journeyRef,
     originCommitmentRef: leg.originCommitmentRef,
     destinationCommitmentRef: leg.destinationCommitmentRef,
+    ...(leg.destinationPlaceKey !== undefined ? { destinationPlaceKey: leg.destinationPlaceKey } : {}),
     mode: leg.mode,
     readyAt: leg.readyAt,
     provenance: leg.provenance,

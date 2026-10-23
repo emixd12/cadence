@@ -1365,34 +1365,49 @@ export type Database = {
       }
       travel_settings: {
         Row: {
+          arrival_buffer_minutes: number | null
           base_location_text: string | null
           created_at: string
           enabled: boolean
+          habits_updated_at: string | null
+          leave_feedback: Json
           mode: string | null
           navigation_preference: string | null
           onboarding_completed_at: string | null
+          place_modes: Json
+          preparation_minutes: number | null
           routing_consent_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          arrival_buffer_minutes?: number | null
           base_location_text?: string | null
           created_at?: string
           enabled?: boolean
+          habits_updated_at?: string | null
+          leave_feedback?: Json
           mode?: string | null
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
+          place_modes?: Json
+          preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          arrival_buffer_minutes?: number | null
           base_location_text?: string | null
           created_at?: string
           enabled?: boolean
+          habits_updated_at?: string | null
+          leave_feedback?: Json
           mode?: string | null
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
+          place_modes?: Json
+          preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
           user_id?: string

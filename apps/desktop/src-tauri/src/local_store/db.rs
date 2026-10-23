@@ -107,6 +107,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "behavior_where",
         include_str!("../../migrations/0018_behavior_where.sql"),
     ),
+    (
+        19,
+        "travel_habits",
+        include_str!("../../migrations/0019_travel_habits.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {

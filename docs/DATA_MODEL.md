@@ -67,6 +67,38 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
+Migration `20261022170000_travel_habits.sql` (Ticket 217) adds learned travel
+habits to `travel_settings`. Every value comes from the user: an edit in Travel
+Settings, a travel mode chosen for a place, or a leave-time answer.
+
+- `preparation_minutes` (get-ready time, 0–60) and `arrival_buffer_minutes`
+  (0–30). Null follows the versioned defaults in
+  `packages/core/src/services/travel-habits.ts` (`travel-habit-defaults@1`:
+  10 and 5 minutes).
+- `place_modes`: at most 100 `{place_key, mode, chosen_at}` entries in ascending
+  `place_key` order. `place_key` is the Ticket 216 place key: the unpadded
+  base64url SHA-256 of the normalized place text, equal to the
+  `travel_place_cache` text key. No place text is stored.
+- `leave_feedback`: the newest 30 `{event_ref, local_date, answer, answered_at,
+  rules_version}` answers, at most one per local date, in ascending date order.
+  `event_ref` is the hex SHA-256 of `calendar:<event id>` or
+  `behavior:<occurrence id>`. Answers hold no title, time or location.
+- `habits_updated_at`: null until the first habit change. Habit writes compare
+  this revision only, so they never conflict with a Settings save; Settings saves
+  compare `updated_at` and leave the habit columns alone.
+
+Check functions validate entry shape, order, bounds and canonical
+microsecond instants. A row without a habit revision must hold no learned values.
+Owner RLS and grants are unchanged. Account sync carries the habits in the
+singleton profile entity as `travel_preparation_minutes`,
+`travel_arrival_buffer_minutes`, `travel_place_modes`, `travel_leave_feedback` and
+`travel_habits_updated_at`, so the profile value has 13 keys. Older saved
+baselines read the missing keys as nothing learned. A desktop build that predates
+Ticket 217 rejects the 13-key hosted profile and fails closed on every
+synchronization with "Update Cadence before synchronizing account data." until
+updated, as Ticket 215 builds do for Where. Route durations are never stored to
+learn habits.
+
 Device samples and route results remain transient. Exclude them from account sync,
 exports, backups, logs and analytics. Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive
@@ -257,7 +289,13 @@ create table travel_settings (
   routing_consent_at timestamptz,
   onboarding_completed_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Ticket 217 learned habits; null minutes follow travel-habit-defaults@1.
+  preparation_minutes integer check (preparation_minutes between 0 and 60),
+  arrival_buffer_minutes integer check (arrival_buffer_minutes between 0 and 30),
+  place_modes jsonb not null default '[]',
+  leave_feedback jsonb not null default '[]',
+  habits_updated_at timestamptz
 );
 ```
 
@@ -267,7 +305,8 @@ Settings no longer shows `navigation_preference`; saves pass the stored value
 through unchanged, and links follow the platform (Apple Maps on Apple devices,
 Google Maps elsewhere). The column and its sync field remain for compatibility. Missing
 base suppresses final-return advice only. Device samples, provider geocodes,
-route results and Calendar/model grants never enter this table.
+route results and Calendar/model grants never enter this table. Learned habits
+(Ticket 217) are described under Travel locations and preferences above.
 
 `recurrence_rule` and `scheduled_time` store the first schedule's recurrence
 and first time-entry start for compatibility, sorting, and simple summaries.
