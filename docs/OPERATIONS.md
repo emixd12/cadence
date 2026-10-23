@@ -131,9 +131,15 @@ CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contrac
 
 Local API credentials stay inside the existing config reader. Startup/reset
 output is suppressed; failures identify the phase and show only container names,
-health, ports and networks. The 30-minute job bounds startup/reset separately and
-stops only its Cadence containers before ending the proxy. It never prunes Docker
-or touches hosted resources; the runner discards its temporary volumes afterward.
+health, ports and networks. A failed start attempt also reports its exit code and
+one fixed cause category (time limit, rate limit, image pull, health check,
+migration or seed, timeout, proxy rejection). The proxy logs any rejected request
+as method and path only. Startup gets two 8-minute attempts; the second starts
+from a stopped stack with this project's two volumes removed. The 30-minute job
+stops only its Cadence containers before ending the proxy. Docker cleanup is
+limited to the CLI's prunes filtered by this project's label; the shared network
+is never pruned, and nothing touches hosted resources. The runner discards its
+temporary volumes afterward.
 
 A successful run establishes migration replay and local database contracts for
 the recorded source. Provider acceptance, the Outlook support/scope decision,

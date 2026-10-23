@@ -87,6 +87,21 @@ export function rewriteCreate(name, value) {
   return body;
 }
 
+/**
+ * The CLI cleans up (stop, failed start) with label-filtered prunes. Accept only
+ * this project's label; volumes may also carry Docker's `all` flag for named volumes.
+ */
+export function projectPruneFilters(kind, searchParams) {
+  requireSafe([...searchParams.keys()].every((key) => key === "filters") && searchParams.getAll("filters").length === 1);
+  let filters;
+  try { filters = JSON.parse(searchParams.get("filters")); } catch { requireSafe(false); }
+  requireSafe(object(filters) && object(filters.label));
+  requireSafe(Object.keys(filters).every((key) => key === "label" || (kind === "volumes" && key === "all")));
+  requireSafe(JSON.stringify(filters.label) === JSON.stringify({ [`${LABELS[0]}=${PROJECT}`]: true }));
+  requireSafe(filters.all === undefined || JSON.stringify(filters.all) === JSON.stringify({ true: true }));
+  return filters;
+}
+
 async function readBody(stream) {
   const chunks = [];
   let bytes = 0;
@@ -108,27 +123,32 @@ function reply(response, status, message) {
   response.end(JSON.stringify({ message }));
 }
 
-/** This supports start/reset/status only. No exec, attach, prune, or global settings. */
-export function createDockerProxy(daemonSocket) {
+class InspectError extends Error {}
+
+/** This supports start/stop/reset/status only. No exec, attach, global settings or unscoped prune. */
+export function createDockerProxy(daemonSocket, onReject = (line) => console.error(`Cadence Docker proxy rejected ${line}`)) {
   requireSafe(typeof daemonSocket === "string" && daemonSocket.startsWith("/"));
   const inspect = async (path) => {
     const response = await new Promise((ok, fail) => {
       const request = http.request({ socketPath: daemonSocket, path, method: "GET" }, ok);
-      request.setTimeout(15_000, () => request.destroy());
-      request.on("error", fail);
+      request.setTimeout(15_000, () => request.destroy(new Error("timeout")));
+      // Error codes only: daemon and socket messages stay out of the log.
+      request.on("error", (error) => fail(new InspectError(error.code ?? error.message)));
       request.end();
     });
     const bytes = await readBody(response);
     if (response.statusCode === 404) return null;
-    requireSafe(response.statusCode === 200);
+    if (response.statusCode !== 200) throw new InspectError(`status ${response.statusCode}`);
     return parseBody(bytes);
   };
   const server = http.createServer(async (request, response) => {
+    let method = request.method ?? "";
+    let path = "";
     try {
       requireSafe(request.url?.startsWith("/") && !request.url.startsWith("//"));
       const url = new URL(request.url, "http://docker.local");
-      const path = url.pathname.replace(/^\/v\d+\.\d+(?=\/)/, "");
-      const method = request.method;
+      path = url.pathname.replace(/^\/v\d+\.\d+(?=\/)/, "");
+      method = request.method;
       const read = method === "GET" || method === "HEAD";
       const bytes = await readBody(request);
       let forwarded = bytes;
@@ -158,6 +178,16 @@ export function createDockerProxy(daemonSocket) {
         const existing = await inspect(`/volumes/${encodeURIComponent(name)}`);
         if (!existing) { reply(response, 404, "Cadence volume not found."); return; }
         requireSafe(owned(existing.Labels));
+      } else if (method === "POST" && (path === "/containers/prune" || path === "/volumes/prune")) {
+        requireSafe(bytes.length === 0);
+        projectPruneFilters(path.split("/")[1], url.searchParams);
+      } else if (method === "POST" && path === "/networks/prune") {
+        requireSafe(bytes.length === 0);
+        projectPruneFilters("networks", url.searchParams);
+        // The loopback network is shared and must survive cleanup; report nothing pruned.
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ NetworksDeleted: null }));
+        return;
       } else if (method === "POST" && path === "/images/create") {
         requireSafe(inert(bytes.length) && [...url.searchParams.keys()].every((key) => ["fromImage", "tag"].includes(key)));
         const image = url.searchParams.get("fromImage");
@@ -190,7 +220,10 @@ export function createDockerProxy(daemonSocket) {
       });
       response.on("close", () => upstream.destroy());
       upstream.end(forwarded);
-    } catch {
+    } catch (error) {
+      // Method and path only: no query string, headers or bodies reach the log.
+      const cause = error instanceof InspectError ? `daemon inspect failed: ${error.message}` : "policy";
+      onReject(`${method} ${path || "(invalid path)"} (${cause})`);
       if (!response.headersSent) reply(response, 403, "Cadence Docker request rejected.");
       else response.destroy();
     }

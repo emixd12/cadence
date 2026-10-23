@@ -120,6 +120,20 @@ The Outlook support decision, signed installed desktop and coordinated rollout
 gates below remain open. See the disposable rehearsal section in
 `docs/OPERATIONS.md`.
 
+Rehearsal start failures, October 23, 2026: on some runners both start attempts
+failed after about three minutes and were reported as a proxy rejection. The
+proxy rejected the CLI's cleanup prune (`POST /containers/prune`), which runs
+after any failed start or `supabase stop`. Locally, through `main`'s proxy, a
+failed migration left the stopped database container and volume behind and
+printed the rejection, hiding the real error. The proxy now forwards only this
+project's label-filtered container and volume prunes. It answers network prunes
+itself, so the shared network is never removed. It also logs every rejected
+request as method and path, and the script reports the most specific cause
+first. In CI no container survived either attempt. Those failures therefore
+happened before the database container existed, most likely while pulling
+images; their exact cause stays unverified until a failing run under the new
+logging.
+
 Native CI
 ([run 39571395232](https://github.com/emixd12/cadence/actions/runs/39571395232))
 passed the locked macOS Cargo check and all 115 library tests for PR head

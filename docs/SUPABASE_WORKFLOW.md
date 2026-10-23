@@ -103,15 +103,24 @@ privileged configuration, unknown creates, and other-project mutations.
 Only the three exact Auth, Storage, and Realtime initialization jobs may omit
 a name. Their database host must be `supabase_db_habit-tracking-app` on port
 5432. The proxy never prints request bodies, environments, or daemon errors.
+It logs each rejected request as `Cadence Docker proxy rejected METHOD PATH
+(cause)`: no query string, headers or body. The cause is `policy` or a failed
+ownership read reported by status or error code.
 
 The proxy reads ownership before container or volume lifecycle mutations.
 It requires the existing loopback bridge network and never changes networks.
 It supports normal HTTP response streaming, including Docker's raw log frames.
-It rejects exec, attach/hijack, global prune, build, and settings operations.
+It rejects exec, attach/hijack, unscoped prune, build, and settings operations.
 CLI 2.105.0 starts and resets this stack through container lifecycle calls,
 log reads, and PostgreSQL connections; these operations do not need Docker exec.
-Stop the local stack through explicit project container lifecycle commands.
-Do not run `supabase stop` through this proxy because its prune calls are rejected.
+`supabase stop` and the CLI's own cleanup after a failed `start` prune with the
+`com.supabase.cli.project=habit-tracking-app` label filter. The proxy forwards
+exactly that container prune and that volume prune (with Docker's `all` flag
+for named volumes). It answers the network prune itself with an empty report,
+so `cadence-local` is never removed. Any other filter, query or body is
+rejected. Before October 23, 2026 every prune was rejected: a failed start left
+the stopped database container and volume behind, and its output always
+contained the proxy rejection, which hid the start's real error.
 
 Run the focused fake-daemon tests before operator review:
 
