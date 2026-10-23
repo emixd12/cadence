@@ -111,6 +111,7 @@ export function OutlookCalendarPanel({ coordinator, refreshRange, callbackMessag
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
         <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? outlookStatusLabel(status)}</p>
         {status === "not_configured" ? <p className="text-muted-readable">Outlook Calendar connection is not configured for this Cadence deployment.</p> : null}
+        {status === "not_configured" ? null : <p id="outlook-calendar-permission-disclosure" className="text-muted-readable">Microsoft asks you to allow reading your calendars, which covers event details. Cadence requests only event titles, times, availability, your response, and calendar names, and never edits events.</p>}
         {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting deletes Cadence&apos;s saved Microsoft access; Microsoft keeps the permission until you remove it there.</p> : null}
         {status === "disconnected" || status === "reconnect_required" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">
           {pending === "connect" ? "Opening Outlook connection…" : status === "reconnect_required" ? "Reconnect Outlook Calendar" : "Connect Outlook Calendar"}
