@@ -106,6 +106,15 @@ Product and implementation docs:
 24. `/docs/INTEGRATION_PLAYBOOK.md`
 25. `/docs/MCP_INTEGRATION.md`
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
+27. `/docs/PRIVACY_CHANGES.md`
+28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
+
+## Privacy changes
+
+Until the pre-launch privacy pass, log privacy, disclosure and marketing-language
+conflicts in `docs/PRIVACY_CHANGES.md`. These conflicts never block development.
+In-progress work proceeds as if no privacy policy constrains it. Provider-terms and
+licence questions stay in `docs/LEGAL.md`.
 
 ## Product constraints
 
