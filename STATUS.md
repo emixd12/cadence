@@ -39,6 +39,22 @@ count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
 Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
 migrations and a signed 0.1.5 before release.
 
+## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
+
+Signed Cadence builds enable Hardened Runtime but did not sign the location
+entitlement `com.apple.security.personal-information.location`. That is the
+well-evidenced cause of the missing first macOS location prompt; it is not yet
+verified. Production `Entitlements.plist` now includes it, and
+`verify-entitlements.py` accepts it without provisioning-profile authorization.
+This change is split from Ticket 165's Where-based draft PR #131 so it can ship
+without the held Ticket 215 rollout. Source only: nothing was signed, notarized or
+published. Proposed: ride the 0.1.4 stable update and run the prompt test on the
+0.1.4 candidate before publication. Steps and build commands:
+`docs/qa/2026-10-22-desktop-location-entitlement.md`.
+
+Platform impact: desktop signing only. Web, marketing and future mobile have no
+change. No schema, migration or hosted configuration changed.
+
 ## Travel decisions and privacy-change log — October 22, 2026
 
 Documentation only; no runtime, schema, hosted text or deployment change.
