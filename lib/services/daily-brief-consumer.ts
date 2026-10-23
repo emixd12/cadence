@@ -45,8 +45,18 @@ context.connectorSources holds sources the user disclosed separately. calendars 
 recordedActivity lists past workouts that already happened, recorded in Hevy. Use them only as context about earlier activity today. A recorded workout never reserves future time, never proves free or busy time, never completes or proves a Behavior, never changes a duration estimate and never measures adherence. Do not describe exercises, intensity, location or performance; none are supplied.
 A missing, partial, stale or unavailable source proves nothing: it never establishes free time, the absence of a meeting or the absence of a workout.`;
 
+/** Appended only when the facts carry travel (Ticket 219). The facts hold Cadence's conclusions, never route timing. */
+export const DAILY_BRIEF_TRAVEL_INSTRUCTIONS = `Travel policy:
+context.travel holds slow-changing travel facts and Cadence's own travel conclusions. It supplies no travel times. Never state or estimate how long a trip takes, when to leave, or when the user arrives or gets back; exact leave-by times appear in a separate calculated line beside the brief.
+behaviors[].where says where a Behavior happens: home, place (a saved place whose address is never supplied), anywhere (it fits wherever the user is) or not_set (location not set: the user has not said where). Never treat not_set as anywhere or as home. You may say that setting Where helps travel advice when it bears on today.
+usualMode is how the user usually travels. routing off means travel estimates are off; then say nothing about trips.
+When route.state is available: travelDay yes means the rest of today includes a planned trip. trips lists them by destination reference, an occurrence or event already in the facts, or null for the trip home; estimate unknown means Cadence has no current estimate. fits gives Cadence's conclusion for unresolved Behavior occurrences at their scheduled time: fits means travel leaves room for it; does_not_fit means travel crowds it (travel_overlap) or the trip there arrives late (late_arrival); unknown means Cadence cannot tell. trip and position say which trip a conclusion concerns and whether the occurrence comes before or after it.
+Never turn unknown into fits and never assume unknown travel takes no time. Mention travel uncertainty only when it changes a recommendation. When route.state is unavailable, the facts prove nothing about travel.
+Planner options and day evidence do not account for travel. Never claim a planner option avoids travel, and do not recommend an option for an occurrence whose travel conclusion is does_not_fit.
+habits, weather and placeLabels appear only when supplied. getReadyMinutes is the user's own preparation time. A weather marginMinutes is a fixed allowance for the condition; you may suggest leaving that much earlier or the suggestedMode, never a departure time. placeLabels count where the user marked a Behavior Completed.`;
+
 /** Identifies the exact instruction text, so workbench runs can show prompt changes between candidates. */
-export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}`).digest("hex").slice(0, 16);
+export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}\0${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}`).digest("hex").slice(0, 16);
 
 export type DailyBriefGenerator = (input: Readonly<{
   instructions: string;
@@ -78,7 +88,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   input.signal.throwIfAborted();
   const prepared = prepareBriefing(context, input.config ?? activeBriefingConfig(), input.planningNow ?? input.now().toString(), input.analysis);
   const { config, facts, references, plan, configurationRevision, pipelineVersion, analysis } = prepared;
-  const instructions = `${DAILY_BRIEF_INSTRUCTIONS}${analysis ? `\n${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}` : ""}${"connectorSources" in facts ? `\n${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}` : ""}\nPresentation: ${JSON.stringify({ tone: config.tone, directness: config.directness, encouragement: config.encouragement, maxWords: config.length.maxWords, priorities: config.priorities })}. Hard limit: at most ${config.length.maxWords} words across ${analysis ? "text, all suggestion text and tip.text" : "text and all suggestion text"} combined, not per field. Aim below this limit; summarize selectively instead of listing every Behavior. Maximum ${config.alternatives} suggestions. Route: ${plan.route}.`;
+  const instructions = `${DAILY_BRIEF_INSTRUCTIONS}${analysis ? `\n${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}` : ""}${"connectorSources" in facts ? `\n${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}` : ""}${facts.travel ? `\n${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}` : ""}\nPresentation: ${JSON.stringify({ tone: config.tone, directness: config.directness, encouragement: config.encouragement, maxWords: config.length.maxWords, priorities: config.priorities })}. Hard limit: at most ${config.length.maxWords} words across ${analysis ? "text, all suggestion text and tip.text" : "text and all suggestion text"} combined, not per field. Aim below this limit; summarize selectively instead of listing every Behavior. Maximum ${config.alternatives} suggestions. Route: ${plan.route}.`;
   // Keep detailed rejection diagnostics in the inspector, not the prose inputs.
   const modelPlan = {
     version: plan.version, route: plan.route, outcome: plan.outcome,

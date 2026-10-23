@@ -13847,9 +13847,47 @@ installed-desktop acceptance; merging with Ticket 217's `preparationSeconds`.
 
 ## Ticket 219: Travel, habit and weather facts in Daily Brief model input
 
-Status: filed October 17, 2026; planned. Blocked on a disclosure update. Google terms:
-accepted risk since October 18, 2026 (`docs/LEGAL.md` L-001).
+Status: stage 1 implemented in source October 22, 2026 in draft PR #132, based on
+the Ticket 215 branch; not deployed. Stage 2 follows Tickets 216, 217 and 218. Owner decision (October 22,
+2026): disclosure updates, re-consent and marketing language are tracked in the
+privacy surface and do not block development. The existing Daily Brief model-data
+toggle stays the gate; there is no new consent gate. Google terms: accepted risk
+since October 18, 2026 (`docs/LEGAL.md` L-001).
 Dependencies: 215 and 217; 216 for label counts; 218 for weather.
+
+Staging:
+
+- Stage 1 (October 22, 2026), facts available on the Ticket 215 branch:
+  - `TravelTimingModelProjection` 2.0 holds only Cadence's conclusions: travel day,
+    trips by destination ref with mode and a current/unknown estimate, and a
+    fits/does_not_fit/unknown conclusion per unresolved Behavior with the trip it
+    concerns. Version 1.0 carried route timing and was never enabled.
+  - The day context gains an optional `travel` block: Behavior Where, including
+    `not_set` ("location not set"), routing on/off, usual travel and the route
+    conclusions or an unavailable reason. The strict validator rejects any instant,
+    duration, extra field or free text.
+  - `projectBriefingContext` narrows the block to the facts the model receives.
+    Conclusions shaped by a Calendar event need the Calendar source; a trip to an
+    excluded stop withholds all conclusions. The planner never sees travel.
+  - The live brief sends Where and usual travel. It sends no route conclusions yet:
+    route estimates stay on the client and are never stored, so the server has none
+    when it writes a brief. The facts say `not_supplied`.
+  - The private workbench gains synthetic `travel_day` and `travel_unknown` fixtures.
+    Invented places and estimates pass through the real travel resolver.
+  - Tests prove that no duration, departure, arrival, leave-by time, place or derived
+    time pair reaches model input.
+- Stage 2, after Tickets 216, 217 and 218 land:
+  - Fill the typed slots: `habits` (217: get-ready minutes, usual mode per Behavior
+    place), `weather` (218: condition, fixed margin minutes, suggested mode) and
+    `placeLabels` (216: home, saved place and elsewhere counts). Each slot is already
+    validated and projected; stage 2 supplies values and refines instructions.
+  - Decide how live route conclusions reach the brief. Option A: the routes
+    response carries a server-signed conclusions token, and the brief request
+    returns it; this needs a server secret. Option B: route the day on the server
+    during generation; this adds paid calls and conflicts with Ticket 170's rule
+    against extra routing for prose. Option A is recommended.
+  - Planner options ignore travel. Stage 2 may withhold options that travel
+    crowds, using a yes/no check only.
 
 Goal: the advisor tells the user how far ahead to prepare, for example: "Rain is
 expected before your 3 PM. Leave about 10 minutes earlier, or take transit instead
@@ -13876,7 +13914,8 @@ Scope and acceptance:
 - Extend `TravelTimingModelProjection` and `projectBriefingContext`. Unknown legs stay
   unknown in model input; they never become zero travel.
 - Update the Daily Brief model-data disclosure to cover travel and weather facts.
-  Existing users consent again.
+  Existing users consent again. Owner decision (October 22, 2026): this is tracked in
+  the privacy surface, does not block development and adds no consent gate.
 - Google terms for route-derived facts in model input: accepted risk under the regime
   above (`docs/LEGAL.md` L-001). Asking Google in writing stays open. Section
   3.2.3(c)(vii) prohibits using Maps content to train, test or validate models. The
@@ -13891,6 +13930,14 @@ Platform impact:
 - Marketing: review AI and privacy claims, including the public no-AI disclosure
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
+
+Stage 1 implementation references: `packages/core/src/types/briefing-travel.ts`,
+`packages/core/src/services/briefing-travel.ts`, `TravelTimingModelProjection` and
+`resolveTravelEvidence` in the travel types and resolver, `validateAdvisorDayContext`,
+`projectBriefingContext`, `lib/services/briefing-account-context.service.ts`,
+`lib/services/briefing-fixtures.ts` and `DAILY_BRIEF_TRAVEL_INSTRUCTIONS`.
+Verification: `tests/travel-model-projection.test.ts`, `tests/briefing-travel.test.ts`,
+`tests/briefing-account-context.test.ts`.
 
 ## Cadence MCP server and AI plugins: Tickets 220–232
 

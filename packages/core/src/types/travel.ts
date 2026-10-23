@@ -280,24 +280,52 @@ export type TravelResolvedLegEvidence = Readonly<{
   weather?: TravelLegWeather;
 }>;
 
+/**
+ * Ticket 219: version of Cadence's own travel conclusions for model input.
+ * Version 1.0 carried route timing and was never enabled.
+ */
+export const TRAVEL_MODEL_PROJECTION_VERSION = "2.0" as const;
+
+/** A trip the plan knows about. Its destination's own time is already in the facts. */
+export type TravelModelTrip = Readonly<{
+  /** Destination commitment ref; `null` for the trip back to Home. */
+  destinationRef: string | null;
+  role: TravelLegRole;
+  /** `null` when Cadence could not plan the trip. */
+  mode: TravelMode | null;
+  /** `unknown` never means zero travel. */
+  estimate: "current" | "unknown";
+}>;
+
+export type TravelFitConclusion = "fits" | "does_not_fit" | "unknown";
+
+/**
+ * Whether travel leaves room for one unresolved Behavior occurrence at its
+ * scheduled time. A yes/no/unknown conclusion carries no time or duration.
+ */
+export type TravelModelFit = Readonly<{
+  ref: string;
+  conclusion: TravelFitConclusion;
+  basis: "travel_known" | "travel_overlap" | "late_arrival" | "travel_unknown" | "duration_unknown";
+  /** The trip the conclusion is about, by destination; `null` when today has none. */
+  trip: Readonly<{ destinationRef: string | null; role: TravelLegRole }> | null;
+  /** Order relative to that trip's destination, which the facts already show. */
+  position: "before" | "after" | null;
+}>;
+
+/**
+ * Cadence's own deterministic travel conclusions (Ticket 219, `docs/LEGAL.md`
+ * L-001). It never carries route durations, departure or arrival times,
+ * occupied intervals, leave-by times, provider text, places or coordinates.
+ */
 export type TravelTimingModelProjection = Readonly<{
-  version: typeof TRAVEL_EVIDENCE_VERSION;
-  journeyRef: string;
-  legs: ReadonlyArray<Readonly<{
-    ref: string;
-    role: TravelLegRole;
-    mode: TravelMode;
-    departureAt: string;
-    arrivalAt: string;
-    durationSeconds: number;
-    fallback: boolean;
-    observedAt: string;
-    expiresAt: string;
-  }>>;
-  occupiedSpans: TravelOccupiedSpan[];
-  collisions: TravelCollisionEvidence[];
-  completeTrip: boolean;
-  finalAvailabilityAt: string | null;
+  version: typeof TRAVEL_MODEL_PROJECTION_VERSION;
+  /** `yes` when the rest of today includes a planned trip. */
+  travelDay: "yes" | "no" | "unknown";
+  /** Whether a Calendar event shaped these conclusions; they then need the Calendar source. */
+  calendarEvents: boolean;
+  trips: readonly TravelModelTrip[];
+  fits: readonly TravelModelFit[];
 }>;
 
 export type TravelEvidenceResult = Readonly<{

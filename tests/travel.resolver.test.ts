@@ -316,7 +316,7 @@ describe("resolveTravelEvidence", () => {
     ]);
   });
 
-  it("projects timing only when explicitly enabled", () => {
+  it("projects conclusions only when explicitly enabled, never timing", () => {
     const plan = resolveTravelPlan(planningInput({ now: "2026-09-16T12:00:00Z" }));
     const results = plan.legs.map((leg) => resultFor(
       leg,
@@ -329,8 +329,11 @@ describe("resolveTravelEvidence", () => {
       modelProjection: "enabled",
     });
 
-    expect(evidence.modelProjection?.legs).toHaveLength(2);
-    expect(JSON.stringify(evidence.modelProjection)).not.toMatch(/latitude|longitude|placeId|originRef|destinationRef/);
+    expect(evidence.modelProjection).toMatchObject({ version: "2.0", travelDay: "yes", calendarEvents: true, fits: [] });
+    expect(evidence.modelProjection?.trips.map((trip) => [trip.role, trip.destinationRef, trip.estimate])).toEqual([
+      ["outbound", "event-1", "current"], ["return", null, "current"],
+    ]);
+    expect(JSON.stringify(evidence.modelProjection)).not.toMatch(/latitude|longitude|placeId|originRef|\d{4}-\d{2}-\d{2}T|3000/);
   });
 });
 
