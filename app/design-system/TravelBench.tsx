@@ -13,8 +13,17 @@ const client: TravelSettingsClient = {
   save: async (value) => ({ ...initial, ...value, routingConsentAt: value.enabled ? initial.updatedAt : null }),
 };
 const denied = async () => ({ state: "denied" as const });
+// Ticket 165 guidance: travel on, device location not yet allowed, desktop Settings button.
+const enabled: TravelSettings = { ...initial, enabled: true, mode: "walking", routingConsentAt: initial.updatedAt };
+const enabledClient: TravelSettingsClient = { load: async () => enabled, save: async () => enabled };
+const notAllowed = async (requestPermission: boolean) => requestPermission
+  ? { state: "unavailable" as const, reason: "timeout" } : { state: "prompt" as const };
+const benchOnly = async () => {};
 export function TravelSettingsBench() {
-  return <TravelSettingsPanel client={client} readLocation={denied} />;
+  return <div className="grid gap-8">
+    <TravelSettingsPanel client={client} readLocation={denied} />
+    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} openLocationSettings={benchOnly} desktop />
+  </div>;
 }
 
 // Synthetic 2:30–4:30 attendance, 1:30 departure and 6:30 availability.

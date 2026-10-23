@@ -317,13 +317,16 @@ Source timing never automatically completes a Behavior.
 ## Travel implementation — Tickets 162–165
 
 `apps/desktop/src/product.tsx` uses the shared Settings and Timeline travel
-presentation. `INT-TRAVEL-001` through `INT-TRAVEL-005` in `interaction-registry.json`
+presentation. `INT-TRAVEL-001` through `INT-TRAVEL-007` in `interaction-registry.json`
 own the implemented intents; Ticket 215's toggle, Home, usual travel and Behavior
 Where use the shared Settings panel and Behavior form, SQLite migration 0018 and the
 account synchronization contract. Desktop map links always open Apple Maps; the existing design catalog owns the Settings and Calendar
 bench evidence. `apps/desktop/src/travel.ts` permits hosted estimates only for a
 linked, synchronized online account. Local location preferences and tracking work
-offline. Foreground Core Location is implemented in `native/location.m`.
+offline. Foreground Core Location is implemented in `native/location.m`. Ticket 165
+adds the fixed-URL `open_location_settings` command behind Open Location Services
+(`INT-TRAVEL-007`) and signs production builds with the Hardened Runtime location
+entitlement.
 
 Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390px
 UI checks pass. Those checks do not establish installed permission, restart,

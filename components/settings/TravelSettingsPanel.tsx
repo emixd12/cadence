@@ -17,9 +17,11 @@ const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
  * Ticket 215: three inputs. The toggle records routing consent and asks for
  * foreground location in the same click; Home and usual travel save together.
  */
-export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, desktop = false }: Readonly<{
+export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, openLocationSettings, desktop = false }: Readonly<{
   client?: TravelSettingsClient;
   readLocation?: (requestPermission: boolean) => Promise<ForegroundLocation>;
+  /** Desktop only: opens System Settings › Privacy & Security › Location Services. */
+  openLocationSettings?: () => Promise<void>;
   desktop?: boolean;
 }>) {
   const id = useId();
@@ -30,6 +32,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   const [message, setMessage] = useState("");
   const [location, setLocation] = useState<ForegroundLocation["state"] | null>(null);
   const [locating, setLocating] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [permission, setPermission] = useState<DeviceLocationPermission | null>(null);
   const sequence = useRef(0);
   const [locationReason, setLocationReason] = useState<string | null>(null);
@@ -89,7 +92,20 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     } catch { if (current === locationSequence.current) { setLocation("unavailable"); setLocationReason(null); } }
     finally { if (current === locationSequence.current) { setLocating(false); refreshPermission(); } }
   };
-  const permissionHint = permission ? deviceLocationHint(permission, desktop) : null;
+  const retry = async () => {
+    setRetrying(true);
+    try { await locate(); } finally { setRetrying(false); }
+  };
+  const openSettings = async () => {
+    try { await openLocationSettings?.(); } catch { setMessage("System Settings could not open. Open it from the Apple menu."); }
+  };
+  // Ticket 165: macOS may not show its prompt, so travel that is on explains the manual path.
+  // The toggle's own first request hides this until it answers; a retry keeps it in place.
+  const locationDenied = permission === "blocked" || location === "denied";
+  const locationTimedOut = location === "unavailable" && locationReason === "timeout";
+  const locationHelp = Boolean(settings?.enabled) && location !== "available" && (!locating || retrying)
+    && (permission === "not yet allowed" || locationDenied || locationTimedOut);
+  const permissionHint = permission && !locationHelp ? deviceLocationHint(permission, desktop) : null;
   const changed = settings ? (home.trim() || null) !== settings.baseLocationText || (mode || null) !== settings.mode : false;
   return <SettingsPanel title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
     <div className="grid max-w-2xl gap-4 text-sm leading-6">
@@ -107,6 +123,14 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
         <p className="text-muted-readable">Cadence saves only the places you enter. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
         {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked account, a synchronized working copy and an internet connection.</p> : null}
         {permission ? <p className="text-muted-readable">Device location: {permission}.{permissionHint ? ` ${permissionHint}` : ""}</p> : null}
+        {locationHelp ? <div className="grid gap-2">
+          <p className="text-muted-readable">{deviceLocationGuidance(permission, locationDenied, desktop)}</p>
+          <p className="text-muted-readable">Saved places and Calendar trips keep working without device location.</p>
+          <div className="flex flex-wrap gap-2">
+            {desktop && openLocationSettings ? <button type="button" onClick={() => { void openSettings(); }} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Open Location Services</button> : null}
+            <button type="button" onClick={() => { void retry(); }} disabled={locating} className="product-action product-action-secondary min-h-11 w-fit px-3 py-2 text-sm font-bold">Check again</button>
+          </div>
+        </div> : null}
       </fieldset> : <p>Loading travel settings…</p>}
       {locating ? <p role="status">Checking device location…</p> : location ? <p role="status">{location === "available" ? "A current position is available. Cadence did not save it." : `Location ${location}. Estimates start from Home or your previous stop instead.${locationReason && (location === "unavailable" || location === "denied") ? ` Diagnostic: ${locationReason}.` : ""}`}</p> : null}
       {message ? <p role="status">{message}</p> : null}
@@ -140,4 +164,16 @@ function deviceLocationHint(permission: DeviceLocationPermission, desktop: boole
   if (desktop) return "Allow it in System Settings › Privacy & Security › Location Services › Cadence.";
   if (isIosSafari()) return "Allow it in Settings › Privacy & Security › Location Services › Safari Websites.";
   return "Allow location for this site in your browser’s site settings.";
+}
+
+function deviceLocationGuidance(permission: DeviceLocationPermission | null, denied: boolean, desktop: boolean): string {
+  if (desktop) return "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again.";
+  const safari = isIosSafari();
+  if (denied) return safari
+    ? "Allow location in Settings › Privacy & Security › Location Services › Safari Websites, then choose Check again."
+    : "Allow location for this site in your browser’s site settings, then choose Check again.";
+  if (permission === "not yet allowed") return safari
+    ? "Choose Check again and allow location. To stop Safari asking, tap AA, then Website Settings, then Location, then Allow."
+    : "Choose Check again and allow location when your browser asks.";
+  return "Your device did not return a position in time. Choose Check again.";
 }

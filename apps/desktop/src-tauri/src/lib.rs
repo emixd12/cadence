@@ -84,6 +84,7 @@ pub fn run() {
             notifications::native_notifications,
             notifications::native_events,
             location::foreground_location,
+            location::open_location_settings,
             local_store::local_store,
             files::save_export,
             files::local_database_info,
