@@ -13807,7 +13807,7 @@
           "control": "CC BY 4.0"
         }
       ],
-      "availability": "The deployment enables weather, the device position gave a forecast area and a travel leg carries a weather margin.",
+      "availability": "The deployment enables weather, the device position gave a forecast area and a travel leg carries a weather margin, or a Daily Brief whose model facts held weather trips (Ticket 219 stage 2).",
       "success_result": "Opens the Open-Meteo site or the licence in a new tab, or in the system browser on desktop. No account, location or route data is sent.",
       "failure_result": "Without a weather margin no credit renders; travel timing is unchanged.",
       "effects": [

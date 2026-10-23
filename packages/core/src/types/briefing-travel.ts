@@ -1,4 +1,5 @@
-import type { TravelMode, TravelTimingModelProjection } from "./travel";
+import type { TravelLegRole, TravelMode, TravelTimingModelProjection } from "./travel";
+import type { WeatherConditionId, WeatherMarginTableVersion } from "./weather";
 
 /**
  * Ticket 219: travel facts in the Daily Brief context. Everything here may reach
@@ -28,39 +29,81 @@ export type AdvisorTravelRouteFacts =
   | Readonly<{ state: "unavailable"; reason: AdvisorTravelRouteUnavailableReason }>;
 
 /**
- * Ticket 217 slot, filled in stage 2. Learned from what the user told Cadence.
- * Minutes are the user's own preparation time, never a route duration.
+ * Ticket 217 habit facts, learned only from what the user told Cadence. Get-ready
+ * minutes are the user's own preparation time, never a route duration.
  */
 export type AdvisorTravelHabits = Readonly<{
-  getReadyMinutes: number | null;
-  /** Usual mode for the place of each Behavior, keyed by Behavior, never by place text or ID. */
+  rulesVersion: "travel-habit-defaults@1";
+  getReadyMinutes: number;
+  /** `default` follows the rules version; `learned` is the user's own value. */
+  getReadySource: "default" | "learned";
+  /** Remembered mode for the place of each Behavior, keyed by Behavior, never by place text, key or ID. */
   placeModes: readonly Readonly<{ behaviorRef: string; mode: TravelMode }>[];
 }>;
 
-export const ADVISOR_WEATHER_CONDITIONS = ["precipitation", "snow", "extreme_heat"] as const;
-export type AdvisorWeatherCondition = (typeof ADVISOR_WEATHER_CONDITIONS)[number];
+export const ADVISOR_WEATHER_STATES = [
+  /** A forecast was read; each trip says clear, margin or unknown. */
+  "applied",
+  /** No usable device position, so no weather margin today. */
+  "no_position",
+  /** The forecast could not be read. */
+  "unavailable",
+  /** No travel evidence was supplied with this context. */
+  "not_supplied",
+  /** The trips depend on Calendar events that the facts exclude. */
+  "calendar_not_included",
+  /** A trip goes to an occurrence or event that the facts exclude. */
+  "scope_narrowed",
+] as const;
+export type AdvisorWeatherState = (typeof ADVISOR_WEATHER_STATES)[number];
+
+/** One trip's weather rule conclusion (Ticket 218, `weather-margin@1`). */
+export type AdvisorWeatherTrip = Readonly<{
+  /** Destination commitment ref; `null` for the trip back to Home, as in route trips. */
+  destinationRef: string | null;
+  role: TravelLegRole;
+  mode: TravelMode;
+  /** `unknown` stays unknown: it never means clear weather. */
+  state: "clear" | "margin" | "unknown";
+  conditions: readonly WeatherConditionId[];
+  /** A fixed table value for the condition, never a share of the trip; 0 unless `margin`. */
+  marginMinutes: number;
+  suggestion: Readonly<{ instead: TravelMode; alternatives: readonly TravelMode[] }> | null;
+}>;
 
 /**
- * Ticket 218 slot, filled in stage 2. A margin is a fixed number of minutes for a
- * weather condition, never a share of trip time, so it reveals no route duration.
+ * Ticket 218 weather outlook and rule conclusions. The departure period comes from
+ * planned timing, so the facts reveal no route duration. The Open-Meteo credit is
+ * shown in the UI whenever these facts reach the model.
  */
 export type AdvisorWeatherOutlook = Readonly<{
   source: "open_meteo";
-  conditions: readonly Readonly<{
-    /** The trip the condition affects, by destination ref; `null` for the day. */
-    tripDestinationRef: string | null;
-    condition: AdvisorWeatherCondition;
-    marginMinutes: number;
-    suggestedMode: TravelMode | null;
-  }>[];
+  tableVersion: WeatherMarginTableVersion;
+  state: AdvisorWeatherState;
+  /** Whether a Calendar event shaped the trips; they then need the Calendar source. */
+  calendarEvents: boolean;
+  trips: readonly AdvisorWeatherTrip[];
 }>;
 
-/** Ticket 216 slot, filled in stage 2. Counts of completion place labels in the retention window. */
-export type AdvisorPlaceLabelCounts = Readonly<{
+/**
+ * Ticket 216 label counts for one Behavior in the suggestion window, for example
+ * "logged at Home 9 of 10 times". Counts only: no place keys, positions or text.
+ */
+export type AdvisorPlaceLabelBehaviorCounts = Readonly<{
   behaviorRef: string;
+  total: number;
   home: number;
-  savedPlace: number;
+  /** At the saved place named by the Behavior's own Where. */
+  wherePlace: number;
+  otherSavedPlace: number;
   elsewhere: number;
+}>;
+
+export type AdvisorPlaceLabelCounts = Readonly<{
+  rulesVersion: "where-suggestion-rules@1";
+  /** The rule set's fixed window ending today, in local days. */
+  periodDays: number;
+  behaviors: readonly AdvisorPlaceLabelBehaviorCounts[];
 }>;
 
 export type AdvisorTravelContext = Readonly<{
@@ -73,7 +116,7 @@ export type AdvisorTravelContext = Readonly<{
   route: AdvisorTravelRouteFacts;
   habits?: AdvisorTravelHabits;
   weather?: AdvisorWeatherOutlook;
-  placeLabels?: readonly AdvisorPlaceLabelCounts[];
+  placeLabels?: AdvisorPlaceLabelCounts;
 }>;
 
 /** The model sees the same shape, narrowed to the facts it receives. */

@@ -27,10 +27,14 @@ import {
   ADVISOR_BEHAVIOR_WHERE,
   ADVISOR_TRAVEL_CONTEXT_VERSION,
   ADVISOR_TRAVEL_ROUTE_UNAVAILABLE_REASONS,
-  ADVISOR_WEATHER_CONDITIONS,
+  ADVISOR_WEATHER_STATES,
 } from "../types/briefing-travel";
 import type { OccurrenceStatus } from "../types/database";
 import { TRAVEL_MODEL_PROJECTION_VERSION, type TravelLegRole, type TravelMode, type TravelModelFit } from "../types/travel";
+import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
+import { CURRENT_WHERE_SUGGESTION_RULES } from "../resolvers/place-label.resolver";
+import { WEATHER_MARGIN_TABLE } from "../resolvers/weather-margin.resolver";
+import { TRAVEL_HABIT_RULES } from "./travel-habits";
 import type {
   ExternalEventFailure,
   ExternalEventSnapshotV1,
@@ -630,9 +634,15 @@ function validateTravel(value: unknown, refs: Readonly<{ occurrenceRefs: Set<str
   }
 
   if ("habits" in travel) {
+    if (travel.routing !== "on") fail("context.travel.habits requires routing.");
     const habits = record(travel.habits, "context.travel.habits");
-    exactKeys(habits, ["getReadyMinutes", "placeModes"], "context.travel.habits");
-    if (habits.getReadyMinutes !== null) whole(habits.getReadyMinutes, "travel.habits.getReadyMinutes", 120);
+    exactKeys(habits, ["rulesVersion", "getReadyMinutes", "getReadySource", "placeModes"], "context.travel.habits");
+    if (habits.rulesVersion !== TRAVEL_HABIT_RULES.version) fail("travel.habits.rulesVersion is unsupported.");
+    const preparation = TRAVEL_HABIT_RULES.preparation;
+    whole(habits.getReadyMinutes, "travel.habits.getReadyMinutes", preparation.maxMinutes);
+    if ((habits.getReadyMinutes as number) % preparation.stepMinutes !== 0) fail("travel.habits.getReadyMinutes is invalid.");
+    if (habits.getReadySource !== "default" && habits.getReadySource !== "learned") fail("travel.habits.getReadySource is invalid.");
+    if (habits.getReadySource === "default" && habits.getReadyMinutes !== preparation.defaultMinutes) fail("travel.habits.getReadyMinutes does not match its source.");
     unique(array(habits.placeModes, "travel.habits.placeModes", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
       const row = record(item, `travel.placeMode[${index}]`);
       exactKeys(row, ["behaviorRef", "mode"], `travel.placeMode[${index}]`);
@@ -641,25 +651,61 @@ function validateTravel(value: unknown, refs: Readonly<{ occurrenceRefs: Set<str
     }), "travel.habits.placeModes");
   }
   if ("weather" in travel) {
+    if (travel.routing !== "on") fail("context.travel.weather requires routing.");
     const weather = record(travel.weather, "context.travel.weather");
-    exactKeys(weather, ["source", "conditions"], "context.travel.weather");
+    exactKeys(weather, ["source", "tableVersion", "state", "calendarEvents", "trips"], "context.travel.weather");
     if (weather.source !== "open_meteo") fail("travel.weather.source is invalid.");
-    array(weather.conditions, "travel.weather.conditions", 16).forEach((item, index) => {
-      const row = record(item, `travel.weather.condition[${index}]`);
-      exactKeys(row, ["tripDestinationRef", "condition", "marginMinutes", "suggestedMode"], `travel.weather.condition[${index}]`);
-      destinationRef(row.tripDestinationRef, "travel.weather.tripDestinationRef");
-      if (!(ADVISOR_WEATHER_CONDITIONS as readonly unknown[]).includes(row.condition)) fail("travel.weather.condition is invalid.");
-      whole(row.marginMinutes, "travel.weather.marginMinutes", 60);
-      mode(row.suggestedMode, "travel.weather.suggestedMode", true);
-    });
+    if (weather.tableVersion !== WEATHER_MARGIN_TABLE_VERSION) fail("travel.weather.tableVersion is unsupported.");
+    if (!(ADVISOR_WEATHER_STATES as readonly unknown[]).includes(weather.state)) fail("travel.weather.state is invalid.");
+    if (typeof weather.calendarEvents !== "boolean") fail("travel.weather.calendarEvents is invalid.");
+    const trips = array(weather.trips, "travel.weather.trips", ADVISOR_DAY_CONTEXT_LIMITS.occurrences);
+    if (weather.state !== "applied" && trips.length) fail("travel.weather.trips require a forecast.");
+    unique(trips.map((item, index) => {
+      const trip = record(item, `travel.weather.trip[${index}]`);
+      exactKeys(trip, ["destinationRef", "role", "mode", "state", "conditions", "marginMinutes", "suggestion"], `travel.weather.trip[${index}]`);
+      destinationRef(trip.destinationRef, "travel.weather.trip.destinationRef");
+      if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.weather.trip.role is invalid.");
+      // As in route trips, only the trip home has no destination.
+      if ((trip.role === "return") !== (trip.destinationRef === null)) fail("travel.weather.trip.destinationRef is invalid.");
+      mode(trip.mode, "travel.weather.trip.mode", false);
+      if (trip.state !== "clear" && trip.state !== "margin" && trip.state !== "unknown") fail("travel.weather.trip.state is invalid.");
+      const conditions = array(trip.conditions, "travel.weather.trip.conditions", WEATHER_MARGIN_TABLE.length);
+      unique(conditions.map((condition) => {
+        if (!WEATHER_MARGIN_TABLE.some((rule) => rule.id === condition)) fail("travel.weather.trip.condition is invalid.");
+        return condition as string;
+      }), "travel.weather.trip.conditions");
+      // The margin is the largest fixed table value among the conditions, never a share of trip time.
+      const margin = WEATHER_MARGIN_TABLE.filter((rule) => conditions.includes(rule.id)).reduce((largest, rule) => Math.max(largest, rule.marginMinutes), 0);
+      if (trip.marginMinutes !== margin || (trip.state === "margin") !== (margin > 0)) fail("travel.weather.trip.marginMinutes is invalid.");
+      if (trip.suggestion !== null) {
+        const suggestion = record(trip.suggestion, "travel.weather.trip.suggestion");
+        exactKeys(suggestion, ["instead", "alternatives"], "travel.weather.trip.suggestion");
+        if (trip.state !== "margin" || suggestion.instead !== trip.mode) fail("travel.weather.trip.suggestion is invalid.");
+        const alternatives = array(suggestion.alternatives, "travel.weather.trip.suggestion.alternatives", TRAVEL_MODES.length - 1);
+        if (!alternatives.length) fail("travel.weather.trip.suggestion.alternatives is invalid.");
+        unique(alternatives.map((alternative) => {
+          mode(alternative, "travel.weather.trip.suggestion.alternative", false);
+          if (alternative === trip.mode) fail("travel.weather.trip.suggestion.alternative is invalid.");
+          return alternative as string;
+        }), "travel.weather.trip.suggestion.alternatives");
+      }
+      return `${trip.role}:${trip.destinationRef ?? ""}`;
+    }), "travel.weather.trips");
   }
   if ("placeLabels" in travel) {
-    unique(array(travel.placeLabels, "context.travel.placeLabels", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+    const labels = record(travel.placeLabels, "context.travel.placeLabels");
+    exactKeys(labels, ["rulesVersion", "periodDays", "behaviors"], "context.travel.placeLabels");
+    if (labels.rulesVersion !== CURRENT_WHERE_SUGGESTION_RULES.version || labels.periodDays !== CURRENT_WHERE_SUGGESTION_RULES.periodDays) {
+      fail("travel.placeLabels.rulesVersion is unsupported.");
+    }
+    unique(array(labels.behaviors, "travel.placeLabels.behaviors", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
       const row = record(item, `travel.placeLabel[${index}]`);
-      exactKeys(row, ["behaviorRef", "home", "savedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
-      for (const key of ["home", "savedPlace", "elsewhere"] as const) whole(row[key], `travel.placeLabel.${key}`, 10_000);
+      exactKeys(row, ["behaviorRef", "total", "home", "wherePlace", "otherSavedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
+      for (const key of ["total", "home", "wherePlace", "otherSavedPlace", "elsewhere"] as const) whole(row[key], `travel.placeLabel.${key}`, 10_000);
+      const parts = (row.home as number) + (row.wherePlace as number) + (row.otherSavedPlace as number) + (row.elsewhere as number);
+      if (row.total === 0 || row.total !== parts) fail("travel.placeLabel.total is invalid.");
       return behaviorRef(row.behaviorRef, "travel.placeLabel.behaviorRef");
-    }), "context.travel.placeLabels");
+    }), "travel.placeLabels.behaviors");
   }
 }
 

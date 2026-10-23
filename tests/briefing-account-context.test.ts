@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
+import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 
 const mocks = vi.hoisted(() => ({
   preferences: vi.fn(),
@@ -17,8 +18,11 @@ const mocks = vi.hoisted(() => ({
   connector: vi.fn(),
   travelSettings: vi.fn(),
   whereKinds: vi.fn(),
+  labelSettings: vi.fn(),
+  labels: vi.fn(),
 }));
-vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readBehaviorWhereKinds: mocks.whereKinds }));
+vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readTravelBehaviorLocations: mocks.whereKinds }));
+vi.mock("@/lib/db/placeLabels.repo", () => ({ readPlaceLabelSettingsRow: mocks.labelSettings, readCompletionPlaceLabelRows: mocks.labels }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
 vi.mock("@/lib/services/connector-credentials", () => ({ getConnectorConnection: mocks.connector }));
 vi.mock("@/lib/db/advisor-analysis.repo", async (original) => ({
@@ -82,6 +86,8 @@ beforeEach(() => {
   })));
   mocks.travelSettings.mockResolvedValue(null);
   mocks.whereKinds.mockResolvedValue([]);
+  mocks.labelSettings.mockResolvedValue(null);
+  mocks.labels.mockResolvedValue([]);
 });
 
 describe("stored travel facts (Ticket 219)", () => {
@@ -98,12 +104,49 @@ describe("stored travel facts (Ticket 219)", () => {
       version: "1.0", routing: "on", usualMode: "transit",
       behaviors: [{ behaviorRef: "behavior_fixture", where: "home" }],
       route: { state: "unavailable", reason: "not_supplied" },
+      // Stage 2: default habits; weather needs supplied evidence, which this path never has.
+      habits: { rulesVersion: "travel-habit-defaults@1", getReadyMinutes: 10, getReadySource: "default", placeModes: [] },
+      weather: { source: "open_meteo", tableVersion: "weather-margin@1", state: "not_supplied", calendarEvents: false, trips: [] },
     });
     expect(JSON.stringify(prepared.contexts)).not.toContain("Main Street");
     await expect(prepared.assertCurrent()).resolves.toBeUndefined();
 
     mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: null }, { id: "other", where_kind: "anywhere" }]);
     await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+
+  it("adds learned habits and label counts by Behavior, never place text or keys (stage 2)", async () => {
+    const homeKey = travelPlaceKey("1 Main Street"), gymKey = travelPlaceKey("2 Gym Road");
+    mocks.ids.mockResolvedValue(["fixture", "gym"]);
+    mocks.travelSettings.mockResolvedValue({ ...travelSettings, preparation_minutes: 20, arrival_buffer_minutes: null, leave_feedback: [],
+      place_modes: [{ place_key: homeKey, mode: "walking", chosen_at: "2026-10-20T12:00:00.000000Z" }, { place_key: gymKey, mode: "driving", chosen_at: "2026-10-20T12:00:00.000000Z" }]
+        .sort((left, right) => left.place_key < right.place_key ? -1 : 1),
+      habits_updated_at: "2026-10-20T12:00:00.000000Z" });
+    mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: "home", location_text: null }, { id: "gym", where_kind: "place", location_text: "2 Gym Road" }]);
+    mocks.labelSettings.mockResolvedValue({ enabled: true, retention: "90_days" });
+    const label = (day: number, value: string) => ({ id: `o${day}`, behavior_id: "fixture", local_date: Temporal.PlainDate.from(fixture.localDate).subtract({ days: day }).toString(),
+      label: value, rule_version: "place-label-rules@1", recorded_at: "2026-10-20T12:00:00.000000Z" });
+    mocks.labels.mockResolvedValue([...Array.from({ length: 9 }, (_, day) => label(day + 1, "home")), label(12, "elsewhere"), label(61, "elsewhere"),
+      { ...label(2, "home"), id: "gym-o", behavior_id: "gym" }]);
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+    expect(prepared.contexts[0].travel).toMatchObject({
+      habits: { getReadyMinutes: 20, getReadySource: "learned", placeModes: [{ behaviorRef: "behavior_fixture", mode: "walking" }] },
+      // Only Behaviors in this context; the label older than the 60-day window is not counted.
+      placeLabels: { rulesVersion: "where-suggestion-rules@1", periodDays: 60,
+        behaviors: [{ behaviorRef: "behavior_fixture", total: 10, home: 9, wherePlace: 0, otherSavedPlace: 0, elsewhere: 1 }] },
+    });
+    const serialized = JSON.stringify(prepared.contexts);
+    for (const leaked of ["Main Street", "Gym Road", homeKey, gymKey, "saved_place"]) expect(serialized).not.toContain(leaked);
+    await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+    // A new label or a habit change before delivery fences the brief.
+    mocks.labels.mockResolvedValue([label(3, "elsewhere")]);
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+    mocks.labelSettings.mockResolvedValue({ enabled: false, retention: "90_days" });
+    mocks.labels.mockResolvedValue([]);
+    const off = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+    expect(off.contexts[0].travel).not.toHaveProperty("placeLabels");
+    // One read to prepare and one per fence check; labels that are off are never read.
+    expect(mocks.labels).toHaveBeenCalledTimes(3);
   });
 
   it("reports routing off and location not set without a travel settings row", async () => {

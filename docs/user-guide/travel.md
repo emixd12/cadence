@@ -84,7 +84,9 @@ and select Save where I complete Behaviors:
 - **Until I delete them**: keeps every label until you delete it. The most history and
   the best insights; the most stored about where you have been.
 
-Labels do not reach the Daily Brief yet. Switching to a shorter option asks first and
+While the Daily Brief is on, it receives label counts only, never places: for
+example, a Behavior logged at Home 9 of 10 times in the last 60 days. Switching to a
+shorter option asks first and
 deletes older labels. Cadence also deletes labels past your choice every day.
 
 When you mark an Occurrence Completed from Unresolved, on its own day and near its
@@ -280,9 +282,13 @@ location with your account, keyed by a one-way fingerprint of the typed text.
 It never stores the text or coordinates there. Turning travel off deletes them. Google retention follows its own
 terms. Cadence cannot erase a request already processed by Google.
 
-Raw locations and route results are not sent to the Daily Brief model. Deterministic
-travel facts stay separate from the briefing. Updating travel never silently
-regenerates an attempted briefing or resets its dismissal state.
+Raw locations, route results and travel times are not sent to the Daily Brief model.
+While the Daily Brief is on, it receives slow-changing travel facts only: each
+Behavior's Where, usual travel, your get-ready time, the travel you chose for a
+Behavior's place and completion label counts. Weather and trip conclusions reach it
+only as Cadence's own yes/no answers and fixed margins; when they do, the brief shows
+the Open-Meteo credit. Exact leave times stay in Cadence's calculated line. Updating
+travel never silently regenerates an attempted briefing or resets its dismissal state.
 
 Desktop saves Home, Where and other places you enter offline. Hosted estimates require a linked,
 synchronized account and connectivity. Provider, deployed-web and installed-macOS

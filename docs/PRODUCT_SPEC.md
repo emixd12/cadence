@@ -673,7 +673,8 @@ completion stores one label (Home, a saved place or elsewhere) and discards the
 position. Fixed, versioned rules (`place-label-rules@1`, `where-suggestion-rules@1`)
 turn labels into Where suggestions that the user must apply. The user chooses label
 retention (90 days, 1 year or until deleted). Labels sync with the account and stay
-out of exports and Daily Brief model input until Ticket 219 decides model use.
+out of exports. Ticket 219 stage 2 sends only per-Behavior label counts in the
+`where-suggestion-rules@1` window to Daily Brief model input.
 
 ### Weather travel margin (Ticket 218)
 
@@ -729,8 +730,9 @@ starting values; a changed value needs a new version.
 - `projectWeatherOutlook` in `packages/core/src/services/weather-outlook.ts`
   (`weather-outlook@1`) is the model-safe projection for Ticket 219: commitment
   references, mode, conditions, margin minutes, suggestion and table version. It
-  carries no area, coordinates, times or durations. Nothing sends it to a model
-  until Ticket 219's disclosure gate passes.
+  carries no area, coordinates, times or durations. Ticket 219 stage 2 maps it to
+  the Daily Brief weather facts (`advisorWeatherOutlook`) only with supplied travel
+  evidence; the live brief has none yet, so it says `not_supplied`.
 
 Platform impact: web uses the hosted adapter in `lib/services`; a linked desktop
 receives weather through the same travel route and makes no provider call; marketing

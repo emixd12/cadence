@@ -303,7 +303,7 @@ export function CompletionPlacesSection() {
             : <fieldset className="grid gap-3" disabled={pending}>
               <legend className="font-bold">Keep labels for</legend>
               <RetentionChoices name={`${id}-retention`} value={retention} onChange={setRetention} />
-              <p className="text-muted-readable">Next, record a marker at Home and at each saved place with I&apos;m here. Labels do not reach the Daily Brief yet.</p>
+              <p className="text-muted-readable">Next, record a marker at Home and at each saved place with I&apos;m here. While the Daily Brief is on, it receives label counts only, never places.</p>
               <div className="flex flex-wrap gap-3">
                 <button type="button" className="product-action product-action-primary min-h-11 w-fit"
                   onClick={() => { void save(true, retention, "Completion places are on."); }}>Save where I complete Behaviors</button>

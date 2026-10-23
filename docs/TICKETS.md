@@ -13616,7 +13616,8 @@ Model input
 
 - `projectPlaceLabelCounts` in the same resolver returns per-Behavior counts (at Home, at
   the Behavior's own place, at another saved place, elsewhere) without place keys,
-  positions or text. Nothing is added to model input; Ticket 219 owns that.
+  positions or text. Ticket 219 stage 2 (travel release train, October 23, 2026) sends
+  these counts to Daily Brief model input; see Ticket 219.
 
 Export
 
@@ -13848,7 +13849,12 @@ installed-desktop acceptance; merging with Ticket 217's `preparationSeconds`.
 ## Ticket 219: Travel, habit and weather facts in Daily Brief model input
 
 Status: stage 1 implemented in source October 22, 2026 in draft PR #132, based on
-the Ticket 215 branch; not deployed. Stage 2 follows Tickets 216, 217 and 218. Owner decision (October 22,
+the Ticket 215 branch; stage 2 implemented in source October 23, 2026 on the travel
+release train (Tickets 165, 212 and 216–219 combined on 215); not deployed. Open point:
+the owner is waiting for Google's reply to support case 76805292 (whether sending yes/no
+route conclusions to the model complies with Maps Platform Terms 3.2.3(c)) before
+deciding whether to restrict conclusions to day-level facts. Stage 2 leaves the stage 1
+conclusions unchanged until that decision. Owner decision (October 22,
 2026): disclosure updates, re-consent and marketing language are tracked in the
 privacy surface and do not block development. The existing Daily Brief model-data
 toggle stays the gate; there is no new consent gate. Google terms: accepted risk
@@ -13876,7 +13882,28 @@ Staging:
     Invented places and estimates pass through the real travel resolver.
   - Tests prove that no duration, departure, arrival, leave-by time, place or derived
     time pair reaches model input.
-- Stage 2, after Tickets 216, 217 and 218 land:
+- Stage 2 (October 23, 2026, travel release train). Done:
+  - `habits` (217): `rulesVersion` (`travel-habit-defaults@1`), get-ready minutes with
+    their source (default or learned) and the remembered mode for each Behavior's
+    place, keyed by Behavior. The place key is derived on the server and never leaves
+    it. Sent only while routing is on.
+  - `weather` (218): table version, outlook state and one rule conclusion per trip,
+    named like route trips: clear, margin or unknown, the conditions, the fixed table
+    margin and the mode suggestion. It comes from the same evidence and the same
+    model-projection gate as the route conclusions, and is withheld whole for an
+    excluded Calendar or stop. The validator accepts only the table margin for the
+    listed conditions. The live brief has no evidence, so it sends `not_supplied`.
+  - `placeLabels` (216): per-Behavior counts in the `where-suggestion-rules@1` 60-day
+    window (home, the Behavior's own place, another saved place, elsewhere, total).
+    No keys, positions or text; nothing while labels are off.
+  - A brief whose model facts held weather trips carries `attributions: ["open_meteo"]`;
+    the bubble shows the CC BY 4.0 credit unless the travel block already does.
+  - The workbench fixtures add learned habits, a synthetic rain forecast and invented
+    labels through the real resolvers. Tests prove the stage 2 facts are identical for
+    any route duration and that model input holds no duration-bearing number.
+  - Live weather and live route conclusions share one open decision: how supplied
+    evidence reaches the server (Option A token or Option B server routing, below).
+- Stage 2 plan, as filed after Tickets 216, 217 and 218:
   - Fill the typed slots: `habits` (217: get-ready minutes, usual mode per Behavior
     place), `weather` (218: condition, fixed margin minutes, suggested mode) and
     `placeLabels` (216: home, saved place and elsewhere counts). Each slot is already
@@ -13930,6 +13957,16 @@ Platform impact:
 - Marketing: review AI and privacy claims, including the public no-AI disclosure
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
+
+Stage 2 implementation references: `advisorTravelHabits`, `advisorWeatherOutlook`,
+`advisorPlaceLabelCounts` and `briefingUsesWeather` in
+`packages/core/src/services/briefing-travel.ts`, the slot validator in
+`packages/core/src/services/advisor-day-context.ts`, `readBriefingTravel` in
+`lib/services/briefing-account-context.service.ts`, the fixtures in
+`lib/services/briefing-fixtures.ts` and the bubble credit in
+`components/briefing/DailyBriefBubble.tsx`. Verification adds stage 2 cases to
+`tests/briefing-travel.test.ts`, `tests/briefing-account-context.test.ts` and
+`tests/travel-weather-ui.dom.test.tsx`.
 
 Stage 1 implementation references: `packages/core/src/types/briefing-travel.ts`,
 `packages/core/src/services/briefing-travel.ts`, `TravelTimingModelProjection` and

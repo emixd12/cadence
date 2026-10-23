@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { overlapsTravelSpans, type BriefTravelGuidance, type BriefTravelGuidanceItem } from "@cadence/core/services/brief-travel-guidance";
 import { briefingOptionText, briefingReferenceLabel, briefingTipEvidence, formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 
 type DailyBriefBubbleProps = Readonly<{
@@ -62,6 +63,9 @@ export function DailyBriefBubble({
               <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{briefing.tip.text}</p>
               <p className="text-xs leading-5 text-muted-readable">{briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation)}</p>
             </div> : null}
+            {/* Ticket 219: the model used Open-Meteo facts; credit them unless the travel block below already does. */}
+            {briefing.attributions?.includes("open_meteo") && !(weatherShown && travelToday?.weather?.attribution)
+              ? <div className="mt-2 text-xs leading-5 text-muted-readable" data-brief-weather-credit><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div> : null}
             {travelToday?.items.length ? <div className="mt-3 border-t border-line pt-2">
               <p className="text-xs font-bold text-muted-readable">Travel</p>
               <ul className="text-sm leading-6">

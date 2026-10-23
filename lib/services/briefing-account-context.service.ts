@@ -4,8 +4,11 @@ import type { AdvisorDayContext, AdvisorOpaqueRef } from "@cadence/core/types/ad
 import type { AdvisorTravelContext } from "@cadence/core/types/briefing-travel";
 import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
 import { storedBehaviorWhere } from "@cadence/core/services/behavior-where";
-import { buildAdvisorTravelContext } from "@cadence/core/services/briefing-travel";
-import { readBehaviorWhereKinds, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
+import { advisorPlaceLabelCounts, advisorTravelHabits, buildAdvisorTravelContext } from "@cadence/core/services/briefing-travel";
+import { travelHabitsFromSyncValue } from "@cadence/core/services/travel-habits";
+import type { PlaceLabelValue } from "@cadence/core/types/place-labels";
+import { readTravelBehaviorLocations, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
+import { readCompletionPlaceLabelRows, readPlaceLabelSettingsRow } from "@/lib/db/placeLabels.repo";
 import type { BriefingAnalysisSource, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import { readAdvisorAnalysisRevision, readAdvisorAnalysisSnapshot } from "@/lib/db/advisor-analysis.repo";
 import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
@@ -150,9 +153,10 @@ export async function prepareAccountBriefingContexts(
   });
   input.signal.throwIfAborted();
   const makeOpaqueRef = createAdvisorOpaqueRef(key, authorization);
-  // Ticket 219 stage 1: stored travel facts only. Route conclusions never come
-  // from this path, so the account workbench never sends Maps-derived facts.
-  const readTravel = () => readBriefingTravel(caller, authorization.behaviorIds, makeOpaqueRef);
+  // Ticket 219: stored travel facts only (Where, usual travel, learned habits and
+  // place label counts). Route conclusions and weather never come from this path,
+  // so the account workbench never sends Maps-derived facts.
+  const readTravel = () => readBriefingTravel(caller, authorization.behaviorIds, makeOpaqueRef, capturedContexts[0]!.localDate);
   const travel = await readTravel();
   input.signal.throwIfAborted();
   const contexts = capturedContexts.map((context) => withTravel(context, travel));
@@ -219,26 +223,49 @@ export async function prepareAccountBriefingContexts(
   return { contexts, assertCurrent, configurationRefs, preferences, analysisSource, tipFingerprint };
 }
 
-async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly string[], makeOpaqueRef: AdvisorOpaqueRef): Promise<AdvisorTravelContext> {
-  const [settings, behaviors] = await Promise.all([
+async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly string[], makeOpaqueRef: AdvisorOpaqueRef, localDate: string): Promise<AdvisorTravelContext> {
+  const [settings, behaviors, labelSettings] = await Promise.all([
     readTravelSettingsRow(caller.client, caller.user.id),
-    readBehaviorWhereKinds(caller.client, caller.user.id),
+    readTravelBehaviorLocations(caller.client, caller.user.id),
+    readPlaceLabelSettingsRow(caller.client, caller.user.id),
   ]);
+  const labelsOn = labelSettings?.enabled === true;
+  const labels = labelsOn ? await readCompletionPlaceLabelRows(caller.client, caller.user.id) : [];
   const authorized = new Set(behaviorIds);
+  // Place and Home text derive place keys and label refs here; neither leaves this function.
+  const visible = behaviors.filter((behavior) => authorized.has(behavior.id)).map((behavior) => ({
+    id: behavior.id,
+    behaviorRef: makeOpaqueRef("behavior", behavior.id),
+    whereKind: storedBehaviorWhere({ where_kind: behavior.where_kind }).where_kind,
+    locationText: behavior.location_text,
+  }));
+  const habits = settings ? travelHabitsFromSyncValue({
+    travel_preparation_minutes: settings.preparation_minutes,
+    travel_arrival_buffer_minutes: settings.arrival_buffer_minutes,
+    travel_place_modes: settings.place_modes,
+    travel_leave_feedback: settings.leave_feedback,
+    travel_habits_updated_at: settings.habits_updated_at,
+  }) : null;
   return buildAdvisorTravelContext({
     routing: !!settings?.enabled && !!settings.routing_consent_at,
     usualMode: settings?.mode ?? null,
-    behaviors: behaviors.filter((behavior) => authorized.has(behavior.id)).map((behavior) => ({
-      behaviorRef: makeOpaqueRef("behavior", behavior.id),
-      whereKind: storedBehaviorWhere({ where_kind: behavior.where_kind }).where_kind,
-    })),
+    behaviors: visible.map(({ behaviorRef, whereKind }) => ({ behaviorRef, whereKind })),
+    habits: advisorTravelHabits(habits, visible, settings?.base_location_text ?? null),
+    placeLabels: advisorPlaceLabelCounts({ enabled: labelsOn, behaviors: visible, today: Temporal.PlainDate.from(localDate),
+      labels: labels.map((label) => ({ behaviorId: label.behavior_id, localDate: label.local_date, label: label.label as PlaceLabelValue })) }),
   });
 }
 
 /** Keeps only Behaviors this context carries, as the strict context validator requires. */
 function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext): AdvisorDayContext {
   const refs = new Set([...context.cadence.occurrences.map(({ behaviorRef }) => behaviorRef), ...context.cadence.history.behaviors.map(({ behaviorRef }) => behaviorRef)]);
-  return validateVersionedAdvisorDayContext({ ...context, travel: { ...travel, behaviors: travel.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)) } });
+  const placeLabels = travel.placeLabels ? { ...travel.placeLabels, behaviors: travel.placeLabels.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)) } : null;
+  return validateVersionedAdvisorDayContext({ ...context, travel: {
+    ...travel,
+    behaviors: travel.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)),
+    ...(travel.habits ? { habits: { ...travel.habits, placeModes: travel.habits.placeModes.filter(({ behaviorRef }) => refs.has(behaviorRef)) } } : {}),
+    ...(placeLabels ? { placeLabels } : {}),
+  } });
 }
 
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {

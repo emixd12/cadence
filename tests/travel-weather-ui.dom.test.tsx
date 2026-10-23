@@ -126,4 +126,17 @@ describe("Daily Brief travel block with weather", () => {
     expect(container.textContent).toContain("No weather margin: device location is unavailable.");
     expect(container.querySelector("[data-weather-credit]")).toBeNull();
   });
+
+  it("credits Open-Meteo once when the model used weather facts (Ticket 219 stage 2)", async () => {
+    const used = { ...briefing, attributions: ["open_meteo"] as const };
+    await act(() => root.render(<DailyBriefBubble state="ready" briefing={used} onDismiss={() => undefined} />));
+    expect(container.querySelector("[data-brief-weather-credit]")?.textContent).toContain("Weather data by Open-Meteo.com (CC BY 4.0).");
+    // The travel block already credits Open-Meteo, so the brief adds no second credit.
+    await act(() => root.render(<DailyBriefBubble state="ready" briefing={used} onDismiss={() => undefined}
+      travel={guidance({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION }, true)} />));
+    expect(container.querySelectorAll("[data-weather-credit]")).toHaveLength(1);
+    expect(container.querySelector("[data-brief-weather-credit]")).toBeNull();
+    await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined} />));
+    expect(container.querySelector("[data-weather-credit]")).toBeNull();
+  });
 });

@@ -409,7 +409,8 @@ export type PlaceLabelCountProjection = Readonly<{
 
 /**
  * Ticket 219 input candidate: counts only, never place keys, positions or text.
- * Nothing calls this for model input yet.
+ * Ticket 219 stage 2 sends these counts to Daily Brief model input through
+ * `advisorPlaceLabelCounts`.
  */
 export function projectPlaceLabelCounts(input: Readonly<{
   labels: readonly Pick<CompletionPlaceLabel, "behaviorId" | "label" | "localDate">[];

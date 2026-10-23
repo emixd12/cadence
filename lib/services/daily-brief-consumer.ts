@@ -5,6 +5,7 @@ import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context"
 import { activeBriefingConfig, briefingConfigurationRevision, prepareBriefing, type BriefingAnalysisInput } from "./briefing-pipeline";
 import { DAILY_BRIEF_POLICY_VERSION, type DailyBriefing } from "@cadence/core/types/daily-brief";
 import { describeBriefingFinding, describeBriefingLimitation } from "@cadence/core/services/briefing-analysis";
+import { briefingUsesWeather } from "@cadence/core/services/briefing-travel";
 
 export const DAILY_BRIEF_INSTRUCTIONS = `Write a concise, forward-looking Daily Brief for Cadence's horse speech bubble within the supplied combined word budget.
 Purpose: a morning overview of practical day constraints and supported opportunities, adding interpretation beyond the visible ledger.
@@ -53,7 +54,9 @@ usualMode is how the user usually travels. routing off means travel estimates ar
 When route.state is available: travelDay yes means the rest of today includes a planned trip. trips lists them by destination reference, an occurrence or event already in the facts, or null for the trip home; estimate unknown means Cadence has no current estimate. fits gives Cadence's conclusion for unresolved Behavior occurrences at their scheduled time: fits means travel leaves room for it; does_not_fit means travel crowds it (travel_overlap) or the trip there arrives late (late_arrival); unknown means Cadence cannot tell. trip and position say which trip a conclusion concerns and whether the occurrence comes before or after it.
 Never turn unknown into fits and never assume unknown travel takes no time. Mention travel uncertainty only when it changes a recommendation. When route.state is unavailable, the facts prove nothing about travel.
 Planner options and day evidence do not account for travel. Never claim a planner option avoids travel, and do not recommend an option for an occurrence whose travel conclusion is does_not_fit.
-habits, weather and placeLabels appear only when supplied. getReadyMinutes is the user's own preparation time. A weather marginMinutes is a fixed allowance for the condition; you may suggest leaving that much earlier or the suggestedMode, never a departure time. placeLabels count where the user marked a Behavior Completed.`;
+habits, weather and placeLabels appear only when supplied. habits.getReadyMinutes is the time the user needs to get ready before leaving Home or their current position (getReadySource default means Cadence's starting value, learned means the user's own); habits.placeModes give the travel mode the user chose for a Behavior's place, and usualMode applies elsewhere.
+weather.state applied means Cadence read a forecast; each weather trip, named like route trips, is clear, margin or unknown. unknown is not clear weather. marginMinutes is a fixed allowance for the listed conditions from Cadence's table, never a share of the trip: you may suggest allowing that many extra minutes, or a suggestion alternative instead of suggestion.instead, but never a departure time. Any other weather.state means there are no weather facts today; then say nothing about the weather.
+placeLabels count where the user was when marking each Behavior Completed over the last periodDays days: home, wherePlace (the Behavior's own saved place), otherSavedPlace and elsewhere, out of total. You may say, for example, "logged at Home 9 of 10 times". Never infer a place beyond these counts.`;
 
 /** Identifies the exact instruction text, so workbench runs can show prompt changes between candidates. */
 export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}\0${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}`).digest("hex").slice(0, 16);
@@ -151,6 +154,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     text: value.text.trim(), localDate: context.localDate, timezone: context.timezone,
     generatedAt: now.toString(), expiresAt: context.expiresAt, coverage: facts.status,
     warnings: ["Suggestions only. No changes were applied."],
+    ...(briefingUsesWeather(facts.travel) ? { attributions: ["open_meteo"] as const } : {}),
   };
 }
 

@@ -3,11 +3,11 @@ import type { WeatherOutlookModelProjection } from "../types/weather";
 import { WEATHER_MARGIN_TABLE_VERSION, WEATHER_OUTLOOK_VERSION } from "../types/weather";
 
 /**
- * Projects weather facts a later Daily Brief stage may send to the model (Ticket 219).
- * Each fact names a commitment, never a time: no area, coordinates, departure or arrival
- * times, durations or provider payloads. The departure period comes from planned timing,
- * so the facts reveal no route duration (`docs/LEGAL.md` L-001). Nothing calls this for
- * model input until Ticket 219's disclosure gate passes.
+ * Projects weather facts the Daily Brief may send to the model (Ticket 219 stage 2,
+ * through `advisorWeatherOutlook`). Each fact names a commitment, never a time: no area,
+ * coordinates, departure or arrival times, durations or provider payloads. The departure
+ * period comes from planned timing, so the facts reveal no route duration
+ * (`docs/LEGAL.md` L-001).
  */
 export function projectWeatherOutlook(
   evidence: Pick<TravelEvidenceResult, "legs" | "weather"> | null | undefined,
