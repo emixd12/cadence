@@ -100,6 +100,33 @@ class Cleanup(unittest.TestCase):
         self.assertEqual(self.api.rules, [])
         self.assertIsNone(self.api.tag)
 
+    def test_exact_final_pair_revision_restores(self):
+        self.assertEqual(m.SHA, '7735499e026b2dc3152107cca3092404bfd476ec')
+        self.finish()
+
+    def test_old_revision_rejected_at_each_identity_boundary(self):
+        previous = '3a2ea7d73d8b643b67c194bebdcb2714a8661860'
+        for boundary in ['control', 'run', 'tag']:
+            with self.subTest(boundary=boundary):
+                self.setUp()
+                if boundary == 'control':
+                    self.c['sha'] = previous
+                    self.write()
+                elif boundary == 'run':
+                    self.api.runs[123]['head_sha'] = previous
+                else:
+                    self.api.tag['object']['sha'] = previous
+                for _ in range(4):
+                    result = self.tick()
+                self.assertEqual(result, {'event': 'retry', 'ownerGateMustRemain': True})
+                self.assertIsNotNone(self.api.tag)
+                if boundary == 'control':
+                    self.assertEqual(self.api.calls, [])
+                if boundary == 'run':
+                    self.assertTrue(all(method == 'GET' for _, method, _ in self.api.calls))
+                self.assertFalse(any('/git/ref' in path and method == 'DELETE'
+                                     for path, method, _ in self.api.calls))
+
     def test_transient_get_then_deadline_without_agent_wake(self):
         self.api.fail = lambda p, method: '/actions/runs/' in p
         for now in [90, 100, 105]:
