@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,11 +16,13 @@ function plist(body: string): string {
 `;
 }
 
-function entitlements(groups = [identifier]): string {
+// Production also signs the Hardened Runtime location entitlement, which profiles never list.
+function entitlements(groups = [identifier], extra = "<key>com.apple.security.personal-information.location</key><true/>"): string {
   return `<dict>
   <key>com.apple.application-identifier</key><string>${identifier}</string>
   <key>com.apple.developer.team-identifier</key><string>${team}</string>
   <key>keychain-access-groups</key><array>${groups.map((group) => `<string>${group}</string>`).join("")}</array>
+  ${extra}
 </dict>`;
 }
 
@@ -81,10 +83,30 @@ process.stdout.write(fs.readFileSync(${JSON.stringify(path.join(directory, sourc
     ["another team's profile", () => writeFileSync(path.join(directory, "profile.plist"), profile({ teamId: "ABCDEFGHIJ" })), "different team"],
     ["an expired profile", () => writeFileSync(path.join(directory, "profile.plist"), profile({ expires: "2020-01-01T00:00:00Z" })), "expired"],
     ["a profile without the Keychain group", () => writeFileSync(path.join(directory, "profile.plist"), profile({ groups: ["ABCDEFGHIJ.*"] })), "keychain-access-groups"],
+    ["a false location entitlement", () => {
+      const value = plist(entitlements([identifier], "<key>com.apple.security.personal-information.location</key><false/>"));
+      writeFileSync(expected, value); writeFileSync(path.join(directory, "signed.plist"), value);
+    }, "must be true"],
+    ["another runtime exception the profile does not authorize", () => {
+      const value = plist(entitlements([identifier], "<key>com.apple.security.cs.disable-library-validation</key><true/>"));
+      writeFileSync(expected, value); writeFileSync(path.join(directory, "signed.plist"), value);
+    }, "does not authorize com.apple.security.cs.disable-library-validation"],
   ])("rejects %s", (_name, change, message) => {
     change();
     const result = verify();
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(message);
+  });
+});
+
+describe("production location access (Ticket 165)", () => {
+  // Hardened Runtime blocks Location Services unless the signature carries this entitlement.
+  it("signs the location entitlement and declares the macOS usage strings", () => {
+    const native = path.resolve("apps/desktop/src-tauri");
+    expect(readFileSync(path.join(native, "Entitlements.plist"), "utf8"))
+      .toMatch(/<key>com\.apple\.security\.personal-information\.location<\/key>\s*<true\/>/);
+    const info = readFileSync(path.join(native, "Info.plist"), "utf8");
+    expect(info).toContain("<key>NSLocationUsageDescription</key>");
+    expect(info).toContain("<key>NSLocationWhenInUseUsageDescription</key>");
   });
 });
