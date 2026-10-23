@@ -8463,7 +8463,12 @@ Only synthetic local data was used. No deployment or hosted data operation ran.
 
 ## Ticket 115: Apple-trusted macOS distribution acceptance
 
-Current state (2026-09-27): in progress. The owner authorized every execution step.
+Current state (2026-10-22): complete. Cadence for Mac 0.1.3 is published on the public
+`desktop-stable` release and verified; see Ticket 181 and
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`. macOS 14 runtime testing stays
+owner-deferred. History follows.
+
+Earlier state (2026-09-27): in progress. The owner authorized every execution step.
 The owner's account page confirms Apple Developer Program membership. The Developer
 ID identity and matching profile are installed; Apple accepted the notarization
 credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
@@ -12691,7 +12696,11 @@ second acceptance inventory. Filing these tickets performs no release or live te
 
 ## Ticket 178: Signed account and Calendar lifecycle acceptance
 
-Status: in progress September 28. The dedicated test Calendar contains a
+Status: complete October 21, 2026. Installed acceptance on signed 0.1.3 covered
+sign-in renewal, callback replay, revoked-session recovery and reconnection without
+data loss. Calendar expiry is covered by a unit test; see
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+Earlier status: in progress September 28. The dedicated test Calendar contains a
 timed public-landmark fixture with no guests or notifications. The owner selected
 Chrome and confirmed the test account is signed in. Native lifecycle execution
 resumed with isolated data. Notification-independent account checks now pass:
@@ -12883,12 +12892,12 @@ and crypto checks, database comparison and restoration. Apply required checks to
 
 ## Ticket 181: Final signed-release acceptance and publication
 
-Status: published October 22, 2026. By owner decision, 0.1.3 is live on the public
+Status: complete October 22, 2026. By owner decision, 0.1.3 is live on the public
 `desktop-stable` release, and both update feeds name it. Public download, hash,
-feed-signature and quarantined Gatekeeper readback pass. Open: verify the marketing
-**Download for Mac** link in production, then refresh the app's Trust marketing
-deployment ID. 0.1.4 follows as the first stable update. Packet:
-`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+feed-signature and quarantined Gatekeeper readback pass. Production marketing
+(cadence-me.com) links **Download for Mac** to the stable DMG, and the app's Trust
+marketing deployment ID was refreshed and the app redeployed. 0.1.4 follows as the
+first stable update. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 Earlier status: verification in progress September 28; publication remains gated.
 All 76 current migrations replayed cleanly in a separate local project. The real
 authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
@@ -14132,15 +14141,16 @@ connector framework, background polling, new primary route, or mobile app.
 
 | Ticket | Delivery slice | Dependencies |
 |---|---|---|
-| 220 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
-| 221 | Shared calendar-source and recorded-activity contracts | 220 |
-| 222 | Secure lifecycle for new connectors | 221 |
-| 223 | Hevy workout timing connector | 222 |
-| 224 | Outlook Calendar connector | 222 |
-| 225 | Connector library and Timeline on web and desktop | 223, 224; 227 when ready |
-| 226 | Separately approved connector context in Daily Brief | 225 |
-| 227 | iCloud Calendar connector | 222 |
-| 228 | Verification and disclosure reconciliation | 221–227 |
+| 233 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
+| 234 | Shared calendar-source and recorded-activity contracts | 233 |
+| 235 | Secure lifecycle for new connectors | 234 |
+| 236 | Hevy workout timing connector | 235 |
+| 237 | Outlook Calendar connector | 235 |
+| 238 | Connector library and Timeline on web and desktop | 236, 237; 240 when ready |
+| 239 | Separately approved connector context in Daily Brief | 238 |
+| 240 | iCloud Calendar connector | 235 |
+| 241 | Verification and disclosure reconciliation | 234–240 |
+| 242 | Outlook personal-account support via `Calendars.Read` | 237, 241 live evidence |
 
 Tickets 236 and 237 may run in parallel in separate provider files. Shared schema,
 registry, Settings, Timeline, and briefing files are edited serially.
@@ -14317,7 +14327,7 @@ session and Keychain client state; the desktop client itself belongs to Ticket 2
 App registration, live personal or work/school access and publisher verification
 remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
 
-Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
+Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect. Ticket 242 retest (2026-10-22, `Calendars.Read`): personal account **passed** and work/school account **passed** with verified per-user (`Principal`) consent in the home tenant; see Ticket 242 and `STATUS.md`. Still not exercised: cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -14506,8 +14516,8 @@ Platform impact:
 ## Ticket 241: Verification and disclosure reconciliation
 
 Status: independently approved at `a10b461` for local implementation and
-synthetic verification. Live providers, installed desktop, iCloud
-custody acceptance and release remain open.
+synthetic verification. Live providers, installed desktop and release remain
+open; the owner accepted iCloud custody on 2026-10-19.
 
 Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
@@ -14527,4 +14537,68 @@ Platform impact:
 | Web | `components/settings/LegalContent.tsx`; source/fixture verification with unchanged connector runtime. |
 | Desktop | `docs/DESKTOP_PARITY.md` and shared UI/broker checks; installed acceptance remains open. |
 | Marketing | Existing FAQ, homepage, About/docs and generated mirrors under `apps/marketing/src`; no deployment. |
+| Future mobile | Not applicable: no mobile surface. |
+
+## Ticket 242: Outlook Calendar personal-account support via Calendars.Read
+
+Status: approved by the owner on 2026-10-21; implemented and live-verified on
+2026-10-22 on a disposable local stack. A personal account and a work/school
+account (home tenant, per-user `Principal` grant) connected, listed calendars,
+read events with titles and times only, showed them on Timeline and
+disconnected. Live finding: Microsoft co-grants an earlier `Calendars.ReadBasic`
+consent with `Calendars.Read`; it is accepted only alongside `Calendars.Read`
+(`06fc275`). Not exercised: cross-tenant consent, tenants that block unverified
+apps, installed desktop. Details in `STATUS.md`.
+
+Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
+personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
+every calendar endpoint returns 401 with an empty body. The same personal
+account read its calendars with a token carrying `Calendars.Read`, through a
+fresh test app. Work/school accounts work with either permission. Most people
+will connect personal Outlook.com, Hotmail or Live accounts, so the connector
+must support them. Owner direction: anyone with a Microsoft account must be able
+to connect it.
+
+Decision: request `openid offline_access Calendars.Read` for every Microsoft
+account (one Entra app, authority `common`). Do not branch scopes by account
+type. This matches the Google Calendar connector, whose read-only scope also
+covers event details. Data minimization moves from the permission to the
+request: Cadence keeps `$select` limited to the fields the contract already
+allows, never requests bodies, attachments or extensions, and discards any
+field outside the contract.
+
+Acceptance:
+
+- `OUTLOOK_CALENDAR_SCOPES` and granted-scope validation accept exactly one
+  effective Graph data permission, `Calendars.Read`; OIDC scopes may be echoed,
+  and a co-granted `Calendars.ReadBasic` from earlier consent is accepted (live,
+  October 22, 2026: Microsoft returned `openid Calendars.Read Calendars.ReadBasic`
+  for a personal account that had consented to ReadBasic before; it grants
+  nothing beyond `Calendars.Read`). A token
+  whose scope adds write or other Graph permissions is still rejected. An
+  existing connection granted only `Calendars.ReadBasic` moves to
+  `reconnect_required` on its next read, without crashing.
+- Graph requests keep explicit `$select` lists. Tests prove no request asks
+  for `body`, `bodyPreview`, `attachments` or extensions, and that unexpected
+  response fields are dropped before validation output.
+- Update `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`
+  (Outlook brief: scopes, rationale and the live evidence), `docs/OPERATIONS.md`,
+  `.env.example`, `docs/DECISIONS.md`, Settings legal text
+  (`components/settings/LegalContent.tsx`), the Outlook Settings disclosure, and
+  marketing FAQ/Privacy copy: Microsoft's permission allows reading event
+  details; Cadence requests only titles, times, calendar and response fields.
+- The Entra app "Cadence Calendar" lists `Calendars.Read` (delegated) instead of
+  `Calendars.ReadBasic` in its configured permissions.
+- Live retest on a disposable local stack: one personal account and one
+  work/school account connect, list calendars, read events and disconnect.
+  Agents drive the UI; the owner only signs in and consents.
+- Required checks, interaction registry and design-system checks pass.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `lib/services/outlook-calendar-oauth.ts`, Outlook service and adapter, Settings Outlook panel disclosure and legal text. |
+| Desktop | Same hosted broker and shared contracts; no desktop-specific scope handling. Installed acceptance stays with Ticket 238/115. |
+| Marketing | FAQ and Privacy wording for the broader Microsoft permission. |
 | Future mobile | Not applicable: no mobile surface. |
