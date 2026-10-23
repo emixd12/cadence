@@ -632,7 +632,7 @@
       "benchAnchor": "design-system#ds-module-travel-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
+      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Ticket 212 adds the `travel` anchor. The panel is one sparse sequence: setup and device-location guidance, then How you travel (Ticket 217) and Completion places (Ticket 216) as ruled subsections; I'm here sits below Home while labels are on. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
     },
     {
       "id": "module.travel-habits-section",
@@ -677,18 +677,18 @@
       "notes": "Ticket 217: once-a-day Too early / About right / Too late question with Not now, shown in the Timeline status area. Not now records nothing."
     },
     {
-      "id": "module.completion-places-panel",
-      "name": "CompletionPlacesPanel",
+      "id": "module.completion-places-section",
+      "name": "CompletionPlacesSection",
       "kind": "module",
       "source": "components/travel/PlaceLabels.tsx",
-      "exportName": "CompletionPlacesPanel",
+      "exportName": "CompletionPlacesSection",
       "usageNames": [
-        "CompletionPlacesPanel"
+        "CompletionPlacesSection"
       ],
-      "benchAnchor": "design-system#ds-module-completion-places-panel",
+      "benchAnchor": "design-system#ds-module-completion-places-section",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 216: separate opt-in for completion place labels with a retention choice (90 days default, 1 year, until deleted), label and marker counts, and confirmed delete and turn-off controls. Synthetic bench state; no position read or request."
+      "notes": "Ticket 216: Completion places subsection of the Travel panel, after How you travel: separate opt-in for completion place labels with a retention choice (90 days default, 1 year, until deleted), label and marker counts, and confirmed delete and turn-off controls. Synthetic bench state; no position read or request."
     },
     {
       "id": "composite.place-marker-control",

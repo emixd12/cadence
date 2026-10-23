@@ -938,7 +938,7 @@ setup (Ticket 212) links to the same Home and usual travel controls at
 
 ### Completion places and Where suggestions (Ticket 216)
 
-1. In Settings, Completion places, the user selects Set up completion places,
+1. In Settings, Travel, Completion places, the user selects Set up completion places,
    chooses how long labels are kept (90 days by default) and selects Save where I
    complete Behaviors. Labels stay off until then.
 2. At Home or a saved place the user selects I'm here: beside Home in Travel

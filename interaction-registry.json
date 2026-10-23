@@ -15222,7 +15222,7 @@
           "control": "Save where I complete Behaviors"
         }
       ],
-      "availability": "Settings, Completion places, while labels are off. Off by default; 90 days is preselected.",
+      "availability": "Settings, Travel, Completion places, while labels are off. Off by default; 90 days is preselected.",
       "success_result": "Saves the opt-in time and retention, shows label and marker counts, and reveals I'm here controls.",
       "failure_result": "Keeps labels off and shows a reload message after a stale or failed save.",
       "effects": [
@@ -15232,7 +15232,7 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
         "app/(app)/settings/page.tsx",
         "lib/services/place-labels.service.ts"
       ],
@@ -15250,7 +15250,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "app/(app)/settings/page.tsx",
             "lib/services/place-labels.service.ts"
           ],
@@ -15266,7 +15266,7 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx",
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "apps/desktop/src/local-place-labels.service.ts"
           ],
           "evidence": [
@@ -15319,7 +15319,7 @@
           "control": "Switch and delete"
         }
       ],
-      "availability": "Settings, Completion places, while labels are on.",
+      "availability": "Settings, Travel, Completion places, while labels are on.",
       "success_result": "A longer choice saves at once; a shorter choice asks first and deletes older labels in the same save.",
       "failure_result": "Keeps the prior retention and labels after a stale or failed save.",
       "effects": [
@@ -15330,7 +15330,7 @@
       "risk": "destructive",
       "confirmation": "acknowledgement",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
         "app/(app)/settings/page.tsx",
         "lib/services/place-labels.service.ts"
       ],
@@ -15348,7 +15348,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "app/(app)/settings/page.tsx",
             "lib/services/place-labels.service.ts"
           ],
@@ -15364,7 +15364,7 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx",
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "apps/desktop/src/local-place-labels.service.ts"
           ],
           "evidence": [
@@ -15413,7 +15413,7 @@
           "control": "Delete labels"
         }
       ],
-      "availability": "Settings, Completion places, while at least one label exists.",
+      "availability": "Settings, Travel, Completion places, while at least one label exists.",
       "success_result": "Deletes all labels after confirmation; suggestions restart from new completions.",
       "failure_result": "Keeps labels and shows a reload message.",
       "effects": [
@@ -15424,7 +15424,7 @@
       "risk": "destructive",
       "confirmation": "acknowledgement",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
         "app/(app)/settings/page.tsx",
         "lib/services/place-labels.service.ts"
       ],
@@ -15442,7 +15442,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "app/(app)/settings/page.tsx",
             "lib/services/place-labels.service.ts"
           ],
@@ -15458,7 +15458,7 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx",
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "apps/desktop/src/local-place-labels.service.ts"
           ],
           "evidence": [
@@ -15507,7 +15507,7 @@
           "control": "Delete place markers"
         }
       ],
-      "availability": "Settings, Completion places, while at least one marker exists.",
+      "availability": "Settings, Travel, Completion places, while at least one marker exists.",
       "success_result": "Deletes all markers after confirmation; new labels wait for new markers.",
       "failure_result": "Keeps markers and shows a reload message.",
       "effects": [
@@ -15518,7 +15518,7 @@
       "risk": "destructive",
       "confirmation": "acknowledgement",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
         "app/(app)/settings/page.tsx",
         "lib/services/place-labels.service.ts"
       ],
@@ -15536,7 +15536,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "app/(app)/settings/page.tsx",
             "lib/services/place-labels.service.ts"
           ],
@@ -15552,7 +15552,7 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx",
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "apps/desktop/src/local-place-labels.service.ts"
           ],
           "evidence": [
@@ -15605,7 +15605,7 @@
           "control": "Turn off and delete"
         }
       ],
-      "availability": "Settings, Completion places, while labels are on.",
+      "availability": "Settings, Travel, Completion places, while labels are on.",
       "success_result": "Turns labels off and deletes every label, marker and suggestion dismissal on hosted and local stores.",
       "failure_result": "Keeps labels on and shows a reload message.",
       "effects": [
@@ -15616,7 +15616,7 @@
       "risk": "destructive",
       "confirmation": "acknowledgement",
       "implementation": [
-        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
         "app/(app)/settings/page.tsx",
         "lib/services/place-labels.service.ts"
       ],
@@ -15634,7 +15634,7 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "app/(app)/settings/page.tsx",
             "lib/services/place-labels.service.ts"
           ],
@@ -15650,7 +15650,7 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx",
-            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
             "apps/desktop/src/local-place-labels.service.ts"
           ],
           "evidence": [

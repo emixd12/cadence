@@ -11,6 +11,7 @@ import { TravelModeChoice } from "@/components/timeline/TravelModeChoice";
 import type { TravelSettings } from "@cadence/core/types/travel";
 import type { TravelWeatherInput } from "@cadence/core/types/weather";
 import type { TravelSettingsClient } from "@/lib/ui/travel-settings";
+import { PlaceLabelBench } from "./PlaceLabelBench";
 
 const BENCH_NOW = "2026-10-22T15:00:00.000000Z";
 const homeKey = travelPlaceKey("10 Bench Road");
@@ -36,7 +37,8 @@ const notAllowed = async (requestPermission: boolean) => requestPermission
 const benchOnly = async () => {};
 export function TravelSettingsBench() {
   return <div className="grid gap-8">
-    <TravelSettingsPanel client={client} readLocation={denied} />
+    {/* The complete panel: setup, How you travel and Completion places (Tickets 215–217). */}
+    <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} /></PlaceLabelBench>
     <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} openLocationSettings={benchOnly} desktop />
   </div>;
 }

@@ -13,7 +13,6 @@ import {
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import type { BehaviorWhereKind } from "@cadence/core/types/behavior";
 import type { PlaceLabelRetention, PlaceLabelState, PlaceMarkerInput, PlaceRef } from "@cadence/core/types/place-labels";
-import { SettingsPanel } from "@/components/settings/SettingsPanels";
 import { PLACE_LABELS_CHANGED_EVENT, notifyPlaceLabelsChanged, webPlaceLabelClient, type PlaceLabelClient } from "@/lib/ui/place-labels";
 
 /**
@@ -273,8 +272,8 @@ const RETENTION_OPTIONS: ReadonlyArray<{ value: PlaceLabelRetention; label: stri
 ];
 const RETENTION_LABELS: Readonly<Record<PlaceLabelRetention, string>> = { "90_days": "90 days", "1_year": "1 year", until_deleted: "until you delete them" };
 
-/** Settings › Completion places: opt-in with retention, counts, and delete controls. */
-export function CompletionPlacesPanel() {
+/** Settings › Travel › Completion places: opt-in with retention, counts, and delete controls. */
+export function CompletionPlacesSection() {
   const id = useId();
   const context = usePlaceLabels();
   const [setup, setSetup] = useState(false);
@@ -294,8 +293,10 @@ export function CompletionPlacesPanel() {
     enabled, retention: nextRetention, markerPromptDismissed: state.settings.markerPromptDismissedAt !== null,
     expectedUpdatedAt: state.settings.updatedAt }), done);
   const markerCount = state ? state.placeMarkers.length + (state.homeMarker ? 1 : 0) : 0;
-  return <SettingsPanel title="Completion places" description="When you mark a Behavior Completed, Cadence can check your device position once, if location is already allowed, and save only whether you were at Home, a saved place or elsewhere. It never saves that position. Labels suggest each Behavior's Where and never change a Behavior on their own.">
-    <div className="grid max-w-2xl gap-4 text-sm leading-6" data-completion-places>
+  return <section aria-labelledby={`${id}-title`} className="grid gap-2 border-t border-line pt-4" data-completion-places>
+    <h3 id={`${id}-title`} className="font-bold">Completion places</h3>
+    <p className="text-muted-readable">When you mark a Behavior Completed, Cadence can check your device position once, if location is already allowed, and save only whether you were at Home, a saved place or elsewhere. It never saves that position. Labels suggest each Behavior&apos;s Where and never change a Behavior on their own.</p>
+    <div className="grid gap-4">
       {!state ? <p>{context.failed ? "Completion places could not load." : "Loading completion places…"}</p>
         : !state.settings.enabled ? <div className="grid gap-3">
           {!setup ? <button type="button" className="product-action product-action-primary min-h-11 w-fit" onClick={() => { setSetup(true); setRetention("90_days"); }}>Set up completion places</button>
@@ -337,7 +338,7 @@ export function CompletionPlacesPanel() {
         </div>}
       {message ? <p role="status">{message}</p> : null}
     </div>
-  </SettingsPanel>;
+  </section>;
 }
 
 function RetentionChoices({ name, value, onChange }: Readonly<{ name: string; value: PlaceLabelRetention; onChange: (value: PlaceLabelRetention) => void }>) {

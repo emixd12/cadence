@@ -74,7 +74,7 @@ erase them.
 ## Save where you complete Behaviors
 
 Completion places are off by default and separate from travel estimates. In Settings,
-Completion places, select Set up completion places, choose how long to keep labels,
+Travel, Completion places, select Set up completion places, choose how long to keep labels,
 and select Save where I complete Behaviors:
 
 - **90 days** (default): keeps the least about where you have been. Enough for
@@ -130,7 +130,7 @@ and dismissal records the version that produced it.
 
 ## Delete labels and markers
 
-Settings, Completion places has Delete labels and Delete place markers, each with a
+Settings, Travel, Completion places has Delete labels and Delete place markers, each with a
 confirmation. Turn off deletes every label, place marker and dismissed suggestion.
 Labels and markers synchronize with your account and are part of desktop database
 backups. They are not part of Full JSON, CSV, JSONL or BehaviorLog exports.

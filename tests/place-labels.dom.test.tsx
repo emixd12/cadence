@@ -7,7 +7,7 @@ import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import type { PlaceLabelState } from "@cadence/core/types/place-labels";
 import {
   BehaviorPlaceAssist,
-  CompletionPlacesPanel,
+  CompletionPlacesSection,
   PlaceLabelProvider,
   PlaceMarkerControl,
   useCompletionPlaceCapture,
@@ -64,7 +64,7 @@ function button(name: string): HTMLButtonElement {
 
 it("turns labels on only after a retention choice, defaulting to the shortest", async () => {
   const fake = client(OFF);
-  await render(<PlaceLabelProvider client={fake}><CompletionPlacesPanel /></PlaceLabelProvider>);
+  await render(<PlaceLabelProvider client={fake}><CompletionPlacesSection /></PlaceLabelProvider>);
   expect(host.textContent).toContain("It never saves that position.");
   await act(async () => button("Set up completion places").click());
   const checked = host.querySelector<HTMLInputElement>('input[type="radio"]:checked')!;
@@ -76,7 +76,7 @@ it("turns labels on only after a retention choice, defaulting to the shortest", 
 
 it("asks before switching to a shorter retention or turning off", async () => {
   const fake = client({ ...ON, settings: { ...ON.settings, retention: "1_year" }, labelCount: 4 });
-  await render(<PlaceLabelProvider client={fake}><CompletionPlacesPanel /></PlaceLabelProvider>);
+  await render(<PlaceLabelProvider client={fake}><CompletionPlacesSection /></PlaceLabelProvider>);
   await act(async () => host.querySelector<HTMLInputElement>('input[value="90_days"]')!.click());
   expect(fake.saveSettings).not.toHaveBeenCalled();
   expect(host.textContent).toContain("Switching deletes labels older than 90 days.");
@@ -159,4 +159,22 @@ it("reloads place state when the Behavior's saved Where changes", async () => {
   const loads = vi.mocked(fake.load).mock.calls.length;
   await render(view("place", "2 Example Gym"));
   await vi.waitFor(() => expect(vi.mocked(fake.load).mock.calls.length).toBeGreaterThan(loads));
+});
+
+it("renders Completion places as the last Travel subsection, after How you travel (travel release train)", async () => {
+  const { TravelSettingsPanel } = await import("@/components/settings/TravelSettingsPanel");
+  const settings = { enabled: false, baseLocationText: "1 Home Lane", mode: "walking" as const, navigationPreference: null,
+    routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  const travel = { load: async () => settings, save: async () => settings, saveHabits: async () => settings };
+  await render(<PlaceLabelProvider client={client(ON)}>
+    <TravelSettingsPanel client={travel} readLocation={async () => ({ state: "prompt" as const })} />
+  </PlaceLabelProvider>);
+  await act(async () => { await Promise.resolve(); });
+  const panel = host.querySelector("#travel")!;
+  expect(panel).not.toBeNull();
+  expect([...panel.querySelectorAll("h3")].map((heading) => heading.textContent)).toEqual(["How you travel", "Completion places"]);
+  expect(panel.querySelectorAll("[data-completion-places]")).toHaveLength(1);
+  // I'm here sits below Home while labels are on; Settings shows no second panel.
+  expect(panel.querySelector('[data-place-marker="home"]')).not.toBeNull();
+  expect([...host.querySelectorAll("h2")].map((heading) => heading.textContent)).toEqual(["Travel"]);
 });
