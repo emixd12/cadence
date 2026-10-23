@@ -58,8 +58,9 @@ Create or edit a Behavior and choose Where:
   in Settings, Travel.
 - **A place**: type a full address. Cadence estimates the trip to it.
 
-Travel estimates and scheduling advice work better when Where is set. Cadence may
-later suggest a Where; a suggestion never changes a Behavior on its own.
+Travel estimates and scheduling advice work better when Where is set. With
+completion places on, Cadence may suggest a Where; a suggestion never changes a
+Behavior on its own.
 Behaviors that had a location before October 19, 2026 show Where as A place with
 the same text. Changing Where makes no Google Maps call; the next refresh looks up
 a new place once.
@@ -69,6 +70,70 @@ backups; provider results and device samples do not. Full JSON includes Where,
 place text and configuration history. CSV, JSONL and BehaviorLog omit Where and
 place text. Configuration history keeps earlier values; changing Where does not
 erase them.
+
+## Save where you complete Behaviors
+
+Completion places are off by default and separate from travel estimates. In Settings,
+Completion places, select Set up completion places, choose how long to keep labels,
+and select Save where I complete Behaviors:
+
+- **90 days** (default): keeps the least about where you have been. Enough for
+  suggestions; little history for the advisor to learn from.
+- **1 year**: keeps a year of places, so Cadence and the advisor can learn seasonal
+  patterns.
+- **Until I delete them**: keeps every label until you delete it. The most history and
+  the best insights; the most stored about where you have been.
+
+Labels do not reach the Daily Brief yet. Switching to a shorter option asks first and
+deletes older labels. Cadence also deletes labels past your choice every day.
+
+When you mark an Occurrence Completed from Unresolved, on its own day and near its
+scheduled time, Cadence checks the device position once, only if location is already
+allowed. It never asks for permission at that moment. It compares the position with
+your place markers on the device and saves one label: Home, a saved place or
+elsewhere. It then discards the position. Nothing is saved when the position is more
+than two minutes old, less accurate than 100 m, or between 150 m and 400 m from the
+nearest marker. Needs decision choices, imports, other devices' marks and later
+corrections never create a label. Changing a status away from Completed deletes its
+label.
+
+## Record a place marker
+
+A marker is your own device's position for Home or a place you typed as a Behavior's
+Where. Cadence never uses Google coordinates for labels. While completion places are
+on, select **I'm here** when you are at the place:
+
+- beside Home in Settings, Travel;
+- below Where in the Behavior form, for Home or A place;
+- in a one-line prompt on a Behavior whose place has no marker yet.
+
+I'm here may show the browser or macOS location prompt, because you asked for it.
+Update marker records the place again; Remove deletes that marker. Behaviors with the
+same place text share one marker. A Home marker stops applying when you change the Home
+address. **Not now** on a prompt turns these prompts off on every device; the other
+I'm here controls stay.
+
+## Where suggestions
+
+After at least six labels in the last 60 days, a Behavior may show one line:
+
+- usually completed at Home or at a saved place (80% or more of its labels);
+- usually completed away from your saved places, which suggests adding that place;
+- completed in different places (two or more places at 25% or more each), which
+  suggests Anywhere.
+
+A suggestion appears only when it disagrees with the current Where. Review Where opens
+the Behavior's settings with Where filled in; nothing changes until you save. Dismiss
+hides the suggestion until six more labels arrive and the rule still applies. The
+rules carry versions (`place-label-rules@1`, `where-suggestion-rules@1`); every label
+and dismissal records the version that produced it.
+
+## Delete labels and markers
+
+Settings, Completion places has Delete labels and Delete place markers, each with a
+confirmation. Turn off deletes every label, place marker and dismissed suggestion.
+Labels and markers synchronize with your account and are part of desktop database
+backups. They are not part of Full JSON, CSV, JSONL or BehaviorLog exports.
 
 ## Inspect travel and correct a journey
 
@@ -206,8 +271,10 @@ location only when you open it; search does not verify route timing.
 
 Reviewed routing sends endpoints, your usual travel and relevant times to Google Maps.
 It does not send Calendar titles, notes, account IDs or Calendar credentials.
-Cadence keeps device samples and route results in temporary memory and excludes
-them from sync, exports, backups and telemetry. To avoid paying Google again for
+Cadence keeps device samples used for travel and route results in temporary memory
+and excludes them from sync, exports, backups and telemetry. Place markers you record
+with I'm here are the exception: they are stored with your account, synchronize, and
+enter desktop backups until you remove them or turn completion places off. To avoid paying Google again for
 the same place, Cadence stores Google's place identifier for each looked-up
 location with your account, keyed by a one-way fingerprint of the typed text.
 It never stores the text or coordinates there. Turning travel off deletes them. Google retention follows its own

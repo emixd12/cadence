@@ -150,6 +150,51 @@ deployment clearance; deployed-web and installed-desktop acceptance; merging wit
 Ticket 217's `preparationSeconds`. Platform impact: web and linked desktop share the
 hosted adapter and components; marketing makes no claim; future mobile inherits it.
 
+## Ticket 216: Completion place labels and Where suggestions — October 23, 2026
+
+Implemented in source on branch `claude/ticket-216-place-labels-b20c33` (draft PR
+against Ticket 215's branch); not deployed. Built from the owner's October 22
+decisions: device-recorded "I'm here" markers instead of Google coordinates
+(resolves `docs/LEGAL.md` L-003 by design), versioned rule sets, user-chosen
+retention, and export out of scope. The revised ticket in `docs/TICKETS.md` records
+the design, the storage decision and the privacy surface entries.
+
+- Core: `packages/core/src/resolvers/place-label.resolver.ts` holds frozen
+  `place-label-rules@1` and `where-suggestion-rules@1` with pinned tests, plus a
+  counts-only `projectPlaceLabelCounts` that nothing feeds to the model yet.
+- Storage: account-level, with RLS. Hosted migration
+  `20261022160000_completion_place_labels.sql` adds four owner-scoped tables,
+  opt-in and Completed-only triggers, deletion on opt-out and status change, a
+  settings save that purges by retention, a service-role daily purge (called by the
+  occurrence-sync cron) and four account-sync entity kinds. SQLite migration 0020
+  mirrors the tables. Sync conflicts on these kinds resolve without review.
+- Web and desktop: shared `components/travel/PlaceLabels.tsx` (Completion places
+  panel, I'm here beside Home and below Where, one sparse Behavior line for a
+  suggestion or a marker prompt, silent completion capture), the
+  `/api/travel/place-labels` route and a local SQLite client. Registry
+  `INT-PLACE-001` to `010`; bench previews for the three components.
+
+Verification: required checks pass (agents, interactions, resolvers, core,
+design-system, lint, web and desktop typecheck, web and desktop builds). The full
+Vitest run passed 3,562 tests (96 skipped); two desktop release-acceptance cases
+timed out under build load and pass when rerun alone (46/46). 118 native tests,
+22 real-SQLite contract tests, all 23 SQL smokes, the RLS smoke (92 checks), the
+account-sync RPC smoke and a new opt-in hosted round trip
+(`tests/place-labels.local-integration.test.ts`: TypeScript and SQL fingerprints
+match for the new kinds; uploads and opt-out apply) pass against the isolated
+loopback stack `cadence-t216`, which replayed all 90 migrations. Generated types
+match. Browser QA on port 4333 covered opt-in, Home marker (blocked and stubbed
+granted position), completion label, deletion on Not Completed, suggestion with its
+rule version, Review Where, Dismiss, marker prompt, Not now, Turn off and a 375 px
+layout. QA found and fixed a stale suggestion draft after save; the contract test
+found and fixed a desktop settings-save timestamp mismatch.
+
+Open: hosted migration after `20261019180000_add_behavior_where.sql`, then web, then
+a desktop release with schema 19 (older desktops fail closed on sync); iPhone
+Safari re-prompt check (needs the owner's simulator or device approval); installed
+signed-desktop CoreLocation acceptance; approved privacy text and marketing privacy
+review for the listed conflicts.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21

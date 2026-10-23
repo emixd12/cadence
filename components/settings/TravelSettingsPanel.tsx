@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
+import { PlaceMarkerControl } from "@/components/travel/PlaceLabels";
 import { readBrowserForegroundLocation, type ForegroundLocation } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import { TravelHabitsSection } from "./TravelHabitsSection";
@@ -118,7 +119,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
           <p id={`${id}-disclosure`} className="text-muted-readable">While this is on, Cadence sends trip start and end points, your usual travel and times to Google Maps as you use the app. Trip points can be your current position, Home, Behavior places and Calendar event locations. Google processes requests under its own terms. Turning this on asks for device location.</p>
           {!settings.enabled && !mode ? <p className="text-muted-readable">Choose your usual travel to turn on estimates.</p> : null}
         </div>
-        <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 border-0 border-b border-line bg-background" autoComplete="off" /><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p></div>
+        <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 border-0 border-b border-line bg-background" autoComplete="off" /><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p>{settings.baseLocationText ? <PlaceMarkerControl place={{ kind: "home" }} /> : null}</div>
         <div className="grid gap-1 sm:max-w-xs"><label htmlFor={`${id}-mode`}>Usual travel</label><select id={`${id}-mode`} value={mode} onChange={(event) => setMode(event.target.value as TravelMode | "")} className="min-h-11 min-w-0 border-0 border-b border-line bg-background">{mode ? null : <option value="">Choose</option>}{TRAVEL_MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         <button type="button" onClick={() => { void save(settings.enabled); }} disabled={!changed} className="product-action product-action-primary min-h-11 w-fit">{pending ? "Saving…" : "Save travel settings"}</button>
         {client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={setSettings} /> : null}

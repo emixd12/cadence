@@ -1,5 +1,20 @@
 # Desktop data model
 
+Schema version 20 adds completion place labels (Ticket 216). Migration
+`0020_completion_place_labels.sql` mirrors the four hosted tables in DATA_MODEL:
+`place_label_settings`, `place_markers`, `completion_place_labels` and
+`where_suggestion_dismissals`, with the same checks on place keys, microdegree
+ranges, accuracy, labels and rule versions. Insert and update triggers require the
+opt-in, and a label requires a Completed occurrence of the same Behavior and local
+date. Deletions run in the store commands, not in triggers, so account sync applies
+each deletion exactly once: `applyStatusTransition` deletes the label when status
+leaves Completed, and the `commitPlaceLabels` settings save deletes everything when
+labels turn off and older labels when retention shortens. The desktop client deletes
+labels past retention when it loads them. `commitPlaceLabels` journals only a request
+hash and a null result, so the outbox never keeps marker positions. Domain-revision
+triggers cover all four tables. Account snapshots carry them as four entity kinds;
+older builds fail closed with "Update Cadence". Native backups include the tables.
+
 Schema version 18 adds the optional Behavior Where (Ticket 215). Migration
 `0018_behavior_where.sql` adds nullable `behaviors.where_kind` (`anywhere`,
 `home` or `place`; null means Not set) and sets `place` for every Behavior with

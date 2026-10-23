@@ -24,6 +24,10 @@ pub enum AccountSyncEntityKind {
     ImportedIntervention,
     ReminderDelivery,
     NoteShortcutState,
+    PlaceLabelSettings,
+    PlaceMarker,
+    CompletionPlaceLabel,
+    WhereSuggestionDismissal,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -65,6 +69,10 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::ImportedIntervention => { decode_row::<ImportedIntervention>(value)?; }
             AccountSyncEntityKind::ReminderDelivery => { decode_row::<ReminderDelivery>(value)?; }
             AccountSyncEntityKind::NoteShortcutState => { decode_row::<NoteShortcutState>(value)?; }
+            AccountSyncEntityKind::PlaceLabelSettings => { decode_row::<PlaceLabelSettings>(value)?; }
+            AccountSyncEntityKind::PlaceMarker => { decode_row::<PlaceMarker>(value)?; }
+            AccountSyncEntityKind::CompletionPlaceLabel => { decode_row::<CompletionPlaceLabel>(value)?; }
+            AccountSyncEntityKind::WhereSuggestionDismissal => { decode_row::<WhereSuggestionDismissal>(value)?; }
         }
     }
     Ok(())
@@ -117,6 +125,10 @@ fn apply_mode(
             if (matches!(write.kind, AccountSyncEntityKind::Profile) && write.id == "profile")
                 || (matches!(write.kind, AccountSyncEntityKind::NoteShortcutState)
                     && write.id == "global")
+                || (matches!(write.kind, AccountSyncEntityKind::PlaceLabelSettings)
+                    && write.id == "place_labels")
+                || (matches!(write.kind, AccountSyncEntityKind::PlaceMarker)
+                    && db::valid_place_ref(&write.id))
             {
                 Ok(())
             } else {
@@ -208,6 +220,18 @@ fn apply_mode(
             }
             AccountSyncEntityKind::NoteShortcutState => {
                 row_write::<NoteShortcutState>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::PlaceLabelSettings => {
+                row_write::<PlaceLabelSettings>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::PlaceMarker => {
+                row_write::<PlaceMarker>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::CompletionPlaceLabel => {
+                row_write::<CompletionPlaceLabel>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::WhereSuggestionDismissal => {
+                row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)?
             }
         }
     }
@@ -412,6 +436,18 @@ fn validate_write(
         AccountSyncEntityKind::NoteShortcutState => {
             validate_row_write::<NoteShortcutState>(db, profile, write, false, false)
         }
+        AccountSyncEntityKind::PlaceLabelSettings => {
+            validate_row_write::<PlaceLabelSettings>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::PlaceMarker => {
+            validate_row_write::<PlaceMarker>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::CompletionPlaceLabel => {
+            validate_row_write::<CompletionPlaceLabel>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::WhereSuggestionDismissal => {
+            validate_row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)
+        }
     }
 }
 
@@ -602,6 +638,11 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         | AccountSyncEntityKind::ImportedIntervention => 6,
         AccountSyncEntityKind::ReminderDelivery => 8,
         AccountSyncEntityKind::NoteShortcutState => 9,
+        // Settings precede markers, labels and dismissals; labels follow occurrences.
+        AccountSyncEntityKind::PlaceLabelSettings => 10,
+        AccountSyncEntityKind::PlaceMarker
+        | AccountSyncEntityKind::CompletionPlaceLabel
+        | AccountSyncEntityKind::WhereSuggestionDismissal => 11,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first

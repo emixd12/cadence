@@ -84,7 +84,10 @@ pub fn snapshot(db: &Connection, profile_id: &str) -> Result<Value> {
         "importRuns":db::owned::<BehaviorLogImportRun>(db,profile_id)?,"mappings":db::owned::<BehaviorLogImportRecordMapping>(db,profile_id)?,
         "importedNotes":db::owned::<ImportedNote>(db,profile_id)?,"importedInterventions":db::owned::<ImportedIntervention>(db,profile_id)?,
         "noteShortcutStates":super::note_shortcut::read_states(db,profile_id)?,
-        "travelSettings":super::travel::read_value(db,profile_id)?
+        "travelSettings":super::travel::read_value(db,profile_id)?,
+        "placeLabelSettings":db::owned::<PlaceLabelSettings>(db,profile_id)?,"placeMarkers":db::owned::<PlaceMarker>(db,profile_id)?,
+        "completionPlaceLabels":db::owned::<CompletionPlaceLabel>(db,profile_id)?,
+        "whereSuggestionDismissals":db::owned::<WhereSuggestionDismissal>(db,profile_id)?
     }))
 }
 

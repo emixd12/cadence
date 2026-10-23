@@ -543,6 +543,58 @@ export type Database = {
         }
         Relationships: []
       }
+      completion_place_labels: {
+        Row: {
+          behavior_id: string
+          id: string
+          label: string
+          local_date: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          id: string
+          label: string
+          local_date: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          id?: string
+          label?: string
+          local_date?: string
+          recorded_at?: string
+          rule_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "completion_place_labels_behavior_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "completion_place_labels_occurrence_fkey"
+            columns: ["user_id", "id"]
+            isOneToOne: false
+            referencedRelation: "occurrences"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "completion_place_labels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connector_connections: {
         Row: {
           account_digest: string | null
@@ -1160,6 +1212,85 @@ export type Database = {
           },
         ]
       }
+      place_label_settings: {
+        Row: {
+          enabled: boolean
+          enabled_at: string | null
+          id: string
+          marker_prompt_dismissed_at: string | null
+          retention: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          enabled?: boolean
+          enabled_at?: string | null
+          id?: string
+          marker_prompt_dismissed_at?: string | null
+          retention?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          enabled_at?: string | null
+          id?: string
+          marker_prompt_dismissed_at?: string | null
+          retention?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_label_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_markers: {
+        Row: {
+          accuracy_meters: number
+          id: string
+          latitude_e6: number
+          longitude_e6: number
+          place_key: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_meters: number
+          id: string
+          latitude_e6: number
+          longitude_e6: number
+          place_key: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Update: {
+          accuracy_meters?: number
+          id?: string
+          latitude_e6?: number
+          longitude_e6?: number
+          place_key?: string
+          recorded_at?: string
+          rule_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_markers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1460,6 +1591,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      where_suggestion_dismissals: {
+        Row: {
+          dismissed_at: string
+          id: string
+          rule_version: string
+          suggestion: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at: string
+          id: string
+          rule_version: string
+          suggestion: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          rule_version?: string
+          suggestion?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "where_suggestion_dismissals_behavior_fkey"
+            columns: ["user_id", "id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "where_suggestion_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1943,6 +2113,7 @@ export type Database = {
         Args: { p_access_token_hash: string; p_resource: string }
         Returns: Json
       }
+      purge_expired_completion_place_labels: { Args: never; Returns: number }
       read_account_sync_snapshot: { Args: never; Returns: Json }
       read_advisor_analysis_snapshot: {
         Args: {
@@ -2032,6 +2203,30 @@ export type Database = {
           p_include_reminder_history: boolean
         }
         Returns: Json
+      }
+      save_place_label_settings: {
+        Args: {
+          expected_updated_at: string
+          next_enabled: boolean
+          next_marker_prompt_dismissed: boolean
+          next_retention: string
+          retention_cutoff: string
+        }
+        Returns: {
+          enabled: boolean
+          enabled_at: string | null
+          id: string
+          marker_prompt_dismissed_at: string | null
+          retention: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "place_label_settings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       update_behavior_with_definition_event: {
         Args: {

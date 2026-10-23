@@ -272,7 +272,12 @@
         "INT-BEHAVIOR-028",
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
-        "INT-TRAVEL-005"
+        "INT-TRAVEL-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
       ]
     },
     {
@@ -312,7 +317,14 @@
         "INT-CALENDAR-012",
         "INT-CALENDAR-013",
         "INT-CALENDAR-014",
-        "INT-CALENDAR-015"
+        "INT-CALENDAR-015",
+        "INT-PLACE-001",
+        "INT-PLACE-002",
+        "INT-PLACE-003",
+        "INT-PLACE-004",
+        "INT-PLACE-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007"
       ]
     },
     {
@@ -470,7 +482,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 44,
+      "interaction_marker_count": 45,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -486,7 +498,8 @@
         "INT-BEHAVIOR-021",
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
-        "INT-TRAVEL-005"
+        "INT-TRAVEL-005",
+        "INT-PLACE-006"
       ]
     },
     {
@@ -509,7 +522,11 @@
         "INT-BEHAVIOR-025",
         "INT-BEHAVIOR-026",
         "INT-BEHAVIOR-027",
-        "INT-BEHAVIOR-028"
+        "INT-BEHAVIOR-028",
+        "INT-PLACE-006",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
       ]
     },
     {
@@ -858,8 +875,26 @@
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
+        "INT-PLACE-006",
         "INT-TRAVEL-006",
         "INT-TRAVEL-007"
+      ]
+    },
+    {
+      "path": "components/travel/PlaceLabels.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 32,
+      "interaction_ids": [
+        "INT-PLACE-001",
+        "INT-PLACE-002",
+        "INT-PLACE-003",
+        "INT-PLACE-004",
+        "INT-PLACE-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
       ]
     },
     {
@@ -4035,13 +4070,14 @@
         }
       ],
       "availability": "Available on unresolved rows and inside expanded correction controls; behavior date review also exposes it.",
-      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, refreshes the view, and attempts the completion chime at most once for a new Completed transition.",
+      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, refreshes the view, and attempts the completion chime at most once for a new Completed transition. With completion places on and location already allowed, a first resolution on the occurrence's day and hours reads one foreground position, stores only a place label and discards the position (Ticket 216).",
       "failure_result": "Refreshes server truth after a stale-status conflict, rolls back optimistic presentation, and shows a factual error; no partial status write is retained.",
       "effects": [
         "database_write",
         "reminder_cancellation",
         "ui_state",
-        "optional_audio"
+        "optional_audio",
+        "optional_device_location_read"
       ],
       "risk": "moderate",
       "confirmation": "none",
@@ -4050,13 +4086,15 @@
         "app/(app)/timeline/actions.ts#markOccurrenceStatusAction",
         "app/(app)/behaviors/actions.ts#markBehaviorReviewOccurrenceStatusAction",
         "apps/desktop/src/local-actions.ts",
-        "apps/desktop/src/timeline-screen.tsx"
+        "apps/desktop/src/timeline-screen.tsx",
+        "components/travel/PlaceLabels.tsx#PlaceLabelProvider"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-interactions-ui.test.tsx",
-          "tests/status-buttons-completion-chime.test.ts"
+          "tests/status-buttons-completion-chime.test.ts",
+          "tests/place-labels.dom.test.tsx"
         ],
         "notes": "Timeline UI coverage renders the Completed control. The mobile activation harness preserves one submission, one guarded preparation, one media playback attempt, and one playback-start event; transition and persistence behavior are covered separately."
       },
@@ -15147,6 +15185,957 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-001",
+      "name": "Turn on completion places",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#save-where-you-complete-behaviors"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Opt in to saving where Behaviors are completed, choosing how long labels are kept.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Set up completion places"
+        },
+        {
+          "kind": "change",
+          "control": "Keep labels for"
+        },
+        {
+          "kind": "activate",
+          "control": "Save where I complete Behaviors"
+        }
+      ],
+      "availability": "Settings, Completion places, while labels are off. Off by default; 90 days is preselected.",
+      "success_result": "Saves the opt-in time and retention, shows label and marker counts, and reveals I'm here controls.",
+      "failure_result": "Keeps labels off and shows a reload message after a stale or failed save.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover the retention step and default; service tests and the SQL smoke cover the opt-in and compare-and-set."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-002",
+      "name": "Change label retention",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#save-where-you-complete-behaviors"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Keep labels for 90 days, 1 year or until deleted.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Keep labels for"
+        },
+        {
+          "kind": "activate",
+          "control": "Switch and delete"
+        }
+      ],
+      "availability": "Settings, Completion places, while labels are on.",
+      "success_result": "A longer choice saves at once; a shorter choice asks first and deletes older labels in the same save.",
+      "failure_result": "Keeps the prior retention and labels after a stale or failed save.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover the confirmation; the SQL smoke and native tests cover deletion in the same save."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-003",
+      "name": "Delete completion place labels",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Delete every saved completion place label.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Delete labels"
+        }
+      ],
+      "availability": "Settings, Completion places, while at least one label exists.",
+      "success_result": "Deletes all labels after confirmation; suggestions restart from new completions.",
+      "failure_result": "Keeps labels and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover deletion; DOM tests cover the panel."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-004",
+      "name": "Delete place markers",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Delete every recorded place marker.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Delete place markers"
+        }
+      ],
+      "availability": "Settings, Completion places, while at least one marker exists.",
+      "success_result": "Deletes all markers after confirmation; new labels wait for new markers.",
+      "failure_result": "Keeps markers and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover deletion; DOM tests cover the panel."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-005",
+      "name": "Turn off completion places",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop saving completion places and delete everything location-derived.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Turn off"
+        },
+        {
+          "kind": "activate",
+          "control": "Turn off and delete"
+        }
+      ],
+      "availability": "Settings, Completion places, while labels are on.",
+      "success_result": "Turns labels off and deletes every label, marker and suggestion dismissal on hosted and local stores.",
+      "failure_result": "Keeps labels on and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "The SQL smoke, native tests and the sync planner cover deletion on every writer."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel; a hosted trigger and the native command delete the rows."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesPanel",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel; a hosted trigger and the native command delete the rows. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-006",
+      "name": "Record a place marker",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "behaviors"
+      ],
+      "routes": [
+        "/settings",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06",
+        "J14"
+      ],
+      "intent": "Record the device's current position as the marker for Home or a saved place.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "I'm here"
+        },
+        {
+          "kind": "activate",
+          "control": "Update marker"
+        }
+      ],
+      "availability": "While labels are on: beside a saved Home in Travel Settings, below Where for Home or A place, and in a Behavior's missing-marker prompt.",
+      "success_result": "Reads one foreground position after the tap, checks age and accuracy, and stores it as the place's marker in microdegrees.",
+      "failure_result": "Explains a blocked, unavailable, old or inaccurate position and stores nothing.",
+      "effects": [
+        "device_location_read",
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/behaviors/BehaviorForm.tsx",
+        "components/behaviors/BehaviorList.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests prove the tap requests location and sends microdegrees; service tests cover sample limits."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "lib/ui/place-labels.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared control; browser or CoreLocation read."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared control; browser or CoreLocation read. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-007",
+      "name": "Remove a place marker",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "behaviors"
+      ],
+      "routes": [
+        "/settings",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06",
+        "J14"
+      ],
+      "intent": "Remove the marker for one place.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Remove"
+        }
+      ],
+      "availability": "Beside a recorded marker while labels are on.",
+      "success_result": "Deletes that marker; labels for the place stop until it is recorded again.",
+      "failure_result": "Keeps the marker as loaded.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#PlaceMarkerControl"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover single-marker deletion."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared control."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared control. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-008",
+      "name": "Review a Where suggestion",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#where-suggestions"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Open the Behavior's settings with the suggested Where filled in.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Review Where"
+        }
+      ],
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1.",
+      "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
+      "failure_result": "No change is stored.",
+      "effects": [
+        "form_draft",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorForm.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests prove the suggestion is not applied by itself and carries its rule version."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "components/behaviors/BehaviorList.tsx"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-009",
+      "name": "Dismiss a Where suggestion",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#where-suggestions"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Hide a Where suggestion for a Behavior.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Dismiss"
+        }
+      ],
+      "availability": "On an active Behavior with a suggestion.",
+      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies.",
+      "failure_result": "Keeps the suggestion visible.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM, resolver and service tests cover the dismissal and its return rule."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-010",
+      "name": "Turn off marker prompts",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop the one-line prompts that ask for missing place markers.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Not now"
+        }
+      ],
+      "availability": "On the first active Behavior per place with no current marker, while prompts are on.",
+      "success_result": "Records the dismissal in settings; prompts stay off on every device while Settings and Where keep I'm here.",
+      "failure_result": "Keeps the prompt visible.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover Not now; the resolver test covers prompt suppression."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
         }
       }
     }

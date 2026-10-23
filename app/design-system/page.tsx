@@ -3,6 +3,7 @@ import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } fr
 import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
 import { TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
+import { BehaviorPlaceAssistBench, CompletionPlacesPanelBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -1622,6 +1623,9 @@ const previewFactories: Record<
   "module.travel-habits-section": () => <ProductPreview><TravelHabitsBench /></ProductPreview>,
   "composite.travel-mode-choice": () => <ProductPreview><TravelModeChoiceBench /></ProductPreview>,
   "composite.travel-leave-question": () => <ProductPreview><TravelLeaveQuestionBench /></ProductPreview>,
+  "module.completion-places-panel": () => <ProductPreview><CompletionPlacesPanelBench /></ProductPreview>,
+  "composite.place-marker-control": () => <ProductPreview><PlaceMarkerControlBench /></ProductPreview>,
+  "composite.behavior-place-assist": () => <ProductPreview><BehaviorPlaceAssistBench /></ProductPreview>,
   "module.daily-brief-bubble": () => <ProductPreview><DailyBriefBubbleBench /></ProductPreview>,
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
   "composite.external-event-details": () => <ProductPreview><CalendarDetailsBench /></ProductPreview>,

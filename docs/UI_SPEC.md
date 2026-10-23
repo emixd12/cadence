@@ -304,6 +304,23 @@ desktop location guidance, the journey mode choice, the leave-time question and 
 Home Behavior.
 Installed acceptance remains in `qa/travel-release.md`.
 
+Completion places (Ticket 216) is its own Settings panel after Travel. While off it
+shows one description and Set up completion places. Setup shows three retention
+radios with one plain line each (90 days preselected) and Save where I complete
+Behaviors. While on it shows one count line, the same radios, Delete labels, Delete
+place markers and Turn off. A shorter retention, both deletes and Turn off each ask
+on one inline line with a danger button and Cancel; there is no modal. While labels
+are on, a saved Home shows one marker line below its hint, and the Behavior form
+shows the same line below Where for Home or A place: the marker state and I'm here
+(or Update marker and Remove). A Behavior record shows at most one line below its
+outcome stats: a Where suggestion with Review Where and Dismiss, or, for the first
+Behavior per unmarked place, a marker prompt with I'm here and Not now. Review Where
+opens Details and Settings with Where filled in and the note "Where is filled in from
+a suggestion. Save to keep it." A completion label is silent. Implementation:
+`components/travel/PlaceLabels.tsx`; registry `INT-PLACE-001` through `INT-PLACE-010`;
+bench previews `module.completion-places-panel`, `composite.place-marker-control` and
+`composite.behavior-place-assist`.
+
 The current day should be prominent and should begin the forward timeline.
 
 Do not show a visible Timeline page title or explanatory helper text above the

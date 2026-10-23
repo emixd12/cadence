@@ -10,9 +10,10 @@ import type { BehaviorConfigurationSnapshot } from "../types/behavior-configurat
 const DEFAULT_TIMEZONE = "America/New_York";
 
 // Private account fields cannot travel through the location-free BehaviorLog export,
-// which also omits Behavior Where (Ticket 215).
+// which also omits Behavior Where (Ticket 215) and completion place labels (Ticket 216).
 export function firstLinkIncludesTravel(snapshot: AccountSyncSnapshot): boolean {
   return snapshot.entities.some(({ kind, value }) => {
+    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal") return true;
     const row = object(value);
     // Learned travel habits (Ticket 217) have a revision once anything was learned.
     if (kind === "profile") return !!(row.travel_enabled || row.base_location_text || row.travel_mode ||
@@ -74,5 +75,6 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
     snapshot.importRuns.length > 0 || snapshot.mappings.length > 0 ||
     snapshot.importedNotes.length > 0 || snapshot.importedInterventions.length > 0 ||
     (snapshot.reminderDeliveries?.length ?? 0) > 0 ||
-    (snapshot.noteShortcutStates?.length ?? 0) > 0;
+    (snapshot.noteShortcutStates?.length ?? 0) > 0 ||
+    (snapshot.placeLabelSettings?.length ?? 0) > 0;
 }
