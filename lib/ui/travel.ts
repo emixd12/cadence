@@ -87,14 +87,14 @@ export const webTravelClient: TravelClient = {
   readLocation: readBrowserForegroundLocation,
 };
 
-export type TravelBehaviorRevision = Readonly<{ id: string; locationText: string | null; updatedAt: string }>;
+export type TravelBehaviorRevision = Readonly<{ id: string; whereKind?: string | null; locationText: string | null; updatedAt: string }>;
 /**
- * Travel inputs only: visible events, occurrence schedule and owning Behavior location revisions.
+ * Travel inputs only: visible events, occurrence schedule and owning Behavior Where revisions.
  * Status, Note and duration-history changes are excluded (Ticket 214): they make no provider call.
  * Core filters resolved stops and withdraws evidence when a reopened stop or duration needs new routes.
  */
 export function travelSourceKey(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections" | "durationEstimates">, behaviors: readonly TravelBehaviorRevision[] = []): string {
-  const byId = new Map(behaviors.map((behavior) => [behavior.id, behavior.locationText]));
+  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
   const eventInputs = events.map((event) => [event.id, event.location, event.state, event.currentUserResponse, !!event.conference,
     event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   return JSON.stringify([eventInputs, timeline.daySections.map((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null]))]);

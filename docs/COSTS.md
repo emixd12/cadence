@@ -43,7 +43,7 @@ These costs do not grow with each user.
 | Apple Developer Program | US$99 per year | US$8.25 | Apple, not rechecked | — | Required for signed macOS builds. |
 | Domain `cadence-me.com` | About US$10–11 per year | About US$0.90 | Cloudflare Registrar, not verified | — | Replace with the renewal invoice amount. |
 | Sequenzy | Plan not recorded; public free allowance 2,500 emails per month | Unknown | [Sequenzy pricing](https://www.sequenzy.com/pricing) | 2026-08-01 | `docs/SEQUENZY_WORKFLOW.md` requires the owner to record the plan. |
-| Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$29, planned | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18; not subscribed. Plan confirmation open (`docs/LEGAL.md` L-008). |
+| Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$29, planned | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18; not subscribed. Development and testing use the free plan (owner decision 2026-10-22); API Standard is required before commercial use (`docs/LEGAL.md` L-008). |
 | **Total known** | | **About US$54 today; about US$83 with planned weather** | | | |
 
 Fixed cost per user: about US$5.42 at 10 users, US$0.54 at 100 users and
@@ -61,7 +61,7 @@ implement most of it in source; it is not deployed yet.
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
 | Daily Brief model | US$0.06 | US$0.13 | US$0.25 | Live |
-| Weather (Open-Meteo) | US$0 | US$0 | US$0 | Planned (Ticket 218); the fixed plan covers up to 1 million calls a month |
+| Weather (Open-Meteo) | US$0 | US$0 | US$0 | Planned (Ticket 218); free plan for development and testing; the paid plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
@@ -200,7 +200,8 @@ usage as `unavailable`. Replace the assumptions with measured usage.
 
 ## Weather
 
-Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). Planned plan: API
+Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). Development and testing use
+the free plan (owner decision 2026-10-22). Planned plan before commercial use: API
 Standard, US$29 per month for 1 million calls, checked 2026-10-17 on
 [Open-Meteo pricing](https://open-meteo.com/en/pricing). Not subscribed yet.
 The comparison is in `docs/plans/2026-10-17-weather-provider-comparison.md`.
@@ -239,10 +240,13 @@ arrives, fees reduce the US$5:
   US$10 per UTC day (assumed for a small user count; raise it as users grow). The ceiling is permissive. The target is
   the efficient design above, about US$1.30–2.14 for a typical user. Heavy
   drivers (about US$5.73 estimated) would reach the ceiling before month end.
-  Assumed, not confirmed: the ceiling covers Google Maps calls only.
+  Confirmed by the owner on 2026-10-22: the ceiling applies per user per calendar
+  month, in the user's timezone, and covers Google Maps calls only.
 - 2026-10-18: Open-Meteo is the weather provider (Ticket 218). This file assumes
-  the API Standard plan, US$29 per month; not subscribed. The plan choice stays open
-  (`docs/LEGAL.md` L-008).
+  the API Standard plan, US$29 per month; not subscribed.
+- 2026-10-22: development and testing use the free Open-Meteo plan. The paid API
+  Standard plan is required before commercial use (`docs/LEGAL.md` L-008, open until
+  subscribed).
 
 ## Proposals awaiting owner decision
 
@@ -260,6 +264,8 @@ arrives, fees reduce the US$5:
   circuit breaker, place-ID storage and the three-hour routing window.
 - 2026-10-18: Recorded Open-Meteo as the weather provider (planned US$29 fixed
   cost) and linked the model-input risk acceptance in `docs/LEGAL.md`.
+- 2026-10-22: Recorded the confirmed travel budget posture, the free Open-Meteo plan
+  for development and testing, and backlog Ticket 243 for six-leg speed.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
@@ -278,7 +284,8 @@ used five geocodes and no routes; two temporary street-address corrections used
 two geocodes and two routes. Each of three identical refreshes then used zero
 geocodes and two routes. Calendar and saved-place records stayed unchanged.
 Four successful two-leg requests measured server p50 3.3562 s and nearest-rank
-p95 3.5984 s. Six-leg and multi-user loads were not measured. See
+p95 3.5984 s. Six-leg and multi-user loads were not measured; Ticket 243 tracks the
+six-leg and before/after measurements. See
 `docs/qa/travel-release.md` for sample counts, dates and baseline limits.
 
 Final review-fix verification added two cached-place routes and zero geocodes.

@@ -9,6 +9,7 @@ const ALLOWED_KEYS: &[&str] = &[
     "pending-state",
     "pending-calendar-state",
     "pending-calendar-agent-state",
+    "pending-outlook-calendar-attempt",
 ];
 
 extern "C" {

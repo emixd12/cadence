@@ -10,7 +10,8 @@ When this Cadence server supports Daily Brief, enable it in **Settings**.
 Cadence sends today's Behavior schedule and bounded completion history, including
 findings calculated from it, to OpenAI.
 **Include selected Google Calendar timing** separately enables Calendar timing.
-Notes, Calendar descriptions and credentials are excluded. Provider retention may apply.
+Calendar descriptions and credentials are excluded. Notes require the separate
+control described below. Provider retention may apply.
 
 On the first Timeline opening each day, the horse presents the generated briefing.
 Ignore it to keep tracking, or choose **Close** to dismiss it for this account,
@@ -32,6 +33,26 @@ lines from its travel estimates; the model does not write them.
 In **Settings**, you can separately allow reminder delivery history and Notes on Not
 Completed occurrences to inform tips, when your Cadence server uses them. Each option
 describes exactly what is sent. Turning Daily Brief off turns both off.
+
+Outlook Calendar, iCloud Calendar and Hevy each need their own choice before the
+brief can use them. Connecting a source or showing it on Timeline never turns it on.
+**Include selected Outlook Calendar timing** sends today's event times, availability
+and your response for the selected calendars, without titles or details.
+**Include selected iCloud Calendar timing** separately sends the same timing
+projection for iCloud.
+**Include today's recorded Hevy workout times** sends only the start and end of
+workouts already recorded today. A recorded workout never completes a Behavior and
+never shows when you are free. A source that is missing or partly read proves
+nothing about your day. Each source needs its own connected account and separate permission.
+If you reconnect a source or change its calendars, the brief stops using it and
+Settings says so under that source. Choose **Allow Outlook Calendar again** or
+**Allow iCloud Calendar again** or **Allow Hevy again** to let the brief use it, or turn it off. Until you choose, the
+brief cannot start. If a source is disconnected or has no selected calendars,
+Settings says which; reconnect it or choose calendars in Connectors, then turn it
+on again. Changing any other Daily Brief choice turns off every source that is
+waiting for your decision; it never allows one again for you. Turning Daily Brief
+off turns all of these off, and an older Cadence app that saves Daily Brief settings
+also turns them off.
 
 The briefing can recommend changes but cannot apply them. Cadence stores no
 briefing history. When its timing expires, the bubble offers **Get a fresh brief**.
@@ -277,9 +298,8 @@ line. A blue dot shows the current position. Expanding Notes keeps the same time
 mapping. Show more days extends the same line. Manual statuses and Needs decision
 keep their existing meaning. No status changes automatically at midnight.
 
-Google's review of Calendar access is pending. The connector is not yet verified
-for public rollout. When the Cadence deployment is configured, connect Calendar separately in
-Settings with the same Google account used for Cadence. Ordinary Google sign-in
+Deployment and installed-build acceptance require their own release evidence.
+When the deployment is configured, connect Calendar separately in Settings with the same Google account used for Cadence. Ordinary Google sign-in
 does not grant Calendar access. Cadence tracking remains available without
 Calendar.
 
@@ -328,6 +348,57 @@ account synchronization, and user-created desktop backups. Supabase daily
 backups may retain sealed credential ciphertext for the current seven-day window.
 See [Privacy, account information, and deletion](privacy-and-account.md#google-calendar-data-and-disconnection).
 
+## Connected sources: Outlook Calendar, iCloud Calendar, and Hevy
+
+Settings lists every read-only source under **Connected sources**: Google
+Calendar, Outlook Calendar, iCloud Calendar, and Hevy. Each source connects,
+refreshes, fails, and disconnects on its own. Tracking never waits on a source.
+On desktop, sources require a linked Cadence account. These instructions describe
+locally verified source and synthetic flows. Live Microsoft, Apple and Hevy access,
+installed desktop behavior and deployment remain unverified. iCloud custody
+acceptance remains required before real credentials or release.
+
+**Outlook Calendar** shows scheduled events like Google Calendar.
+
+1. Choose **Connect Outlook Calendar** and sign in to a personal, work, or school
+   Microsoft account. Your organization may need to approve Cadence first.
+   On desktop, the browser returns to Cadence, which finishes only the connection
+   it started.
+2. Choose calendars and visibility, then **Save Outlook settings**.
+3. Choose **Refresh Outlook Calendar** to read the displayed range now.
+4. On Timeline, Outlook markers use a calendar icon and say "Outlook Calendar"
+   in their label and details.
+
+**Hevy** is recorded activity, not a calendar. It shows when each workout
+started and how long it lasted. Provider responses can contain exercises, titles,
+notes, sets and weights. Cadence discards those fields before creating its snapshot.
+
+1. Hevy API access requires Hevy Pro. Create an API key in Hevy settings.
+2. Enter the key once under **Hevy API key** and choose **Connect Hevy**. The
+   field clears immediately. Cadence stores the key encrypted on its server and
+   never on your device.
+3. Choose **Refresh Hevy** to read today's workouts now.
+4. On Timeline, today's workouts appear under **Recorded activity · Hevy** below
+   the date, apart from Calendar markers.
+
+**Result and persistence:** A workout never completes, changes, or matches a
+Behavior or Occurrence, and Cadence never merges records by similar title or
+time. Even today-only reads scan global history, bounded at 500 Hevy workouts;
+a larger history reports incomplete without workout page reads. Count and page
+checks mean no change was detected, not an atomic snapshot. Concurrent changes
+can escape these checks. Desktop keeps one disposable cache per source and linked account,
+outside the tracking database and user-created backups, and labels saved
+context as possibly out of date while offline.
+
+**Recovery or undo:** A failed or incomplete refresh keeps the last complete
+read and labels it. **Disconnect Outlook Calendar** and **Disconnect Hevy**
+delete Cadence's saved access and clear the local source cache. Other devices
+clear it on their next connection check; offline data can remain stale. Cadence
+does not revoke provider access: remove Cadence in Microsoft account privacy app permissions
+(personal) or My Apps (work or school), and remove or regenerate the Hevy API
+key in Hevy settings. Account switch and sign-out on desktop clear every source
+cache.
+
 **Keyboard and mobile:** Calendar markers have descriptive names and 44px
 targets. Hover does not move focus. The preview does not trap focus. The details
 drawer traps focus while open and returns it on close. Touch uses the same
@@ -338,6 +409,42 @@ occurrences in the previous 90 local days. Insufficient history shows unknown.
 Running timers remain separate activity signals. Possible overlap is advisory;
 unknown, incomplete, or stale Calendar data cannot establish availability. All-day
 events do not create timed-overlap warnings.
+
+
+### iCloud Calendar
+
+The local implementation uses a hosted CalDAV connection on web and linked
+desktop. It does not read calendars stored only on your Mac. Live Apple access,
+installed desktop acceptance and release remain unverified.
+
+1. Under **Connected sources**, read the custody disclosure. Apple does not limit
+   an app-specific password to Calendar; it can also reach Mail, Contacts and
+   other iCloud data. Cadence uses it only for Calendar reads.
+2. Create an app-specific password at account.apple.com. Enter it with your Apple
+   Account email and choose **Connect iCloud Calendar**. Never enter your primary
+   Apple Account password. Both fields clear immediately. Cadence seals both
+   values on its server; it does not save them on your device.
+3. Select calendars and visibility, then choose **Save iCloud settings**.
+   **Refresh iCloud Calendar** reads the displayed range. Markers and details
+   name iCloud Calendar; duplicate events from other sources remain separate.
+4. Allow selected iCloud timing in **Daily Brief** separately if desired.
+   Reconnecting or changing selection requires **Allow iCloud Calendar again**.
+5. **Disconnect iCloud Calendar** deletes Cadence's saved login and clears the
+   local source cache. Other devices observe removal on their next connection check.
+   Apple keeps the password active until you remove it at account.apple.com:
+   **Sign-In and Security → App-Specific Passwords → Remove**, or **Revoke All**.
+   Account deletion shows the same removal instruction.
+
+Reads cover at most 32 calendars and 31 local dates. Unexpanded recurrence,
+truncated data and malformed events make coverage incomplete. A failed refresh
+can retain the last complete read with a stale label. Permission withdrawal
+removes saved context from display. Desktop's disposable source cache preserves
+calendar visibility and all-day choices for offline restart. It stays outside
+tracking exports, synchronization and backups.
+
+Owner acceptance of hosted app-specific-password custody is still required
+before real credentials or user release. No live access is implied by these
+local implementation instructions.
 
 ## Calendar for Daily Brief
 

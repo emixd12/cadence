@@ -18,6 +18,7 @@ import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import { getConnectedApps } from "@/lib/services/oauth-ui.service";
 import { disconnectAppAction } from "./actions";
 import { GlobalNoteShortcutControl } from "@/components/note-shortcuts/NoteShortcutControls";
+import { WebConnectorLibrary } from "@/components/settings/WebConnectorLibrary";
 import { WebGoogleCalendarPanel } from "@/components/settings/WebGoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
@@ -69,7 +70,7 @@ async function SettingsContent() {
         vapidPublicKey={settings.vapidPublicKey}
       />
 
-      <WebGoogleCalendarPanel timezone={settings.timezone} />
+      <WebConnectorLibrary timezone={settings.timezone} />
 
       <TravelSettingsPanel />
 

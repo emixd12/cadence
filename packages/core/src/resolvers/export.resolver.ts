@@ -35,6 +35,7 @@ import type {
   ExportImportedHistory,
 } from "../types/export";
 import { DEFAULT_TIMEZONE } from "../types/recurrence";
+import type { BehaviorWhereKind } from "../types/behavior";
 import { BEHAVIOR_CONFIGURATION_CHANGED_FIELDS } from "../types/behavior-configuration-event";
 import { isBehaviorLogScheduleBoundary } from "./behavior-configuration.resolver";
 import {
@@ -422,6 +423,14 @@ function toJsonCategories(
     }));
 }
 
+// Inputs written before Ticket 215 carry only location text, which meant A place.
+function exportWhereKind(input: {
+  whereKind?: BehaviorWhereKind | null;
+  locationText?: string | null;
+}): BehaviorWhereKind | null {
+  return input.whereKind === undefined ? (input.locationText ? "place" : null) : input.whereKind;
+}
+
 function toJsonBehavior(
   behavior: ExportBehaviorInput,
   includeNotes: boolean,
@@ -432,6 +441,7 @@ function toJsonBehavior(
     category: behavior.categoryName,
     title: behavior.title,
     description: behavior.description,
+    where_kind: exportWhereKind(behavior),
     location_text: behavior.locationText ?? null,
     recurrence_rule: behavior.recurrenceRule,
     scheduled_time: behavior.scheduledTime,
@@ -526,6 +536,7 @@ function toJsonBehaviorConfigurationSnapshot(
   return {
     category_id: snapshot.categoryId,
     location_text: snapshot.locationText ?? null,
+    where_kind: exportWhereKind(snapshot),
     schedule_graph: snapshot.scheduleGraph.map((schedule) => ({
       recurrence_rule: schedule.recurrenceRule,
       sort_order: schedule.sortOrder,
@@ -1105,9 +1116,11 @@ function toBehaviorLogBundle(input: ExportImportedHistory & {
 function toBehaviorLogRawConfigurationEvent(
   event: ExportJsonBehaviorConfigurationEvent,
 ): Record<string, unknown> {
+  // BehaviorLog keeps its pre-Where shape: no place text and no Where.
   const withoutLocation = (snapshot: ExportJsonBehaviorConfigurationSnapshot) => {
-    const { location_text: _locationText, ...rest } = snapshot;
+    const { location_text: _locationText, where_kind: _whereKind, ...rest } = snapshot;
     void _locationText;
+    void _whereKind;
     return rest;
   };
   return {
@@ -1116,7 +1129,7 @@ function toBehaviorLogRawConfigurationEvent(
       ? withoutLocation(event.previous_configuration)
       : null,
     next_configuration: withoutLocation(event.next_configuration),
-    changed_fields: event.changed_fields.filter((field) => field !== "location_text"),
+    changed_fields: event.changed_fields.filter((field) => field !== "location_text" && field !== "where_kind"),
   };
 }
 

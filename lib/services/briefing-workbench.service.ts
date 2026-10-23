@@ -18,6 +18,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { briefingBenchBudget, type BriefingBenchReservation } from "./briefing-bench-budget";
 import type { BriefingAnalysisLaneId, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
+import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import {
   benchPartition, BRIEFING_BENCH_MAX_INPUT_BYTES, BRIEFING_BENCH_SCHEMA_VERSION, createBriefingBenchStore, isBriefingBenchStoreError, isBenchId,
@@ -131,10 +132,12 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           } } : {}),
           ...(descriptionsConfirmed ? { descriptions: { ownerConfirmed: true as const } } : {}),
         }), signal) : null;
+        // The workbench never requests separately disclosed connector sources, so account contexts stay Google-only `1.0`.
+        const accountContexts = account ? account.contexts.map((context) => validateAdvisorDayContext(context)) : null;
         const replay = saved ? replaySavedCase(saved.case, configs) : null;
         const fixtureId = (saved?.case.source.mode === "synthetic" ? saved.case.source.fixtureId : value.fixtureId) as BriefingFixtureId;
         const analysisFixtureId = (saved?.case.source.mode === "synthetic" ? saved.case.source.analysisFixtureId ?? undefined : value.analysisFixtureId) as BriefingAnalysisFixtureId | undefined;
-        const contexts = replay?.contexts ?? account?.contexts ?? configs.map(config => briefingFixture(fixtureId, config));
+        const contexts = replay?.contexts ?? accountContexts ?? configs.map(config => briefingFixture(fixtureId, config));
         const effectiveConfigs = replay?.configs ?? (account ? configs.map(config => accountConfig(config, account.configurationRefs, account.preferences.includeCalendar)) : configs);
         const analysisSource = replay ? replay.analysisSource : account ? account.analysisSource : undefined;
         const revisions = effectiveConfigs.map(briefingConfigurationRevision);
@@ -157,7 +160,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             notesDisclosed: account.preferences.includeNotes,
             ...(account.descriptions ? { descriptionsDisclosed: "workbench_owner_confirmed" as const } : {}),
           } : null,
-          inputs: account ? { contexts: account.contexts, analysisSource: account.analysisSource, configurationRefs: account.configurationRefs,
+          inputs: account && accountContexts ? { contexts: accountContexts, analysisSource: account.analysisSource, configurationRefs: account.configurationRefs,
             ...(account.descriptions ? { descriptions: account.descriptions } : {}) } : null,
         }) : null;
         const attemptId = randomUUID();

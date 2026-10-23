@@ -1,5 +1,5 @@
 import type { RecurrenceRule } from "./recurrence";
-import type { ArchiveNote } from "./behavior";
+import type { ArchiveNote, BehaviorWhereKind } from "./behavior";
 import type { PortabilityNoteRow, PortabilityInterventionRow, PortabilityImportRunRow, PortabilityMappingRow } from "./portability-rows";
 
 export type ExportImportedHistory = {
@@ -76,6 +76,7 @@ export type ExportBehaviorInput = {
   categoryName: string | null;
   title: string;
   description: string | null;
+  whereKind?: BehaviorWhereKind | null;
   locationText?: string | null;
   recurrenceRule: RecurrenceRule;
   scheduledTime: string;
@@ -127,6 +128,7 @@ export type ExportBehaviorConfigurationSchedule = {
 export type ExportBehaviorConfigurationSnapshot = {
   categoryId: string | null;
   locationText?: string | null;
+  whereKind?: BehaviorWhereKind | null;
   scheduleGraph: ExportBehaviorConfigurationSchedule[];
   browserReminderEnabled: boolean;
   emailReminderEnabled: boolean;
@@ -279,6 +281,7 @@ export type ExportJsonBehavior = {
   category: string | null;
   title: string;
   description: string | null;
+  where_kind: BehaviorWhereKind | null;
   location_text: string | null;
   recurrence_rule: RecurrenceRule;
   scheduled_time: string;
@@ -363,6 +366,7 @@ export type ExportJsonBehaviorDefinitionEvent = {
 export type ExportJsonBehaviorConfigurationSnapshot = {
   category_id: string | null;
   location_text: string | null;
+  where_kind: BehaviorWhereKind | null;
   schedule_graph: Array<{
     recurrence_rule: RecurrenceRule;
     sort_order: number;

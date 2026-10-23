@@ -341,8 +341,14 @@ fn validate_write(
                     .as_ref()
                     .and_then(Value::as_object)
                     .ok_or("An account sync upsert requires a value.")?;
-                if ["default_duration_minutes", "end_date", "auto_archived_at", "location_text"]
-                    .iter()
+                if [
+                    "default_duration_minutes",
+                    "end_date",
+                    "auto_archived_at",
+                    "location_text",
+                    "where_kind",
+                ]
+                .iter()
                     .any(|field| !value.contains_key(*field))
                 {
                     return Err("Update Cadence before synchronizing Behavior changes.".into());
@@ -943,6 +949,7 @@ mod tests {
             title: "Graph".into(),
             description: None,
             location_text: None,
+            where_kind: None,
             active: true,
             archive_notes: vec![],
             archived_at: None,
@@ -1641,6 +1648,7 @@ mod tests {
             title: "Graph behavior".into(),
             description: None,
             location_text: None,
+            where_kind: None,
             active: false,
             archive_notes: vec![BehaviorArchiveNote {
                 id: "10000000-0000-4000-8000-000000000005".into(),

@@ -1,4 +1,4 @@
-import type { AdvisorDayContextV1, AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
 import { isLaneRecipe, type BriefingConfig } from "../types/briefing-config";
 
 /** Ticket 188 bounds. Descriptions are untrusted user text; Cadence trims and caps them. */
@@ -25,7 +25,7 @@ export type DescriptionEstimate = Readonly<{
  * without a known enabled source, and with a non-empty description.
  */
 export function selectDescriptionEstimateItems(
-  context: AdvisorDayContextV1,
+  context: Pick<AdvisorDayContext, "cadence">,
   config: BriefingConfig,
   descriptions: Readonly<Record<string, string>>,
 ): DescriptionEstimateItem[] {
@@ -81,7 +81,7 @@ export function parseDescriptionEstimates(value: unknown, items: readonly Descri
 }
 
 /** Adds each estimate as the lowest-priority duration candidate; configuration still selects. */
-export function applyDescriptionEstimates(context: AdvisorDayContextV1, estimates: readonly DescriptionEstimate[]): AdvisorDayContextV1 {
+export function applyDescriptionEstimates<T extends AdvisorDayContext>(context: T, estimates: readonly DescriptionEstimate[]): T {
   const byRef = new Map(estimates.filter((item) => item.minutes !== null).map((item) => [item.behaviorRef, item.minutes as number]));
   if (!byRef.size) return context;
   return {

@@ -13,7 +13,11 @@ const mocks = vi.hoisted(() => ({
   calendar: vi.fn(),
   analysis: vi.fn(),
   analysisRevision: vi.fn(),
+  outlook: vi.fn(),
+  connector: vi.fn(),
 }));
+vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
+vi.mock("@/lib/services/connector-credentials", () => ({ getConnectorConnection: mocks.connector }));
 vi.mock("@/lib/db/advisor-analysis.repo", async (original) => ({
   ...await original<typeof import("@/lib/db/advisor-analysis.repo")>(),
   readAdvisorAnalysisSnapshot: mocks.analysis,
@@ -48,6 +52,14 @@ const preferences = {
   revision: 3,
   calendarConnectionGeneration: null,
   calendarSelectionRevision: null,
+  includeOutlookCalendar: false,
+  outlookConnectionGeneration: null,
+  outlookSelectionRevision: null,
+  includeIcloudCalendar: false,
+  icloudConnectionGeneration: null,
+  icloudSelectionRevision: null,
+  includeHevy: false,
+  hevyConnectionGeneration: null,
 };
 const caller = { client: {}, user: { id: "owner-1" } } as CalendarCaller;
 const signal = new AbortController().signal;
@@ -238,5 +250,66 @@ describe("analysis source reads (Ticket 169)", () => {
     expect(first.tipFingerprint(finding)).toBe(second.tipFingerprint(finding));
     const other = await prepareAccountBriefingContexts({ ...caller, user: { id: "owner-2" } } as CalendarCaller, { historyDays: [90], includeCalendar: false, signal, clock: now, analysis: { includeReminders: false, includeNotes: false } });
     expect(other.tipFingerprint(finding)).not.toBe(first.tipFingerprint(finding));
+  });
+});
+
+describe("separately disclosed connector fences (Ticket 239)", () => {
+  const disclosed = { ...preferences, includeOutlookCalendar: true, outlookConnectionGeneration: 2, outlookSelectionRevision: 3, includeHevy: true, hevyConnectionGeneration: 5 };
+  const sources = { calendars: true, recordedActivity: true, deadlineAt: Date.now() + 50_000 };
+  beforeEach(() => {
+    mocks.preferences.mockResolvedValue(disclosed);
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["b", "a"] } });
+    mocks.connector.mockResolvedValue({ status: "connected", generation: 5, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+  });
+
+  it("never reads or requests new sources for callers that omit them, even when disclosed", async () => {
+    await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now });
+    expect(mocks.outlook).not.toHaveBeenCalled();
+    expect(mocks.connector).not.toHaveBeenCalled();
+    const call = mocks.contexts.mock.calls[0][0];
+    expect(call).not.toHaveProperty("connectorSources");
+    expect(call.authorization).not.toHaveProperty("outlookCalendar");
+  });
+
+  it("binds each disclosed source to its granted generation and selection", async () => {
+    await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources });
+    const call = mocks.contexts.mock.calls[0][0];
+    expect(call.connectorSources).toEqual({ outlookCalendar: true, icloudCalendar: false, hevy: true, deadlineAt: sources.deadlineAt });
+    expect(call.authorization).toMatchObject({
+      outlookCalendar: { calendarIds: ["a", "b"], connectionGeneration: 2, selectionRevision: 3 },
+      icloudCalendar: null,
+      hevy: { connectionGeneration: 5 },
+    });
+  });
+
+  it("drops calendar sources when the configuration excludes Calendar and leaves undisclosed sources unread", async () => {
+    await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now, connectorSources: { ...sources, calendars: false } });
+    expect(mocks.outlook).not.toHaveBeenCalled();
+    expect(mocks.contexts.mock.calls[0][0].connectorSources).toMatchObject({ outlookCalendar: false, hevy: true });
+    mocks.preferences.mockResolvedValue(preferences);
+    mocks.connector.mockClear();
+    await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources });
+    expect(mocks.contexts.mock.calls[1][0].connectorSources).toEqual({ outlookCalendar: false, icloudCalendar: false, hevy: false, deadlineAt: sources.deadlineAt });
+    expect(mocks.connector).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Outlook reconnect", () => mocks.outlook.mockResolvedValue({ status: "connected", generation: 3, selectionRevision: 3, preferences: { selectedSourceIds: ["a"] } })],
+    ["Outlook selection change", () => mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 4, preferences: { selectedSourceIds: ["a"] } })],
+    ["Hevy disconnect", () => mocks.connector.mockResolvedValue({ status: "disconnected", generation: 6, selectionRevision: 0, preferences: { selectedSourceIds: [] } })],
+  ])("refuses a stale disclosure before reading context: %s", async (_label, change) => {
+    change();
+    await expect(prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources }))
+      .rejects.toMatchObject({ code: "context_changed" });
+    expect(mocks.contexts).not.toHaveBeenCalled();
+  });
+
+  it("rejects prepared output when a disclosure is withdrawn or a source changes before delivery", async () => {
+    const prepared = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: true, signal, clock: now, connectorSources: sources });
+    mocks.preferences.mockResolvedValue({ ...disclosed, includeHevy: false, hevyConnectionGeneration: null, revision: 4 });
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+    mocks.preferences.mockResolvedValue(disclosed);
+    mocks.connector.mockResolvedValue({ status: "connected", generation: 7, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
   });
 });

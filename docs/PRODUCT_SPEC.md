@@ -455,6 +455,8 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - Local-first macOS tracking parity under Tickets 107–114
 - Optional desktop Google account linking and synchronization under Tickets 116–122
 - Incremental shared domain code and design tokens, with preserved web APIs
+- Read-only Outlook and iCloud Calendar context and Hevy workout timing under
+  Tickets 233–241
 
 ## Day-progress timeline and gated Calendar context (Tickets 132–137)
 
@@ -538,8 +540,42 @@ on September 18, 2026, but scope approval and post-approval smoke checks remain
 open under Ticket 141. Ticket 137 retains controlled provider-failure and
 Workspace-restriction coverage plus dense/overnight installed fixtures and
 multi-day resume evidence. Apple-trusted desktop distribution remains separate
-under Ticket 115. Native mobile, dynamic rearrangement, and non-Google connectors
-remain deferred.
+under Ticket 115. Native mobile and dynamic rearrangement remain deferred.
+Outlook, iCloud, and Hevy connectors have local source/fixture verification
+under Tickets 233–241; live, installed and release acceptance remain open.
+
+## Connector expansion (Tickets 233–241)
+
+Approved October 18, 2026; Tickets 233–240 are implemented and independently
+verified locally. Ticket 241 reconciles disclosures and final evidence. This
+state does not establish deployed availability or live provider interoperability. Cadence adds read-only Outlook Calendar and iCloud Calendar context
+and Hevy workout timing on web and linked desktop. The Settings connector library
+lists every source with its own connect, refresh, and disconnect controls.
+
+Outlook and iCloud events keep scheduled-event semantics and reuse the Calendar
+Timeline presentation. Hevy workouts are recorded past intervals with derived
+duration. They use their own presentation, never count as Calendar events, and
+never complete or change a Behavior or Occurrence. Hevy exercise, title, routine,
+and note data is discarded. Hevy provides no location; Cadence shows it as unknown.
+
+New provider identities bind to the current Cadence account and need not match
+the Google sign-in identity. One account per provider. Credentials stay sealed on
+the server. Desktop uses hosted brokers and stores no provider credential.
+Account-free desktop mode offers no connector. Each source reaches Daily Brief
+only after its own default-off disclosure; the existing Calendar disclosure stays
+Google-only.
+
+iCloud uses a user-generated app-specific password over CalDAV. Apple does not
+limit that password to Calendar; it can reach at least iCloud Mail, Contacts, and
+Calendar. The owner accepted hosted custody on 2026-10-19 (Ticket 240), so
+owner-run live tests may use real Apple credentials. User release remains a
+separate gate. Hevy requires Pro. Even a today-only request scans global
+workout history, bounded at 500 workouts; larger accounts return incomplete
+without workout page reads. Complete reads report no detected change,
+not an atomic snapshot. Local Mac calendars and EventKit stay out of
+scope. Generic CalDAV providers and subscription feeds are later coverage. Live
+provider access, Microsoft publisher verification, and deployment remain separate
+gates. Briefs and research: `docs/INTEGRATION_PLAYBOOK.md`.
 
 ## In-app daily briefing (Tickets 145–148)
 
@@ -772,7 +808,11 @@ added. Existing live-data and release gates remain separate.
 - General AI coaching/chat and autonomous execution beyond the in-app read-only
   daily briefing planned under Tickets 146–148
 - Two-way Calendar sync and source-event editing; Tickets 132–137 cover only
-  gated read-only Google Calendar context
+  gated read-only Google Calendar context, and locally verified read-only
+  Outlook and iCloud Calendar context under Tickets 233–241 (release unverified)
+- Workout writes, workout coaching, exercise analysis, and automatic Behavior
+  completion from recorded activity
+- Apple Health, EventKit, and local-only Mac calendar access
 - PWA offline cache
 - Web offline writes
 - Payment/subscription infrastructure

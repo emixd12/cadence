@@ -42,6 +42,8 @@ function toStoredConfigurationSnapshot(value: Json): Json {
   if (!Array.isArray(schedules)) throw new Error("Invalid native configuration schedule graph.");
   return {
     category_id: snapshot.categoryId, location_text: snapshot.locationText ?? null,
+    // Shared export assembly derives a missing Where from location text.
+    ...(snapshot.whereKind === undefined ? {} : { where_kind: snapshot.whereKind }),
     browser_reminder_enabled: snapshot.browserReminderEnabled,
     email_reminder_enabled: snapshot.emailReminderEnabled, reminder_offset_minutes: snapshot.reminderOffsetMinutes,
     active: snapshot.active, timezone: snapshot.timezone,

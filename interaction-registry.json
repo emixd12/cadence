@@ -271,7 +271,8 @@
         "INT-BEHAVIOR-027",
         "INT-BEHAVIOR-028",
         "INT-BEHAVIOR-030",
-        "INT-BEHAVIOR-031"
+        "INT-BEHAVIOR-031",
+        "INT-TRAVEL-005"
       ]
     },
     {
@@ -295,7 +296,18 @@
         "INT-TRAVEL-001",
         "INT-TRAVEL-002",
         "INT-TRAVEL-003",
-        "INT-TRAVEL-004"
+        "INT-TRAVEL-004",
+        "INT-CALENDAR-008",
+        "INT-CALENDAR-009",
+        "INT-CALENDAR-010",
+        "INT-CALENDAR-011",
+        "INT-CONNECTOR-001",
+        "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003",
+        "INT-CALENDAR-012",
+        "INT-CALENDAR-013",
+        "INT-CALENDAR-014",
+        "INT-CALENDAR-015"
       ]
     },
     {
@@ -452,7 +464,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 43,
+      "interaction_marker_count": 44,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -467,7 +479,8 @@
         "INT-BEHAVIOR-020",
         "INT-BEHAVIOR-021",
         "INT-BEHAVIOR-030",
-        "INT-BEHAVIOR-031"
+        "INT-BEHAVIOR-031",
+        "INT-TRAVEL-005"
       ]
     },
     {
@@ -794,7 +807,7 @@
       "classification": "excluded",
       "interaction_marker_count": 102,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 preserves owner-month reserved travel spend from the existing account-access readback without provider calls. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case."
     },
     {
       "path": "app/design-system/BriefingReview.tsx",
@@ -816,7 +829,7 @@
     {
       "path": "components/briefing/DailyBriefSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 9,
+      "interaction_marker_count": 13,
       "interaction_ids": [
         "INT-BRIEF-004"
       ]
@@ -831,18 +844,11 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 14,
+      "interaction_marker_count": 8,
       "interaction_ids": [
         "INT-TRAVEL-001",
         "INT-TRAVEL-002"
       ]
-    },
-    {
-      "path": "app/design-system/BriefingDays.tsx",
-      "classification": "excluded",
-      "interaction_marker_count": 40,
-      "interaction_ids": [],
-      "reason": "Development-only historical exploration and chronological review under Tickets 182\u2013183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
     },
     {
       "path": "components/oauth/ConsentForm.tsx",
@@ -879,6 +885,52 @@
       "interaction_ids": [
         "INT-MKT-013",
         "INT-MKT-014"
+      ]
+    },
+    {
+      "path": "app/design-system/BriefingDays.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 40,
+      "interaction_ids": [],
+      "reason": "Development-only historical exploration and chronological review under Tickets 182\u2013183. Native date/time controls, explicit no-model analysis, per-source evidence limits, selected-day local save, saved-day selection, chronological plan before generation, diagnostic lane previews, provider-call budget, cancellation preserving partial results, saved/unsaved reading and local report. No production interaction or promotion."
+    },
+    {
+      "path": "components/settings/OutlookCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 15,
+      "interaction_ids": [
+        "INT-CALENDAR-008",
+        "INT-CALENDAR-009",
+        "INT-CALENDAR-010",
+        "INT-CALENDAR-011"
+      ]
+    },
+    {
+      "path": "components/settings/HevyPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 9,
+      "interaction_ids": [
+        "INT-CONNECTOR-001",
+        "INT-CONNECTOR-002",
+        "INT-CONNECTOR-003"
+      ]
+    },
+    {
+      "path": "app/design-system/ConnectorBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 2,
+      "interaction_ids": [],
+      "reason": "Ticket 238 development-only synthetic connector bench. No production interaction, provider, account, Keychain, or cache access."
+    },
+    {
+      "path": "components/settings/IcloudCalendarPanel.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 20,
+      "interaction_ids": [
+        "INT-CALENDAR-012",
+        "INT-CALENDAR-013",
+        "INT-CALENDAR-014",
+        "INT-CALENDAR-015"
       ]
     }
   ],
@@ -5073,7 +5125,7 @@
         "audience": "user",
         "references": [
           "docs/user-guide/behaviors-and-review.md#create-a-behavior",
-          "docs/user-guide/travel.md#add-a-behavior-location"
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
         ]
       },
       "status": "implemented",
@@ -6149,7 +6201,7 @@
         "audience": "user",
         "references": [
           "docs/user-guide/behaviors-and-review.md#create-a-behavior",
-          "docs/user-guide/travel.md#add-a-behavior-location"
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
         ]
       },
       "status": "implemented",
@@ -9059,7 +9111,7 @@
           "control": "Delete account"
         }
       ],
-      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending.",
+      "availability": "Enabled only when the export acknowledgement and exact typed confirmation are both present and no deletion is pending. The confirmation explains manual Apple app-specific password revocation at account.apple.com before deletion.",
       "success_result": "Server revalidates both gates, verifies the server-only service-role client, hard-deletes the Supabase Auth user and its server session rows, then attempts captured Calendar grant revocation and global sign-out to clear the current browser session and redirects to the public login confirmation.",
       "failure_result": "A validation, service-role verification, or user-deletion failure shows a specific recoverable error and preserves both account and session. A post-deletion sign-out error cannot restore the deleted account and does not block the success redirect.",
       "effects": [
@@ -11846,7 +11898,7 @@
         }
       ],
       "availability": "Available when validated visible events intersect the displayed dates.",
-      "success_result": "Google Calendar markers open persistent bottom previews; View details opens one centered native modal. Close or Escape restores focus without reopening the preview.",
+      "success_result": "Google Calendar markers open persistent bottom previews; View details opens one centered native modal. Close or Escape restores focus without reopening the preview. Markers and details name their source (Google, Outlook or iCloud Calendar); recorded Hevy workouts are a separate non-interactive list and never become markers.",
       "failure_result": "Unavailable details display their field-specific missing-data state.",
       "effects": [
         "ui_state",
@@ -11860,6 +11912,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/connector-timeline.dom.test.tsx",
           "tests/day-progress-timeline.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
@@ -12053,6 +12106,597 @@
             "tests/desktop-calendar.test.ts"
           ],
           "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-008",
+      "name": "Connect or reconnect Outlook Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Bind a read-only Microsoft calendar grant to this Cadence account.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Connect Outlook Calendar"
+        }
+      ],
+      "availability": "Explicit action after Cadence sign-in when Outlook is configured; on desktop it requires a linked account.",
+      "success_result": "Opens Microsoft consent. Web completes through the callback for the same cookie user. Desktop completes only a link whose state matches the Keychain attempt it started, through the authenticated hosted PUT with its client state.",
+      "failure_result": "Consent denial, admin approval, wrong account, expired or foreign attempts leave Cadence data unchanged and show a fixed message. A foreign desktop link is ignored and the pending attempt stays intact.",
+      "effects": [
+        "authentication_session",
+        "external_navigation",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx",
+        "lib/ui/connectors.ts",
+        "apps/desktop/src/calendar/outlook-calendar.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/calendar/use-connectors.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts",
+            "tests/desktop-connectors-hook.dom.test.tsx"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-009",
+      "name": "Select Outlook calendars and visibility",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Choose which Outlook calendars Cadence may show and how.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Save Outlook settings"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "effects": [
+        "database_write",
+        "local_preference"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-010",
+      "name": "Refresh Outlook Calendar context",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Read the displayed Outlook range now.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh Outlook Calendar"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected.",
+      "success_result": "Reloads the calendar list and the selected range; a complete read replaces that scope's cache.",
+      "failure_result": "An incomplete or failed read keeps the last complete read, labels it, and leaves other sources unchanged.",
+      "effects": [
+        "network_request",
+        "database_read"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/connector-coordinator.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-011",
+      "name": "Disconnect Outlook Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop Outlook reads and delete Cadence's saved Microsoft access.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect Outlook Calendar"
+        }
+      ],
+      "availability": "Available while Outlook Calendar is connected or requiring reconnection.",
+      "success_result": "Deletes the sealed credential and that source's cache, fences late responses, and shows the Microsoft account or My Apps removal step.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "effects": [
+        "database_delete",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/OutlookCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/OutlookCalendarPanel.tsx",
+            "apps/desktop/src/calendar/outlook-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-001",
+      "name": "Connect or reconnect Hevy",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Enter a Hevy API key once so Cadence can read workout timing.",
+      "triggers": [
+        {
+          "kind": "submit",
+          "control": "Hevy API key and Connect Hevy"
+        }
+      ],
+      "availability": "Available after Cadence sign-in when connectors are configured; Hevy API access requires Hevy Pro. Desktop requires a linked account.",
+      "success_result": "Clears the field before the request settles, verifies and seals the key on the server, and never stores it on the device.",
+      "failure_result": "A non-Pro, refused, malformed, or different-account key shows a fixed message; the field stays empty.",
+      "effects": [
+        "network_request",
+        "database_write",
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/calendar/connector-broker.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-002",
+      "name": "Refresh Hevy recorded activity",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Read today's recorded workout timing now.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh Hevy"
+        }
+      ],
+      "availability": "Available while Hevy is connected.",
+      "success_result": "A complete read replaces the same-scope cache; the Timeline shows when and how long each workout lasted.",
+      "failure_result": "An incomplete or failed read keeps the same-scope complete read, labels it, and leaves other sources and tracking unchanged.",
+      "effects": [
+        "network_request",
+        "database_read"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CONNECTOR-003",
+      "name": "Disconnect Hevy",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop Hevy reads and delete Cadence's saved API key.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect Hevy"
+        }
+      ],
+      "availability": "Available while Hevy is connected.",
+      "success_result": "Deletes the sealed key and that source's cache and shows the Hevy key removal step.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked the key.",
+      "effects": [
+        "database_delete",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/HevyPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx"
+        ],
+        "notes": "Synthetic coordinators and fixtures only; live Microsoft and Hevy access remain separate gates."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/hevy.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -12517,7 +13161,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Enable or disable the Daily Brief and choose whether selected Calendar timing, reminder delivery history, and Notes on Not Completed occurrences may inform it.",
+      "intent": "Enable or disable the Daily Brief and choose whether selected Google Calendar timing, reminder delivery history, Notes on Not Completed occurrences, and each separately connected Outlook Calendar, iCloud Calendar, or Hevy workout-timing source may inform it.",
       "triggers": [
         {
           "kind": "change",
@@ -12530,10 +13174,18 @@
         {
           "kind": "change",
           "control": "Include Notes on Not Completed occurrences"
+        },
+        {
+          "kind": "change",
+          "control": "Include selected Outlook Calendar timing, Include selected iCloud Calendar timing, or Include today's recorded Hevy workout times"
+        },
+        {
+          "kind": "activate",
+          "control": "Allow Outlook Calendar again, Allow iCloud Calendar again, or Allow Hevy again"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources. Calendar disclosure binds the agent grant generation and selection revision.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 240 adds its adapter. Google Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one. Google Calendar disclosure binds the agent grant generation and selection revision.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -12553,7 +13205,7 @@
           "tests/daily-brief-ui.dom.test.tsx",
           "tests/daily-brief.service.test.ts"
         ],
-        "notes": "DOM coverage verifies exact preference fields, the optional-source disclosures and revocation on disable; service coverage verifies two- and four-field saves."
+        "notes": "DOM coverage verifies exact preference fields, the optional-source and connector disclosures, revocation on disable, per-source changed/no-calendar/unavailable copy, Allow again renewing only its source, and unrelated saves revoking sources that need attention; service coverage verifies two-, four-, and seven-field saves, connected-source checks, and generation/selection renewal state; SQL smoke verifies admission after renewal."
       },
       "platforms": {
         "web": {
@@ -12670,7 +13322,7 @@
     },
     {
       "id": "INT-TRAVEL-001",
-      "name": "Configure proactive travel",
+      "name": "Save Home and usual travel",
       "user_guidance": {
         "audience": "user",
         "references": [
@@ -12687,15 +13339,15 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Save user-authored optional base, selected mode, navigation preference and explicit routing consent.",
+      "intent": "Save the optional Home and the usual travel mode (walking, cycling, transit or driving). The travel toggle keeps its state.",
       "triggers": [
         {
           "kind": "activate",
           "control": "Save travel settings"
         }
       ],
-      "availability": "Existing Settings; route estimates remain deployment-gated.",
-      "success_result": "Save user-authored optional base, selected mode, navigation preference and explicit routing consent.",
+      "availability": "Existing Settings; enabled after Home or usual travel changes. Route estimates remain deployment-gated.",
+      "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
@@ -12753,11 +13405,11 @@
     },
     {
       "id": "INT-TRAVEL-002",
-      "name": "Check foreground device location permission",
+      "name": "Turn travel estimates on or off",
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/travel.md#check-device-permission"
+          "docs/user-guide/travel.md#set-up-travel"
         ]
       },
       "status": "implemented",
@@ -12770,18 +13422,21 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Request one foreground position and report its usability without saving or transmitting it.",
+      "intent": "Turning the travel toggle on records routing consent beside the Google Maps disclosure and requests one foreground device position in the same click. Turning it off withdraws consent.",
       "triggers": [
         {
-          "kind": "activate",
-          "control": "Check device location permission"
+          "kind": "change",
+          "control": "Travel estimates"
         }
       ],
-      "availability": "Existing Settings; route estimates remain deployment-gated.",
-      "success_result": "Request one foreground position and report its usability without saving or transmitting it.",
+      "availability": "Existing Settings after usual travel is chosen; route estimates remain deployment-gated.",
+      "success_result": "Saves the toggle with consent, shows the device location state, and does not save or send the position from this request.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write",
         "permission_request"
       ],
       "risk": "moderate",
@@ -12792,7 +13447,7 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-navigation.test.ts"
+          "tests/travel-settings.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
       },
@@ -12804,7 +13459,7 @@
             "components/settings/TravelSettingsPanel.tsx"
           ],
           "evidence": [
-            "tests/travel-navigation.test.ts"
+            "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -12816,7 +13471,7 @@
             "apps/desktop/src/product.tsx"
           ],
           "evidence": [
-            "tests/travel-navigation.test.ts"
+            "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -12988,6 +13643,93 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-005",
+      "name": "Choose a Behavior's Where",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#set-where-for-a-behavior"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J05",
+        "J06"
+      ],
+      "intent": "Choose Not set, Anywhere, Home or A place for a Behavior. A place takes typed text. Saving the Behavior stores Where and records it in configuration history.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Where"
+        }
+      ],
+      "availability": "Behavior create and edit forms. Not set is the default; travel suggestions never change Where.",
+      "success_result": "Shows the Place field only for A place; the saved Behavior keeps Where and announces travel changes.",
+      "failure_result": "Shows a field error when A place has no text and keeps the draft.",
+      "effects": [
+        "form_draft"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/behaviors/BehaviorForm.tsx",
+        "lib/services/behavior-form.ts",
+        "packages/core/src/services/behavior-where.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/behavior-form-travel.dom.test.tsx",
+          "tests/behavior-where.test.ts"
+        ],
+        "notes": "Provider-free tests. Where changes make no provider call; the next travel refresh looks up a new place."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/behaviors/BehaviorForm.tsx"
+          ],
+          "evidence": [
+            "tests/behavior-form-travel.dom.test.tsx",
+            "tests/behavior-where.test.ts"
+          ],
+          "reason": "Shared Behavior form and core Where rules."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/behaviors/BehaviorForm.tsx",
+            "apps/desktop/src/local-behavior.service.ts"
+          ],
+          "evidence": [
+            "tests/behavior-form-travel.dom.test.tsx",
+            "tests/desktop-store-contract.test.ts"
+          ],
+          "reason": "Shared form; SQLite and account synchronization carry Where."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot edit authenticated Behaviors."
         },
         "mobile": {
           "applicability": "not_applicable",
@@ -13529,6 +14271,342 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Public developer documentation belongs to the marketing site."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-012",
+      "name": "Connect or reconnect iCloud Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#icloud-calendar"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Send Apple Account email and an app-specific password once to the hosted broker; bind a read-only CalDAV connection to this Cadence account.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Connect iCloud Calendar"
+        }
+      ],
+      "availability": "Explicit action after Cadence sign-in when iCloud is configured; on desktop it requires a linked account.",
+      "success_result": "Clears both fields immediately, verifies the principal, seals both values server-side and offers calendar selection. No credential enters desktop storage.",
+      "failure_result": "Invalid login, denied access, wrong principal and timeout preserve tracking and other sources. A different principal requires disconnect first.",
+      "effects": [
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/IcloudCalendarPanel.tsx",
+        "lib/ui/connectors.ts",
+        "apps/desktop/src/calendar/icloud-calendar.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic source, broker, cache and UI evidence only. Live Apple access and installed desktop acceptance remain unverified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "apps/desktop/src/calendar/icloud-calendar.ts",
+            "apps/desktop/src/calendar/use-connectors.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts",
+            "tests/desktop-connectors-hook.dom.test.tsx"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-013",
+      "name": "Select iCloud calendars and visibility",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#icloud-calendar"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Choose which iCloud calendars Cadence may show and how.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Save iCloud settings"
+        }
+      ],
+      "availability": "Available while iCloud Calendar is connected.",
+      "success_result": "Saves the selection for every readable chosen calendar and clears that source's cached context.",
+      "failure_result": "An unreadable calendar or provider failure leaves the saved selection unchanged.",
+      "effects": [
+        "database_write",
+        "local_preference"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/IcloudCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx"
+        ],
+        "notes": "Synthetic source, broker, cache and UI evidence only. Live Apple access and installed desktop acceptance remain unverified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "apps/desktop/src/calendar/icloud-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-014",
+      "name": "Refresh iCloud Calendar context",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#icloud-calendar"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Read the displayed iCloud range now.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Refresh iCloud Calendar"
+        }
+      ],
+      "availability": "Available while iCloud Calendar is connected.",
+      "success_result": "Reloads the calendar list and the selected range; a complete read replaces that scope's cache.",
+      "failure_result": "An incomplete or failed read keeps the last complete read, labels it, and leaves other sources unchanged.",
+      "effects": [
+        "network_request",
+        "database_read"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/IcloudCalendarPanel.tsx",
+        "lib/ui/connectors.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic source, broker, cache and UI evidence only. Live Apple access and installed desktop acceptance remain unverified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "lib/ui/connectors.ts"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "apps/desktop/src/calendar/connector-coordinator.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-CALENDAR-015",
+      "name": "Disconnect iCloud Calendar",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/timeline.md#icloud-calendar"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop iCloud reads and delete Cadence's saved Apple login values.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Disconnect iCloud Calendar"
+        }
+      ],
+      "availability": "Available while connected or requiring reconnection.",
+      "success_result": "Deletes sealed Apple login values and iCloud cache. Explains manual revocation at account.apple.com under Sign-In and Security, App-Specific Passwords.",
+      "failure_result": "A failed disconnect keeps the connection and shows a fixed message. Copy never claims Cadence revoked provider access.",
+      "effects": [
+        "database_delete",
+        "network_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/IcloudCalendarPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/connector-library.dom.test.tsx",
+          "tests/connectors-client.test.ts"
+        ],
+        "notes": "Synthetic source, broker, cache and UI evidence only. Live Apple access and installed desktop acceptance remain unverified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx"
+          ],
+          "evidence": [
+            "tests/connector-library.dom.test.tsx",
+            "tests/connectors-client.test.ts"
+          ]
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/IcloudCalendarPanel.tsx",
+            "apps/desktop/src/calendar/icloud-calendar.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/desktop-calendar.test.ts"
+          ],
+          "reason": "Shared Settings controls over the hosted broker in linked-account mode; local mode shows the source as requiring a linked account. Installed-native and live provider acceptance remain unverified."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing consumes approved claims; it does not implement application tracking or account controls."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Future mobile implementation and parity remain unscheduled."
         }
       }
     }

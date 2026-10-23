@@ -248,20 +248,35 @@ text. Preserve hover/focus/tap/click behavior, keyboard access, 44px targets,
 left-side Calendar context and the right-side ledger. Add no separate travel lane
 or permanent duration fill. Unknown timing never creates a precise occupied span.
 
-Show available Calendar location text with Google Maps or a supported preferred
-navigation link. Unresolved addresses can offer Search in maps without claiming a
-verified route. Put optional Behavior location in the existing Behavior form.
-Travel setup explains automatic routing and the optional base. Current position
-is the default immediate origin, ahead of a predicted scheduled position. When
-location is unavailable, request a base for that origin. Missing base withholds
-only final-return advice; current-location-to-event and event-to-event advice
-remain available for usable points. Never insert a base detour automatically.
+Show available Calendar location text with a navigation link that follows the
+platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
+setting. Unresolved addresses can offer Search in maps without claiming a
+verified route. Current position is the default immediate origin, ahead of a
+predicted scheduled position. When location is unavailable, Home or the previous
+stop is the origin. Missing Home withholds only the trip back; current-location-
+to-event and event-to-event advice remain available for usable points. Never
+insert a detour through Home automatically.
+
+Travel Settings (Ticket 215) has three inputs in one column: the Travel estimates
+checkbox with the Google Maps disclosure directly below its label, Home (optional)
+and Usual travel (Walking, Cycling, Transit, Driving). Turning the checkbox on
+records consent and asks for foreground location in the same click; it stays
+disabled, with one line of guidance, until usual travel is chosen. Save travel
+settings stores Home and usual travel. A device-location state line and the
+storage note follow. No separate consent checkbox, "saved base" wording, map-app
+selector or permission-check button.
+
+The Behavior form shows Where after Description: a select with Not set (default),
+Anywhere, Home and A place. A place adds a required Place text field beside it.
+One hint follows: "Travel estimates and scheduling advice work better when Where
+is set." The pair stacks on narrow screens.
 
 Implementation references: `components/timeline/DayProgressTimeline.tsx`,
-`components/timeline/ExternalEventDetails.tsx`, the existing Behavior form and
-`components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
-`INT-TRAVEL-001` through `INT-TRAVEL-003`; the existing bench includes complete-trip
-and no-base fixtures. Installed acceptance remains in `qa/travel-release.md`.
+`components/timeline/ExternalEventDetails.tsx`, `components/behaviors/BehaviorForm.tsx`
+and `components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
+`INT-TRAVEL-001` through `INT-TRAVEL-005`; the existing bench includes complete-trip
+and no-base fixtures, the panel before usual travel is chosen and a Home Behavior.
+Installed acceptance remains in `qa/travel-release.md`.
 
 The current day should be prominent and should begin the forward timeline.
 

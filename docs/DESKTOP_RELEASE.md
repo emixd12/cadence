@@ -363,7 +363,10 @@ CI certificate or creating an Apple credential is a separate operation.
 Production overlays use `src-tauri/Entitlements.plist` for Cadence's registered
 App ID prefix `HK26VT477G` and private Keychain access group. The Apple portal
 confirmed this prefix when `app.cadence.desktop` was registered on September 27.
-Provisioning must authorize those entitlements. Preview overlays omit both the
+Provisioning must authorize those entitlements. The same file grants the Hardened
+Runtime location entitlement `com.apple.security.personal-information.location`
+(Ticket 165). Apple lists it under Hardened Runtime resource access; the code
+signature grants it and provisioning profiles do not list it. Preview overlays omit both the
 entitlements and provisioning profile. Production child processes strip the
 legacy-Keychain build flag, and production artifact verification rejects its
 compiled marker. Installed Data Protection Keychain acceptance remains required.
@@ -406,7 +409,8 @@ runtime, code signatures,
 Gatekeeper acceptance, and stapled notarization for the app and DMG. For production,
 `verify-entitlements.py` requires the signed entitlements to equal
 `src-tauri/Entitlements.plist` exactly. The embedded provisioning profile must belong
-to the same team, be unexpired, and authorize every entitlement. It decodes
+to the same team, be unexpired, and authorize every entitlement except the
+listed Hardened Runtime resource entitlements, which must be `true`. It decodes
 Tauri's public-key/signature envelopes and asks Minisign to verify the updater
 archive. It compares every file's bytes and permissions, directory, and symlink
 target with the verified app. It rejects missing, surplus, duplicate, unsafe,

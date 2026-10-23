@@ -46,11 +46,11 @@ export async function updateTravelSettingsRow(
 export async function readTravelBehaviorLocations(
   client: AppSupabaseClient,
   userId: string,
-): Promise<{ id: string; location_text: string | null; updated_at: string }[]> {
+): Promise<{ id: string; where_kind: string | null; location_text: string | null; updated_at: string }[]> {
   const { data, error } = await client.from("behaviors")
-    .select("id,location_text,updated_at")
+    .select("id,where_kind,location_text,updated_at")
     .eq("user_id", userId)
     .order("id");
   if (error) throw error;
-  return (data ?? []) as { id: string; location_text: string | null; updated_at: string }[];
+  return (data ?? []) as { id: string; where_kind: string | null; location_text: string | null; updated_at: string }[];
 }

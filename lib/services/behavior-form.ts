@@ -1,4 +1,5 @@
 import { BehaviorValidationError, isWeekday, validateBehaviorPlanningFields } from "@cadence/core/services/behavior-values";
+import { isBehaviorWhereKind } from "@cadence/core/services/behavior-where";
 export { BehaviorValidationError, normalizeRecurrenceRule, recurrenceRuleToJson, recurrenceDefaultsFromRule, defaultRecurrenceDefaults, summarizeRecurrenceRule, normalizeScheduledTime, formatScheduledTimeLabel, formatScheduleSlotLabel, summarizeReminders, formatReminderOffset } from "@cadence/core/services/behavior-values";
 import type { BehaviorInput } from "@cadence/core/behavior-store";
 import type {
@@ -43,7 +44,11 @@ export function parseBehaviorFormData(
   const behaviorId = getOptionalString(formData, "behavior_id");
   const title = getOptionalString(formData, "title").trim();
   const description = getOptionalString(formData, "description").trim();
-  const locationText = getOptionalString(formData, "location_text").trim();
+  // Forms without Where (MCP input) keep the earlier rule: location text means A place.
+  const whereKind = formData.has("where_kind") ? getOptionalString(formData, "where_kind").trim() || null : undefined;
+  const locationText = whereKind === undefined || whereKind === "place"
+    ? getOptionalString(formData, "location_text").trim()
+    : "";
   const categoryId = getOptionalString(formData, "category_id").trim();
   const duration = getOptionalString(formData, "default_duration_minutes").trim();
   const defaultDurationMinutes = duration ? Number(duration) : null;
@@ -68,8 +73,12 @@ export function parseBehaviorFormData(
     fieldErrors.description =
       "Keep the description to 1,000 characters or fewer.";
   }
-  if (locationText.length > 500 || /[\u0000-\u001f\u007f]/u.test(locationText)) {
-    fieldErrors.location_text = "Keep the location to 500 characters and remove control characters.";
+  if (whereKind != null && !isBehaviorWhereKind(whereKind)) {
+    fieldErrors.where_kind = "Choose where this happens.";
+  } else if (whereKind === "place" && !locationText) {
+    fieldErrors.location_text = "Enter the place.";
+  } else if (locationText.length > 500 || /[\u0000-\u001f\u007f]/u.test(locationText)) {
+    fieldErrors.location_text = "Keep the place to 500 characters and remove control characters.";
   }
 
   if (categoryId && !UUID_PATTERN.test(categoryId)) {
@@ -96,6 +105,7 @@ export function parseBehaviorFormData(
     endDate,
     title,
     description: description || null,
+    whereKind: whereKind === undefined ? undefined : isBehaviorWhereKind(whereKind) ? whereKind : null,
     locationText: locationText || null,
     categoryId: categoryId || null,
     recurrenceRule,

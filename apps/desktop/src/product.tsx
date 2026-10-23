@@ -12,6 +12,13 @@ import { createDesktopTravelClient } from "./travel";
 import { createLocalTravelSettingsClient } from "./local-travel-settings.service";
 import { readMacForegroundLocation } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
+import { useDesktopConnectors } from "./calendar/use-connectors";
+import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
+import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
+import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
+import { HevyPanel } from "@/components/settings/HevyPanel";
+import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
+import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { createDesktopDailyBriefClient } from "./daily-brief";
 import { TimelineScreen } from "./timeline-screen";
 import { BehaviorsScreen } from "./behaviors-screen";
@@ -313,6 +320,19 @@ export function Product() {
     accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York", range: calendarRange,
     enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
   });
+  const connectors = useDesktopConnectors({
+    client: calendarClient,
+    screen: activeScreen === "timeline" || activeScreen === "settings" ? activeScreen : null,
+    accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
+    todayLocalDate: calendarRange.startLocalDate, lastLocalDate: calendarRange.endLocalDate,
+    enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
+  });
+  const outlookTimeline = connectors.outlook;
+  const icloudTimeline = connectors.icloud;
+  const icloudEvents = icloudTimeline.snapshot?.events.filter((event) => !icloudTimeline.hiddenCalendarIds.includes(event.calendarId)
+    && (icloudTimeline.showAllDay || event.kind !== "all_day")) ?? [];
+  const outlookEvents = outlookTimeline.snapshot?.events.filter((event) => !outlookTimeline.hiddenCalendarIds.includes(event.calendarId)
+    && (outlookTimeline.showAllDay || event.kind !== "all_day")) ?? [];
   const currentTravelCorrections = useMemo(() => (travelCorrections.accountId === accountUserId ? travelCorrections.items : []).filter((correction) => calendar.snapshot?.events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [travelCorrections, calendar.snapshot, accountUserId]);
   const visibleCalendarEvents = calendar.preferences?.visible ? calendar.snapshot?.events.filter((event) =>
     !calendar.preferences!.hiddenCalendarIds.includes(event.calendarId)
@@ -320,16 +340,16 @@ export function Product() {
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} },
-      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
+      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
   const calendarContext = {
     travelMessage: travel.message,
     travelStatus: travel,
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
-    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
-    events: visibleCalendarEvents,
-    freshness: calendar.snapshot ? { ...calendar.snapshot.freshness, label: calendar.label,
-      ...(calendar.stale ? { state: "stale" as const, canAssertNoOverlap: false } : {}) }
-      : { state: "unavailable" as const, refreshedAt: null, label: calendar.label, canAssertNoOverlap: false },
+    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
+    // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
+    events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
+    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),
+    recordedActivity: connectors.hevy,
   };
   const syncAccount = useCallback((): Promise<SyncCompletion> => {
     if (!syncReady || !accountUserId || !profileId || !auth.current) {
@@ -383,13 +403,14 @@ export function Product() {
     return completion;
   }, [accountUserId, conflictReview, profileId, refreshScreen, syncReady]);
   const refreshCalendar = calendar.refresh;
+  const refreshConnectors = connectors.refresh;
   const reloadTimeline = useCallback(async () => {
     const synced = accountUserId ? await syncAccount() : null;
     const accountCurrent = synced ? synced.status.state === "current" : true;
     const cadenceCurrent = synced?.localCurrent || await refreshScreen();
-    const calendarCurrent = await refreshCalendar("manual");
-    return accountCurrent && cadenceCurrent && calendarCurrent;
-  }, [accountUserId, refreshCalendar, refreshScreen, syncAccount]);
+    const [calendarCurrent, connectorsCurrent] = await Promise.all([refreshCalendar("manual"), refreshConnectors("manual")]);
+    return accountCurrent && cadenceCurrent && calendarCurrent && connectorsCurrent;
+  }, [accountUserId, refreshCalendar, refreshConnectors, refreshScreen, syncAccount]);
   useEffect(() => {
     if (!syncReady) return;
     const trigger = () => syncAccount();
@@ -501,8 +522,20 @@ export function Product() {
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
-        calendarControls={calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} />
-          : <section className="py-4"><h2 className="text-xl">Google Calendar</h2><p className="mt-3 text-sm text-muted-readable">{calendar.label}</p></section>}
+        calendarControls={<ConnectorLibrary sources={[
+          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} nested />
+            : <ConnectorUnavailable id="google_calendar" reason={calendar.label} /> },
+          { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
+            refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")}
+            callbackMessage={connectors.outlookMessage} refreshVersion={connectors.panelVersion} />
+            : <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
+          { id: "icloud_calendar", content: connectors.icloudCoordinator ? <IcloudCalendarPanel key={`icloud-${accountUserId}`} coordinator={connectors.icloudCoordinator}
+            refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")} />
+            : <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
+          { id: "hevy", content: connectors.hevyCoordinator ? <HevyPanel key={`hevy-${accountUserId}`} coordinator={connectors.hevyCoordinator}
+            localDate={calendarRange.startLocalDate} timezone={profile?.timezone ?? "America/New_York"} refreshVersion={connectors.panelVersion} />
+            : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
+        ]} />}
         dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
         travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}

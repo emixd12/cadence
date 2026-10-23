@@ -33,6 +33,10 @@ export type ArchiveNote = {
   updatedAt: string;
 };
 
+/** Where a Behavior happens (Ticket 215). `null` means Not set. */
+export const BEHAVIOR_WHERE_KINDS = ["anywhere", "home", "place"] as const;
+export type BehaviorWhereKind = (typeof BEHAVIOR_WHERE_KINDS)[number];
+
 export type BehaviorView = {
   defaultDurationMinutes?: number | null;
   endDate?: string | null;
@@ -40,6 +44,7 @@ export type BehaviorView = {
   id: string;
   title: string;
   description: string;
+  whereKind?: BehaviorWhereKind | null;
   locationText?: string | null;
   categoryId: string;
   categoryName: string;
@@ -73,6 +78,7 @@ export const BEHAVIOR_FORM_FIELDS = [
   "behavior_id",
   "title",
   "description",
+  "where_kind",
   "location_text",
   "default_duration_minutes",
   "end_date",

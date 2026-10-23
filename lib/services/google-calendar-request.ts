@@ -44,7 +44,7 @@ export async function runCalendarRequest(request: Request, run: (caller: Calenda
     return calendarResponse(request, { error: code }, code === "unauthenticated" ? 401 : code === "invalid_request" ? 400 : code === "not_configured" ? 503 : 409);
   }
 }
-export async function readCalendarRequestBody(request: Request): Promise<unknown> {
+export async function readCalendarRequestBody(request: Request, maxBytes = 70_000): Promise<unknown> {
   // A small explicit byte ceiling precedes JSON parsing, including chunked requests.
   const reader = request.body?.getReader();
   if (!reader) throw new CalendarConnectionError("invalid_request");
@@ -53,7 +53,7 @@ export async function readCalendarRequestBody(request: Request): Promise<unknown
     const { done, value } = await reader.read();
     if (done) break;
     bytes += value.byteLength;
-    if (bytes > 70_000) { await reader.cancel(); throw new CalendarConnectionError("invalid_request"); }
+    if (bytes > maxBytes) { await reader.cancel(); throw new CalendarConnectionError("invalid_request"); }
     chunks.push(value);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }

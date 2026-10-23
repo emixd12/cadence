@@ -123,27 +123,31 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
   if (context.status !== "complete") {
     return unavailableResult(base, input, unresolved, "context_partial", "The day context is partial.");
   }
-  if (!connector || connector.state === "not_requested") {
+  // Every requested Calendar source must be current and complete; one source never proves another's free time.
+  const calendars = requestedCalendars(input);
+  if (calendars.length === 0) {
     return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
   }
-  if (connector.state !== "current" || !connector.complete || connector.coverage.some((row) => !row.paginationComplete)) {
-    return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar coverage is not current and complete.");
-  }
-  if (connector.coverage.length === 0) {
-    return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
-  }
-  const fetchedAt = connector.fetchedAt ? instant(connector.fetchedAt, "connector.fetchedAt") : null;
-  if (
-    !fetchedAt
-    || Temporal.Instant.compare(fetchedAt, now) > 0
-    || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0
-    || connector.coverage.some((row) => row.startLocalDate !== context.localDate || row.endLocalDate !== context.localDate)
-  ) {
-    return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar freshness or day coverage is invalid.");
+  for (const calendarSource of calendars) {
+    if (calendarSource.state !== "current" || !calendarSource.complete || calendarSource.coverage.some((row) => !row.paginationComplete)) {
+      return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar coverage is not current and complete.");
+    }
+    if (calendarSource.coverage.length === 0) {
+      return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
+    }
+    const fetchedAt = calendarSource.fetchedAt ? instant(calendarSource.fetchedAt, "connector.fetchedAt") : null;
+    if (
+      !fetchedAt
+      || Temporal.Instant.compare(fetchedAt, now) > 0
+      || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0
+      || calendarSource.coverage.some((row) => row.startLocalDate !== context.localDate || row.endLocalDate !== context.localDate)
+    ) {
+      return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar freshness or day coverage is invalid.");
+    }
   }
 
   const occurrences = new Map(context.cadence.occurrences.map((item) => [item.ref, item]));
-  const calendarBlocks = connector.events.flatMap((event) => calendarBlock(event, context));
+  const calendarBlocks = calendars.flatMap((calendarSource) => calendarSource.events.flatMap((event) => calendarBlock(event, context)));
   const calendarEventRefs = [...new Set(calendarBlocks.flatMap((block) => block.calendarEventRef ?? []))].sort();
   const rejections: BriefingPlanRejection[] = [...dayEvidenceRejections(dayEvidence)];
   const candidates: Candidate[] = [];
@@ -271,9 +275,10 @@ function resolveDayEvidence(
   contextIsCurrent: boolean,
 ): DayEvidenceResolution {
   const context = input.context;
-  const connector = context.connectors[0];
+  const calendars = requestedCalendars(input);
   const calendar = calendarFreshness(input, now, contextIsCurrent);
-  const fetchedAt = connector && connector.state !== "not_requested" ? connector.fetchedAt : null;
+  const fetchedAt = calendars.map((item) => item.fetchedAt).filter((value): value is string => value !== null)
+    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left), Temporal.Instant.from(right)))[0] ?? null;
   const cadenceObservedAt = instant(context.cadence.observedAt, "context.cadence.observedAt");
   const cadenceCurrent = contextIsCurrent
     && Temporal.Instant.compare(cadenceObservedAt, now) <= 0
@@ -307,10 +312,10 @@ function resolveDayEvidence(
       return Temporal.Instant.compare(start, dayStart) >= 0 && Temporal.Instant.compare(start, dayEnd) < 0;
     })
     .sort((left, right) => left.ref.localeCompare(right.ref));
+  // Known events from each current source stay observable when another source is missing.
   const observedCalendarBlocks = calendar === "current_complete" || calendar === "current_partial"
-    ? connector && connector.state !== "not_requested"
-      ? connector.events.flatMap((event) => calendarBlock(event, context))
-      : []
+    ? calendars.filter((item) => isCurrentFreshness(sourceFreshness(input, item, now, contextIsCurrent)))
+      .flatMap((item) => item.events.flatMap((event) => calendarBlock(event, context)))
     : [];
   const drafts: DayEvidenceDraft[] = [];
   const bufferSeconds = input.policy.bufferMinutes * 60;
@@ -501,12 +506,39 @@ function calendarFreshness(
   now: Temporal.Instant,
   contextIsCurrent: boolean,
 ): BriefingDayEvidenceCalendarFreshness {
-  const connector = input.context.connectors[0];
-  if (!connector || connector.state === "not_requested" || connector.state === "unavailable" || !connector.fetchedAt) return "missing";
+  const states = requestedCalendars(input).map((item) => sourceFreshness(input, item, now, contextIsCurrent));
+  if (states.length === 0 || states.every((state) => state === "missing")) return "missing";
+  if (states.length === 1) return states[0]!;
+  // Several sources: any stale source makes the combined view stale; any gap makes it partial.
+  if (states.includes("stale")) return "stale";
+  return states.every((state) => state === "current_complete") ? "current_complete" : "current_partial";
+}
+
+type PlannerCalendar = NonNullable<BriefingPlanInput["additionalCalendars"]>[number];
+
+/** Google from the `1.0` view first, then separately disclosed Outlook or iCloud sources (Ticket 239). */
+function requestedCalendars(input: BriefingPlanInput): readonly PlannerCalendar[] {
+  const google = input.context.connectors[0];
+  return [...(google && google.state !== "not_requested" ? [google] : []), ...(input.additionalCalendars ?? [])];
+}
+
+function isCurrentFreshness(state: BriefingDayEvidenceCalendarFreshness): boolean {
+  return state === "current_complete" || state === "current_partial";
+}
+
+function sourceFreshness(
+  input: BriefingPlanInput,
+  connector: PlannerCalendar,
+  now: Temporal.Instant,
+  contextIsCurrent: boolean,
+): BriefingDayEvidenceCalendarFreshness {
+  if (connector.state === "unavailable" || !connector.fetchedAt) return "missing";
   const fetchedAt = instant(connector.fetchedAt, "connector.fetchedAt");
   if (!contextIsCurrent || connector.state === "stale" || Temporal.Instant.compare(fetchedAt, now) > 0
     || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0) return "stale";
-  const complete = input.context.status === "complete" && connector.state === "current" && connector.complete
+  // The `1.0` view's status reflects Google only; added sources carry their own completeness.
+  const statusComplete = connector.source !== "google_calendar" || input.context.status === "complete";
+  const complete = statusComplete && connector.state === "current" && connector.complete
     && connector.coverage.length > 0 && connector.coverage.every((row) => row.paginationComplete
       && row.startLocalDate === input.context.localDate && row.endLocalDate === input.context.localDate);
   return complete ? "current_complete" : "current_partial";
@@ -821,6 +853,10 @@ function validateInput(input: BriefingPlanInput): void {
     throw new Error("policy.preference is unsupported.");
   }
   if (typeof input.fixedCommitmentsComplete !== "boolean") throw new Error("fixedCommitmentsComplete must be boolean.");
+  const added = (input.additionalCalendars ?? []).map((item) => item.source);
+  if (added.some((source) => source !== "outlook_calendar" && source !== "icloud_calendar") || new Set(added).size !== added.length) {
+    throw new Error("additionalCalendars must list Outlook or iCloud at most once each.");
+  }
   if (input.movableOccurrences.length > BRIEFING_PLAN_LIMITS.movableOccurrences) {
     throw new Error("movableOccurrences exceeds its limit.");
   }

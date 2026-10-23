@@ -1,5 +1,19 @@
 # Desktop data model
 
+Schema version 18 adds the optional Behavior Where (Ticket 215). Migration
+`0018_behavior_where.sql` adds nullable `behaviors.where_kind` (`anywhere`,
+`home` or `place`; null means Not set) and sets `place` for every Behavior with
+location text. Two triggers keep the hosted rule that only `place` keeps
+`location_text`, because SQLite cannot add a table check to an existing table.
+Native row validation rejects an unknown Where and place text on any other value.
+Configuration history is not rewritten: the native snapshot normalizer reads a
+missing `whereKind` as `place` when `locationText` is set and as null otherwise,
+and `where_kind` is an allowed changed field. Account synchronization requires
+`where_kind` in every Behavior upsert, so a build that predates it fails closed
+with "Update Cadence before synchronizing Behavior changes." Local edits and
+export use the shared core rules. Travel Settings and the Behavior form are the
+shared web components; desktop links always open Apple Maps.
+
 Schema version 16 adds optional Behavior locations and the owner-authored travel
 settings singleton. Travel defaults to disabled. Migration 0016 stores no device
 sample, provider geocode or route result.
@@ -139,7 +153,7 @@ The final app must obtain its own permission and reconcile actual OS readback.
 | Tables | Contract |
 |---|---|
 | `profiles`, `categories` | Stable local identity and current default category Rows |
-| `behaviors`, `behavior_schedules`, `behavior_schedule_slots` | Full current Behavior graph, optional user-authored location, compatibility fields, custom and preset ranges, retained IDs and creation instants |
+| `behaviors`, `behavior_schedules`, `behavior_schedule_slots` | Full current Behavior graph, optional Where and user-authored place text, compatibility fields, custom and preset ranges, retained IDs and creation instants |
 | `travel_settings` | Disabled-by-default routing preference, optional user-authored base, separate consent and CAS revision; no device or provider data |
 | `behavior_definition_events` | Definition history; updates cannot rewrite events |
 | `behavior_configuration_events` | Configuration snapshots and deferred current-event pointer ownership |

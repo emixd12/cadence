@@ -42,7 +42,7 @@ beforeEach(() => {
       return;
     }
     if (command === "auth_first_link_baseline") return native.baseline;
-    if (command === "calendar_cache_clear" || command === "auth_open_url") return;
+    if (command === "calendar_cache_clear" || command === "connector_cache_clear" || command === "auth_open_url") return;
     throw new Error(`Unexpected native command: ${command}`);
   });
   native.callback = null;

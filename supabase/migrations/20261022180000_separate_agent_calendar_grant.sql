@@ -133,14 +133,21 @@ as $$
       and connection.status = 'connected'
       and connection.generation = p_connection_generation
       and preference.selection_revision = p_selection_revision
-  ));
+  ))
+    -- Keep 20261019041000's Outlook, iCloud and Hevy fence.
+    and cadence_advisor_private.daily_brief_connector_fence_is_current(p_user_id);
 $$;
 
-create or replace function cadence_advisor_private.save_daily_brief_preferences_v2(
+-- 20261019041000 made v2 a wrapper around v3, so only v3 reads the Calendar grant.
+-- Same body as 20261019041000, reading the agent Calendar grant instead.
+create or replace function cadence_advisor_private.save_daily_brief_preferences_v3(
   p_enabled boolean,
   p_include_calendar boolean,
   p_include_reminder_history boolean,
   p_include_notes boolean,
+  p_include_outlook_calendar boolean,
+  p_include_icloud_calendar boolean,
+  p_include_hevy boolean,
   p_expected_revision bigint
 )
 returns jsonb
@@ -154,10 +161,17 @@ declare
   next_revision bigint;
   connection_generation bigint;
   selection_revision bigint;
+  outlook_generation bigint;
+  outlook_selection bigint;
+  icloud_generation bigint;
+  icloud_selection bigint;
+  hevy_generation bigint;
 begin
   if p_enabled is null or p_include_calendar is null
     or p_include_reminder_history is null or p_include_notes is null
-    or (not p_enabled and (p_include_calendar or p_include_reminder_history or p_include_notes))
+    or p_include_outlook_calendar is null or p_include_icloud_calendar is null or p_include_hevy is null
+    or (not p_enabled and (p_include_calendar or p_include_reminder_history or p_include_notes
+      or p_include_outlook_calendar or p_include_icloud_calendar or p_include_hevy))
     or p_expected_revision is null or p_expected_revision not between 0 and 2147483647
   then
     raise exception 'Daily Brief preferences are invalid.' using errcode = '22023';
@@ -173,7 +187,6 @@ begin
   for update;
   current_revision := coalesce(current_revision, 0);
 
-  -- Keep 20260927173716's nonretryable code; PostgREST retries 40001.
   if current_revision <> p_expected_revision or current_revision = 2147483647 then
     raise exception 'Daily Brief preferences changed.' using errcode = '55000';
   end if;
@@ -192,13 +205,63 @@ begin
     end if;
   end if;
 
+  if p_include_outlook_calendar then
+    select connection.generation, selection.selection_revision
+      into outlook_generation, outlook_selection
+    from public.connector_connections as connection
+    join public.connector_preferences as selection
+      on selection.user_id = connection.user_id and selection.provider = connection.provider
+    where connection.user_id = actor_id
+      and connection.provider = 'outlook_calendar'
+      and connection.status = 'connected'
+      and cardinality(selection.selected_source_ids) > 0;
+
+    if outlook_generation is null or outlook_selection is null then
+      raise exception 'A connected Outlook Calendar selection is required.' using errcode = '55000';
+    end if;
+  end if;
+
+  if p_include_icloud_calendar then
+    select connection.generation, selection.selection_revision
+      into icloud_generation, icloud_selection
+    from public.connector_connections as connection
+    join public.connector_preferences as selection
+      on selection.user_id = connection.user_id and selection.provider = connection.provider
+    where connection.user_id = actor_id
+      and connection.provider = 'icloud_calendar'
+      and connection.status = 'connected'
+      and cardinality(selection.selected_source_ids) > 0;
+
+    if icloud_generation is null or icloud_selection is null then
+      raise exception 'A connected iCloud Calendar selection is required.' using errcode = '55000';
+    end if;
+  end if;
+
+  if p_include_hevy then
+    select connection.generation into hevy_generation
+    from public.connector_connections as connection
+    where connection.user_id = actor_id
+      and connection.provider = 'hevy'
+      and connection.status = 'connected';
+
+    if hevy_generation is null then
+      raise exception 'A connected Hevy account is required.' using errcode = '55000';
+    end if;
+  end if;
+
   next_revision := current_revision + 1;
   insert into cadence_advisor_private.daily_brief_preferences as preference (
     user_id, enabled, include_calendar, include_reminder_history, include_notes, revision,
-    calendar_connection_generation, calendar_selection_revision, updated_at
+    calendar_connection_generation, calendar_selection_revision,
+    include_outlook_calendar, outlook_connection_generation, outlook_selection_revision,
+    include_icloud_calendar, icloud_connection_generation, icloud_selection_revision,
+    include_hevy, hevy_connection_generation, updated_at
   ) values (
     actor_id, p_enabled, p_include_calendar, p_include_reminder_history, p_include_notes, next_revision,
-    connection_generation, selection_revision, statement_timestamp()
+    connection_generation, selection_revision,
+    p_include_outlook_calendar, outlook_generation, outlook_selection,
+    p_include_icloud_calendar, icloud_generation, icloud_selection,
+    p_include_hevy, hevy_generation, statement_timestamp()
   )
   on conflict (user_id) do update set
     enabled = excluded.enabled,
@@ -208,11 +271,20 @@ begin
     revision = excluded.revision,
     calendar_connection_generation = excluded.calendar_connection_generation,
     calendar_selection_revision = excluded.calendar_selection_revision,
+    include_outlook_calendar = excluded.include_outlook_calendar,
+    outlook_connection_generation = excluded.outlook_connection_generation,
+    outlook_selection_revision = excluded.outlook_selection_revision,
+    include_icloud_calendar = excluded.include_icloud_calendar,
+    icloud_connection_generation = excluded.icloud_connection_generation,
+    icloud_selection_revision = excluded.icloud_selection_revision,
+    include_hevy = excluded.include_hevy,
+    hevy_connection_generation = excluded.hevy_connection_generation,
     updated_at = excluded.updated_at;
 
+  -- Any preference change drops pending and completed attempts, so no output
+  -- prepared under an earlier disclosure can still be delivered.
   delete from cadence_advisor_private.daily_brief_runs
   where user_id = actor_id;
-  -- Disabling the feature removes tip repetition metadata.
   if not p_enabled then
     delete from cadence_advisor_private.daily_brief_tip_deliveries
     where user_id = actor_id;

@@ -106,6 +106,50 @@ downloads; authorized reruns passed. Both requested token scopes reached
 
 ## Standard verification
 
+### Disposable local Supabase rehearsal
+
+`.github/workflows/supabase-rehearsal.yml` runs on relevant pull requests and
+manual dispatch. Pull requests use GitHub's merge commit; the job summary records
+the checked commit/tree and PR head/base. It runs on a fresh `ubuntu-24.04` VM
+with Node 24, read-only repository permission and no hosted secrets or deployment
+environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
+runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
+
+The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
+project-scoped Docker proxy. It pulls the pinned images from `ghcr.io/supabase`
+(`SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`): anonymous `public.ecr.aws` pulls
+were throttled (`toomanyrequests`) on some shared runner addresses. GHCR serves
+the same manifest digests. It copies only config, the empty seed and tracked
+migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
+checks service health before and after `db reset --local`. The tracked migration
+version list must exactly match the applied list; its count is derived from the
+tested tree. All `tests/sql/*.sql` rollback fixtures then run with
+`psql -X -v ON_ERROR_STOP=1`, followed by:
+
+```bash
+npm run smoke:rls:local
+npm run smoke:account-sync:local
+CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+```
+
+Local API credentials stay inside the existing config reader. Startup/reset
+output is suppressed; failures identify the phase and show only container names,
+health, ports and networks. A failed start attempt also reports its exit code and
+one fixed cause category (time limit, rate limit, image pull, health check,
+migration or seed, timeout, proxy rejection). The proxy logs any rejected request
+as method and path only. Startup gets two 8-minute attempts; the second starts
+from a stopped stack with this project's two volumes removed. The 30-minute job
+stops only its Cadence containers before ending the proxy. Docker cleanup is
+limited to the CLI's prunes filtered by this project's label; the shared network
+is never pruned, and nothing touches hosted resources. The runner discards its
+temporary volumes afterward.
+
+A successful run establishes migration replay and local database contracts for
+the recorded source. Provider acceptance, the Outlook support/scope decision,
+installed desktop compatibility and the authorized hosted rollout remain
+separate gates. A workflow definition or fake-daemon proxy test is not a completed
+database rehearsal.
+
 ### Day-progress review bench (Ticket 132)
 
 The development-only `/design-system?preview=day-progress` surface compares
@@ -1543,6 +1587,46 @@ Server environment names: `GOOGLE_CALENDAR_CLIENT_ID`,
 configured HTTPS `/auth/google-calendar/callback` path. Desktop uses only public
 `VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets.
 
+Hevy, Outlook, and iCloud credentials (Ticket 235) use a separate server-only
+keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
+`CONNECTOR_CREDENTIAL_KEY_ID`, and optional `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS`.
+Never reuse the Google key. Missing configuration reports `not_configured`. The
+same rotation rules below apply.
+
+Outlook Calendar (Ticket 237) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
+Entra application GUID), `OUTLOOK_CALENDAR_CLIENT_SECRET`, and
+`OUTLOOK_CALENDAR_CALLBACK_URL` (exact HTTPS `/auth/outlook-calendar/callback`,
+on the same host as the web session).
+
+App registration steps (owner-run, not authorized in local work):
+
+1. Register one multitenant app that also accepts personal Microsoft accounts
+   (authority `common`), with the exact web redirect URI above.
+2. Under API permissions, keep only the delegated Microsoft Graph
+   `Calendars.Read` permission (Ticket 242). Remove the default `User.Read` that the
+   portal adds to new registrations. Add no application permissions and no
+   `Calendars.ReadBasic`, write, shared-calendar, `profile`, or `email` permission.
+   Graph rejects personal-account tokens that carry only `Calendars.ReadBasic`
+   (401, empty body), so that permission cannot serve personal accounts.
+3. Create a client secret and store it only in the server environment.
+
+The token check refuses any present Graph permission other than
+`Calendars.Read`, so a leftover `User.Read` makes every connect fail as
+`consent_denied`. Microsoft echoes an earlier `Calendars.ReadBasic` consent next to
+`Calendars.Read` (live, October 22, 2026); because it is a subset of `Calendars.Read`,
+it is accepted only alongside it, and a `Calendars.ReadBasic`-only grant is refused. A connection created before Ticket 242 with only
+`Calendars.ReadBasic` moves to `reconnect_required` on its next read; the user
+reconnects and grants `Calendars.Read`. `Calendars.Read` allows reading event
+details, so data minimization is in the adapter: every Graph request, including
+provider next links, selects only contract fields and never bodies, attachments, or
+extensions. An omitted `scope` in the token response is accepted because
+Microsoft documents that it then covers the requested scopes. Status reports `not_configured` until both these values and the
+connector keyring are present. Disconnect deletes Cadence's sealed refresh token
+only. Microsoft documents no app-side revocation for these scopes, so Settings
+must send users to their Microsoft account or My Apps permissions page. Publisher
+verification and per-tenant consent policy remain release gates. Local
+implementation does not authorize app registration or live-account access.
+
 For key rotation, retain old decrypt keys while credentials use those key IDs.
 New consent seals with the current key. Remove an old key only after every
 connection using it reconnects or disconnects. Missing keys fail closed and
@@ -1561,6 +1645,63 @@ Hosted ciphertext can exist in infrastructure backups under the existing retenti
 policy. Cadence exports, account synchronization, and user-created desktop backups
 exclude credentials and cached events. Test the local SQL contract before any hosted
 rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
+
+## Connector expansion acceptance and operation (Tickets 233–241)
+
+Tickets 233–241 have independent local source/synthetic approval. `STATUS.md`,
+under "Owner-run live acceptance", records the later authorized provider tests.
+Those tests do not establish installed-desktop, hosted-deployment or public-release
+acceptance. Repository review alone does not authorize real provider reads,
+publication, deployment, or hosted configuration changes.
+
+Outlook uses only delegated `Calendars.Read` plus identity/offline scopes
+(Ticket 242), with explicit field selection. One personal account and one
+home-tenant work/school account (per-user consent) passed live on 2026-10-22.
+Cross-tenant behavior and publisher verification remain release gates. Hevy
+requires Pro. Its key has no documented read-only scope;
+the adapter permits only account verification, count and workout-list GETs.
+A today-only read still scans global history, up to 500 workouts/50 pages.
+Larger accounts return incomplete without workout page reads. Stable before/after
+counts and page counts mean no detected change, not an atomic snapshot.
+Concurrent changes may escape detection. Cadence discards workout detail fields;
+only timing reaches Timeline or separately authorized Daily Brief.
+
+iCloud uses hosted CalDAV with sealed Apple Account email and app-specific
+password. That password is broader than Calendar. The owner accepted hosted
+custody on 2026-10-19; release remains a separate gate. The recorded local live test
+covered discovery, server-expanded recurrence, all-day and cross-zone events.
+Installed and deployed acceptance remain unverified. Unsupported recurrence/timezones
+are quarantined as incomplete; they do not prove an empty calendar. No EventKit
+or local-only Mac Calendar access is implemented.
+
+Each source has a separate default-off Daily Brief disclosure. Generation and
+calendar-selection changes require renewed permission. Disablement and older
+client preference saves revoke the new choices. Only current, disclosed timing
+can reach the model; raw provider details and credentials cannot. Source failures
+never change manual Behavior status. Travel remains Google-only. Existing
+production brief retention remains unchanged: no prompt/text history in Cadence,
+bounded operational metadata, `store:false` with provider retention still possible.
+
+Credentials remain sealed in the hosted private schema. Web snapshots stay in
+memory; desktop uses disposable per-source caches outside tracking exports,
+account synchronization and user-created backups. Infrastructure backups can
+retain ciphertext under the existing seven-day policy. Failed/incomplete reads
+may retain stale complete snapshots; offline clients learn of remote removal
+when they next check. Desktop sign-out/account switch clears local caches.
+Disconnect and successful Auth deletion remove live credentials but do not revoke
+Microsoft, Apple or Hevy access. Direct users to Microsoft app permissions/My Apps,
+Apple app-specific-password revocation, or Hevy key removal/regeneration.
+
+Reuse unchanged lifecycle/disclosure migration evidence and native unit-test
+results from the shared PR Context. Main's #110 fix for the inherited
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` test failure is included in
+the reviewed PR stack. Repeat the migration smoke suite in a disposable local
+database before hosted rollout.
+Full-suite desktop-release-acceptance tests have intermittently exceeded their
+unchanged five-second timeout, then passed unchanged. No base-SHA CI link proves
+the cause of that timing observation. Never reset retained `habit-tracking-app`.
+Ticket 241 evidence lives in the workspace task and shared PR Context notes.
+Local disclosure edits do not supersede release approval for published notices.
 
 ## Public Calendar verification execution (Tickets 138–141)
 

@@ -900,6 +900,28 @@ Refresh travel becomes available without a reload.
 The private workbench account-access read shows month-to-date reserved travel spend
 without provider calls or generation.
 
+### Travel Settings and Behavior Where (Ticket 215)
+
+Travel Settings supersedes steps 1–2 above with three inputs:
+
+1. The user chooses usual travel (walking, cycling, transit or driving) and may
+   enter Home. Save travel settings stores both.
+2. The user turns on Travel estimates beside the Google Maps disclosure. That click
+   records routing consent and asks for foreground device location. Denied or
+   unavailable location leaves Home or the previous stop as the origin. Turning
+   the toggle off withdraws consent and clears temporary estimates.
+3. In the Behavior form the user chooses Where: Not set (default), Anywhere, Home
+   or A place. A place needs typed text. Not set and Anywhere request no route.
+   Home routes home when the user is elsewhere and needs a saved Home. A place
+   routes to that text, looked up once on the next refresh.
+4. Navigation links open Apple Maps on Apple devices and Google Maps elsewhere.
+   There is no map-app setting.
+
+Migration keeps every existing Behavior location as Where = A place with no
+provider call. Where joins Behavior configuration history and account sync. A
+Where suggestion (Ticket 216) never changes a Behavior on its own. Ticket 212
+reuses Home and usual travel in onboarding.
+
 ## Connect and disconnect an AI client
 
 1. Start a Cadence connection from the AI client.
