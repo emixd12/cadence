@@ -8,6 +8,7 @@ const ALLOWED_KEYS: &[&str] = &[
     "supabase-pkce",
     "pending-state",
     "pending-calendar-state",
+    "pending-outlook-calendar-attempt",
 ];
 
 extern "C" {

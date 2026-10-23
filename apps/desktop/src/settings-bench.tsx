@@ -3,6 +3,7 @@ import { DesktopApp } from "./desktop-app";
 import { DesktopUpdateSection } from "./desktop-update-panel";
 import type { DesktopUpdateState } from "./desktop-updater";
 import { LocalDatabaseSection } from "./local-database-controls";
+import { ConnectorLibraryBench } from "@/app/design-system/ConnectorBench";
 
 export function SettingsBench() {
   const [accountName, setAccountName] = useState("Cadence User");
@@ -29,6 +30,7 @@ export function SettingsBench() {
       onCheck={() => setPhase("available")} onAutomaticDownloads={setAutomaticDownloads} onDownload={() => setPhase("downloaded")}
       onInstall={() => setPhase("installed")} onRetry={() => setPhase("downloaded")} onRestart={() => setRestartBlocked(true)}
       restartBlocked={restartBlocked} onCancelRestart={() => setRestartBlocked(false)} onDiscardAndRestart={() => { setRestartBlocked(false); setMessage("Fixture restart requested."); }} />
+    <div id="connector-library-bench" className="mt-8 border-t border-line pt-6"><ConnectorLibraryBench /></div>
     <LocalDatabaseSection info={{ path: "/Users/fixture/Library/Application Support/app.cadence.desktop/cadence.sqlite3", localMode: false,
       recovery: { state: "reopen_verified", backupPath: "/Users/fixture/Library/Application Support/app.cadence.desktop/Backups/.cadence-protected-storage-recovery.sqlite3", before: usage, after: usage } }}
       confirmation="" busy={false} message={message} onConfirmationChange={() => {}} onReveal={() => setMessage("Fixture reveal requested.")}

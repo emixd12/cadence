@@ -1,4 +1,7 @@
-export type ExternalEventSource = "google_calendar";
+export type ExternalEventSource =
+  | "google_calendar"
+  | "outlook_calendar"
+  | "icloud_calendar";
 
 export type ExternalEventField =
   | "title"

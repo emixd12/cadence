@@ -859,6 +859,7 @@ frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
 acceptance, promotion, deployment and stored-brief decisions remain separate.
 This is an evaluation direction; runtime policy and production presets are unchanged.
 
+
 ## 2026-10-08: Rename the repository to emixd12/cadence
 
 Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,
@@ -950,3 +951,26 @@ a later client can reuse the contract.
 This decision authorizes the tickets. It authorizes no hosted migration push,
 signing-key import, deployment, legal publication, or directory submission. Those
 remain owner-only actions.
+
+
+## 2026-10-19: Accept hosted custody of the iCloud app-specific password
+
+Ticket 240. The owner accepted the documented risk that Cadence's hosted server
+holds a sealed iCloud app-specific password, although Apple does not limit that
+password to Calendar; it can reach at least iCloud Mail and Contacts. Cadence
+still uses it only for read-only CalDAV `PROPFIND`/`REPORT` calls, and disconnect
+and account deletion still tell the user to revoke it. This unblocks owner-run
+live tests with a real Apple credential. Hosted migration, deployment and user
+release remain separate approvals.
+
+
+## 2026-10-21: Request Calendars.Read for Outlook Calendar
+
+Ticket 242. Live testing showed Microsoft Graph rejects personal Microsoft
+account tokens that carry only `Calendars.ReadBasic`, contrary to its permission
+tables; `Calendars.Read` works. The owner requires personal accounts to work, so
+the Outlook connector requests `Calendars.Read` for all Microsoft accounts. This
+supersedes the earlier choice of `Calendars.ReadBasic` as the least-privileged
+scope. Cadence still requests only the contract's fields and never downloads
+bodies, attachments or extensions; disclosures say Microsoft's permission is
+broader than what Cadence reads.

@@ -50,7 +50,7 @@ Cadence is an open-source personal behavior tracker. You define Behaviors with S
 2. Each Schedule produces Occurrences on a today-first timeline. Prior-day Unresolved Occurrences collect in Needs decision.
 3. Make a Decision for each Occurrence, with an optional note. Every Decision writes an append-only status event.
 4. Review adherence across 7, 30, or 90 days on a calendar heatmap, then export the full history anytime.
-5. See your behaviors in context. Optional connectors bring context from other tools into your Timeline. See events alongside recurring behaviors to spot overlaps with the rest of your day. Google Calendar is the first connector, with read-only access. Public rollout is pending Google review.
+5. See your behaviors in context. Optional connectors bring context from other tools into your Timeline. See events alongside recurring behaviors to spot overlaps with the rest of your day. Google Calendar provides optional read-only context. Outlook Calendar, iCloud Calendar and Hevy workout timing have local verification only; live providers, installed desktop and release remain unverified.
 
 ## Philosophy
 
@@ -148,6 +148,8 @@ This route is optimized for coding agents, retrieval tools, and developers evalu
 Use status_events.jsonl as the BehaviorLog history authority. Treat occurrences.jsonl current_status as a snapshot only.
 
 Adherence includes only decided Occurrences. Unresolved Occurrences remain separate. Do not infer causes, clinical meaning, or motivation from a Record.
+
+You choose whether to share exports with an external AI service. Separately, where enabled, optional Daily Brief sends disclosed context to OpenAI. Each connected source needs its own model-data choice.
 
 ## Canonical Application Pages
 

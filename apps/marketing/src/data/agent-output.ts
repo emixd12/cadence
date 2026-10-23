@@ -46,7 +46,7 @@ export function getLlmsTxt(): string {
     "- Do not infer failure from unresolved status.",
     "- Calculate Adherence from decided Occurrences only. Keep Unresolved separate.",
     "- Do not infer causes, clinical meaning, or motivation from a Record.",
-    "- Exported data goes to an external service only when the user chooses it. MCP access is consent-based; hosted launch remains pending. See /developers/data-and-privacy.md.",
+    "- Exported data goes to an external service only when the user chooses it. Separately, where enabled, optional Daily Brief sends disclosed context to OpenAI. Each connected source needs its own model-data choice. MCP access is consent-based; hosted launch remains pending. See /developers/data-and-privacy.md.",
     "- Do not treat the example bundle as real account data.",
     "",
   ];
