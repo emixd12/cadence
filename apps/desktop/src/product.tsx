@@ -303,8 +303,13 @@ export function Product() {
   const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient) : null, [calendarClient, accountUserId]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
-    return { load: local.load, save: async (value: Parameters<typeof local.save>[0]) => {
+    return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
       const saved = await local.save(value);
+      setSyncRequest((previous) => previous + 1);
+      return saved;
+    }, saveHabits: async (value: Parameters<typeof local.saveHabits>[0]) => {
+      // Learned habits reach the hosted route through account synchronization (Ticket 217).
+      const saved = await local.saveHabits(value);
       setSyncRequest((previous) => previous + 1);
       return saved;
     } };
@@ -346,6 +351,7 @@ export function Product() {
     travelStatus: travel,
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
+    travelSettingsClient,
     // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
     events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
     ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),

@@ -17,6 +17,39 @@ export type TravelSettings = Readonly<{
   routingConsentAt: string | null;
   onboardingCompletedAt: string | null;
   updatedAt: string;
+  /** Ticket 217. Absent means nothing learned yet: the travel-habit defaults apply. */
+  habits?: TravelHabits;
+}>;
+
+export type TravelLeaveAnswer = "too_early" | "about_right" | "too_late";
+
+/** A remembered travel mode. The key is a digest of the place text; no text or position. */
+export type TravelPlaceMode = Readonly<{
+  placeKey: string;
+  mode: TravelMode;
+  chosenAt: string;
+}>;
+
+/** One leave-time answer. The event reference is a digest; no title, time or location. */
+export type TravelLeaveFeedback = Readonly<{
+  eventRef: string;
+  localDate: string;
+  answer: TravelLeaveAnswer;
+  answeredAt: string;
+  rulesVersion: string;
+}>;
+
+/**
+ * Ticket 217: learned only from what the user tells Cadence. Null minutes follow
+ * the versioned defaults. `updatedAt` is null until the first habit change and is
+ * the revision for habit writes, separate from the settings revision.
+ */
+export type TravelHabits = Readonly<{
+  preparationMinutes: number | null;
+  arrivalBufferMinutes: number | null;
+  placeModes: readonly TravelPlaceMode[];
+  leaveFeedback: readonly TravelLeaveFeedback[];
+  updatedAt: string | null;
 }>;
 
 export type TravelPoint =
@@ -85,6 +118,8 @@ export type TravelCommitment = Readonly<{
   endpoint: TravelEndpoint | null;
   mode: TravelMode | null;
   excluded?: boolean;
+  /** Ticket 217: digest of the destination text, used to remember a mode for this place. */
+  placeKey?: string | null;
 }>;
 
 export type TravelJourneyCorrection = Readonly<{
@@ -98,6 +133,12 @@ export type TravelBuffers = Readonly<{
   arrivalSeconds: number;
   exitSeconds: number;
   settlingSeconds: number;
+  /**
+   * Ticket 217 get-ready time before a leg that starts at Home or the current
+   * position. It occupies time before departure; it never moves the departure
+   * or the route request. Absent means zero.
+   */
+  preparationSeconds?: number;
 }>;
 
 export type TravelPlanningInput = Readonly<{
@@ -136,6 +177,8 @@ export type TravelPlannedLeg = Readonly<{
   journeyRef: string;
   originCommitmentRef: string | null;
   destinationCommitmentRef: string | null;
+  /** Ticket 217: the destination's place digest; null for the return home. */
+  destinationPlaceKey?: string | null;
   mode: TravelMode;
   readyAt: string;
   request: TravelRouteRequest;
@@ -191,7 +234,7 @@ export type TravelEvidenceInput = Readonly<{
 
 export type TravelOccupiedSegment = Readonly<{
   id: string;
-  kind: "commitment" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer";
+  kind: "commitment" | "preparation_buffer" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer";
   startAt: string;
   endAt: string;
   sourceRefs: string[];
@@ -217,6 +260,8 @@ export type TravelEvidenceLeg = Readonly<{
   journeyRef: string;
   originCommitmentRef: string | null;
   destinationCommitmentRef: string | null;
+  /** Ticket 217: lets the journey's mode choice name its place without any place text. */
+  destinationPlaceKey?: string | null;
   mode: TravelMode;
   readyAt: string;
   provenance: TravelLegProvenance;

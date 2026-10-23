@@ -1,6 +1,7 @@
 import { sha256 } from "../hash";
 import { parseArchiveNotes } from "./archive-note.resolver";
 import { NOTE_SHORTCUT_LIMITS, validateNoteShortcutState } from "./note-suggestion.resolver";
+import { travelHabitSyncJson, travelHabitsFromSyncValue } from "../services/travel-habits";
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
@@ -389,6 +390,8 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
       routing_consent_at: typeof value.routing_consent_at === "string" ? value.routing_consent_at : null,
       onboarding_completed_at: typeof value.onboarding_completed_at === "string" ? value.onboarding_completed_at : null,
       updated_at: typeof value.updated_at === "string" ? value.updated_at : null,
+      // Ticket 217 learned habits. Baselines saved before them read as nothing learned.
+      ...travelHabitSyncJson(profileTravelHabits(value)),
     });
     validateProfileSyncValue(normalized);
     return { kind: "profile", id: "profile", value: normalized };
@@ -413,6 +416,11 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     validateBehaviorPersistenceFields(value);
   }
   return { kind: entity.kind, id: entity.id, value };
+}
+
+function profileTravelHabits(value: Readonly<Record<string, Json | undefined>>) {
+  try { return travelHabitsFromSyncValue(value); }
+  catch { throw new Error("The synced travel habits are invalid."); }
 }
 
 function validateProfileSyncValue(value: Json): void {

@@ -255,6 +255,14 @@ Daily Brief mutation. A generated brief requests day scope once through the shar
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
 
+`GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
+or the Behavior's own place text, keyed by place key. Calendar-only places get no
+name. `PUT /api/travel/habits` accepts exactly `{ expectedUpdatedAt, change }` with one
+of four changes (get-ready time, arrival buffer, place mode, leave-time answer). The
+server derives the owner, plans the change with the shared core rules and compares
+the habit revision only; a stale revision returns 409. Neither method calls a
+provider or accepts an owner ID, position or route result.
+
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 
 `GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical

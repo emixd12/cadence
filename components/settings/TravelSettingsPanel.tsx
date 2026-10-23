@@ -5,6 +5,7 @@ import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
 import { readBrowserForegroundLocation, type ForegroundLocation } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
+import { TravelHabitsSection } from "./TravelHabitsSection";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -104,7 +105,8 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
         <div className="grid gap-1"><label htmlFor={`${id}-home`}>Home (optional)</label><input id={`${id}-home`} maxLength={500} value={home} onChange={(event) => setHome(event.target.value)} className="min-h-11 min-w-0 border-0 border-b border-line bg-background" autoComplete="off" /><p className="text-muted-readable">Use a full address. Trips home and Behaviors set to Home use it. Without Home, the trip back stays unknown.</p></div>
         <div className="grid gap-1 sm:max-w-xs"><label htmlFor={`${id}-mode`}>Usual travel</label><select id={`${id}-mode`} value={mode} onChange={(event) => setMode(event.target.value as TravelMode | "")} className="min-h-11 min-w-0 border-0 border-b border-line bg-background">{mode ? null : <option value="">Choose</option>}{TRAVEL_MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         <button type="button" onClick={() => { void save(settings.enabled); }} disabled={!changed} className="product-action product-action-primary min-h-11 w-fit">{pending ? "Saving…" : "Save travel settings"}</button>
-        <p className="text-muted-readable">Cadence saves only the places you enter. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
+        {client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={setSettings} /> : null}
+        <p className="text-muted-readable">Cadence saves only the places you enter and the travel habits you tell it. Device positions and route results stay temporary and never enter exports or synced backups. Travel places and route results are not sent to the Daily Brief model.</p>
         {desktop ? <p className="text-muted-readable">Saved places work offline. Route estimates need a linked account, a synchronized working copy and an internet connection.</p> : null}
         {permission ? <p className="text-muted-readable">Device location: {permission}.{permissionHint ? ` ${permissionHint}` : ""}</p> : null}
       </fieldset> : <p>Loading travel settings…</p>}

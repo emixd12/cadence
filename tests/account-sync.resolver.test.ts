@@ -241,6 +241,8 @@ describe("resolveAccountSync", () => {
       timezone: "America/New_York", travel_enabled: false, base_location_text: null,
       travel_mode: null, navigation_preference: null, routing_consent_at: null,
       onboarding_completed_at: null, updated_at: null,
+      travel_preparation_minutes: null, travel_arrival_buffer_minutes: null,
+      travel_place_modes: [], travel_leave_feedback: [], travel_habits_updated_at: null,
     });
   });
 

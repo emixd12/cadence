@@ -2,7 +2,7 @@
 
 import { combineExternalEventFreshness, projectExternalEventSchedulingEvent } from "@cadence/core/services/external-event-projection";
 import { CalendarDays } from "lucide-react";
-import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
+import type { TravelEvidenceResult, TravelLeaveAnswer, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { Temporal } from "@js-temporal/polyfill";
 import { useRefresh } from "@cadence/ui/runtime";
 import {
@@ -27,6 +27,8 @@ import type {
 
 import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming } from "./ExternalEventDetails";
 import { RecordedActivityList } from "./RecordedActivityList";
+import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
+import { TravelModeChoice } from "./TravelModeChoice";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
 import styles from "./day-progress-timeline.module.css";
@@ -35,6 +37,22 @@ import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlook
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
+import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
+import {
+  dismissTravelLeaveQuestion,
+  rememberTravelLeaveCandidates,
+  travelLeaveCandidates,
+  travelLeaveQuestionDismissed,
+  useTravelHabits,
+  type TravelHabitsState,
+} from "@/lib/ui/travel-habits";
+import {
+  resolveTravelHabits,
+  resolveTravelLeavePrompt,
+  routedOutboundCandidates,
+  travelArrivalPhrase,
+  travelLeaveSubjects,
+} from "@cadence/core/services/travel-habits";
 import type {
   OccurrenceFormAction,
   TimeTrackingFormAction,
@@ -53,6 +71,8 @@ export type DayProgressContext = Readonly<{
   travelMode?: TravelMode | null;
   navigationPreference?: TravelNavigationPreference | null;
   onTravelCorrection?: (correction: TravelCorrection) => void;
+  /** Ticket 217: saves learned habits (desktop: SQLite, then account synchronization). */
+  travelSettingsClient?: TravelSettingsClient | null;
   /** Ticket 238: today's recorded Hevy workouts, shown apart from Calendar markers. */
   recordedActivity?: HevyTimelineState | null;
   /** Ticket 238: status lines for calendar sources other than Google. */
@@ -172,6 +192,33 @@ export function DayProgressTimeline({
   useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
   useEffect(() => () => publishBriefTravel(null), []);
 
+  // Ticket 217: learned habits, the journey mode choice and the once-a-day leave-time question.
+  const habitsClient = context ? context.travelSettingsClient ?? null : liveCalendar ? webTravelSettingsClient : null;
+  const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence));
+  const usualTravelMode = context?.travelMode ?? liveTravel.view?.mode ?? null;
+  const travelAccountKey = travelStatus?.view?.accountId ?? travelAccountId;
+  const [, setLeaveDismissals] = useState(0);
+  const [leaveConfirmation, setLeaveConfirmation] = useState<string | null>(null);
+  useEffect(() => {
+    if (!travelAccountKey || !travel) return;
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    rememberTravelLeaveCandidates(travelAccountKey, timeline.todayLocalDate, routedOutboundCandidates(travel, travelLeaveSubjects({
+      localDate: timeline.todayLocalDate, evidence: travel, events: travelEvents, occurrences: today?.occurrences ?? [] })));
+  }, [travel, travelAccountKey, travelEvents, timeline.daySections, timeline.todayLocalDate]);
+  const leavePrompt = travelAccountKey && travelHabits.save && travelHabits.settings ? resolveTravelLeavePrompt({
+    now, localDate: timeline.todayLocalDate, habits: travelHabits.settings.habits,
+    candidates: travelLeaveCandidates(travelAccountKey, timeline.todayLocalDate),
+    dismissed: travelLeaveQuestionDismissed(travelAccountKey, timeline.todayLocalDate),
+  }) : null;
+  const answerLeaveTime = async (answer: TravelLeaveAnswer) => {
+    if (!leavePrompt || !travelHabits.save) throw new Error("The leave-time question is unavailable.");
+    const saved = await travelHabits.save({ kind: "leave_feedback", eventRef: leavePrompt.eventRef, localDate: leavePrompt.localDate, answer });
+    const arrival = travelArrivalPhrase(resolveTravelHabits(saved.habits).arrivalBufferMinutes);
+    const confirmation = answer === "about_right" ? `Saved. Cadence keeps planning to arrive ${arrival}.` : `Saved. Cadence now plans to arrive ${arrival}.`;
+    setLeaveConfirmation(confirmation);
+    return confirmation;
+  };
+
   const layout = useMemo(() => {
     const days = visibleSections.flatMap((section) => measured[section.localDate] ? [measured[section.localDate]!] : []);
     if (days.length !== visibleSections.length) return null;
@@ -277,6 +324,9 @@ export function DayProgressTimeline({
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
       <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} />
+      {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
+        onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
+        : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
       {layout && firstMeasured ? <DayOverlay
         layout={layout}
         measured={measured}
@@ -295,6 +345,8 @@ export function DayProgressTimeline({
         activeIds={activeIds}
         activity={section.localDate === timeline.todayLocalDate ? (context ? context.recordedActivity ?? null : hevy) : null}
         travel={travel}
+        travelHabits={travelHabits}
+        usualTravelMode={usualTravelMode}
         timezone={timeline.timezone}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel)}
         shortcutsByBehavior={shortcutsByBehavior}
@@ -331,6 +383,7 @@ export function DayProgressTimeline({
         onTravelCorrection={context?.onTravelCorrection ?? (liveTravel.view ? (correction) => {
           setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
         } : undefined)}
+        travelHabits={travelHabits}
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
@@ -347,6 +400,8 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   activity: HevyTimelineState | null;
   contexts: ReadonlyMap<string, TimelineOccurrenceContext>;
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
+  travelHabits?: TravelHabitsState | null;
+  usualTravelMode?: TravelMode | null;
   timezone: string;
   onMeasure: () => void;
   registerMeasurement: (date: string, measure: () => MeasuredDay) => () => void;
@@ -364,6 +419,8 @@ function DayProgressDay({
   activity,
   contexts,
   travel,
+  travelHabits,
+  usualTravelMode,
   timezone,
   onMeasure,
   registerMeasurement,
@@ -489,7 +546,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={contexts.get(occurrence.id)}
-                  travelDetails={renderTravelTiming({ eventId: occurrence.id, travel, timezone })}
+                  travelDetails={travelDetails(occurrence.id, travel, timezone, travelHabits, usualTravelMode)}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -635,6 +692,13 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
   } catch {
     return freshness.label;
   }
+}
+
+/** A located Behavior's travel timing and, for a journey to a place, its mode choice (Ticket 217). */
+function travelDetails(occurrenceId: string, travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined, timezone: string,
+  habits: TravelHabitsState | null | undefined, usualMode: TravelMode | null | undefined) {
+  const timing = renderTravelTiming({ eventId: occurrenceId, travel, timezone });
+  return timing ? <>{timing}<TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></> : null;
 }
 
 /** One status line for travel: observation time or failure copy, plus a manual refresh link. */
