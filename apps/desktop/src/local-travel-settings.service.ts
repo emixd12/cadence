@@ -13,6 +13,12 @@ export async function readLocalTravelSettings(): Promise<TravelSettings> {
   return normalizeInstants(await localCommand("readTravelSettings", { profileId: profile.id }));
 }
 
+/** Ticket 212: the setup guide learns only whether Home and usual travel exist. */
+export async function readLocalTravelSetupPresence(): Promise<{ hasHome: boolean; hasMode: boolean }> {
+  const settings = await readLocalTravelSettings();
+  return { hasHome: Boolean(settings.baseLocationText?.trim()), hasMode: settings.mode !== null };
+}
+
 export async function saveLocalTravelSettings(
   input: TravelSettingsSaveInput,
   now = Temporal.Now.instant(),

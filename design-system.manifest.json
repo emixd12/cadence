@@ -71,7 +71,7 @@
       "benchAnchor": "design-system#ds-flow-first-run-onboarding-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Timeline-only setup pop-up that routes into existing Behaviors, Settings, and Export controls."
+      "notes": "Timeline-only setup pop-up that routes into existing Behaviors, Settings, and Export controls. Ticket 212 adds the optional Home and travel row; the bench supplies a synthetic routing report and never calls the travel routes endpoint."
     },
     {
       "id": "flow.account-deletion-panel",

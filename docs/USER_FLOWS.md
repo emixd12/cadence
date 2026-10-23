@@ -188,6 +188,7 @@ Steps:
 2. Request browser notification permission.
 3. Import data when import exists.
 4. Point to Settings timezone confirmation when useful.
+5. Optionally save Home and usual travel where travel routing is configured.
 
 Onboarding should stay thin. It should reuse existing app controls and should
 not become a broad setup wizard. The Timeline may show a dismissible first-run
@@ -198,11 +199,19 @@ over the page instead of appearing before the feed. Its actions route to:
 - `/settings#notifications`
 - `/settings#timezone`
 - `/export#behaviorlog-import`
+- `/settings#travel`
 
 Import is optional and does not block setup completion.
-Planned under Ticket 212: an optional "Home and travel" item routes to
-`/settings#travel` for the home address and usual travel mode. It does not
-block setup completion and appears only where travel routing is configured.
+Home and travel (Ticket 212) is also optional and never blocks completion. It
+appears only after the deployment's `GET /api/travel/routes` report says routing
+is configured; that report calls no provider. The row opens the Travel settings
+section, where the user enters Home and chooses usual travel, then chooses Save
+travel settings. Saving sends nothing to Google, requests no device location and
+leaves the Travel estimates toggle unchanged. The row reads Saved once both
+values exist. The
+setup read carries only whether each value exists, never the Home text. On
+desktop the row needs a linked account to ask the deployment; local mode omits
+it, and Travel settings still saves both values offline.
 If browser notifications are denied or already blocked, that permission state
 counts as a completed onboarding decision because the app cannot unblock it from
 inside Cadence. The user can still use the tracker and may re-enable browser
@@ -919,8 +928,9 @@ Travel Settings supersedes steps 1–2 above with three inputs:
 
 Migration keeps every existing Behavior location as Where = A place with no
 provider call. Where joins Behavior configuration history and account sync. A
-Where suggestion (Ticket 216) never changes a Behavior on its own. Ticket 212
-reuses Home and usual travel in onboarding.
+Where suggestion (Ticket 216) never changes a Behavior on its own. First-run
+setup (Ticket 212) links to the same Home and usual travel controls at
+`/settings#travel`.
 
 ## Connect and disconnect an AI client
 

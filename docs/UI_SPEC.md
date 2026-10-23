@@ -264,7 +264,8 @@ records consent and asks for foreground location in the same click; it stays
 disabled, with one line of guidance, until usual travel is chosen. Save travel
 settings stores Home and usual travel. A device-location state line and the
 storage note follow. No separate consent checkbox, "saved base" wording, map-app
-selector or permission-check button.
+selector or permission-check button. The section carries the `travel` anchor
+that first-run setup opens (Ticket 212).
 
 The Behavior form shows Where after Description: a select with Not set (default),
 Anywhere, Home and A place. A place adds a required Place text field beside it.
@@ -320,11 +321,20 @@ current browser. It should:
 - Sit below the sticky mobile header on narrow screens and remain scrollable
   when the setup rows exceed the available height.
 - Link to the existing create-behavior, notification, timezone, and import
-  controls.
-- Treat import as optional.
+  controls, plus Travel settings where travel routing is configured.
+- Treat import and Home and travel as optional. Each optional row shows one
+  muted description line under its label.
+- Show Home and travel (Ticket 212) last, with a house icon, the action Open
+  travel and the line "Cadence uses these to estimate travel time to and from
+  located Behaviors and Calendar events." It reads Saved when Home and usual
+  travel both exist and Optional otherwise. Show it only after the deployment
+  reports travel routing as configured; while that answer is pending the web
+  pop-up waits rather than inserting the row later. The desktop guide opens at
+  once, asks only with a linked account and appends the row when the answer
+  arrives, so only Skip setup moves.
 - Never request notification permission on page load.
 - Use compact list rows, quiet dividers, and factual state labels such as Done,
-  Not enabled, Blocked, Confirmed, Review, and Optional.
+  Not enabled, Blocked, Confirmed, Review, Optional, and Saved.
 - Provide a Skip setup control.
 - Avoid motivational copy, progress gamification, an inline takeover, or a
   wizard.
@@ -583,8 +593,8 @@ Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.
 
 Public launch includes a short first-run onboarding flow. It reuses the same
-behavior form, notification permission control, import entry, and timezone
-settings rather than creating a separate onboarding product.
+behavior form, notification permission control, import entry, timezone
+settings, and Travel settings rather than creating a separate onboarding product.
 
 ## Recurrence editor
 
