@@ -6,6 +6,7 @@ import type {
   ExternalEventSourceTimezoneFallback,
   ExternalEventState,
 } from "./day-progress";
+import type { AdvisorTravelContext } from "./briefing-travel";
 import type { OccurrenceStatus } from "./database";
 
 export const ADVISOR_DAY_CONTEXT_VERSION = "1.0" as const;
@@ -225,6 +226,8 @@ export type AdvisorDayContextV1 = Readonly<{
   grantGeneration: number;
   cadence: AdvisorCadenceSource;
   connectors: Array<AdvisorCalendarConnector | AdvisorCalendarNotRequested>;
+  /** Ticket 219 travel facts. Omitted by contexts that predate it and by most synthetic fixtures. */
+  travel?: AdvisorTravelContext;
 }>;
 
 export type AdvisorOpaqueRef = (

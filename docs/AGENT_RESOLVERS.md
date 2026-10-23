@@ -284,7 +284,7 @@ pure owner with paired tests; current runtime owners are listed below.
 | Day-progress layout | `packages/core/src/resolvers/day-progress.resolver.ts` | Synthetic design bench, shared Timeline UI, web/desktop services, and resolver tests | UI calculating independent dot/span mappings, changing actual times for collision spacing, fixed 24-hour local days | `docs/UI_SPEC.md`, `docs/DATETIME_STRATEGY.md` | `tests/day-progress.resolver.test.ts` | Geometry and injected instants only; no DOM, clocks, providers, or writes |
 | Duration and external context | `packages/core/src/resolvers/timeline-context.resolver.ts` | Shared Timeline assembly, owner-scoped web/desktop services, synthetic fixtures, and resolver tests | Averaging sessions instead of Occurrences, treating unknown as zero, running samples, automatic decisions or schedule writes | `docs/PRODUCT_SPEC.md` | `tests/timeline-context.resolver.test.ts` | Positive stopped Completed totals, optional default duration, explicit unknown/freshness, half-open timed overlaps |
 | Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
-| Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and timing-only model projection |
+| Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts`, `tests/travel-model-projection.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and a conclusions-only model projection (Ticket 219) |
 
 - `packages/core/src/resolvers/timeline.resolver.ts` retains day selection,
   Needs decision, Occurrence status projection, and future-range ownership.
@@ -319,8 +319,13 @@ resolver receives injected instants, source revisions and grant revisions.
 
 `TravelEvidenceResult` is safe for API and UI use. It excludes route requests,
 coordinates, place IDs and saved location text. Its optional model projection
-contains timing and collision facts only. Callers must keep that projection
-disabled until Ticket 165 clears provider/model use.
+(`TravelTimingModelProjection` 2.0, Ticket 219) holds only Cadence's own
+conclusions: travel day, trips by destination ref with mode and a known/unknown
+estimate, and a fits/does_not_fit/unknown conclusion per unresolved Behavior.
+The resolver compares instants internally; no instant, duration, interval or
+provider field leaves it. An unknown or non-current leg makes every overlapping
+fit `unknown`, never free. Production routing still passes `disabled`; see the
+Ticket 219 section below for how conclusions reach model input.
 
 `resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
 affected by manual decisions, preserves unaffected estimates, and withholds a
@@ -475,7 +480,8 @@ windows and selected durations support individual fit observations only with
 complete relevant coverage. Resolved work stays out of remaining-work evidence.
 Day evidence never grants move permission. The existing inspector retains full
 evidence and rejection details; the model explains ranked supported findings.
-No travel evidence enters this boundary until its separate release gates pass.
+No travel evidence enters this boundary. Ticket 219 travel conclusions reach the
+model beside the plan, never through planner intervals.
 Ticket 239 adds optional `additionalCalendars` (Outlook or iCloud, each at most
 once) to the planner input. Their events are fixed blocks beside Google, and every
 requested Calendar source must be current and complete before a scheduling option
@@ -527,6 +533,39 @@ inspector; it does not return internal context. `daily-brief-consumer.ts` serial
 that same selected projection and owns Daily Brief policy 2.1 instructions.
 Recipe/policy versions contribute to the effective revision and result metadata.
 
+### Travel facts in Daily Brief model input (Ticket 219)
+
+Stage 1 implemented in source October 22, 2026. `docs/LEGAL.md` L-001 bounds it:
+Google route data reaches the model only as Cadence's own conclusions.
+
+- `packages/core/src/types/briefing-travel.ts` defines `AdvisorTravelContext`, the
+  optional `travel` block of a day context: Behavior Where (`not_set` means
+  "location not set"), routing on/off, usual travel, route conclusions or an
+  unavailable reason, and typed stage-2 slots for Tickets 216–218.
+- `validateAdvisorDayContext` closes that block: enums, refs already in the
+  context and bounded whole minutes or counts in the slots. It rejects any
+  instant, duration, extra field or free text.
+- `packages/core/src/services/briefing-travel.ts` owns `buildAdvisorTravelContext`
+  (stored preferences plus optional conclusions) and `projectBriefingTravelFacts`.
+  `projectBriefingContext` calls it to narrow the block to the facts the model
+  receives. Conclusions shaped by a Calendar event need the Calendar source;
+  a trip to an excluded stop withholds all conclusions, never part of them.
+- `scopeBriefingContext` drops travel, so the planner never sees it; planner
+  intervals would otherwise reveal travel timing.
+- `lib/services/briefing-account-context.service.ts` reads Where kinds and travel
+  settings, never place text, and fences them in `assertCurrent`. It never adds
+  route conclusions, so the account workbench sends no Maps-derived facts. The
+  live brief currently has no route evidence either: estimates stay on the client
+  and are never stored. Stage 2 decides how conclusions reach the live brief.
+- `lib/services/briefing-fixtures.ts` builds `travel_day` and `travel_unknown` from
+  invented places and estimates through the real travel resolver (Maps Terms
+  3.2.3(c)(vii)). `daily-brief-consumer.ts` appends `DAILY_BRIEF_TRAVEL_INSTRUCTIONS`
+  only when the facts carry travel.
+
+Paired tests: `tests/travel-model-projection.test.ts`, `tests/briefing-travel.test.ts`
+(including no route duration, departure, arrival or derived time pair in the full
+model payload) and `tests/briefing-account-context.test.ts`.
+
 ## Historical completion timing resolver
 
 `packages/core/src/resolvers/completion-timing.resolver.ts` owns sample eligibility,
@@ -560,8 +599,9 @@ Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
   one selected finding and the deterministic evidence line.
 - Ticket 170: `packages/core/src/services/brief-travel-guidance.ts` projects existing
   `travel.resolver.ts` evidence for display beside the brief, paired with
-  `tests/brief-travel-guidance.test.ts`. It never routes or estimates. Travel stays
-  out of model input; the model never recomputes intervals.
+  `tests/brief-travel-guidance.test.ts`. It never routes or estimates. Exact
+  leave-by times stay in that line; the model never recomputes intervals. Ticket
+  219 below owns the travel facts that may reach model input.
 - Ticket 173: `briefing-pipeline.ts` selects findings; `daily-brief-consumer.ts`
   validates the tip and drops quoted or unsupported Note themes;
   `daily-brief.service.ts` records a tip only after a completed, current attempt.

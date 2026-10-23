@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
-import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorOpaqueRef } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorTravelContext } from "@cadence/core/types/briefing-travel";
+import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
+import { storedBehaviorWhere } from "@cadence/core/services/behavior-where";
+import { buildAdvisorTravelContext } from "@cadence/core/services/briefing-travel";
+import { readBehaviorWhereKinds, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import type { BriefingAnalysisSource, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import { readAdvisorAnalysisRevision, readAdvisorAnalysisSnapshot } from "@/lib/db/advisor-analysis.repo";
 import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
@@ -129,7 +134,7 @@ export async function prepareAccountBriefingContexts(
   };
 
   const authorization = await readAuthorization();
-  const contexts = await readAdvisorDayContexts({
+  const capturedContexts = await readAdvisorDayContexts({
     caller,
     authorization,
     revalidateAuthorization: readAuthorization,
@@ -145,6 +150,12 @@ export async function prepareAccountBriefingContexts(
   });
   input.signal.throwIfAborted();
   const makeOpaqueRef = createAdvisorOpaqueRef(key, authorization);
+  // Ticket 219 stage 1: stored travel facts only. Route conclusions never come
+  // from this path, so the account workbench never sends Maps-derived facts.
+  const readTravel = () => readBriefingTravel(caller, authorization.behaviorIds, makeOpaqueRef);
+  const travel = await readTravel();
+  input.signal.throwIfAborted();
+  const contexts = capturedContexts.map((context) => withTravel(context, travel));
   const configurationRefs = Object.fromEntries(authorization.behaviorIds.map((behaviorId) => [
     workbenchBehaviorRef(caller.user.id, behaviorId),
     makeOpaqueRef("behavior", behaviorId),
@@ -194,6 +205,8 @@ export async function prepareAccountBriefingContexts(
         JSON.stringify(currentAuthorization) !== JSON.stringify(authorization)) {
       throw new DailyBriefError("context_changed");
     }
+    // Where edits do not change the Cadence revision, so travel facts are fenced directly.
+    if (JSON.stringify(await readTravel()) !== JSON.stringify(travel)) throw new DailyBriefError("context_changed");
     if (analysisRequest && await readAdvisorAnalysisRevision(caller.client, analysisRequest) !== analysisRevision) {
       throw new DailyBriefError("context_changed");
     }
@@ -204,6 +217,28 @@ export async function prepareAccountBriefingContexts(
   };
 
   return { contexts, assertCurrent, configurationRefs, preferences, analysisSource, tipFingerprint };
+}
+
+async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly string[], makeOpaqueRef: AdvisorOpaqueRef): Promise<AdvisorTravelContext> {
+  const [settings, behaviors] = await Promise.all([
+    readTravelSettingsRow(caller.client, caller.user.id),
+    readBehaviorWhereKinds(caller.client, caller.user.id),
+  ]);
+  const authorized = new Set(behaviorIds);
+  return buildAdvisorTravelContext({
+    routing: !!settings?.enabled && !!settings.routing_consent_at,
+    usualMode: settings?.mode ?? null,
+    behaviors: behaviors.filter((behavior) => authorized.has(behavior.id)).map((behavior) => ({
+      behaviorRef: makeOpaqueRef("behavior", behavior.id),
+      whereKind: storedBehaviorWhere({ where_kind: behavior.where_kind }).where_kind,
+    })),
+  });
+}
+
+/** Keeps only Behaviors this context carries, as the strict context validator requires. */
+function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext): AdvisorDayContext {
+  const refs = new Set([...context.cadence.occurrences.map(({ behaviorRef }) => behaviorRef), ...context.cadence.history.behaviors.map(({ behaviorRef }) => behaviorRef)]);
+  return validateVersionedAdvisorDayContext({ ...context, travel: { ...travel, behaviors: travel.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)) } });
 }
 
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {

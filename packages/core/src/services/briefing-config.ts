@@ -21,6 +21,7 @@ import { BRIEFING_ANALYSIS_LANE_IDS, type BriefingAnalysisLaneId } from "../type
 import type { BriefingAnalysisConfig } from "../types/briefing-config";
 import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
 import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "./advisor-day-context";
+import { projectBriefingTravelFacts } from "./briefing-travel";
 
 const TONES: readonly BriefingTone[] = ["calm", "warm", "matter_of_fact"];
 const DIRECTNESS: readonly BriefingDirectness[] = ["gentle", "balanced", "direct"];
@@ -139,7 +140,8 @@ export function serializeBriefingConfig(value: unknown): string {
 }
 
 export function scopeBriefingContext(contextValue: unknown, configValue: unknown): AdvisorDayContextV1 {
-  const context = validateAdvisorDayContext(contextValue);
+  // The planner never sees travel (Ticket 219): its intervals would reveal travel timing.
+  const context = Object.fromEntries(Object.entries(validateAdvisorDayContext(contextValue)).filter(([key]) => key !== "travel")) as AdvisorDayContextV1;
   const config = parseBriefingConfig(configValue);
   if (context.cadence.history.lookbackDays !== config.scope.historyDays) {
     fail("Briefing context history does not match configuration.scope.historyDays.");
@@ -262,6 +264,13 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
   const recorded = (sourceContext.cadence.recordedElapsedDurations ?? []).filter(({ behaviorRef, localDate }) =>
     selectedBehaviors.has(behaviorRef) && localDate >= context.cadence.history.startLocalDate && localDate < context.cadence.history.endLocalDateExclusive);
   const recordedIncluded = config.context.includeRecordedElapsedDurations && recorded.length > 0;
+  const calendarInFacts = config.scope.includeCalendar && calendarIncluded;
+  const travel = sourceContext.travel ? projectBriefingTravelFacts(sourceContext.travel, {
+    occurrenceRefs: new Set(occurrences.map(({ ref }) => ref)),
+    behaviorRefs: new Set(occurrences.map(({ behaviorRef }) => behaviorRef)),
+    eventRefs: new Set(calendarInFacts && calendar && "events" in calendar ? calendar.events.map(({ ref }) => ref) : []),
+    calendarIncluded: calendarInFacts,
+  }) : null;
   const facts = {
     version: context.version,
     snapshotId: context.snapshotId,
@@ -286,11 +295,13 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
         recordedElapsedDurations: recorded,
       } : {}),
     },
-    ...(config.scope.includeCalendar && calendarIncluded ? { connectors: context.connectors } : {}),
+    ...(calendarInFacts ? { connectors: context.connectors } : {}),
+    ...(travel ? { travel: travel.facts } : {}),
   };
   return {
     facts,
     contextControls: {
+      ...(travel ? { travel: travel.control } : {}),
       calendar: control(config.scope.includeCalendar, config.scope.includeCalendar && calendarIncluded, calendarAvailable ? "available" : "unavailable"),
       completionHistory: control(config.context.includeCompletionHistory, config.context.includeCompletionHistory, context.cadence.history.completeness === "complete" ? "available" : "unavailable"),
       historicalCompletionTimes: control(config.context.includeHistoricalCompletionTimes,
