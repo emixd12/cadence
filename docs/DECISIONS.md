@@ -952,6 +952,63 @@ This decision authorizes the tickets. It authorizes no hosted migration push,
 signing-key import, deployment, legal publication, or directory submission. Those
 remain owner-only actions.
 
+## 2026-10-17: Travel redesign budget, Behavior Where and model input
+
+The travel review found hosted routing stopped since September 25 because the
+nonrenewing 40-refresh pilot budget ran out. The owner decided:
+
+- Travel spend has an absolute ceiling of US$5 per user per month at Google list
+  price. The ceiling is permissive; the design should spend well below it.
+- Behavior Where is optional: Not set, Anywhere, Home or a saved place. Not set
+  differs from Anywhere. Cadence may suggest a Where from completion place labels
+  stored only after a separate opt-in. A suggestion never changes a Behavior.
+- The Daily Brief model receives slow-changing travel facts, learned travel habits
+  and a weather outlook. Core calculates all times. Exact leave-by times stay in the
+  calculated line beside the brief. Addresses, coordinates, place IDs and raw
+  provider responses never reach the model.
+- Travel Settings shrink to the toggle with its disclosure, Home and usual travel.
+  Learned values replace buffer settings.
+
+Tickets 213–219 record the scope. This decision approves product direction only.
+It grants no provider spending, migration, deployment, new provider or model-data
+transmission. The disclosure update and the Google terms review gate model input.
+
+## 2026-10-18: Google route data in model input; legal register
+
+The owner set a risk regime for Google Maps data in Daily Brief model input:
+
+- Cadence may send the model only its own deterministic conclusions derived from
+  Google route data. Examples: "run fits before the afternoon trip: yes", "travel
+  day", "the Home Behavior does not fit today because of travel".
+- It never sends route durations, rounded trip lengths, leave-by times, or anything
+  from which a route duration can be recovered. A departure time shown next to an
+  event time, for example, reveals the duration.
+- Exact timing stays in the calculated line beside the brief.
+- The owner accepts this as a business risk without asking Google first. Asking Google
+  in writing stays an open item.
+
+This replaces the Google terms review gate from the 2026-10-17 decision. The
+disclosure update still gates model input.
+
+The owner also created one legal register, [`docs/LEGAL.md`](LEGAL.md), for all legal
+matters and questions. Entry L-001 records this regime. Open questions from
+`docs/plans/2026-10-17-weather-provider-comparison.md` moved there.
+
+## 2026-10-18: Weather provider is Open-Meteo
+
+The owner selected Open-Meteo as Ticket 218's weather provider, as recommended in
+`docs/plans/2026-10-17-weather-provider-comparison.md`. Its CC BY 4.0 licence allows
+caching one forecast per area per hour, sharing it across users and sending derived
+facts to the model. It covers the world with hourly forecasts.
+
+- `docs/COSTS.md` assumes the API Standard plan at US$29 per month. The plan choice
+  stays open in `docs/LEGAL.md` entry L-008.
+- The weather area comes from the device position (`docs/LEGAL.md` entry L-002).
+- The Google Weather API would conflict with the regime above, because its forecast
+  facts would be Google content in model input.
+
+This selects the provider. Buying the plan and creating the API key wait for the
+owner's authorization when Ticket 218 is implemented.
 
 ## 2026-10-19: Accept hosted custody of the iCloud app-specific password
 
@@ -974,3 +1031,120 @@ supersedes the earlier choice of `Calendars.ReadBasic` as the least-privileged
 scope. Cadence still requests only the contract's fields and never downloads
 bodies, attachments or extensions; disclosures say Microsoft's permission is
 broader than what Cadence reads.
+
+## 2026-10-22: Travel budget posture confirmed
+
+Tickets 213–219. The owner confirmed the posture that the October 17 records marked as
+an assumption. The US$5 travel ceiling applies per user per calendar month, in the
+user's timezone, and covers Google Maps calls only. Hosting, the Daily Brief model and
+weather are tracked separately in `docs/COSTS.md`. This matches the implemented
+monthly ledger in Ticket 213. Recorded from the owner's October 22 decisions, relayed
+by the orchestrating agent session.
+
+## 2026-10-22: Privacy conflicts never block development before launch
+
+Until the pre-launch privacy pass, privacy, disclosure and marketing-language
+conflicts are logged in `docs/PRIVACY_CHANGES.md` and never block development.
+In-progress work proceeds as if no privacy policy constrains it. The pass is not yet
+ticketed. Provider-terms and licence questions stay in `docs/LEGAL.md`; `docs/LEGAL.md`
+L-011 moved to P-003. `AGENTS.md` ("Privacy changes") states the rule. This decision
+changes no hosted text and authorizes no deployment. Recorded from the owner's October
+22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 165 macOS location permission and directions test
+
+Signed Cadence for Mac 0.1.3 was published on October 22, 2026 (Tickets 115, 178 and
+181). In September testing of signed rc.3, macOS did not show the first location
+prompt; enabling Cadence by hand in Location Services worked
+(`docs/qa/travel-release.md`, September 29). That file records no 0.1.3 retest. The
+owner chose both options:
+
+- A: in-app guidance for the manual macOS permission path, System Settings › Privacy &
+  Security › Location Services › Cadence.
+- B: investigate why the first permission prompt does not appear.
+
+The navigation directions test runs after Ticket 215 deploys. Platform impact: desktop
+implements A and B; web, marketing and future mobile are not affected. Recorded from
+the owner's October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 216 "I'm here" place markers and confirmed starting values
+
+The owner chose option B. Place positions come from the user's own device: the user
+records an "I'm here" marker at Home or a saved place, through a UI that asks the user
+to record it. Cadence compares the completion position with those markers. It fetches
+no Google coordinates and compares nothing with them, which resolves `docs/LEGAL.md`
+L-003.
+
+- The distances and suggestion rules in Ticket 216 are confirmed as starting values.
+  They are versioned and auditable, so a later change is traceable.
+- The user chooses label retention from two or three options. This replaces the fixed
+  90-day proposal.
+- Full JSON export of labels and markers moves to backlog Ticket 244. It does not
+  block Ticket 216.
+- Privacy-text changes are logged as `docs/PRIVACY_CHANGES.md` P-001.
+
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 217 starting values confirmed
+
+The owner confirmed Ticket 217's proposed defaults and step sizes as starting values:
+a 10-minute get-ready time, a 5-minute arrival buffer, 5-minute feedback steps within
+0–30 minutes, and at most one leave-time question a day. Privacy-text changes for
+stored habits and feedback taps are logged as `docs/PRIVACY_CHANGES.md` P-002.
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 218 free Open-Meteo plan for testing and a fixed margin table
+
+- Development and testing use the free Open-Meteo plan. The paid API Standard plan is
+  required before commercial use; `docs/LEGAL.md` L-008 stays open until Cadence
+  subscribes.
+- The weather margin is a versioned, fixed table: minutes per weather condition, never
+  a share of trip time.
+- Privacy and attribution items are logged as `docs/PRIVACY_CHANGES.md` P-003.
+
+This supersedes the open plan choice in "2026-10-18: Weather provider is Open-Meteo".
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 219 disclosures logged, not blocking
+
+The Daily Brief model-data disclosure, the re-consent for travel, habit and weather
+facts, and the marketing language are logged as `docs/PRIVACY_CHANGES.md` P-004 to
+P-006. They do not block development. This supersedes, for development, the
+disclosure gate in "2026-10-17: Travel redesign budget, Behavior Where and model
+input" and "2026-10-18: Google route data in model input; legal register". The
+written question to Google about the `docs/LEGAL.md` L-001 regime is sent from
+info@identityscaffolding.com; L-001 stays accepted risk. Recorded from the owner's
+October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Ticket 219 live conclusions reach the brief through a signed token
+
+The owner chose Option A. The travel routes response carries a server-signed (HMAC)
+token that holds only Cadence's deterministic route and weather conclusions. The
+Daily Brief request returns the token, and the server verifies it before the
+conclusions enter model input. This needs a new server-only secret and makes no
+extra Google calls. Live conclusions reach the model only after the secret is
+provisioned.
+
+Option B, routing the day again during brief generation, was rejected: it adds paid
+calls and breaks Ticket 170's rule against extra paid routing merely to generate
+prose. The `docs/LEGAL.md` L-001 regime still applies, including its open point on
+yes/no conclusions that bound a route duration from one side. Privacy text: P-004 in
+`docs/PRIVACY_CHANGES.md`.
+
+Ticket 219 implements the token on the travel release train (PR #138). Platform
+impact: web hosts the token and its verification; linked desktop uses the same hosted
+routes and brief generation; marketing claims are reviewed under P-006; future
+mobile would use the hosted path. Recorded from the owner's October 23 decisions,
+relayed by the orchestrating agent session.
+
+## 2026-10-23: Place-label counts cover the suggestion window and full history
+
+Daily Brief model input carries per-Behavior place-label counts for two periods,
+labeled separately: the 60-day suggestion window and the user's full retained label
+history. This keeps the retention copy's promise that longer retention lets the
+advisor learn more. Counts carry no place keys, positions or text. Privacy text:
+P-001 and P-004 in `docs/PRIVACY_CHANGES.md`. Recorded from the owner's October 23
+decisions, relayed by the orchestrating agent session.
