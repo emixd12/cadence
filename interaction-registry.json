@@ -3430,11 +3430,12 @@
         }
       ],
       "availability": "Dismiss controls appear while the setup guide is visible. Desktop Settings can reopen the guide.",
-      "success_result": "Dismissal hides the guide and records localStorage when available. Show setup guide opens it for the current session.",
+      "success_result": "Dismissal hides the guide and records localStorage when available. Show setup guide opens it for the current session. While the guide shows, it reads the deployment's travel routing report (GET /api/travel/routes, no provider call) to decide whether the optional Home and travel row appears (Ticket 212).",
       "failure_result": "The pop-up still hides for the current render if localStorage is unavailable.",
       "effects": [
         "ui_state",
-        "local_preference"
+        "local_preference",
+        "network_request"
       ],
       "risk": "low",
       "confirmation": "none",
@@ -3509,7 +3510,8 @@
         "/behaviors#create-behavior",
         "/settings#notifications",
         "/settings#timezone",
-        "/export#behaviorlog-import"
+        "/export#behaviorlog-import",
+        "/settings#travel"
       ],
       "journeys": [
         "J04",
@@ -3522,7 +3524,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Create behavior, Enable notifications, Confirm timezone, or Import data setup row"
+          "control": "Create behavior, Enable notifications, Confirm timezone, Import data, or Home and travel setup row"
         }
       ],
       "variants": [
@@ -3545,9 +3547,14 @@
           "id": "import",
           "label": "Import data",
           "result": "Navigate to /export#behaviorlog-import."
+        },
+        {
+          "id": "travel",
+          "label": "Home and travel",
+          "result": "Navigate to /settings#travel (desktop: Settings, travel anchor). Optional; complete when Home and usual travel both exist. Shown only when the deployment reports travel routing as configured."
         }
       ],
-      "availability": "A row is actionable while its corresponding setup task is available for review.",
+      "availability": "A row is actionable while its corresponding setup task is available for review. Ticket 212: Home and travel appears only after GET /api/travel/routes reports routing configured (no provider call); desktop asks only with a linked account, so local mode omits it.",
       "success_result": "Navigates to the existing owning screen and fragment without performing the task automatically.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -3559,7 +3566,9 @@
         "components/onboarding/FirstRunOnboardingPanel.tsx",
         "apps/desktop/src/onboarding-guide.tsx",
         "apps/desktop/src/product.tsx#Product",
-        "apps/desktop/src/desktop-navigation.ts"
+        "apps/desktop/src/desktop-navigation.ts",
+        "lib/services/onboarding-model.ts",
+        "lib/ui/travel.ts#readTravelRoutingReport"
       ],
       "test_coverage": {
         "level": "indirect",
@@ -3567,9 +3576,10 @@
           "tests/onboarding.service.test.ts",
           "tests/ux-ticket-049-052-ui.test.tsx",
           "tests/desktop-settings-ui.test.tsx",
-          "tests/desktop-navigation.test.ts"
+          "tests/desktop-navigation.test.ts",
+          "tests/onboarding-travel.dom.test.tsx"
         ],
-        "notes": "Task resolution and client-state handling are automated, but activating the client-only setup links remains browser QA."
+        "notes": "Task resolution and client-state handling are automated. Ticket 212 DOM tests cover the Home and travel row, its routing gate and the desktop travel destination; activating the client-only setup links remains browser QA."
       },
       "platforms": {
         "web": {
@@ -3580,7 +3590,8 @@
           ],
           "evidence": [
             "tests/onboarding.service.test.ts",
-            "tests/ux-ticket-049-052-ui.test.tsx"
+            "tests/ux-ticket-049-052-ui.test.tsx",
+            "tests/onboarding-travel.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -3594,9 +3605,10 @@
             "tests/ux-ticket-049-052-ui.test.tsx",
             "tests/desktop-settings-ui.test.tsx",
             "tests/desktop-navigation.test.ts",
+            "tests/onboarding-travel.dom.test.tsx",
             "docs/qa/2026-08-30-desktop-native-boundary.md"
           ],
-          "reason": "Shared setup model and local navigation contracts pass. Native Open import reached the loaded import controls. Dismissal lifecycle is tracked separately."
+          "reason": "Shared setup model and local navigation contracts pass. Native Open import reached the loaded import controls. Dismissal lifecycle is tracked separately. Ticket 212 Home and travel needs a linked account for the routing report; native activation has not had installed QA."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -13281,7 +13293,8 @@
         "settings"
       ],
       "routes": [
-        "/settings"
+        "/settings",
+        "/settings#travel"
       ],
       "journeys": [
         "J14"
@@ -13293,7 +13306,7 @@
           "control": "Save travel settings"
         }
       ],
-      "availability": "Existing Settings; enabled after Home or usual travel changes. Route estimates remain deployment-gated.",
+      "availability": "Existing Settings; enabled after Home or usual travel changes. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
       "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
@@ -13310,7 +13323,8 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-settings.dom.test.tsx"
+          "tests/travel-settings.dom.test.tsx",
+          "tests/onboarding-travel.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
       },

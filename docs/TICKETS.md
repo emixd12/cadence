@@ -13236,8 +13236,10 @@ Execution evidence: `docs/qa/cadence-project-rename.md`.
 
 ## Ticket 212: Home address and usual travel in first-run onboarding
 
-Status: filed October 17, 2026 from owner direction during the travel review; planned,
-not started. Numbered after the iOS plan's proposed 189–211 range to avoid collisions.
+Status: implemented in source October 22, 2026 on the Ticket 215 branch; not deployed.
+It ships with Ticket 215's rollout and needs no migration. Browser and installed desktop
+QA of the setup row remain open. Filed October 17, 2026 from owner direction during the
+travel review. Numbered after the iOS plan's proposed 189–211 range to avoid collisions.
 Owner direction (October 17): onboarding scope includes the user's home address and how
 they usually travel. These are two of the three inputs the simplified travel design keeps
 in Settings; the third is the travel toggle.
@@ -13264,15 +13266,26 @@ Scope and acceptance:
 - Update `docs/USER_FLOWS.md`, `docs/UI_SPEC.md`, `interaction-registry.json` and
   onboarding model tests in the implementing change.
 
-Dependency: the travel routing budget is exhausted in production (see `STATUS.md`,
-October 17). The onboarding item adds no provider cost, but it is only useful after the
-travel redesign restores routing.
+Implementation notes (October 22):
+
+- "Routing configured" is the existing `GET /api/travel/routes` report, the same check
+  the Timeline uses. It reads server configuration and calls no provider. The setup
+  pop-up asks only while it will show, and a failed or slow answer (5 s) hides the row.
+- The web Timeline bundle reads Home and mode presence in a repository function that
+  returns two booleans. A failed read hides the row instead of failing Timeline.
+- The row is last in the list and reads "Saved" when complete, "Optional" otherwise.
+  Optional rows now take their one-line description from the shared model.
+- Owner decision (October 23): desktop local mode omits the row. Only a linked
+  account can ask the hosted deployment, and local mode cannot route. The Travel
+  settings panel still saves Home and usual travel offline in local mode.
 
 Platform impact:
-- Web: `lib/services/onboarding-model.ts`, `lib/services/onboarding.service.ts`, the
-  first-run setup pop-up and `components/settings/TravelSettingsPanel.tsx`.
-- Desktop: `apps/desktop/src/onboarding-guide.tsx` shares the onboarding model. Local mode
-  saves the address and mode offline; hosted estimates still need a linked account.
+- Web: `lib/services/onboarding-model.ts`, `lib/services/onboarding.service.ts`,
+  `lib/db/travelSettings.repo.ts`, `components/onboarding/FirstRunOnboardingPanel.tsx`
+  and the `travel` anchor in `components/settings/TravelSettingsPanel.tsx`.
+- Desktop: `apps/desktop/src/onboarding-guide.tsx` shares the onboarding model and reads
+  presence from local SQLite. The Travel settings panel saves the address and mode offline;
+  the row and hosted estimates need a linked account.
 - Marketing: not applicable; travel has no public copy before release acceptance.
 - Future mobile: carry the same item into the iOS plan's Settings and onboarding
   milestone (proposed Ticket 196).

@@ -22,6 +22,12 @@ Select Save travel settings after changing Home or usual travel. Clear Home and 
 to remove it. Calendar permission, routing consent, device permission and model
 disclosure are separate. Saving a place alone turns none of them on.
 
+First-run setup can open this section. Where this deployment has travel routing
+configured, **Set up Cadence** shows an optional **Home and travel** row; **Open
+travel** goes to Settings, Travel. The row reads **Saved** once Home and usual travel
+both exist. On the Mac app the row needs a linked account; in local mode, open
+Settings, Travel directly.
+
 Turning estimates on asks the browser or macOS for one foreground position. Cadence
 does not save that position or send it from this request. When location is denied,
 revoked, unavailable, stale or inaccurate, estimates start from Home or your previous

@@ -159,7 +159,11 @@ If replacement or reopen fails, Cadence restores the original database.
 ## Review setup
 
 The setup guide opens existing Behavior, notification, timezone, and optional
-import controls. It does not request permission or change tracking data on load.
+import controls. With a linked account and a deployment that has travel routing
+configured, it also shows an optional **Home and travel** row that opens
+Settings, Travel. Local mode omits that row; Settings, Travel still saves Home
+and usual travel offline. The guide does not request permission or change
+tracking data on load.
 **Dismiss setup** and **Skip setup** hide it using a local UI preference.
 **Show setup guide** in Settings reopens it for the current session. Controls
 for an unavailable preview screen remain disabled.

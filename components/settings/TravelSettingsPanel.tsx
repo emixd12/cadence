@@ -107,7 +107,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
     && (permission === "not yet allowed" || locationDenied || locationTimedOut);
   const permissionHint = permission && !locationHelp ? deviceLocationHint(permission, desktop) : null;
   const changed = settings ? (home.trim() || null) !== settings.baseLocationText || (mode || null) !== settings.mode : false;
-  return <SettingsPanel title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
+  return <SettingsPanel id="travel" title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
     <div className="grid max-w-2xl gap-4 text-sm leading-6">
       {settings ? <fieldset disabled={pending} className="grid min-w-0 gap-4">
         <div className="grid gap-1">

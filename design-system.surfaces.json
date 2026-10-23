@@ -445,12 +445,14 @@
       "id": "flow.first-run-setup",
       "name": "First-run setup",
       "tier": "flow",
-      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, and import controls.",
+      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, import, and travel controls.",
       "sharedContract": [
         "Never requests notification permission on page load",
         "Uses factual status labels without progress or reward language",
         "Links into existing app controls rather than creating a separate wizard",
-        "Import stays optional and does not block setup completion"
+        "Import stays optional and does not block setup completion",
+        "Home and travel stays optional, appears only when the deployment reports travel routing as configured, and reads presence flags rather than the Home text",
+        "Optional rows show one description line from the shared model"
       ],
       "surfaceImplementations": [
         {
@@ -484,7 +486,7 @@
             "docs/DESKTOP_BUILD.md"
           ],
           "implementationIds": [],
-          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress."
+          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress. Ticket 212: Home and travel reads presence from local SQLite and appears only when a linked account's hosted routing report says configured; local mode omits it."
         },
         {
           "surfaceId": "mobile",

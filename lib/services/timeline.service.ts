@@ -19,7 +19,10 @@ import {
 } from "@/lib/resolvers/timeline.resolver";
 import { resolvePersistedTimeline } from "@cadence/core/services/timeline.service";
 import { toTimeSession } from "@/lib/services/time-tracking.service";
-import { createFirstRunOnboardingState } from "@/lib/services/onboarding.service";
+import {
+  createFirstRunOnboardingState,
+  readFirstRunTravelSetup,
+} from "@/lib/services/onboarding.service";
 import { ensureUserOccurrencesFresh } from "@/lib/services/occurrence.service";
 import { reconcileMyDueBehaviorArchives } from "@/lib/services/behavior-lifecycle.service";
 import { readOccurrenceSyncState } from "@/lib/services/occurrence-sync-state.service";
@@ -62,11 +65,12 @@ export async function getTimelinePageBundleForUser(
 ): Promise<TimelinePageBundle> {
   const now = options.now ?? Temporal.Now.instant();
   await reconcileMyDueBehaviorArchives(supabase, userId);
-  const [profileTimezone, behaviors, importRuns, syncState] = await Promise.all([
+  const [profileTimezone, behaviors, importRuns, syncState, travel] = await Promise.all([
     readCachedProfileTimezone(supabase, userId),
     readCachedUserBehaviors(supabase, userId),
     readCachedBehaviorLogImportRuns(supabase, userId, 1),
     readOccurrenceSyncState(supabase, userId),
+    readFirstRunTravelSetup(supabase, userId),
   ]);
   const timeline = await getTimelineViewForUser({
     supabase,
@@ -84,6 +88,7 @@ export async function getTimelinePageBundleForUser(
       hasAnyBehavior: behaviors.length > 0,
       hasImportRuns: importRuns.length > 0,
       timezone: profileTimezone,
+      travel,
     }),
   };
 }
