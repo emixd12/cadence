@@ -13,13 +13,17 @@ const IMAGES = {
   inbucket: "mailpit:v1.22.3", realtime: "realtime:v2.103.2",
   rest: "postgrest:v14.12", storage: "storage-api:v1.60.4",
 };
-const imageFor = (service) => `public.ecr.aws/supabase/${IMAGES[service]}`;
-const NAMES = new Map(Object.keys(IMAGES).map((service) => [`supabase_${service}_${PROJECT}`, imageFor(service)]));
+// The CLI pulls from SUPABASE_INTERNAL_IMAGE_REGISTRY (default public.ecr.aws).
+// Both registries served identical manifest digests for every pin on October 23, 2026.
+const REGISTRIES = ["public.ecr.aws", "ghcr.io"];
+const imagesFor = (service) => REGISTRIES.map((registry) => `${registry}/supabase/${IMAGES[service]}`);
+const NAMES = new Map(Object.keys(IMAGES).map((service) => [`supabase_${service}_${PROJECT}`, imagesFor(service)]));
+const ALLOWED_IMAGES = new Set([...NAMES.values()].flat());
 const VOLUMES = new Map([[DB, "/var/lib/postgresql/data"], [`supabase_storage_${PROJECT}`, "/mnt"]]);
 const JOBS = new Map([
-  [imageFor("auth"), ["gotrue", "migrate"]],
-  [imageFor("storage"), ["node", "dist/scripts/migrate-call.js"]],
-  [imageFor("realtime"), ["/app/bin/realtime", "eval", '{:ok, _} = Application.ensure_all_started(:realtime)\n{:ok, _} = Realtime.Tenants.health_check("realtime-dev")']],
+  ...imagesFor("auth").map((image) => [image, ["gotrue", "migrate"]]),
+  ...imagesFor("storage").map((image) => [image, ["node", "dist/scripts/migrate-call.js"]]),
+  ...imagesFor("realtime").map((image) => [image, ["/app/bin/realtime", "eval", '{:ok, _} = Application.ensure_all_started(:realtime)\n{:ok, _} = Realtime.Tenants.health_check("realtime-dev")']]),
 ]);
 const CONFIG_KEYS = new Set("Hostname Domainname User AttachStdin AttachStdout AttachStderr ExposedPorts Tty OpenStdin StdinOnce Env Cmd Healthcheck ArgsEscaped Image Volumes WorkingDir Entrypoint NetworkDisabled MacAddress OnBuild Labels StopSignal StopTimeout Shell HostConfig NetworkingConfig".split(" "));
 const HOST_KEYS = new Set("Binds NetworkMode PortBindings RestartPolicy ExtraHosts".split(" "));
@@ -62,7 +66,7 @@ export function rewriteCreate(name, value) {
       binding.HostIp = "127.0.0.1";
     }
   }
-  if (name) requireSafe(NAMES.get(name) === body.Image);
+  if (name) requireSafe(NAMES.get(name)?.includes(body.Image) === true);
   else {
     requireSafe(JOBS.has(body.Image) && JSON.stringify(body.Cmd) === JSON.stringify(JOBS.get(body.Image)) &&
       inert(body.Entrypoint) && inert(body.ExposedPorts) && inert(body.Volumes) &&
@@ -75,10 +79,10 @@ export function rewriteCreate(name, value) {
       requireSafe(!env.has(key));
       env.set(key, entry.slice(index + 1));
     }
-    if (body.Image === imageFor("realtime")) requireSafe(env.get("DB_HOST") === DB && env.get("DB_PORT") === "5432" && env.get("DB_NAME") === "postgres");
+    if (imagesFor("realtime").includes(body.Image)) requireSafe(env.get("DB_HOST") === DB && env.get("DB_PORT") === "5432" && env.get("DB_NAME") === "postgres");
     else {
       let url;
-      try { url = new URL(env.get(body.Image === imageFor("auth") ? "GOTRUE_DB_DATABASE_URL" : "DATABASE_URL")); }
+      try { url = new URL(env.get(imagesFor("auth").includes(body.Image) ? "GOTRUE_DB_DATABASE_URL" : "DATABASE_URL")); }
       catch { requireSafe(false); }
       requireSafe(url.protocol === "postgresql:" && url.hostname === DB && url.port === "5432" &&
         url.pathname === "/postgres" && !url.search && !url.hash);
@@ -192,14 +196,14 @@ export function createDockerProxy(daemonSocket, onReject = (line) => console.err
         requireSafe(inert(bytes.length) && [...url.searchParams.keys()].every((key) => ["fromImage", "tag"].includes(key)));
         const image = url.searchParams.get("fromImage");
         const tag = url.searchParams.get("tag");
-        requireSafe([...NAMES.values()].includes(tag ? `${image}:${tag}` : image));
+        requireSafe(ALLOWED_IMAGES.has(tag ? `${image}:${tag}` : image));
       } else {
         const container = path.match(/^\/containers\/([^/]+)(?:\/(start|stop|restart|kill|wait))?$/);
         requireSafe(container && ((method === "POST" && container[2]) || (method === "DELETE" && !container[2])));
         const current = await inspect(`/containers/${encodeURIComponent(decodeURIComponent(container[1]))}/json`);
         if (!current) { reply(response, 404, "Cadence container not found."); return; }
         requireSafe(owned(current.Config?.Labels) && current.HostConfig?.NetworkMode === NETWORK &&
-          [...NAMES.values()].includes(current.Config?.Image));
+          ALLOWED_IMAGES.has(current.Config?.Image));
         if (["start", "restart"].includes(container[2])) {
           requireSafe(!current.HostConfig.PublishAllPorts && Object.values(current.HostConfig.PortBindings ?? {})
             .every((bindings) => Array.isArray(bindings) && bindings.every((binding) => binding.HostIp === "127.0.0.1")));

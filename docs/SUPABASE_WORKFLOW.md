@@ -94,7 +94,11 @@ service images and three initialization commands come from that version's
 [Dockerfile](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/pkg/config/templates/Dockerfile)
 and [schema initialization](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/internal/db/start/start.go).
 Review those pins before using a different CLI version. Do not widen the
-unnamed-job rule merely to bypass a rejected request.
+unnamed-job rule merely to bypass a rejected request. The proxy accepts each
+pinned tag from `public.ecr.aws/supabase` (the CLI default) or
+`ghcr.io/supabase`, which the CLI uses when `SUPABASE_INTERNAL_IMAGE_REGISTRY`
+is `ghcr.io`. On October 23, 2026 both registries served identical manifest
+digests for all seven pins. Recheck the digests before adding a pin.
 
 The proxy requires both exact project labels, project `habit-tracking-app`,
 and network `cadence-local`. It rewrites every explicit published binding to
