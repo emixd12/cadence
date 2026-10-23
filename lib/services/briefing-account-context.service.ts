@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
-import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext } from "@cadence/core/types/advisor-day-context";
 import type { BriefingAnalysisSource, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import { readAdvisorAnalysisRevision, readAdvisorAnalysisSnapshot } from "@/lib/db/advisor-analysis.repo";
 import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
@@ -18,6 +18,8 @@ import {
 } from "./advisor-day-context.service";
 import { assertBriefContextFresh, DailyBriefError } from "./daily-brief-consumer";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
+import { getConnectorConnection } from "./connector-credentials";
+import { getOutlookCalendarConnection } from "./outlook-calendar.service";
 
 const CLIENT_ID = "cadence-daily-brief";
 
@@ -42,9 +44,16 @@ export async function prepareAccountBriefingContexts(
     localDate?: string;
     /** Reads analysis history only when a configuration selects lanes. Optional sources also need their disclosure. */
     analysis?: Readonly<{ includeReminders: boolean; includeNotes: boolean }>;
+    /**
+     * Ticket 239: only the live Daily Brief passes this. Each source is read
+     * only with its own disclosure; `deadlineAt` (epoch ms) ends provider reads
+     * before the generation reserve. Workbench and history omit it, so older
+     * presets and evaluations never read a new source.
+     */
+    connectorSources?: Readonly<{ calendars: boolean; recordedActivity: boolean; deadlineAt: number }>;
   }>,
 ): Promise<Readonly<{
-  contexts: AdvisorDayContextV1[];
+  contexts: AdvisorDayContext[];
   assertCurrent: () => Promise<void>;
   configurationRefs: Record<string, string>;
   preferences: DailyBriefPreferences;
@@ -58,6 +67,10 @@ export async function prepareAccountBriefingContexts(
   input.signal.throwIfAborted();
   if (!preferences.enabled) throw new DailyBriefError("access_denied");
 
+  const sources = input.connectorSources;
+  const includeOutlook = !!sources?.calendars && preferences.includeOutlookCalendar;
+  const includeIcloud = !!sources?.calendars && preferences.includeIcloudCalendar;
+  const includeHevy = !!sources?.recordedActivity && preferences.includeHevy;
   const key = randomBytes(32);
   const grantExpiresAt = clock().add({ minutes: 5 }).toString();
   const readAuthorization = async (signal: AbortSignal = input.signal): Promise<AdvisorAuthorizationFence> => {
@@ -81,6 +94,28 @@ export async function prepareAccountBriefingContexts(
         selectionRevision: connection.selectionRevision,
       };
     }
+    // Each disclosed connector must still match the generation and selection it was granted for.
+    const connectorFence = async (provider: "outlook_calendar" | "icloud_calendar", generation: number | null, revision: number | null) => {
+      const connection = provider === "outlook_calendar" ? await getOutlookCalendarConnection(caller) : await getConnectorConnection(caller, provider);
+      signal.throwIfAborted();
+      if (connection.status !== "connected" || connection.generation !== generation || connection.selectionRevision !== revision) {
+        throw new DailyBriefError("context_changed");
+      }
+      return {
+        calendarIds: [...connection.preferences.selectedSourceIds].sort(),
+        connectionGeneration: connection.generation,
+        selectionRevision: connection.selectionRevision,
+      };
+    };
+    const outlookCalendar = includeOutlook ? await connectorFence("outlook_calendar", preferences.outlookConnectionGeneration, preferences.outlookSelectionRevision) : null;
+    const icloudCalendar = includeIcloud ? await connectorFence("icloud_calendar", preferences.icloudConnectionGeneration, preferences.icloudSelectionRevision) : null;
+    let hevy: AdvisorAuthorizationFence["hevy"] = null;
+    if (includeHevy) {
+      const connection = await getConnectorConnection(caller, "hevy");
+      signal.throwIfAborted();
+      if (connection.status !== "connected" || connection.generation !== preferences.hevyConnectionGeneration) throw new DailyBriefError("context_changed");
+      hevy = { connectionGeneration: connection.generation };
+    }
     return {
       userId: caller.user.id,
       clientId: CLIENT_ID,
@@ -89,6 +124,7 @@ export async function prepareAccountBriefingContexts(
       grantExpiresAt,
       behaviorIds,
       calendar,
+      ...(sources ? { outlookCalendar, icloudCalendar, hevy } : {}),
     };
   };
 
@@ -99,6 +135,7 @@ export async function prepareAccountBriefingContexts(
     revalidateAuthorization: readAuthorization,
     historyDays: input.historyDays,
     includeGoogleCalendar: input.includeCalendar && preferences.includeCalendar,
+    ...(sources ? { connectorSources: { outlookCalendar: includeOutlook, icloudCalendar: includeIcloud, hevy: includeHevy, deadlineAt: sources.deadlineAt } } : {}),
     includeRecordedElapsedDurations: input.includeRecordedElapsedDurations,
     includeHistoricalCompletionTimes: input.includeHistoricalCompletionTimes,
     localDate: input.localDate,
@@ -172,5 +209,9 @@ export async function prepareAccountBriefingContexts(
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {
   return left.enabled === right.enabled && left.includeCalendar === right.includeCalendar && left.revision === right.revision &&
     left.includeReminderHistory === right.includeReminderHistory && left.includeNotes === right.includeNotes &&
-    left.calendarConnectionGeneration === right.calendarConnectionGeneration && left.calendarSelectionRevision === right.calendarSelectionRevision;
+    left.calendarConnectionGeneration === right.calendarConnectionGeneration && left.calendarSelectionRevision === right.calendarSelectionRevision &&
+    left.includeOutlookCalendar === right.includeOutlookCalendar && left.outlookConnectionGeneration === right.outlookConnectionGeneration &&
+    left.outlookSelectionRevision === right.outlookSelectionRevision && left.includeIcloudCalendar === right.includeIcloudCalendar &&
+    left.icloudConnectionGeneration === right.icloudConnectionGeneration && left.icloudSelectionRevision === right.icloudSelectionRevision &&
+    left.includeHevy === right.includeHevy && left.hevyConnectionGeneration === right.hevyConnectionGeneration;
 }

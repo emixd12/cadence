@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "1.1.0",
+  "adapterVersion": "icloud-calendar-v1",
+  "accountId": "account-1",
+  "connectionGeneration": 2,
+  "source": "icloud_calendar",
+  "requestedRange": {
+    "startLocalDate": "2026-11-01",
+    "endLocalDate": "2026-11-03",
+    "timezone": "America/New_York",
+    "selectedCalendarIds": [
+      "calendar-1"
+    ]
+  },
+  "fetchedAt": "2026-11-01T13:00:00Z",
+  "completeness": "complete",
+  "freshness": {
+    "state": "current",
+    "refreshedAt": "2026-11-01T13:00:00Z",
+    "label": "Calendar current",
+    "canAssertNoOverlap": true
+  },
+  "capabilities": {
+    "calendar_listing": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "timed_events": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "all_day_events": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "recurrence": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "details": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "source_links": {
+      "support": "unsupported",
+      "permission": "unknown",
+      "availability": "unavailable"
+    }
+  },
+  "coverage": [
+    {
+      "calendarId": "calendar-1",
+      "startLocalDate": "2026-11-01",
+      "endLocalDate": "2026-11-03",
+      "paginationComplete": true,
+      "itemCount": 3
+    }
+  ],
+  "failures": [],
+  "events": [
+    {
+      "id": "icloud_calendar/account-1/calendar-1/uid-1/20261102T130000Z",
+      "providerEventId": "uid-1",
+      "logicalInstanceId": "icloud_calendar/account-1/calendar-1/uid-1/20261102T130000Z",
+      "calendarId": "calendar-1",
+      "source": "icloud_calendar",
+      "calendarName": "Personal",
+      "sourceTimezone": "America/New_York",
+      "sourceTimezoneFallback": "none",
+      "state": "confirmed",
+      "availability": "busy",
+      "currentUserResponse": null,
+      "revision": {
+        "availability": "available",
+        "providerUpdatedAt": "2026-10-28T10:00:00Z",
+        "providerEtag": "\"etag-1\""
+      },
+      "title": "Gym slot",
+      "description": "",
+      "location": "",
+      "sourceUrl": null,
+      "fieldAvailability": {
+        "description": "unsupported",
+        "location": "unsupported",
+        "organizer": "unsupported",
+        "attendees": "unsupported",
+        "conference": "unsupported",
+        "attachments": "unsupported",
+        "source_url": "unsupported"
+      },
+      "detailCompleteness": {},
+      "organizer": null,
+      "attendees": null,
+      "attendeesOmitted": false,
+      "conference": null,
+      "recurrence": {
+        "seriesId": "uid-1",
+        "originalStart": {
+          "kind": "timed",
+          "startAt": "2026-11-02T13:00:00Z"
+        }
+      },
+      "attachments": null,
+      "kind": "timed",
+      "startAt": "2026-11-02T13:00:00Z",
+      "endAt": "2026-11-02T13:45:00Z",
+      "endUnspecified": false,
+      "duration": {
+        "kind": "known",
+        "seconds": 2700
+      }
+    },
+    {
+      "id": "icloud_calendar/account-1/calendar-1/uid-2",
+      "providerEventId": "uid-2",
+      "logicalInstanceId": "icloud_calendar/account-1/calendar-1/uid-2",
+      "calendarId": "calendar-1",
+      "source": "icloud_calendar",
+      "calendarName": "Personal",
+      "sourceTimezone": "America/New_York",
+      "sourceTimezoneFallback": "request",
+      "state": "unknown",
+      "availability": "unknown",
+      "currentUserResponse": null,
+      "revision": {
+        "availability": "unavailable",
+        "providerUpdatedAt": null,
+        "providerEtag": null
+      },
+      "title": "Open-ended reminder",
+      "description": "",
+      "location": "",
+      "sourceUrl": null,
+      "fieldAvailability": {
+        "description": "unsupported",
+        "location": "unsupported",
+        "organizer": "unsupported",
+        "attendees": "unsupported",
+        "conference": "unsupported",
+        "attachments": "unsupported",
+        "source_url": "unsupported"
+      },
+      "detailCompleteness": {},
+      "organizer": null,
+      "attendees": null,
+      "attendeesOmitted": false,
+      "conference": null,
+      "recurrence": null,
+      "attachments": null,
+      "kind": "timed",
+      "startAt": "2026-11-03T14:00:00Z",
+      "endAt": "2026-11-03T14:00:01Z",
+      "endUnspecified": true,
+      "duration": {
+        "kind": "unknown",
+        "reason": "end_unspecified"
+      }
+    }
+  ],
+  "tombstones": [
+    {
+      "id": "icloud_calendar/account-1/calendar-1/uid-1/20261103T130000Z",
+      "providerEventId": "uid-1",
+      "logicalInstanceId": "icloud_calendar/account-1/calendar-1/uid-1/20261103T130000Z",
+      "calendarId": "calendar-1",
+      "source": "icloud_calendar",
+      "recurrence": {
+        "seriesId": "uid-1",
+        "originalStart": {
+          "kind": "timed",
+          "startAt": "2026-11-03T13:00:00Z"
+        }
+      },
+      "revision": {
+        "availability": "available",
+        "providerUpdatedAt": null,
+        "providerEtag": "\"etag-2\""
+      }
+    }
+  ]
+}

@@ -4,13 +4,24 @@ import { Temporal } from "@js-temporal/polyfill";
 import { ExternalLink, X } from "lucide-react";
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
+import type { ExternalEventSource, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigation";
 import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelCorrection } from "@/lib/ui/travel";
 
 import styles from "./day-progress-timeline.module.css";
+
+const SOURCE_NAMES: Readonly<Record<ExternalEventSource, string>> = {
+  google_calendar: "Google Calendar",
+  outlook_calendar: "Outlook Calendar",
+  icloud_calendar: "iCloud Calendar",
+};
+
+/** Ticket 238 source label for scheduled calendar events. */
+export function externalEventSourceName(source: ExternalEventSource): string {
+  return SOURCE_NAMES[source] ?? "Calendar";
+}
 
 type ExternalEventPreviewProps = Readonly<{
   id: string;
@@ -143,6 +154,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
           <article className="grid min-w-0 gap-2 text-sm leading-6">
             <p className="break-words">{event.description || unavailable(event, "description")}</p>
             <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3">
+              <dt className="font-bold">Source</dt><dd>{externalEventSourceName(event.source)}</dd>
               <dt className="font-bold">Calendar</dt><dd>{event.calendarName}</dd>
               <dt className="font-bold">Time</dt><dd>{eventTimeLabel(event, timezone)}</dd>
               <dt className="font-bold">Duration</dt><dd>{event.duration.kind === "known" ? `${event.duration.seconds / 60} minutes` : event.duration.kind === "calendar_days" ? `${event.duration.days} calendar days` : "Unknown"}</dd>

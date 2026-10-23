@@ -540,6 +540,71 @@ export type Database = {
         }
         Relationships: []
       }
+      connector_connections: {
+        Row: {
+          account_digest: string | null
+          attempt_hash: string | null
+          generation: number
+          provider: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          account_digest?: string | null
+          attempt_hash?: string | null
+          generation?: number
+          provider: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          account_digest?: string | null
+          attempt_hash?: string | null
+          generation?: number
+          provider?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      connector_preferences: {
+        Row: {
+          hidden_source_ids: string[]
+          provider: string
+          selected_source_ids: string[]
+          selection_revision: number
+          show_all_day: boolean
+          user_id: string
+          visible: boolean
+        }
+        Insert: {
+          hidden_source_ids?: string[]
+          provider: string
+          selected_source_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id: string
+          visible?: boolean
+        }
+        Update: {
+          hidden_source_ids?: string[]
+          provider?: string
+          selected_source_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_preferences_user_id_provider_fkey"
+            columns: ["user_id", "provider"]
+            isOneToOne: true
+            referencedRelation: "connector_connections"
+            referencedColumns: ["user_id", "provider"]
+          },
+        ]
+      }
       google_calendar_connections: {
         Row: {
           attempt_hash: string | null
@@ -1513,6 +1578,61 @@ export type Database = {
         }
         Returns: Json
       }
+      connector_begin_attempt: {
+        Args: {
+          client_nonce: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+          return_target: string
+          state_digest: string
+          verifier_ciphertext: string
+        }
+        Returns: number
+      }
+      connector_consume_attempt: {
+        Args: { provider_key: string; state_digest: string }
+        Returns: Json
+      }
+      connector_disconnect: {
+        Args: {
+          expected_generation: number
+          next_status: string
+          owner_id: string
+          provider_key: string
+        }
+        Returns: number
+      }
+      connector_install_credential: {
+        Args: {
+          credential_ciphertext: string
+          expected_generation: number
+          expected_state_hash: string
+          owner_id: string
+          provider_account_digest: string
+          provider_key: string
+        }
+        Returns: number
+      }
+      connector_read_credential: {
+        Args: {
+          expected_account_digest: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+        }
+        Returns: string
+      }
+      connector_replace_credential: {
+        Args: {
+          credential_ciphertext: string
+          expected_account_digest: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+        }
+        Returns: boolean
+      }
       consume_launch_rate_limit: {
         Args: { p_action: string }
         Returns: {
@@ -1878,6 +1998,19 @@ export type Database = {
           p_expected_revision: number
           p_include_calendar: boolean
           p_include_notes: boolean
+          p_include_reminder_history: boolean
+        }
+        Returns: Json
+      }
+      save_daily_brief_preferences_v3: {
+        Args: {
+          p_enabled: boolean
+          p_expected_revision: number
+          p_include_calendar: boolean
+          p_include_hevy: boolean
+          p_include_icloud_calendar: boolean
+          p_include_notes: boolean
+          p_include_outlook_calendar: boolean
           p_include_reminder_history: boolean
         }
         Returns: Json

@@ -15,8 +15,8 @@ Provider terms, data licences and the owner's legal risk decisions stay in
 
 ## Current text the entries cite
 
-- `components/settings/LegalContent.tsx`: the Privacy and Terms pages (both dated
-  October 18, 2026) and the Trust page (dated August 27, 2026).
+- `components/settings/LegalContent.tsx`: the Privacy page (dated October 21, 2026),
+  the Terms page (dated October 18, 2026) and the Trust page (dated August 27, 2026).
   `tests/legal-content.test.tsx` asserts parts of that text.
 - `docs/user-guide/*`: factual user guidance.
 - Marketing: `apps/marketing` (cadence-me.com), including `src/data/faq.ts`,

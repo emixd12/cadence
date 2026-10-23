@@ -54,8 +54,8 @@ synchronization.
 ## Use optional Calendar context on desktop
 
 Calendar requires a linked Cadence account and a desktop build configured with
-the Cadence HTTPS Calendar connector. Google's review of Calendar access is
-pending; the connector is not yet verified for public rollout. Local account-free
+the Cadence HTTPS Calendar connector. Deployment and installed-build acceptance
+require their own release evidence. Local account-free
 tracking remains available when Calendar is unavailable. The desktop app sends its existing
 Cadence account session to the Cadence server. Google credentials remain on the
 server and never enter the desktop app. The Cadence session and short-lived

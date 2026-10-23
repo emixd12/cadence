@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>/1234567/calendars/home/timed.ics</d:href>
+    <d:propstat>
+      <d:prop><d:getetag>"e-timed"</d:getetag><c:calendar-data><![CDATA[BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Synthetic//Cadence fixture//EN
+BEGIN:VEVENT
+UID:timed-1
+DTSTART:20261101T130000Z
+DTEND:20261101T134500Z
+END:VEVENT
+END:VCALENDAR
+]]></c:calendar-data></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/1234567/calendars/home/</d:href>
+    <d:status>HTTP/1.1 507 Insufficient Storage</d:status>
+  </d:response>
+</d:multistatus>
