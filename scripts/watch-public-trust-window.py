@@ -11,7 +11,7 @@ BASE = 'repos/emixd12/cadence'
 ENV = BASE + '/environments/public-trust-preview'
 POLICY = {'protected_branches': True, 'custom_branch_policies': False}
 TAG = 'trust-preview-diagnostic-232'
-SHA = '7735499e026b2dc3152107cca3092404bfd476ec'
+SHA = 'fe2af7eab9ffcedac48192a2be9573e14d7beb93'
 OWNER = 4998651
 
 

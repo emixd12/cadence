@@ -1226,7 +1226,7 @@ For an explicitly approved diagnostic access window, use the local cleanup tick
 in `scripts/watch-public-trust-window.py` and the hook source returned by
 `publicTrustWindowHook(directory)` from `scripts/public-trust-window-hook.mjs`.
 This is operator tooling, not application code or a workflow dispatch command.
-It is pinned to diagnostic revision `7735499`; changing that
+It is pinned to diagnostic revision `fe2af7e`; changing that
 revision requires review. Keep each window's baseline, control and restoration
 receipt in its own `.intent/artifacts/trust232/<window>` directory. Reuse the
 existing `one-run-control.json` and `one-run-policy-baseline.json` formats,

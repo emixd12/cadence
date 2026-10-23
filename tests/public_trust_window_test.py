@@ -101,11 +101,11 @@ class Cleanup(unittest.TestCase):
         self.assertIsNone(self.api.tag)
 
     def test_exact_final_pair_revision_restores(self):
-        self.assertEqual(m.SHA, '7735499e026b2dc3152107cca3092404bfd476ec')
+        self.assertEqual(m.SHA, 'fe2af7eab9ffcedac48192a2be9573e14d7beb93')
         self.finish()
 
     def test_old_revision_rejected_at_each_identity_boundary(self):
-        previous = '3a2ea7d73d8b643b67c194bebdcb2714a8661860'
+        previous = '7735499e026b2dc3152107cca3092404bfd476ec'
         for boundary in ['control', 'run', 'tag']:
             with self.subTest(boundary=boundary):
                 self.setUp()
