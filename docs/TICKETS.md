@@ -13647,9 +13647,14 @@ Platform impact:
 
 ## Ticket 218: Weather provider selection and travel margin
 
-Status: filed October 17, 2026; planned. The owner selected Open-Meteo on October 18,
-2026 (`docs/DECISIONS.md`). The plan choice stays open (`docs/LEGAL.md` L-008).
-Dependencies: 217 for the travel margin.
+Status: implemented in source October 22, 2026; not deployed. Weather stays off until
+the operator sets `CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`. The owner selected
+Open-Meteo on October 18, 2026 (`docs/DECISIONS.md`). On October 22 the owner chose the
+free API for development and testing, a versioned fixed margin table with starting
+values set by the orchestrator, and logging the privacy items instead of blocking.
+The paid plan before commercial use stays open (`docs/LEGAL.md` L-008).
+Dependencies: 217 for the travel margin. The weather margin is a separate resolver
+input, so Ticket 217's `preparationSeconds` combines with it at merge.
 Provider comparison: `docs/plans/2026-10-17-weather-provider-comparison.md` (October 17,
 2026). Its open legal questions moved to `docs/LEGAL.md`.
 
@@ -13685,6 +13690,51 @@ Platform impact:
 - Desktop: shares the hosted adapter through the linked account; no local provider call.
 - Marketing: review privacy claims before release.
 - Future mobile: inherits the hosted adapter.
+
+### Implementation, October 22, 2026
+
+- Rules: `packages/core/src/resolvers/weather-margin.resolver.ts` holds
+  `weather-margin@1` with the owner's starting values (`docs/PRODUCT_SPEC.md`, Weather
+  travel margin). The largest single matching margin applies; margins never stack.
+  Every margin records the table version. `tests/weather-margin.resolver.test.ts`
+  covers every row and its boundaries.
+- Departure window: the two hours before an arrival target, or after a fixed return
+  departure, taken from planned timing. Margins and conditions are identical for any
+  route duration (tested).
+- Timing: `resolveTravelEvidence` takes `weather` beside `buffers`. It adds a
+  `weather_margin` segment before an arrive-by departure or after a fixed-departure
+  arrival, and shifts final availability on the way home. Google estimates stay
+  unchanged.
+- Area: `resolveWeatherArea` rounds the request's device sample to a 0.1° grid. It
+  rejects samples older than 15 minutes or less accurate than 5 km. No other input can
+  become an area. Without one the state is `no_position`.
+- Provider: `lib/services/weather-provider.ts` (Open-Meteo, server-only config, Open-Meteo
+  hosts only, unit and shape validation, 4-second timeout).
+  `lib/services/weather-forecast.service.ts` keeps one 48-hour forecast per area per
+  UTC hour in server memory, shared across users, with joined in-flight requests. A
+  failure is not cached and never blocks routing. The cache is per server instance.
+- Presentation: travel timing, the Timeline travel status line and the Daily Brief
+  travel block show the adjusted time, the margin, any suggestion and the plain
+  no-weather line. `components/timeline/TravelWeather.tsx` renders the CC BY 4.0
+  credit (`INT-WEATHER-001`, design-system `composite.travel-weather-credit`).
+- Model-safe projection: `projectWeatherOutlook` (`weather-outlook@1`) in
+  `packages/core/src/services/weather-outlook.ts`, tested to carry no time, duration,
+  area or coordinate. Ticket 219 consumes it after its disclosure gate.
+
+Privacy surface entries (logged, not blocking; owner decision October 22):
+- Open-Meteo receives a 0.1° area (about 11 km) derived from the device position, plus
+  the request time. Its logs may hold that area and are deleted after 90 days
+  (`docs/LEGAL.md` L-011).
+- The shared hourly forecast cache holds the area key and forecast only, in server
+  memory, never with a user or account.
+- The Google notice on combining device location with another provider's data
+  (Maps Platform Terms 4.4(c)(iii), L-011) applies to the travel disclosure.
+- The privacy content, Settings travel disclosure and marketing privacy claims do not
+  name Open-Meteo yet. `docs/user-guide/travel.md#weather-margin` does.
+
+Remaining gates: privacy disclosure and Open-Meteo recipient text; the paid plan before
+commercial use; operator clearance per deployment; live Open-Meteo, deployed-web and
+installed-desktop acceptance; merging with Ticket 217's `preparationSeconds`.
 
 ## Ticket 219: Travel, habit and weather facts in Daily Brief model input
 

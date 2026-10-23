@@ -43,11 +43,11 @@ These costs do not grow with each user.
 | Apple Developer Program | US$99 per year | US$8.25 | Apple, not rechecked | — | Required for signed macOS builds. |
 | Domain `cadence-me.com` | About US$10–11 per year | About US$0.90 | Cloudflare Registrar, not verified | — | Replace with the renewal invoice amount. |
 | Sequenzy | Plan not recorded; public free allowance 2,500 emails per month | Unknown | [Sequenzy pricing](https://www.sequenzy.com/pricing) | 2026-08-01 | `docs/SEQUENZY_WORKFLOW.md` requires the owner to record the plan. |
-| Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$29, planned | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18; not subscribed. Plan confirmation open (`docs/LEGAL.md` L-008). |
-| **Total known** | | **About US$54 today; about US$83 with planned weather** | | | |
+| Open-Meteo API Standard (weather, Ticket 218) | US$29 per month for 1 million calls | US$0 while testing on the free API; US$29 before commercial use | [Open-Meteo pricing](https://open-meteo.com/en/pricing) | 2026-10-17 | Selected 2026-10-18. On 2026-10-22 the owner chose the free API for development and testing; API Standard is required before commercial use (`docs/LEGAL.md` L-008). Not subscribed. |
+| **Total known** | | **About US$54 today; about US$83 with the paid weather plan** | | | |
 
 Fixed cost per user: about US$5.42 at 10 users, US$0.54 at 100 users and
-US$0.05 at 1,000 users. With planned weather: about US$8.30, US$0.83 and US$0.08.
+US$0.05 at 1,000 users. With the paid weather plan: about US$8.30, US$0.83 and US$0.08.
 
 ## Variable costs per user per month
 
@@ -61,7 +61,7 @@ implement most of it in source; it is not deployed yet.
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
 | Daily Brief model | US$0.06 | US$0.13 | US$0.25 | Live |
-| Weather (Open-Meteo) | US$0 | US$0 | US$0 | Planned (Ticket 218); the fixed plan covers up to 1 million calls a month |
+| Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
 | Browser push, Google sign-in, Google Calendar API | US$0 | US$0 | US$0 | No per-call charge |
@@ -75,8 +75,9 @@ implement most of it in source; it is not deployed yet.
 | Daily Brief | US$0.06 | US$0.13 | US$0.25 |
 | **Total before payment fees** | **US$0.83–0.97** | **US$1.97–2.81** | **US$4.24–6.52** |
 
-Planned weather adds US$0.29 per user at 100 users: totals become US$1.12–1.26
-(light), US$2.26–3.10 (typical) and US$4.53–6.81 (heavy).
+The paid weather plan adds US$0.29 per user at 100 users: totals become US$1.12–1.26
+(light), US$2.26–3.10 (typical) and US$4.53–6.81 (heavy). The free testing API adds
+nothing.
 
 Typical users fit under US$5. Heavy drivers do not, unless a per-user travel
 limit applies (see proposals). Payment processing would take more on top of
@@ -200,13 +201,21 @@ usage as `unavailable`. Replace the assumptions with measured usage.
 
 ## Weather
 
-Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). Planned plan: API
-Standard, US$29 per month for 1 million calls, checked 2026-10-17 on
-[Open-Meteo pricing](https://open-meteo.com/en/pricing). Not subscribed yet.
+Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). On 2026-10-22 the owner
+chose the free API (no key) for development and testing. The free API is for
+non-commercial use only; API Standard, US$29 per month for 1 million calls (checked
+2026-10-17 on [Open-Meteo pricing](https://open-meteo.com/en/pricing)), is required
+before commercial use. Not subscribed. Switching needs only server configuration:
+`CADENCE_WEATHER_BASE_URL` and `CADENCE_WEATHER_API_KEY`. Weather stays off until
+`CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`.
 The comparison is in `docs/plans/2026-10-17-weather-provider-comparison.md`.
 
-Cadence requests one forecast per coarse area per clock hour and shares it across
-users. Requests per user before sharing, all assumed:
+Cadence requests one forecast per coarse area (0.1° grid) per clock hour and shares
+it across users. Each forecast covers 48 hours. The cache lives in server memory, so
+each running server instance fetches its own copy; multiply the figures below by the
+typical number of warm instances. Only a travel refresh with at least one leg and a
+usable device position requests weather. Requests per user before sharing, all
+assumed:
 
 | Assumption | Light | Typical | Heavy |
 | --- | --- | --- | --- |
@@ -216,8 +225,9 @@ users. Requests per user before sharing, all assumed:
 
 At 1,000 typical users that is about 180,000 requests a month; at 1,000 heavy
 users, about 490,000. Both fit the 1 million call plan, so weather adds no
-variable cost. The free tier allows 10,000 calls a day for non-commercial use only
-(`docs/LEGAL.md` L-008).
+variable cost. The free tier allows 10,000 calls a day, 5,000 an hour and 300,000 a
+month, for non-commercial use only (`docs/LEGAL.md` L-008); testing stays far below
+that.
 
 ## Payment fees
 
@@ -243,6 +253,8 @@ arrives, fees reduce the US$5:
 - 2026-10-18: Open-Meteo is the weather provider (Ticket 218). This file assumes
   the API Standard plan, US$29 per month; not subscribed. The plan choice stays open
   (`docs/LEGAL.md` L-008).
+- 2026-10-22: the free Open-Meteo API for development and testing; the paid API
+  Standard plan before commercial use (Ticket 218).
 
 ## Proposals awaiting owner decision
 
@@ -260,6 +272,9 @@ arrives, fees reduce the US$5:
   circuit breaker, place-ID storage and the three-hour routing window.
 - 2026-10-18: Recorded Open-Meteo as the weather provider (planned US$29 fixed
   cost) and linked the model-input risk acceptance in `docs/LEGAL.md`.
+- 2026-10-22: Ticket 218 in source. Weather uses the free API for testing, one
+  48-hour forecast per area per hour per server instance, and costs nothing until the
+  paid plan starts.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

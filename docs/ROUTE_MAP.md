@@ -254,6 +254,10 @@ event revisions before and after provider work. It makes no tracking, Calendar, 
 Daily Brief mutation. A generated brief requests day scope once through the shared
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
+Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
+state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
+leg may carry its fixed weather margin. The server derives the weather area from the
+request's device sample only; the route accepts no area, forecast or provider URL.
 
 `GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
 or the Behavior's own place text, keyed by place key. Calendar-only places get no

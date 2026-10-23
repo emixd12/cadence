@@ -36,11 +36,12 @@ describe("brief travel guidance", () => {
       localDate: "2026-09-21", observedAt: "2026-09-21T13:00:00Z", expiresAt: "2026-09-21T15:30:00Z", attribution: "Google Maps",
       items: [
         { kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" },
-        { kind: "departure", at: "2026-09-21T14:30:00Z", label: "Dentist", mode: "driving" },
+        { kind: "departure", at: "2026-09-21T14:30:00Z", label: "Dentist", mode: "driving", weather: null },
         { kind: "return", at: "2026-09-21T16:40:00Z" },
       ],
       conflictingOptionIds: ["option-crowded"],
       occupiedSpans: [{ startAt: "2026-09-21T14:30:00Z", endAt: "2026-09-21T16:40:00Z" }],
+      weather: null,
     });
   });
 
@@ -49,7 +50,7 @@ describe("brief travel guidance", () => {
     const guidance = projectBriefTravelGuidance(input(withoutBase))!;
     expect(guidance.items).toEqual([
       { kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" },
-      { kind: "departure", at: "2026-09-21T14:30:00Z", label: "Dentist", mode: "driving" },
+      { kind: "departure", at: "2026-09-21T14:30:00Z", label: "Dentist", mode: "driving", weather: null },
       { kind: "return_unknown" },
     ]);
     expect(overlapsTravelSpans({ startAt: "2026-09-21T16:00:00Z", endAt: "2026-09-21T16:30:00Z" }, guidance.occupiedSpans)).toBe(true);
@@ -82,4 +83,19 @@ it("drops overlaps from a leg that is no longer current", () => {
   const legs = evidence().legs.map((item) => item.leg.id === "leg-out" ? { ...item, state: "stale" as const } : item);
   const guidance = projectBriefTravelGuidance(input(evidence({ legs })))!;
   expect(guidance.items.some((item) => item.kind === "overlap")).toBe(false);
+});
+
+it("shows the weather-adjusted departure, its fixed margin and the weather credit (Ticket 218)", async () => {
+  const { OPEN_METEO_ATTRIBUTION } = await import("@cadence/core/resolvers/weather-margin.resolver");
+  const legs = evidence().legs.map((item) => item.leg.id === "leg-out" ? { ...item, leg: { ...item.leg, mode: "cycling" as const }, weather: {
+    tableVersion: "weather-margin@1" as const, state: "margin" as const, conditions: ["rain" as const], marginSeconds: 600,
+    suggestion: { instead: "cycling" as const, alternatives: ["transit" as const] }, departureAt: "2026-09-21T14:20:00Z", arrivalAt: "2026-09-21T15:00:00Z",
+  } } : item);
+  const weather = { tableVersion: "weather-margin@1" as const, state: "applied" as const, forecastAt: "2026-09-21T13:05:00Z", attribution: OPEN_METEO_ATTRIBUTION };
+  const guidance = projectBriefTravelGuidance(input(evidence({ legs, weather })))!;
+  expect(guidance.items.find((item) => item.kind === "departure")).toEqual({ kind: "departure", at: "2026-09-21T14:20:00Z", label: "Dentist", mode: "cycling",
+    weather: { marginMinutes: 10, conditions: ["rain"], suggestion: { instead: "cycling", alternatives: ["transit"] } } });
+  expect(guidance.weather).toEqual({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION });
+  const noPosition = projectBriefTravelGuidance(input(evidence({ weather: { ...weather, state: "no_position", forecastAt: null, attribution: null } })))!;
+  expect(noPosition.weather).toEqual({ state: "no_position", attribution: null });
 });

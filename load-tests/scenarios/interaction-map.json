@@ -1494,6 +1494,11 @@
       "reason": "Choosing Where is an unsaved Behavior form draft."
     },
     {
+      "id": "INT-WEATHER-001",
+      "classification": "browser_only",
+      "reason": "Opening the Open-Meteo credit or licence is navigation with no Cadence mutation and sends no account facts."
+    },
+    {
       "id": "INT-TRAVEL-008",
       "classification": "destructive_serial_only",
       "reason": "A leave-time answer writes learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."

@@ -464,7 +464,7 @@
       "benchAnchor": "design-system#ds-module-day-progress-timeline",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Shared web/desktop Timeline with source-labeled Google and Outlook Calendar markers, a separate recorded-activity list, thin facet overlap borders and duration lines, and synthetic provider-free preview."
+      "notes": "Shared web/desktop Timeline with source-labeled Google and Outlook Calendar markers, a separate recorded-activity list, thin facet overlap borders and duration lines, and synthetic provider-free preview. Ticket 218 shows weather-adjusted leave times, fixed weather margins, mode suggestions and the plain no-weather status in the travel status line; bench fixtures cover thunderstorms and no device location."
     },
     {
       "id": "module.daily-brief-bubble",
@@ -478,7 +478,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench."
+      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block."
     },
     {
       "id": "module.daily-brief-settings-panel",
@@ -605,6 +605,20 @@
       "trackUsages": "optional",
       "status": "active",
       "notes": "Persistent bottom preview with title-aligned close control and reserved rendered height."
+    },
+    {
+      "id": "composite.travel-weather-credit",
+      "name": "TravelWeatherCredit",
+      "kind": "composite",
+      "source": "components/timeline/TravelWeather.tsx",
+      "exportName": "TravelWeatherCredit",
+      "usageNames": [
+        "TravelWeatherCredit"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-weather-credit",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 218: Open-Meteo CC BY 4.0 credit with site and licence links and the change note. It sits beside weather-margin lines in travel timing and the Daily Brief travel block; desktop opens links through onOpenExternal. Synthetic bench; no weather provider call."
     },
     {
       "id": "module.travel-settings-panel",

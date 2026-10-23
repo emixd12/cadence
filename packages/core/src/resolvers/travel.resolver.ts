@@ -25,6 +25,7 @@ import type {
   TravelUnknownLeg,
 } from "../types/travel";
 import { TRAVEL_EVIDENCE_VERSION } from "../types/travel";
+import { resolveTravelWeather } from "./weather-margin.resolver";
 
 const DEFAULT_MAX_DEVICE_AGE_SECONDS = 60;
 const DEFAULT_MAX_DEVICE_ACCURACY_METERS = 100;
@@ -188,7 +189,7 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
   for (const resultId of resultByLeg.keys()) {
     if (!plannedLegIds.has(resultId)) throw new Error("Travel route result must belong to the current plan.");
   }
-  const legs = input.plan.legs.map((leg): TravelResolvedLegEvidence => {
+  const routedLegs = input.plan.legs.map((leg): TravelResolvedLegEvidence => {
     if (!planRevisionCurrent || !grantCurrent) {
       return rejected(publicLeg(leg), "rejected_revision", "Journey or grant revision changed.");
     }
@@ -220,9 +221,13 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
       "Estimated arrival is after the planned arrival time."] } : result.estimate;
     return { leg: publicLeg(leg), state: "current", estimate, reason: null };
   });
+  // Ticket 218: the weather margin is its own input beside the buffers, never a share of the route.
+  const weather = resolveTravelWeather({ weather: input.weather, plannedLegs: input.plan.legs, legs: routedLegs,
+    now: input.now, current: planRevisionCurrent && grantCurrent });
+  const legs = weather.legs;
 
   const segments = planRevisionCurrent && grantCurrent
-    ? resolveSegments(input.plan.commitments, legs, input.buffers)
+    ? resolveSegments(input.plan.commitments, legs, input.buffers, weather.segments)
     : [];
   const occupiedSpans = mergeSegments(segments);
   const collisions = resolveTravelCollisions(segments, input.collisionCandidates);
@@ -232,7 +237,7 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     legs.every((entry) => entry.state === "current") &&
     returnLeg?.state === "current";
   const finalAvailabilityAt = completeTrip && returnLeg?.state === "current" && returnLeg.estimate
-    ? instant(returnLeg.estimate.arrivalAt, "Return arrival")
+    ? instant(returnLeg.weather?.arrivalAt ?? returnLeg.estimate.arrivalAt, "Return arrival")
         .add({ seconds: input.buffers.settlingSeconds })
         .toString()
     : null;
@@ -269,6 +274,7 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     collisions,
     completeTrip,
     finalAvailabilityAt,
+    ...(weather.summary ? { weather: weather.summary } : {}),
     modelProjection,
   };
 }
@@ -409,16 +415,17 @@ function resolveSegments(
   commitments: TravelCommitment[],
   legs: TravelResolvedLegEvidence[],
   buffers: TravelEvidenceInput["buffers"],
+  weatherSegments: readonly TravelOccupiedSegment[] = [],
 ): TravelOccupiedSegment[] {
   const commitmentsByRef = new Map(commitments.map((commitment) => [commitment.ref, commitment]));
-  const segments: TravelOccupiedSegment[] = commitments.flatMap((commitment) =>
+  const segments: TravelOccupiedSegment[] = [...weatherSegments, ...commitments.flatMap((commitment) =>
     commitment.endAt && Temporal.Instant.compare(
       instant(commitment.startAt, "Commitment start"),
       instant(commitment.endAt, "Commitment end"),
     ) < 0
       ? [segment(`commitment:${commitment.ref}`, "commitment", commitment.startAt, commitment.endAt, [commitment.ref], null)]
       : [],
-  );
+  )];
 
   for (const entry of legs) {
     if (entry.state !== "current" || !entry.estimate) continue;
@@ -433,7 +440,7 @@ function resolveSegments(
     // time ends at that earlier departure, so the two spans never overlap.
     const preparationSeconds = buffers.preparationSeconds ?? 0;
     if (leg.role === "outbound" && preparationSeconds > 0) {
-      const leaveAt = estimate.departureAt;
+      const leaveAt = entry.weather?.departureAt ?? estimate.departureAt;
       const start = instant(leaveAt, "Route departure").subtract({ seconds: preparationSeconds }).toString();
       segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start, leaveAt, sourceRefs, leg.id));
     }
@@ -453,10 +460,12 @@ function resolveSegments(
       segments.push(segment(`arrival:${leg.id}`, "arrival_buffer", start, destination.startAt, [destination.ref], leg.id));
     }
     if (leg.role === "return" && buffers.settlingSeconds > 0) {
-      const end = instant(estimate.arrivalAt, "Return arrival")
+      // Settling follows any weather margin on the way back.
+      const arrivedAt = entry.weather?.arrivalAt ?? estimate.arrivalAt;
+      const end = instant(arrivedAt, "Return arrival")
         .add({ seconds: buffers.settlingSeconds })
         .toString();
-      segments.push(segment(`settling:${leg.id}`, "settling_buffer", estimate.arrivalAt, end, sourceRefs, leg.id));
+      segments.push(segment(`settling:${leg.id}`, "settling_buffer", arrivedAt, end, sourceRefs, leg.id));
     }
   }
 

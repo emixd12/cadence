@@ -1,3 +1,5 @@
+import type { TravelLegWeather, TravelWeatherInput, TravelWeatherSummary } from "./weather";
+
 export const TRAVEL_EVIDENCE_VERSION = "1.0" as const;
 
 export type TravelMode = "walking" | "cycling" | "transit" | "driving";
@@ -226,6 +228,8 @@ export type TravelEvidenceInput = Readonly<{
   results: TravelLegResult[];
   collisionCandidates: TravelCollisionCandidate[];
   buffers: TravelBuffers;
+  /** Ticket 218 weather margin, kept apart from the buffers. Absent means weather is off. */
+  weather?: TravelWeatherInput | null;
   now: string;
   expectedJourneyRevision: string;
   expectedGrantRevision: string;
@@ -234,7 +238,7 @@ export type TravelEvidenceInput = Readonly<{
 
 export type TravelOccupiedSegment = Readonly<{
   id: string;
-  kind: "commitment" | "preparation_buffer" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer";
+  kind: "commitment" | "preparation_buffer" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer" | "weather_margin";
   startAt: string;
   endAt: string;
   sourceRefs: string[];
@@ -272,6 +276,8 @@ export type TravelResolvedLegEvidence = Readonly<{
   state: "current" | "unavailable" | "stale" | "rejected_revision";
   estimate: TravelRouteEstimate | null;
   reason: string | null;
+  /** Ticket 218: present when weather is on and the leg's revision is current. */
+  weather?: TravelLegWeather;
 }>;
 
 export type TravelTimingModelProjection = Readonly<{
@@ -303,6 +309,8 @@ export type TravelEvidenceResult = Readonly<{
   collisions: TravelCollisionEvidence[];
   completeTrip: boolean;
   finalAvailabilityAt: string | null;
+  /** Ticket 218: weather state and attribution; absent when weather is off. */
+  weather?: TravelWeatherSummary;
   modelProjection: TravelTimingModelProjection | null;
   /** Snapshot of future Behaviors, including resolved stops omitted from this plan. */
   behaviorSources?: readonly Readonly<{

@@ -157,6 +157,42 @@ the newest 30 answers.
 
 Learned habits synchronize with the account and belong in native Cadence database
 backups. They are not in exports yet; Home and usual travel are not either.
+## Weather margin
+
+When the deployment enables weather, each refresh also checks the forecast for the
+area around your device. Bad weather before a trip adds a fixed margin: leave
+earlier for an arrival, or expect to arrive later on a trip home. The margin is a
+set number of minutes per condition, never a share of the trip:
+
+| Condition | Margin | Suggestion |
+|---|---|---|
+| Thunderstorms | 15 min | Transit or driving instead of walking or cycling |
+| Snow | 15 min | Transit or driving instead of cycling |
+| Freezing rain or drizzle | 15 min | Transit or driving instead of cycling |
+| Heavy rain (4 mm an hour or more) | 15 min | Transit instead of walking or cycling |
+| Rain (0.5 mm an hour or more, or a 60% chance) | 10 min | Transit instead of cycling |
+| Extreme heat (feels like 35 °C or more) | 5 min | Transit instead of cycling |
+| Strong wind (gusts of 60 km/h or more) | 5 min | Transit instead of cycling |
+
+Only the largest matching margin applies; margins do not add up. Cadence reads the
+two hours before the arrival time, or the two hours after a fixed departure home.
+A suggestion appears only for the modes its row names. Travel timing shows the
+adjusted leave time with, for example, "Includes 10 min for rain." The credit
+"Weather data by Open-Meteo.com (CC BY 4.0)" sits beside those lines and links to
+Open-Meteo and the licence. Get-ready time ends at the adjusted leave time, so it
+moves earlier with the margin.
+
+Weather uses the device position only, so trips that start at another stop use the
+forecast for where you are now. Without a position there is no weather margin, and
+the status line says "No weather margin: device location is unavailable." When the
+forecast cannot be read, it says the forecast is unavailable. Travel estimates
+still work in both cases.
+
+Cadence rounds the position to a grid of 0.1° (about 11 km) and sends only that
+area to Open-Meteo. One forecast per area and hour is shared by everyone in that
+area and kept in server memory until the hour ends. It is never stored with your
+account, synced, exported or backed up. Open-Meteo deletes its request logs after
+90 days.
 
 ## Open navigation
 

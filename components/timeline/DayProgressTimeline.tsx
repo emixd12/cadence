@@ -26,6 +26,7 @@ import type {
 } from "@cadence/core/types/day-progress";
 
 import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming } from "./ExternalEventDetails";
+import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
@@ -348,6 +349,7 @@ export function DayProgressTimeline({
         travelHabits={travelHabits}
         usualTravelMode={usualTravelMode}
         timezone={timeline.timezone}
+        onOpenExternal={onOpenExternal}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel)}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
@@ -422,6 +424,7 @@ function DayProgressDay({
   travelHabits,
   usualTravelMode,
   timezone,
+  onOpenExternal,
   onMeasure,
   registerMeasurement,
   onPreview,
@@ -546,7 +549,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={contexts.get(occurrence.id)}
-                  travelDetails={travelDetails(occurrence.id, travel, timezone, travelHabits, usualTravelMode)}
+                  travelDetails={travelDetails(occurrence.id, travel, timezone, travelHabits, usualTravelMode, onOpenExternal)}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -696,8 +699,8 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
 
 /** A located Behavior's travel timing and, for a journey to a place, its mode choice (Ticket 217). */
 function travelDetails(occurrenceId: string, travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined, timezone: string,
-  habits: TravelHabitsState | null | undefined, usualMode: TravelMode | null | undefined) {
-  const timing = renderTravelTiming({ eventId: occurrenceId, travel, timezone });
+  habits: TravelHabitsState | null | undefined, usualMode: TravelMode | null | undefined, onOpenExternal?: (url: string) => void | Promise<void>) {
+  const timing = renderTravelTiming({ eventId: occurrenceId, travel, timezone, onOpenExternal });
   return timing ? <>{timing}<TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></> : null;
 }
 
@@ -723,7 +726,10 @@ export function travelStatusText(status: TravelState | null, fallbackMessage: st
   if (status.view?.evidence && status.observedAt) {
     const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
     const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
-    return message ? `${prefix} ${message}` : prefix;
+    const text = message ? `${prefix} ${message}` : prefix;
+    // Ticket 218: say plainly when no weather margin could be added.
+    const weather = travelWeatherStateText(status.view.evidence.weather?.state);
+    return weather ? `${text.endsWith(".") ? text : `${text}.`} ${weather}` : text;
   }
   return message;
 }

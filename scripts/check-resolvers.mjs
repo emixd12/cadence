@@ -66,6 +66,12 @@ const resolverRegistry = [
     source: "docs/TICKETS.md",
   },
   {
+    domain: "weather travel margin",
+    resolver: "packages/core/src/resolvers/weather-margin.resolver.ts",
+    test: "tests/weather-margin.resolver.test.ts",
+    source: "docs/TICKETS.md",
+  },
+  {
     domain: "Note shortcuts",
     resolver: "packages/core/src/resolvers/note-suggestion.resolver.ts",
     test: "tests/note-suggestion.resolver.test.ts",

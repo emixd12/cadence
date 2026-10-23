@@ -537,7 +537,8 @@
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
             "public/brand/google-calendar.svg",
-            "components/timeline/RecordedActivityList.tsx"
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "module.timeline",
@@ -551,9 +552,10 @@
             "composite.travel-mode-choice",
             "composite.travel-leave-question",
             "composite.external-event-preview",
-            "composite.recorded-activity-list"
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "marketing",
@@ -585,7 +587,8 @@
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
             "public/brand/google-calendar.svg",
-            "components/timeline/RecordedActivityList.tsx"
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "composite.occurrence-note-form",
@@ -594,9 +597,10 @@
             "composite.travel-mode-choice",
             "composite.travel-leave-question",
             "composite.external-event-preview",
-            "composite.recorded-activity-list"
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "mobile",
