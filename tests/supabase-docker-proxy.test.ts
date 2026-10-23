@@ -67,6 +67,16 @@ describe("Cadence Docker create policy", () => {
     expect(() => rewriteCreate(DB, null)).toThrow();
   });
 
+  it("accepts the same pinned images from GHCR and rejects any other registry", () => {
+    const ghcr = (image: string) => image.replace("public.ecr.aws/", "ghcr.io/");
+    expect(rewriteCreate(DB, { ...createBody(), Image: ghcr(createBody().Image) }).Image).toBe("ghcr.io/supabase/postgres:17.6.1.132");
+    for (const body of jobs) expect(rewriteCreate("", { ...body, Image: ghcr(body.Image) }).Cmd).toEqual(body.Cmd);
+    for (const image of ["docker.io/supabase/postgres:17.6.1.132", "supabase/postgres:17.6.1.132", "ghcr.io/supabase/postgres:latest", "ghcr.io/other/postgres:17.6.1.132"]) {
+      expect(() => rewriteCreate(DB, { ...createBody(), Image: image }), image).toThrow();
+    }
+    expect(() => rewriteCreate("", { ...jobs[0], Image: "docker.io/supabase/gotrue:v2.189.0" })).toThrow();
+  });
+
   it.each(jobs)("accepts the exact initialization command for $Image", (body) => {
     expect(rewriteCreate("", body).Cmd).toEqual(body.Cmd);
     expect(() => rewriteCreate("", { ...body, Cmd: ["sh", "-c", "arbitrary command"] })).toThrow();
@@ -186,6 +196,18 @@ describe("Docker HTTP forwarding against a fake Unix-socket daemon", () => {
       .toEqual(["/v1.47/containers/prune", "/volumes/prune"]);
     expect(rejections).toContain("POST /containers/prune (policy)");
     expect(rejections).toContain("POST /images/prune (policy)");
+  });
+
+  it("pulls only pinned images from the two Supabase registries", async () => {
+    const { send, received } = await setup();
+    for (const image of ["public.ecr.aws/supabase/postgres", "ghcr.io/supabase/postgres"]) {
+      expect((await send("POST", `/images/create?fromImage=${encodeURIComponent(image)}&tag=17.6.1.132`)).status, image).toBe(201);
+    }
+    for (const query of ["fromImage=docker.io%2Fsupabase%2Fpostgres&tag=17.6.1.132", "fromImage=ghcr.io%2Fsupabase%2Fpostgres&tag=latest",
+      "fromImage=ghcr.io%2Fsupabase%2Fpostgres&tag=17.6.1.132&platform=linux%2Famd64"]) {
+      expect((await send("POST", `/images/create?${query}`)).status, query).toBe(403);
+    }
+    expect(received.filter((request) => request.path.startsWith("/images/create"))).toHaveLength(2);
   });
 
   it("logs rejected methods and paths without query strings, bodies or private values", async () => {

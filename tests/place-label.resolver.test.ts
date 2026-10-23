@@ -310,7 +310,7 @@ describe("resolvePlaceLabelState", () => {
 });
 
 describe("projectPlaceLabelCounts", () => {
-  it("returns counts without place keys or positions", () => {
+  it("returns recent and retained counts without place keys or positions", () => {
     const labels = [
       { behaviorId: "b1", label: "home" as const, localDate: "2026-10-20" },
       { behaviorId: "b1", label: GYM_REF, localDate: "2026-10-20" },
@@ -319,7 +319,11 @@ describe("projectPlaceLabelCounts", () => {
       { behaviorId: "b1", label: "home" as const, localDate: "2026-06-01" },
     ];
     const [projection] = projectPlaceLabelCounts({ labels, behaviors: [{ id: "b1", whereKind: "place", locationText: "1 Gym Street" }], today: Temporal.PlainDate.from("2026-10-22") });
-    expect(projection).toEqual({ behaviorId: "b1", periodDays: 60, total: 4, atHome: 1, atWherePlace: 1, atOtherSavedPlace: 1, elsewhere: 1 });
+    expect(projection).toEqual({
+      behaviorId: "b1",
+      recent: { periodDays: 60, total: 4, atHome: 1, atWherePlace: 1, atOtherSavedPlace: 1, elsewhere: 1 },
+      retained: { total: 5, atHome: 2, atWherePlace: 1, atOtherSavedPlace: 1, elsewhere: 1 },
+    });
     expect(JSON.stringify(projection)).not.toContain("saved_place");
   });
 });

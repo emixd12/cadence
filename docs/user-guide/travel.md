@@ -195,3 +195,11 @@ its affected travel from the display without buying new estimates.
 When clearing a decision adds a stop absent from the cached trip, Cadence hides the
 old guidance and offers Refresh travel. A changed duration estimate does the same.
 Neither change calls Google Maps automatically.
+
+## Device location on the Mac
+
+Cadence for Mac 0.1.3, published October 22, 2026, is signed by the developer and
+notarized by Apple. macOS may not show a location prompt when you turn travel on. If
+Settings shows `Device location: not yet allowed`, open System Settings › Privacy &
+Security › Location Services, turn on Cadence, then return to Cadence. Estimates
+between known places still work without device location.

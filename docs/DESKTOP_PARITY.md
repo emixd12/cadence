@@ -331,7 +331,9 @@ offline. Foreground Core Location is implemented in `native/location.m`.
 Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390px
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
-`docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+`docs/qa/travel-release.md`. Signed Cadence for Mac 0.1.3 was published October 22,
+2026 (Tickets 115, 178 and 181); the manual macOS location permission path is handled
+under Ticket 165.
 
 
 Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and

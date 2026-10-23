@@ -122,6 +122,10 @@ while IFS= read -r volume; do
 done <<< "$volume_names"
 
 export SUPABASE_TELEMETRY_DISABLED=1 SUPABASE_ACCESS_TOKEN="" SUPABASE_DB_PASSWORD=""
+# Anonymous public.ecr.aws pulls hit "toomanyrequests" on some shared runner
+# addresses (October 22-23, 2026), failing both start attempts. GHCR serves the
+# same pinned manifests; the Docker proxy accepts exactly those images.
+export SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io
 export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-linux-x64/bin/supabase-go"
 test "$(npm run --silent supabase -- --version)" = 2.105.0
 

@@ -11,7 +11,8 @@ the design, the storage decision and the privacy surface entries.
 
 - Core: `packages/core/src/resolvers/place-label.resolver.ts` holds frozen
   `place-label-rules@1` and `where-suggestion-rules@1` with pinned tests, plus a
-  counts-only `projectPlaceLabelCounts` that nothing feeds to the model yet.
+  counts-only `projectPlaceLabelCounts` for the 60-day window and the full retained
+  history (October 23 decision) that nothing feeds to the model yet.
 - Storage: account-level, with RLS. Hosted migration
   `20261022160000_completion_place_labels.sql` adds four owner-scoped tables,
   opt-in and Completed-only triggers, deletion on opt-out and status change, a
@@ -43,7 +44,56 @@ Open: hosted migration after `20261019180000_add_behavior_where.sql`, then web, 
 a desktop release with schema 19 (older desktops fail closed on sync); iPhone
 Safari re-prompt check (needs the owner's simulator or device approval); installed
 signed-desktop CoreLocation acceptance; approved privacy text and marketing privacy
-review for the listed conflicts.
+review for the listed conflicts (`docs/PRIVACY_CHANGES.md` P-001). Full JSON export
+of labels and markers is backlog Ticket 244.
+
+## Travel decisions and privacy-change log — October 22, 2026
+
+Documentation only; no runtime, schema, hosted text or deployment change.
+
+- The owner's October 22 decisions on Tickets 165 and 216–219, the confirmed travel
+  budget posture and the privacy rule are recorded in `docs/DECISIONS.md`
+  (2026-10-22). The budget posture: US$5 per user per calendar month, in the user's
+  timezone, Google Maps calls only.
+- `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
+  privacy pass, privacy, disclosure and marketing-language conflicts are logged there
+  and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
+  219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
+  and the "saved base" wording that Ticket 215 renamed to Home. P-003 and P-004 now
+  also cover the draft Ticket 218 (PR #133) and Ticket 219 stage 1 (PR #132) reports;
+  P-001 and P-002 cover the draft Ticket 216 (PR #137) and 217 (PR #136) reports.
+  Entries use the status "logged". That pass is not yet ticketed.
+- `docs/LEGAL.md`: L-003 resolved by the "I'm here" marker design (option B); L-008
+  records the free Open-Meteo plan for development and testing and stays open until
+  API Standard is subscribed; L-011 moved to P-003; L-001's written question to
+  Google is sent from info@identityscaffolding.com and stays accepted risk.
+- October 23: the L-001 question went to Google as Maps Platform support case
+  76805292; L-001 awaits the reply and stays accepted risk.
+- October 23: `docs/DECISIONS.md` records two Ticket 219 owner decisions: live route
+  and weather conclusions reach the brief through a server-signed token (Option A),
+  and label counts cover both the 60-day window and the full retained history. P-001
+  and P-004 record the privacy effect.
+- Backlog Ticket 243 tracks six-leg refresh speed and a before/after comparison at
+  low priority; two-leg speed is confirmed. Backlog Ticket 244 adds place labels and
+  "I'm here" markers to Full JSON and does not block Ticket 216.
+- Signed Cadence for Mac 0.1.3 (published October 22) replaces the "blocked until
+  Developer ID signing" lines in the travel redesign intro, Ticket 214,
+  `docs/DESKTOP_PARITY.md` and `docs/user-guide/travel.md`. Ticket 165 handles the
+  manual macOS location permission path.
+- Three items that main already cited but never received are restored from local
+  uncommitted work, with the owner's approval: the `docs/DECISIONS.md` entries
+  "2026-10-17: Travel redesign budget, Behavior Where and model input", "2026-10-18:
+  Google route data in model input; legal register" and "2026-10-18: Weather
+  provider is Open-Meteo"; `docs/plans/2026-10-17-weather-provider-comparison.md`;
+  and the `docs/COSTS.md` line in the `AGENTS.md` source-of-truth list (item 28).
+  The October 22 entries and a dated note in the plan record what they supersede.
+
+Checks: `npm run agents:check`, `npm run interactions:check`,
+`npm run resolvers:check` and `git diff --check` pass. Lint is not applicable: the
+repository has no Markdown linter, and no source file changed.
+
+Platform impact: documentation for web, desktop and marketing; no implementation.
+Future mobile is not applicable.
 
 ## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
 
@@ -215,10 +265,14 @@ printed the rejection, hiding the real error. The proxy now forwards only this
 project's label-filtered container and volume prunes. It answers network prunes
 itself, so the shared network is never removed. It also logs every rejected
 request as method and path, and the script reports the most specific cause
-first. In CI no container survived either attempt. Those failures therefore
-happened before the database container existed, most likely while pulling
-images; their exact cause stays unverified until a failing run under the new
-logging.
+first. The first PR run under the new logging
+([run 39959055300](https://github.com/emixd12/cadence/actions/runs/39959055300))
+named the real cause: both attempts hit an image registry rate limit
+(`toomanyrequests` from `public.ecr.aws`), with no proxy rejection. A dispatched
+run on the same commit passed. The rehearsal now pulls from `ghcr.io/supabase`,
+which serves identical manifest digests for all seven pins. Locally the pinned
+CLI pulled all seven from GHCR through the proxy, kept loopback ports, and
+stopped cleanly.
 
 Native CI
 ([run 39571395232](https://github.com/emixd12/cadence/actions/runs/39571395232))

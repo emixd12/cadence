@@ -396,9 +396,7 @@ export function resolvePlaceLabelState(input: Readonly<{
   };
 }
 
-export type PlaceLabelCountProjection = Readonly<{
-  behaviorId: string;
-  periodDays: number;
+export type PlaceLabelCounts = Readonly<{
   total: number;
   atHome: number;
   /** At the saved place named by the Behavior's own Where. */
@@ -407,9 +405,18 @@ export type PlaceLabelCountProjection = Readonly<{
   elsewhere: number;
 }>;
 
+export type PlaceLabelCountProjection = Readonly<{
+  behaviorId: string;
+  /** The suggestion period: the last `periodDays` local days, today included. */
+  recent: PlaceLabelCounts & Readonly<{ periodDays: number }>;
+  /** Every label the user's retention choice still keeps. */
+  retained: PlaceLabelCounts;
+}>;
+
 /**
- * Ticket 219 input candidate: counts only, never place keys, positions or text.
- * Nothing calls this for model input yet.
+ * Ticket 219 input candidate: counts only, never place keys, positions or text. The
+ * owner's October 23 decision labels two periods separately, so longer retention
+ * gives the advisor more history. Nothing calls this for model input yet.
  */
 export function projectPlaceLabelCounts(input: Readonly<{
   labels: readonly Pick<CompletionPlaceLabel, "behaviorId" | "label" | "localDate">[];
@@ -421,16 +428,21 @@ export function projectPlaceLabelCounts(input: Readonly<{
   const first = input.today.subtract({ days: rules.periodDays - 1 }).toString(), last = input.today.toString();
   return input.behaviors.map((behavior) => {
     const own = placeRefForWhere(behavior);
-    const labels = input.labels.filter((label) => label.behaviorId === behavior.id && label.localDate >= first && label.localDate <= last);
-    const count = (predicate: (label: PlaceLabelValue) => boolean) => labels.filter((label) => predicate(label.label)).length;
+    const retained = input.labels.filter((label) => label.behaviorId === behavior.id && label.localDate <= last);
+    const counts = (labels: typeof retained): PlaceLabelCounts => {
+      const count = (predicate: (label: PlaceLabelValue) => boolean) => labels.filter((label) => predicate(label.label)).length;
+      return {
+        total: labels.length,
+        atHome: count((label) => label === "home"),
+        atWherePlace: count((label) => label !== "home" && label !== "elsewhere" && label === own),
+        atOtherSavedPlace: count((label) => label !== "home" && label !== "elsewhere" && label !== own),
+        elsewhere: count((label) => label === "elsewhere"),
+      };
+    };
     return {
       behaviorId: behavior.id,
-      periodDays: rules.periodDays,
-      total: labels.length,
-      atHome: count((label) => label === "home"),
-      atWherePlace: count((label) => label !== "home" && label !== "elsewhere" && label === own),
-      atOtherSavedPlace: count((label) => label !== "home" && label !== "elsewhere" && label !== own),
-      elsewhere: count((label) => label === "elsewhere"),
+      recent: { periodDays: rules.periodDays, ...counts(retained.filter((label) => label.localDate >= first)) },
+      retained: counts(retained),
     };
   });
 }
