@@ -721,6 +721,28 @@ Behavior still Unresolved at generation movable by default, within that day, for
 suggestions only. No movability setting is added. The Behavior's schedule is unchanged.
 The brief mentions a different time only as a suggestion backed by a planner option.
 Recipe 1.0, used by the production default, keeps explicit movability.
+Recipe 1.2 (Ticket 184 candidate 3, owner review October 23, 2026) keeps the 1.1 rules.
+The overview names problems once, with overlap and gap lengths in minutes and where
+each overlap falls (all of a Behavior, its start, its end or its middle), and
+never mentions a move, free time or a Behavior without a problem. Moves appear only as
+"New suggested time" blocks, at most three, one per Behavior. Behaviors that overlap a
+commitment come first, and chosen times keep the buffer from each other. Logging tips advise only on recording decisions. A quiet
+day shows only a history-based tip, or no brief. Recipe 1.2 drops next-day tip
+spacing: a different tip may follow the next day. One tip per day and the per-tip
+cooldown remain. Recipe 1.0 and 1.1 keep next-day spacing.
+Recipe 1.2 planning treats range-scheduled Behaviors as flexible: they never count as
+overlaps and are never moved. A range Behavior with a known or estimated length holds
+only that length, packed at the earliest free time in its span, so the rest of the span
+can take moves, including Behaviors whose time has passed today. A Behavior with no known or estimated length gets no
+suggestion and blocks nothing; Behaviors without a description are estimated from the
+title. When the model gives no tip, a deterministic "Setup tip" asks the user to add a
+typical length for the first such Behavior today. The recipe 1.2 estimate step covers
+every unresolved Behavior today and also returns `alongside`: whether the activity can
+usually happen during other activities. Such Behaviors get no moves and are never one
+side of a raised conflict; a recorded length still beats the estimate. Every planner
+move is shown, and the overview states each move's reason (overlap, too close, or its
+time has passed and it is still undecided). When the model returns no overview while
+moves are shown, Cadence writes one plain sentence per move from those reasons.
 Ticket 188 adds a third duration source for recipe 1.1 configurations that opt in. When
 neither the default duration nor tracked sessions are known, one separate model call
 estimates whole minutes (1–480) from the Behavior's title and description. Cadence

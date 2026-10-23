@@ -31,6 +31,9 @@ describe("selecting Behaviors to estimate", () => {
       { behaviorRef: "behavior_fixture", title: "Walk", description: "A 25 minute loop around the park." },
     ]);
     expect(selectDescriptionEstimateItems(context, v11, { behavior_fixture: "   " })).toEqual([]);
+    // Recipe 1.2 estimates from the title when there is no description.
+    const v12 = BRIEFING_PRESETS.find((item) => item.id === "advisor-analysis-3")!.config;
+    expect(selectDescriptionEstimateItems(context, v12, {})).toEqual([{ behaviorRef: "behavior_fixture", title: "Walk", description: "" }]);
     expect(selectDescriptionEstimateItems(context, parseBriefingConfig({ ...v11, scope: { ...v11.scope, behaviorRefs: [] } }), descriptions)).toEqual([]);
     const off = parseBriefingConfig({ ...v11, context: { ...v11.context, duration: { ...v11.context.duration, includeDescriptionEstimate: false } } });
     expect(selectDescriptionEstimateItems(context, off, descriptions)).toEqual([]);

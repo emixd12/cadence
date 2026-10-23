@@ -9,7 +9,7 @@ import { briefingFixture, BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type B
 import { BRIEFING_PIPELINE_VERSION, briefingConfigurationRevision, prepareBriefing } from "./briefing-pipeline";
 import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
 import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief, generateOpenAIDurationEstimates } from "./daily-brief-openai";
-import { DAILY_BRIEF_RECIPE_V1_1 } from "@cadence/core/types/briefing-config";
+import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { getDailyBriefSettings } from "./daily-brief.service";
 import { briefingAccountRef, prepareAccountBriefingContexts, workbenchBehaviorRef } from "./briefing-account-context.service";
@@ -98,7 +98,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         (savedMode && value.review === undefined)) throw new DailyBriefError("invalid_request");
     const configs = value.configs.map(parseBriefingConfig) as BriefingConfig[];
     // Ticket 188: descriptions leave the server only for configurations that estimate durations.
-    const estimating = configs.map((config) => config.recipe.version === DAILY_BRIEF_RECIPE_V1_1.version && config.context.duration.includeDescriptionEstimate === true);
+    const estimating = configs.map((config) => isPlainRecipe(config.recipe) && config.context.duration.includeDescriptionEstimate === true);
     const descriptionsConfirmed = accountMode && value.descriptionsConfirmed === true && estimating.some(Boolean);
     const review = value.review === undefined ? null : parseReview(value.review, configs.length);
     if (!generate && !process.env.OPENAI_API_KEY) return json({ error: "not_configured" }, 503);

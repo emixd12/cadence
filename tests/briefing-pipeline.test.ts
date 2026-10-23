@@ -96,7 +96,13 @@ it("supplies day evidence without movable Behaviors and never treats it as move 
     generate: async ({ facts, instructions, ...capabilities }) => {
       const payload = JSON.parse(facts);
       expect(Object.keys(capabilities)).toEqual(["signal"]);
-      expect(payload.plan.dayEvidence.findings).toEqual(prepared.plan.dayEvidence.findings);
+      // Overlap participants are recipe 1.2 input; recipe 1.0 receives the findings without them.
+      expect(payload.plan.dayEvidence.findings).toEqual(prepared.plan.dayEvidence.findings.map((finding) => {
+        if (finding.kind !== "known_overlap") return finding;
+        const rest: Record<string, unknown> = { ...finding };
+        delete rest.participants;
+        return rest;
+      }));
       expect(payload.plan).not.toHaveProperty("rejections");
       expect(instructions).toContain("independently of move permission");
       expect(instructions).toContain("Never calculate gaps, overlaps, transitions or fits");

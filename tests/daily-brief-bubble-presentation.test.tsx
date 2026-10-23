@@ -104,4 +104,32 @@ describe("Daily Brief visible text and quote validation", () => {
     legacy.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined} />);
     expect(legacy.querySelector('[data-tip-category="pattern"] p')?.textContent).toBe("Pattern tip");
   });
+
+  it("renders recipe 1.2 advice blocks with highlighted names, and hides an empty brief", () => {
+    const move = { intervals: { current: { startAt: "2026-11-01T17:30:00Z", endAt: "2026-11-01T17:50:00Z" }, proposed: option.intervals.proposed } } as BriefingPlanOption;
+    const laned: DailyBriefing = { ...briefing, text: "Walk overlaps your meeting by 20 minutes.", behaviorNames: ["Walk"],
+      versions: { configuration: "c", references: "r", planner: "p", pipeline: "x", recipe: "daily_brief@1.2" },
+      suggestions: [
+        { text: "This clears your meeting.", occurrenceRefs: [], referenceIds: [], optionId: "option-one", option: move, behavior: "Walk" },
+        { text: "", occurrenceRefs: [], referenceIds: [], optionId: "option-two", option: move, behavior: "Read" },
+      ],
+      tip: { ...briefing.tip!, text: "Mark Walk right after you finish.", category: "logging" } };
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={laned} onDismiss={() => undefined} />);
+    // One heading for all moves, each move a bullet with its times only.
+    const moves = container.querySelector('[aria-label="Suggestions only"]')!;
+    expect([...moves.querySelectorAll("p")].map((item) => item.textContent)).toEqual(["New suggested time"]);
+    expect([...moves.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
+      "Walk: 12:30 PM–12:50 PM → 12:00 PM–12:30 PM", "Read: 12:30 PM–12:50 PM → 12:00 PM–12:30 PM",
+    ]);
+    expect([...container.querySelectorAll("strong")].map((item) => item.textContent)).toEqual(["Walk", "Walk", "Read", "Walk"]);
+    expect(container.textContent).not.toContain("Suggested time:");
+
+    const empty: DailyBriefing = { ...laned, text: "", suggestions: [], tip: undefined };
+    expect(renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={empty} onDismiss={() => undefined} />)).toBe("");
+    const tipOnly = document.createElement("div");
+    tipOnly.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={{ ...laned, text: "", suggestions: [] }} onDismiss={() => undefined} />);
+    expect(tipOnly.querySelector('[role="status"]')).toBeNull();
+    expect(tipOnly.textContent).toContain("Logging tip");
+  });
 });

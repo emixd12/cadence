@@ -1057,6 +1057,12 @@ Tips from logging lanes (late logging, marking times, decisions with no record,
 corrections) use the label "Logging tip"; others keep "Pattern tip". The evidence line
 sits indented under its tip behind a hairline left border. Recipe 1.1 omits the
 "A pattern, not proof of a cause." limitation; the model still never claims a cause.
+Recipe 1.2 briefs (Ticket 184 candidate 3) show each kind of advice under one label.
+All moves share one "New suggested time" heading; each is a bullet such as
+"Walk: 12:30 PM–12:50 PM → 1:10 PM–1:30 PM", with no reason line; the overview never repeats the move. Behavior names render as compact chips. On a
+quiet day the bubble shows only the tip; with no tip either, no bubble appears.
+A "Setup tip" (recipe 1.2, written by Cadence) asks for a typical length for a Behavior
+with none, with its reason as the indented evidence line.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):

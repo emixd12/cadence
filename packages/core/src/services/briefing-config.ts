@@ -3,6 +3,7 @@ import {
   BRIEFING_CONFIG_VERSION,
   DAILY_BRIEF_RECIPE,
   DAILY_BRIEF_RECIPE_V1_1,
+  DAILY_BRIEF_RECIPE_V1_2,
   LEGACY_BRIEFING_CONFIG_VERSION,
   type BriefingConfig,
   type BriefingContextConfig,
@@ -66,9 +67,11 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
   if (config.version !== BRIEFING_CONFIG_VERSION) fail("configuration.version is unsupported.");
   const recipe = record(config.recipe, "configuration.recipe");
   exactKeys(recipe, ["id", "version"], "configuration.recipe");
-  // Recipe 1.1 needs the 1.3 fields; older configurations keep recipe 1.0.
-  const recipeV11 = current && recipe.id === DAILY_BRIEF_RECIPE_V1_1.id && recipe.version === DAILY_BRIEF_RECIPE_V1_1.version;
-  if (!recipeV11 && (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version)) {
+  // Recipes 1.1 and 1.2 need the 1.3 fields; older configurations keep recipe 1.0.
+  const candidateRecipe = current && recipe.id === DAILY_BRIEF_RECIPE.id
+    ? [DAILY_BRIEF_RECIPE_V1_1, DAILY_BRIEF_RECIPE_V1_2].find((item) => item.version === recipe.version) ?? null
+    : null;
+  if (!candidateRecipe && (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version)) {
     fail("configuration.recipe is incompatible with this configuration.");
   }
   const tone = oneOf(config.tone, TONES, "configuration.tone");
@@ -93,7 +96,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
   const historyDays = integer(scope.historyDays, "configuration.scope.historyDays", 1, 90);
   if (typeof scope.includeCalendar !== "boolean") fail("configuration.scope.includeCalendar must be a boolean.");
 
-  const context = parseContext(config.context, recipeV11);
+  const context = parseContext(config.context, candidateRecipe !== null);
 
   const referenceIds = uniqueIds(config.referenceIds, "configuration.referenceIds", 4);
   const planner = record(config.planner, "configuration.planner");
@@ -108,7 +111,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
 
   return {
     version: BRIEFING_CONFIG_VERSION,
-    recipe: recipeV11 ? DAILY_BRIEF_RECIPE_V1_1 : DAILY_BRIEF_RECIPE,
+    recipe: candidateRecipe ?? DAILY_BRIEF_RECIPE,
     tone,
     directness,
     encouragement,
@@ -272,15 +275,15 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
   };
 }
 
-function parseContext(value: unknown, recipeV11 = false): BriefingContextConfig {
+function parseContext(value: unknown, plainRecipe = false): BriefingContextConfig {
   const context = record(value, "configuration.context");
   exactKeys(context, ["includeCompletionHistory", "includeHistoricalCompletionTimes", "includeRecordedElapsedDurations", "duration"], "configuration.context");
   for (const key of ["includeCompletionHistory", "includeHistoricalCompletionTimes", "includeRecordedElapsedDurations"] as const) {
     if (typeof context[key] !== "boolean") fail(`configuration.context.${key} must be a boolean.`);
   }
   const duration = record(context.duration, "configuration.context.duration");
-  exactKeys(duration, ["includeHistoricalAverage", "includeConfiguredDefault", "preference", "fallback", ...(recipeV11 ? ["includeDescriptionEstimate"] : [])], "configuration.context.duration");
-  if (recipeV11 && typeof duration.includeDescriptionEstimate !== "boolean") fail("configuration.context.duration.includeDescriptionEstimate must be a boolean.");
+  exactKeys(duration, ["includeHistoricalAverage", "includeConfiguredDefault", "preference", "fallback", ...(plainRecipe ? ["includeDescriptionEstimate"] : [])], "configuration.context.duration");
+  if (plainRecipe && typeof duration.includeDescriptionEstimate !== "boolean") fail("configuration.context.duration.includeDescriptionEstimate must be a boolean.");
   if (typeof duration.includeHistoricalAverage !== "boolean" || typeof duration.includeConfiguredDefault !== "boolean") {
     fail("configuration.context.duration source controls must be booleans.");
   }
@@ -299,7 +302,7 @@ function parseContext(value: unknown, recipeV11 = false): BriefingContextConfig 
       includeConfiguredDefault: duration.includeConfiguredDefault,
       preference: duration.preference,
       fallback: duration.fallback,
-      ...(recipeV11 ? { includeDescriptionEstimate: duration.includeDescriptionEstimate as boolean } : {}),
+      ...(plainRecipe ? { includeDescriptionEstimate: duration.includeDescriptionEstimate as boolean } : {}),
     },
   };
 }

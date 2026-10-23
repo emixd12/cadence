@@ -13097,8 +13097,12 @@ The criteria and versioned profile `daily-brief-balanced@1` live in
 ten reserved cases and one seven-day sequence. Iteration 1 tuning pass 1 ran October 16,
 2026 (T1–T6, 12 calls). Owner feedback produced candidate 2: recipe `daily_brief@1.1`
 in preset `advisor-analysis-2`, with Behavior-description duration estimates under
-Ticket 188. Held-out cases, quality acceptance, promotion and rollback execution remain
-open. Phase 5 of the briefing-bench plan.
+Ticket 188. The owner reviewed candidate 2 on October 23 (account case plus T1–T6).
+That review produced candidate 3: recipe `daily_brief@1.2` in preset
+`advisor-analysis-3`, with labeled advice blocks, overlap lengths, highlighted Behavior
+names, empty quiet days and relaxed next-day tip spacing (owner decision October 23).
+Held-out cases, quality acceptance, promotion and rollback execution remain open.
+Phase 5 of the briefing-bench plan.
 Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
 174; do not duplicate or silently close their outstanding gates.
 
@@ -13144,7 +13148,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Existing hosted Daily Brief and 390 px acceptance; update existing QA and interaction evidence for changed behavior. |
-| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. |
+| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. Candidate 3's empty-brief hiding and labeled blocks are in the shared `DailyBriefBubble`. |
 | Marketing | No automatic copy change. Review existing claims only if the accepted production behavior changes them. |
 | Future mobile | Responsive web acceptance only; native mobile remains deferred. |
 

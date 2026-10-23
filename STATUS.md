@@ -1,5 +1,39 @@
 # Implementation Status
 
+## Ticket 184 candidate 3 — October 23, 2026
+
+In progress. The owner reviewed candidate 2 on the October 16 account comparison
+and T1–T6; the review is in `docs/qa/briefing-workbench.md`. Candidate 3 is recipe
+`daily_brief@1.2` in preset `advisor-analysis-3`. It keeps every 1.1 rule and adds:
+
+- One labeled block per advice type. A move reads "New suggested time" with the
+  Behavior and its current → new times, and no reason line (owner, October 23).
+- Overlap and gap lengths in whole minutes in the model input. The planner now reports
+  which part of each side an overlap covers (all, start, end or middle). The overview states
+  each problem once and never mentions moves, free time or Behaviors without a problem.
+- Behavior names as compact chips, from a deterministic `behaviorNames` list, never model markup.
+- Up to three moves, one per Behavior, overlaps first; chosen times keep the buffer
+  from each other (owner T2 review, October 23).
+- Range-scheduled Behaviors never form overlaps and are never moved; a known or estimated
+  length is packed at the earliest free time in the span, leaving the rest open for moves.
+  Unknown lengths block nothing; titles alone can be estimated (owner account review).
+- A deterministic Setup tip asks for a missing length when no other tip is shown.
+- The estimate step also flags Behaviors that can happen alongside other activities;
+  they get no moves or raised conflicts. Every planner move is shown with its reason;
+  Cadence writes the overview from those reasons if the model leaves it empty.
+- Logging tips advise only on recording. Tip text does not restate its evidence.
+- Quiet days show only a tip; with no tip, the bubble stays hidden.
+- Owner decision (October 23): recipe 1.2 drops next-day tip spacing. One tip per
+  day and the per-tip cooldown remain.
+
+Recipe 1.0 and 1.1 presets and the production default are unchanged. The owner
+preferred revision 3.9 on a live-account case (October 23). T3–T6 review, held-out
+cases, the seven-day sequence, acceptance and promotion remain open. A weighted
+Behavior profile for the model needs its own ticket. Rounds:
+`docs/qa/briefing-workbench.md`.
+Platform impact: web and linked desktop share the bubble and hosted generation; marketing
+and future mobile are not affected.
+
 ## Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026
 
 Four commits from October 16 never reached main: PR #83 merged a rewritten

@@ -701,3 +701,15 @@ It omits Timeline display controls and explains the separate model-data disclosu
 Recipe 1.1 briefs keep the bubble's sections and tokens. Option lines read "Suggested time".
 Logging-lane tips use the "Logging tip" label. The evidence line sits under the tip with a
 1px `border-line` left border and 12px indent. `DailyBriefBubbleBench` shows this state.
+
+## Daily Brief recipe 1.2 bubble — Ticket 184
+
+Recipe 1.2 briefs (candidate 3) group suggestions by type. Each group sits above a
+`border-line` hairline with one muted label, such as "New suggested time", and a
+disc-bulleted list (`list-disc`, 20px indent). A move bullet is the Behavior name and
+"current → new" times, with no reason line. Suggestions without a time use the label
+"Suggestion", one bullet each. Behavior names that Cadence lists in `behaviorNames` render as
+compact chips (1px `border-line`, `bg-surface` fill, 4px side padding, Ink text) in the
+overview, move line and tip. Weight stays 400 under the no-bold rule. A Cadence-written
+"Setup tip" uses the same tip block and label style. An empty overview is omitted; an empty brief renders no bubble.
+`DailyBriefBubbleBench` shows the 1.2 state after the 1.1 state.

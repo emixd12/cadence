@@ -1006,3 +1006,67 @@ Agent observation, not owner-reviewed: every brief shows "Suggestions only. No
 changes were applied." even when it has no suggestions.
 
 No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 3 (candidate 3), October 23, 2026
+
+Source: work on `claude/nostalgic-khayyam-34bf80` after `b7ea8af`, committed with this record. Rerun
+candidate on each saved T1–T6 case with `advisor-analysis-3` (recipe `daily_brief@1.2`,
+label "Candidate 3"), model `gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`.
+The local server ran at `127.0.0.1:4325`. 6 calls, 6 passed, none withheld.
+
+| Case | Words | Result |
+|---|---|---|
+| T1 | 35 | Overlap by 20 minutes; one New suggested time block (12:30 → 1:10 PM). |
+| T2 | 102 | Overlap length stated; one move for Behavior 6; a schedule-load Pattern tip. |
+| T3 | 37 | Same shape as T1. |
+| T4 | 89 | One move only (12:25 PM); the 7:00 AM opening is gone; a recording-only Logging tip. |
+| T5 | 51 | Tip only; no sentence about Walk's free slot. |
+| T6 | 0 | No brief shown: no conflict, and the fixture has no tip finding. |
+
+Agent observations, pending owner review: T4 repeats "minutes before your calendar event"
+in the overview and reason, and "ten minutes is preferred" reads mechanically. The T2
+tip is general advice. T6 shows nothing because the `no_issue` fixture offers no
+history finding, so the quiet-day tip path is exercised only by T5. Synthetic names
+such as "Synthetic behavior 6" give the effort rule nothing to judge. Product type is
+weight 400 only, so names use a Cold Surface fill instead of bold.
+
+### Ticket 184 iteration 1 — candidate 3 owner review rounds, October 23, 2026
+
+Same day, the owner reviewed candidate 3 revisions on T1–T2 and on a fresh account case.
+Exact comments are stored as feedback records in each local case.
+
+Synthetic: T1 preferred B, and later B 3.1. The owner asked for overlap placement
+(start, end, all), name chips, and no reason line under a move. T2 (3.2, no pick) asked
+for moves for every conflicting Behavior, not only the smallest change. T3–T6 were
+rerun but not reviewed in this round.
+
+Account case: live account data, captured 12:25 PM New York, with Calendar and
+owner-confirmed workbench-only descriptions. Later revisions reran on the same
+captured inputs and clock. A was `cadence-default` in every row.
+
+| Revision | Owner | What changed after it |
+|---|---|---|
+| 3.3 | B | No moves: one Behavior with no length blocked the rest of the day. The owner asked that unknown lengths block nothing, titles be estimated, a Setup tip nudge for lengths, and the noticed issues be fixed. |
+| 3.4 | — | Lost its estimate call to a stale dev-server module; not reviewed. |
+| 3.5 | B | The helmet overlap was still raised, a move had no reason, one move went unused, and a shortened name got no chip. All agreed. |
+| 3.6 | No pick | All moves went to Behaviors whose time had passed, and the overview was empty. The owner kept those moves: place them in future free time, and let ranges hold only their estimated length. |
+| 3.7 | — | Agent-found planner bugs: ranges were packed into the moved Behavior's slot, and colliding moves jumped to a later gap. |
+| 3.8 | No pick | Correct moves (12:25, 12:38, 1:18 PM). The owner asked for natural sentences instead of three near-identical ones. |
+| 3.9 | B | One combined overview sentence. The owner asked for one "New suggested time" heading with bullets, and for repetition review to ignore Behavior names. |
+
+The owner's broader request is a Behavior profile for the model, weighted per advice
+lane: description, category, duration, location and Note history. It is not implemented.
+It changes the day-context contract and disclosures, so it needs its own ticket.
+The first bullet of the owner's 3.3 feedback was cut off ("We should include") and is unresolved.
+
+Revision 3.9 also covers the 3.9 display follow-ups: one heading with bullets, and names
+skipped in repetition review. Medication timing: the owner kept moves for overdue
+Behaviors, including Daily Injections. Account runs used `cadence-ticket184-account-run`,
+the pre-Ticket-187 worktree, with this candidate patched in uncommitted. This branch's
+Ticket 187 Calendar migration is not on hosted.
+
+Verification at commit: agents, interactions, resolvers, design-system and core checks,
+lint with zero warnings, web and desktop TypeScript, Vitest (3,153 passed, 94 skipped) and
+the web build pass. Earlier full runs had one desktop release test file exceed its 5 s
+limit under load; it passed alone. No candidate is accepted. No production preset,
+schema or hosted change.

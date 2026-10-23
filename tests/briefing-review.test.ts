@@ -23,6 +23,26 @@ describe("briefing reading review", () => {
     expect(review.repeated).toEqual([{ between: ["overview", "tip"], phrase: "walk marks tend to come" }]);
   });
 
+  it("does not count a Behavior title in two parts as repetition, but still flags repeated advice", () => {
+    const title = "Physical Therapy in Red Light";
+    const nameOnly = reviewBriefingReading({
+      visibleText: "", behaviorTitles: [title],
+      segments: [
+        { label: "overview", text: `${title} was due at 10:00 AM and is still open.` },
+        { label: "tip", text: `Record the decision right after doing ${title}.` },
+      ],
+    });
+    expect(nameOnly.repeated).toEqual([]);
+    const advice = reviewBriefingReading({
+      visibleText: "", behaviorTitles: [title],
+      segments: [
+        { label: "overview", text: `For ${title}, record the decision right after you finish.` },
+        { label: "tip", text: `Try to record the decision right after you finish ${title}.` },
+      ],
+    });
+    expect(advice.repeated).toEqual([{ between: ["overview", "tip"], phrase: "record the decision right after" }]);
+  });
+
   it("flags internal vocabulary unless a Behavior title uses the word", () => {
     const segments = [{ label: "overview", text: "The planner found a move option. Run your Baseline stretch at noon." }];
     expect(reviewBriefingReading({ visibleText: "", segments }).mechanicsTerms).toEqual(["planner", "move option", "baseline"]);

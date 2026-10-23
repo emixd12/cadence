@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BriefingConfig } from "@cadence/core/types/briefing-config";
+import { isPlainRecipe, type BriefingConfig } from "@cadence/core/types/briefing-config";
 import { DAILY_BRIEF_POLICY_VERSION, type DailyBriefing, type DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import type { BriefingPlanOption } from "@cadence/core/types/briefing-plan";
 import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG, parseBriefingConfig } from "@cadence/core/services/briefing-config";
@@ -44,16 +44,26 @@ const RECIPE_V11_BENCH_BRIEFING: DailyBriefing = {
   versions: { configuration: "bench", references: "bench", planner: "1.1", pipeline: "3.0", recipe: "daily_brief@1.1", policy: "3.0" },
 };
 
+/** Static recipe 1.2 state: labeled New suggested time block, highlighted names, tip-only body. Not model output. */
+const RECIPE_V12_BENCH_BRIEFING: DailyBriefing = {
+  ...RECIPE_V11_BENCH_BRIEFING,
+  text: "Walk overlaps your meeting by 20 minutes.", behaviorNames: ["Walk"],
+  suggestions: [{ text: "This clears your meeting.", occurrenceRefs: [], referenceIds: [], optionId: "bench-option", behavior: "Walk",
+    option: { intervals: { current: { startAt: "2026-09-20T16:30:00Z", endAt: "2026-09-20T16:50:00Z" }, proposed: { startAt: "2026-09-20T17:10:00Z", endAt: "2026-09-20T17:30:00Z" } } } as BriefingPlanOption }],
+  tip: { ...RECIPE_V11_BENCH_BRIEFING.tip!, text: "Try marking Walk right after you finish it." },
+  versions: { ...RECIPE_V11_BENCH_BRIEFING.versions!, recipe: "daily_brief@1.2" },
+};
+
 /** Ticket 188: whether a configuration may send descriptions for duration estimates. */
 function estimatesDurations(config: BriefingConfig): boolean {
-  return config.recipe.version === "1.1" && config.context.duration.includeDescriptionEstimate === true;
+  return isPlainRecipe(config.recipe) && config.context.duration.includeDescriptionEstimate === true;
 }
 
 export function DailyBriefBubbleBench() {
   return <div className="bg-background"><div className="aspect-[1423/367] w-full overflow-hidden bg-background sm:aspect-[2041/239]"><picture className="block h-full w-full"><source media="(max-width: 639px)" srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png" /><img src="/brand/cadence-timeline-horse-lines-dots-clear-background.png" width={2041} height={239} alt="" aria-hidden="true" className="block h-full w-full object-fill" /></picture></div><div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={{
     text: `Your midday walk overlaps a fixed commitment. ${"schedule".repeat(260)}`, localDate: "2026-09-20", timezone: "America/New_York",
     generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
-  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
+  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V12_BENCH_BRIEFING} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
 }
 
 export function DailyBriefSettingsBench() {
@@ -403,7 +413,7 @@ export function DailyBriefWorkbench({ repositoryRoot = "" }: { repositoryRoot?: 
           <label className="flex min-h-11 items-center gap-2"><input aria-label={`${label} ${index + 1}`} type="checkbox" checked={config.context.duration[field]} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, [field]: event.target.checked } } })} />{label}</label>
           <a className="inline-flex min-h-11 items-center text-sm underline" href={`#briefing-term-config.context.duration.${field}`}>Definition</a>
         </div>)}
-        {config.recipe.version === "1.1" ? <div className="flex flex-wrap items-center gap-x-3">
+        {isPlainRecipe(config.recipe) ? <div className="flex flex-wrap items-center gap-x-3">
           <label className="flex min-h-11 items-center gap-2"><input aria-label={`Description estimate ${index + 1}`} type="checkbox" checked={config.context.duration.includeDescriptionEstimate === true} onChange={event => change(index, { ...config, context: { ...config.context, duration: { ...config.context.duration, includeDescriptionEstimate: event.target.checked } } })} />Estimate from description when nothing is recorded</label>
           <a className="inline-flex min-h-11 items-center text-sm underline" href="#briefing-term-config.context.duration.includeDescriptionEstimate">Definition</a>
         </div> : null}

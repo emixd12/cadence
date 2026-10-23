@@ -10,6 +10,7 @@ import {
   diffBriefingConfigs, reviewBriefingReading,
 } from "@cadence/core/services/briefing-review";
 import type { BenchCaseSummary, BenchDisposition, BenchFeedback, BenchPreference, BenchProposal } from "@/lib/services/briefing-bench-store";
+import { isEmptyBriefing } from "@cadence/core/services/daily-brief-presentation";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 
 /** One output shown in a reading column, from a saved run or an unsaved response. */
@@ -136,6 +137,7 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
       <p className="text-sm">{run.label} · {run.state === "cancelled" ? "cancelled before completion" : `${run.validation}; ${run.latencyMs} ms`}{draftChanged ? " · the draft has changed since this run" : ""}</p>
       <div key={run.id ?? JSON.stringify(run.briefing ?? run.error ?? run.state)} ref={measure} className="bg-background pt-10 font-sans">
         {run.state === "cancelled" ? <p className="text-sm">No output. The request was cancelled.</p>
+          : run.state === "ready" && run.briefing && isEmptyBriefing(run.briefing) ? <p className="text-sm">No brief shown. Nothing needed attention and no tip was selected (recipe 1.2).</p>
           : <DailyBriefBubble state={run.state === "ready" ? "ready" : "error"} briefing={run.briefing} message={run.error} onDismiss={() => undefined} />}
       </div>
       <ReadingReview run={run} text={visibleText} />

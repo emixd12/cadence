@@ -399,6 +399,18 @@ describe("occasional tip selection across days", () => {
     expect(pick("2026-09-15", [a], shown).tip?.id).toBe("a");
   });
 
+  it("lets a different tip follow the next day when next-day spacing is off, keeping one tip per day and cooldown", () => {
+    const a = finding("a"), b = finding("b");
+    const shown = [{ fingerprint: "a|share:4", lastShownLocalDate: "2026-09-01" }];
+    const relaxed = (localDate: string, findings: BriefingFinding[], history = shown) =>
+      selectBriefingTip({ findings, maxTips: 1, cooldownDays: 14, nextDaySpacing: false, localDate, shown: history, fingerprintOf });
+    expect(relaxed("2026-09-02", [a, b]).decisions).toEqual([{ findingId: "a", decision: "cooldown" }, { findingId: "b", decision: "selected" }]);
+    // Another tip already shown today still blocks a second one.
+    expect(relaxed("2026-09-02", [b], [...shown, { fingerprint: "c|share:4", lastShownLocalDate: "2026-09-02" }]).tip).toBeNull();
+    // The default keeps next-day spacing.
+    expect(pick("2026-09-02", [b], shown).decisions).toEqual([{ findingId: "b", decision: "spacing" }]);
+  });
+
   it("requires relevance to today and honors a zero ceiling", () => {
     expect(pick("2026-09-01", [finding("a", false)], []).decisions).toEqual([{ findingId: "a", decision: "not_relevant" }]);
     expect(selectBriefingTip({ findings: [finding("a")], maxTips: 0, cooldownDays: 14, localDate: "2026-09-01", shown: [], fingerprintOf }).tip).toBeNull();

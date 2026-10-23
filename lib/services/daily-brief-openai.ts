@@ -16,12 +16,21 @@ export async function generateOpenAIDurationEstimates(
   input: Parameters<DailyBriefGenerator>[0],
   options: Readonly<{ apiKey: string; fetch?: typeof fetch }>,
 ): Promise<unknown> {
-  return requestStructured(input, options, "cadence_duration_estimates", DURATION_ESTIMATE_SCHEMA);
+  return input.estimateVariant === "alongside"
+    ? requestStructured(input, options, "cadence_duration_estimates_v1_2", DURATION_ESTIMATE_ALONGSIDE_SCHEMA)
+    : requestStructured(input, options, "cadence_duration_estimates", DURATION_ESTIMATE_SCHEMA);
 }
 
 const DURATION_ESTIMATE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
   estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis"], properties: {
     behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] },
+  } } },
+} } as const;
+
+/** Recipe 1.2 adds `alongside`: whether the activity can usually happen during other activities. */
+const DURATION_ESTIMATE_ALONGSIDE_SCHEMA = { type: "object", additionalProperties: false, required: ["estimates"], properties: {
+  estimates: { type: "array", items: { type: "object", additionalProperties: false, required: ["behaviorRef", "minutes", "basis", "alongside"], properties: {
+    behaviorRef: { type: "string" }, minutes: { type: ["integer", "null"] }, basis: { type: "string", enum: ["stated", "inferred"] }, alongside: { type: "boolean" },
   } } },
 } } as const;
 

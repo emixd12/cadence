@@ -1,5 +1,5 @@
 import type { AdvisorDayContextV1, AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
-import type { BriefingConfig } from "../types/briefing-config";
+import { isLaneRecipe, type BriefingConfig } from "../types/briefing-config";
 
 /** Ticket 188 bounds. Descriptions are untrusted user text; Cadence trims and caps them. */
 export const DESCRIPTION_DURATION_LIMITS = Object.freeze({
@@ -16,6 +16,8 @@ export type DescriptionEstimate = Readonly<{
   minutes: number | null;
   /** "stated": the description gives the length. "inferred": the model judged a typical length. */
   basis: "stated" | "inferred";
+  /** Recipe 1.2: the activity can usually happen during other activities. */
+  alongside?: boolean;
 }>;
 
 /**
@@ -32,9 +34,11 @@ export function selectDescriptionEstimateItems(
   const items = new Map<string, DescriptionEstimateItem>();
   for (const occurrence of context.cadence.occurrences) {
     if (occurrence.status !== "unresolved" || (scope && !scope.has(occurrence.behaviorRef)) || items.has(occurrence.behaviorRef)) continue;
-    if (hasRecordedDuration(occurrence, config)) continue;
-    const description = descriptions[occurrence.behaviorRef]?.trim();
-    if (!description) continue;
+    // Recipe 1.2 also asks about Behaviors with a recorded length, for `alongside`; the recorded length still wins.
+    if (hasRecordedDuration(occurrence, config) && !isLaneRecipe(config.recipe)) continue;
+    const description = descriptions[occurrence.behaviorRef]?.trim() ?? "";
+    // Recipe 1.2 also estimates from the title alone (owner review, October 23).
+    if (!description && !isLaneRecipe(config.recipe)) continue;
     items.set(occurrence.behaviorRef, {
       behaviorRef: occurrence.behaviorRef,
       title: occurrence.title,
@@ -54,7 +58,7 @@ function hasRecordedDuration(occurrence: AdvisorOccurrence, config: BriefingConf
 }
 
 /** Accepts only well-formed estimates for requested Behaviors. Anything else is dropped, not repaired. */
-export function parseDescriptionEstimates(value: unknown, items: readonly DescriptionEstimateItem[]): DescriptionEstimate[] {
+export function parseDescriptionEstimates(value: unknown, items: readonly DescriptionEstimateItem[], options: Readonly<{ alongside?: boolean }> = {}): DescriptionEstimate[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const estimates = (value as Record<string, unknown>).estimates;
   if (!Array.isArray(estimates) || estimates.length > items.length) return [];
@@ -64,13 +68,14 @@ export function parseDescriptionEstimates(value: unknown, items: readonly Descri
   for (const entry of estimates) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const row = entry as Record<string, unknown>;
-    if (Object.keys(row).sort().join() !== "basis,behaviorRef,minutes") continue;
+    if (Object.keys(row).sort().join() !== (options.alongside ? "alongside,basis,behaviorRef,minutes" : "basis,behaviorRef,minutes")) continue;
+    if (options.alongside && typeof row.alongside !== "boolean") continue;
     if (typeof row.behaviorRef !== "string" || !requested.has(row.behaviorRef) || seen.has(row.behaviorRef)) continue;
     if (row.basis !== "stated" && row.basis !== "inferred") continue;
     const minutes = row.minutes;
     if (minutes !== null && !(Number.isInteger(minutes) && (minutes as number) >= DESCRIPTION_DURATION_LIMITS.minMinutes && (minutes as number) <= DESCRIPTION_DURATION_LIMITS.maxMinutes)) continue;
     seen.add(row.behaviorRef);
-    accepted.push({ behaviorRef: row.behaviorRef, minutes: minutes as number | null, basis: row.basis });
+    accepted.push({ behaviorRef: row.behaviorRef, minutes: minutes as number | null, basis: row.basis, ...(options.alongside ? { alongside: row.alongside as boolean } : {}) });
   }
   return accepted;
 }

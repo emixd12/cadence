@@ -60,7 +60,8 @@ it("simulates in chronological order with stable fingerprints, explicit warmup, 
   const generate = vi.fn();
   const body = await (await startBriefingSequence(request(input(["case-sequence-0002", "case-sequence-0001"])), generate, store)).json();
   expect(body.caseIds).toEqual(["case-sequence-0001", "case-sequence-0002"]);
-  expect(body).toMatchObject({ plannedCalls: 4, warmup: [], spacing: "one_tip_per_day_skip_different_tip_next_day" });
+  expect(body).toMatchObject({ plannedCalls: 4, warmup: [], spacing: "one_tip_per_day" });
+  expect(body.days[0].selections[0].nextDaySpacing).toBe(true);
   expect(body.assumption).toContain("assumed delivered");
   expect(body.days[0].selections[0].fingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(body.days[1].selections[0]).toMatchObject({ tipId: null, decisions: [expect.objectContaining({ decision: "cooldown" })] });
