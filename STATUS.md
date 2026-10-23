@@ -40,12 +40,22 @@ Integration:
 
 Ticket 219 stage 2: the Daily Brief context now carries learned habits (get-ready
 minutes and the remembered mode per Behavior place), place label counts and the
-weather outlook with rule conclusions. Live briefs send habits and counts; weather
-and route conclusions stay `not_supplied` until the owner decides how supplied
-evidence reaches the server. A brief that used weather facts shows the Open-Meteo
-credit. Stage 1's yes/no conclusions are unchanged. Open point: the owner waits for
-Google's reply on support case 76805292 before deciding whether to restrict
+weather outlook with rule conclusions. A brief that used weather facts shows the
+Open-Meteo credit. Stage 1's yes/no conclusions are unchanged. Open point: the owner
+waits for Google's reply on support case 76805292 before deciding whether to restrict
 conclusions to day-level facts.
+
+Owner decisions (October 23), implemented:
+- Option A: one-day travel views carry an HMAC-signed token of Cadence's own
+  conclusions, bound to the user, local date, stored travel inputs and expiry.
+  - The Daily Brief request returns the token; the server verifies it before
+    filling route and weather conclusions.
+  - Any failure, or no `TRAVEL_CONCLUSIONS_SIGNING_SECRET`, leaves them
+    `not_supplied` without failing the brief.
+  - Account-free desktop sends nothing.
+- Label counts cover the last 60 days and all retained history (90 days, 1 year or
+  until deleted). Each set is labelled with its window. The retention copy says what
+  the Daily Brief sees.
 
 Verification (local, October 23; Vitest and ESLint exclude `.claude/**`):
 - Repository and catalog checks pass: agents, interactions, resolvers, core,
@@ -65,9 +75,13 @@ Verification (local, October 23; Vitest and ESLint exclude `.claude/**`):
   - the RLS smoke (92 checks), the account-sync smoke, the Where, place-label and
     habit integration tests and the authenticated BehaviorStore contract passed;
   - generated types matched the checked-in file.
+- Option A and full-history counts, a later commit: lint, typechecks, checks and both
+  builds pass. The suite ran 3,750 passed; three load timeouts in unchanged desktop
+  release tests pass alone (71/71). GitHub CI passed on the previous head.
 
 Owner-gated: the decisions above, privacy disclosures (logged on main's PR #129;
-new stage 2 entries in the PR description), the version bump, the hosted
+new stage 2 entries in the PR description), provisioning
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` in Vercel, the version bump, the hosted
 migration window, web deployment, desktop signing and publication, installed and
 live acceptance, and operator weather clearance. Platform impact: web and desktop
 as in each ticket section; marketing not applicable until privacy claims are

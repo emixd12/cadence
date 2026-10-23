@@ -26,6 +26,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 }));
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 
 const now = Temporal.Instant.from("2026-09-22T08:00:00Z");
@@ -369,3 +370,78 @@ describe("refreshTravelRoutes weather (Ticket 218)", () => {
     expect(mocks.weather).not.toHaveBeenCalled();
   });
 });
+
+describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
+  const secret = "test-only-conclusions-secret-0123456789";
+  const ready = { status: "ready" as const, baseUrl: "https://api.open-meteo.com/v1/forecast", apiKey: null };
+  const device = { latitude: 40.7484, longitude: -73.9857, accuracyMeters: 20, sampledAt: "2026-09-22T07:59:40Z" };
+  const rainy = { state: "forecast" as const, forecast: { provider: "open-meteo" as const, areaKey: "40.7,-74.0",
+    hourStart: "2026-09-22T08:00:00Z", fetchedAt: now.toString(), expiresAt: "2026-09-22T09:00:00Z",
+    hours: Array.from({ length: 48 }, (_, index) => ({ time: now.add({ hours: index }).toString(), weatherCode: 61, rainMillimeters: 1.2,
+      snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 })) } };
+  const decode = (token: string) => JSON.parse(Buffer.from(token.split(".")[0]!, "base64url").toString("utf8")) as Record<string, unknown>;
+
+  it("signs only Cadence's conclusions and weather rules for a one-day view", async () => {
+    located();
+    mocks.weather.mockResolvedValue(rainy);
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready, secret);
+    expect(result.conclusionsToken).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/);
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+    expect(payload).toMatchObject({ v: 1, sub: "owner", date: "2026-09-22", iat: now.toString(), exp: result.expiresAt,
+      conclusions: { version: "2.0", travelDay: "yes", trips: [
+        { destinationRef: "occurrence:occurrence-1", role: "outbound", mode: "walking", estimate: "current" },
+        { destinationRef: null, role: "return", mode: "walking", estimate: "unknown" },
+      ] },
+      weather: { state: "applied", trips: [
+        { destinationRef: "occurrence:occurrence-1", role: "outbound", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
+        { destinationRef: null, role: "return", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
+      ] },
+      events: {} });
+    // The view itself stays free of model conclusions.
+    expect(result.evidence).not.toHaveProperty("modelProjection");
+    const body = decode(result.conclusionsToken!);
+    const text = JSON.stringify(body);
+    for (const leaked of ["durationSeconds", "departureAt", "arrivalAt", "occupiedSpans", "finalAvailabilityAt", "place_id", "placeId",
+      "Habit St", "Base St", keyOf("2 Habit St"), keyOf("1 Base St"), "40.7", "-73.9", "Google Maps", "600", "09:50", "09:40"]) {
+      expect(text).not.toContain(leaked);
+    }
+    // The only numbers are the token version and the weather table margins; the only instants are issue and expiry.
+    expect(numbers(body)).toEqual([1, 10, 10]);
+    expect(strings(body).filter((value) => /^\d{4}-\d{2}-\d{2}T/.test(value)).sort()).toEqual([result.expiresAt, now.toString()].sort());
+  });
+
+  it("names Calendar trips by event identity and records their provider revision", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [{
+      id: "event-row-1", calendarId: "primary", providerEventId: "provider-1", kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T11:00:00Z", endAt: "2026-09-22T11:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: "etag-1", providerUpdatedAt: null } }] });
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    const payload = decode(result.conclusionsToken!);
+    expect(JSON.stringify(payload.conclusions)).toContain(JSON.stringify("event:primary\u0000provider-1").slice(1, -1));
+    expect(payload.events).toEqual({ "event:primary\u0000provider-1": JSON.stringify({ providerEtag: "etag-1", providerUpdatedAt: null }) });
+    expect(JSON.stringify(payload)).not.toContain("3 Event St");
+    expect(JSON.stringify(payload)).not.toContain("event-row-1");
+  });
+
+  it("issues no token without a secret or for a two-day view", async () => {
+    located();
+    expect(await refreshTravelRoutes(caller, day, config, now)).not.toHaveProperty("conclusionsToken");
+    located();
+    expect(await refreshTravelRoutes(caller, { startLocalDate: "2026-09-22", endLocalDate: "2026-09-23" }, config, now, undefined, secret))
+      .not.toHaveProperty("conclusionsToken");
+  });
+});
+
+function numbers(value: unknown): number[] {
+  if (typeof value === "number") return [value];
+  if (Array.isArray(value)) return value.flatMap(numbers);
+  return value && typeof value === "object" ? Object.values(value).flatMap(numbers) : [];
+}
+
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  return value && typeof value === "object" ? [...Object.keys(value), ...Object.values(value).flatMap(strings)] : [];
+}

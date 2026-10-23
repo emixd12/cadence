@@ -8,6 +8,9 @@ import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 
+const travelToken = vi.hoisted(() => vi.fn<(accountId: string | null, localDate: string) => string | null>(() => null));
+vi.mock("@/lib/ui/travel", async (load) => ({ ...(await load<typeof import("@/lib/ui/travel")>()), travelConclusionsToken: travelToken }));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -45,6 +48,25 @@ function client(overrides: Partial<DailyBriefClient> = {}): DailyBriefClient {
 }
 
 describe("Daily Brief UI", () => {
+  it("returns the latest signed travel conclusions with the request, and nothing without a travel account (Ticket 219)", async () => {
+    travelToken.mockImplementation((accountId) => accountId === "owner" ? "signed.token" : null);
+    const linked = client();
+    await act(() => root.render(<DailyBriefLauncher client={linked} travelAccountId="owner" sessionKey="owner" />));
+    await vi.waitFor(() => expect(linked.requestBrief).toHaveBeenCalledOnce());
+    expect(travelToken).toHaveBeenCalledWith("owner", settings.localDate);
+    expect(linked.requestBrief).toHaveBeenCalledWith(expect.objectContaining({ travelConclusions: "signed.token" }), expect.any(AbortSignal));
+    await act(() => root.unmount());
+    root = createRoot(container);
+    localStorage.clear();
+    // Account-free desktop and signed-out views have no travel account, so the request carries no token.
+    const local = client();
+    await act(() => root.render(<DailyBriefLauncher client={local} sessionKey="local" />));
+    await vi.waitFor(() => expect(local.requestBrief).toHaveBeenCalledOnce());
+    expect(vi.mocked(local.requestBrief).mock.calls[0]![0]).not.toHaveProperty("travelConclusions");
+    travelToken.mockReset();
+    travelToken.mockReturnValue(null);
+  });
+
   it("starts once, announces ready text politely, and keeps the dismiss control reachable", async () => {
     const adapter = client();
     await act(() => root.render(<DailyBriefLauncher client={adapter} />));

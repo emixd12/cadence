@@ -18,5 +18,10 @@ export type TravelRoutesResponse = Readonly<{
   /** Ticket 217: the learned-habit revision this view was planned with. */
   habitsRevision?: string | null;
   expiresAt: string | null;
+  /**
+   * Ticket 219 Option A: signed conclusions for the Daily Brief request to return
+   * unchanged. Present only when the server has a signing secret.
+   */
+  conclusionsToken?: string;
   evidence: TravelRouteDisplay | null;
 }>;

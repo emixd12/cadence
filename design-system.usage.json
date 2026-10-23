@@ -102,7 +102,7 @@
     {
       "componentId": "composite.behavior-place-assist",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 135,
+      "line": 147,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -110,7 +110,7 @@
     {
       "componentId": "composite.behavior-place-assist",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 148,
+      "line": 160,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -254,7 +254,7 @@
     {
       "componentId": "composite.place-marker-control",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 91,
+      "line": 103,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -262,7 +262,7 @@
     {
       "componentId": "composite.place-marker-control",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 103,
+      "line": 115,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -294,7 +294,7 @@
     {
       "componentId": "composite.recorded-activity-list",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 222,
+      "line": 225,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -326,30 +326,6 @@
     {
       "componentId": "composite.recorded-activity-list",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 233,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 234,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
-      "line": 235,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "composite.recorded-activity-list",
-      "file": "tests/connector-library.dom.test.tsx",
       "line": 236,
       "route": null,
       "usageKind": "render",
@@ -364,9 +340,33 @@
       "confidence": "exact"
     },
     {
+      "componentId": "composite.recorded-activity-list",
+      "file": "tests/connector-library.dom.test.tsx",
+      "line": 238,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.recorded-activity-list",
+      "file": "tests/connector-library.dom.test.tsx",
+      "line": 239,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.recorded-activity-list",
+      "file": "tests/connector-library.dom.test.tsx",
+      "line": 240,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "composite.travel-weather-credit",
       "file": "components/briefing/DailyBriefBubble.tsx",
-      "line": 71,
+      "line": 68,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -390,7 +390,7 @@
     {
       "componentId": "flow.account-deletion-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 243,
+      "line": 246,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -766,7 +766,7 @@
     {
       "componentId": "module.completion-places-section",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 79,
+      "line": 78,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -830,23 +830,23 @@
     {
       "componentId": "module.daily-brief-bubble",
       "file": "components/briefing/DailyBriefLauncher.tsx",
-      "line": 249,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.daily-brief-bubble",
-      "file": "components/briefing/DailyBriefLauncher.tsx",
-      "line": 252,
-      "route": null,
-      "usageKind": "render",
-      "confidence": "exact"
-    },
-    {
-      "componentId": "module.daily-brief-bubble",
-      "file": "components/briefing/DailyBriefLauncher.tsx",
       "line": 255,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.daily-brief-bubble",
+      "file": "components/briefing/DailyBriefLauncher.tsx",
+      "line": 258,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.daily-brief-bubble",
+      "file": "components/briefing/DailyBriefLauncher.tsx",
+      "line": 261,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -862,7 +862,7 @@
     {
       "componentId": "module.daily-brief-bubble",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 219,
+      "line": 241,
       "route": null,
       "usageKind": "render",
       "confidence": "heuristic"
@@ -870,7 +870,7 @@
     {
       "componentId": "module.daily-brief-bubble",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 234,
+      "line": 256,
       "route": null,
       "usageKind": "render",
       "confidence": "heuristic"
@@ -878,7 +878,7 @@
     {
       "componentId": "module.daily-brief-bubble",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 258,
+      "line": 280,
       "route": null,
       "usageKind": "render",
       "confidence": "heuristic"
@@ -910,7 +910,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 98,
+      "line": 120,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -918,7 +918,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 113,
+      "line": 135,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -926,7 +926,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 127,
+      "line": 149,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -934,7 +934,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 147,
+      "line": 169,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -942,7 +942,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 157,
+      "line": 179,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -950,7 +950,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 175,
+      "line": 197,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -958,7 +958,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 189,
+      "line": 211,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -966,7 +966,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 200,
+      "line": 222,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -974,7 +974,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "tests/daily-brief-ui.dom.test.tsx",
-      "line": 209,
+      "line": 231,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1342,7 +1342,7 @@
     {
       "componentId": "module.icloud-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 265,
+      "line": 268,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1350,7 +1350,7 @@
     {
       "componentId": "module.icloud-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 280,
+      "line": 283,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1526,7 +1526,7 @@
     {
       "componentId": "module.outlook-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 155,
+      "line": 157,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1534,7 +1534,7 @@
     {
       "componentId": "module.outlook-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 159,
+      "line": 162,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1542,7 +1542,7 @@
     {
       "componentId": "module.outlook-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 166,
+      "line": 169,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1550,7 +1550,7 @@
     {
       "componentId": "module.outlook-calendar-panel",
       "file": "tests/connector-library.dom.test.tsx",
-      "line": 209,
+      "line": 212,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1846,7 +1846,7 @@
     {
       "componentId": "module.trust-and-legal-panel",
       "file": "tests/legal-content.test.tsx",
-      "line": 164,
+      "line": 167,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1894,7 +1894,7 @@
     {
       "componentId": "module.travel-settings-panel",
       "file": "tests/place-labels.dom.test.tsx",
-      "line": 170,
+      "line": 182,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"

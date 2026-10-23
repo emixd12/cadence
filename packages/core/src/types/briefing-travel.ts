@@ -1,4 +1,5 @@
 import type { TravelLegRole, TravelMode, TravelTimingModelProjection } from "./travel";
+import type { PlaceLabelRetention } from "./place-labels";
 import type { WeatherConditionId, WeatherMarginTableVersion } from "./weather";
 
 /**
@@ -104,6 +105,14 @@ export type AdvisorPlaceLabelCounts = Readonly<{
   /** The rule set's fixed window ending today, in local days. */
   periodDays: number;
   behaviors: readonly AdvisorPlaceLabelBehaviorCounts[];
+  /**
+   * Every label kept under the user's retention choice (owner decision, October 23,
+   * 2026): 90 days, 1 year, or until the user deletes them.
+   */
+  retained: Readonly<{
+    retention: PlaceLabelRetention;
+    behaviors: readonly AdvisorPlaceLabelBehaviorCounts[];
+  }>;
 }>;
 
 export type AdvisorTravelContext = Readonly<{

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
+import { issueTravelConclusionsToken, travelConclusionsSourceKey, type TravelConclusionsPayload, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
 
 const mocks = vi.hoisted(() => ({
   preferences: vi.fn(),
@@ -20,7 +21,11 @@ const mocks = vi.hoisted(() => ({
   whereKinds: vi.fn(),
   labelSettings: vi.fn(),
   labels: vi.fn(),
+  routeSource: vi.fn(),
+  dayOccurrences: vi.fn(),
 }));
+vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.routeSource }));
+vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.dayOccurrences }));
 vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readTravelBehaviorLocations: mocks.whereKinds }));
 vi.mock("@/lib/db/placeLabels.repo", () => ({ readPlaceLabelSettingsRow: mocks.labelSettings, readCompletionPlaceLabelRows: mocks.labels }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
@@ -88,6 +93,8 @@ beforeEach(() => {
   mocks.whereKinds.mockResolvedValue([]);
   mocks.labelSettings.mockResolvedValue(null);
   mocks.labels.mockResolvedValue([]);
+  mocks.routeSource.mockResolvedValue(null);
+  mocks.dayOccurrences.mockResolvedValue([]);
 });
 
 describe("stored travel facts (Ticket 219)", () => {
@@ -133,7 +140,9 @@ describe("stored travel facts (Ticket 219)", () => {
       habits: { getReadyMinutes: 20, getReadySource: "learned", placeModes: [{ behaviorRef: "behavior_fixture", mode: "walking" }] },
       // Only Behaviors in this context; the label older than the 60-day window is not counted.
       placeLabels: { rulesVersion: "where-suggestion-rules@1", periodDays: 60,
-        behaviors: [{ behaviorRef: "behavior_fixture", total: 10, home: 9, wherePlace: 0, otherSavedPlace: 0, elsewhere: 1 }] },
+        behaviors: [{ behaviorRef: "behavior_fixture", total: 10, home: 9, wherePlace: 0, otherSavedPlace: 0, elsewhere: 1 }],
+        // All kept history under 90-day retention also counts the 61-day-old label.
+        retained: { retention: "90_days", behaviors: [{ behaviorRef: "behavior_fixture", total: 11, home: 9, wherePlace: 0, otherSavedPlace: 0, elsewhere: 2 }] } },
     });
     const serialized = JSON.stringify(prepared.contexts);
     for (const leaked of ["Main Street", "Gym Road", homeKey, gymKey, "saved_place"]) expect(serialized).not.toContain(leaked);
@@ -163,6 +172,102 @@ describe("stored travel facts (Ticket 219)", () => {
     await expect(prepared.assertCurrent()).resolves.toBeUndefined();
     mocks.travelSettings.mockResolvedValue(travelSettings);
     await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+});
+
+describe("signed travel conclusions (Ticket 219 Option A)", () => {
+  const SECRET = "test-only-conclusions-secret-0123456789";
+  const secrets = { current: SECRET, previous: null };
+  const routing = { enabled: true, routing_consent_at: "2026-10-01T00:00:00Z", mode: "transit", base_location_text: "1 Main Street",
+    navigation_preference: null, onboarding_completed_at: null, updated_at: "2026-10-01T00:00:00Z" };
+  const routeSource = { settings: { enabled: true, mode: "transit", routingConsentAt: "2026-10-01T00:00:00.000000Z" },
+    settingsRevision: "2026-10-01T00:00:00.000000Z", habitsRevision: null,
+    behaviors: [{ id: "fixture", whereKind: "home", locationText: null, updatedAt: "2026-10-01T00:00:00.000000Z" }] };
+  const calendar = { status: "connected", generation: 1, selectionRevision: 1 };
+  const dayOccurrence = { id: "fixture", behavior_id: "fixture", scheduled_for: fixture.cadence.occurrences[0]!.scheduledFor, local_date: fixture.localDate,
+    schedule_kind: "exact", schedule_end_time: null, status: "unresolved", updated_at: "2026-10-01T00:00:00Z" };
+  const sourceKey = () => travelConclusionsSourceKey({ settingsRevision: routeSource.settingsRevision, habitsRevision: null, enabled: true, mode: "transit",
+    routingConsentAt: routeSource.settings.routingConsentAt, calendar, behaviors: routeSource.behaviors, occurrences: [dayOccurrence] });
+  const payload = (overrides: Partial<Omit<TravelConclusionsPayload, "v">> = {}): Omit<TravelConclusionsPayload, "v"> => ({
+    sub: "owner-1", date: fixture.localDate, src: sourceKey(), iat: "2026-11-01T11:58:00Z", exp: "2026-11-01T12:03:00Z",
+    conclusions: { version: "2.0", travelDay: "yes", calendarEvents: true,
+      trips: [{ destinationRef: "event:fixture", role: "outbound", mode: "transit", estimate: "current" },
+        { destinationRef: null, role: "return", mode: "transit", estimate: "current" }],
+      fits: [{ ref: "occurrence:fixture", conclusion: "fits", basis: "travel_known", trip: { destinationRef: "event:fixture", role: "outbound" }, position: "after" }] },
+    weather: { source: "open_meteo", tableVersion: "weather-margin@1", state: "applied", calendarEvents: true, trips: [
+      { destinationRef: "event:fixture", role: "outbound", mode: "transit", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null }] },
+    events: { "event:fixture": "event" },
+    ...overrides,
+  });
+  const prepare = (token: unknown, tokenSecrets: { current: string | null; previous: string | null } = secrets, clock = now) =>
+    prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock, travelConclusions: { token, secrets: tokenSecrets } });
+  const notSupplied = { route: { state: "unavailable", reason: "not_supplied" },
+    weather: { source: "open_meteo", tableVersion: "weather-margin@1", state: "not_supplied", calendarEvents: false, trips: [] } };
+
+  beforeEach(() => {
+    mocks.ids.mockResolvedValue(["fixture"]);
+    mocks.travelSettings.mockResolvedValue(routing);
+    mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: "home", location_text: null }]);
+    mocks.routeSource.mockResolvedValue(routeSource);
+    mocks.calendar.mockResolvedValue(calendar);
+    mocks.dayOccurrences.mockResolvedValue([dayOccurrence]);
+  });
+
+  it("fills route and weather conclusions from a verified token, mapped to this context's refs", async () => {
+    let at = now();
+    const prepared = await prepare(issueTravelConclusionsToken(payload(), SECRET), secrets, () => at);
+    expect(prepared.contexts[0]!.travel).toMatchObject({
+      route: { state: "available", conclusions: { travelDay: "yes", calendarEvents: true,
+        trips: [{ destinationRef: "event_fixture", role: "outbound" }, { destinationRef: null, role: "return" }],
+        fits: [{ ref: "occurrence_fixture", conclusion: "fits", trip: { destinationRef: "event_fixture" } }] } },
+      weather: { state: "applied", trips: [{ destinationRef: "event_fixture", marginMinutes: 10 }] },
+    });
+    expect(mocks.dayOccurrences).toHaveBeenCalledWith(caller.client, "owner-1", fixture.localDate, fixture.localDate);
+    const serialized = JSON.stringify(prepared.contexts);
+    for (const leaked of ["event:fixture", "occurrence:fixture", "Main Street"]) expect(serialized).not.toContain(leaked);
+    // The delivery fence compares stored facts only: a token that expires during generation never fails the brief.
+    at = Temporal.Instant.from("2026-11-01T12:03:30Z");
+    await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+  });
+
+  it("leaves route and weather not_supplied for every failed check, without failing the brief", async () => {
+    const valid = issueTravelConclusionsToken(payload(), SECRET);
+    const [body, signature] = valid.split(".") as [string, string];
+    const cases: [string, unknown, (() => void)?, TravelConclusionsSecrets?][] = [
+      ["tampered", `${Buffer.from(JSON.stringify({ v: 1, ...payload({ src: "other" }) })).toString("base64url")}.${signature}`],
+      ["other user", issueTravelConclusionsToken(payload({ sub: "owner-2" }), SECRET)],
+      ["other day", issueTravelConclusionsToken(payload({ date: "2026-10-31" }), SECRET)],
+      ["expired", issueTravelConclusionsToken(payload({ exp: "2026-11-01T12:00:00Z" }), SECRET)],
+      ["stale source", valid, () => mocks.dayOccurrences.mockResolvedValue([{ ...dayOccurrence, status: "completed" }])],
+      ["changed settings", valid, () => mocks.routeSource.mockResolvedValue({ ...routeSource, settingsRevision: "2026-10-02T00:00:00.000000Z" })],
+      ["malformed", `${body}.not-a-signature`],
+      ["not a string", 7],
+      ["secret not configured", valid, undefined, { current: null, previous: null }],
+      ["changed Calendar event", issueTravelConclusionsToken(payload({ events: { "event:fixture": "older" } }), SECRET)],
+      ["commitment outside this context", issueTravelConclusionsToken(payload({ conclusions: { ...payload().conclusions,
+        fits: [{ ...payload().conclusions.fits[0]!, ref: "occurrence:other" }] } }), SECRET)],
+      ["unknown ref kind", issueTravelConclusionsToken(payload({ conclusions: { ...payload().conclusions,
+        trips: [{ destinationRef: "place:1 Main Street", role: "outbound", mode: "transit", estimate: "current" }] } }), SECRET)],
+    ];
+    for (const [label, token, arrange, tokenSecrets] of cases) {
+      mocks.dayOccurrences.mockResolvedValue([dayOccurrence]);
+      mocks.routeSource.mockResolvedValue(routeSource);
+      arrange?.();
+      const prepared = await prepare(token, tokenSecrets);
+      expect(prepared.contexts[0]!.travel, label).toMatchObject(notSupplied);
+    }
+  });
+
+  it("behaves exactly as before without a token, and never verifies while routing is off", async () => {
+    const without = await prepareAccountBriefingContexts(caller, { historyDays: [90], includeCalendar: false, signal, clock: now });
+    const empty = await prepare(null);
+    expect(empty.contexts[0]!.travel).toEqual(without.contexts[0]!.travel);
+    expect(without.contexts[0]!.travel).toMatchObject(notSupplied);
+    expect(mocks.routeSource).not.toHaveBeenCalled();
+    mocks.travelSettings.mockResolvedValue({ ...routing, enabled: false });
+    const off = await prepare(issueTravelConclusionsToken(payload(), SECRET));
+    expect(off.contexts[0]!.travel?.route).toEqual({ state: "unavailable", reason: "routing_off" });
+    expect(mocks.routeSource).not.toHaveBeenCalled();
   });
 });
 

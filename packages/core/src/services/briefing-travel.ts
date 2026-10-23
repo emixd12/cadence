@@ -1,5 +1,5 @@
 import type { Temporal } from "@js-temporal/polyfill";
-import { CURRENT_WHERE_SUGGESTION_RULES, projectPlaceLabelCounts } from "../resolvers/place-label.resolver";
+import { CURRENT_WHERE_SUGGESTION_RULES, placeLabelRetentionCutoff, placeRefForWhere } from "../resolvers/place-label.resolver";
 import {
   ADVISOR_TRAVEL_CONTEXT_VERSION,
   type AdvisorPlaceLabelCounts,
@@ -11,7 +11,7 @@ import {
   type BriefingTravelControl,
 } from "../types/briefing-travel";
 import type { BehaviorWhereKind } from "../types/behavior";
-import type { CompletionPlaceLabel } from "../types/place-labels";
+import type { CompletionPlaceLabel, PlaceLabelRetention, PlaceLabelValue } from "../types/place-labels";
 import type { TravelEvidenceResult, TravelHabits, TravelMode, TravelTimingModelProjection } from "../types/travel";
 import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
 import { rememberedTravelMode, resolveTravelHabits, TRAVEL_HABIT_RULES, travelHabitPlaceKey } from "./travel-habits";
@@ -51,7 +51,7 @@ export function buildAdvisorTravelContext(input: Readonly<{
     // Habits and weather shape trips only, so they stay out while routing is off.
     ...(input.routing && input.habits ? { habits: input.habits } : {}),
     ...(input.routing ? { weather } : {}),
-    ...(input.placeLabels?.behaviors.length ? { placeLabels: input.placeLabels } : {}),
+    ...(input.placeLabels?.retained.behaviors.length ? { placeLabels: input.placeLabels } : {}),
   };
 }
 
@@ -104,25 +104,35 @@ export function advisorWeatherOutlook(
   };
 }
 
-/** Ticket 216: label counts per Behavior in the suggestion window; nothing while labels are off. */
+/**
+ * Ticket 216: label counts per Behavior in the suggestion window and over everything
+ * kept under the user's retention choice; nothing while labels are off.
+ */
 export function advisorPlaceLabelCounts(input: Readonly<{
   enabled: boolean;
+  retention: PlaceLabelRetention;
   labels: readonly Pick<CompletionPlaceLabel, "behaviorId" | "label" | "localDate">[];
   behaviors: readonly Readonly<{ behaviorRef: string; id: string; whereKind: BehaviorWhereKind | null; locationText: string | null }>[];
   today: Temporal.PlainDate;
 }>): AdvisorPlaceLabelCounts | null {
   if (!input.enabled) return null;
   const rules = CURRENT_WHERE_SUGGESTION_RULES;
-  const refs = new Map(input.behaviors.map((behavior) => [behavior.id, behavior.behaviorRef]));
-  const counts = projectPlaceLabelCounts({ labels: input.labels, behaviors: input.behaviors, today: input.today, rules });
   // A new rules version needs its own model-input review before it ships.
   if (rules.version !== "where-suggestion-rules@1") throw new Error("Unsupported Where suggestion rules for model input.");
-  return {
-    rulesVersion: rules.version,
-    periodDays: rules.periodDays,
-    behaviors: counts.filter((count) => count.total > 0).map((count) => ({ behaviorRef: refs.get(count.behaviorId)!,
-      total: count.total, home: count.atHome, wherePlace: count.atWherePlace, otherSavedPlace: count.atOtherSavedPlace, elsewhere: count.elsewhere })),
-  };
+  const today = input.today.toString();
+  const periodStart = input.today.subtract({ days: rules.periodDays - 1 }).toString();
+  const retainedStart = placeLabelRetentionCutoff(input.retention, input.today)?.toString() ?? null;
+  const counts = (from: string | null) => input.behaviors.flatMap((behavior) => {
+    const own = placeRefForWhere(behavior);
+    const labels = input.labels.filter((label) => label.behaviorId === behavior.id && label.localDate <= today && (from === null || label.localDate >= from));
+    const count = (predicate: (label: PlaceLabelValue) => boolean) => labels.filter((label) => predicate(label.label)).length;
+    const saved = (label: PlaceLabelValue) => label !== "home" && label !== "elsewhere";
+    return labels.length ? [{ behaviorRef: behavior.behaviorRef, total: labels.length, home: count((label) => label === "home"),
+      wherePlace: count((label) => saved(label) && label === own), otherSavedPlace: count((label) => saved(label) && label !== own),
+      elsewhere: count((label) => label === "elsewhere") }] : [];
+  });
+  return { rulesVersion: rules.version, periodDays: rules.periodDays, behaviors: counts(periodStart),
+    retained: { retention: input.retention, behaviors: counts(retainedStart) } };
 }
 
 /**
@@ -167,6 +177,8 @@ export function projectBriefingTravelFacts(travel: AdvisorTravelContext, visible
     ...(weatherFacts ? { weather: weatherFacts } : {}),
     ...(travel.placeLabels ? { placeLabels: { ...travel.placeLabels,
       behaviors: travel.placeLabels.behaviors.filter((row) => visible.behaviorRefs.has(row.behaviorRef)),
+      retained: { ...travel.placeLabels.retained,
+        behaviors: travel.placeLabels.retained.behaviors.filter((row) => visible.behaviorRefs.has(row.behaviorRef)) },
     } } : {}),
   };
   return { facts, control: { route: route.state === "available" ? "available" : route.reason } };

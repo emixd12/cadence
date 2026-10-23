@@ -194,6 +194,9 @@ sign-in and the existing linked-desktop authenticated request path. The server
 derives the owner, local day and allowed fields, calls the bounded internal read
 service, then the model adapter. Return validated briefing text and provenance,
 not credentials or a raw export. POST starts generation, never a source mutation.
+The body holds `installationId`, `retry` and, optionally, the signed
+`travelConclusions` token from the latest one-day travel view (Ticket 219 Option A).
+The server alone verifies that token; it never widens what the caller may request.
 
 Require web origin/CSRF checks, exact desktop broker origins, RLS ownership,
 feature/disclosure checks, bounded attempts, output validation and `no-store`.
@@ -258,6 +261,12 @@ Ticket 218 adds optional weather to the same response: `evidence.weather` carrie
 state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
 leg may carry its fixed weather margin. The server derives the weather area from the
 request's device sample only; the route accepts no area, forecast or provider URL.
+Ticket 219 Option A: with `TRAVEL_CONCLUSIONS_SIGNING_SECRET` set, a one-day response
+also carries `conclusionsToken`. It is Cadence's own conclusions for that view,
+HMAC-signed and bound to the user, local date, stored travel inputs and the view's
+expiry. Clients keep it in page memory only and return it unchanged as
+`travelConclusions` in `POST /api/advisor/brief`. The server verifies it there; any
+failure leaves trip and weather facts `not_supplied` and never fails the brief.
 
 `GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
 or the Behavior's own place text, keyed by place key. Calendar-only places get no

@@ -12,6 +12,7 @@ import { getHevyConnection } from "./hevy.service";
 
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
 import { measurePerformanceSpan } from "./performance-timing";
+import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
 
 /** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
 export const DAILY_BRIEF_DEADLINE_MS = 60_000;
@@ -109,7 +110,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   now?: () => Temporal.Instant;
   deadlineMs?: number;
 }> = {}): Promise<DailyBriefResponse> {
-  if (!record(value) || Object.keys(value).sort().join() !== "installationId,retry" || typeof value.installationId !== "string" ||
+  // Ticket 219 Option A: an optional signed travel token. Its value is never validated here;
+  // a token that fails any later check only leaves travel conclusions unsupplied.
+  const keys = record(value) ? Object.keys(value).sort().join() : "";
+  if (!record(value) || (keys !== "installationId,retry" && keys !== "installationId,retry,travelConclusions") || typeof value.installationId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.installationId) || typeof value.retry !== "boolean") {
     throw new DailyBriefError("invalid_request");
   }
@@ -147,6 +151,7 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
         clock,
         preferences,
         localDate: admission.localDate,
+        travelConclusions: { token: value.travelConclusions ?? null, secrets: readTravelConclusionsSecrets(process.env) },
         ...(configuration.analysis.lanes.length ? { analysis: {
           includeReminders: configuration.analysis.lanes.includes("reminder-effectiveness"),
           includeNotes: configuration.analysis.lanes.includes("notes-failure-themes"),

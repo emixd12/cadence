@@ -265,10 +265,14 @@ export function BehaviorPlaceAssist({ behaviorId, whereKind = null, placeText, o
   </div>;
 }
 
+/**
+ * The Daily Brief receives counts over the last 60 days and over everything kept under
+ * this choice (Ticket 219, owner decision October 23, 2026); the copy says so.
+ */
 const RETENTION_OPTIONS: ReadonlyArray<{ value: PlaceLabelRetention; label: string; detail: string }> = [
-  { value: "90_days", label: "90 days", detail: "Keeps the least about where you have been. Enough for suggestions; little history for the advisor to learn from." },
-  { value: "1_year", label: "1 year", detail: "Keeps a year of places, so Cadence and the advisor can learn seasonal patterns." },
-  { value: "until_deleted", label: "Until I delete them", detail: "Keeps every label until you delete it. The most history and the best insights; the most stored about where you have been." },
+  { value: "90_days", label: "90 days", detail: "Keeps the least about where you have been. Suggestions use the last 60 days; the Daily Brief sees counts for up to 90 days." },
+  { value: "1_year", label: "1 year", detail: "Keeps a year of places. The Daily Brief also sees counts across the whole year." },
+  { value: "until_deleted", label: "Until I delete them", detail: "Keeps every label until you delete it. The Daily Brief sees counts across all of it: the most history, and the most stored about where you have been." },
 ];
 const RETENTION_LABELS: Readonly<Record<PlaceLabelRetention, string>> = { "90_days": "90 days", "1_year": "1 year", until_deleted: "until you delete them" };
 

@@ -74,6 +74,18 @@ it("turns labels on only after a retention choice, defaulting to the shortest", 
   expect(fake.saveSettings).toHaveBeenCalledWith({ enabled: true, retention: "90_days", markerPromptDismissed: false, expectedUpdatedAt: null });
 });
 
+it("says what the Daily Brief sees under each retention option (Ticket 219, October 23)", async () => {
+  await render(<PlaceLabelProvider client={client(OFF)}><CompletionPlacesSection /></PlaceLabelProvider>);
+  await act(async () => button("Set up completion places").click());
+  const detail = (value: string) => host.querySelector<HTMLInputElement>(`input[value="${value}"]`)!.closest("label")!.textContent!;
+  expect(detail("90_days")).toContain("Suggestions use the last 60 days; the Daily Brief sees counts for up to 90 days.");
+  expect(detail("1_year")).toContain("The Daily Brief also sees counts across the whole year.");
+  expect(detail("until_deleted")).toContain("The Daily Brief sees counts across all of it");
+  expect(host.textContent).toContain("While the Daily Brief is on, it receives label counts only, never places.");
+  // No option promises insight the counts cannot give.
+  expect(host.textContent).not.toMatch(/seasonal|best insights/);
+});
+
 it("asks before switching to a shorter retention or turning off", async () => {
   const fake = client({ ...ON, settings: { ...ON.settings, retention: "1_year" }, labelCount: 4 });
   await render(<PlaceLabelProvider client={fake}><CompletionPlacesSection /></PlaceLabelProvider>);

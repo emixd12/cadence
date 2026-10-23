@@ -26,6 +26,9 @@ import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 import { readTravelWeather } from "@/lib/services/weather-forecast.service";
 import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
+import { advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
+import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey } from "@/lib/services/travel-conclusions-token";
 
 const PLACE_LOOKUP_CONCURRENCY = 4;
 
@@ -36,6 +39,8 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * first paid call and once before returning, and route only legs in the window.
  * Ticket 213: every provider call reserves its list price first.
  * Ticket 218: weather comes from the device position only, through a shared hourly cache.
+ * Ticket 219 Option A: with a signing secret, a one-day view also carries a signed token
+ * of Cadence's own conclusions for the Daily Brief request to return.
  */
 export async function refreshTravelRoutes(
   caller: CalendarCaller,
@@ -43,6 +48,7 @@ export async function refreshTravelRoutes(
   config: TravelProviderConfig,
   now = Temporal.Now.instant(),
   weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
+  conclusionsSecret: string | null = null,
 ): Promise<TravelRoutesResponse> {
   assertTravelProviderReady(config);
   const request = parseTravelRouteRefreshRequest(raw);
@@ -165,8 +171,16 @@ export async function refreshTravelRoutes(
     ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
   ];
   const weather = await weatherRequest;
-  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
-  return response(caller.user.id, source, { ...projectTravelRouteDisplay(evidence),
+  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate;
+  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
+  const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
+    secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
+    events: snapshot?.events ?? [], occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    sourceKey: travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
+      enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
+      calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences }),
+  }) : null;
+  return response(caller.user.id, source, conclusionsToken, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
       const duration = durationEstimates.get(occurrence.behavior_id);
       return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
@@ -436,9 +450,41 @@ function collisionCandidates(commitments: readonly TravelCommitment[], occupancy
   return [...candidates, ...occupancy.filter((candidate) => !refs.has(candidate.ref))];
 }
 
-function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
+function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, conclusionsToken: ((expiresAt: string) => string | null) | null,
+  evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
   const expiresAt = evidence?.legs.reduce<string | null>((earliest, leg) => !leg.estimate ? earliest : !earliest || leg.estimate.expiresAt < earliest ? leg.estimate.expiresAt : earliest, null)
     ?? Temporal.Now.instant().add({ seconds: 300 }).toString();
+  const token = conclusionsToken?.(expiresAt) ?? null;
   return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision,
-    habitsRevision: source.habitsRevision, expiresAt, evidence };
+    habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}) };
+}
+
+/**
+ * Signs Cadence's conclusions for this view (Ticket 219 Option A). Commitments are named
+ * by occurrence ID or Calendar event identity so the brief can map them to its own refs.
+ * Any commitment it cannot name withholds the whole token.
+ */
+function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
+  secret: string; userId: string; localDate: string; now: Temporal.Instant; expiresAt: string; sourceKey: string;
+  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"]; occurrenceIds: readonly string[];
+}>): string | null {
+  const conclusions = evidence.modelProjection;
+  if (!conclusions || Temporal.Instant.compare(Temporal.Instant.from(input.expiresAt), input.now) <= 0) return null;
+  const occurrences = new Set(input.occurrenceIds);
+  const events = new Map(input.events.map((event) => [event.id, event]));
+  const named = new Map<string, string>();
+  const rename = (ref: string) => {
+    const event = events.get(ref);
+    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? `event:${event.calendarId}\0${event.providerEventId}` : null;
+    if (!key) throw new Error("Unnamed travel commitment.");
+    if (event) named.set(key, JSON.stringify(event.revision));
+    return key;
+  };
+  try {
+    const facts = renameTravelConclusionRefs({ conclusions, weather: advisorWeatherOutlook(evidence) }, rename);
+    return issueTravelConclusionsToken({ sub: input.userId, date: input.localDate, src: input.sourceKey, iat: input.now.toString(),
+      exp: input.expiresAt, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named) }, input.secret);
+  } catch {
+    return null;
+  }
 }

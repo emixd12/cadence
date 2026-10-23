@@ -77,15 +77,17 @@ Completion places are off by default and separate from travel estimates. In Sett
 Travel, Completion places, select Set up completion places, choose how long to keep labels,
 and select Save where I complete Behaviors:
 
-- **90 days** (default): keeps the least about where you have been. Enough for
-  suggestions; little history for the advisor to learn from.
-- **1 year**: keeps a year of places, so Cadence and the advisor can learn seasonal
-  patterns.
-- **Until I delete them**: keeps every label until you delete it. The most history and
-  the best insights; the most stored about where you have been.
+- **90 days** (default): keeps the least about where you have been. Suggestions use
+  the last 60 days; the Daily Brief sees counts for up to 90 days.
+- **1 year**: keeps a year of places. The Daily Brief also sees counts across the
+  whole year.
+- **Until I delete them**: keeps every label until you delete it. The Daily Brief sees
+  counts across all of it: the most history, and the most stored about where you
+  have been.
 
-While the Daily Brief is on, it receives label counts only, never places: for
-example, a Behavior logged at Home 9 of 10 times in the last 60 days. Switching to a
+While the Daily Brief is on, it receives label counts only, never places, in two
+windows: the last 60 days and everything you kept. For example: logged at Home 9 of
+10 times in the last 60 days, and 41 of 52 times in the kept year. Switching to a
 shorter option asks first and
 deletes older labels. Cadence also deletes labels past your choice every day.
 
@@ -285,9 +287,11 @@ terms. Cadence cannot erase a request already processed by Google.
 Raw locations, route results and travel times are not sent to the Daily Brief model.
 While the Daily Brief is on, it receives slow-changing travel facts only: each
 Behavior's Where, usual travel, your get-ready time, the travel you chose for a
-Behavior's place and completion label counts. Weather and trip conclusions reach it
-only as Cadence's own yes/no answers and fixed margins; when they do, the brief shows
-the Open-Meteo credit. Exact leave times stay in Cadence's calculated line. Updating
+Behavior's place and completion label counts. When the Timeline has current travel
+estimates, the brief request also carries Cadence's signed trip and weather
+conclusions: yes/no answers and fixed margins, never times. Cadence checks that they
+belong to you, to today and to your current travel settings; otherwise the brief has
+no trip facts. When weather reaches the model, the brief shows the Open-Meteo credit. Exact leave times stay in Cadence's calculated line. Updating
 travel never silently regenerates an attempted briefing or resets its dismissal state.
 
 Desktop saves Home, Where and other places you enter offline. Hosted estimates require a linked,

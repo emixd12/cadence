@@ -21,6 +21,8 @@ export type TravelRoutesView = Readonly<{
   settingsRevision: string | null; expiresAt: string | null; evidence: Omit<TravelEvidenceResult, "modelProjection"> | null;
   /** Ticket 217: learned-habit revision; a desktop view waits until its habits have synchronized. */
   habitsRevision?: string | null;
+  /** Ticket 219 Option A: signed conclusions, returned unchanged with the Daily Brief request. */
+  conclusionsToken?: string;
 }>;
 export type TravelClient = Readonly<{
   settings: TravelSettingsClient;
@@ -149,12 +151,30 @@ function clearTravelCacheForAccount(accountId: string): void {
   travelEpoch++;
   for (const key of [...travelViewCache.keys()]) if ((JSON.parse(key) as unknown[])[0] === accountId) travelViewCache.delete(key);
   for (const key of [...travelInFlight.keys()]) if ((JSON.parse((JSON.parse(key) as string[])[0]!) as unknown[])[0] === accountId) travelInFlight.delete(key);
+  for (const key of [...travelConclusionTokens.keys()]) if ((JSON.parse(key) as unknown[])[0] === accountId) travelConclusionTokens.delete(key);
 }
 /** Settings and Behavior location saves fire this event from screens where no Timeline is mounted, so invalidate at module level too. */
-function invalidateAllTravel(): void { travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); }
+function invalidateAllTravel(): void { travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear(); }
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
 /** Test-only reset of the in-memory travel view cache. */
-export function resetTravelViewCacheForTest(): void { travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); }
+export function resetTravelViewCacheForTest(): void { travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear(); }
+
+/**
+ * Ticket 219 Option A: the latest signed conclusions per account and local date, in page
+ * memory only. The token is opaque here; only the server reads and verifies it.
+ */
+const travelConclusionTokens = new Map<string, Readonly<{ token: string; expiresAt: string }>>();
+function rememberTravelConclusions(accountId: string, localDate: string, view: TravelRoutesView): void {
+  const key = JSON.stringify([accountId, localDate]);
+  if (view.conclusionsToken && view.expiresAt) travelConclusionTokens.set(key, { token: view.conclusionsToken, expiresAt: view.expiresAt });
+  else travelConclusionTokens.delete(key);
+}
+/** The unexpired token for a Daily Brief request, or null. */
+export function travelConclusionsToken(accountId: string | null, localDate: string, nowMs = Date.now()): string | null {
+  if (!accountId) return null;
+  const entry = travelConclusionTokens.get(JSON.stringify([accountId, localDate]));
+  return entry && Date.parse(entry.expiresAt) > nowMs ? entry.token : null;
+}
 
 export type TravelState = Readonly<{
   view: TravelRoutesView | null; message: string | null;
@@ -296,6 +316,7 @@ export function useTravelContext(input: Readonly<{
           if (view.accountId !== accountId || view.settingsRevision !== settings.updatedAt
             || (view.habitsRevision ?? null) !== (settings.habits?.updatedAt ?? null)) { settle({}); return; }
           if (sameEpoch()) cacheTravel(stateKey, { view, message: null, at: Date.now(), device: device ? { latitude: device.latitude, longitude: device.longitude, accuracyMeters: device.accuracyMeters } : null });
+          if (sameEpoch()) rememberTravelConclusions(accountId, input.localDate, view);
           inFlight = false; committed = false;
           if (active) {
             showView(view, Date.now(), { pending: false });

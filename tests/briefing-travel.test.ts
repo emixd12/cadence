@@ -7,7 +7,7 @@ import { briefingFixture } from "@/lib/services/briefing-fixtures";
 import { prepareBriefing } from "@/lib/services/briefing-pipeline";
 import { DAILY_BRIEF_TRAVEL_INSTRUCTIONS, generateDailyBrief } from "@/lib/services/daily-brief-consumer";
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
-import { advisorTravelHabits, advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
+import { advisorPlaceLabelCounts, advisorTravelHabits, advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
 import { travelHabitBuffers } from "@cadence/core/services/travel-habits";
 import type { TravelWeatherInput } from "@cadence/core/types/weather";
 
@@ -52,7 +52,12 @@ describe("Daily Brief travel facts", () => {
       placeLabels: { rulesVersion: "where-suggestion-rules@1", periodDays: 60, behaviors: [
         { behaviorRef: "behavior_fixture", total: 10, home: 2, wherePlace: 0, otherSavedPlace: 1, elsewhere: 7 },
         { behaviorRef: "behavior_travel_stretch", total: 10, home: 9, wherePlace: 0, otherSavedPlace: 0, elsewhere: 1 },
-      ] },
+      ],
+      // The fixture keeps a year; the 400-day-old label is past it.
+      retained: { retention: "1_year", behaviors: [
+        { behaviorRef: "behavior_fixture", total: 14, home: 4, wherePlace: 0, otherSavedPlace: 2, elsewhere: 8 },
+        { behaviorRef: "behavior_travel_stretch", total: 13, home: 12, wherePlace: 0, otherSavedPlace: 0, elsewhere: 1 },
+      ] } },
     });
     expect(fit(facts)).toEqual({
       occurrence_travel_run: ["fits", "travel_known", "event_travel_dentist", "outbound", "before"],
@@ -190,6 +195,10 @@ describe("Daily Brief travel facts", () => {
       { ...travel, placeLabels: { ...labels, behaviors: [{ ...labels.behaviors[0], latitude: 40.7 }] } },
       { ...travel, placeLabels: { ...labels, periodDays: 365 } },
       { ...travel, placeLabels: { ...labels, behaviors: [{ ...labels.behaviors[0], behaviorRef: "behavior_missing" }] } },
+      { ...travel, placeLabels: { ...labels, retained: { ...labels.retained, retention: "forever" } } },
+      { ...travel, placeLabels: { ...labels, retained: { ...labels.retained, behaviors: [] } } },
+      { ...travel, placeLabels: { ...labels, retained: { ...labels.retained, behaviors: [{ ...labels.retained.behaviors[0], home: 1, elsewhere: 12 }] } } },
+      { ...travel, placeLabels: { ...labels, retained: { retention: "1_year" } } },
     ];
     for (const value of invalid) expect(() => validateAdvisorDayContext({ ...context, travel: value })).toThrow();
   });
@@ -235,6 +244,32 @@ describe("Daily Brief travel facts", () => {
     for (const phrase of ["getReadyMinutes", "unknown is not clear weather", "never a share of the trip", "never a departure time", "logged at Home 9 of 10 times"]) {
       expect(DAILY_BRIEF_TRAVEL_INSTRUCTIONS).toContain(phrase);
     }
+  });
+});
+
+describe("place label counts over kept history (owner decision, October 23, 2026)", () => {
+  const today = Temporal.PlainDate.from("2026-11-01");
+  const behaviors = [{ behaviorRef: "behavior_a", id: "a", whereKind: "home" as const, locationText: null }];
+  // Home 30 days ago, elsewhere 80, Home 200, elsewhere 400, plus a future label that never counts.
+  const labels = ([[30, "home"], [80, "elsewhere"], [200, "home"], [400, "elsewhere"], [-1, "home"]] as const)
+    .map(([days, label]) => ({ behaviorId: "a", label, localDate: today.subtract({ days }).toString() }));
+  const row = (total: number, home: number, elsewhere: number) => ({ behaviorRef: "behavior_a", total, home, wherePlace: 0, otherSavedPlace: 0, elsewhere });
+
+  it.each([
+    ["90_days", row(2, 1, 1)],
+    ["1_year", row(3, 2, 1)],
+    ["until_deleted", row(4, 2, 2)],
+  ] as const)("counts the last 60 days and everything kept under %s", (retention, kept) => {
+    const counts = advisorPlaceLabelCounts({ enabled: true, retention, labels, behaviors, today });
+    expect(counts).toEqual({ rulesVersion: "where-suggestion-rules@1", periodDays: 60, behaviors: [row(1, 1, 0)], retained: { retention, behaviors: [kept] } });
+  });
+
+  it("keeps a Behavior with only older labels, and sends nothing while labels are off", () => {
+    const older = labels.filter(({ localDate }) => localDate < today.subtract({ days: 60 }).toString());
+    expect(advisorPlaceLabelCounts({ enabled: true, retention: "1_year", labels: older, behaviors, today }))
+      .toMatchObject({ behaviors: [], retained: { behaviors: [row(2, 1, 1)] } });
+    expect(advisorPlaceLabelCounts({ enabled: false, retention: "until_deleted", labels, behaviors, today })).toBeNull();
+    expect(JSON.stringify(advisorPlaceLabelCounts({ enabled: true, retention: "until_deleted", labels, behaviors, today }))).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 });
 

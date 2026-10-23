@@ -12936,7 +12936,7 @@
         }
       ],
       "availability": "Available only when the first-party feature is enabled and the hosted service is available; linked desktop also needs connectivity.",
-      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result. With travel consent and provider clearance, each generated brief requests whole-day travel once, within the eight-leg bound, for the calculated display only (Ticket 214).",
+      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result. With travel consent and provider clearance, each generated brief requests whole-day travel once, within the eight-leg bound, for the calculated display only (Ticket 214). The request returns the latest unexpired signed travel conclusions for the account and day unchanged, when the client holds one; the server verifies them before any trip or weather conclusion reaches model input (Ticket 219 Option A).",
       "failure_result": "Keeps Timeline usable. Bounded client deadlines end stalled reads. Timeout, offline, sign-in, changed-context, rate-limit, pending and interrupted outcomes show distinct nonblocking notices with an explicit retry where one can help. A Timeline change or expiry withdraws delivered text and offers a refresh.",
       "effects": [
         "network_request",

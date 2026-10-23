@@ -173,7 +173,7 @@ function travelFixture(context: AdvisorDayContextV1, id: "travel_day" | "travel_
       behaviors: behaviors.map(({ behaviorRef, whereKind }) => ({ behaviorRef, whereKind })),
       habits: advisorTravelHabits(habits, behaviors, homeSet ? TRAVEL_FIXTURE_HOME_TEXT : null),
       weather: advisorWeatherOutlook(evidence),
-      placeLabels: advisorPlaceLabelCounts({ enabled: true, behaviors, today: day, labels: travelFixtureLabels(day) }) }),
+      placeLabels: advisorPlaceLabelCounts({ enabled: true, retention: "1_year", behaviors, today: day, labels: travelFixtureLabels(day) }) }),
   });
 }
 
@@ -202,14 +202,22 @@ function travelFixtureForecast(now: string, rainUntil: string): TravelWeatherInp
     fetchedAt: now, expiresAt: hourStart.add({ hours: 1 }).toString(), hours } };
 }
 
-/** Invented completion labels: the run is mostly elsewhere; the Home stretch is nearly always at Home. */
+/**
+ * Invented completion labels: the run is mostly elsewhere; the Home stretch is nearly
+ * always at Home. Older labels fall outside the 60-day window but inside a kept year.
+ */
 function travelFixtureLabels(today: Temporal.PlainDate): { behaviorId: string; localDate: string; label: PlaceLabelValue }[] {
   const gym = `saved_place:${travelPlaceKey("2 Synthetic Gym")}` as PlaceLabelValue;
   const runs: PlaceLabelValue[] = ["elsewhere", "elsewhere", "elsewhere", "home", "elsewhere", "elsewhere", gym, "elsewhere", "home", "elsewhere"];
   const stretches: PlaceLabelValue[] = ["home", "home", "home", "home", "elsewhere", "home", "home", "home", "home", "home"];
   const dated = (behaviorId: string, values: PlaceLabelValue[]) =>
     values.map((label, index) => ({ behaviorId, label, localDate: today.subtract({ days: index * 3 + 1 }).toString() }));
-  return [...dated("behavior_fixture", runs), ...dated("behavior_travel_stretch", stretches)];
+  const older = (behaviorId: string, values: PlaceLabelValue[]) =>
+    values.map((label, index) => ({ behaviorId, label, localDate: today.subtract({ days: 90 + index * 20 }).toString() }));
+  return [...dated("behavior_fixture", runs), ...dated("behavior_travel_stretch", stretches),
+    ...older("behavior_fixture", ["home", "home", "elsewhere", gym]), ...older("behavior_travel_stretch", ["home", "home", "home"]),
+    // Older than a year: kept only by "until I delete them".
+    { behaviorId: "behavior_travel_stretch", label: "elsewhere", localDate: today.subtract({ days: 400 }).toString() }];
 }
 
 function timedEvent(source: AdvisorCalendarEvent, ref: string, startAt: string, endAt: string): AdvisorCalendarEvent {

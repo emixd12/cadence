@@ -13863,7 +13863,10 @@ release train (Tickets 165, 212 and 216–219 combined on 215); not deployed. Op
 the owner is waiting for Google's reply to support case 76805292 (whether sending yes/no
 route conclusions to the model complies with Maps Platform Terms 3.2.3(c)) before
 deciding whether to restrict conclusions to day-level facts. Stage 2 leaves the stage 1
-conclusions unchanged until that decision. Owner decision (October 22,
+conclusions unchanged until that decision. Owner decisions (October 23, 2026): live
+route and weather conclusions use Option A, a server-signed conclusions token, and label
+counts also cover all retained history. Both are implemented on the release train.
+Owner decision (October 22,
 2026): disclosure updates, re-consent and marketing language are tracked in the
 privacy surface and do not block development. The existing Daily Brief model-data
 toggle stays the gate; there is no new consent gate. Google terms: accepted risk
@@ -13903,15 +13906,44 @@ Staging:
     excluded Calendar or stop. The validator accepts only the table margin for the
     listed conditions. The live brief has no evidence, so it sends `not_supplied`.
   - `placeLabels` (216): per-Behavior counts in the `where-suggestion-rules@1` 60-day
-    window (home, the Behavior's own place, another saved place, elsewhere, total).
-    No keys, positions or text; nothing while labels are off.
+    window (home, the Behavior's own place, another saved place, elsewhere, total), and
+    in `retained`, the same counts over everything kept under the user's retention
+    choice (90 days, 1 year or until deleted; owner decision October 23, 2026). The
+    model is told to name the window with each count. No keys, positions or text;
+    nothing while labels are off. The retention lines in Settings and the user guide
+    say what the Daily Brief sees under each option.
   - A brief whose model facts held weather trips carries `attributions: ["open_meteo"]`;
     the bubble shows the CC BY 4.0 credit unless the travel block already does.
   - The workbench fixtures add learned habits, a synthetic rain forecast and invented
     labels through the real resolvers. Tests prove the stage 2 facts are identical for
     any route duration and that model input holds no duration-bearing number.
-  - Live weather and live route conclusions share one open decision: how supplied
-    evidence reaches the server (Option A token or Option B server routing, below).
+  - Live route and weather conclusions use Option A (owner decision, October 23, 2026):
+    - With the server-only secret `TRAVEL_CONCLUSIONS_SIGNING_SECRET`, a one-day
+      `POST /api/travel/routes` response carries `conclusionsToken`. It is an HMAC-signed
+      payload of the view's yes/no fits, trips, unknowns and weather rule conclusions.
+      Commitments are named by occurrence ID or Calendar event identity, never places
+      or keys. It is bound to the user, local date, a hash of the stored travel inputs
+      (settings and habit revisions, Calendar connection, Behavior places, the day's
+      occurrences and statuses), issue time and the view's expiry.
+    - Web and linked desktop keep the latest token per account and day in page memory
+      and return it unchanged as `travelConclusions` with the Daily Brief request.
+      Account-free desktop sends nothing.
+    - The server verifies the signature (current or previous key), owner, date, expiry
+      and current stored inputs. It then maps commitments to the context's opaque refs
+      and checks each named Calendar event's provider revision against the brief's own
+      events.
+    - Any failure leaves route and weather `not_supplied` and never fails the brief:
+      tampered, other user, other day, expired, stale inputs, malformed, an unknown or
+      missing commitment, a changed event, or no secret.
+    - The delivery fence compares stored facts only, so a token that expires during
+      generation never fails the brief.
+    - The workbench never receives a token.
+    - Implementation: `lib/services/travel-conclusions-token.ts`, the refresh service,
+      `readSuppliedTravelConclusions` in `briefing-account-context.service.ts` and
+      `travelConclusionsToken` in `lib/ui/travel.ts`. Operations:
+      `docs/OPERATIONS.md#travel-conclusions-signing-secret-ticket-219-option-a`.
+    - Limitation: a brief requested before the Timeline has a current one-day view has
+      no token, so its trip facts are `not_supplied`.
 - Stage 2 plan, as filed after Tickets 216, 217 and 218:
   - Fill the typed slots: `habits` (217: get-ready minutes, usual mode per Behavior
     place), `weather` (218: condition, fixed margin minutes, suggested mode) and

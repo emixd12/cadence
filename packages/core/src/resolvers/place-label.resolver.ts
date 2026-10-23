@@ -409,8 +409,8 @@ export type PlaceLabelCountProjection = Readonly<{
 
 /**
  * Ticket 219 input candidate: counts only, never place keys, positions or text.
- * Ticket 219 stage 2 sends these counts to Daily Brief model input through
- * `advisorPlaceLabelCounts`.
+ * Ticket 219 stage 2's `advisorPlaceLabelCounts` applies the same categories to Daily
+ * Brief model input, over the rule period and over the whole retained history.
  */
 export function projectPlaceLabelCounts(input: Readonly<{
   labels: readonly Pick<CompletionPlaceLabel, "behaviorId" | "label" | "localDate">[];

@@ -6,9 +6,18 @@ import { validateVersionedAdvisorDayContext } from "@cadence/core/services/advis
 import { storedBehaviorWhere } from "@cadence/core/services/behavior-where";
 import { advisorPlaceLabelCounts, advisorTravelHabits, buildAdvisorTravelContext } from "@cadence/core/services/briefing-travel";
 import { travelHabitsFromSyncValue } from "@cadence/core/services/travel-habits";
-import type { PlaceLabelValue } from "@cadence/core/types/place-labels";
+import { PLACE_LABEL_RETENTIONS, type PlaceLabelRetention, type PlaceLabelValue } from "@cadence/core/types/place-labels";
 import { readTravelBehaviorLocations, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import { readCompletionPlaceLabelRows, readPlaceLabelSettingsRow } from "@/lib/db/placeLabels.repo";
+import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { readTravelRouteSource } from "./travel-settings.service";
+import {
+  renameTravelConclusionRefs,
+  travelConclusionsSourceKey,
+  verifyTravelConclusionsToken,
+  type TravelConclusionsPayload,
+  type TravelConclusionsSecrets,
+} from "./travel-conclusions-token";
 import type { BriefingAnalysisSource, BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import { readAdvisorAnalysisRevision, readAdvisorAnalysisSnapshot } from "@/lib/db/advisor-analysis.repo";
 import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
@@ -59,6 +68,12 @@ export async function prepareAccountBriefingContexts(
      * presets and evaluations never read a new source.
      */
     connectorSources?: Readonly<{ calendars: boolean; recordedActivity: boolean; deadlineAt: number }>;
+    /**
+     * Ticket 219 Option A: only the live Daily Brief passes the token its request
+     * returned. A token that fails any check leaves route and weather facts
+     * `not_supplied`; it never fails the brief. Workbench and history omit it.
+     */
+    travelConclusions?: Readonly<{ token: unknown; secrets: TravelConclusionsSecrets }>;
   }>,
 ): Promise<Readonly<{
   contexts: AdvisorDayContext[];
@@ -159,7 +174,12 @@ export async function prepareAccountBriefingContexts(
   const readTravel = () => readBriefingTravel(caller, authorization.behaviorIds, makeOpaqueRef, capturedContexts[0]!.localDate);
   const travel = await readTravel();
   input.signal.throwIfAborted();
-  const contexts = capturedContexts.map((context) => withTravel(context, travel));
+  const supplied = input.travelConclusions && travel.routing === "on"
+    ? await readSuppliedTravelConclusions(caller, input.travelConclusions, capturedContexts[0]!.localDate, clock()).catch(() => null)
+    : null;
+  input.signal.throwIfAborted();
+  // The delivery fence compares stored facts only, so a token that expires mid-generation never fails the brief.
+  const contexts = capturedContexts.map((context) => withTravel(context, travel, supplied, makeOpaqueRef));
   const configurationRefs = Object.fromEntries(authorization.behaviorIds.map((behaviorId) => [
     workbenchBehaviorRef(caller.user.id, behaviorId),
     makeOpaqueRef("behavior", behaviorId),
@@ -251,21 +271,72 @@ async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly 
     usualMode: settings?.mode ?? null,
     behaviors: visible.map(({ behaviorRef, whereKind }) => ({ behaviorRef, whereKind })),
     habits: advisorTravelHabits(habits, visible, settings?.base_location_text ?? null),
-    placeLabels: advisorPlaceLabelCounts({ enabled: labelsOn, behaviors: visible, today: Temporal.PlainDate.from(localDate),
+    placeLabels: advisorPlaceLabelCounts({ enabled: labelsOn, retention: (PLACE_LABEL_RETENTIONS as readonly string[]).includes(labelSettings?.retention ?? "")
+        ? labelSettings!.retention as PlaceLabelRetention : "90_days", behaviors: visible,
+      today: Temporal.PlainDate.from(localDate),
       labels: labels.map((label) => ({ behaviorId: label.behavior_id, localDate: label.local_date, label: label.label as PlaceLabelValue })) }),
   });
 }
 
 /** Keeps only Behaviors this context carries, as the strict context validator requires. */
-function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext): AdvisorDayContext {
+function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: TravelConclusionsPayload | null,
+  makeOpaqueRef: AdvisorOpaqueRef): AdvisorDayContext {
   const refs = new Set([...context.cadence.occurrences.map(({ behaviorRef }) => behaviorRef), ...context.cadence.history.behaviors.map(({ behaviorRef }) => behaviorRef)]);
-  const placeLabels = travel.placeLabels ? { ...travel.placeLabels, behaviors: travel.placeLabels.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)) } : null;
-  return validateVersionedAdvisorDayContext({ ...context, travel: {
+  const placeLabels = travel.placeLabels ? { ...travel.placeLabels,
+    behaviors: travel.placeLabels.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)),
+    retained: { ...travel.placeLabels.retained, behaviors: travel.placeLabels.retained.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)) },
+  } : null;
+  const stored: AdvisorTravelContext = {
     ...travel,
     behaviors: travel.behaviors.filter(({ behaviorRef }) => refs.has(behaviorRef)),
     ...(travel.habits ? { habits: { ...travel.habits, placeModes: travel.habits.placeModes.filter(({ behaviorRef }) => refs.has(behaviorRef)) } } : {}),
     ...(placeLabels ? { placeLabels } : {}),
-  } });
+  };
+  if (supplied) {
+    try {
+      return validateVersionedAdvisorDayContext({ ...context, travel: withSuppliedConclusions(context, stored, supplied, makeOpaqueRef) });
+    } catch {
+      // A token naming a commitment this context lacks, or a changed Calendar event, supplies nothing.
+    }
+  }
+  return validateVersionedAdvisorDayContext({ ...context, travel: stored });
+}
+
+/**
+ * Ticket 219 Option A: verifies the signature, owner, local date and expiry, then the
+ * current stored travel inputs. Returns null on any mismatch.
+ */
+async function readSuppliedTravelConclusions(caller: CalendarCaller, supplied: Readonly<{ token: unknown; secrets: TravelConclusionsSecrets }>,
+  localDate: string, now: Temporal.Instant): Promise<TravelConclusionsPayload | null> {
+  const payload = verifyTravelConclusionsToken(supplied.token, { secrets: supplied.secrets, userId: caller.user.id, localDate, now });
+  if (!payload) return null;
+  const [source, calendar, occurrences] = await Promise.all([
+    readTravelRouteSource(caller.client, caller.user.id),
+    getCalendarConnection(caller),
+    listOccurrencesBetweenLocalDates(caller.client, caller.user.id, localDate, localDate),
+  ]);
+  const current = travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
+    enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
+    calendar, behaviors: source.behaviors, occurrences });
+  return current === payload.src ? payload : null;
+}
+
+/** Maps the token's commitments to this context's opaque refs; a changed Calendar event throws. */
+function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: TravelConclusionsPayload,
+  makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
+  const eventRevisions = new Map(context.connectors.flatMap((connector) =>
+    connector.source === "google_calendar" && connector.state !== "not_requested" && "events" in connector
+      ? connector.events.map((event) => [event.ref, event.revision] as const) : []));
+  const rename = (key: string) => {
+    if (key.startsWith("occurrence:")) return makeOpaqueRef("occurrence", key.slice("occurrence:".length));
+    if (!key.startsWith("event:")) throw new Error("Unknown travel commitment.");
+    const ref = makeOpaqueRef("event", key.slice("event:".length));
+    const revision = supplied.events[key];
+    if (revision === undefined || eventRevisions.get(ref) !== makeOpaqueRef("revision", revision)) throw new Error("Calendar event changed after travel was planned.");
+    return ref;
+  };
+  const facts = renameTravelConclusionRefs({ conclusions: supplied.conclusions, weather: supplied.weather }, rename);
+  return { ...travel, route: { state: "available", conclusions: facts.conclusions }, ...(facts.weather ? { weather: facts.weather } : {}) };
 }
 
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {

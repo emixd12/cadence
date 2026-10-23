@@ -33,6 +33,7 @@ import type { OccurrenceStatus } from "../types/database";
 import { TRAVEL_MODEL_PROJECTION_VERSION, type TravelLegRole, type TravelMode, type TravelModelFit } from "../types/travel";
 import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
 import { CURRENT_WHERE_SUGGESTION_RULES } from "../resolvers/place-label.resolver";
+import { PLACE_LABEL_RETENTIONS } from "../types/place-labels";
 import { WEATHER_MARGIN_TABLE } from "../resolvers/weather-margin.resolver";
 import { TRAVEL_HABIT_RULES } from "./travel-habits";
 import type {
@@ -694,20 +695,38 @@ function validateTravel(value: unknown, refs: Readonly<{ occurrenceRefs: Set<str
   }
   if ("placeLabels" in travel) {
     const labels = record(travel.placeLabels, "context.travel.placeLabels");
-    exactKeys(labels, ["rulesVersion", "periodDays", "behaviors"], "context.travel.placeLabels");
+    exactKeys(labels, ["rulesVersion", "periodDays", "behaviors", "retained"], "context.travel.placeLabels");
     if (labels.rulesVersion !== CURRENT_WHERE_SUGGESTION_RULES.version || labels.periodDays !== CURRENT_WHERE_SUGGESTION_RULES.periodDays) {
       fail("travel.placeLabels.rulesVersion is unsupported.");
     }
-    unique(array(labels.behaviors, "travel.placeLabels.behaviors", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
-      const row = record(item, `travel.placeLabel[${index}]`);
-      exactKeys(row, ["behaviorRef", "total", "home", "wherePlace", "otherSavedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
-      for (const key of ["total", "home", "wherePlace", "otherSavedPlace", "elsewhere"] as const) whole(row[key], `travel.placeLabel.${key}`, 10_000);
-      const parts = (row.home as number) + (row.wherePlace as number) + (row.otherSavedPlace as number) + (row.elsewhere as number);
-      if (row.total === 0 || row.total !== parts) fail("travel.placeLabel.total is invalid.");
-      return behaviorRef(row.behaviorRef, "travel.placeLabel.behaviorRef");
-    }), "travel.placeLabels.behaviors");
+    const counts = (value: unknown, label: string) => {
+      const rows = new Map<string, Record<string, unknown>>();
+      unique(array(value, label, ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+        const row = record(item, `travel.placeLabel[${index}]`);
+        exactKeys(row, ["behaviorRef", "total", "home", "wherePlace", "otherSavedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
+        for (const key of PLACE_LABEL_COUNT_KEYS) whole(row[key], `travel.placeLabel.${key}`, 10_000);
+        const parts = (row.home as number) + (row.wherePlace as number) + (row.otherSavedPlace as number) + (row.elsewhere as number);
+        if (row.total === 0 || row.total !== parts) fail("travel.placeLabel.total is invalid.");
+        const ref = behaviorRef(row.behaviorRef, "travel.placeLabel.behaviorRef");
+        rows.set(ref, row);
+        return ref;
+      }), label);
+      return rows;
+    };
+    const period = counts(labels.behaviors, "travel.placeLabels.behaviors");
+    const retained = record(labels.retained, "travel.placeLabels.retained");
+    exactKeys(retained, ["retention", "behaviors"], "travel.placeLabels.retained");
+    if (!(PLACE_LABEL_RETENTIONS as readonly unknown[]).includes(retained.retention)) fail("travel.placeLabels.retained.retention is invalid.");
+    const kept = counts(retained.behaviors, "travel.placeLabels.retained.behaviors");
+    // Every retention keeps at least the 60-day window, so kept history never counts fewer labels.
+    for (const [ref, row] of period) {
+      const whole = kept.get(ref);
+      if (!whole || PLACE_LABEL_COUNT_KEYS.some((key) => (whole[key] as number) < (row[key] as number))) fail("travel.placeLabels.retained is invalid.");
+    }
   }
 }
+
+const PLACE_LABEL_COUNT_KEYS = ["total", "home", "wherePlace", "otherSavedPlace", "elsewhere"] as const;
 
 function validateHistoricalCompletionTimes(value: unknown, historyValue: unknown, zone: string, refs: Set<string>): void {
   const timing = record(value, "historicalCompletionTimes");
