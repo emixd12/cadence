@@ -836,6 +836,28 @@ describe("Ticket 216 place label synchronization", () => {
     expect(result.localWrites.some(({ kind, operation }) => kind === "completion_place_label" && operation === "delete")).toBe(true);
   });
 
+  it("carries learned habits and place labels in one plan in either direction (Tickets 216 and 217)", () => {
+    const habits = (minutes: number): AccountSyncEntity => ({ kind: "profile", id: "profile", value: {
+      timezone: "UTC", travel_preparation_minutes: minutes, travel_arrival_buffer_minutes: null,
+      travel_place_modes: [{ place_key: key, mode: "transit", chosen_at: "2026-10-22T12:00:00.000000Z" }],
+      travel_leave_feedback: [], travel_habits_updated_at: "2026-10-22T12:00:00.000000Z",
+    } });
+    const recorded = [completed, settings(true, "2026-10-01T00:00:00Z"), marker("2026-10-22T12:00:00Z"), label()];
+    const upload = plan(base, snapshot(completeRows([...recorded, habits(15)])), base);
+    expect(upload.conflicts).toEqual([]);
+    expect(upload.hostedWrites.map(({ kind, operation }) => `${kind}:${operation}`).sort())
+      .toEqual(["completion_place_label:upsert", "place_marker:upsert", "profile:upsert"]);
+    expect(upload.hostedWrites.find(({ kind }) => kind === "profile")?.value).toMatchObject({
+      travel_preparation_minutes: 15, travel_place_modes: [{ place_key: key, mode: "transit" }] });
+    // Habits changed on the web while the desktop recorded labels: each side receives the other's change.
+    const crossed = plan(base, snapshot(completeRows(recorded)), snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), habits(20)])));
+    expect(crossed.conflicts).toEqual([]);
+    expect(crossed.localWrites.map(({ kind }) => kind)).toEqual(["profile"]);
+    expect(crossed.hostedWrites.map(({ kind }) => kind).sort()).toEqual(["completion_place_label", "place_marker"]);
+    // Out-of-range learned values fail the whole plan beside valid place labels.
+    expect(() => plan(base, snapshot(completeRows([...recorded, habits(61)])), base)).toThrow(/travel habits are invalid/i);
+  });
+
   it("rejects malformed rows and unknown rule versions", () => {
     const bad = (entity: AccountSyncEntity) => () => plan(base, snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), entity])), base);
     expect(bad({ ...marker("2026-10-22T12:00:00Z"), value: { ...(marker("2026-10-22T12:00:00Z").value as object), accuracy_meters: 101 } })).toThrow(/place marker is invalid/);

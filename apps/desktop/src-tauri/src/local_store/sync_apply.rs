@@ -1369,6 +1369,36 @@ mod tests {
     }
 
     #[test]
+    fn account_sync_applies_travel_habits_and_place_labels_in_one_plan() {
+        // Travel release train: Ticket 217's profile habits and Ticket 216's place-label
+        // rows arrive together from a hosted account that has both migrations.
+        let (_directory, mut connection, profile, _category) = database();
+        let current = profile_value(&connection, &profile).unwrap();
+        let mut next = current.clone();
+        next["travel_preparation_minutes"] = json!(20);
+        next["travel_place_modes"] = json!([{"place_key":"a".repeat(43),"mode":"transit","chosen_at":"2026-09-01T00:00:00.000000Z"}]);
+        next["travel_habits_updated_at"] = json!("2026-09-01T00:00:00.000000Z");
+        let settings = json!({"id":"place_labels","enabled":true,"retention":"1_year","enabled_at":"2026-09-01T00:00:00.000000Z",
+            "marker_prompt_dismissed_at":null,"updated_at":"2026-09-01T00:00:00.000000Z"});
+        let marker_id = format!("saved_place:{}", "a".repeat(43));
+        let marker = json!({"id":marker_id,"place_key":"a".repeat(43),"latitude_e6":41_878_100,"longitude_e6":-87_629_800,
+            "accuracy_meters":20,"rule_version":"place-label-rules@1","recorded_at":"2026-09-01T00:00:00.000000Z"});
+        let upsert = |kind: AccountSyncEntityKind, id: &str, expected: Option<Value>, value: Value| AccountSyncWrite {
+            kind, id: id.into(), operation: AccountSyncOperation::Upsert, expected, value: Some(value) };
+        execute(&mut connection, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![
+            upsert(AccountSyncEntityKind::PlaceMarker, &marker_id, None, marker),
+            upsert(AccountSyncEntityKind::Profile, "profile", Some(current), next.clone()),
+            upsert(AccountSyncEntityKind::PlaceLabelSettings, "place_labels", None, settings),
+        ] }).unwrap();
+        assert_eq!(profile_value(&connection, &profile).unwrap(), next);
+        let markers: i64 = connection.query_row("SELECT count(*) FROM place_markers WHERE user_id=?1", [&profile], |row| row.get(0)).unwrap();
+        assert_eq!(markers, 1);
+        // The same marker's place key also names the remembered mode, so both describe one place.
+        let saved = super::super::travel::read_value(&connection, &profile).unwrap();
+        assert_eq!(saved["habits"]["placeModes"][0]["placeKey"], "a".repeat(43));
+    }
+
+    #[test]
     fn account_sync_rejects_profile_and_history_deletion() {
         let (_directory, mut connection, profile, _category) = database();
         let failure = execute(
