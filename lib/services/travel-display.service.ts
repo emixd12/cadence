@@ -14,6 +14,8 @@ export type TravelRoutesResponse = Readonly<{
   mode: TravelMode | null;
   navigationPreference: TravelNavigationPreference | null;
   settingsRevision: string | null;
+  /** Ticket 217: the learned-habit revision this view was planned with. */
+  habitsRevision?: string | null;
   expiresAt: string | null;
   evidence: TravelRouteDisplay | null;
 }>;

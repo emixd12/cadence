@@ -13554,46 +13554,96 @@ Platform impact:
 
 ## Ticket 217: Learned travel habits
 
-Status: filed October 17, 2026; planned. Defaults and step sizes are proposals for
-owner confirmation.
+Status: implemented in source October 22, 2026; not deployed. Draft PR against the
+Ticket 215 branch. Hosted migration `20261022170000_travel_habits.sql`, deployment,
+a desktop preview with SQLite migration 0019 and production QA remain owner-gated.
+The hosted migration replays locally with every migration on the branch; it ships
+with the Ticket 215 coordinated rollout, after the 215 migration. Desktop builds that
+predate Ticket 217 fail closed on every synchronization ("Update Cadence before
+synchronizing account data.") until updated, as with Ticket 215.
+Owner decision (October 22, 2026): the starting values below are confirmed.
 Dependencies: 215.
 
 Goal: estimates match how the user actually travels, learned only from what the user
 tells Cadence.
 
+Confirmed values, kept in the versioned constant `TRAVEL_HABIT_RULES`
+(`travel-habit-defaults@1`) in `packages/core/src/services/travel-habits.ts`:
+
+- Get-ready time: 10 minutes.
+- Arrival buffer: 5 minutes.
+- Each "too late" answer adds 5 minutes and each "too early" answer removes 5,
+  within 0–30 minutes.
+- Ask at most once a day. Dismissing records nothing.
+- `exitSeconds` and `settlingSeconds` stay zero.
+
+Cadence assumptions, not owner-confirmed: get-ready time is editable from 0 to 60
+minutes in 5-minute steps; the newest 30 answers are kept; at most 100 places keep a
+remembered mode, dropping the oldest choice. A later change adds a new rules version.
+
 Scope and acceptance:
 
 - Learn only from user input. No continuous or background location tracking. Never
-  store Google route durations to build history.
+  store Google route durations to build history. Done: habits change only through
+  Settings edits, a mode choice and leave-time answers.
 - Usual mode per place: event details and located Behavior details offer a mode choice
   for that journey. Cadence remembers the last choice or correction per saved place and
-  falls back to usual travel.
-- Get-ready time: the time the user needs before leaving. Proposed default: 10 minutes.
-  It occupies time before departure in Timeline spans and fit checks.
-- Arrival buffer: the resolver's existing `arrivalSeconds`. Proposed default: 5 minutes.
-  Keep `exitSeconds` and `settlingSeconds` at zero until evidence shows a need.
+  falls back to usual travel. Done: Travel by in Calendar event details and expanded
+  located Behaviors. The place is the Ticket 216 place key (the place-cache text key),
+  so a mode and a completion label name the same place. The trip home follows the
+  last stop's mode.
+- Get-ready time: the time the user needs before leaving. It occupies time before
+  departure in Timeline spans and fit checks. Done: a `preparation_buffer` segment
+  before each outbound leg's departure; it never moves the departure or the route
+  request.
+- Arrival buffer: the resolver's existing `arrivalSeconds`. Keep `exitSeconds` and
+  `settlingSeconds` at zero until evidence shows a need.
 - The resolver has no buffer before a leg that starts at Home or the current position.
   Add `preparationSeconds` beside the three existing buffers for get-ready time.
+  Done: optional `TravelBuffers.preparationSeconds`, zero when absent.
 - Replace production `ZERO_BUFFERS` in `lib/services/travel-route-refresh.service.ts`
-  with the learned values.
+  with the learned values. Done: `travelHabitBuffers(settings.habits)`; the habit
+  revision joins the journey revision and both source fences.
 - Feedback: after an event with a routed outbound leg, the next Timeline view that day
   asks once: "Your leave time was too early / about right / too late." Too late adds
   5 minutes to the arrival buffer; too early removes 5; the range is 0–30 minutes.
-  Ask at most once a day. Dismissing records nothing.
+  Ask at most once a day. Dismissing records nothing. Done: the question waits for the
+  event's end (its start when the end is unknown). Journeys seen with a current
+  outbound estimate are remembered in page memory only. Not now hides the question
+  for that visit and stores nothing.
 - Travel Settings shows the learned values in plain words that the user can edit, for
   example "You usually need 15 minutes to get ready." These replace buffer settings.
-  Add no new settings fields.
+  Add no new settings fields. Done: How you travel, with inline selects inside the
+  sentences.
 - Store per-place modes, get-ready time, arrival buffer and feedback taps with the
-  account. Taps hold an event reference, the answer and a time; no location.
+  account. Taps hold an event reference, the answer and a time; no location. Done:
+  columns on `travel_settings` with owner RLS, a separate habit revision, generated
+  types, SQLite migration 0019 and the singleton profile sync entity (13 keys). An
+  answer holds a hex SHA-256 event reference, the local date, the answer, the time and
+  the rules version.
 - Add the feedback tap, mode choice and inline edits to `interaction-registry.json`.
-  Include migration, `docs/DATA_MODEL.md` and resolver tests for the new buffer.
+  Include migration, `docs/DATA_MODEL.md` and resolver tests for the new buffer. Done:
+  `INT-TRAVEL-008`, `INT-TRAVEL-009` and `INT-TRAVEL-010`.
+
+Follow-ups (not in this ticket):
+
+- Exports: learned habits, Home and usual travel are not in any export yet.
+- Ticket 219 reads `resolveTravelHabits` and `rememberedTravelMode` for model facts.
+- Merging with Ticket 218: its weather margin is a separate `TravelEvidenceInput.weather`
+  input, not a buffer, so the APIs sit side by side. One semantic step remains at
+  merge: get-ready time must end at the weather-adjusted departure
+  (`entry.weather?.departureAt ?? estimate.departureAt`), as Ticket 218 does for
+  settling. The refresh service then passes the learned `buffers` and `weather`
+  together and drops `ZERO_BUFFERS`.
 
 Platform impact:
-- Web: travel resolver, refresh service, event details, Travel Settings and a migration.
-- Desktop: shares the components and resolver. Add the preferences to SQLite and the
-  synchronization contract.
-- Marketing: not applicable.
-- Future mobile: inherits the preferences and feedback tap.
+- Web: travel resolver, refresh service, `/api/travel/habits`, event details, located
+  Behavior details, Timeline question, Travel Settings and a migration.
+- Desktop: shares the components and resolver. SQLite migration 0019, the
+  `commitTravelHabits` native command and the profile synchronization contract carry
+  the habits; the hosted refresh reads them after synchronization.
+- Marketing: not applicable; travel has no public copy.
+- Future mobile: inherits the stored habits, the mode choice and the question.
 
 ## Ticket 218: Weather provider selection and travel margin
 

@@ -62,6 +62,56 @@ installed desktop guide. Both remain open and ship with Ticket 215's rollout.
 Platform impact: web and desktop as above; marketing not applicable; future mobile
 carries the row into the proposed Ticket 196.
 
+## Ticket 217: learned travel habits in source — October 22, 2026
+
+**Owner decision (October 22):** the starting values are confirmed: get-ready
+time 10 minutes, arrival buffer 5 minutes, each "too late" or "too early" answer
+moves the buffer by 5 minutes within 0–30, at most one question a day, dismissing
+records nothing, and exit and settling buffers stay zero. They live in the
+versioned constant `TRAVEL_HABIT_RULES` (`travel-habit-defaults@1`) in
+`packages/core/src/services/travel-habits.ts`.
+
+Implemented on a draft PR against the Ticket 215 branch; not deployed:
+- Resolver: optional `TravelBuffers.preparationSeconds` adds a
+  `preparation_buffer` segment before each outbound departure. It never moves the
+  departure or the route request. Production `ZERO_BUFFERS` is replaced by the
+  learned values.
+- Mode per place: Travel by in Calendar event details and expanded located
+  Behaviors. Cadence remembers it under the Ticket 216 place key and falls back to
+  usual travel.
+- Leave-time question on the Timeline after a journey with a routed outbound leg,
+  once a day. Not now stores nothing.
+- Travel Settings, How you travel: the learned values as plain sentences with
+  inline selects. No buffer fields.
+- Storage: hosted migration `20261022170000_travel_habits.sql` (habit columns on
+  `travel_settings`, owner RLS unchanged, a separate habit revision), generated
+  types, SQLite migration 0019, the `commitTravelHabits` native command and the
+  singleton profile sync entity, now 13 keys. `PUT /api/travel/habits` writes one
+  change; `GET` names remembered places.
+- Registry: `INT-TRAVEL-008` to `INT-TRAVEL-010`. Design-system manifest, usage,
+  surfaces and bench entries for the three new components.
+
+Assumptions, not owner-confirmed: get-ready time editable 0–60 minutes in
+5-minute steps; the newest 30 answers kept; at most 100 remembered places.
+
+Rollout: ship with the Ticket 215 coordinated rollout, after its migration.
+Desktop builds that predate Ticket 217 fail closed on every synchronization
+("Update Cadence before synchronizing account data.") once the hosted migration
+runs, as with Ticket 215. No hosted migration, deployment, signing or Google
+Maps call was made.
+
+Local verification on an isolated `cadence-t217` stack (loopback ports
+55420–55429, stopped afterwards): clean replay of all 90 migrations, all 23 SQL
+rollback fixtures including the new `ticket-217-travel-habits-smoke.sql`, RLS
+smoke (92 ownership checks), account-sync RPC smoke with a learned-habit round
+trip and old-client rejection, the authenticated BehaviorStore contract and the
+new opt-in `tests/travel-habits.local-integration.test.ts`. Results of the
+repository checks are in the PR.
+
+Platform impact: web and desktop implemented; marketing not applicable; future
+mobile inherits the stored habits, the mode choice and the question. Exports do
+not include learned habits yet, as for Home and usual travel.
+
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
 **Owner decision (October 22):** publish the tested 0.1.3, overriding the October 21

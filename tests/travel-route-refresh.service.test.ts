@@ -25,6 +25,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 }));
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 
 const now = Temporal.Instant.from("2026-09-22T08:00:00Z");
 const source = {
@@ -277,5 +278,44 @@ describe("refreshTravelRoutes", () => {
     let reads = 0;
     mocks.source.mockImplementation(async () => (reads += 1) < 3 ? source : { ...source, settingsRevision: "settings-2" });
     await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+  });
+
+  describe("Ticket 217 learned habits", () => {
+    const habits = { preparationMinutes: 15, arrivalBufferMinutes: 10, leaveFeedback: [], updatedAt: "2026-09-21T00:00:00.000000Z",
+      placeModes: [{ placeKey: travelPlaceKey("2 Habit St"), mode: "transit" as const, chosenAt: "2026-09-21T00:00:00.000000Z" }] };
+
+    it("uses the place-cache key for remembered places", () => {
+      expect(travelPlaceKey(" 2  HABIT st ")).toBe(keyOf("2 Habit St"));
+    });
+
+    it("routes with the learned arrival buffer and the remembered mode, and occupies get-ready time", async () => {
+      located();
+      mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, habits }, habitsRevision: habits.updatedAt });
+      const result = await refreshTravelRoutes(caller, day, config, now);
+      const requests = mocks.route.mock.calls[0]![0].routes.map((route: { request: { mode: string; timing: unknown } }) => route.request);
+      expect(requests.map((request: { mode: string }) => request.mode)).toEqual(["transit", "transit"]);
+      expect(requests[0].timing).toEqual({ kind: "arrive_by", at: "2026-09-22T09:50:00Z" });
+      expect(result.habitsRevision).toBe(habits.updatedAt);
+      expect(result.evidence?.segments.filter((segment) => segment.kind === "preparation_buffer"))
+        .toEqual([expect.objectContaining({ startAt: "2026-09-22T09:35:00Z", endAt: "2026-09-22T09:50:00Z" })]);
+      expect(result.evidence?.legs[0]?.leg.destinationPlaceKey).toBe(travelPlaceKey("2 Habit St"));
+    });
+
+    it("falls back to usual travel and the confirmed defaults when nothing was learned", async () => {
+      located();
+      const result = await refreshTravelRoutes(caller, day, config, now);
+      const requests = mocks.route.mock.calls[0]![0].routes.map((route: { request: { mode: string; timing: unknown } }) => route.request);
+      expect(requests[0]).toMatchObject({ mode: "walking", timing: { kind: "arrive_by", at: "2026-09-22T09:55:00Z" } });
+      expect(result.evidence?.segments.filter((segment) => segment.kind === "preparation_buffer"))
+        .toEqual([expect.objectContaining({ startAt: "2026-09-22T09:40:00Z", endAt: "2026-09-22T09:50:00Z" })]);
+    });
+
+    it("withdraws the refresh when habits change during it", async () => {
+      located();
+      let reads = 0;
+      mocks.source.mockImplementation(async () => (reads += 1) < 3 ? { ...source, habitsRevision: null }
+        : { ...source, settings: { ...source.settings, habits }, habitsRevision: habits.updatedAt });
+      await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    });
   });
 });

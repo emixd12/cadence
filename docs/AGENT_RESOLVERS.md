@@ -285,6 +285,7 @@ pure owner with paired tests; current runtime owners are listed below.
 | Duration and external context | `packages/core/src/resolvers/timeline-context.resolver.ts` | Shared Timeline assembly, owner-scoped web/desktop services, synthetic fixtures, and resolver tests | Averaging sessions instead of Occurrences, treating unknown as zero, running samples, automatic decisions or schedule writes | `docs/PRODUCT_SPEC.md` | `tests/timeline-context.resolver.test.ts` | Positive stopped Completed totals, optional default duration, explicit unknown/freshness, half-open timed overlaps |
 | Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
 | Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and timing-only model projection |
+| Learned travel habits | `packages/core/src/services/travel-habits.ts` | Refresh service, web and desktop travel settings services, Travel Settings, Timeline mode choice and leave-time question | Restating defaults, steps or bounds; learning from position or route durations; storing place text or event titles | `docs/TICKETS.md` (Ticket 217), `docs/DATA_MODEL.md` | `tests/travel-habits.test.ts` | Versioned rules constant, injected instants, canonical stored order, one answer per local date |
 
 - `packages/core/src/resolvers/timeline.resolver.ts` retains day selection,
   Needs decision, Occurrence status projection, and future-range ownership.
@@ -333,6 +334,18 @@ and the 500 m movement rule, paired with `tests/travel-refresh-policy.test.ts`.
 `lib/services/travel-route-refresh.service.ts` and `lib/ui/travel.ts` call it; they
 must not restate those rules. Provider SKU prices and the traffic-aware window stay
 in the provider adapter `lib/services/travel-provider.ts`.
+
+`packages/core/src/services/travel-habits.ts` (Ticket 217) owns the learned-habit
+rules in the versioned `TRAVEL_HABIT_RULES` constant (`travel-habit-defaults@1`):
+defaults, steps and bounds, habit-change planning, the remembered mode per place,
+the stored and synchronized shape, and the once-a-day leave-time question. It is
+paired with `tests/travel-habits.test.ts`. `travelHabitBuffers` produces the
+resolver's `TravelBuffers`, including `preparationSeconds`; the travel resolver turns
+get-ready time into a `preparation_buffer` segment before an outbound departure
+without moving the route. The refresh service, web and desktop settings services,
+Travel Settings and the Timeline call these functions; they must not restate the
+steps, bounds or prompt rules. Place keys come from Ticket 216's
+`packages/core/src/services/travel-place-key.ts`.
 
 ## Day-progress production consumers (Tickets 133–136)
 

@@ -229,6 +229,35 @@ pub struct TravelSettingsMutation {
     pub updated_at: String,
 }
 
+/// Ticket 217: the complete next habits, planned by the shared TypeScript rules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelHabitsMutation {
+    pub preparation_minutes: Option<i64>,
+    pub arrival_buffer_minutes: Option<i64>,
+    pub place_modes: Vec<TravelPlaceModeEntry>,
+    pub leave_feedback: Vec<TravelLeaveFeedbackEntry>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelPlaceModeEntry {
+    pub place_key: String,
+    pub mode: String,
+    pub chosen_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelLeaveFeedbackEntry {
+    pub event_ref: String,
+    pub local_date: String,
+    pub answer: String,
+    pub answered_at: String,
+    pub rules_version: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "operation",
@@ -354,6 +383,13 @@ pub enum Request {
         now: String,
         expected_updated_at: String,
         next: TravelSettingsMutation,
+    },
+    CommitTravelHabits {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        expected_updated_at: Option<String>,
+        next: TravelHabitsMutation,
     },
     CommitNativeReminderPlan {
         profile_id: String,
@@ -756,6 +792,13 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             next,
             ..
         } => travel::write(db, profile_id, now, expected_updated_at, next),
+        Request::CommitTravelHabits {
+            profile_id,
+            now,
+            expected_updated_at,
+            next,
+            ..
+        } => travel::write_habits(db, profile_id, now, expected_updated_at.as_deref(), next),
         Request::CommitNativeReminderPlan { .. } => reminder::plan(db, request),
         Request::RecordNativeReminderCoverage { .. } => reminder::record(db, request),
         Request::CreateBehaviorGraph {
@@ -889,6 +932,12 @@ impl Request {
                 ..
             }
             | Self::CommitTravelSettings {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CommitTravelHabits {
                 profile_id,
                 mutation_id,
                 now,

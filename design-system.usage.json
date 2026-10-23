@@ -94,7 +94,7 @@
     {
       "componentId": "composite.external-event-details",
       "file": "components/timeline/DayProgressTimeline.tsx",
-      "line": 319,
+      "line": 371,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -110,7 +110,7 @@
     {
       "componentId": "composite.external-event-preview",
       "file": "components/timeline/DayProgressTimeline.tsx",
-      "line": 311,
+      "line": 363,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -174,7 +174,7 @@
     {
       "componentId": "composite.occurrence-row",
       "file": "components/timeline/DayProgressTimeline.tsx",
-      "line": 489,
+      "line": 546,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -222,7 +222,7 @@
     {
       "componentId": "composite.recorded-activity-list",
       "file": "components/timeline/DayProgressTimeline.tsx",
-      "line": 473,
+      "line": 530,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -231,6 +231,30 @@
       "componentId": "composite.recorded-activity-list",
       "file": "tests/connector-library.dom.test.tsx",
       "line": 191,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.travel-leave-question",
+      "file": "components/timeline/DayProgressTimeline.tsx",
+      "line": 327,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.travel-mode-choice",
+      "file": "components/timeline/DayProgressTimeline.tsx",
+      "line": 701,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.travel-mode-choice",
+      "file": "components/timeline/ExternalEventDetails.tsx",
+      "line": 178,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -638,7 +662,7 @@
     {
       "componentId": "module.category-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 523,
+      "line": 528,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -678,7 +702,7 @@
     {
       "componentId": "module.connector-library",
       "file": "apps/desktop/src/product.tsx",
-      "line": 526,
+      "line": 531,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -774,7 +798,7 @@
     {
       "componentId": "module.daily-brief-settings-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 540,
+      "line": 545,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1070,7 +1094,7 @@
     {
       "componentId": "module.google-calendar-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 527,
+      "line": 532,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1166,7 +1190,7 @@
     {
       "componentId": "module.hevy-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 536,
+      "line": 541,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1206,7 +1230,7 @@
     {
       "componentId": "module.icloud-calendar-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 533,
+      "line": 538,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1318,7 +1342,7 @@
     {
       "componentId": "module.note-shortcut-controls",
       "file": "apps/desktop/src/product.tsx",
-      "line": 522,
+      "line": 527,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1382,7 +1406,7 @@
     {
       "componentId": "module.outlook-calendar-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 529,
+      "line": 534,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1671,6 +1695,14 @@
       "componentId": "module.timezone-panel",
       "file": "tests/ux-ticket-049-052-ui.test.tsx",
       "line": 55,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "module.travel-habits-section",
+      "file": "components/settings/TravelSettingsPanel.tsx",
+      "line": 108,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"

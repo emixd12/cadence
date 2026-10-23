@@ -621,6 +621,48 @@
       "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
     },
     {
+      "id": "module.travel-habits-section",
+      "name": "TravelHabitsSection",
+      "kind": "module",
+      "source": "components/settings/TravelHabitsSection.tsx",
+      "exportName": "TravelHabitsSection",
+      "usageNames": [
+        "TravelHabitsSection"
+      ],
+      "benchAnchor": "design-system#ds-module-travel-habits-section",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 217: learned get-ready time, arrival buffer and travel per place as plain sentences with inline selects; each change saves at once with the habit revision. Bench saves stay in page memory."
+    },
+    {
+      "id": "composite.travel-mode-choice",
+      "name": "TravelModeChoice",
+      "kind": "composite",
+      "source": "components/timeline/TravelModeChoice.tsx",
+      "exportName": "TravelModeChoice",
+      "usageNames": [
+        "TravelModeChoice"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-mode-choice",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 217: Travel by select in Calendar event details and expanded located Behaviors; remembers the mode for the place key. Synthetic bench evidence; no provider call."
+    },
+    {
+      "id": "composite.travel-leave-question",
+      "name": "TravelLeaveQuestion",
+      "kind": "composite",
+      "source": "components/timeline/TravelLeaveQuestion.tsx",
+      "exportName": "TravelLeaveQuestion",
+      "usageNames": [
+        "TravelLeaveQuestion"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-leave-question",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 217: once-a-day Too early / About right / Too late question with Not now, shown in the Timeline status area. Not now records nothing."
+    },
+    {
       "id": "flow.consent-form",
       "name": "ConsentForm",
       "kind": "flow",

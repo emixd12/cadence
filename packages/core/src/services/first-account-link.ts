@@ -14,8 +14,9 @@ const DEFAULT_TIMEZONE = "America/New_York";
 export function firstLinkIncludesTravel(snapshot: AccountSyncSnapshot): boolean {
   return snapshot.entities.some(({ kind, value }) => {
     const row = object(value);
+    // Learned travel habits (Ticket 217) have a revision once anything was learned.
     if (kind === "profile") return !!(row.travel_enabled || row.base_location_text || row.travel_mode ||
-      row.navigation_preference || row.routing_consent_at || row.onboarding_completed_at);
+      row.navigation_preference || row.routing_consent_at || row.onboarding_completed_at || row.travel_habits_updated_at);
     if (kind === "behavior") return !!(row.location_text || row.where_kind);
     return kind === "configuration_event" && [row.previous_configuration, row.next_configuration]
       .some((configuration) => configuration && (object(configuration).location_text || object(configuration).locationText
@@ -61,7 +62,7 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
   if (snapshot.profile.timezone !== DEFAULT_TIMEZONE) return true;
   const travel = snapshot.travelSettings;
   if (travel && (travel.enabled || travel.baseLocationText || travel.mode || travel.navigationPreference ||
-    travel.routingConsentAt || travel.onboardingCompletedAt)) return true;
+    travel.routingConsentAt || travel.onboardingCompletedAt || travel.habits?.updatedAt)) return true;
   const categories = [...snapshot.categories]
     .sort((left, right) => left.sort_order - right.sort_order)
     .map(({ name }) => name);

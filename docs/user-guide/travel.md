@@ -1,8 +1,8 @@
 # Travel routing
 
 Cadence estimates travel to located Calendar events and to Behaviors with a Where,
-using Google Maps. The controls live in Settings, Travel; the Behavior form; and
-Calendar event details.
+using Google Maps. The controls live in Settings, Travel; the Behavior form;
+Calendar event details; and the Timeline's leave-time question.
 
 ## Set up travel
 
@@ -108,6 +108,55 @@ you refresh. When a refresh fails, the line shows the reason instead.
 Travel estimates have a monthly limit per account. When it is used up, the
 Timeline keeps the last estimates, marked as possibly stale, and says on which date
 estimates resume. Refresh travel is hidden until then.
+
+## Learned travel habits
+
+Cadence learns how you travel only from what you tell it. It never tracks your
+position to learn, and it never keeps Google route durations.
+
+Settings, Travel, How you travel shows the learned values as sentences you can
+edit in place:
+
+- **Get-ready time**: "You usually need 10 minutes to get ready." This time comes
+  before you leave Home or your current position. On the Timeline it occupies the
+  span before departure, so a Behavior in that span shows as a travel overlap. It
+  does not move the leave time. Choose 0 to 60 minutes in 5-minute steps.
+- **Arrival buffer**: "You like to arrive 5 minutes early." Cadence plans arrival
+  this long before an event or Behavior starts. Choose 0 to 30 minutes in 5-minute
+  steps. Your answers to the leave-time question also change it.
+- **Travel by place**: "You usually take transit to Home." Change a place's mode, or
+  choose use usual travel to forget it. Home and Behavior places show their names;
+  a Calendar place shows the date you chose its mode, because Cadence keeps no text
+  for it.
+
+Choosing a value marked (default) follows Cadence's starting values: 10 minutes to
+get ready and a 5-minute arrival buffer. Cadence never leaves time after an event
+or after arriving home.
+
+### Choose travel for a place
+
+Calendar event details and an expanded located Behavior show Travel by when a trip
+reaches that place. Choose walking, cycling, transit or driving. Cadence remembers
+the choice for that place and uses it for later trips there; Usual travel forgets
+it. The trip home follows the mode of your last stop. Cadence identifies the place
+by a one-way fingerprint of its text, the same fingerprint used for place lookups.
+
+### Answer the leave-time question
+
+After an event or Behavior whose trip from Home or your current position had an
+estimate, the next Timeline view that day asks once: your leave time was too early,
+about right or too late. Cadence remembers such trips only while the app stays
+open, so a reload before the event ends means no question that day. Too late adds
+5 minutes to the arrival buffer; too early removes 5; the buffer stays between 0
+and 30 minutes. About right keeps it. Cadence asks at most once a day. Not now
+records nothing and hides the question for the rest of this visit.
+
+Each answer keeps a one-way fingerprint of the event, the date, the answer, the time
+and the rules version; never the title, the event time or a location. Cadence keeps
+the newest 30 answers.
+
+Learned habits synchronize with the account and belong in native Cadence database
+backups. They are not in exports yet; Home and usual travel are not either.
 
 ## Open navigation
 

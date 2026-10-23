@@ -297,6 +297,9 @@
         "INT-TRAVEL-002",
         "INT-TRAVEL-003",
         "INT-TRAVEL-004",
+        "INT-TRAVEL-008",
+        "INT-TRAVEL-009",
+        "INT-TRAVEL-010",
         "INT-TRAVEL-006",
         "INT-TRAVEL-007",
         "INT-CALENDAR-008",
@@ -783,7 +786,8 @@
         "INT-TIMELINE-001",
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
-        "INT-TRAVEL-004"
+        "INT-TRAVEL-004",
+        "INT-TRAVEL-008"
       ]
     },
     {
@@ -794,7 +798,8 @@
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
         "INT-CALENDAR-007",
-        "INT-TRAVEL-003"
+        "INT-TRAVEL-003",
+        "INT-TRAVEL-009"
       ]
     },
     {
@@ -852,6 +857,30 @@
         "INT-TRAVEL-002",
         "INT-TRAVEL-006",
         "INT-TRAVEL-007"
+      ]
+    },
+    {
+      "path": "components/settings/TravelHabitsSection.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-TRAVEL-010"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelLeaveQuestion.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-TRAVEL-008"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelModeChoice.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TRAVEL-009"
       ]
     },
     {
@@ -13696,6 +13725,300 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-008",
+      "name": "Answer the leave-time question",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#answer-the-leave-time-question"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0\u201330 minutes (travel-habit-defaults@1).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Too early"
+        },
+        {
+          "kind": "activate",
+          "control": "About right"
+        },
+        {
+          "kind": "activate",
+          "control": "Too late"
+        },
+        {
+          "kind": "activate",
+          "control": "Not now"
+        }
+      ],
+      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this page session. Hidden after an answer that day or after Not now in this session.",
+      "success_result": "Stores the answer with an event digest, local date, time and rules version, updates the arrival buffer, names the new buffer and refreshes estimates when the buffer changed. Not now records nothing.",
+      "failure_result": "Keeps the question and says the answer could not save. Tracking data and estimates are unchanged.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelLeaveQuestion.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "lib/ui/travel-habits.ts",
+        "packages/core/src/services/travel-habits.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-habits.test.ts"
+        ],
+        "notes": "Provider-free tests. No position, route duration or event title is stored."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelLeaveQuestion.tsx",
+            "components/timeline/DayProgressTimeline.tsx",
+            "app/api/travel/habits/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; hosted route and travel_settings store the answer."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelLeaveQuestion.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; SQLite stores the answer and account synchronization carries it."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-009",
+      "name": "Choose travel for a place",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#choose-travel-for-a-place"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Choose walking, cycling, transit or driving for the journey to a located Calendar event or Behavior. Cadence remembers the choice for that place; Usual travel forgets it.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Travel by"
+        }
+      ],
+      "availability": "Calendar event details and expanded located Behavior rows while a planned leg reaches that place. The trip home follows the last stop and offers no choice.",
+      "success_result": "Stores the mode with the place key and time, then refreshes estimates once with the remembered mode.",
+      "failure_result": "Keeps the previous mode and says the choice could not save.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelModeChoice.tsx",
+        "components/timeline/ExternalEventDetails.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "lib/services/travel-route-refresh.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-habits.test.ts",
+          "tests/travel-route-refresh.service.test.ts"
+        ],
+        "notes": "Provider-free tests. The place key is a digest; no place text is stored for Calendar places."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/ExternalEventDetails.tsx"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; the hosted refresh routes with the remembered mode."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelModeChoice.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; SQLite stores the mode and account synchronization carries it to the hosted refresh."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-010",
+      "name": "Edit learned travel habits",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#learned-travel-habits"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Edit the learned get-ready time, arrival buffer and travel mode per place, shown as plain sentences in Travel Settings. Choosing a default follows it; Use usual travel forgets a place.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Get-ready time"
+        },
+        {
+          "kind": "change",
+          "control": "Arrival buffer"
+        },
+        {
+          "kind": "change",
+          "control": "Travel to {place}"
+        }
+      ],
+      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision; there are no separate buffer fields.",
+      "success_result": "Saves the habit, says Travel habits saved, and refreshes estimates once.",
+      "failure_result": "Keeps the stored habits and asks the user to reload Settings when another device changed them.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelHabitsSection.tsx",
+        "components/settings/TravelSettingsPanel.tsx",
+        "app/api/travel/habits/route.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-settings.service.test.ts"
+        ],
+        "notes": "Provider-free tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelHabitsSection.tsx",
+            "app/api/travel/habits/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-settings.service.test.ts"
+          ],
+          "reason": "Shared Settings section; hosted habit writes compare the habit revision."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelHabitsSection.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-settings.service.test.ts"
+          ],
+          "reason": "Shared Settings section; SQLite habit writes compare the habit revision and synchronize."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
         }
       }
     },

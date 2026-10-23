@@ -274,6 +274,21 @@ Security › Location Services and offers Open Location Services; browsers name 
 site setting (Safari Websites on iPhone and iPad). Both offer Check again, disabled
 while a request runs, and state that saved places and Calendar trips keep working.
 
+Learned travel habits (Ticket 217) follow as a How you travel subsection under a
+rule. Each value is a sentence with an inline select: "You usually need [10 minutes]
+to get ready." and "You like to arrive [5 minutes] early." The default option says
+(default). Remembered places read "You usually [take transit] to Home."; a Calendar
+place shows the date its mode was chosen instead of a name. Each change saves at once
+and announces "Travel habits saved." There are no buffer fields.
+
+On the Timeline, Calendar event details and expanded located Behaviors show a
+"Travel by" select below travel timing when a trip reaches that place: Usual travel
+(the mode) first, then Walking, Cycling, Transit and Driving. After a journey with a
+current outbound estimate ends, the Timeline status area asks once that day: "Your
+leave time for {title} was:" with Too early, About right and Too late as text buttons
+and a muted Not now. An answer is replaced by a one-line confirmation naming the new
+arrival buffer. Controls keep 44px targets and wrap on narrow screens.
+
 The Behavior form shows Where after Description: a select with Not set (default),
 Anywhere, Home and A place. A place adds a required Place text field beside it.
 One hint follows: "Travel estimates and scheduling advice work better when Where
@@ -282,9 +297,11 @@ is set." The pair stacks on narrow screens.
 Implementation references: `components/timeline/DayProgressTimeline.tsx`,
 `components/timeline/ExternalEventDetails.tsx`, `components/behaviors/BehaviorForm.tsx`
 and `components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
-`INT-TRAVEL-001` through `INT-TRAVEL-007`; the existing bench includes complete-trip
-and no-base fixtures, the panel before usual travel is chosen, the desktop location
-guidance and a Home Behavior.
+`INT-TRAVEL-001` through `INT-TRAVEL-007` and, for Ticket 217, `INT-TRAVEL-008`
+through `INT-TRAVEL-010`; the existing bench includes complete-trip and no-base
+fixtures, the panel before usual travel is chosen, the panel with learned habits, the
+desktop location guidance, the journey mode choice, the leave-time question and a
+Home Behavior.
 Installed acceptance remains in `qa/travel-release.md`.
 
 The current day should be prominent and should begin the forward timeline.

@@ -93,19 +93,24 @@ impl StoredRow for Behavior {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TravelSettings {
+    pub arrival_buffer_minutes: Option<i64>,
     pub base_location_text: Option<String>,
     pub created_at: String,
     pub enabled: bool,
+    pub habits_updated_at: Option<String>,
+    pub leave_feedback: Value,
     pub mode: Option<String>,
     pub navigation_preference: Option<String>,
     pub onboarding_completed_at: Option<String>,
+    pub place_modes: Value,
+    pub preparation_minutes: Option<i64>,
     pub routing_consent_at: Option<String>,
     pub updated_at: String,
     pub user_id: String,
 }
 impl StoredRow for TravelSettings {
     const TABLE: &'static str = "travel_settings";
-    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const JSON_COLUMNS: &'static [&'static str] = &["leave_feedback", "place_modes"];
     const BOOL_COLUMNS: &'static [&'static str] = &["enabled"];
 }
 
