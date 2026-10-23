@@ -120,6 +120,12 @@ part of L-002.
   no duration-bearing value reaches model input. The private briefing workbench keeps
   synthetic travel facts, because example (vii) bars testing or validating models
   with Maps Content.
+- **Open point, held until Google replies to case 76805292 (owner decision, October
+  23, 2026):** a yes/no fit conclusion can bound route duration from one side.
+  Example: a run ending 1:30 PM plus an event at 3:00 PM plus "fits: yes" implies the
+  trip takes under 90 minutes. After the reply, decide whether to ask Google about
+  this, or to send only day-level conclusions (for example "travel day"). Ticket 219
+  should weigh the same option.
 
 ## L-002: Google coordinates sent to a non-Google provider
 
