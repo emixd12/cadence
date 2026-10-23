@@ -965,3 +965,44 @@ Agent observations, pending owner review: T1–T3 now give one concrete suggeste
 T6 says "Nothing is left on today's schedule."; T4 and T5 still say "buffer"; T4 still
 mentions an opening it does not suggest; the T5 realistic-timing tip mixes scheduling
 and logging advice; T2 calls a recorded 20-minute length "approximate".
+
+### Ticket 184 iteration 1 — owner review of candidate 2, October 23, 2026
+
+The owner reviewed one account comparison and T1–T6 pass 2. A was `cadence-default`
+and B was candidate 2. The account comparison ran October 16 on live account data,
+with Calendar and Behavior descriptions included. The review made no new model calls.
+Exact comments are stored as feedback records in each local case. Agent notes inside
+a comment are labeled.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| Account | Neither | The B logging tip is repetitive; remove superfluous text. |
+| T1 | B | Give each kind of suggestion its own formatting. |
+| T2 | B | Still robotic. State the overlap length. Use what the Behavior is to judge whether it needs time between items. |
+| T3 | B | Overlap length is still missing. The move is unclear. Replace the repeated time with one "New suggested time". |
+| T4 | B (closest to the target) | Logging tip formatting and natural move wording work. B offers 7:00 AM, then suggests 12:25 PM; mention one move once. |
+| T5 | No pick | Do not describe a free slot for a Behavior that has no conflict. The tip mixes logging and scheduling advice. Use defined advice lanes, such as Logging tip and New suggested time. Format Behavior names. |
+| T6 | Neither | Do not say there is no issue, and do not show this brief. Show a logging tip or other history-based advice instead. |
+
+The T4 and T6 preferences were inferred from the owner's wording, not stated as a pick.
+The agreed agent observations were: one move stated two or three times, "buffer" and
+"transition room", "approximate" for recorded lengths, and the T5 tip mixing advice types.
+
+Requirements for candidate 3:
+- One labeled block per advice type. Each block carries one kind of advice only.
+- One move per Behavior, stated once, as a "New suggested time" with the original time.
+- Every overlap states how long it is.
+- Behavior titles and descriptions inform whether a move or spacing matters.
+- Behavior names get distinct formatting in brief text.
+- No sentence reports an absent conflict, a fitting slot or a quiet day.
+- No "buffer", "transition room", "reserved", or "approximate" for recorded lengths.
+
+Owner decision, October 23: relax tip spacing so quiet days can show a history-based
+tip. T6 asked for that advice, but the current policy allows at most one tip, with a
+7–30 day cooldown and one-day spacing. Quiet days would often have no allowed tip and
+an empty brief. Candidate 3 relaxes spacing in its own preset only; production is unchanged.
+
+Agent observation, not owner-reviewed: every brief shows "Suggestions only. No
+changes were applied." even when it has no suggestions.
+
+No candidate is accepted. No prompt, preset or production behavior changed.
