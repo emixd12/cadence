@@ -187,6 +187,73 @@ and the owner's publication instruction. See
 Platform impact: desktop authentication only; web, marketing and future mobile
 have no implementation change. No schema or hosted configuration changes.
 
+## Ticket 215 merge review and rollout boundary — October 21, 2026
+
+Added a disposable local Supabase rehearsal workflow for relevant PR changes and
+manual dispatch. It tests GitHub's PR merge commit, records exact source identity,
+replays the tracked migrations through the existing loopback Docker proxy, and
+runs the existing SQL, RLS, account-sync and authenticated BehaviorStore checks.
+This branch currently contains 89 migrations and 22 SQL fixtures; the workflow
+derives its inventory from the tested tree. The first GitHub rehearsal
+([run 39571395076](https://github.com/emixd12/cadence/actions/runs/39571395076))
+replayed all 89 migrations and passed 22 SQL fixtures and 92 authenticated RLS
+checks. Account-sync smoke then failed on the pre-existing timezone-only profile
+fixture; authenticated BehaviorStore checks and the final zero-user check were
+not reached. [PR #121](https://github.com/emixd12/cadence/pull/121) corrects the
+smoke helper. A complete successful rerun remains required; latest exact-source
+CI evidence is tracked on [PR #112](https://github.com/emixd12/cadence/pull/112).
+YAML parsing, actionlint and Bash syntax checks pass; the existing fake-daemon
+proxy suite passes all 20 tests with temporary Unix-socket access.
+No runtime source, schema, provider scope or hosted configuration changed.
+The Outlook support decision, signed installed desktop and coordinated rollout
+gates below remain open. See the disposable rehearsal section in
+`docs/OPERATIONS.md`.
+
+Rehearsal start failures, October 23, 2026: on some runners both start attempts
+failed after about three minutes and were reported as a proxy rejection. The
+proxy rejected the CLI's cleanup prune (`POST /containers/prune`), which runs
+after any failed start or `supabase stop`. Locally, through `main`'s proxy, a
+failed migration left the stopped database container and volume behind and
+printed the rejection, hiding the real error. The proxy now forwards only this
+project's label-filtered container and volume prunes. It answers network prunes
+itself, so the shared network is never removed. It also logs every rejected
+request as method and path, and the script reports the most specific cause
+first. The first PR run under the new logging
+([run 39959055300](https://github.com/emixd12/cadence/actions/runs/39959055300))
+named the real cause: both attempts hit an image registry rate limit
+(`toomanyrequests` from `public.ecr.aws`), with no proxy rejection. A dispatched
+run on the same commit passed. The rehearsal now pulls from `ghcr.io/supabase`,
+which serves identical manifest digests for all seven pins. Locally the pinned
+CLI pulled all seven from GHCR through the proxy, kept loopback ports, and
+stopped cleanly.
+
+Native CI
+([run 39571395232](https://github.com/emixd12/cadence/actions/runs/39571395232))
+passed the locked macOS Cargo check and all 115 library tests for PR head
+`ab7591f6` against base `2901cdba`. Compilation and library tests do not establish
+signed artifact or installed desktop acceptance; those gates remain open.
+
+Earlier local review integrated main and confirmed that the lifecycle SQL smoke
+preserves both `location_text` and `where_kind`. That source passed 2,897 tests
+(167 skipped), the web and desktop builds, typechecks, registry checks, lint
+and Design System Bench verification. That Linux review did not rerun the
+earlier Postgres or Rust acceptance recorded in the PR.
+
+Hosted rollout remains blocked on an ordered migration plan and a compatible,
+installed desktop candidate. The connector migrations in PR #111 precede
+`20261019180000_add_behavior_where.sql`; deploy them in order if both features
+ship. Older installed desktops do not send `where_kind` and fail closed on
+Behavior synchronization after the hosted migration. Build and verify the
+replacement before changing hosted schema. The signed 0.1.3 artifact does not
+cover this contract. See `docs/qa/2026-10-21-behavior-where-rollout.md`.
+
+An earlier review integrated PR #111 (`e9c2dc6`). The desktop Timeline retains
+Google, Outlook and iCloud events, their freshness, and Hevy activity while
+using Apple Maps. Travel stays Google-only. That combined source passed 366
+focused tests (one local-database test skipped), registry/design checks, lint,
+web/desktop typechecks, core portability and desktop parity. Deployment and
+installed acceptance remain gated by the rollout plan.
+
 ## Tickets 233–241 connector expansion — October 18, 2026
 
 Microsoft publisher verification started October 22, 2026 (public-approval
@@ -806,6 +873,57 @@ superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets
 - Ticket 230 (Claude and ChatGPT plugin packages): implemented locally October 18, 2026; awaiting independent wave-4 review. Three shared skills, standalone Claude/OpenAI packages, root marketplace and reproducible ignored ZIPs. Claude strict validation, manifest/schema checks, registry-reference tests and all repository gates pass on Node 26. Distribution only; marketing links in Ticket 229; web, desktop and mobile not applicable. OpenAI portal scans, legal approval, publication and live installation remain unverified/owner-gated.
 - Ticket 231 (privacy disclosure and directory submission packet): review correction implemented October 18, 2026; awaiting independent re-review. Reviewer instructions now separate identical-input replay, changed-input key reuse rejection, and new-key stale-revision conflict; focused integration-write tests pass. `docs/qa/mcp-directory-submission.md` contains unpublished Privacy/Terms drafts, listing copy, reviewer-account options, test cases, recording script and owner release steps. OpenAI challenge route returns exact plain text or 404; focused tests, full tests, build, lint and drift checks pass. Typecheck passes after Ticket 230's shared-file correction; independent compiler recheck passes. Served legal pages unchanged. Web route and marketing listing copy; desktop/mobile not applicable. Legal approval, health-data eligibility, reviewer access and hosted acceptance remain owner gates; no hosted actions.
 - Ticket 232 (production deployment and live client acceptance): disabled release deployed October 18, 2026 from PR108 merge 280b6eacc9ebcabbd9c5b675c67adf1c01870c8d (reviewed tree 81eface). Six approved migrations are deployed; hosted history is 86 and the family-deadline function hashes/permissions match review. Both Node24 production sites are Ready; final web redeploy binds the Ready marketing deployment. MCP/OAuth/discovery return 503, challenge returns 404, and approved Privacy/Terms/marketing text and October18 dates match. Public Trust correctly marks prior-release evidence Stale; its Preview refresh exposed a validator collision with a public tool-reference path. A local field-scoped correction is under review; publication remains paused. Scheduled maintenance and live-client acceptance remain unverified. No public activation, signing-key change, manual scheduler invocation or live account test occurred. Web/marketing released; desktop sync acceptance remains separately gated and future mobile deferred.
+
+## Ticket 215: Three-input travel Settings and Behavior Where — October 19, 2026
+
+Implemented in source on branch `claude/unruffled-babbage-e830a5`; not deployed.
+Hosted migration push, deployment, desktop preview release and production QA remain
+owner-gated.
+
+- Settings: `components/settings/TravelSettingsPanel.tsx` shows the Travel estimates
+  toggle with the Google Maps disclosure, optional Home and usual travel. The toggle
+  saves consent and asks for foreground location in the same click; it stays
+  disabled until usual travel is chosen. The consent checkbox, "saved base" wording,
+  map-app selector and permission-check button are gone. Saves pass the stored
+  `navigation_preference` through unchanged.
+- Navigation: `lib/ui/navigation-platform.ts` opens Apple Maps on Apple devices and
+  Google Maps elsewhere; desktop always uses Apple Maps. Event details say "Home"
+  and "Return home".
+- Where: `behaviors.where_kind` (null = Not set, `anywhere`, `home`, `place`).
+  Migration `20261019180000_add_behavior_where.sql` and SQLite `0018_behavior_where.sql`
+  set `place` for every Behavior with location text, call no provider and rewrite no
+  configuration history. Core `packages/core/src/services/behavior-where.ts` plans
+  and reads Where; snapshots without it read as `place` when they have text. MCP
+  input keeps the earlier text-only rule. Where joins configuration history, account
+  sync (Behavior upserts require `where_kind`) and Full JSON; CSV, JSONL, Markdown
+  and BehaviorLog omit it.
+- Rollout compatibility (review fix): the hosted graph writers and plan validator
+  also accept the previous web build's payloads, which carry no `where_kind`, so
+  web edits keep working between the migration and the web deployment.
+  `tests/sql/ticket-215-behavior-where-smoke.sql` covers both payload shapes; it
+  fails with the constraint violation against the original writer.
+- Routing: Not set and Anywhere request no route; Home routes to the saved Home
+  (one shared lookup) and requests none without it; A place routes to its text.
+- Registry: `INT-TRAVEL-001` (Save Home and usual travel), `INT-TRAVEL-002` (now the
+  travel toggle), new `INT-TRAVEL-005` (Behavior Where). Docs: user guide, UI spec,
+  user flows, data models, export formats, desktop parity, design catalog notes.
+
+Verification: agents, interactions, resolvers, core, design-system, lint, web and
+desktop typecheck, web and desktop builds and `git diff --check` pass. 2,869 tests
+passed, 96 skipped. 111 native tests pass, including the new 0018 migration test; 21
+real-SQLite contract tests pass. An isolated loopback stack (`cadence-t215`)
+replayed all 87 migrations and the seed from scratch; generated types match the
+checked-in file. The opt-in `tests/behavior-where.local-integration.test.ts` passed
+against it, and seven SQL smokes passed, including the new Where smoke. The
+unchanged `origin/main` web store and core service also passed create, edit,
+clear and Home cases against the migrated database (scratch test, not committed). `behavior-end-date-lifecycle-smoke.sql`
+had lacked `location_text` since September 22; it now carries both fields.
+
+Release order: hosted migration, then the web deployment, then a desktop preview.
+Installed preview.50 fails closed on Behavior sync after the hosted migration until
+it updates. Risks and follow-ups: the approved Privacy text still says "saved base"
+and "routing consent" (owner wording update); the MCP contract does not expose
+Where; Ticket 219 owns "location not set" in model input.
 
 ## Tickets 213–214 completed — October 18, 2026
 

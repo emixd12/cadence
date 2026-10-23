@@ -1471,12 +1471,12 @@
     {
       "id": "INT-TRAVEL-001",
       "classification": "destructive_serial_only",
-      "reason": "Travel settings writes require isolated owner and consent revision checks."
+      "reason": "Home and usual travel writes require isolated owner and revision checks."
     },
     {
       "id": "INT-TRAVEL-002",
-      "classification": "browser_only",
-      "reason": "Explicit foreground OS permission needs browser or installed native acceptance."
+      "classification": "destructive_serial_only",
+      "reason": "The travel toggle writes routing consent with owner revision checks and requests foreground OS permission, which needs browser or installed native acceptance."
     },
     {
       "id": "INT-TRAVEL-003",
@@ -1487,6 +1487,11 @@
       "id": "INT-TRAVEL-004",
       "classification": "external_provider",
       "reason": "Manual travel refresh can trigger a reviewed route provider request."
+    },
+    {
+      "id": "INT-TRAVEL-005",
+      "classification": "browser_only",
+      "reason": "Choosing Where is an unsaved Behavior form draft."
     },
     {
       "id": "INT-CALENDAR-012",

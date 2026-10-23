@@ -15,7 +15,7 @@
       "benchAnchor": "design-system#ds-composite-behavior-form",
       "trackUsages": "optional",
       "status": "active",
-      "notes": ""
+      "notes": "Ticket 215 adds optional Where (Not set, Anywhere, Home, A place) with a Place field for A place and one travel hint."
     },
     {
       "id": "composite.occurrence-note-form",
@@ -618,7 +618,7 @@
       "benchAnchor": "design-system#ds-module-travel-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Separate routing disclosure, optional saved base, selected mode and foreground location permission. Synthetic bench never reads location or contacts a provider."
+      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Synthetic bench never reads location or contacts a provider."
     },
     {
       "id": "flow.consent-form",

@@ -121,6 +121,7 @@ describe("createBehaviorFromFormData", () => {
           changedFields: [
             "category_id",
             "location_text",
+            "where_kind",
             "schedule_graph",
             "browser_reminder_enabled",
             "email_reminder_enabled",

@@ -9,6 +9,7 @@ import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } fro
 import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigation";
 import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelCorrection } from "@/lib/ui/travel";
+import { platformNavigationPreference } from "@/lib/ui/navigation-platform";
 
 import styles from "./day-progress-timeline.module.css";
 
@@ -127,7 +128,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
     };
     const close = () => dialogRef.current?.close();
     const navigation = event ? buildTravelNavigationLink({ locationText: event.location,
-      preference: navigationPreference, mode: travelMode,
+      preference: navigationPreference ?? platformNavigationPreference(), mode: travelMode,
       resolved: travel?.legs.some((item) => item.state === "current" && item.leg.destinationCommitmentRef === event.id && item.leg.provenance.destinationSource === "calendar") }) : null;
 
     return (
@@ -203,10 +204,10 @@ export function renderTravelTiming({ eventId, travel, timezone, compact = false 
   const legs = travel?.legs.filter((item) => item.leg.originCommitmentRef === eventId || item.leg.destinationCommitmentRef === eventId) ?? [];
   if (!legs.length) return null;
   const label = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  const originLabels = { device: "current device position", saved_base: "saved base", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
+  const originLabels = { device: "current device position", saved_base: "Home", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
     {legs.map(({ leg, state, estimate, reason }) => <p key={leg.id}>
-      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return to saved base" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(estimate.departureAt)}, arrive ${label(estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
+      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return home" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(estimate.departureAt)}, arrive ${label(estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
       {!compact ? ` Origin: ${(leg.originCommitmentRef ? "planned prior stop" : originLabels[leg.provenance.originSource])}.` : ""}
     </p>)}
     {!travel?.completeTrip ? <p>Full-trip availability is unknown. Known travel spans still apply.</p> : travel.finalAvailabilityAt ? <p>Available again {label(travel.finalAvailabilityAt)}.</p> : null}

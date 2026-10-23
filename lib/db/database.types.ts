@@ -439,6 +439,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          where_kind: string | null
         }
         Insert: {
           active?: boolean
@@ -462,6 +463,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          where_kind?: string | null
         }
         Update: {
           active?: boolean
@@ -485,6 +487,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          where_kind?: string | null
         }
         Relationships: [
           {

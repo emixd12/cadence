@@ -129,7 +129,7 @@ fn snapshot(graph: &GraphRows) -> Value {
             schedule.to_string(),
         )
     });
-    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone})
+    json!({"categoryId":behavior.category_id,"locationText":behavior.location_text,"whereKind":behavior.where_kind,"scheduleGraph":schedules,"browserReminderEnabled":behavior.browser_reminder_enabled,"emailReminderEnabled":behavior.email_reminder_enabled,"reminderOffsetMinutes":behavior.reminder_offset_minutes,"active":behavior.active,"timezone":behavior.timezone})
 }
 
 fn normalize_configuration_snapshot(value: &Value) -> Value {
@@ -138,6 +138,13 @@ fn normalize_configuration_snapshot(value: &Value) -> Value {
         object
             .entry("locationText".to_string())
             .or_insert(Value::Null);
+        // Snapshots written before Ticket 215 carry only location text, which meant A place.
+        let derived = if object.get("locationText").is_some_and(Value::is_string) {
+            json!("place")
+        } else {
+            Value::Null
+        };
+        object.entry("whereKind".to_string()).or_insert(derived);
     }
     normalized
 }
@@ -209,6 +216,7 @@ fn validate_history(
             "email_reminder_enabled",
             "reminder_offset_minutes",
             "location_text",
+            "where_kind",
             "active",
             "timezone",
         ];
