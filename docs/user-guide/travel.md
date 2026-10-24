@@ -29,6 +29,19 @@ stop instead. Settings shows whether device location is allowed, not yet allowed
 blocked, and where to change it. Cadence does not track continuously or in the
 background, and it does not prompt on every route.
 
+### Allow device location
+
+While travel is on and device location is not allowed, not yet allowed or timed out,
+Settings, Travel explains how to allow it and offers Check again.
+
+- **Mac app**: macOS may not ask on its own. Open System Settings › Privacy &
+  Security › Location Services, turn on Location Services and Cadence, then choose
+  Check again. Open Location Services opens that pane.
+- **Browsers**: allow location for the site in the browser's site settings. On iPhone
+  and iPad, use Settings › Privacy & Security › Location Services › Safari Websites.
+
+Saved places and Calendar trips keep working without device location.
+
 ## Set Where for a Behavior
 
 Create or edit a Behavior and choose Where:

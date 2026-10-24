@@ -11877,18 +11877,29 @@ preserved, and unchanged status/schedule/dismissal flows.
 
 ## Ticket 165: Travel provider and cross-platform release acceptance
 
-Status: in progress; native device location remains open. Repository, local database,
-public-landmark, deployed-web and private-account acceptance pass (PRs #58–#65,
-September 22–23). Installed macOS passed cold start, account sync, restart
-preservation and a hosted route request on preview.45. Open: native device location
-(first-Mac rc.2/rc.3 timeout and absent first permission prompt remain unresolved).
-September 29: clean second-Mac rc.3 acquired a current position after the owner
-manually enabled Cadence in Location Services. Initial prompt did not appear.
-Manual grant/retry and foreground acquisition pass; automatic prompting does not. Signed rc.3
-Google Maps search handoff passed September 28: the timed test Calendar event
-opened Central Park in Chrome. Search has no transport mode; directions remain
-unverified. Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.
-Filed September 21, 2026. Reviews begin alongside Tickets 162–164; release follows them.
+Status: in progress. Repository, local database, public-landmark, deployed-web and
+private-account acceptance pass (PRs #58–#65, September 22–23). Installed macOS passed
+cold start, account sync, restart preservation and a hosted route request on
+preview.45. September 29: clean second-Mac rc.3 acquired a current position after the
+owner manually enabled Cadence in Location Services; no first prompt appeared. Manual
+grant/retry and foreground acquisition pass. Signed rc.3 Google Maps search handoff
+passed September 28: the timed test Calendar event opened Central Park in Chrome.
+Search has no transport mode. Evidence: `docs/qa/travel-release.md`. Billing and
+restricted local credentials are configured. Filed September 21, 2026. Reviews begin
+alongside Tickets 162–164; release follows them.
+
+October 22, 2026: signed Cadence for Mac 0.1.3 is published (Tickets 115, 178, 181),
+so device location no longer waits for Developer ID signing; rc.2 and rc.3 were
+already Developer ID signed when the prompt failed. Owner decisions (October 22):
+accept the manual macOS permission path, investigate the prompt, and test directions
+after Ticket 215. Source change in this round: Travel Settings guidance with Open
+Location Services and Check again (`INT-TRAVEL-006`, `INT-TRAVEL-007`), and the
+Hardened Runtime location entitlement, which signed builds lacked. The entitlement
+also ships alone from main (PR #134) so it can be tested without the held Where
+rollout. Open gates: an owner prompt test on a main-based signed build, an installed
+check of Open Location Services and Check again after the hosted Where migration,
+and the directions handoff matrix after Ticket 215 deploys. The steps and plan are
+in `docs/qa/travel-release.md`, October 22.
 
 Goal: establish provider-use, disclosure and runtime evidence for the accepted travel feature.
 
@@ -11940,8 +11951,8 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | `docs/qa/travel-release.md` records synthetic, hosted runtime and private-account acceptance; Daily Brief stays independent. |
-| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45; native device location remains open; signed Google Maps search handoff passed September 28. |
+| Web | `docs/qa/travel-release.md` records synthetic, hosted runtime and private-account acceptance; Daily Brief stays independent. The shared panel shows browser location guidance and Check again; directions remain open. |
+| Desktop | `docs/qa/travel-release.md` records installed sync, restart and route acceptance on preview.45, manual grant/retry on September 29 and signed Google Maps search on September 28. Ticket 165 adds Location Services guidance, `open_location_settings` and the location entitlement; the signed prompt test and directions remain open. |
 | Marketing | `components/settings/LegalContent.tsx` and `docs/user-guide/travel.md` disclose the disabled rollout; public claims need deployed evidence. |
 | Future mobile | Not applicable to native release: native app remains deferred. Mobile-web evidence belongs to web acceptance. |
 
@@ -11949,8 +11960,8 @@ Verification: required repository checks and applicable platform builds; reviewe
 provider/disclosure evidence; separately authorized live tests; spend/rollback checks.
 Filing this ticket does not create credentials, deploy, read location or transmit private data.
 
-September 28 remaining work: reproduce the signed location request on a second Mac
-or an owner-arranged isolated macOS account. Do not reset TCC or treat the dedicated
+September 28 remaining work (superseded by the October 22 status above): reproduce the
+signed location request on a second Mac or an owner-arranged isolated macOS account. Do not reset TCC or treat the dedicated
 Google test identity as OS isolation. Record permission, denial, timeout and success
 separately without coordinate logs; fix only a demonstrated defect. For navigation,
 use an authorized located Calendar event with a visible Search or Directions action

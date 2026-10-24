@@ -1686,7 +1686,7 @@
     {
       "componentId": "module.travel-settings-panel",
       "file": "apps/desktop/src/product.tsx",
-      "line": 541,
+      "line": 540,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -1702,7 +1702,7 @@
     {
       "componentId": "module.travel-settings-panel",
       "file": "tests/travel-settings.dom.test.tsx",
-      "line": 59,
+      "line": 129,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"

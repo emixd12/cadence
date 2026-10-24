@@ -1,5 +1,38 @@
 # Implementation Status
 
+## Ticket 165 review: status-only device location permission — October 24, 2026
+
+The owner's dev.2 evidence in PR #140 exposed a separate permission-refresh bug:
+Travel Settings called the foreground-position command to read the OS grant. Its
+save and position-completion refreshes could compete with the active request or
+time out on a second position read, clearing the permission line after success.
+
+The desktop now uses `location_permission`, a read of Core Location authorization
+and Location Services state that requests no coordinates or permission prompt.
+Travel Settings accepts a separate permission reader; browser permission queries
+keep their existing behavior. Toggle and Check again still request one position,
+and Timeline's `readLocation(false)` still reads coordinates without asking for a
+new grant. Synthetic bench adapters supply their own permission states.
+
+Regression coverage separates an allowed grant from both an available position and
+a timed-out position, checks the native bridge contract and preserves Timeline
+reads. Native Rust tests cover denied, restricted, unknown and granted status
+mapping. The native macOS CI and an installed dev-build check remain required;
+this Linux review cannot establish the real permission or Core Location behavior.
+The notarized 0.1.5 candidate and its evidence remain unchanged.
+
+Validation: agents, interactions, resolvers, lint, web and desktop typechecks,
+the full Vitest suite (324 files, 3,498 tests; 15 files/176 tests skipped), web and
+desktop renderer builds, public-source audit and diff check pass. The exact pure
+Rust mapping and its source unit test also pass in an isolated Rust 1.97.1 harness.
+The design-system check cannot run here because its external
+`design-system-bench` verifier is absent; the existing bench and manifest are updated.
+
+Platform impact: desktop fixes permission readback through a native adapter;
+web retains its Permissions API behavior through the shared Settings contract;
+marketing and future mobile have no implementation change. No migration, provider
+configuration, signing or release action.
+
 ## Desktop release acceptance and version-free download link — October 24, 2026
 
 The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
@@ -200,6 +233,39 @@ incomplete.
 
 Platform impact: marketing's existing Astro upgrade and test tooling only;
 web and desktop runtime behavior is unchanged. Future mobile is not implemented.
+
+## Ticket 165: macOS location permission path and directions plan — October 22, 2026
+
+Ticket 165 stays in progress. Source only, on the Ticket 215 base; not deployed or
+signed. Owner decisions (October 22): accept the manual macOS permission path,
+investigate the missing first prompt, and test directions after Ticket 215.
+
+- Travel Settings now explains how to allow device location while travel is on and
+  location is not allowed, not yet allowed or timed out. Desktop adds Open Location
+  Services (`INT-TRAVEL-007`, fixed-URL native command `open_location_settings`);
+  both platforms add Check again (`INT-TRAVEL-006`). The panel states that saved
+  places and Calendar trips keep working without device location.
+- Investigation: signed builds enable Hardened Runtime but lacked the Hardened
+  Runtime location entitlement `com.apple.security.personal-information.location`.
+  Apple lists it under Hardened Runtime resource access; Chrome, which works on the
+  same Mac, signs it. Production `Entitlements.plist` now includes it, and
+  `verify-entitlements.py` accepts it without provisioning-profile authorization.
+  The native Core Location adapter showed no defect. Whether the entitlement restores
+  the prompt is not yet verified.
+- Device location no longer waits for Developer ID signing: 0.1.3 is published, and
+  signed rc.2 and rc.3 already failed to prompt.
+- The entitlement and verifier change also ships alone from main in PR #134, so the
+  prompt test can run on a main-based build (recommended: the 0.1.4 candidate)
+  without the held Where rollout.
+- Open: owner prompt test on that main-based build, installed check of Open
+  Location Services and Check again after the hosted Where migration, and the
+  directions handoff matrix after Ticket 215 deploys. Steps and plan:
+  `docs/qa/travel-release.md`, October 22, and
+  `docs/qa/2026-10-22-desktop-location-entitlement.md` (PR #134).
+
+Platform impact: web shares the panel guidance and Check again; desktop adds the
+settings command and the signing entitlement; marketing is not applicable (no public
+travel copy changed); future mobile inherits the shared guidance pattern.
 
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 
