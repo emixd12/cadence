@@ -436,7 +436,7 @@ Minimum tests:
 - Reminder delivery generation
 - Export formatting
 
-Before considering a ticket complete, run:
+Before considering a ticket complete, and before every push, run these checks:
 
 ```bash
 npm run agents:check
@@ -447,6 +447,19 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+Run them with one command from the repository root:
+
+```bash
+dagger check --progress=report
+```
+
+Dagger runs all of them, plus the desktop, marketing and public-trust CI steps,
+in containers, and returns unchanged checks from cache. A passing run prints one
+line per check. A failing check prints only its own log. Rerun one check with
+`dagger check cadence/<name> --progress=report`. If Docker or the Dagger CLI is
+unavailable, run the npm commands directly. Setup and limits:
+`docs/OPERATIONS.md`, "Dagger checks".
 
 If a command does not exist yet, either add it or state clearly that it is not available.
 
