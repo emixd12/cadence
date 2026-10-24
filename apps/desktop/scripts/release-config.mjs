@@ -3,6 +3,8 @@ export const RELEASE_NAME = "Cadence";
 export const RELEASE_TARGET = "aarch64-apple-darwin";
 export const PREVIEW_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json";
 export const UPDATER_QA_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json";
+export const STABLE_ENDPOINT = "https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json";
+export const DEV_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-dev\.[1-9]\d*$/;
 
 export function createReleaseBuildEnvironment(env) {
   const buildEnvironment = { ...env, CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false" };
@@ -14,6 +16,13 @@ export function createPreviewBuildEnvironment(env) {
   // Never let installed Apple credentials turn a preview into an accidental notarization submission.
   return { ...createReleaseBuildEnvironment(Object.fromEntries(Object.entries(env)
     .filter(([key]) => !key.startsWith("APPLE_") && key !== "TAURI_CONFIG"))), CADENCE_LEGACY_KEYCHAIN_QA: "1" };
+}
+
+export function createDevBuildEnvironment(env) {
+  // Tauri gets no Apple credential, so it signs ad hoc and cannot notarize, and no updater key,
+  // so it cannot sign release artifacts. release.mjs applies the Developer ID signature afterwards.
+  return createReleaseBuildEnvironment(Object.fromEntries(Object.entries(env)
+    .filter(([key]) => !(key.startsWith("APPLE_") || key.startsWith("TAURI_SIGNING_PRIVATE_KEY") || key === "TAURI_CONFIG"))));
 }
 
 export function createReleaseOverlay(base, env) {
@@ -35,6 +44,14 @@ export function createPreviewOverlay(base, env, version) {
     macOS: { signingIdentity: "-", minimumSystemVersion: "14.0", hardenedRuntime: true } } };
 }
 
+export function createDevOverlay(base, env, version) {
+  // Production identity, entitlements and profile, but only the app bundle: no DMG and no updater archive.
+  // Tauri signs ad hoc, without contacting Apple; release.mjs then signs with the Developer ID identity.
+  const overlay = createReleaseOverlay(base, env);
+  return { ...overlay, version, bundle: { ...overlay.bundle, targets: ["app"], createUpdaterArtifacts: false,
+    macOS: { ...overlay.bundle.macOS, signingIdentity: "-" } } };
+}
+
 export function validatePreviewConfiguration(base, overlay) {
   const errors = validateReleaseConfiguration({ ...base, version: overlay.version }, overlay);
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-preview\.[1-9]\d*$/.test(overlay.version ?? "")) {
@@ -51,6 +68,51 @@ export function validatePreviewBuildEnvironment(env) {
   if (env.TAURI_CONFIG) errors.push("Unset TAURI_CONFIG; preview configuration comes from the reviewed preview overlay.");
   errors.push(...validateDesktopPublicSupabaseEnvironment(env));
   return errors;
+}
+
+export function validateDevConfiguration(base, overlay) {
+  const errors = validateNativeConfiguration({ ...base, version: overlay.version }, overlay);
+  if (!DEV_VERSION_PATTERN.test(overlay.version ?? "")) errors.push("An explicit dev SemVer such as 0.1.6-dev.1 is required.");
+  else {
+    try {
+      // A release cut from this source must never be older than the dev build it replaces.
+      if (compareVersions(overlay.version.split("-")[0], (base.version ?? "").split("+")[0]) <= 0) errors.push(`The dev version must start above the source version ${base.version}.`);
+    } catch { errors.push("The source version in tauri.conf.json must be a SemVer version."); }
+  }
+  if (overlay.bundle?.createUpdaterArtifacts !== false || overlay.bundle?.targets?.join() !== "app") errors.push("Dev-signed builds produce only the app bundle, without a DMG or updater archive.");
+  if (overlay.bundle?.macOS?.entitlements !== "Entitlements.plist" || !overlay.bundle?.macOS?.files?.["embedded.provisionprofile"]) errors.push("Dev-signed builds require the production entitlements and provisioning profile.");
+  if (overlay.bundle?.macOS?.signingIdentity !== "-") errors.push("Tauri must sign dev builds ad hoc; release.mjs applies the Developer ID signature.");
+  if (overlay.plugins?.updater?.endpoints?.[0] !== STABLE_ENDPOINT) errors.push("Dev-signed builds must use the stable feed, so the next published release replaces them.");
+  return errors;
+}
+
+export function validateDevBuildEnvironment(env, base) {
+  const errors = [...validateDesktopPublicSupabaseEnvironment(env), ...validateDesktopPublicServiceEnvironment(env, base)];
+  if (!env.APPLE_SIGNING_IDENTITY?.startsWith("Developer ID Application:")) errors.push("APPLE_SIGNING_IDENTITY must select a valid Developer ID Application certificate.");
+  if (env.TAURI_CONFIG) errors.push("Unset TAURI_CONFIG; dev-signed configuration comes from the reviewed dev overlay.");
+  return errors;
+}
+
+// SemVer precedence for the release, prerelease and dev versions Cadence uses.
+export function compareVersions(left, right) {
+  const parse = (value) => {
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?$/.exec(value ?? "");
+    if (!match) throw new Error(`${value} is not a SemVer version.`);
+    return { core: match.slice(1, 4).map(BigInt), prerelease: match[4]?.split(".") ?? [] };
+  };
+  const [a, b] = [parse(left), parse(right)];
+  for (let index = 0; index < 3; index++) if (a.core[index] !== b.core[index]) return a.core[index] < b.core[index] ? -1 : 1;
+  if (!a.prerelease.length || !b.prerelease.length) return Math.sign(b.prerelease.length - a.prerelease.length);
+  for (let index = 0; index < Math.max(a.prerelease.length, b.prerelease.length); index++) {
+    const [x, y] = [a.prerelease[index], b.prerelease[index]];
+    if (x === y) continue;
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    const [xNumeric, yNumeric] = [/^\d+$/.test(x), /^\d+$/.test(y)];
+    if (xNumeric && yNumeric) return BigInt(x) < BigInt(y) ? -1 : 1;
+    if (xNumeric !== yNumeric) return xNumeric ? -1 : 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
 }
 
 export function validateDesktopPublicSupabaseEnvironment(env) {
@@ -104,11 +166,16 @@ export function decodeUpdaterPublicKey(value) {
 }
 
 export function validateReleaseConfiguration(base, overlay) {
+  const errors = validateNativeConfiguration(base, overlay);
+  if (overlay.bundle?.createUpdaterArtifacts !== true || !["app", "dmg"].every((target) => overlay.bundle?.targets?.includes(target))) errors.push("Release builds require signed updater artifacts, app and DMG targets.");
+  return errors;
+}
+
+function validateNativeConfiguration(base, overlay) {
   const errors = [];
   if (overlay.identifier !== RELEASE_IDENTIFIER || overlay.productName !== RELEASE_NAME) errors.push("Release identity must be Cadence / app.cadence.desktop.");
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(base.version ?? "")) errors.push("The native version must be a SemVer version.");
   if (base.bundle?.macOS?.minimumSystemVersion !== "14.0" || base.bundle?.macOS?.hardenedRuntime !== true) errors.push("Release builds require macOS 14.0 minimum and hardened runtime.");
-  if (overlay.bundle?.createUpdaterArtifacts !== true || !["app", "dmg"].every((target) => overlay.bundle?.targets?.includes(target))) errors.push("Release builds require signed updater artifacts, app and DMG targets.");
   const updater = overlay.plugins?.updater;
   try { decodeUpdaterPublicKey(updater?.pubkey); } catch (error) { errors.push(error.message); }
   if (!["dangerousInsecureTransportProtocol", "dangerousAcceptInvalidCerts", "dangerousAcceptInvalidHostnames"].every((flag) => updater?.[flag] === undefined || updater[flag] === false)) errors.push("Updater transport and certificate validation cannot be disabled.");

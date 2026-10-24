@@ -39,6 +39,60 @@ count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
 Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
 migrations and a signed 0.1.5 before release.
 
+## Dev-signed desktop builds — October 23, 2026
+
+The owner approved dev-signed builds for installed desktop testing. Apple notarization
+and publication stay the owner's decision each time (`docs/DECISIONS.md`, 2026-10-23).
+
+- `release.mjs dev-check|dev-build <X.Y.Z-dev.N>`: Tauri signs ad hoc without any Apple
+  credential. The command then signs with the Developer ID identity, hardened runtime
+  and production entitlements, without a secure timestamp, and verifies the result. No
+  step contacts Apple. The app and its report go to
+  `~/Library/Application Support/Cadence Release/dev-builds/<version>/`.
+- `install-dev-build.mjs <version>` refuses unmerged migrations, downgrades, changed or
+  unsigned builds and a running Cadence. It saves the database and the installed app,
+  swaps the app, opens it and checks the migrated database.
+- `docs/DESKTOP_RELEASE.md` ("Dev-signed builds") has the commands, version rules and
+  rollback. `AGENTS.md`, `docs/OPERATIONS.md` and `docs/DESKTOP_BUILD.md` point to it.
+  `.env.example` lists the three path overrides.
+- The owner-private helper `~/Library/Application Support/Cadence Release/dev-signed-env.sh`
+  holds public values, the identity name and the profile path only.
+
+Verification:
+
+- Real `dev-build 0.1.6-dev.1` from `f922685`: Developer ID authority, team
+  `HK26VT477G`, hardened runtime, production entitlements and embedded profile;
+  `spctl` rejects it as "Unnotarized Developer ID". The first attempt failed: codesign
+  could not reach Apple's timestamp server from the agent sandbox. That failure led to
+  the timestamp-free signature.
+- The installer and the documented rollback ran with real tools on scratch copies of
+  the build, the installed 0.1.2 app and a synthetic database.
+- Focused release and installer tests: 51 passed. A deliberately broken downgrade guard
+  failed its test.
+- `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck`,
+  `desktop:typecheck`, `core:check`, `design-system:check`, `public-source:check`,
+  `git diff --check` and the web build pass.
+- Full Vitest: 3,555 passed, 96 skipped, 1 failed. The failure was
+  `tests/desktop-release-acceptance.test.ts`, which timed out at 5 seconds under
+  full-suite load; it passes alone (46 of 46). This change does not touch that test or
+  its script.
+
+Installed on the owner's Mac at 20:42 UTC on the owner's instruction, with Cadence
+quit. `install-dev-build.mjs` replaced 0.1.2 with 0.1.6-dev.1 and opened it. The
+database moved from schema 17 to 18; integrity and foreign-key checks pass, and no
+table lost rows. About 30 seconds after launch the app completed an account sync with
+the saved Keychain session and no sign-in prompt; the previous sync was at 15:42 UTC.
+macOS therefore accepts the timestamp-free Developer ID signature with the Keychain
+group entitlement. Protected copy:
+`~/Library/Application Support/Cadence Release/dev-installs/20261023T204210Z-0.1.6-dev.1/`.
+
+Not verified: location permission and notifications on a dev build, and grants
+persisting across two dev builds. The 0.1.5 candidate's prepared upgrade check
+(PR #140) expected 0.1.2 on this Mac; installing 0.1.5 here now needs a rollback first.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are not
+affected. No schema, migration, hosted configuration or interaction change.
+
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
 Signed Cadence builds enable Hardened Runtime but did not sign the location
