@@ -1148,3 +1148,84 @@ history. This keeps the retention copy's promise that longer retention lets the
 advisor learn more. Counts carry no place keys, positions or text. Privacy text:
 P-001 and P-004 in `docs/PRIVACY_CHANGES.md`. Recorded from the owner's October 23
 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Dev-signed desktop builds; the owner gates notarization and publication
+
+The owner is Cadence's only user. Each desktop change had been producing its own
+notarized release candidate, with an owner approval, two-Mac installed acceptance, a
+release packet and publication steps. Nine Developer ID candidates were built after
+September 27, and only 0.1.3 was published. Signing and notarization themselves took
+about three minutes for the 0.1.5 candidate.
+
+- A dev-signed build carries the production Developer ID signature, entitlements and
+  provisioning profile, without a secure timestamp. It is not notarized, has no DMG or
+  updater archive, and is never published. Building it contacts no Apple service. `apps/desktop/scripts/release.mjs dev-build` builds it and
+  `apps/desktop/scripts/install-dev-build.mjs` installs it. Commands, version rules
+  and rollback: `docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
+- Standing approval: agents may build dev-signed builds and install them on the
+  owner's Macs without asking each time. Installation goes through the install
+  script, which keeps its protected copies. Cadence must already be quit; agents
+  never quit it. Builds come from main, or from a branch whose SQLite migrations
+  match `origin/main`.
+- A dev-signed build satisfies a ticket's installed desktop acceptance. Checks that
+  need a notarized or downloaded artifact stay with releases: Gatekeeper on a
+  quarantined download, the DMG, and updates from the published feed.
+- Still the owner's call each time: any Apple notarization submission (`release.mjs
+  build`), any upload, feed or marketing-link change, `--allow-unmerged-migrations`,
+  and restoring a protected database copy, which discards later changes.
+- The owner decides when a batch ships as a notarized release. Merging a desktop
+  change no longer implies a signed candidate. The release gates in
+  `docs/DESKTOP_RELEASE.md` are unchanged.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are
+not affected. Recorded from the owner's October 23 instruction in the release-process
+session.
+
+## 2026-10-24: Right-sized desktop release acceptance and a version-free download link
+
+Cadence for Mac 0.1.3 shipped on October 22 after three notarized candidates. Each one
+repeated the full two-Mac installed matrix and a long packet. Moving the download link
+then took a marketing PR, a production marketing deployment and a Trust redeploy. The
+owner approved three changes, quoted below. This entry supersedes the October 23 line
+"The release gates in `docs/DESKTOP_RELEASE.md` are unchanged."
+
+- **Acceptance.** Every notarized release after 0.1.3 needs four checks on the exact
+  artifact:
+  - all 14 artifact checks in `release.mjs build`;
+  - notarization, plus Gatekeeper on a quarantined download;
+  - an upgrade from the last published version, with the data comparison;
+  - the real updater, when the SQLite schema changes or the last published version
+    changed its updater files.
+
+  Area checks run only when `git diff` from the last published commit touches their
+  files. They cover sign-in callback replays, session renewal and revoked-session tests,
+  Calendar callback replays, native reminders, and the second Mac or a new macOS user.
+  Evidence from a dev-signed build or an earlier candidate counts while those files are
+  unchanged. Packets follow `docs/qa/desktop-release-packet-template.md`. The file lists
+  are in `docs/DESKTOP_RELEASE.md`, "Release acceptance".
+- **The test Mac stays on the last published release.** Dev-signed builds go only to
+  the owner's Mac. This narrows the October 23 standing approval, which covered both
+  Macs.
+- **The real-updater test runs during publication.** Published builds read only the
+  stable feed. So the stable feed changes first, and the test Mac updates through it and
+  passes the data comparison. Only then do the download link and the preview feed move.
+  On failure, the previous feed is restored.
+- **The download link is version-free.** The `desktop-stable` release carries a copy of
+  the current DMG named `Cadence_aarch64.dmg`, and **Download for Mac** links to it.
+  Each publication replaces that asset, so it needs no marketing PR, deployment or Trust
+  marketing-ID refresh. The public Trust evidence never requests a release asset, and
+  the files it digests were byte-identical before and after the change (October 24).
+  Every merge to `main` still rebuilds marketing and needs the Trust refresh.
+- **One upload authorized.** The owner authorized uploading a copy of the published 0.1.3
+  DMG (SHA-256 `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`) to
+  `desktop-stable` as `Cadence_aarch64.dmg`, before the link change merges.
+- **Unchanged.** The owner instructs each notarization, every other upload, each feed
+  change, each publication and each merge of a release change.
+
+The owner's words: "I approve all three release-policy changes in PR #143 as proposed,
+and I authorize uploading a copy of the published 0.1.3 DMG to the desktop-stable
+release as Cadence_aarch64.dmg."
+
+Platform impact: the desktop release process, and the marketing download link
+(`INT-MKT-012`). Web and future mobile are not affected. Recorded from the owner's
+October 24 sign-off, relayed by the orchestrating agent session.

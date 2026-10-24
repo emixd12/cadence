@@ -1,5 +1,115 @@
 # Implementation Status
 
+## Desktop release acceptance and version-free download link — October 24, 2026
+
+The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
+2026-10-24). This change covers documentation, one marketing link and its test. Nothing
+was notarized, published or deployed, and no feed changed. The one authorized upload is
+recorded below.
+
+- `docs/DESKTOP_RELEASE.md` gains "Release acceptance" and "Publication". Every
+  notarized release after 0.1.3 needs four checks: the 14 artifact checks,
+  notarization and Gatekeeper on a quarantined download, an upgrade from the last
+  published version with the data comparison, and the real updater when the SQLite
+  schema or the last release's updater files changed. Area checks run only when
+  `git diff` from the last published commit touches their files. Dev-build evidence
+  counts while those files are unchanged. The test Mac stays on the published release.
+- Published builds read only the stable feed, so the real-updater test runs during
+  publication: the stable feed changes first, the test Mac updates and passes the
+  comparison, then the download link and the preview feed move.
+- `docs/qa/desktop-release-packet-template.md` is the one-page packet.
+  `docs/OPERATIONS.md` points the release gates at the new sections.
+- **Download for Mac** (`apps/marketing/src/data/site.ts`) links to the version-free
+  `desktop-stable/Cadence_aarch64.dmg`. Each publication replaces that asset, so it
+  needs no marketing PR, deployment or Trust marketing-ID refresh.
+  `tests/marketing-layout.test.ts` pins the link and rejects versioned names;
+  `INT-MKT-012` is updated.
+
+Trust audit: the public Trust evidence does not depend on the versioned DMG name. Route
+and artifact checks fetch only the named application and marketing deployments. A fresh
+marketing build before and after the change produced byte-identical `robots.txt`,
+`llms.txt`, `llms-full.txt`, `data/route-manifest.json` and example ZIP; the link
+appears only in the header of 34 HTML pages. Every merge to `main` still rebuilds
+marketing and needs the Trust refresh in `docs/VERCEL_WORKFLOW.md`.
+
+**Version-free asset uploaded October 24, 2026, at 01:44:18Z.** The release-process
+session uploaded it on the owner's authorization, from the retained 0.1.3 copy, which
+it hashed before the upload. Readback:
+- GitHub lists `Cadence_aarch64.dmg` at 8,063,145 bytes, with the same SHA-256 as
+  `Cadence_0.1.3_aarch64.dmg`:
+  `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`.
+- The public URL returns 200 after one redirect, and its download has that hash.
+- Gatekeeper accepts a quarantined copy of the download as Notarized Developer ID, both
+  the DMG and the app inside. Both staples validate, and `syspolicy_check distribution`
+  passes.
+- Every earlier asset and `latest.json` is unchanged. No feed changed.
+
+Merging waits for the owner's instruction. A merge deploys marketing to production, and
+then needs the Trust marketing-ID refresh in `docs/VERCEL_WORKFLOW.md`.
+
+Applied to 0.1.5 (PR #140; `dcefe7e` to `ed93fff`): schema 17 to 18 requires the
+real-updater upgrade from 0.1.3 during publication. `auth.ts` and `auth.rs` require the
+sign-in callback, session renewal and revoked-session checks. The Calendar files require
+the Calendar replay. `Entitlements.plist` and `first-account-link.ts` require a new
+macOS user or the second Mac. Native reminder and updater files did not change.
+
+Platform impact: desktop release process and the marketing download link. Web and
+future mobile are not affected. No schema, migration or hosted configuration change.
+
+## Dev-signed desktop builds — October 23, 2026
+
+The owner approved dev-signed builds for installed desktop testing. Apple notarization
+and publication stay the owner's decision each time (`docs/DECISIONS.md`, 2026-10-23).
+
+- `release.mjs dev-check|dev-build <X.Y.Z-dev.N>`: Tauri signs ad hoc without any Apple
+  credential. The command then signs with the Developer ID identity, hardened runtime
+  and production entitlements, without a secure timestamp, and verifies the result. No
+  step contacts Apple. The app and its report go to
+  `~/Library/Application Support/Cadence Release/dev-builds/<version>/`.
+- `install-dev-build.mjs <version>` refuses unmerged migrations, downgrades, changed or
+  unsigned builds and a running Cadence. It saves the database and the installed app,
+  swaps the app, opens it and checks the migrated database.
+- `docs/DESKTOP_RELEASE.md` ("Dev-signed builds") has the commands, version rules and
+  rollback. `AGENTS.md`, `docs/OPERATIONS.md` and `docs/DESKTOP_BUILD.md` point to it.
+  `.env.example` lists the three path overrides.
+- The owner-private helper `~/Library/Application Support/Cadence Release/dev-signed-env.sh`
+  holds public values, the identity name and the profile path only.
+
+Verification:
+
+- Real `dev-build 0.1.6-dev.1` from `f922685`: Developer ID authority, team
+  `HK26VT477G`, hardened runtime, production entitlements and embedded profile;
+  `spctl` rejects it as "Unnotarized Developer ID". The first attempt failed: codesign
+  could not reach Apple's timestamp server from the agent sandbox. That failure led to
+  the timestamp-free signature.
+- The installer and the documented rollback ran with real tools on scratch copies of
+  the build, the installed 0.1.2 app and a synthetic database.
+- Focused release and installer tests: 51 passed. A deliberately broken downgrade guard
+  failed its test.
+- `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck`,
+  `desktop:typecheck`, `core:check`, `design-system:check`, `public-source:check`,
+  `git diff --check` and the web build pass.
+- Full Vitest: 3,555 passed, 96 skipped, 1 failed. The failure was
+  `tests/desktop-release-acceptance.test.ts`, which timed out at 5 seconds under
+  full-suite load; it passes alone (46 of 46). This change does not touch that test or
+  its script.
+
+Installed on the owner's Mac at 20:42 UTC on the owner's instruction, with Cadence
+quit. `install-dev-build.mjs` replaced 0.1.2 with 0.1.6-dev.1 and opened it. The
+database moved from schema 17 to 18; integrity and foreign-key checks pass, and no
+table lost rows. About 30 seconds after launch the app completed an account sync with
+the saved Keychain session and no sign-in prompt; the previous sync was at 15:42 UTC.
+macOS therefore accepts the timestamp-free Developer ID signature with the Keychain
+group entitlement. Protected copy:
+`~/Library/Application Support/Cadence Release/dev-installs/20261023T204210Z-0.1.6-dev.1/`.
+
+Not verified: location permission and notifications on a dev build, and grants
+persisting across two dev builds. The 0.1.5 candidate's prepared upgrade check
+(PR #140) expected 0.1.2 on this Mac; installing 0.1.5 here now needs a rollback first.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are not
+affected. No schema, migration, hosted configuration or interaction change.
+
 ## Connector production secrets and redeploy — October 23, 2026
 
 The owner approved release steps 1–5 at 16:19 UTC. Steps 1–3 (preflight, dry
