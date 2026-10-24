@@ -1,5 +1,30 @@
 # Implementation Status
 
+## PR #138 brought in line with main after the Ticket 187 release — October 24, 2026
+
+Main gained PR #150 (Tickets 187, 184 candidates 2–3 and 188), which shipped without
+the travel train. This branch now merges that main. The conflicts take PR #135's
+resolutions, because #135 already combined the same main code with this train at
+`6cf3c047`. That includes the recipe 1.2 travel-option policy and its regressions
+(`tests/briefing-travel-candidates.test.ts` and two bubble tests). Without it, recipe
+1.2 would restore planner moves that travel rejected.
+
+Hosted Supabase now ends at `20261022180000_separate_agent_calendar_grant.sql`,
+applied October 24. The travel migrations are renamed to sort after it:
+
+- `20261022160000_completion_place_labels.sql` → `20261024200000_completion_place_labels.sql`
+- `20261022170000_travel_habits.sql` → `20261024210000_travel_habits.sql`
+
+Their SQL is unchanged. Neither touches an object the Ticket 187 migration defines,
+so the new order produces the same schema. A plain `db push` applies both; it needs
+no `--include-all`. DATA_MODEL, TICKETS, the rollout and merge-readiness QA notes,
+the travel-train STATUS entries and the SQLite 0020 header name the new files.
+Nothing was pushed to hosted.
+
+Platform impact: web and linked desktop gain main's Daily Brief Calendar connection
+and the recipe 1.2 travel-option policy. Desktop SQLite numbering is unchanged.
+Marketing: no change. Future mobile: not applicable.
+
 ## Ticket 187 release without the travel train — October 24, 2026
 
 The owner chose, on October 24, 2026, to ship Ticket 187 for Google's demo recording
@@ -623,8 +648,8 @@ stage 1). The moved 215 branch was merged again on October 23; the later 216 and
 
 Integration:
 - Hosted migrations, all after `20261019180000_add_behavior_where.sql`:
-  `20261022160000_completion_place_labels.sql` (216), then
-  `20261022170000_travel_habits.sql` (217). Both patch the account-sync RPCs by
+  `20261024200000_completion_place_labels.sql` (216), then
+  `20261024210000_travel_habits.sql` (217). Both patch the account-sync RPCs by
   anchor and compose. 91 tracked migrations in total. As of October 23,
   production has `20261019040000`, `20261019041000` and `20261019180000`
   (Ticket 215 and PR #111, merged to main as PR #112); the train's two are pending.
@@ -780,7 +805,7 @@ Implemented on a draft PR against the Ticket 215 branch; not deployed:
   once a day. Not now stores nothing.
 - Travel Settings, How you travel: the learned values as plain sentences with
   inline selects. No buffer fields.
-- Storage: hosted migration `20261022170000_travel_habits.sql` (habit columns on
+- Storage: hosted migration `20261024210000_travel_habits.sql` (habit columns on
   `travel_settings`, owner RLS unchanged, a separate habit revision), generated
   types, SQLite migration 0019, the `commitTravelHabits` native command and the
   singleton profile sync entity, now 13 keys. `PUT /api/travel/habits` writes one
@@ -860,7 +885,7 @@ the design, the storage decision and the privacy surface entries.
   `place-label-rules@1` and `where-suggestion-rules@1` with pinned tests, plus a
   counts-only `projectPlaceLabelCounts` that nothing feeds to the model yet.
 - Storage: account-level, with RLS. Hosted migration
-  `20261022160000_completion_place_labels.sql` adds four owner-scoped tables,
+  `20261024200000_completion_place_labels.sql` adds four owner-scoped tables,
   opt-in and Completed-only triggers, deletion on opt-out and status change, a
   settings save that purges by retention, a service-role daily purge (called by the
   occurrence-sync cron) and four account-sync entity kinds. SQLite migration 0020

@@ -67,7 +67,7 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
-Migration `20261022170000_travel_habits.sql` (Ticket 217) adds learned travel
+Migration `20261024210000_travel_habits.sql` (Ticket 217) adds learned travel
 habits to `travel_settings`. Every value comes from the user: an edit in Travel
 Settings, a travel mode chosen for a place, or a leave-time answer.
 
@@ -334,7 +334,7 @@ the committed sync state remains stale.
 
 ### Completion place labels (Ticket 216)
 
-Migration `20261022160000_completion_place_labels.sql` adds four owner-scoped
+Migration `20261024200000_completion_place_labels.sql` adds four owner-scoped
 tables. Owner RLS permits each table's own reads and writes; nothing reads another
 account. Cadence never fetches, stores or compares Google coordinates here.
 
