@@ -452,6 +452,7 @@ Daily Brief uses a separate Calendar connection from the Timeline.
 In Settings, open **Google Calendar for Daily Brief** and connect the Google account you use for Cadence.
 Choose calendars and save. Then enable **Include calendars selected in Google Calendar for Daily Brief** under **Daily Brief**.
 Connecting Calendar alone does not enable sharing with OpenAI.
+The line under that choice lists what Daily Brief sends: today's event times, timezone, availability and your response. Titles, descriptions, locations and attendees are not sent.
 
 If you previously included Timeline Calendar in Daily Brief, connect this separate grant and enable Calendar again after the update.
 Disconnecting this connection stops Daily Brief Calendar reads across your devices. Your Timeline Calendar connection remains separate.

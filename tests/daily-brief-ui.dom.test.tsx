@@ -104,6 +104,11 @@ describe("Daily Brief UI", () => {
     await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false }));
     expect(container.querySelector('a[href="https://developers.openai.com/api/docs/guides/your-data"]')).not.toBeNull();
     expect(container.textContent).toContain("cannot change tracking or Calendar records");
+    expect(controls[1]!.getAttribute("aria-describedby")).toBe("daily-brief-calendar-disclosure");
+    const calendarDisclosure = container.querySelector("#daily-brief-calendar-disclosure")?.textContent ?? "";
+    expect(calendarDisclosure).toContain("Sends today’s event times, timezone, availability and your response for those calendars.");
+    expect(calendarDisclosure).toContain("Event titles, descriptions, locations and attendees are not sent.");
+    expect(calendarDisclosure).toContain("Your Timeline Google Calendar connection is never used.");
   });
 });
 

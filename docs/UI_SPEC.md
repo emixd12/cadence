@@ -1122,4 +1122,5 @@ Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Br
 Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
 Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
 Explain that model sharing requires the separate Daily Brief control after connection and selection.
+Under that Daily Brief control, a disclosure line (`daily-brief-calendar-disclosure`) names what is sent: today's event times, timezone, availability and response, never titles, descriptions, locations or attendees, and never the Timeline connection.
 The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.
