@@ -49,6 +49,30 @@ try {
   const returnedProfile = first.snapshot.entities.find((row) => row.kind === "profile");
   assert(returnedProfile, "updated profile snapshot");
   assert(entityDigest([returnedProfile]) === entityDigest([nextProfile]), "timezone update preserves remaining profile fields");
+  // Ticket 217: learned habits round-trip in the profile entity; an 8-key profile from an older build fails closed.
+  assert(returnedProfile.value.travel_habits_updated_at === null && Array.isArray(returnedProfile.value.travel_place_modes), "profile carries empty learned habits");
+  const habitProfile = { ...returnedProfile, value: { ...returnedProfile.value, travel_preparation_minutes: 15, travel_arrival_buffer_minutes: 10,
+    travel_place_modes: [{ place_key: "A".repeat(43), mode: "transit", chosen_at: "2026-09-01T06:00:00.000000Z" }],
+    travel_leave_feedback: [{ event_ref: "a".repeat(64), local_date: "2026-09-01", answer: "too_late", answered_at: "2026-09-01T06:00:00.000000Z", rules_version: "travel-habit-defaults@1" }],
+    travel_habits_updated_at: "2026-09-01T06:00:00.000000Z" } };
+  const habitMerged = first.snapshot.entities.map((row) => row.kind === "profile" ? habitProfile : row);
+  const legacyProfile = Object.fromEntries(Object.entries(returnedProfile.value).filter(([key]) => !key.startsWith("travel_") || key === "travel_enabled" || key === "travel_mode"));
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: payload(first.snapshot,
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: returnedProfile.value, value: { ...legacyProfile, timezone: "UTC" } }],
+    entityDigest(first.snapshot.entities), "2170".repeat(16)) }), "a pre-Ticket 217 profile write is refused");
+  const unordered = { ...habitProfile.value, travel_place_modes: [{ place_key: "B".repeat(43), mode: "walking", chosen_at: "2026-09-01T06:00:00.000000Z" }, habitProfile.value.travel_place_modes[0]] };
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: payload(first.snapshot,
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: returnedProfile.value, value: unordered }],
+    entityDigest(first.snapshot.entities), "2171".repeat(16)) }), "unordered learned places are refused");
+  const habitResult = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: payload(first.snapshot,
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: returnedProfile.value, value: habitProfile.value }],
+    entityDigest(habitMerged), "2172".repeat(16)) }));
+  const habitReturned = habitResult.snapshot.entities.find((row) => row.kind === "profile");
+  assert(entityDigest([habitReturned]) === entityDigest([habitProfile]), "learned habits round-trip through the profile entity");
+  const otherProfile = (await readSnapshot(clients[1])).entities.find((row) => row.kind === "profile");
+  assert(otherProfile.value.travel_habits_updated_at === null, "learned habits stay with their owner");
+  first.snapshot = habitResult.snapshot;
+  first.fingerprint = habitResult.fingerprint;
   const category = first.snapshot.entities.find((row) => row.kind === "category");
   assert(category, "timestamp roundtrip category");
   const timestampValue = { ...category.value, name: "Timestamp roundtrip", description: "Synced category context", updated_at: "2026-09-01T06:00:00.123457Z" };
@@ -213,7 +237,7 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }

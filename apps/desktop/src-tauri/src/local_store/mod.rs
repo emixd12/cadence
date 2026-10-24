@@ -7,6 +7,7 @@ mod import;
 mod import_write;
 mod note_shortcut;
 mod occurrence;
+mod place_labels;
 mod recovery;
 mod reminder;
 #[cfg(test)]
@@ -229,6 +230,35 @@ pub struct TravelSettingsMutation {
     pub updated_at: String,
 }
 
+/// Ticket 217: the complete next habits, planned by the shared TypeScript rules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelHabitsMutation {
+    pub preparation_minutes: Option<i64>,
+    pub arrival_buffer_minutes: Option<i64>,
+    pub place_modes: Vec<TravelPlaceModeEntry>,
+    pub leave_feedback: Vec<TravelLeaveFeedbackEntry>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelPlaceModeEntry {
+    pub place_key: String,
+    pub mode: String,
+    pub chosen_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TravelLeaveFeedbackEntry {
+    pub event_ref: String,
+    pub local_date: String,
+    pub answer: String,
+    pub answered_at: String,
+    pub rules_version: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "operation",
@@ -287,6 +317,9 @@ pub enum Request {
         kind: Option<import::ImportRunKind>,
     },
     ReadNoteShortcutStates {
+        profile_id: String,
+    },
+    ReadPlaceLabels {
         profile_id: String,
     },
     ReadNoteShortcutContext {
@@ -354,6 +387,13 @@ pub enum Request {
         now: String,
         expected_updated_at: String,
         next: TravelSettingsMutation,
+    },
+    CommitTravelHabits {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        expected_updated_at: Option<String>,
+        next: TravelHabitsMutation,
     },
     CommitNativeReminderPlan {
         profile_id: String,
@@ -429,6 +469,12 @@ pub enum Request {
         expected: note_shortcut::NoteShortcutContext,
         next: NoteShortcutState,
         require_enabled: bool,
+    },
+    CommitPlaceLabels {
+        profile_id: String,
+        mutation_id: String,
+        now: String,
+        mutation: place_labels::PlaceLabelMutation,
     },
     StartTimeSession {
         profile_id: String,
@@ -539,6 +585,8 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
         let payload = serde_json::to_string(&request)
             .map_err(|_| "The local request could not be encoded.")?;
         let note_shortcut_commit = matches!(&request, Request::CommitNoteShortcutState { .. });
+        // Place markers and labels must not outlive opt-out in the mutation journal.
+        let place_label_commit = matches!(&request, Request::CommitPlaceLabels { .. });
         // Full-history restore carries both expected rows and their replacements.
         let payload_limit = if note_shortcut_commit
             || matches!(&request, Request::PrepareBehaviorLogImport { .. })
@@ -554,7 +602,7 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             &request,
             Request::CommitNativeReminderPlan { .. } | Request::RecordNativeReminderCoverage { .. }
         );
-        let journal_payload = if note_shortcut_commit || reminder_commit {
+        let journal_payload = if note_shortcut_commit || reminder_commit || place_label_commit {
             json!(format!("{:x}", Sha256::digest(payload.as_bytes()))).to_string()
         } else {
             payload.clone()
@@ -574,6 +622,9 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             if reminder_commit {
                 return reminder::read(&tx, profile_id);
             }
+            if place_label_commit {
+                return place_labels::read(&tx, profile_id);
+            }
             return serde_json::from_str(&result)
                 .map_err(|_| "The prior mutation result is invalid.".into());
         }
@@ -583,7 +634,7 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             .as_str()
             .ok_or("Missing local operation.")?
             .to_string();
-        let journal_result = if note_shortcut_commit || reminder_commit {
+        let journal_result = if note_shortcut_commit || reminder_commit || place_label_commit {
             "null".into()
         } else {
             result.to_string()
@@ -709,6 +760,10 @@ pub fn execute(db: &mut Connection, request: Request) -> Result<Value> {
             db::owner(&tx, profile_id)?;
             json!(note_shortcut::read_states(&tx, profile_id)?)
         }
+        Request::ReadPlaceLabels { profile_id } => {
+            db::owner(&tx, profile_id)?;
+            place_labels::read(&tx, profile_id)?
+        }
         Request::ReadNoteShortcutContext {
             profile_id,
             behavior_id,
@@ -756,6 +811,13 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             next,
             ..
         } => travel::write(db, profile_id, now, expected_updated_at, next),
+        Request::CommitTravelHabits {
+            profile_id,
+            now,
+            expected_updated_at,
+            next,
+            ..
+        } => travel::write_habits(db, profile_id, now, expected_updated_at.as_deref(), next),
         Request::CommitNativeReminderPlan { .. } => reminder::plan(db, request),
         Request::RecordNativeReminderCoverage { .. } => reminder::record(db, request),
         Request::CreateBehaviorGraph {
@@ -823,6 +885,12 @@ fn apply(db: &Connection, request: &Request) -> Result<Value> {
             require_enabled,
             ..
         } => note_shortcut::commit(db, profile_id, now, expected, next, *require_enabled),
+        Request::CommitPlaceLabels {
+            profile_id,
+            now,
+            mutation,
+            ..
+        } => place_labels::commit(db, profile_id, now, mutation),
         Request::StartTimeSession {
             profile_id,
             session,
@@ -894,6 +962,12 @@ impl Request {
                 now,
                 ..
             }
+            | Self::CommitTravelHabits {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
             | Self::CommitNativeReminderPlan {
                 profile_id,
                 mutation_id,
@@ -937,6 +1011,12 @@ impl Request {
                 ..
             }
             | Self::CommitNoteShortcutState {
+                profile_id,
+                mutation_id,
+                now,
+                ..
+            }
+            | Self::CommitPlaceLabels {
                 profile_id,
                 mutation_id,
                 now,

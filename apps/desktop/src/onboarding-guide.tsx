@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   CheckCircle2,
   Circle,
   Clock3,
+  House,
   ListChecks,
   Upload,
   X,
@@ -12,7 +13,9 @@ import { resolveFirstRunOnboardingModel } from "@/lib/services/onboarding-model"
 import type {
   FirstRunOnboardingClientSnapshot,
   FirstRunOnboardingItemKey,
+  FirstRunTravelSetup,
 } from "@/lib/types/onboarding";
+import { readTravelRoutingReport } from "@/lib/ui/travel";
 import type { DesktopScreen } from "./desktop-app";
 import type {
   NativeNotificationPermission,
@@ -25,6 +28,7 @@ const ICONS = {
   notifications: Bell,
   timezone: Clock3,
   import: Upload,
+  travel: House,
 };
 const DESTINATIONS: Record<
   FirstRunOnboardingItemKey,
@@ -34,6 +38,7 @@ const DESTINATIONS: Record<
   notifications: { screen: "settings", anchor: "notifications" },
   timezone: { screen: "settings", anchor: "timezone" },
   import: { screen: "export", anchor: "behaviorlog-import" },
+  travel: { screen: "settings", anchor: "travel" },
 };
 export type DesktopOnboardingGuideProps = Readonly<{
   hasAnyBehavior: boolean;
@@ -43,6 +48,10 @@ export type DesktopOnboardingGuideProps = Readonly<{
   coverage: NativeSettingsCoverage | null;
   onNavigate: (screen: DesktopScreen, anchor: string) => void;
   availableScreens: readonly DesktopScreen[];
+  /** Reads Home and usual travel presence from the local working copy. */
+  loadTravelSetup?: (() => Promise<FirstRunTravelSetup>) | null;
+  /** Asks the hosted deployment; null without a linked account, which hides the travel item. */
+  readTravelRoutingConfigured?: ((signal: AbortSignal) => Promise<boolean>) | null;
   forceOpen?: boolean;
   onDismiss?: () => void;
 }>;
@@ -55,6 +64,8 @@ export function DesktopOnboardingGuide({
   coverage,
   onNavigate,
   availableScreens,
+  loadTravelSetup = null,
+  readTravelRoutingConfigured = null,
   forceOpen = false,
   onDismiss,
 }: DesktopOnboardingGuideProps) {
@@ -72,6 +83,10 @@ export function DesktopOnboardingGuide({
   const [deviceTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || null,
   );
+  const [travel, setTravel] = useState<{
+    setup: FirstRunTravelSetup | null;
+    configured: boolean | null;
+  }>({ setup: null, configured: null });
   const permissionAllowed =
     permission === "authorized" || permission === "provisional";
   // Reuse only the pure checklist model. Native readiness replaces Web Push inspection.
@@ -95,6 +110,8 @@ export function DesktopOnboardingGuide({
       coverage.status !== "unverified"
         ? "saved"
         : "missing",
+    // Unlinking removes the reader; an earlier answer must not keep the row.
+    travelRoutingConfigured: readTravelRoutingConfigured ? travel.configured : null,
   };
   const model = resolveFirstRunOnboardingModel(
     {
@@ -102,10 +119,25 @@ export function DesktopOnboardingGuide({
       hasImportRuns,
       timezone: currentTimezone,
       vapidPublicKey: "",
+      travel: travel.setup,
     },
     client,
   );
-  if (dismissed || (!forceOpen && !model.shouldRender)) return null;
+  const visible = !dismissed && (forceOpen || model.shouldRender);
+  const checkTravel = visible && Boolean(loadTravelSetup && readTravelRoutingConfigured);
+  useEffect(() => {
+    if (!checkTravel || !loadTravelSetup || !readTravelRoutingConfigured) return;
+    const controller = new AbortController();
+    // Local presence works offline; the travel row also needs the hosted routing report.
+    void Promise.all([
+      loadTravelSetup().catch(() => null),
+      readTravelRoutingReport(readTravelRoutingConfigured, controller.signal),
+    ]).then(([setup, configured]) => {
+      if (!controller.signal.aborted) setTravel({ setup, configured });
+    });
+    return () => controller.abort();
+  }, [checkTravel, loadTravelSetup, readTravelRoutingConfigured]);
+  if (!visible) return null;
 
   function dismiss() {
     try {
@@ -175,9 +207,9 @@ export function DesktopOnboardingGuide({
                       {available ? item.statusLabel : "Unavailable"}
                     </span>
                   </div>
-                  {item.optional ? (
+                  {item.description ? (
                     <p className="mt-1 text-sm leading-6 text-muted-readable">
-                      Use this only if you already have a BehaviorLog bundle.
+                      {item.description}
                     </p>
                   ) : null}
                 </div>

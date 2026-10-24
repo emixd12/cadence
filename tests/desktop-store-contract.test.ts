@@ -24,6 +24,9 @@ import { createLocalNoteShortcutStore } from "../apps/desktop/src/local-note-sho
 import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import { noteShortcutRevision } from "@cadence/core/resolvers/note-suggestion.resolver";
 import { createLocalOccurrenceActions } from "../apps/desktop/src/local-actions";
+import { createLocalPlaceLabelClient } from "../apps/desktop/src/local-place-labels.service";
+import { portabilityEntities } from "../apps/desktop/src/account/account-sync";
+import { accountSyncFingerprint } from "@cadence/core/resolvers/account-sync.resolver";
 
 const transport = vi.hoisted(() => ({ notify: (_request: unknown): Promise<unknown> => { void _request; return Promise.reject(new Error("OS adapter not configured.")); }, send: (_request: unknown): Promise<unknown> => { void _request; return Promise.reject(new Error("SQLite runner is not started.")); } }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true, invoke: (command: string, args: { request: unknown }) => {
@@ -486,5 +489,34 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     expect(pending.has(original.keys().next().value!)).toBe(false);
     expect([...pending.keys()].filter((id) => original.has(id))).toHaveLength(29);
     expect(operations).not.toContain("requestPermission");
+  }, 20_000);
+  it("keeps completion places in SQLite and hands valid rows to account sync (Ticket 216)", async () => {
+    const profile = await localCommand("readProfile", {});
+    const changed = vi.fn();
+    const client = createLocalPlaceLabelClient(changed);
+    expect((await client.load()).settings.enabled).toBe(false);
+    const created = await createBehavior(createLocalBehaviorStore(profile.id, NOW), {
+      userId: profile.id, timezone: profile.timezone, recordedAt: NOW.toString(), values: { ...VALUES, whereKind: "place", locationText: "1 Example Gym" },
+    });
+    const marker = { place: { kind: "saved_place" as const, text: "1 Example Gym" }, position: { latitudeE6: 41_878_100, longitudeE6: -87_629_800, accuracyMeters: 20 }, sampleAgeSeconds: 2 };
+    await expect(client.recordMarker(marker)).rejects.toThrow(/Turn on/);
+    let state = await client.saveSettings({ enabled: true, retention: "90_days", markerPromptDismissed: false, expectedUpdatedAt: null });
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.markerPrompt).toMatch(/^saved_place:/);
+    state = await client.recordMarker(marker);
+    expect(state.placeMarkers).toHaveLength(1);
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.markerPrompt).toBeNull();
+    await client.dismissSuggestion({ behaviorId: created.id, suggestion: "anywhere", ruleVersion: "where-suggestion-rules@1" });
+    expect(changed).toHaveBeenCalledTimes(3);
+    await stop(); await start();
+    // Local rows normalize and validate exactly as the planner requires.
+    const entities = portabilityEntities(await localCommand("readImportSnapshot", { profileId: profile.id }));
+    expect(entities.filter(({ kind }) => ["place_label_settings", "place_marker", "where_suggestion_dismissal"].includes(kind))).toHaveLength(3);
+    expect(accountSyncFingerprint({ entities })).toMatch(/^[a-f0-9]{64}$/);
+    state = await createLocalPlaceLabelClient().saveSettings({ enabled: false, retention: "90_days", markerPromptDismissed: false,
+      expectedUpdatedAt: (await createLocalPlaceLabelClient().load()).settings.updatedAt });
+    expect(state.placeMarkers).toEqual([]);
+    const after = await localCommand("readPlaceLabels", { profileId: profile.id });
+    expect(after.markers).toEqual([]);
+    expect(after.dismissals).toEqual([]);
   }, 20_000);
 });

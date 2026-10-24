@@ -17,6 +17,7 @@ import {
 } from "@/lib/security/launch-circuit-breakers";
 import { processOccurrenceSyncHorizons } from "@/lib/services/occurrence.service";
 import { runOAuthMaintenance } from "@/lib/services/oauth-maintenance.service";
+import { runPlaceLabelMaintenance } from "@/lib/services/place-labels.service";
 
 export const runtime = "nodejs";
 
@@ -90,10 +91,11 @@ async function processOccurrenceSyncRequest(request: NextRequest) {
       // A failed monitoring sink must not replace the occurrence result or error.
     }
   });
+  const placeLabels = runPlaceLabelMaintenance();
   try {
     return await processAuthenticatedOccurrenceSyncRequest(request);
   } finally {
-    await maintenance;
+    await Promise.all([maintenance, placeLabels]);
   }
 }
 

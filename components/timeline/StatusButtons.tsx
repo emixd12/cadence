@@ -18,6 +18,7 @@ import type {
   TimelineStatus,
 } from "@/lib/types/timeline";
 import type { TimelineStatusActionStatus } from "@/lib/resolvers/timeline-optimistic-status.resolver";
+import { useCompletionPlaceCapture } from "@/components/travel/PlaceLabels";
 
 type StatusButtonsProps = Readonly<{
   occurrenceId: string;
@@ -146,6 +147,7 @@ export function StatusButtons({
     EMPTY_ACTION_STATE,
   );
   const refresh = useRefresh();
+  const capturePlace = useCompletionPlaceCapture();
   const completionChimeIntentRef = useRef<CompletionChimeIntent | null>(null);
   const preparedChimeForSubmitRef = useRef(false);
 
@@ -168,6 +170,10 @@ export function StatusButtons({
         playChime: playCompletionChime,
         refresh: refreshTimeline,
       });
+      // Ticket 216: only a first resolution to Completed on this device can be labeled.
+      if (confirmedStatus === "completed" && completionChimeIntentRef.current?.currentStatus === "unresolved") {
+        capturePlace?.(occurrenceId);
+      }
 
       completionChimeIntentRef.current = null;
       preparedChimeForSubmitRef.current = false;
@@ -179,7 +185,7 @@ export function StatusButtons({
       refresh();
       onStatusError?.();
     }
-  }, [onStatusError, onStatusSuccess, refresh, state]);
+  }, [capturePlace, occurrenceId, onStatusError, onStatusSuccess, refresh, state]);
 
   function prepareForSubmittedStatus(submittedStatus: StatusButtonValue | null) {
     captureCompletionChimeIntent({

@@ -4620,6 +4620,60 @@
         "workbench.mode.synthetic",
         "planner.day-evidence"
       ]
+    },
+    {
+      "id": "context.travel",
+      "label": "Travel facts",
+      "category": "Context",
+      "definition": "Ticket 219 travel block: Behavior Where (with not_set meaning location not set), usual travel and Cadence's own yes, no or unknown fit conclusions. It never carries route durations, departure or arrival times, leave-by times, addresses, coordinates or place IDs. Conclusions that depend on an excluded Calendar or stop are withheld whole.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-travel.ts",
+          "symbol": "AdvisorTravelContext"
+        },
+        {
+          "path": "packages/core/src/services/briefing-travel.ts",
+          "symbol": "projectBriefingTravelFacts"
+        }
+      ],
+      "relatedIds": [
+        "config.context.exclusion",
+        "planner.day-evidence",
+        "workbench.fixture.travel-day"
+      ]
+    },
+    {
+      "id": "workbench.fixture.travel-day",
+      "label": "travel_day fixture",
+      "category": "Workbench",
+      "definition": "Synthetic places and invented route estimates pass through the core travel resolver: one Behavior fits before the trip, one overlaps it, a Home Behavior arrives late and one fits after the trip home. The workbench never evaluates Maps content.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-fixtures.ts",
+          "symbol": "briefingFixture"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.synthetic",
+        "context.travel"
+      ]
+    },
+    {
+      "id": "workbench.fixture.travel-unknown",
+      "label": "travel_unknown fixture",
+      "category": "Workbench",
+      "definition": "The travel_day stops without Home. The trip back stays unknown, so later Behaviors are unknown rather than free.",
+      "contracts": [
+        {
+          "path": "lib/services/briefing-fixtures.ts",
+          "symbol": "briefingFixture"
+        }
+      ],
+      "relatedIds": [
+        "workbench.mode.synthetic",
+        "context.travel",
+        "workbench.fixture.travel-day"
+      ]
     }
   ]
 }

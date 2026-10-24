@@ -113,6 +113,11 @@ describe("desktop account sync adapter", () => {
       routing_consent_at: null,
       onboarding_completed_at: null,
       updated_at: "2026-06-08T16:00:00Z",
+      travel_preparation_minutes: null,
+      travel_arrival_buffer_minutes: null,
+      travel_place_modes: [],
+      travel_leave_feedback: [],
+      travel_habits_updated_at: null,
     } }] });
     expect(accountSyncFingerprint(normalized)).toBe(digest);
   });

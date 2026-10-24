@@ -284,7 +284,10 @@ pure owner with paired tests; current runtime owners are listed below.
 | Day-progress layout | `packages/core/src/resolvers/day-progress.resolver.ts` | Synthetic design bench, shared Timeline UI, web/desktop services, and resolver tests | UI calculating independent dot/span mappings, changing actual times for collision spacing, fixed 24-hour local days | `docs/UI_SPEC.md`, `docs/DATETIME_STRATEGY.md` | `tests/day-progress.resolver.test.ts` | Geometry and injected instants only; no DOM, clocks, providers, or writes |
 | Duration and external context | `packages/core/src/resolvers/timeline-context.resolver.ts` | Shared Timeline assembly, owner-scoped web/desktop services, synthetic fixtures, and resolver tests | Averaging sessions instead of Occurrences, treating unknown as zero, running samples, automatic decisions or schedule writes | `docs/PRODUCT_SPEC.md` | `tests/timeline-context.resolver.test.ts` | Positive stopped Completed totals, optional default duration, explicit unknown/freshness, half-open timed overlaps |
 | Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
-| Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and timing-only model projection |
+| Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts`, `tests/travel-model-projection.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and a conclusions-only model projection (Ticket 219) |
+| Learned travel habits | `packages/core/src/services/travel-habits.ts` | Refresh service, web and desktop travel settings services, Travel Settings, Timeline mode choice and leave-time question | Restating defaults, steps or bounds; learning from position or route durations; storing place text or event titles | `docs/TICKETS.md` (Ticket 217), `docs/DATA_MODEL.md` | `tests/travel-habits.test.ts` | Versioned rules constant, injected instants, canonical stored order, one answer per local date |
+| Weather travel margin | `packages/core/src/resolvers/weather-margin.resolver.ts` | `travel.resolver.ts`, `lib/services/weather-forecast.service.ts` (area and cache hour), the Ticket 219 slot validator in `advisor-day-context.ts` (table margins only), synthetic fixtures, and resolver tests | Provider I/O, location reads, Google coordinates as an area, margins scaled by route duration, stacked margins, or a model inventing rules | `docs/TICKETS.md` (Ticket 218) | `tests/weather-margin.resolver.test.ts` | Versioned `weather-margin@1` table, largest single margin, planned-timing windows, 0.1° device grid, injected instants |
+| Completion place labels and Where suggestions | `packages/core/src/resolvers/place-label.resolver.ts` | `lib/services/place-labels.service.ts`, `apps/desktop/src/local-place-labels.service.ts`, `components/travel/PlaceLabels.tsx` for the device comparison, `packages/core/src/services/briefing-travel.ts` for Ticket 219 label counts, resolver tests | Fetching, storing or comparing Google coordinates; keeping completion samples; UI or repositories choosing labels, qualifying completions or suggestions; changing a Behavior from a suggestion; changing a rule value without a new version | `docs/TICKETS.md` | `tests/place-label.resolver.test.ts` | `place-label-rules@1` and `where-suggestion-rules@1` are frozen and pinned by tests. Callers inject instants, today and device clock. The resolver compares a device sample with device-recorded markers and returns a label, never a position. Suggestions read labels only and carry their rule version. `projectPlaceLabelCounts` returns counts only and has no model caller until Ticket 219. |
 
 - `packages/core/src/resolvers/timeline.resolver.ts` retains day selection,
   Needs decision, Occurrence status projection, and future-range ownership.
@@ -319,13 +322,29 @@ resolver receives injected instants, source revisions and grant revisions.
 
 `TravelEvidenceResult` is safe for API and UI use. It excludes route requests,
 coordinates, place IDs and saved location text. Its optional model projection
-contains timing and collision facts only. Callers must keep that projection
-disabled until Ticket 165 clears provider/model use.
+(`TravelTimingModelProjection` 2.0, Ticket 219) holds only Cadence's own
+conclusions: travel day, trips by destination ref with mode and a known/unknown
+estimate, and a fits/does_not_fit/unknown conclusion per unresolved Behavior.
+The resolver compares instants internally; no instant, duration, interval or
+provider field leaves it. An unknown or non-current leg makes every overlapping
+fit `unknown`, never free. Production routing still passes `disabled`; see the
+Ticket 219 section below for how conclusions reach model input.
 
 `resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
 affected by manual decisions, preserves unaffected estimates, and withholds a
 complete-trip claim until routing refreshes. The shared Timeline calls it;
 `tests/travel.resolver.test.ts` covers removal and restoration without mutation.
+
+`packages/core/src/resolvers/weather-margin.resolver.ts` (Ticket 218) owns the
+versioned `weather-margin@1` table, the departure window, the 0.1° device-position
+grid and the hourly cache key. `resolveTravelEvidence` takes its weather input beside
+the buffers, never inside them, and records the table version on every margin. The
+window comes from planned timing, so weather facts reveal no route duration.
+`packages/core/src/services/weather-outlook.ts` projects model-safe weather facts
+for Ticket 219, paired with `tests/weather-outlook.test.ts`; nothing sends them to a
+model yet. The Open-Meteo adapter `lib/services/weather-provider.ts` owns the request,
+units and payload validation; `lib/services/weather-forecast.service.ts` owns the
+shared hourly cache. Neither restates a table value.
 
 `packages/core/src/services/travel-refresh-policy.ts` (Tickets 213–214) owns the
 three-hour routing window, place-lookup reuse periods, typed-text normalization
@@ -333,6 +352,18 @@ and the 500 m movement rule, paired with `tests/travel-refresh-policy.test.ts`.
 `lib/services/travel-route-refresh.service.ts` and `lib/ui/travel.ts` call it; they
 must not restate those rules. Provider SKU prices and the traffic-aware window stay
 in the provider adapter `lib/services/travel-provider.ts`.
+
+`packages/core/src/services/travel-habits.ts` (Ticket 217) owns the learned-habit
+rules in the versioned `TRAVEL_HABIT_RULES` constant (`travel-habit-defaults@1`):
+defaults, steps and bounds, habit-change planning, the remembered mode per place,
+the stored and synchronized shape, and the once-a-day leave-time question. It is
+paired with `tests/travel-habits.test.ts`. `travelHabitBuffers` produces the
+resolver's `TravelBuffers`, including `preparationSeconds`; the travel resolver turns
+get-ready time into a `preparation_buffer` segment before an outbound departure
+without moving the route. The refresh service, web and desktop settings services,
+Travel Settings and the Timeline call these functions; they must not restate the
+steps, bounds or prompt rules. Place keys come from Ticket 216's
+`packages/core/src/services/travel-place-key.ts`.
 
 ## Day-progress production consumers (Tickets 133–136)
 
@@ -475,7 +506,8 @@ windows and selected durations support individual fit observations only with
 complete relevant coverage. Resolved work stays out of remaining-work evidence.
 Day evidence never grants move permission. The existing inspector retains full
 evidence and rejection details; the model explains ranked supported findings.
-No travel evidence enters this boundary until its separate release gates pass.
+No travel evidence enters this boundary. Ticket 219 travel conclusions reach the
+model beside the plan, never through planner intervals.
 Ticket 239 adds optional `additionalCalendars` (Outlook or iCloud, each at most
 once) to the planner input. Their events are fixed blocks beside Google, and every
 requested Calendar source must be current and complete before a scheduling option
@@ -527,6 +559,48 @@ inspector; it does not return internal context. `daily-brief-consumer.ts` serial
 that same selected projection and owns Daily Brief policy 2.1 instructions.
 Recipe/policy versions contribute to the effective revision and result metadata.
 
+### Travel facts in Daily Brief model input (Ticket 219)
+
+Stages 1 and 2 are implemented on the combined travel release branch. `docs/LEGAL.md` L-001 bounds them:
+Google route data reaches the model only as Cadence's own conclusions.
+
+- `packages/core/src/types/briefing-travel.ts` defines `AdvisorTravelContext`, the
+  optional `travel` block of a day context: Behavior Where (`not_set` means
+  "location not set"), routing on/off, usual travel, route conclusions or an
+  unavailable reason, learned habits, weather rule conclusions and both recent and retained label counts.
+- `validateAdvisorDayContext` closes that block: enums, refs already in the
+  context and bounded whole minutes or counts in the slots. It rejects any
+  instant, duration, extra field or free text.
+- `packages/core/src/services/briefing-travel.ts` owns `buildAdvisorTravelContext`
+  (stored preferences plus optional conclusions) and `projectBriefingTravelFacts`.
+  `projectBriefingContext` calls it to narrow the block to the facts the model
+  receives. Conclusions shaped by a Calendar event need the Calendar source;
+  a trip to an excluded stop withholds all conclusions, never part of them.
+- `scopeBriefingContext` drops travel, so the planner never sees it; planner
+  intervals would otherwise reveal travel timing.
+- `lib/services/briefing-account-context.service.ts` derives stored Where, habit and
+  label-count facts. Home and place text are read only to derive keys and references;
+  neither reaches model input. The account workbench receives stored facts only.
+- The live brief can return the route service's signed conclusions token. Admission
+  verifies owner, local date, expiry, current source values and the complete Calendar
+  snapshot, including events that did not become trips. Home, habits, timezone,
+  occurrences and duration history are bound to the token. Delivery rechecks those
+  stored sources when conclusions were admitted; token expiry during generation is
+  still allowed. Missing or invalid evidence supplies no route or weather facts.
+- `travelDurationHistoryRange` and `travelDurationRevision` share the planning and
+  verification history definition. The route service also fences Home, habits,
+  timezone and occurrence status before spending and before returning. Note edits
+  alone do not invalidate paid routing work. Oversized signed snapshots are omitted
+  within the existing token limit; the brief retains its stored facts.
+- `lib/services/briefing-fixtures.ts` builds `travel_day` and `travel_unknown` from
+  invented places and estimates through the real travel resolver (Maps Terms
+  3.2.3(c)(vii)). `daily-brief-consumer.ts` appends `DAILY_BRIEF_TRAVEL_INSTRUCTIONS`
+  only when the facts carry travel.
+
+Paired tests: `tests/travel-model-projection.test.ts`, `tests/briefing-travel.test.ts`
+(including no route duration, departure, arrival or derived time pair in the full
+model payload) and `tests/briefing-account-context.test.ts`.
+
 ## Historical completion timing resolver
 
 `packages/core/src/resolvers/completion-timing.resolver.ts` owns sample eligibility,
@@ -560,8 +634,9 @@ Implemented in source September 26, 2026. `docs/TICKETS.md` owns acceptance.
   one selected finding and the deterministic evidence line.
 - Ticket 170: `packages/core/src/services/brief-travel-guidance.ts` projects existing
   `travel.resolver.ts` evidence for display beside the brief, paired with
-  `tests/brief-travel-guidance.test.ts`. It never routes or estimates. Travel stays
-  out of model input; the model never recomputes intervals.
+  `tests/brief-travel-guidance.test.ts`. It never routes or estimates. Exact
+  leave-by times stay in that line; the model never recomputes intervals. Ticket
+  219 below owns the travel facts that may reach model input.
 - Ticket 173: `briefing-pipeline.ts` selects findings; `daily-brief-consumer.ts`
   validates the tip and drops quoted or unsupported Note themes;
   `daily-brief.service.ts` records a tip only after a completed, current attempt.

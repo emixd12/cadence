@@ -1955,7 +1955,31 @@ Rollback first removes the clearance flag. Foreground clients clear transient ev
 when they refresh, lose focus, go offline or reach their five-minute expiry.
 User-authored locations and tracking remain intact. Do not roll back the additive
 schema while newer desktop clients can synchronize. Travel never resets Daily Brief
-admission or dismissal; no travel facts enter the model in this release.
+admission or dismissal. Ticket 219 limits travel facts in model input to the
+conclusions-only regime in `docs/TICKETS.md`; never durations or times.
+
+## Travel conclusions signing secret (Ticket 219 Option A)
+
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` is a server-only HMAC key. `POST /api/travel/routes`
+signs Cadence's own conclusions for a one-day view with it. That means yes/no fits,
+trips, unknowns and weather rule conclusions; no durations or times. The Daily Brief
+request returns that token unchanged, and the server verifies the signature, owner,
+local date, expiry and current stored travel inputs before using it.
+
+- Without the secret, routes issue no token and every brief reports trip and weather
+  facts as `not_supplied`. Briefs never fail because of a token.
+- Generate at least 32 random characters, for example `openssl rand -base64 48`.
+  Never prefix it with `NEXT_PUBLIC_` or `VITE_`. Never put it in desktop builds,
+  logs, exports, tickets or chat.
+- Provisioning in Vercel (Production and Preview, sensitive) is an owner-gated rollout
+  step. Redeploy after setting it.
+- Rotation: move the current value to `TRAVEL_CONCLUSIONS_SIGNING_SECRET_PREVIOUS`, set
+  a new current value and redeploy. Remove the previous value after the longest view
+  expiry has passed; route views expire within minutes. The previous key only
+  verifies; it never signs, and it never works without a current key.
+- Rollback: remove the secret. Clients keep working and briefs omit trip facts.
+- Local testing: put a generated value only in git-ignored `.env.development.local`.
+  Tests use inline test-only values.
 
 ## Historical completion-time context
 
