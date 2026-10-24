@@ -1,0 +1,12 @@
+[modules.dang-sdk]
+source = "dagger.io/sdk/dang"
+
+[sdks.dang]
+module = "dang-sdk"
+
+[modules.cadence]
+source = ".dagger/modules/cadence"
+
+[sdks.dang.scopes.".dagger/modules/cadence"]
+is-module = true
+name = "cadence"

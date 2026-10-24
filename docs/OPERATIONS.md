@@ -179,6 +179,58 @@ npm run test
 npm run build
 ```
 
+### Dagger checks
+
+Dagger runs the CI checks in containers on a local machine.
+`dagger.toml` lists the workspace modules, and `dagger.lock` pins module
+versions and image digests. `.dagger/modules/cadence/main.dang` defines one
+check per CI step, each running the matching npm script.
+
+Do not install `dagger.io/js/vitest` while the CLI is v1.0.0-beta.21. Its test
+discovery uses a brace glob that this engine's workspace search does not match,
+so `dagger check` would skip every test and still pass.
+
+Install the pinned CLI once, and keep Docker Desktop running:
+
+```bash
+curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=1.0.0-beta.21 BIN_DIR="$HOME/.local/bin" sh
+```
+
+Run from the repository root:
+
+```bash
+dagger check                          # every check, concurrently
+dagger check -l                       # list checks
+dagger check cadence/typecheck        # one check
+dagger check cadence/lint cadence/test
+dagger check -i                       # open a shell where an exec fails
+dagger call cadence shell terminal    # shell in the checks' container
+```
+
+Agents run `dagger check --progress=report` before every push. A passing run
+prints one line per check. A failing check prints only its own log; the `test`
+check uses Vitest's `agent` reporter, so a failure prints the failing tests and
+the summary, not all 340 files. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
+sign-up hint from the output. If Docker or the Dagger CLI is unavailable, run
+the npm commands above.
+
+The engine caches every step by its inputs. An unchanged check finishes from
+cache. Only a change to a `package.json` or `package-lock.json` reinstalls
+dependencies. Cadence checks run on `node:24-bookworm`, which ships the `git`
+and `python3` that some tests call. The module reads the working tree with
+`.gitignore` rules and also excludes `.env*` files, `node_modules`, `.next`,
+`.claude`, `.local` and `.vercel`.
+
+Dagger covers every GitHub Actions `CI` step except `public-source:check`, which
+needs full Git history. GitHub Actions `CI` stays the merge gate. Dagger runs
+only on local machines: do not enable Dagger Cloud, Cloud Checks or Cloud
+engines (`docs/DECISIONS.md`, 2026-10-24).
+
+Each check reads the whole working tree, minus the excluded paths. So any edit,
+even to a doc, reruns every check, but not the dependency install. On the
+owner's Mac, the first run took 217 s, mostly image pulls and `npm ci`. A run
+after a source edit took 45 s, and an unchanged run took 1 s.
+
 For UI changes, also run the app and inspect at least:
 
 - `/timeline`

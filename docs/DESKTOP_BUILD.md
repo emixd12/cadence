@@ -40,6 +40,14 @@ configuration as data without sending.
 
 ## Native dependency CI
 
+`npm run desktop:dependencies:check` verifies the versions selected by both
+lockfiles. The Tauri JavaScript API and native runtime must share a major/minor
+version; JavaScript/native plugins must match exactly, including the patch.
+Both `agents:check` and the desktop frontend build run this guard. Update the
+JavaScript API, CLI, native `tauri` and matching `tauri-build` together, and
+regenerate both lockfiles. Keep the API and CLI pinned alongside the native
+runtime. See [Tauri's dependency guidance](https://v2.tauri.app/develop/updating-dependencies/).
+
 `.github/workflows/desktop-native.yml` checks changes to native sources,
 Cargo manifests and locks, npm manifests and locks, the bundled icon, and the
 workflow itself. It runs on GitHub's Apple Silicon `macos-15` runner with Node
