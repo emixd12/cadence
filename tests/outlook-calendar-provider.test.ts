@@ -124,6 +124,82 @@ describe("Graph request boundary", () => {
   });
 });
 
+describe("Calendars.Read data minimization (Ticket 242)", () => {
+  const EVENT_FIELDS = ["id", "subject", "isAllDay", "isCancelled", "showAs", "type", "seriesMasterId", "originalStart", "originalStartTimeZone",
+    "responseStatus", "changeKey", "webLink", "start", "end"];
+  const FORBIDDEN = /^(body|bodyPreview|attachments|hasAttachments|extensions|singleValueExtendedProperties|multiValueExtendedProperties|uniqueBody)$/i;
+  function assertMinimal(raw: string, allowed: readonly string[]) {
+    const url = new URL(raw);
+    expect(url.searchParams.has("$expand")).toBe(false);
+    const select = url.searchParams.get("$select");
+    expect(select).not.toBeNull();
+    const fields = select!.split(",");
+    expect(fields.some((field) => FORBIDDEN.test(field))).toBe(false);
+    expect(fields.every((field) => allowed.includes(field))).toBe(true);
+  }
+
+  it("selects only contract fields on calendarView and calendar listing", () => {
+    expect(outlookCalendarViewUrl("calendar-1", RANGE).searchParams.get("$select")!.split(",").sort()).toEqual([...EVENT_FIELDS].sort());
+    assertMinimal(outlookCalendarViewUrl("calendar-1", RANGE).toString(), EVENT_FIELDS);
+  });
+
+  it("keeps every paged request minimal and adds the select list when a next link omits it", async () => {
+    const next = `https://graph.microsoft.com${VIEW_PATH}?$skip=1000`;
+    const h = harness([page([], next), page([])]);
+    const result = await readOutlookCalendarEvents(input(h));
+    expect(result.ok).toBe(true);
+    expect(h.calls).toHaveLength(2);
+    for (const call of h.calls) assertMinimal(call.url, EVENT_FIELDS);
+    const listNext = "https://graph.microsoft.com/v1.0/me/calendars?$skip=10";
+    const l = harness([json({ value: [{ id: "b", name: "Work" }], "@odata.nextLink": listNext }), json({ value: [] })]);
+    await listOutlookCalendars({ accessToken: TOKEN, deadlineAt: 25_000, now: l.time.now, fetch: l.fetch, sleep: l.sleep });
+    for (const call of l.calls) assertMinimal(call.url, ["id", "name", "isDefaultCalendar"]);
+  });
+
+  it.each([
+    `$select=id,subject,body&$skip=1000`,
+    `$select=id,bodyPreview&$skip=1000`,
+    `$select=id,subject&$expand=attachments`,
+    `$expand=extensions&$skip=1000`,
+    `%24expand=attachments&$skip=1000`,
+    `$select=id,location&$skip=1000`,
+  ])("refuses a calendarView next link that broadens the request (%s) before sending the token", async (query) => {
+    const h = harness([page([], `https://graph.microsoft.com${VIEW_PATH}?${query}`)]);
+    const result = await readOutlookCalendarEvents(input(h));
+    expect(result.ok).toBe(false);
+    expect(h.calls).toHaveLength(1);
+    expect(outlookGraphUrlAllowed(`https://graph.microsoft.com${VIEW_PATH}?${query}`, "calendarView")).toBeNull();
+  });
+
+  it("keeps an opaque skip token byte-for-byte when appending the select list", () => {
+    const raw = `https://graph.microsoft.com${VIEW_PATH}?%24skiptoken=a%2Bb+c%3D%3D`;
+    expect(outlookGraphUrlAllowed(raw, "calendarView")!.toString().startsWith(`${raw}&$select=id,`)).toBe(true);
+    const selected = `https://graph.microsoft.com${VIEW_PATH}?$select=id,subject&$skip=1000`;
+    expect(outlookGraphUrlAllowed(selected, "calendarView")!.toString()).toBe(selected);
+  });
+
+  it("refuses a calendar-list next link that broadens the request", () => {
+    expect(outlookGraphUrlAllowed("https://graph.microsoft.com/v1.0/me/calendars?$select=id,name,owner", "calendars")).toBeNull();
+    expect(outlookGraphUrlAllowed("https://graph.microsoft.com/v1.0/me/calendars?$expand=events", "calendars")).toBeNull();
+  });
+
+  it("drops unexpected response fields before the validated snapshot", async () => {
+    const marker = "SYNTHETIC-PRIVATE-DETAIL";
+    const h = harness([page([timed("evt-1", "2026-11-01T14:00:00.0000000", "2026-11-01T15:00:00.0000000", {
+      body: { contentType: "html", content: marker }, bodyPreview: marker, hasAttachments: true, attachments: [{ name: marker }],
+      extensions: [{ id: marker }], location: { displayName: marker }, attendees: [{ emailAddress: { address: `${marker}@example.invalid` } }],
+      organizer: { emailAddress: { name: marker } }, onlineMeeting: { joinUrl: `https://example.invalid/${marker}` }, categories: [marker], iCalUId: marker,
+    })])]);
+    const result = await readOutlookCalendarEvents(input(h));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(JSON.stringify(result.snapshot)).not.toContain(marker);
+    expect(() => validateVersionedExternalEventSnapshot(result.snapshot)).not.toThrow();
+    const [event] = result.snapshot.events;
+    expect(event).toMatchObject({ title: "Event evt-1", description: "", location: "", organizer: null, attendees: null, conference: null, attachments: null });
+  });
+});
+
 describe("calendarView mapping", () => {
   it("reproduces the approved Outlook 1.1.0 fixture, including a Pacific all-day event read by a New York profile", async () => {
     const fixture = JSON.parse(readFileSync("tests/fixtures/external-event-snapshot.outlook.valid.json", "utf8"));
@@ -229,7 +305,9 @@ describe("pagination and failures", () => {
     const h = harness([page([timed("a", "2026-11-01T14:00:00", "2026-11-01T15:00:00")], next), page([timed("b", "2026-11-02T14:00:00", "2026-11-02T15:00:00")])]);
     const result = await readOutlookCalendarEvents(input(h));
     if (!result.ok) throw new Error("expected success");
-    expect(h.calls.map((call) => call.url)).toEqual([outlookCalendarViewUrl("calendar-1", RANGE).toString(), next]);
+    // A next link without $select keeps its exact query and gets the contract list appended.
+    expect(h.calls.map((call) => call.url)).toEqual([outlookCalendarViewUrl("calendar-1", RANGE).toString(),
+      `${next}&$select=${outlookCalendarViewUrl("calendar-1", RANGE).searchParams.get("$select")}`]);
     expect(result.snapshot.coverage[0]).toMatchObject({ paginationComplete: true, itemCount: 2 });
   });
 

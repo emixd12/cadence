@@ -618,7 +618,7 @@
       "benchAnchor": "design-system#ds-module-travel-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
+      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Permission status uses a separate read that never requests coordinates. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
     },
     {
       "id": "flow.consent-form",

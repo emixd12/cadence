@@ -328,10 +328,17 @@ adds the fixed-URL `open_location_settings` command behind Open Location Service
 (`INT-TRAVEL-007`) and signs production builds with the Hardened Runtime location
 entitlement.
 
+Settings reads permission through the separate `location_permission` native
+command, which returns only authorization state and never requests coordinates or
+a prompt. The foreground-position command and Timeline location reads remain
+separate; a position timeout does not change the displayed OS grant.
+
 Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390px
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
-`docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+`docs/qa/travel-release.md`. Signed Cadence for Mac 0.1.3 was published October 22,
+2026 (Tickets 115, 178 and 181); the manual macOS location permission path is handled
+under Ticket 165.
 
 
 Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and

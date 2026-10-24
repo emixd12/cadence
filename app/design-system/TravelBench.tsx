@@ -21,8 +21,8 @@ const notAllowed = async (requestPermission: boolean) => requestPermission
 const benchOnly = async () => {};
 export function TravelSettingsBench() {
   return <div className="grid gap-8">
-    <TravelSettingsPanel client={client} readLocation={denied} />
-    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} openLocationSettings={benchOnly} desktop />
+    <TravelSettingsPanel client={client} readLocation={denied} readPermission={async () => "denied"} />
+    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} readPermission={async () => "prompt"} openLocationSettings={benchOnly} desktop />
   </div>;
 }
 

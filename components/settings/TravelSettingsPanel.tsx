@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
-import { readBrowserForegroundLocation, type ForegroundLocation } from "@/lib/ui/foreground-location";
+import { readBrowserForegroundLocation, readBrowserLocationPermission, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
@@ -17,9 +17,10 @@ const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
  * Ticket 215: three inputs. The toggle records routing consent and asks for
  * foreground location in the same click; Home and usual travel save together.
  */
-export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, openLocationSettings, desktop = false }: Readonly<{
+export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false }: Readonly<{
   client?: TravelSettingsClient;
   readLocation?: (requestPermission: boolean) => Promise<ForegroundLocation>;
+  readPermission?: () => Promise<LocationPermission>;
   /** Desktop only: opens System Settings › Privacy & Security › Location Services. */
   openLocationSettings?: () => Promise<void>;
   desktop?: boolean;
@@ -40,7 +41,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   const permissionSequence = useRef(0);
   const refreshPermission = () => {
     const current = ++permissionSequence.current;
-    void queryDeviceLocationPermission(desktop, readLocation).then((value) => {
+    void queryDeviceLocationPermission(readPermission).then((value) => {
       if (current === permissionSequence.current) setPermission(value);
     });
   };
@@ -140,14 +141,9 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
 
 type DeviceLocationPermission = "allowed" | "not yet allowed" | "blocked";
 
-async function queryDeviceLocationPermission(desktop: boolean, readLocation: (requestPermission: boolean) => Promise<ForegroundLocation>): Promise<DeviceLocationPermission | null> {
+async function queryDeviceLocationPermission(readPermission: () => Promise<LocationPermission>): Promise<DeviceLocationPermission | null> {
   try {
-    if (desktop) {
-      const { state } = await readLocation(false);
-      return state === "available" ? "allowed" : state === "prompt" ? "not yet allowed" : state === "denied" ? "blocked" : null;
-    }
-    if (typeof navigator === "undefined" || typeof navigator.permissions?.query !== "function") return null;
-    const { state } = await navigator.permissions.query({ name: "geolocation" });
+    const state = await readPermission();
     return state === "granted" ? "allowed" : state === "prompt" ? "not yet allowed" : state === "denied" ? "blocked" : null;
   } catch { return null; }
 }
@@ -167,6 +163,9 @@ function deviceLocationHint(permission: DeviceLocationPermission, desktop: boole
 }
 
 function deviceLocationGuidance(permission: DeviceLocationPermission | null, denied: boolean, desktop: boolean): string {
+  if (permission === "allowed" && !denied) return desktop
+    ? "Keep Cadence in front and choose Check again to request a current position."
+    : "Choose Check again to request a current position.";
   if (desktop) return "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again.";
   const safari = isIosSafari();
   if (denied) return safari

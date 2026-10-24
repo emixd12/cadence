@@ -13,13 +13,17 @@ const IMAGES = {
   inbucket: "mailpit:v1.22.3", realtime: "realtime:v2.103.2",
   rest: "postgrest:v14.12", storage: "storage-api:v1.60.4",
 };
-const imageFor = (service) => `public.ecr.aws/supabase/${IMAGES[service]}`;
-const NAMES = new Map(Object.keys(IMAGES).map((service) => [`supabase_${service}_${PROJECT}`, imageFor(service)]));
+// The CLI pulls from SUPABASE_INTERNAL_IMAGE_REGISTRY (default public.ecr.aws).
+// Both registries served identical manifest digests for every pin on October 23, 2026.
+const REGISTRIES = ["public.ecr.aws", "ghcr.io"];
+const imagesFor = (service) => REGISTRIES.map((registry) => `${registry}/supabase/${IMAGES[service]}`);
+const NAMES = new Map(Object.keys(IMAGES).map((service) => [`supabase_${service}_${PROJECT}`, imagesFor(service)]));
+const ALLOWED_IMAGES = new Set([...NAMES.values()].flat());
 const VOLUMES = new Map([[DB, "/var/lib/postgresql/data"], [`supabase_storage_${PROJECT}`, "/mnt"]]);
 const JOBS = new Map([
-  [imageFor("auth"), ["gotrue", "migrate"]],
-  [imageFor("storage"), ["node", "dist/scripts/migrate-call.js"]],
-  [imageFor("realtime"), ["/app/bin/realtime", "eval", '{:ok, _} = Application.ensure_all_started(:realtime)\n{:ok, _} = Realtime.Tenants.health_check("realtime-dev")']],
+  ...imagesFor("auth").map((image) => [image, ["gotrue", "migrate"]]),
+  ...imagesFor("storage").map((image) => [image, ["node", "dist/scripts/migrate-call.js"]]),
+  ...imagesFor("realtime").map((image) => [image, ["/app/bin/realtime", "eval", '{:ok, _} = Application.ensure_all_started(:realtime)\n{:ok, _} = Realtime.Tenants.health_check("realtime-dev")']]),
 ]);
 const CONFIG_KEYS = new Set("Hostname Domainname User AttachStdin AttachStdout AttachStderr ExposedPorts Tty OpenStdin StdinOnce Env Cmd Healthcheck ArgsEscaped Image Volumes WorkingDir Entrypoint NetworkDisabled MacAddress OnBuild Labels StopSignal StopTimeout Shell HostConfig NetworkingConfig".split(" "));
 const HOST_KEYS = new Set("Binds NetworkMode PortBindings RestartPolicy ExtraHosts".split(" "));
@@ -62,7 +66,7 @@ export function rewriteCreate(name, value) {
       binding.HostIp = "127.0.0.1";
     }
   }
-  if (name) requireSafe(NAMES.get(name) === body.Image);
+  if (name) requireSafe(NAMES.get(name)?.includes(body.Image) === true);
   else {
     requireSafe(JOBS.has(body.Image) && JSON.stringify(body.Cmd) === JSON.stringify(JOBS.get(body.Image)) &&
       inert(body.Entrypoint) && inert(body.ExposedPorts) && inert(body.Volumes) &&
@@ -75,16 +79,31 @@ export function rewriteCreate(name, value) {
       requireSafe(!env.has(key));
       env.set(key, entry.slice(index + 1));
     }
-    if (body.Image === imageFor("realtime")) requireSafe(env.get("DB_HOST") === DB && env.get("DB_PORT") === "5432" && env.get("DB_NAME") === "postgres");
+    if (imagesFor("realtime").includes(body.Image)) requireSafe(env.get("DB_HOST") === DB && env.get("DB_PORT") === "5432" && env.get("DB_NAME") === "postgres");
     else {
       let url;
-      try { url = new URL(env.get(body.Image === imageFor("auth") ? "GOTRUE_DB_DATABASE_URL" : "DATABASE_URL")); }
+      try { url = new URL(env.get(imagesFor("auth").includes(body.Image) ? "GOTRUE_DB_DATABASE_URL" : "DATABASE_URL")); }
       catch { requireSafe(false); }
       requireSafe(url.protocol === "postgresql:" && url.hostname === DB && url.port === "5432" &&
         url.pathname === "/postgres" && !url.search && !url.hash);
     }
   }
   return body;
+}
+
+/**
+ * The CLI cleans up (stop, failed start) with label-filtered prunes. Accept only
+ * this project's label; volumes may also carry Docker's `all` flag for named volumes.
+ */
+export function projectPruneFilters(kind, searchParams) {
+  requireSafe([...searchParams.keys()].every((key) => key === "filters") && searchParams.getAll("filters").length === 1);
+  let filters;
+  try { filters = JSON.parse(searchParams.get("filters")); } catch { requireSafe(false); }
+  requireSafe(object(filters) && object(filters.label));
+  requireSafe(Object.keys(filters).every((key) => key === "label" || (kind === "volumes" && key === "all")));
+  requireSafe(JSON.stringify(filters.label) === JSON.stringify({ [`${LABELS[0]}=${PROJECT}`]: true }));
+  requireSafe(filters.all === undefined || JSON.stringify(filters.all) === JSON.stringify({ true: true }));
+  return filters;
 }
 
 async function readBody(stream) {
@@ -108,27 +127,32 @@ function reply(response, status, message) {
   response.end(JSON.stringify({ message }));
 }
 
-/** This supports start/reset/status only. No exec, attach, prune, or global settings. */
-export function createDockerProxy(daemonSocket) {
+class InspectError extends Error {}
+
+/** This supports start/stop/reset/status only. No exec, attach, global settings or unscoped prune. */
+export function createDockerProxy(daemonSocket, onReject = (line) => console.error(`Cadence Docker proxy rejected ${line}`)) {
   requireSafe(typeof daemonSocket === "string" && daemonSocket.startsWith("/"));
   const inspect = async (path) => {
     const response = await new Promise((ok, fail) => {
       const request = http.request({ socketPath: daemonSocket, path, method: "GET" }, ok);
-      request.setTimeout(15_000, () => request.destroy());
-      request.on("error", fail);
+      request.setTimeout(15_000, () => request.destroy(new Error("timeout")));
+      // Error codes only: daemon and socket messages stay out of the log.
+      request.on("error", (error) => fail(new InspectError(error.code ?? error.message)));
       request.end();
     });
     const bytes = await readBody(response);
     if (response.statusCode === 404) return null;
-    requireSafe(response.statusCode === 200);
+    if (response.statusCode !== 200) throw new InspectError(`status ${response.statusCode}`);
     return parseBody(bytes);
   };
   const server = http.createServer(async (request, response) => {
+    let method = request.method ?? "";
+    let path = "";
     try {
       requireSafe(request.url?.startsWith("/") && !request.url.startsWith("//"));
       const url = new URL(request.url, "http://docker.local");
-      const path = url.pathname.replace(/^\/v\d+\.\d+(?=\/)/, "");
-      const method = request.method;
+      path = url.pathname.replace(/^\/v\d+\.\d+(?=\/)/, "");
+      method = request.method;
       const read = method === "GET" || method === "HEAD";
       const bytes = await readBody(request);
       let forwarded = bytes;
@@ -158,18 +182,28 @@ export function createDockerProxy(daemonSocket) {
         const existing = await inspect(`/volumes/${encodeURIComponent(name)}`);
         if (!existing) { reply(response, 404, "Cadence volume not found."); return; }
         requireSafe(owned(existing.Labels));
+      } else if (method === "POST" && (path === "/containers/prune" || path === "/volumes/prune")) {
+        requireSafe(bytes.length === 0);
+        projectPruneFilters(path.split("/")[1], url.searchParams);
+      } else if (method === "POST" && path === "/networks/prune") {
+        requireSafe(bytes.length === 0);
+        projectPruneFilters("networks", url.searchParams);
+        // The loopback network is shared and must survive cleanup; report nothing pruned.
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ NetworksDeleted: null }));
+        return;
       } else if (method === "POST" && path === "/images/create") {
         requireSafe(inert(bytes.length) && [...url.searchParams.keys()].every((key) => ["fromImage", "tag"].includes(key)));
         const image = url.searchParams.get("fromImage");
         const tag = url.searchParams.get("tag");
-        requireSafe([...NAMES.values()].includes(tag ? `${image}:${tag}` : image));
+        requireSafe(ALLOWED_IMAGES.has(tag ? `${image}:${tag}` : image));
       } else {
         const container = path.match(/^\/containers\/([^/]+)(?:\/(start|stop|restart|kill|wait))?$/);
         requireSafe(container && ((method === "POST" && container[2]) || (method === "DELETE" && !container[2])));
         const current = await inspect(`/containers/${encodeURIComponent(decodeURIComponent(container[1]))}/json`);
         if (!current) { reply(response, 404, "Cadence container not found."); return; }
         requireSafe(owned(current.Config?.Labels) && current.HostConfig?.NetworkMode === NETWORK &&
-          [...NAMES.values()].includes(current.Config?.Image));
+          ALLOWED_IMAGES.has(current.Config?.Image));
         if (["start", "restart"].includes(container[2])) {
           requireSafe(!current.HostConfig.PublishAllPorts && Object.values(current.HostConfig.PortBindings ?? {})
             .every((bindings) => Array.isArray(bindings) && bindings.every((binding) => binding.HostIp === "127.0.0.1")));
@@ -190,7 +224,10 @@ export function createDockerProxy(daemonSocket) {
       });
       response.on("close", () => upstream.destroy());
       upstream.end(forwarded);
-    } catch {
+    } catch (error) {
+      // Method and path only: no query string, headers or bodies reach the log.
+      const cause = error instanceof InspectError ? `daemon inspect failed: ${error.message}` : "policy";
+      onReject(`${method} ${path || "(invalid path)"} (${cause})`);
       if (!response.headersSent) reply(response, 403, "Cadence Docker request rejected.");
       else response.destroy();
     }

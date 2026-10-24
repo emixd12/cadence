@@ -1124,3 +1124,33 @@ route durations or provider responses.
 - Search handoff passed on September 28; manual grant, retry and foreground
   acquisition passed on September 29. They need no rerun unless the native path
   changes again.
+
+## October 24 review: permission status and position requests
+
+PR #140's dev.2 record establishes the first location prompt and a successful
+foreground position on the owner's Mac. It also records a second request timing
+out immediately after the successful read. Travel Settings used
+`readLocation(false)` to refresh the permission label after saving and after a
+position request. That function reads coordinates once authorized, so a permission
+refresh could compete with the first request or clear the label after a timeout.
+
+PR #131 now separates those operations. `location_permission` reads only Core
+Location authorization on the main queue and global Location Services state on a
+blocking worker. It
+has no delegate, position request, permission prompt or coordinate result.
+Settings uses that reader, while toggle/Check again and Timeline retain the
+foreground-location command. Browser Settings still queries the Permissions API.
+No 0.1.5 source artifact, signature or release feed changed.
+
+Automated coverage checks that mount and save refreshes request no positions,
+that one explicit request can complete or time out while the allowed grant stays
+visible, and that Timeline can still read coordinates without a new prompt.
+The Rust status mapping handles not determined, restricted, denied, allowed,
+globally disabled and unknown states.
+
+Installed regression remains open on a future dev build containing this change:
+with Cadence frontmost, confirm the permission line survives both a successful
+position and an unavailable position; refresh Settings while a position request is
+active; then verify a changed OS grant is reflected. Use only the existing
+owner-authorized permission-test flow, and record no coordinates. Linux tests do
+not establish macOS native compilation, actual prompts or Core Location delivery.

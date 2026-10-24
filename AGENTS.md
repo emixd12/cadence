@@ -70,6 +70,8 @@ Before implementing a task, read in this order:
 
 If a user prompt conflicts with the docs, report the conflict before editing. If the user intentionally changes product direction, update the relevant docs in the same task.
 
+Installed desktop testing uses dev-signed builds under the owner's standing approval (`docs/DECISIONS.md`, 2026-10-23; commands in `docs/DESKTOP_RELEASE.md`, "Dev-signed builds"). Apple notarization submissions and any publication still need the owner's instruction each time.
+
 Every new or materially changed product/design ticket must state its impact on
 web, desktop, marketing, and future mobile. Each platform entry needs an
 implementation reference, a follow-up ticket, or an explicit not-applicable
@@ -106,6 +108,15 @@ Product and implementation docs:
 24. `/docs/INTEGRATION_PLAYBOOK.md`
 25. `/docs/MCP_INTEGRATION.md`
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
+27. `/docs/PRIVACY_CHANGES.md`
+28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
+
+## Privacy changes
+
+Until the pre-launch privacy pass, log privacy, disclosure and marketing-language
+conflicts in `docs/PRIVACY_CHANGES.md`. These conflicts never block development.
+In-progress work proceeds as if no privacy policy constrains it. Provider-terms and
+licence questions stay in `docs/LEGAL.md`.
 
 ## Product constraints
 

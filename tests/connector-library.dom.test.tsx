@@ -139,6 +139,8 @@ describe("OutlookCalendarPanel", () => {
     const coordinator = outlookCoordinator();
     await act(() => root.render(<OutlookCalendarPanel coordinator={coordinator} refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Work calendar"));
+    // Ticket 242: the broader Microsoft permission is disclosed alongside what Cadence requests.
+    expect(container.querySelector("#outlook-calendar-permission-disclosure")?.textContent).toMatch(/covers event details.*requests only event titles, times/);
     const family = [...container.querySelectorAll("label")].find((label) => label.textContent?.startsWith("Family"))!.querySelector("input")!;
     await act(() => family.click());
     await act(async () => { button("Save Outlook settings").click(); });
@@ -156,6 +158,7 @@ describe("OutlookCalendarPanel", () => {
       refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
     await vi.waitFor(() => expect(container.textContent).toContain("not configured for this Cadence deployment"));
     expect([...container.querySelectorAll("button")].some((node) => node.textContent?.includes("Connect Outlook"))).toBe(false);
+    expect(container.querySelector("#outlook-calendar-permission-disclosure")).toBeNull();
     await act(() => root.render(<OutlookCalendarPanel key="failing" coordinator={outlookCoordinator({ getConnection: vi.fn(async () => { throw new ConnectorClientError("provider_unavailable"); }) })}
       refreshRange={{ startLocalDate: "2026-11-01", endLocalDate: "2026-11-03", timezone: "America/New_York" }} />));
     await vi.waitFor(() => expect(container.textContent).toContain("Other sources and tracking are unaffected."));

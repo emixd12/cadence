@@ -116,7 +116,10 @@ environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
 runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
 
 The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
-project-scoped Docker proxy. It copies only config, the empty seed and tracked
+project-scoped Docker proxy. It pulls the pinned images from `ghcr.io/supabase`
+(`SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`): anonymous `public.ecr.aws` pulls
+were throttled (`toomanyrequests`) on some shared runner addresses. GHCR serves
+the same manifest digests. It copies only config, the empty seed and tracked
 migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
 checks service health before and after `db reset --local`. The tracked migration
 version list must exactly match the applied list; its count is derived from the
@@ -131,9 +134,15 @@ CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contrac
 
 Local API credentials stay inside the existing config reader. Startup/reset
 output is suppressed; failures identify the phase and show only container names,
-health, ports and networks. The 30-minute job bounds startup/reset separately and
-stops only its Cadence containers before ending the proxy. It never prunes Docker
-or touches hosted resources; the runner discards its temporary volumes afterward.
+health, ports and networks. A failed start attempt also reports its exit code and
+one fixed cause category (time limit, rate limit, image pull, health check,
+migration or seed, timeout, proxy rejection). The proxy logs any rejected request
+as method and path only. Startup gets two 8-minute attempts; the second starts
+from a stopped stack with this project's two volumes removed. The 30-minute job
+stops only its Cadence containers before ending the proxy. Docker cleanup is
+limited to the CLI's prunes filtered by this project's label; the shared network
+is never pruned, and nothing touches hosted resources. The runner discards its
+temporary volumes afterward.
 
 A successful run establishes migration replay and local database contracts for
 the recorded source. Provider acceptance, the Outlook support/scope decision,
@@ -1420,6 +1429,9 @@ an ad hoc signed development app with a bound bundle identity; it does not
 satisfy Developer ID signing, notarization, or final-release gates. The local
 signing config must not be used for final release builds. Ticket 113's separate
 ad hoc preview procedure is recorded in `docs/DESKTOP_RELEASE.md`.
+For installed testing on the owner's Macs, `release.mjs dev-build` and
+`install-dev-build.mjs` build and install Developer ID signed, unnotarized apps; see
+`docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
 `desktop:dev:web` exposes the
 developer bench without claiming native APIs work in a browser. For Codex local QA, select the first free port
 in 4321–4330 and bind loopback. Never let the server choose outside that pool.
@@ -1477,11 +1489,13 @@ of rollback: deterministic stale writes must return application conflicts.
 
 Before broad extraction, verify persistent SQLite writes, atomic rollback,
 native scheduling/cancellation, notification activation, and restart behavior.
-Before a production release, verify the shared local-Supabase/real-SQLite
+The first production release, 0.1.3, verified the shared local-Supabase/real-SQLite
 contract suite, full tracking parity, offline launch, actual WKWebView rendering,
-upgrade preservation, and accurate verified native reminder coverage. For the
-first schema-changing desktop update, also test an older installed version
-upgrading through the real updater with a protected database backup.
+upgrade preservation, and accurate verified native reminder coverage. Later releases
+follow `docs/DESKTOP_RELEASE.md`, "Release acceptance": four checks on every release,
+including the real updater when the SQLite schema changes, and area checks only when
+the release changes that area's files. Publication follows "Publication" in the same
+file and changes no marketing source.
 
 Native reminders target the next 30 days and prioritize nearest eligible
 reminders. The owner accepted a clearly displayed OS-limited horizon on
@@ -1594,14 +1608,23 @@ App registration steps (owner-run, not authorized in local work):
 1. Register one multitenant app that also accepts personal Microsoft accounts
    (authority `common`), with the exact web redirect URI above.
 2. Under API permissions, keep only the delegated Microsoft Graph
-   `Calendars.ReadBasic` permission. Remove the default `User.Read` that the portal
-   adds to new registrations. Add no application permissions and no
-   `Calendars.Read`, `profile`, or `email`.
+   `Calendars.Read` permission (Ticket 242). Remove the default `User.Read` that the
+   portal adds to new registrations. Add no application permissions and no
+   `Calendars.ReadBasic`, write, shared-calendar, `profile`, or `email` permission.
+   Graph rejects personal-account tokens that carry only `Calendars.ReadBasic`
+   (401, empty body), so that permission cannot serve personal accounts.
 3. Create a client secret and store it only in the server environment.
 
 The token check refuses any present Graph permission other than
-`Calendars.ReadBasic`, so a leftover `User.Read` makes every connect fail as
-`consent_denied`. An omitted `scope` in the token response is accepted because
+`Calendars.Read`, so a leftover `User.Read` makes every connect fail as
+`consent_denied`. Microsoft echoes an earlier `Calendars.ReadBasic` consent next to
+`Calendars.Read` (live, October 22, 2026); because it is a subset of `Calendars.Read`,
+it is accepted only alongside it, and a `Calendars.ReadBasic`-only grant is refused. A connection created before Ticket 242 with only
+`Calendars.ReadBasic` moves to `reconnect_required` on its next read; the user
+reconnects and grants `Calendars.Read`. `Calendars.Read` allows reading event
+details, so data minimization is in the adapter: every Graph request, including
+provider next links, selects only contract fields and never bodies, attachments, or
+extensions. An omitted `scope` in the token response is accepted because
 Microsoft documents that it then covers the requested scopes. Status reports `not_configured` until both these values and the
 connector keyring are present. Disconnect deletes Cadence's sealed refresh token
 only. Microsoft documents no app-side revocation for these scopes, so Settings
@@ -1636,10 +1659,10 @@ Those tests do not establish installed-desktop, hosted-deployment or public-rele
 acceptance. Repository review alone does not authorize real provider reads,
 publication, deployment, or hosted configuration changes.
 
-Outlook uses only delegated `Calendars.ReadBasic` plus identity/offline scopes.
-The recorded home-tenant work/school test passed, but personal-account reads fail
-with that scope. Broadening the scope needs an owner decision. Per-user consent,
-cross-tenant behavior and publisher verification remain release gates. Hevy
+Outlook uses only delegated `Calendars.Read` plus identity/offline scopes
+(Ticket 242), with explicit field selection. One personal account and one
+home-tenant work/school account (per-user consent) passed live on 2026-10-22.
+Cross-tenant behavior and publisher verification remain release gates. Hevy
 requires Pro. Its key has no documented read-only scope;
 the adapter permits only account verification, count and workout-list GETs.
 A today-only read still scans global history, up to 500 workouts/50 pages.
