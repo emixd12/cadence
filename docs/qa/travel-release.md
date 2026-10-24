@@ -931,3 +931,27 @@ remain unmeasured; the exhausted old pilot could not supply a successful
 baseline. Current-device native location and Apple-trusted distribution remain
 separate Tickets 115/165 gates. The main promotion follows PR #107 and the
 existing matching-marketing-deployment procedure.
+
+## Ticket 165: signed location entitlement on the first Mac — October 24, 2026
+
+Build: dev-signed `0.1.6-dev.2` from main `ed93fff`, with the Hardened Runtime
+location entitlement (PR #134) and the production Developer ID signature. Host: the
+first Mac, macOS 27.0.1. Coordinates were not recorded, no agent answered a system
+dialog, and no TCC or Location Services setting changed. Details:
+[0.1.5 packet](2026-10-23-desktop-0.1.5-release-packet.md), "Location prompt on the
+owner's Mac".
+
+- **First prompt appears.** Turning on Travel estimates asked for authorization
+  with status NotDetermined, and macOS showed its location prompt. September's
+  Developer ID builds without the entitlement timed out on this Mac with no prompt.
+  The answer was Allow, and the status has stayed `AuthorizedAlways` since.
+- **Foreground position available.** With Cadence frontmost, turning Travel
+  estimates off and on showed "A current position is available. Cadence did not save
+  it." locationd sent a position within 17 ms.
+- **Follow-up defect, not a Ticket 165 blocker.** On desktop the Travel panel's
+  permission check runs a full location request. Right after a successful read that
+  second request waited for a new fix, timed out after 12 seconds and cleared the
+  "Device location" line. Opening Travel settings while authorized also requests a
+  position. A status-only native permission query would fix both.
+- Still open: the denied state on this Mac, and the never-authorized macOS user test
+  with the notarized 0.1.5 DMG.
