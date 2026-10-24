@@ -5,6 +5,8 @@ import type { Json } from "../types/json";
 import { resolveExportBundle } from "../resolvers/export.resolver";
 import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
 import { normalizeRecurrenceRule, recurrenceDefaultsFromRule, summarizeRecurrenceRule } from "./behavior-values";
+import { isBehaviorWhereKind, storedBehaviorWhere } from "./behavior-where";
+import type { BehaviorWhereKind } from "../types/behavior";
 import { compareScheduleSlots, formatScheduleSlotsSummary, formatOccurrenceScheduleLabel, toScheduleSlotView } from "./schedule";
 import type {
   ExportBehaviorDefinitionEventInput, ExportBehaviorConfigurationEventInput, ExportBehaviorConfigurationSnapshot,
@@ -218,6 +220,9 @@ function parseConfigurationSnapshot(
       snapshot.location_text ?? null,
       "configuration location_text",
     ),
+    ...(snapshot.where_kind === undefined ? {} : {
+      whereKind: requireWhereKind(snapshot.where_kind, "configuration where_kind"),
+    }),
     scheduleGraph,
     browserReminderEnabled: requireBoolean(
       snapshot.browser_reminder_enabled,
@@ -305,6 +310,17 @@ function requireNullableString(
   label: string,
 ): string | null {
   if (value === null || typeof value === "string") {
+    return value;
+  }
+
+  throw new Error(`Invalid ${label}.`);
+}
+
+function requireWhereKind(
+  value: Json | undefined,
+  label: string,
+): BehaviorWhereKind | null {
+  if (value === null || isBehaviorWhereKind(value)) {
     return value;
   }
 
@@ -408,6 +424,7 @@ function toExportBehaviorInput(
     categoryName: behavior.category?.name ?? null,
     title: behavior.title,
     description: behavior.description,
+    whereKind: storedBehaviorWhere(behavior).where_kind,
     locationText: behavior.location_text ?? null,
     recurrenceRule,
     scheduledTime,

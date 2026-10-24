@@ -67,6 +67,16 @@ describe("Cadence Docker create policy", () => {
     expect(() => rewriteCreate(DB, null)).toThrow();
   });
 
+  it("accepts the same pinned images from GHCR and rejects any other registry", () => {
+    const ghcr = (image: string) => image.replace("public.ecr.aws/", "ghcr.io/");
+    expect(rewriteCreate(DB, { ...createBody(), Image: ghcr(createBody().Image) }).Image).toBe("ghcr.io/supabase/postgres:17.6.1.132");
+    for (const body of jobs) expect(rewriteCreate("", { ...body, Image: ghcr(body.Image) }).Cmd).toEqual(body.Cmd);
+    for (const image of ["docker.io/supabase/postgres:17.6.1.132", "supabase/postgres:17.6.1.132", "ghcr.io/supabase/postgres:latest", "ghcr.io/other/postgres:17.6.1.132"]) {
+      expect(() => rewriteCreate(DB, { ...createBody(), Image: image }), image).toThrow();
+    }
+    expect(() => rewriteCreate("", { ...jobs[0], Image: "docker.io/supabase/gotrue:v2.189.0" })).toThrow();
+  });
+
   it.each(jobs)("accepts the exact initialization command for $Image", (body) => {
     expect(rewriteCreate("", body).Cmd).toEqual(body.Cmd);
     expect(() => rewriteCreate("", { ...body, Cmd: ["sh", "-c", "arbitrary command"] })).toThrow();
@@ -78,7 +88,7 @@ describe("Cadence Docker create policy", () => {
 });
 
 interface RecordedRequest { path: string; method: string; headers: IncomingHttpHeaders; body: Buffer }
-async function setup() {
+async function setup(rejections: string[] = []) {
   const directory = await mkdtemp(join(tmpdir(), "cadence-docker-proxy-test-"));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   const daemonSocket = join(directory, "daemon.sock");
@@ -96,6 +106,7 @@ async function setup() {
     else if (path === "/containers/foreign/json") response.end(JSON.stringify({ ...current, Config: { ...current.Config, Labels: { ...labels, "com.docker.compose.project": "other" } } }));
     else if (path === "/containers/unsafe/json") response.end(JSON.stringify({ ...current, HostConfig: { ...current.HostConfig, PortBindings: { "5432/tcp": [{ HostIp: "0.0.0.0", HostPort: "55322" }] } } }));
     else if (request.method === "GET" && path.startsWith("/volumes/")) response.end(JSON.stringify({ Labels: labels }));
+    else if (path === "/containers/broken/json") { response.writeHead(500); response.end("{}"); }
     else if (path === "/networks/cadence-local") response.end(JSON.stringify({ Name: "cadence-local", Driver: "bridge", Options: { "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1" } }));
     else if (path.endsWith("/logs?follow=1")) {
       response.writeHead(200, { "content-type": "application/vnd.docker.raw-stream", "x-docker-test": "stream" });
@@ -105,7 +116,7 @@ async function setup() {
   });
   await new Promise<void>((ok, fail) => { daemon.once("error", fail); daemon.listen(daemonSocket, ok); });
   cleanups.push(() => new Promise<void>((ok) => daemon.close(() => ok())));
-  const proxy = createDockerProxy(daemonSocket);
+  const proxy = createDockerProxy(daemonSocket, (line: string) => rejections.push(line));
   await new Promise<void>((ok, fail) => { proxy.once("error", fail); proxy.listen(proxySocket, ok); });
   cleanups.push(() => new Promise<void>((ok) => proxy.close(() => ok())));
   const send = (method: string, path: string, body?: string | object, chunked = false) => new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>((ok, fail) => {
@@ -158,6 +169,59 @@ describe("Docker HTTP forwarding against a fake Unix-socket daemon", () => {
     expect((await send("POST", "/containers/unsafe/start")).status).toBe(403);
     expect((await send("POST", "/containers/unsafe/stop")).status).toBe(201);
     expect(received.filter((request) => request.method !== "GET").map((request) => request.path)).toEqual(["/v1.47/containers/owned/start", "/containers/unsafe/stop"]);
+  });
+
+  it("permits only this project's cleanup prunes and never prunes the shared network", async () => {
+    const rejections: string[] = [];
+    const { send, received } = await setup(rejections);
+    const filters = (value: object) => encodeURIComponent(JSON.stringify(value));
+    const project = { label: { [`com.supabase.cli.project=${PROJECT}`]: true } };
+    expect((await send("POST", `/v1.47/containers/prune?filters=${filters(project)}`)).status).toBe(201);
+    expect((await send("POST", `/volumes/prune?filters=${filters({ ...project, all: { true: true } })}`)).status).toBe(201);
+    const network = await send("POST", `/networks/prune?filters=${filters(project)}`);
+    expect(network.status).toBe(200);
+    expect(JSON.parse(network.body.toString())).toEqual({ NetworksDeleted: null });
+    for (const path of [
+      "/containers/prune",
+      `/containers/prune?filters=${filters({ label: { "com.supabase.cli.project=other": true } })}`,
+      `/containers/prune?filters=${filters({ label: { [`com.docker.compose.project=${PROJECT}`]: true } })}`,
+      `/containers/prune?filters=${filters({ ...project, until: { "24h": true } })}`,
+      `/containers/prune?filters=${filters({ ...project, all: { true: true } })}`,
+      `/containers/prune?filters=${filters(project)}&filters=${filters(project)}`,
+      `/volumes/prune?filters=${filters({ ...project, all: { false: true } })}`,
+      `/images/prune?filters=${filters(project)}`,
+    ]) expect((await send("POST", path)).status, path).toBe(403);
+    expect((await send("POST", `/containers/prune?filters=${filters(project)}`, { private: "body" })).status).toBe(403);
+    expect(received.filter((request) => request.method === "POST").map((request) => request.path.split("?")[0]))
+      .toEqual(["/v1.47/containers/prune", "/volumes/prune"]);
+    expect(rejections).toContain("POST /containers/prune (policy)");
+    expect(rejections).toContain("POST /images/prune (policy)");
+  });
+
+  it("pulls only pinned images from the two Supabase registries", async () => {
+    const { send, received } = await setup();
+    for (const image of ["public.ecr.aws/supabase/postgres", "ghcr.io/supabase/postgres"]) {
+      expect((await send("POST", `/images/create?fromImage=${encodeURIComponent(image)}&tag=17.6.1.132`)).status, image).toBe(201);
+    }
+    for (const query of ["fromImage=docker.io%2Fsupabase%2Fpostgres&tag=17.6.1.132", "fromImage=ghcr.io%2Fsupabase%2Fpostgres&tag=latest",
+      "fromImage=ghcr.io%2Fsupabase%2Fpostgres&tag=17.6.1.132&platform=linux%2Famd64"]) {
+      expect((await send("POST", `/images/create?${query}`)).status, query).toBe(403);
+    }
+    expect(received.filter((request) => request.path.startsWith("/images/create"))).toHaveLength(2);
+  });
+
+  it("logs rejected methods and paths without query strings, bodies or private values", async () => {
+    const rejections: string[] = [];
+    const { send } = await setup(rejections);
+    await send("POST", "/containers/owned/exec?detach=private-query", { Cmd: ["private-command"] });
+    await send("POST", `/containers/create?name=${DB}`, { ...createBody(), HostConfig: { ...createBody().HostConfig, Privileged: true } });
+    await send("POST", "/containers/broken/start");
+    expect(rejections).toEqual([
+      "POST /containers/owned/exec (policy)",
+      "POST /containers/create (policy)",
+      "POST /containers/broken/start (daemon inspect failed: status 500)",
+    ]);
+    expect(rejections.join("\n")).not.toMatch(/private|PRIVATE_VALUE/);
   });
 
   it("preserves the existing network and permits only owned volume creation and deletion", async () => {

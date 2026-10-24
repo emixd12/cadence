@@ -10,5 +10,7 @@
   <array>
     <string>HK26VT477G.app.cadence.desktop</string>
   </array>
+  <key>com.apple.security.personal-information.location</key>
+  <true/>
 </dict>
 </plist>

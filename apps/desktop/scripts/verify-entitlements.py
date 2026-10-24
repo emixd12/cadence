@@ -5,6 +5,10 @@ import plistlib
 import subprocess
 import sys
 
+# Hardened Runtime resource access. The code signature grants these booleans; provisioning
+# profiles never list them. Every other entitlement must be authorized by the profile.
+RUNTIME_RESOURCE_ENTITLEMENTS = {"com.apple.security.personal-information.location"}
+
 
 def fail(message):
     sys.stderr.write(message + "\n")
@@ -65,6 +69,10 @@ def main():
     if not isinstance(granted, dict):
         fail("The embedded provisioning profile grants no entitlements.")
     for key, requested in expected.items():
+        if key in RUNTIME_RESOURCE_ENTITLEMENTS:
+            if requested is not True:
+                fail(f"{key} must be true when present.")
+            continue
         if not authorizes(granted.get(key), requested):
             fail(f"The embedded provisioning profile does not authorize {key}.")
 

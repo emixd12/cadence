@@ -61,6 +61,14 @@ fn initialize(db: &Connection) -> Result<(), String> {
            start_local_date TEXT NOT NULL, end_local_date TEXT NOT NULL, timezone TEXT NOT NULL,
            selected_calendar_ids_json TEXT NOT NULL, hidden_calendar_ids_json TEXT NOT NULL,
            visible INTEGER NOT NULL, show_all_day INTEGER NOT NULL, snapshot_json TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS connector_fence(provider TEXT PRIMARY KEY, value INTEGER NOT NULL);
+         CREATE TABLE IF NOT EXISTS connector_pending(
+           provider TEXT PRIMARY KEY, request_id TEXT NOT NULL, fence INTEGER NOT NULL,
+           account_id TEXT NOT NULL, scope_key TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS connector_snapshot(
+           provider TEXT PRIMARY KEY, account_id TEXT NOT NULL, scope_key TEXT NOT NULL, snapshot_json TEXT NOT NULL
          );",
     ).map_err(error)
 }
@@ -161,7 +169,7 @@ fn require_account(
     if account_id(auth)?.as_deref() == Some(expected) {
         return Ok(());
     }
-    clear(cache)?;
+    clear_all(cache)?;
     Err("Calendar cache does not match the linked account.".into())
 }
 
@@ -380,6 +388,316 @@ fn clear(cache: &mut Connection) -> Result<(), String> {
     tx.commit().map_err(error)
 }
 
+// Ticket 238: one disposable snapshot per connector source, keyed by the
+// client-computed scope key (provider, account, generation, range, timezone, and
+// selection). It shares this file, outside cadence.sqlite3 and user backups,
+// and never stores credentials. Each provider has its own fence, so clearing one
+// source never cancels another source's refresh.
+const CONNECTOR_PROVIDERS: &[&str] = &["outlook_calendar", "hevy", "icloud_calendar"];
+const MAX_SCOPE_KEY: usize = 64 * 1024;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectorCachedSnapshot {
+    scope_key: String,
+    snapshot_json: String,
+}
+
+#[tauri::command]
+pub fn connector_cache_begin(
+    cache: State<'_, CalendarCache>,
+    store: State<'_, LocalStore>,
+    provider: String,
+    account_id: String,
+    scope_key: String,
+    request_id: String,
+) -> Result<(), String> {
+    let auth = store.0.lock().map_err(|_| "SQLite lock is unavailable.")?;
+    let mut cache = cache
+        .0
+        .lock()
+        .map_err(|_| "Calendar cache lock is unavailable.")?;
+    source_cache_begin(
+        &auth,
+        &mut cache,
+        &provider,
+        &account_id,
+        &scope_key,
+        &request_id,
+    )
+}
+
+#[tauri::command]
+pub fn connector_cache_read(
+    cache: State<'_, CalendarCache>,
+    store: State<'_, LocalStore>,
+    provider: String,
+    account_id: String,
+    scope_key: String,
+) -> Result<Option<String>, String> {
+    let auth = store.0.lock().map_err(|_| "SQLite lock is unavailable.")?;
+    let mut cache = cache
+        .0
+        .lock()
+        .map_err(|_| "Calendar cache lock is unavailable.")?;
+    source_cache_read(&auth, &mut cache, &provider, &account_id, &scope_key)
+}
+
+#[tauri::command]
+pub fn connector_cache_read_current(
+    cache: State<'_, CalendarCache>,
+    store: State<'_, LocalStore>,
+    provider: String,
+    account_id: String,
+) -> Result<Option<ConnectorCachedSnapshot>, String> {
+    let auth = store.0.lock().map_err(|_| "SQLite lock is unavailable.")?;
+    let mut cache = cache
+        .0
+        .lock()
+        .map_err(|_| "Calendar cache lock is unavailable.")?;
+    source_cache_read_current(&auth, &mut cache, &provider, &account_id)
+}
+
+#[tauri::command]
+pub fn connector_cache_replace(
+    cache: State<'_, CalendarCache>,
+    store: State<'_, LocalStore>,
+    provider: String,
+    account_id: String,
+    scope_key: String,
+    request_id: String,
+    snapshot_json: String,
+) -> Result<(), String> {
+    let auth = store.0.lock().map_err(|_| "SQLite lock is unavailable.")?;
+    let mut cache = cache
+        .0
+        .lock()
+        .map_err(|_| "Calendar cache lock is unavailable.")?;
+    source_cache_replace(
+        &auth,
+        &mut cache,
+        &provider,
+        &account_id,
+        &scope_key,
+        &request_id,
+        &snapshot_json,
+    )
+}
+
+/// Clears one provider, or every connector source when `provider` is absent.
+#[tauri::command]
+pub fn connector_cache_clear(
+    cache: State<'_, CalendarCache>,
+    provider: Option<String>,
+) -> Result<(), String> {
+    let mut cache = cache
+        .0
+        .lock()
+        .map_err(|_| "Calendar cache lock is unavailable.")?;
+    source_cache_clear(&mut cache, provider.as_deref())
+}
+
+fn validate_provider(provider: &str) -> Result<(), String> {
+    if CONNECTOR_PROVIDERS.contains(&provider) {
+        Ok(())
+    } else {
+        Err("Connector cache source is invalid.".into())
+    }
+}
+
+/// Parses `[provider, accountId, generation, ...]` and checks it names this provider and account.
+fn validate_scope(provider: &str, account: &str, scope_key: &str) -> Result<i64, String> {
+    validate_provider(provider)?;
+    if account.is_empty()
+        || account.len() > 128
+        || scope_key.is_empty()
+        || scope_key.len() > MAX_SCOPE_KEY
+    {
+        return Err("Connector cache request is invalid.".into());
+    }
+    let scope: Value = serde_json::from_str(scope_key)
+        .map_err(|_| "Connector cache scope is invalid.".to_string())?;
+    let parts = scope
+        .as_array()
+        .ok_or("Connector cache scope is invalid.")?;
+    let generation = parts.get(2).and_then(Value::as_i64).unwrap_or(0);
+    if parts.len() < 6
+        || parts.first().and_then(Value::as_str) != Some(provider)
+        || parts.get(1).and_then(Value::as_str) != Some(account)
+        || generation < 1
+    {
+        return Err("Connector cache scope does not match the source or account.".into());
+    }
+    Ok(generation)
+}
+
+fn source_cache_fence(tx: &Connection, provider: &str) -> Result<i64, String> {
+    tx.execute(
+        "INSERT OR IGNORE INTO connector_fence(provider,value) VALUES(?1,0)",
+        params![provider],
+    )
+    .map_err(error)?;
+    tx.query_row(
+        "SELECT value FROM connector_fence WHERE provider=?1",
+        params![provider],
+        |row| row.get(0),
+    )
+    .map_err(error)
+}
+
+fn source_cache_begin(
+    auth: &Connection,
+    cache: &mut Connection,
+    provider: &str,
+    account: &str,
+    scope_key: &str,
+    request_id: &str,
+) -> Result<(), String> {
+    validate_scope(provider, account, scope_key)?;
+    if request_id.is_empty() || request_id.len() > 128 {
+        return Err("Connector refresh request is invalid.".into());
+    }
+    require_account(auth, cache, account)?;
+    let tx = cache
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(error)?;
+    let fence = source_cache_fence(&tx, provider)?;
+    tx.execute(
+        "DELETE FROM connector_snapshot WHERE provider=?1 AND NOT (account_id=?2 AND scope_key=?3)",
+        params![provider, account, scope_key],
+    )
+    .map_err(error)?;
+    tx.execute("INSERT OR REPLACE INTO connector_pending(provider,request_id,fence,account_id,scope_key) VALUES(?1,?2,?3,?4,?5)",
+        params![provider, request_id, fence, account, scope_key]).map_err(error)?;
+    tx.commit().map_err(error)
+}
+
+fn source_cache_read(
+    auth: &Connection,
+    cache: &mut Connection,
+    provider: &str,
+    account: &str,
+    scope_key: &str,
+) -> Result<Option<String>, String> {
+    validate_scope(provider, account, scope_key)?;
+    require_account(auth, cache, account)?;
+    cache.query_row("SELECT snapshot_json FROM connector_snapshot WHERE provider=?1 AND account_id=?2 AND scope_key=?3",
+        params![provider, account, scope_key], |row| row.get(0)).optional().map_err(error)
+}
+
+fn source_cache_read_current(
+    auth: &Connection,
+    cache: &mut Connection,
+    provider: &str,
+    account: &str,
+) -> Result<Option<ConnectorCachedSnapshot>, String> {
+    validate_provider(provider)?;
+    require_account(auth, cache, account)?;
+    let stored: Option<(String, String, String)> = cache
+        .query_row(
+            "SELECT account_id,scope_key,snapshot_json FROM connector_snapshot WHERE provider=?1",
+            params![provider],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .map_err(error)?;
+    let Some((owner, scope_key, snapshot_json)) = stored else {
+        return Ok(None);
+    };
+    if owner != account || validate_scope(provider, account, &scope_key).is_err() {
+        source_cache_clear(cache, Some(provider))?;
+        return Ok(None);
+    }
+    Ok(Some(ConnectorCachedSnapshot {
+        scope_key,
+        snapshot_json,
+    }))
+}
+
+fn source_cache_replace(
+    auth: &Connection,
+    cache: &mut Connection,
+    provider: &str,
+    account: &str,
+    scope_key: &str,
+    request_id: &str,
+    snapshot_json: &str,
+) -> Result<(), String> {
+    let generation = validate_scope(provider, account, scope_key)?;
+    if snapshot_json.len() > 16 * 1024 * 1024 {
+        return Err("Connector snapshot is too large.".into());
+    }
+    let value: Value = serde_json::from_str(snapshot_json)
+        .map_err(|_| "Connector snapshot JSON is invalid.".to_string())?;
+    if value.get("source").and_then(Value::as_str) != Some(provider)
+        || value.get("accountId").and_then(Value::as_str) != Some(account)
+        || value.get("connectionGeneration").and_then(Value::as_i64) != Some(generation)
+        || value.get("completeness").and_then(Value::as_str) != Some("complete")
+    {
+        return Err("Connector snapshot does not match the refresh request.".into());
+    }
+    require_account(auth, cache, account)?;
+    let tx = cache
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(error)?;
+    let pending: Option<i64> = tx.query_row(
+        "SELECT fence FROM connector_pending WHERE provider=?1 AND request_id=?2 AND account_id=?3 AND scope_key=?4",
+        params![provider, request_id, account, scope_key], |row| row.get(0)).optional().map_err(error)?;
+    let fence = source_cache_fence(&tx, provider)?;
+    if pending != Some(fence) {
+        return Err("Connector refresh was cleared or superseded.".into());
+    }
+    tx.execute("INSERT OR REPLACE INTO connector_snapshot(provider,account_id,scope_key,snapshot_json) VALUES(?1,?2,?3,?4)",
+        params![provider, account, scope_key, snapshot_json]).map_err(error)?;
+    tx.execute(
+        "DELETE FROM connector_pending WHERE provider=?1",
+        params![provider],
+    )
+    .map_err(error)?;
+    tx.commit().map_err(error)
+}
+
+fn source_cache_clear(cache: &mut Connection, provider: Option<&str>) -> Result<(), String> {
+    let providers: Vec<&str> = match provider {
+        Some(value) => {
+            validate_provider(value)?;
+            vec![value]
+        }
+        None => CONNECTOR_PROVIDERS.to_vec(),
+    };
+    let tx = cache
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(error)?;
+    for value in providers {
+        tx.execute(
+            "INSERT OR IGNORE INTO connector_fence(provider,value) VALUES(?1,0)",
+            params![value],
+        )
+        .map_err(error)?;
+        tx.execute(
+            "UPDATE connector_fence SET value=value+1 WHERE provider=?1",
+            params![value],
+        )
+        .map_err(error)?;
+        tx.execute(
+            "DELETE FROM connector_pending WHERE provider=?1",
+            params![value],
+        )
+        .map_err(error)?;
+        tx.execute(
+            "DELETE FROM connector_snapshot WHERE provider=?1",
+            params![value],
+        )
+        .map_err(error)?;
+    }
+    tx.commit().map_err(error)
+}
+
+fn clear_all(cache: &mut Connection) -> Result<(), String> {
+    clear(cache)?;
+    source_cache_clear(cache, None)
+}
+
 fn error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
@@ -493,6 +811,226 @@ mod tests {
         let partial = snapshot(&request).replace("\"complete\"", "\"incomplete\"");
         assert!(replace(&linked, &mut db, &request, "one", &partial).is_err());
         assert!(read(&linked, &mut db, &request).unwrap().is_none());
+    }
+
+    fn scope(provider: &str, account: &str, generation: i64, end: &str) -> String {
+        serde_json::json!([
+            provider,
+            account,
+            generation,
+            "2026-09-16",
+            end,
+            "America/New_York"
+        ])
+        .to_string()
+    }
+    fn connector_snapshot(provider: &str, account: &str, generation: i64) -> String {
+        serde_json::json!({"source": provider, "accountId": account, "connectionGeneration": generation, "completeness": "complete"}).to_string()
+    }
+
+    #[test]
+    fn connector_sources_are_isolated_from_each_other_and_from_google() {
+        let mut db = cache();
+        let linked = auth(Some("account-a"));
+        let hevy = scope("hevy", "account-a", 1, "2026-09-16");
+        let outlook = scope("outlook_calendar", "account-a", 2, "2026-09-18");
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
+        source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &hevy,
+            "h1",
+            &connector_snapshot("hevy", "account-a", 1),
+        )
+        .unwrap();
+        source_cache_begin(
+            &linked,
+            &mut db,
+            "outlook_calendar",
+            "account-a",
+            &outlook,
+            "o1",
+        )
+        .unwrap();
+        source_cache_replace(
+            &linked,
+            &mut db,
+            "outlook_calendar",
+            "account-a",
+            &outlook,
+            "o1",
+            &connector_snapshot("outlook_calendar", "account-a", 2),
+        )
+        .unwrap();
+        let google = request();
+        begin(&linked, &mut db, &google, "g1").unwrap();
+        replace(&linked, &mut db, &google, "g1", &snapshot(&google)).unwrap();
+        // Clearing Hevy leaves Outlook and Google; clearing Google leaves both connectors.
+        source_cache_clear(&mut db, Some("hevy")).unwrap();
+        assert!(source_cache_read(&linked, &mut db, "hevy", "account-a", &hevy)
+            .unwrap()
+            .is_none());
+        assert!(
+            source_cache_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
+                .unwrap()
+                .is_some()
+        );
+        clear(&mut db).unwrap();
+        assert!(read(&linked, &mut db, &google).unwrap().is_none());
+        assert!(
+            source_cache_read(&linked, &mut db, "outlook_calendar", "account-a", &outlook)
+                .unwrap()
+                .is_some()
+        );
+        // A Hevy snapshot cannot be stored under an Outlook scope or another account.
+        source_cache_begin(
+            &linked,
+            &mut db,
+            "outlook_calendar",
+            "account-a",
+            &outlook,
+            "o2",
+        )
+        .unwrap();
+        assert!(source_cache_replace(
+            &linked,
+            &mut db,
+            "outlook_calendar",
+            "account-a",
+            &outlook,
+            "o2",
+            &connector_snapshot("hevy", "account-a", 2)
+        )
+        .is_err());
+        assert!(source_cache_begin(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &scope("hevy", "account-b", 1, "2026-09-16"),
+            "h2"
+        )
+        .is_err());
+        assert!(source_cache_begin(&linked, &mut db, "hevy", "account-a", &outlook, "h3").is_err());
+        assert!(
+            source_cache_begin(&linked, &mut db, "google_calendar", "account-a", &hevy, "x").is_err()
+        );
+    }
+
+    #[test]
+    fn connector_clear_and_newer_scopes_fence_late_responses() {
+        let mut db = cache();
+        let linked = auth(Some("account-a"));
+        let today = scope("hevy", "account-a", 1, "2026-09-16");
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &today, "late").unwrap();
+        source_cache_clear(&mut db, Some("hevy")).unwrap();
+        assert!(source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &today,
+            "late",
+            &connector_snapshot("hevy", "account-a", 1)
+        )
+        .is_err());
+        assert!(
+            source_cache_read_current(&linked, &mut db, "hevy", "account-a")
+                .unwrap()
+                .is_none()
+        );
+        // A newer scope replaces the pending request; the older response cannot land.
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &today, "first").unwrap();
+        let next_generation = scope("hevy", "account-a", 2, "2026-09-16");
+        source_cache_begin(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &next_generation,
+            "second",
+        )
+        .unwrap();
+        assert!(source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &today,
+            "first",
+            &connector_snapshot("hevy", "account-a", 1)
+        )
+        .is_err());
+        source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &next_generation,
+            "second",
+            &connector_snapshot("hevy", "account-a", 2),
+        )
+        .unwrap();
+        let current = source_cache_read_current(&linked, &mut db, "hevy", "account-a")
+            .unwrap()
+            .unwrap();
+        assert_eq!(current.scope_key, next_generation);
+        // Incomplete snapshots never replace the cache.
+        source_cache_begin(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &next_generation,
+            "third",
+        )
+        .unwrap();
+        let partial =
+            connector_snapshot("hevy", "account-a", 2).replace("\"complete\"", "\"incomplete\"");
+        assert!(source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &next_generation,
+            "third",
+            &partial
+        )
+        .is_err());
+        assert!(
+            source_cache_read(&linked, &mut db, "hevy", "account-a", &next_generation)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn connector_cache_clears_every_source_when_the_linked_account_changes() {
+        let mut db = cache();
+        let linked = auth(Some("account-a"));
+        let hevy = scope("hevy", "account-a", 1, "2026-09-16");
+        source_cache_begin(&linked, &mut db, "hevy", "account-a", &hevy, "h1").unwrap();
+        source_cache_replace(
+            &linked,
+            &mut db,
+            "hevy",
+            "account-a",
+            &hevy,
+            "h1",
+            &connector_snapshot("hevy", "account-a", 1),
+        )
+        .unwrap();
+        let switched = auth(Some("account-b"));
+        assert!(source_cache_read_current(&switched, &mut db, "hevy", "account-a").is_err());
+        assert!(
+            source_cache_read_current(&linked, &mut db, "hevy", "account-a")
+                .unwrap()
+                .is_none()
+        );
+        let signed_out = auth(None);
+        assert!(source_cache_begin(&signed_out, &mut db, "hevy", "account-a", &hevy, "h2").is_err());
     }
 
     #[cfg(unix)]

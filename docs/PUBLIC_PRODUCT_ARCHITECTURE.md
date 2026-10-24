@@ -278,9 +278,13 @@ and must not publish copies.
 
 Cadence provides exports and prepared prompts for services the user chooses.
 Opt-in Daily Brief separately discloses selected tracking information to OpenAI;
-Calendar timing and other optional sources require separate choices. Authorized
-MCP clients receive tracking records and may make scoped changes the user directs
-and confirms. Calendar data remains excluded from MCP.
+Calendar timing and other optional sources require separate choices, and every
+connector requires its own model-data choice. Authorized MCP clients receive
+tracking records and may make scoped changes the user directs and confirms.
+Calendar data remains excluded from MCP. Tickets 233–240 have local
+source/fixture verification only; Ticket 241 reconciles public disclosures.
+Live providers, installed desktop and release remain open; the owner accepted
+iCloud custody on 2026-10-19. Marketing must not equate local verification with public availability.
 Public copy names exactly five export formats: JSONL, JSON, CSV, Markdown, and
 BehaviorLog bundle.
 

@@ -1,3 +1,4 @@
+import type { BehaviorWhereKind } from "./types/behavior";
 import type { BehaviorConfigurationEventPlan } from "./types/behavior-configuration-event";
 import type { BehaviorDefinition, BehaviorDefinitionEventPlan } from "./types/behavior-definition-event";
 import type { Json } from "./types/json";
@@ -9,6 +10,8 @@ export type BehaviorInput = {
   endDate?: string | null;
   title: string;
   description: string | null;
+  /** Omitted by callers that predate Where; the service derives it from `locationText`. */
+  whereKind?: BehaviorWhereKind | null;
   locationText?: string | null;
   categoryId: string | null;
   recurrenceRule: RecurrenceRule;
@@ -27,6 +30,7 @@ export type BehaviorFields = {
   category_id: string | null;
   title: string;
   description: string | null;
+  where_kind?: string | null;
   location_text?: string | null;
   recurrence_rule: Json;
   scheduled_time: string;

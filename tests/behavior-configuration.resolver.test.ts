@@ -53,6 +53,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
       eventKind: "baseline",
       previousConfiguration: null,
       nextConfiguration: dailyConfiguration({
+        whereKind: null,
         scheduleGraph: [
           {
             recurrenceRule: { frequency: "daily", interval: 1 },
@@ -72,6 +73,7 @@ describe("planInitialBehaviorConfigurationEvent", () => {
       changedFields: [
         "category_id",
         "location_text",
+        "where_kind",
         "schedule_graph",
         "browser_reminder_enabled",
         "email_reminder_enabled",
@@ -141,6 +143,7 @@ describe("planBehaviorConfigurationChangeEvent", () => {
     ["reminder_offset_minutes", { reminderOffsetMinutes: 1_440 }],
     ["active", { active: false }],
     ["timezone", { timezone: "America/Los_Angeles" }],
+    ["where_kind", { whereKind: "anywhere" }],
   ] as const)("identifies a %s revision", (changedField, override) => {
     expect(
       planBehaviorConfigurationChangeEvent({
@@ -152,6 +155,41 @@ describe("planBehaviorConfigurationChangeEvent", () => {
         reasonCode: "behavior_edited",
       }),
     ).toMatchObject({ changedFields: [changedField] });
+  });
+
+  it("records a place as both Where and place text (Ticket 215)", () => {
+    expect(
+      planBehaviorConfigurationChangeEvent({
+        previousConfiguration: dailyConfiguration({ whereKind: "home" }),
+        nextConfiguration: dailyConfiguration({ whereKind: "place", locationText: " 1 Example Street " }),
+        recordedAt: RECORDED_AT,
+        effectiveAt: RECORDED_AT,
+        source: "manual",
+        reasonCode: "behavior_edited",
+      }),
+    ).toMatchObject({
+      changedFields: ["location_text", "where_kind"],
+      nextConfiguration: { whereKind: "place", locationText: "1 Example Street" },
+    });
+  });
+
+  it("reads a pre-Where snapshot with location text as A place (Ticket 215)", () => {
+    const legacy = { ...dailyConfiguration({ locationText: "1 Example Street" }) };
+    delete legacy.whereKind;
+    expect(normalizeBehaviorConfiguration(legacy)).toMatchObject({ whereKind: "place", locationText: "1 Example Street" });
+    expect(
+      planBehaviorConfigurationChangeEvent({
+        previousConfiguration: legacy,
+        nextConfiguration: dailyConfiguration({ whereKind: "place", locationText: "1 Example Street" }),
+        recordedAt: RECORDED_AT,
+        effectiveAt: RECORDED_AT,
+        source: "manual",
+        reasonCode: "behavior_edited",
+      }),
+    ).toBeNull();
+    const unlocated = { ...dailyConfiguration() };
+    delete unlocated.whereKind;
+    expect(normalizeBehaviorConfiguration(unlocated).whereKind).toBeNull();
   });
 
   it("returns null for a normalized no-op", () => {

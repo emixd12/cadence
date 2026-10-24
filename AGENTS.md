@@ -42,8 +42,11 @@ uses Tauri v2, Vite, React, and local SQLite. Next.js stays at the repository
 root. Tickets 146–148 implement the authenticated, read-only Cadence Daily Brief
 in-app horse briefing. Tickets 220–232 plan one remote MCP server, a
 Cadence-owned OAuth server, and Claude and ChatGPT plugins; see
-`docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Mobile and broader
-workspace restructuring remain deferred.
+`docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
+read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
+web and linked desktop with local verification. Ticket 241 owns final
+disclosure/evidence review; live and release gates remain open. Mobile and
+broader workspace restructuring remain deferred.
 
 ## Agent operating model
 
@@ -66,6 +69,8 @@ Before implementing a task, read in this order:
 `STATUS.md` is a current-state ledger. Update it when a ticket starts, completes, becomes blocked, is reopened, or materially changes scope. Do not use it to expand product scope.
 
 If a user prompt conflicts with the docs, report the conflict before editing. If the user intentionally changes product direction, update the relevant docs in the same task.
+
+Installed desktop testing uses dev-signed builds under the owner's standing approval (`docs/DECISIONS.md`, 2026-10-23; commands in `docs/DESKTOP_RELEASE.md`, "Dev-signed builds"). Apple notarization submissions and any publication still need the owner's instruction each time.
 
 Every new or materially changed product/design ticket must state its impact on
 web, desktop, marketing, and future mobile. Each platform entry needs an
@@ -103,6 +108,15 @@ Product and implementation docs:
 24. `/docs/INTEGRATION_PLAYBOOK.md`
 25. `/docs/MCP_INTEGRATION.md`
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
+27. `/docs/PRIVACY_CHANGES.md`
+28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
+
+## Privacy changes
+
+Until the pre-launch privacy pass, log privacy, disclosure and marketing-language
+conflicts in `docs/PRIVACY_CHANGES.md`. These conflicts never block development.
+In-progress work proceeds as if no privacy policy constrains it. Provider-terms and
+licence questions stay in `docs/LEGAL.md`.
 
 ## Product constraints
 
@@ -126,6 +140,8 @@ In scope:
 - Local-first macOS desktop tracking parity under Tickets 107–114
 - Optional desktop Google account linking and synchronization under Tickets 116–122
 - In-app read-only Cadence Daily Brief in the horse bubble under Tickets 146–148
+- Read-only Outlook and iCloud Calendar context and Hevy workout timing under
+  Tickets 233–241, each with separate Daily Brief disclosure
 - Remote MCP server, Cadence-owned OAuth server, consent and Connected apps
   settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
   full tracking-data read plus scoped, user-confirmed writes (Occurrence status
@@ -149,8 +165,12 @@ Out of scope for v1:
   stdio MCP server for account-free desktop, MCP prompts/resources, per-event
   client provenance in synced history and BehaviorLog, and a production reviewer
   sign-in (see `docs/FUTURE_UPDATES.md`)
-- Calendar sync and event editing, except the planned read-only Google Calendar
-  context in Tickets 132–137
+- Calendar sync and event editing, except read-only Google Calendar context in
+  Tickets 132–137 and locally implemented read-only Outlook and iCloud Calendar context in
+  Tickets 233–241
+- Workout writes, coaching, exercise analysis, and automatic Behavior completion
+  from recorded activity
+- EventKit and local-only Mac calendar access
 - Payment/subscription infrastructure
 - Admin dashboards
 - PWA offline cache
@@ -484,6 +504,9 @@ Do not expand scope to solve speculative future requirements.
   service-role key or Google provider credential.
 - Keep desktop session secrets in Keychain, not SQLite, browser storage, logs,
   exports, or backups.
+- Keep connector credentials (Google and Outlook refresh tokens, iCloud
+  app-specific passwords, Hevy API keys) sealed in the hosted private schema.
+  Never send them to clients or store them on desktop.
 - Restrict hosted data to the authenticated user and local data to its stable profile.
 - Use RLS on all user-owned web tables.
 - Never commit `.env` files or secrets.

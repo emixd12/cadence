@@ -40,6 +40,14 @@ configuration as data without sending.
 
 ## Native dependency CI
 
+`npm run desktop:dependencies:check` verifies the versions selected by both
+lockfiles. The Tauri JavaScript API and native runtime must share a major/minor
+version; JavaScript/native plugins must match exactly, including the patch.
+Both `agents:check` and the desktop frontend build run this guard. Update the
+JavaScript API, CLI, native `tauri` and matching `tauri-build` together, and
+regenerate both lockfiles. Keep the API and CLI pinned alongside the native
+runtime. See [Tauri's dependency guidance](https://v2.tauri.app/develop/updating-dependencies/).
+
 `.github/workflows/desktop-native.yml` checks changes to native sources,
 Cargo manifests and locks, npm manifests and locks, the bundled icon, and the
 workflow itself. It runs on GitHub's Apple Silicon `macos-15` runner with Node
@@ -506,7 +514,9 @@ Required evidence includes:
 Ticket 115 owns acceptance of the Developer ID signed and notarized `.app` and `.dmg`
 artifacts. Tauri requires [signed updater artifacts](https://v2.tauri.app/plugin/updater/).
 Local commands, signing requirements, and installed-upgrade evidence live in
-[`DESKTOP_RELEASE.md`](DESKTOP_RELEASE.md).
+[`DESKTOP_RELEASE.md`](DESKTOP_RELEASE.md). Installed testing between releases uses
+Developer ID signed, unnotarized
+[dev-signed builds](DESKTOP_RELEASE.md#dev-signed-builds).
 
 Apple membership is available as of September 27, 2026. The Developer ID identity
 and matching provisioning profile are installed. Apple accepted the notarization

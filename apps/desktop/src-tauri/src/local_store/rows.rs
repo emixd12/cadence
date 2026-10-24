@@ -77,6 +77,8 @@ pub struct Behavior {
     pub title: String,
     pub updated_at: String,
     pub user_id: String,
+    #[serde(default)]
+    pub where_kind: Option<String>,
 }
 impl StoredRow for Behavior {
     const TABLE: &'static str = "behaviors";

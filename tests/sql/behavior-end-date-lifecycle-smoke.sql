@@ -66,6 +66,7 @@ begin
   configuration := jsonb_build_object(
     'category_id', null,
     'location_text', null,
+    'where_kind', null,
     'schedule_graph', schedule_graph #- '{0,id}' #- '{0,time_entries,0,id}',
     'browser_reminder_enabled', true,
     'email_reminder_enabled', false,
@@ -110,6 +111,7 @@ begin
       'changed_fields', jsonb_build_array(
         'category_id',
         'location_text',
+        'where_kind',
         'schedule_graph',
         'browser_reminder_enabled',
         'email_reminder_enabled',

@@ -30,8 +30,8 @@ const now = Temporal.Instant.from("2026-09-22T08:00:00Z");
 const source = {
   settings: { enabled: true, mode: "walking" as const, routingConsentAt: "2026-09-20T00:00:00Z", baseLocationText: "1 Base St", navigationPreference: "google_maps" as const },
   settingsRevision: "settings-1", behaviors: [
-    { id: "behavior-1", locationText: "2 Habit St", updatedAt: "2026-09-20T00:00:00Z" },
-    { id: "behavior-2", locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
+    { id: "behavior-1", whereKind: "place" as const, locationText: "2 Habit St", updatedAt: "2026-09-20T00:00:00Z" },
+    { id: "behavior-2", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
   ],
 };
 const caller = { client: {} as never, user: { id: "owner" } as never };
@@ -67,7 +67,7 @@ const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
 
 describe("refreshTravelRoutes", () => {
   it("looks up only the bounded commitments and the base, behind one reservation", async () => {
-    const behaviors = Array.from({ length: 9 }, (_, index) => ({ id: `b${index}`, locationText: `${index} Test St`, updatedAt: "revision" }));
+    const behaviors = Array.from({ length: 9 }, (_, index) => ({ id: `b${index}`, whereKind: "place" as const, locationText: `${index} Test St`, updatedAt: "revision" }));
     mocks.source.mockResolvedValue({ ...source, behaviors });
     mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
     mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: Array.from({ length: 9 }, (_, index) => ({
@@ -94,7 +94,7 @@ describe("refreshTravelRoutes", () => {
 
   it("does not reserve spend or call the provider when nothing is geocodable", async () => {
     located();
-    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
     const result = await refreshTravelRoutes(caller, day, config, now);
     expect(result.evidence).not.toBeNull();
     expect(mocks.spend).not.toHaveBeenCalled();
@@ -213,6 +213,32 @@ describe("refreshTravelRoutes", () => {
     expect(result.evidence.collisions.some((collision) => collision.candidateRef === "occurrence-2")).toBe(true);
     expect(mocks.geocode).toHaveBeenCalledTimes(2);
     expect(mocks.events).not.toHaveBeenCalled();
+  });
+
+  it("routes a Home Behavior to the saved Home with one shared lookup (Ticket 215)", async () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, behaviors: [{ id: "behavior-1", whereKind: "home", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    const result = await refreshTravelRoutes(caller, { ...day, device: { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T08:00:00Z" } }, config, now);
+    if (!result.evidence) throw new Error("Expected travel evidence.");
+    expect(mocks.geocode).toHaveBeenCalledOnce();
+    expect(mocks.geocode.mock.calls[0]![0]).toBe("1 Base St");
+    expect(result.evidence.legs[0]?.leg).toMatchObject({ role: "outbound", destinationCommitmentRef: "occurrence-1" });
+    expect(result.evidence.legs[0]?.leg.provenance.destinationSource).toBe("saved_base");
+  });
+
+  it.each([
+    ["Anywhere", { whereKind: "anywhere" as const, baseLocationText: "1 Base St" }],
+    ["Not set", { whereKind: null, baseLocationText: "1 Base St" }],
+    ["Home without a saved Home", { whereKind: "home" as const, baseLocationText: null }],
+  ])("requests no route for a %s Behavior (Ticket 215)", async (_label, { whereKind, baseLocationText }) => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText },
+      behaviors: [{ id: "behavior-1", whereKind, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    const result = await refreshTravelRoutes(caller, { ...day, device: { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T08:00:00Z" } }, config, now);
+    expect(result.evidence?.legs).toEqual([]);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.spend).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
   });
 
   it("uses completed stopped-session history when no Behavior default duration exists", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { projectExternalEventSchedulingEvent } from "@cadence/core/services/external-event-projection";
+import { combineExternalEventFreshness, projectExternalEventSchedulingEvent } from "@cadence/core/services/external-event-projection";
+import { CalendarDays } from "lucide-react";
 import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { Temporal } from "@js-temporal/polyfill";
 import { useRefresh } from "@cadence/ui/runtime";
@@ -24,11 +25,13 @@ import type {
   TimelineOccurrenceContext,
 } from "@cadence/core/types/day-progress";
 
-import { ExternalEventDetails, ExternalEventPreview, renderTravelTiming } from "./ExternalEventDetails";
+import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming } from "./ExternalEventDetails";
+import { RecordedActivityList } from "./RecordedActivityList";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
 import styles from "./day-progress-timeline.module.css";
 import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
+import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
@@ -50,6 +53,10 @@ export type DayProgressContext = Readonly<{
   travelMode?: TravelMode | null;
   navigationPreference?: TravelNavigationPreference | null;
   onTravelCorrection?: (correction: TravelCorrection) => void;
+  /** Ticket 238: today's recorded Hevy workouts, shown apart from Calendar markers. */
+  recordedActivity?: HevyTimelineState | null;
+  /** Ticket 238: status lines for calendar sources other than Google. */
+  sourceMessages?: readonly string[];
 }>;
 
 type DayProgressTimelineProps = Readonly<{
@@ -90,6 +97,7 @@ const UNAVAILABLE: ExternalEventFreshness = {
 };
 const EMPTY_EVENTS: readonly NormalizedExternalEvent[] = [];
 const EMPTY_IDS: readonly string[] = [];
+const OUTLOOK_ACTIVE: ReadonlySet<ConnectorTimelineState> = new Set(["reconnect_required", "empty", "ready", "stale", "incomplete", "error"]);
 
 export function DayProgressTimeline({
   timeline,
@@ -118,11 +126,30 @@ export function DayProgressTimeline({
   const now = useDayProgressClock(context?.now, timeline.timezone, onDayChange ?? runtimeRefresh);
   const visibleSections = timeline.daySections;
   const live = useWebGoogleCalendarTimeline({ enabled: liveCalendar && !context, localDates: visibleSections.map((section) => section.localDate), timezone: timeline.timezone });
-  const events = context?.events ?? live.snapshot?.events.filter((event) =>
+  const liveConnectors = liveCalendar && !context;
+  const outlook = useWebOutlookCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
+    lastLocalDate: visibleSections.at(-1)?.localDate, timezone: timeline.timezone });
+  const icloud = useWebIcloudCalendarTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate,
+    lastLocalDate: visibleSections.at(-1)?.localDate, timezone: timeline.timezone });
+  const icloudActive = liveConnectors && OUTLOOK_ACTIVE.has(icloud.state);
+  const hevy = useWebHevyActivityTimeline({ enabled: liveConnectors, todayLocalDate: timeline.todayLocalDate, timezone: timeline.timezone });
+  const outlookActive = liveConnectors && OUTLOOK_ACTIVE.has(outlook.state);
+  const googleEvents = useMemo(() => live.snapshot?.events.filter((event) =>
     !live.hiddenCalendarIds.includes(event.calendarId) && (live.showAllDay || event.kind !== "all_day"),
-  ) ?? EMPTY_EVENTS;
-  const travelSourceKey = buildTravelSourceKey(events, timeline);
-  const currentCorrections = useMemo(() => corrections.filter((correction) => events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, events]);
+  ) ?? EMPTY_EVENTS, [live.hiddenCalendarIds, live.showAllDay, live.snapshot]);
+  const outlookEvents = useMemo(() => outlookActive ? outlook.snapshot?.events.filter((event) =>
+    !outlook.hiddenCalendarIds.includes(event.calendarId) && (outlook.showAllDay || event.kind !== "all_day"),
+  ) ?? EMPTY_EVENTS : EMPTY_EVENTS, [outlook.hiddenCalendarIds, outlook.showAllDay, outlook.snapshot, outlookActive]);
+  const icloudEvents = useMemo(() => icloudActive ? icloud.snapshot?.events.filter((event) =>
+    !icloud.hiddenCalendarIds.includes(event.calendarId) && (icloud.showAllDay || event.kind !== "all_day"),
+  ) ?? EMPTY_EVENTS : EMPTY_EVENTS, [icloud.hiddenCalendarIds, icloud.showAllDay, icloud.snapshot, icloudActive]);
+  const contextEvents = context?.events;
+  const events = useMemo(() => contextEvents ?? (outlookEvents.length || icloudEvents.length ? [...googleEvents, ...outlookEvents, ...icloudEvents] : googleEvents),
+    [contextEvents, googleEvents, outlookEvents, icloudEvents]);
+  // Travel estimates and their brief guidance stay Google-only (Ticket 238 adds no new routing disclosure).
+  const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
+  const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
+  const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
@@ -139,9 +166,9 @@ export function DayProgressTimeline({
     const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
     return projectBriefTravelGuidance({
       evidence: travel, localDate: timeline.todayLocalDate, now,
-      ...briefTravelSubjects(today?.occurrences ?? [], events),
+      ...briefTravelSubjects(today?.occurrences ?? [], travelEvents),
     });
-  }, [travel, events, now, timeline.daySections, timeline.todayLocalDate]);
+  }, [travel, travelEvents, now, timeline.daySections, timeline.todayLocalDate]);
   useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
   useEffect(() => () => publishBriefTravel(null), []);
 
@@ -218,12 +245,25 @@ export function DayProgressTimeline({
 
   const layoutsByDate = new Map(layout?.days.map((day) => [day.localDate, day]) ?? []);
   const firstMeasured = visibleSections.map((section) => measured[section.localDate]).find(Boolean);
-  const fresh = context?.freshness ?? live.snapshot?.freshness ?? UNAVAILABLE;
+  // A connected Google source that cannot read (reconnect, provider unavailable, or a failed read
+  // without saved events) still blocks no-overlap claims; an unused Google source does not.
+  const googleFailing = !live.snapshot && (live.state === "error"
+    || (live.state === "disconnected" && (live.connectionStatus === "reconnect_required" || live.connectionStatus === "unavailable")));
+  const fresh = context?.freshness ?? combineExternalEventFreshness([
+    ...(live.snapshot ? [live.snapshot.freshness] : googleFailing ? [UNAVAILABLE] : []),
+    ...(outlookActive ? [outlookFreshness(outlook)] : []),
+    ...(icloudActive ? [outlookFreshness(icloud)] : []),
+  ]) ?? UNAVAILABLE;
+  const googleUnused = (outlookActive || icloudActive) && !googleFailing && (live.state === "disconnected" || live.state === "not_configured");
   const calendarState = context?.freshness
     ? calendarFreshnessLabel(context.freshness, timeline.timezone)
-    : liveCalendar
+    : liveCalendar && !googleUnused
       ? calendarStateLabel(live.state, live.error, live.snapshot?.freshness, timeline.timezone)
       : null;
+  const sourceMessages = context ? context.sourceMessages ?? [] : [
+    ...(outlookActive ? [outlookStateLabel(outlook, timeline.timezone, "Outlook Calendar")] : []),
+    ...(icloudActive ? [outlookStateLabel(icloud, timeline.timezone, "iCloud Calendar")] : []),
+  ].filter(Boolean);
   const dayProgressStyle = firstMeasured ? { "--day-progress-axis-left": `${firstMeasured.axisX}px` } as CSSProperties : undefined;
 
   return (
@@ -235,6 +275,7 @@ export function DayProgressTimeline({
     >
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
+      {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
       <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} />
       {layout && firstMeasured ? <DayOverlay
         layout={layout}
@@ -252,6 +293,7 @@ export function DayProgressTimeline({
         events={events}
         dismissedAllDay={dismissedAllDay}
         activeIds={activeIds}
+        activity={section.localDate === timeline.todayLocalDate ? (context ? context.recordedActivity ?? null : hevy) : null}
         travel={travel}
         timezone={timeline.timezone}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel)}
@@ -284,7 +326,7 @@ export function DayProgressTimeline({
         }}
         onOpenExternal={onOpenExternal}
         travel={travel}
-        navigationPreference={context?.navigationPreference ?? liveTravel.view?.navigationPreference}
+        navigationPreference={context?.navigationPreference}
         travelMode={context?.travelMode ?? liveTravel.view?.mode}
         onTravelCorrection={context?.onTravelCorrection ?? (liveTravel.view ? (correction) => {
           setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
@@ -302,6 +344,7 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   events: readonly NormalizedExternalEvent[];
   dismissedAllDay: readonly string[];
   activeIds: readonly string[];
+  activity: HevyTimelineState | null;
   contexts: ReadonlyMap<string, TimelineOccurrenceContext>;
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
   timezone: string;
@@ -318,6 +361,7 @@ function DayProgressDay({
   events,
   dismissedAllDay,
   activeIds,
+  activity,
   contexts,
   travel,
   timezone,
@@ -426,6 +470,7 @@ function DayProgressDay({
               {visibleAllDay.length && visibleAllDay.length < allDay.length ? <button type="button" className="min-h-11 text-xs underline" onClick={onRestoreAllDay}>Restore ({allDay.length - visibleAllDay.length})</button> : null}
             </aside> : null}
           </div>
+          <RecordedActivityList activity={activity} timezone={timezone} label={section.label} />
         </div>
       </header>
       <div className={styles.feed}>
@@ -492,9 +537,13 @@ function DayOverlay({
       {controls.map((control) => {
         const event = events.find((item) => item.id === control.eventIds[0]);
         if (!event) return null;
-        return <button key={control.id} type="button" data-calendar-node={control.id} className="pointer-events-auto absolute z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center" style={{ left: control.iconX, top: control.position }} aria-label={control.count > 1 ? `Preview ${control.count} Google Calendar events starting at the same time` : `Preview Google Calendar event: ${event.title || "Untitled event"}`} aria-describedby={control.eventIds.some((id) => activeIds.includes(id)) ? previewId : undefined} onPointerEnter={(pointer) => { if (pointer.pointerType !== "touch") onPreview([...control.eventIds], pointer.currentTarget); }} onFocus={(focus) => onPreview([...control.eventIds], focus.currentTarget)} onClick={(click) => onPreview([...control.eventIds], click.currentTarget)}><span className={styles.eventMarker} data-group-variant={control.count > 1 ? "badge" : undefined} aria-hidden="true">{/* Provider artwork stays bundled for offline desktop use. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/google-calendar.svg" alt="" width={18} height={18} />
+        const sources = new Set(control.eventIds.map((id) => events.find((item) => item.id === id)?.source ?? event.source));
+        const groupName = sources.size === 1 ? externalEventSourceName(event.source) : "Calendar";
+        return <button key={control.id} type="button" data-calendar-node={control.id} data-event-source={sources.size === 1 ? event.source : "mixed"} className="pointer-events-auto absolute z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center" style={{ left: control.iconX, top: control.position }} aria-label={control.count > 1 ? `Preview ${control.count} ${groupName} events starting at the same time` : `Preview ${externalEventSourceName(event.source)} event: ${event.title || "Untitled event"}`} aria-describedby={control.eventIds.some((id) => activeIds.includes(id)) ? previewId : undefined} onPointerEnter={(pointer) => { if (pointer.pointerType !== "touch") onPreview([...control.eventIds], pointer.currentTarget); }} onFocus={(focus) => onPreview([...control.eventIds], focus.currentTarget)} onClick={(click) => onPreview([...control.eventIds], click.currentTarget)}><span className={styles.eventMarker} data-group-variant={control.count > 1 ? "badge" : undefined} aria-hidden="true">{/* Provider artwork stays bundled for offline desktop use. */}
+          {sources.size === 1 && event.source === "google_calendar"
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src="/brand/google-calendar.svg" alt="" width={18} height={18} />
+            : <CalendarDays size={16} aria-hidden="true" />}
           {control.count > 1 ? <span className={styles.countBadge}>×{control.count}</span> : null}</span></button>;
       })}
     </div>
@@ -549,6 +598,31 @@ function calendarStateLabel(
   if (state === "not_configured") return "Calendar connection is not configured.";
   if (state === "disconnected") return "Calendar is not connected.";
   return "Loading Calendar context.";
+}
+
+function outlookFreshness(outlook: OutlookTimelineState): ExternalEventFreshness {
+  const snapshot = outlook.snapshot;
+  if (!snapshot) return UNAVAILABLE;
+  if (outlook.state === "incomplete" || outlook.state === "error" || outlook.state === "stale") {
+    return { ...snapshot.freshness, state: outlook.state === "incomplete" ? "incomplete" : "stale", canAssertNoOverlap: false };
+  }
+  return snapshot.freshness;
+}
+
+function outlookStateLabel(outlook: OutlookTimelineState, timezone: string, name: string): string {
+  const refreshed = outlook.snapshot ? lastRefreshed(outlook.snapshot.fetchedAt, timezone) : "";
+  if (outlook.state === "empty") return `No ${name} events in the displayed days.`;
+  if (outlook.state === "stale") return `${name} context may be out of date.${refreshed}`;
+  if (outlook.state === "incomplete") return `${name} context is incomplete; some events may be missing.${refreshed}`;
+  if (outlook.state === "error") return `${name} context could not refresh: ${outlook.error ?? "unavailable"}.${outlook.snapshot ? ` Showing the last complete read.${refreshed}` : ""}`;
+  if (outlook.state === "reconnect_required") return `${name} needs reconnection in Settings.`;
+  return "";
+}
+
+function lastRefreshed(instant: string, timezone: string): string {
+  try {
+    return ` Last refreshed ${Temporal.Instant.from(instant).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+  } catch { return ""; }
 }
 
 function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: string): string {

@@ -1482,6 +1482,7 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
     fixture.db.execute_batch(db::MIGRATIONS[11].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[14].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[15].2).unwrap();
+    fixture.db.execute_batch(db::MIGRATIONS[17].2).unwrap();
     let mut plan = import_plan(&fixture.profile);
     let intervention = imported_intervention(&fixture.profile, 200, "browser_push", "sent");
     plan["importedInterventionWrites"] = json!([{"expected":null,"next":intervention}]);
@@ -1539,6 +1540,9 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
              ALTER TABLE behaviors DROP COLUMN archive_notes;
              DROP TRIGGER profiles_create_default_travel_settings;
              DROP TABLE travel_settings;
+             DROP TRIGGER behaviors_where_place_text_insert;
+             DROP TRIGGER behaviors_where_place_text_update;
+             ALTER TABLE behaviors DROP COLUMN where_kind;
              ALTER TABLE behaviors DROP COLUMN location_text;",
         )
         .unwrap();
@@ -1991,14 +1995,20 @@ fn category_upgrade_preserves_duplicate_ids_and_rejects_invalid_new_names() {
 
 #[test]
 fn configuration_location_migration_canonicalizes_pre_travel_history() {
-    let mut fixture = Fixture::at_schema(db::MIGRATIONS.len() - 1);
+    // Schema 16 predates 0017; the current Behavior row needs a temporary where_kind column.
+    let mut fixture = Fixture::at_schema(16);
+    fixture
+        .db
+        .execute_batch("ALTER TABLE behaviors ADD COLUMN where_kind TEXT;")
+        .unwrap();
     fixture.create();
     fixture
         .db
         .execute_batch(
-            "DROP TRIGGER behavior_configuration_events_append_only;
+            "ALTER TABLE behaviors DROP COLUMN where_kind;
+             DROP TRIGGER behavior_configuration_events_append_only;
              UPDATE behavior_configuration_events SET
-               next_configuration = json_remove(next_configuration, '$.location_text', '$.locationText'),
+               next_configuration = json_remove(next_configuration, '$.location_text', '$.locationText', '$.whereKind'),
                changed_fields = (SELECT json_group_array(value) FROM json_each(changed_fields) WHERE value NOT IN ('location_text'));
              INSERT INTO behavior_configuration_events
                SELECT behavior_id, '[\"active\"]', created_at, effective_at, effective_local_date, 'revision',
@@ -2031,4 +2041,49 @@ fn configuration_location_migration_canonicalizes_pre_travel_history() {
             assert!(previous.as_object().unwrap().contains_key("location_text"));
         }
     }
+}
+
+#[test]
+fn behavior_where_migration_backfills_place_without_rewriting_history() {
+    // Schema 17 predates 0018; the current Behavior row needs a temporary where_kind column.
+    let mut fixture = Fixture::at_schema(17);
+    fixture
+        .db
+        .execute_batch("ALTER TABLE behaviors ADD COLUMN where_kind TEXT;")
+        .unwrap();
+    fixture.create();
+    fixture
+        .db
+        .execute_batch(
+            "UPDATE behaviors SET location_text = '1 Example Street';
+             ALTER TABLE behaviors DROP COLUMN where_kind;",
+        )
+        .unwrap();
+    let history = |db: &Connection| -> String {
+        db.query_row("SELECT json_group_array(json_array(id, previous_configuration, next_configuration, changed_fields)) FROM (SELECT * FROM behavior_configuration_events ORDER BY id)", [], |row| row.get(0)).unwrap()
+    };
+    let before = history(&fixture.db);
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    let where_kind: Option<String> = fixture
+        .db
+        .query_row("SELECT where_kind FROM behaviors", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(where_kind.as_deref(), Some("place"));
+    assert_eq!(history(&fixture.db), before);
+    assert!(fixture
+        .db
+        .execute("UPDATE behaviors SET where_kind = 'home'", [])
+        .is_err());
+    assert!(fixture
+        .db
+        .execute("UPDATE behaviors SET location_text = NULL", [])
+        .is_err());
+    fixture
+        .db
+        .execute("UPDATE behaviors SET where_kind = 'home', location_text = NULL", [])
+        .unwrap();
+    assert!(fixture
+        .db
+        .execute("UPDATE behaviors SET where_kind = 'elsewhere', location_text = NULL", [])
+        .is_err());
 }
