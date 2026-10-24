@@ -309,9 +309,9 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   authorization; Cadence does not use Google user data to train AI models. The same
   change describes both Google Calendar connections in Privacy, "Optional Google
   Calendar", and adds the AI training limit there and in
-  `docs/user-guide/privacy-and-account.md`. The text awaits owner approval. Set this
-  entry to resolved when it is live, with the deployment and date. Travel facts stay
-  with P-004.
+  `docs/user-guide/privacy-and-account.md`. The owner approved the text on October 24,
+  2026. Set this entry to resolved when it is live, with the deployment and date.
+  Travel facts stay with P-004.
 
 ## P-006: Marketing review of AI and travel claims
 
