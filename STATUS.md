@@ -1,5 +1,33 @@
 # Implementation Status
 
+## Ticket 187: Calendar disclosures for Google verification — October 24, 2026
+
+Google's sensitive-scope review of the Daily Brief Calendar client
+(`cadence-calendar-agent-prod`) reads the live Privacy page. This change prepares
+that text. It awaits the owner's approval; nothing is published.
+
+- Privacy, "Optional Google Calendar": describes the Timeline connection and, where
+  available, the separate Google Calendar for Daily Brief connection. Each has its
+  own consent, calendar selection, credential and Disconnect. Daily Brief reads
+  Calendar only through its own connection. Connecting sends nothing to OpenAI.
+  New statement: Cadence does not use Google API data to develop, improve or train
+  generalized AI or machine-learning models, or transfer it for that purpose.
+- Processor and retention rows name both connections; the desktop event cache
+  belongs to the Timeline connection only.
+- Trust, "Data boundaries": the export sentence no longer reads as a general no-AI
+  promise (P-005, now drafted).
+- `docs/user-guide/privacy-and-account.md` covers both connections, AI use and
+  deletion. `tests/legal-content.test.tsx` asserts the new statements.
+
+The "where available" wording keeps the text true before and after PR #135 deploys.
+Search Console still shows `info@identityscaffolding.com` as verified owner of
+`sc-domain:cadence-me.com` (Domain name provider). The agent project's branding is
+configured but not yet verified; the data-access request is not submitted.
+
+Platform impact: web public legal pages and user guide. Desktop shares the hosted
+legal pages; no runtime change. Marketing claims stay accurate in both states and
+are not changed (P-006). Future mobile: not applicable.
+
 ## PR 124: paired Tauri dependency upgrade — October 24, 2026
 
 The API-only update selected JavaScript `@tauri-apps/api` 2.12.4 while the

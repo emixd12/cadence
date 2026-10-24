@@ -38,7 +38,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
     title: "Privacy",
     summary:
       "Privacy policy for the Cadence marketing site and hosted personal behavior tracker.",
-    updated: "October 21, 2026",
+    updated: "October 24, 2026",
     sections: [
       {
         title: "Scope and operator",
@@ -58,12 +58,13 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
       {
         title: "Optional Google Calendar",
         paragraphs: [
-          "The Google Calendar connector is optional. Where enabled, it requires separate read-only consent for the same Google account used to sign in. Cadence reads your subscribed calendar list so you can choose calendars, then reads events from selected calendars intersecting displayed days, including readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. It does not create, edit, or delete Google events or download attachments automatically.",
-          "Cadence uses Calendar information to show selected events in Timeline and provide advisory overlap context. It does not sell Calendar information or use it for advertising. Sending selected Calendar timing to OpenAI for Daily Brief requires a separate choice, described below. Calendar information is never shared through MCP.",
-          "Vercel runtime processes Calendar API requests and returned event details while serving a refresh. Supabase stores the account's connector status, calendar selections, display preferences, and encrypted Google refresh credential. Cadence does not store Google event details in its hosted database. The web app holds returned event details in memory. Desktop can store the last complete normalized event snapshot in a separate account-bound cache for offline display; its account session and pending consent state use macOS Keychain.",
+          "Google Calendar connections are optional and read-only. Each requires its own Google consent for the same Google account used to sign in. The Google Calendar connection shows events in Timeline. Where available, a second connection, Google Calendar for Daily Brief, supplies event timing to Daily Brief only. Each connection reads your subscribed calendar list so you can choose its calendars, then reads events from the calendars selected for that connection: the Timeline connection for displayed days, the Daily Brief connection for today. Events can include readable titles, descriptions, times, locations, organizers, attendees, conference details, attachment links, and Google event links. Neither connection creates, edits, or deletes Google events or downloads attachments automatically.",
+          "Cadence uses Timeline connection information to show selected events in Timeline and provide advisory overlap and travel context. Where Google Calendar for Daily Brief is available, Daily Brief reads Calendar only through that connection, never through the Timeline connection, and Timeline does not show its events. Sending Calendar timing to OpenAI also requires a separate Daily Brief choice, described below; connecting a calendar alone sends nothing to OpenAI. Cadence does not sell Calendar information or use it for advertising. Calendar information is never shared through MCP.",
+          "Cadence does not use information received from Google APIs to develop, improve, or train generalized artificial intelligence or machine-learning models, and does not transfer it to anyone for that purpose. Daily Brief sends Calendar timing to OpenAI only to prepare that user's briefing.",
+          "Vercel runtime processes Calendar API requests and returned event details while serving a refresh or preparing a briefing. Supabase stores each connection's status, calendar selections, and encrypted Google refresh credential, and the Timeline connection's display preferences. The two connections use separate credentials and records. Cadence does not store Google event details in its hosted database. The web app holds returned event details in memory. For the Timeline connection only, desktop can store the last complete normalized event snapshot in a separate account-bound cache for offline display. Desktop keeps no event cache for Google Calendar for Daily Brief. Desktop account sessions and pending consent state use macOS Keychain.",
           "Calendar details and credentials are excluded from Cadence exports, account synchronization, and user-created desktop tracking backups. Deleted connector records and sealed credential ciphertext may remain in Supabase backup copies until Supabase removes those copies under its backup lifecycle. Live-record deletion does not immediately erase existing backups.",
-          "Disconnect Google Calendar marks the account connection disconnected, clears selected calendar IDs, deletes the live server credential, and requests Google grant revocation. If Google cannot confirm revocation, the user must remove Cadence in Google Account permissions. Other clients stop refreshing after they next receive the connection change; an offline desktop device may retain stale cached event details until it reconnects or its Cadence account is disconnected.",
-          "Ordinary web sign-out ends that browser's Cadence session but leaves the account-level Calendar connection active. Desktop Cadence account disconnect or reconnect clears that Mac's Calendar cache and pending consent state but does not revoke the global Google grant. Account deletion attempts revocation and removes the live Auth user and owner-scoped connector records. If revocation fails, Google Account permissions may still show the grant.",
+          "Each connection has its own Disconnect. Disconnect marks that connection disconnected, clears its selected calendar IDs, deletes its live server credential, and requests revocation of its Google grant. The other connection stays connected. If Google cannot confirm revocation, the user must remove Cadence in Google Account permissions. Other clients stop refreshing after they next receive the connection change; an offline desktop device may retain stale cached Timeline event details until it reconnects or its Cadence account is disconnected.",
+          "Ordinary web sign-out ends that browser's Cadence session but leaves account-level Calendar connections active. Desktop Cadence account disconnect or reconnect clears that Mac's Calendar cache and pending consent state but does not revoke Google grants. Account deletion attempts revocation for each connection and removes the live Auth user and owner-scoped connector records. If revocation fails, Google Account permissions may still show a grant.",
           "Cadence's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including its Limited Use requirements.",
         ],
         links: [
@@ -172,7 +173,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Google",
-              "User-selected Google sign-in and optional Google Calendar consent and API access",
+              "User-selected Google sign-in and optional Google Calendar connections, each with its own consent and API access",
               "Google account, authentication, selected-calendar, and readable event data",
             ],
             [
@@ -251,13 +252,13 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
             ],
             [
               "Google Calendar connector records",
-              "Live credential until Calendar disconnect, access revocation, or account deletion; connector status and preferences until account deletion",
+              "Each connection's live credential until its disconnect, access revocation, or account deletion; connector status and preferences until account deletion",
               "Disconnect deletes the live credential; backup copies remain until Supabase removes them under its backup lifecycle",
             ],
             [
               "Desktop Google Calendar cache",
               "Until replacement, Calendar disconnect, Cadence account disconnect or reconnect, or local app-data removal",
-              "Separate local cache; excluded from Cadence exports, account synchronization, and user-created desktop backups",
+              "Separate local cache for the Timeline connection only; excluded from Cadence exports, account synchronization, and user-created desktop backups",
             ],
             [
               "Outlook, iCloud, and Hevy connector records",
@@ -508,13 +509,13 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
     title: "Trust",
     summary:
       "Current, bounded evidence for one named Cadence source commit and its production deployments.",
-    updated: "August 27, 2026",
+    updated: "October 24, 2026",
     sections: [
       {
         title: "Data boundaries",
         paragraphs: [
           "Cadence stores account and behavior records in Supabase. Row Level Security scopes user-owned records to the authenticated account.",
-          "Cadence does not send exported behavior data to an AI provider. Users choose whether to share an export with an external service. Optional Daily Brief separately sends disclosed context to OpenAI. Local connector tests do not verify live providers, installed desktop behavior or deployment.",
+          "Exports go only where the user downloads or shares them; Cadence does not send an export to an AI provider. Optional Daily Brief sends the context described in the Privacy Policy to OpenAI, including Calendar timing only after a separate choice. A connected AI client receives tracking records through MCP only after the user authorizes it. Cadence does not use Google user data to train AI models. Local connector tests do not verify live providers, installed desktop behavior or deployment.",
         ],
       },
       {
