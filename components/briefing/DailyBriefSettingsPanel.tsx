@@ -104,10 +104,13 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
           <input type="checkbox" checked={settings.enabled} disabled={saving} onChange={(event) => save({ enabled: event.target.checked })} />
           <span>Enable Daily Brief</span>
         </label>
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="checkbox" checked={settings.includeCalendar} disabled={!settings.enabled || saving} onChange={(event) => save({ includeCalendar: event.target.checked })} />
-          <span>Include calendars selected in Google Calendar for Daily Brief</span>
-        </label>
+        <div>
+          <label className="flex min-h-11 items-center gap-3">
+            <input type="checkbox" checked={settings.includeCalendar} disabled={!settings.enabled || saving} aria-describedby="daily-brief-calendar-disclosure" onChange={(event) => save({ includeCalendar: event.target.checked })} />
+            <span>Include calendars selected in Google Calendar for Daily Brief</span>
+          </label>
+          <p id="daily-brief-calendar-disclosure" className="max-w-2xl pl-7 text-muted-readable">Sends today’s event times, timezone, availability and your response for those calendars. Event titles, descriptions, locations and attendees are not sent. Your Timeline Google Calendar connection is never used.</p>
+        </div>
         {settings.optionalSources?.reminders ? <div>
           <label className="flex min-h-11 items-center gap-3">
             <input type="checkbox" checked={settings.includeReminderHistory === true} disabled={!settings.enabled || saving} aria-describedby="daily-brief-reminder-disclosure" onChange={(event) => save({ includeReminderHistory: event.target.checked })} />

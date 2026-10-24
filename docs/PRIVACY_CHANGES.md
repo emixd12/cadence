@@ -58,7 +58,7 @@ Status values:
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
 | [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
 | [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
-| [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | logged | 187 | Privacy, Settings |
+| [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | drafted | 187 | Privacy, Settings |
 | [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
@@ -398,7 +398,11 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     does not grant model access." Daily Brief now also needs its own Google connection.
 - **Update needed:** describe both Google Calendar connections, their separate consent,
   selection, credential and Disconnect, and the one-time renewed choice.
-- **Status:** logged.
+- **Status:** drafted. PR #147 (October 24, 2026, to `main`) describes both connections
+  in Privacy, "Optional Google Calendar", and in `docs/user-guide/privacy-and-account.md`,
+  for Google's verification of the Daily Brief Calendar client. It does not yet mention
+  the one-time renewed choice. Daily Brief Settings now has its own Calendar disclosure
+  line. Set this entry to resolved when the text is live.
 
 ## P-011: Behavior descriptions sent for duration estimates
 
