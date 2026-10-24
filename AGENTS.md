@@ -70,6 +70,8 @@ Before implementing a task, read in this order:
 
 If a user prompt conflicts with the docs, report the conflict before editing. If the user intentionally changes product direction, update the relevant docs in the same task.
 
+Installed desktop testing uses dev-signed builds under the owner's standing approval (`docs/DECISIONS.md`, 2026-10-23; commands in `docs/DESKTOP_RELEASE.md`, "Dev-signed builds"). Apple notarization submissions and any publication still need the owner's instruction each time.
+
 Every new or materially changed product/design ticket must state its impact on
 web, desktop, marketing, and future mobile. Each platform entry needs an
 implementation reference, a follow-up ticket, or an explicit not-applicable

@@ -42,7 +42,7 @@ if(tool==='xcrun') {
  if(args[0]==='stapler'&&args[1]==='staple'&&process.env.TEST_STAPLE_FAILURE==='1') process.exit(3);
 }
 if(tool==='lipo') process.stdout.write('arm64\\n');
-if(tool==='codesign'&&args.includes('--display')) process.stderr.write((process.env.TEST_PRODUCTION_SIGNING==='1'?'Authority=Developer ID Application: Test (ABCDEFGHIJ)':'Signature=adhoc')+'\\nflags=0x10002(adhoc,runtime)\\nInfo.plist entries=14\\nSealed Resources version=2 rules=13 files=1\\n');
+if(tool==='codesign'&&args.includes('--display')) process.stderr.write((process.env.TEST_PRODUCTION_SIGNING==='1'?'Authority=Developer ID Application: Test (ABCDEFGHIJ)\\nTeamIdentifier=ABCDEFGHIJ':'Signature=adhoc')+'\\nflags=0x10002(adhoc,runtime)\\nInfo.plist entries=14\\nSealed Resources version=2 rules=13 files=1\\n');
 if(tool==='minisign'&&args.includes('-V')&&process.env.TEST_SIGNATURE_FAILURE==='1') process.exit(3);
 if(tool==='npm') {
  if(args[0]==='run'&&args[1]==='build') {
@@ -55,8 +55,8 @@ if(tool==='npm') {
  const app=path.join(bundle,'macos/Cadence.app');fs.mkdirSync(path.join(app,'Contents/MacOS'),{recursive:true});fs.mkdirSync(path.join(bundle,'dmg'),{recursive:true});
  fs.writeFileSync(path.join(app,'Contents/Info.plist'),'<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>app.cadence.desktop</string><key>CFBundleShortVersionString</key><string>'+(config.version||'0.1.0')+'</string><key>LSMinimumSystemVersion</key><string>14.0</string><key>CFBundleExecutable</key><string>cadence</string></dict></plist>');
  fs.writeFileSync(path.join(app,'Contents/MacOS/cadence'),'synthetic '+(config.version||'0.1.0')+' '+(process.env.CADENCE_LEGACY_KEYCHAIN_QA==='1'?'app.cadence.desktop.auth.legacy-qa':''),{mode:0o755});
- fs.writeFileSync(app+'.tar.gz','synthetic archive');fs.writeFileSync(app+'.tar.gz.sig',Buffer.from('synthetic signature').toString('base64'));
- if(process.env.TEST_OMIT_DMG!=='1') fs.writeFileSync(path.join(bundle,'dmg/Cadence_aarch64.dmg'),'synthetic image');
+ if(config.bundle?.createUpdaterArtifacts!==false){fs.writeFileSync(app+'.tar.gz','synthetic archive');fs.writeFileSync(app+'.tar.gz.sig',Buffer.from('synthetic signature').toString('base64'));}
+ if(process.env.TEST_OMIT_DMG!=='1'&&config.bundle?.targets?.includes('dmg')!==false) fs.writeFileSync(path.join(bundle,'dmg/Cadence_aarch64.dmg'),'synthetic image');
 }
 `;
     for (const tool of ["security", "xcrun", "minisign", "python3", "lipo", "codesign", "npm", "spctl"]) {
@@ -314,6 +314,72 @@ if(tool==='npm') {
     expect(calls().filter(({ tool, args }) => tool === "npm" && args[0] === "exec")).toHaveLength(0);
     expect(existsSync(path.join(previewPath(`0.1.1-preview.${missing === "url" ? "1" : "2"}`), "bundle"))).toBe(false);
     expect(existsSync(path.join(previewPath(`0.1.1-preview.${missing === "url" ? "1" : "2"}`), "artifact-verification.json"))).toBe(false);
+  });
+
+  const devEnvironment = (overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv => ({ ...environment,
+    CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json",
+    CADENCE_RELEASE_STORE: path.join(directory, "store"), APPLE_SIGNING_IDENTITY: "Developer ID Application: Test (ABCDEFGHIJ)",
+    VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+    VITE_CALENDAR_BROKER_ORIGIN: "https://app.cadence-me.com", TEST_PRODUCTION_SIGNING: "1", ...overrides });
+  const devPath = (version = "0.1.1-dev.1") => path.join(directory, "store", "dev-builds", version);
+  const builtApp = () => path.join(desktop, "src-tauri", "target", "aarch64-apple-darwin", "release", "bundle", "macos", "Cadence.app");
+
+  it("builds a dev-signed app without notarization, DMG or updater artifacts, and stages each version once", () => {
+    mkdirSync(path.join(desktop, "src-tauri", "migrations"));
+    writeFileSync(path.join(desktop, "src-tauri", "migrations", "0001_initial.sql"), "CREATE TABLE example (id INTEGER);");
+    writeFileSync(path.join(desktop, "src-tauri", "migrations", "0002_more.sql"), "ALTER TABLE example ADD COLUMN name TEXT;");
+    const env = devEnvironment({ APPLE_ID: "test@example.invalid", APPLE_PASSWORD: "synthetic-password", APPLE_TEAM_ID: "ABCDEFGHIJ",
+      TAURI_SIGNING_PRIVATE_KEY: "synthetic-key", CADENCE_LEGACY_KEYCHAIN_QA: "1" });
+    const check = run(["dev-check", "0.1.1-dev.1"], env);
+    expect(check.status, check.stderr).toBe(0);
+    expect(check.stdout).toContain("Nothing was built, notarized or published");
+    const result = run(["dev-build", "0.1.1-dev.1"], env);
+    expect(result.status, result.stderr).toBe(0);
+    const commands = calls();
+    expect(commands.some(({ tool, args }) => tool === "xcrun" && ["notarytool", "stapler"].includes(args[0]))).toBe(false);
+    expect(commands.some(({ tool }) => tool === "spctl" || tool === "minisign")).toBe(false);
+    const tauri = commands.find(({ tool, args }) => tool === "npm" && args[0] === "exec")!;
+    expect(tauri.appleKeys).toEqual([]);
+    expect(tauri.privateKey).toBe(false);
+    const config = JSON.parse(readFileSync(tauri.args[tauri.args.indexOf("--config") + 1], "utf8"));
+    expect(config).toMatchObject({ version: "0.1.1-dev.1", bundle: { targets: ["app"], createUpdaterArtifacts: false,
+      macOS: { entitlements: "Entitlements.plist", signingIdentity: "-" } }, plugins: { updater: { endpoints: [env.CADENCE_UPDATER_ENDPOINT] } } });
+    const signIndex = commands.findIndex(({ tool, args }) => tool === "codesign" && args[0] === "--force");
+    expect(commands[signIndex].args.slice(0, -1)).toEqual(["--force", "--sign", "Developer ID Application: Test (ABCDEFGHIJ)", "--options", "runtime",
+      "--timestamp=none", "--entitlements", path.join(realpathSync(desktop), "src-tauri", "Entitlements.plist")]);
+    expect(commands[signIndex].args.at(-1)).toMatch(/\/store\/dev-builds\/\.candidate-[^/]+\/bundle\/macos\/Cadence\.app$/);
+    expect(signIndex).toBeGreaterThan(commands.indexOf(tauri));
+    expect(signIndex).toBeLessThan(commands.findIndex(({ tool, args }) => tool === "codesign" && args[0] === "--display"));
+    expect(commands.filter(({ tool, args }) => tool === "python3" && args[0]?.endsWith("verify-entitlements.py"))).toHaveLength(1);
+    expect(commands.some(({ tool, args }) => tool === "python3" && /verify-(dmg|updater-archive)\.py$/.test(args[0] ?? ""))).toBe(false);
+    const app = path.join(devPath(), "bundle", "macos", "Cadence.app");
+    expect(existsSync(app)).toBe(true);
+    expect(existsSync(builtApp())).toBe(false);
+    expect(readFileSync(path.join(app, "Contents", "MacOS", "cadence"), "utf8")).not.toContain("app.cadence.desktop.auth.legacy-qa");
+    const report = JSON.parse(readFileSync(path.join(devPath(), "dev-verification.json"), "utf8"));
+    expect(report).toMatchObject({ milestone: "dev-signed build", version: "0.1.1-dev.1", app, teamIdentifier: "ABCDEFGHIJ",
+      notarization: "not performed", publication: "not performed",
+      frontendPublicConfiguration: { present: ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY", "VITE_CALENDAR_BROKER_ORIGIN"] },
+      source: { sqliteSchemaVersion: 2, unmergedMigrations: ["0001_initial.sql", "0002_more.sql"] } });
+    expect(JSON.stringify(report)).not.toMatch(/sb_publishable_test|synthetic-password|test@example\.invalid/);
+    expect(result.stdout + result.stderr).not.toContain("synthetic-password");
+    const repeated = run(["dev-build", "0.1.1-dev.1"], env);
+    expect(repeated.status).toBe(1);
+    expect(repeated.stderr).toContain("existing builds are never replaced");
+  });
+
+  it("stages no dev build without the Developer ID signature, the stable feed or an identity", () => {
+    const adHoc = run(["dev-build", "0.1.1-dev.1"], devEnvironment({ TEST_PRODUCTION_SIGNING: "" }));
+    expect(adHoc.status).toBe(1);
+    expect(adHoc.stderr).toContain("expected Developer ID authority");
+    expect(existsSync(devPath())).toBe(false);
+    expect(existsSync(builtApp())).toBe(true);
+    const unreviewed = run(["dev-build", "0.1.1-dev.2"], devEnvironment({ APPLE_SIGNING_IDENTITY: "",
+      CADENCE_UPDATER_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json" }));
+    expect(unreviewed.status).toBe(1);
+    expect(unreviewed.stderr).toMatch(/stable feed[\s\S]*APPLE_SIGNING_IDENTITY/);
+    expect(run(["dev-build", "0.1.0-dev.1"], devEnvironment()).stderr).toContain("above the source version 0.1.0");
+    expect(existsSync(devPath("0.1.1-dev.2"))).toBe(false);
   });
 
   it("rejects a production build when the fresh frontend omits reviewed public auth", () => {

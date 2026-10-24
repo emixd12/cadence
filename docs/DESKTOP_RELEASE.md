@@ -417,6 +417,91 @@ target with the verified app. It rejects missing, surplus, duplicate, unsafe,
 and unsupported entries without extracting archive-controlled paths. The resulting local JSON report lists
 artifact hashes and explicitly excludes upgrade preservation and publication.
 
+## Dev-signed builds
+
+Use dev-signed builds to test desktop changes on the owner's Macs
+(`docs/DECISIONS.md`, 2026-10-23). They carry the production Developer ID
+signature, entitlements and provisioning profile, so Keychain sessions, location
+permission and notifications use the same app identity as a release. The saved
+Keychain session carried over from release 0.1.2 to the first dev build on October 23,
+2026. Location and notification grants are expected to carry over too, not yet
+verified. Dev builds have no
+notarization, DMG or updater archive, and are never published. Ad hoc previews cannot
+replace them: previews omit the entitlements, use the legacy login Keychain, and macOS
+treats each preview as a new app.
+
+Build from main, or from a branch whose SQLite migrations match `origin/main`, with
+Node 24, then install:
+
+```bash
+"$HOME/Library/Application Support/Cadence Release/dev-signed-env.sh" node apps/desktop/scripts/release.mjs dev-build 0.1.6-dev.1
+node apps/desktop/scripts/install-dev-build.mjs 0.1.6-dev.1
+```
+
+`dev-check <version>` runs the same preflight without building. The environment
+helper lives outside the repository. It exports the public values, the stable feed,
+`APPLE_SIGNING_IDENTITY` and `CADENCE_APPLE_PROVISIONING_PROFILE`, and unsets the
+notarization credentials and the updater key. To recreate it, use the variables in
+"Local preparation" without those secrets.
+
+Number dev builds `X.Y.Z-dev.N` and never reuse one. `dev-build` requires `X.Y.Z`
+above the source version in `tauri.conf.json`. Also keep `X.Y.Z` above every built
+candidate: after the 0.1.5 candidate, use `0.1.6-dev.N`. Dev builds compile in the
+stable feed, so the next published release replaces them through the normal updater,
+and the feed never offers an older release.
+
+`dev-build` gives the Tauri build no Apple credential and no updater key, so Tauri
+signs ad hoc and cannot notarize. The command then signs the app with the Developer ID
+identity, hardened runtime and `Entitlements.plist`, without a secure timestamp. Only
+notarization needs a timestamp, and requesting one contacts Apple's timestamp server,
+so no `dev-build` step contacts Apple. One signature covers the app because it has a
+single executable; the command stops if the bundle gains nested code. It verifies the
+Developer ID authority, hardened runtime, arm64, the macOS 14 minimum, the production
+Keychain path, and that the signed entitlements and embedded profile match. It stages
+the app and `dev-verification.json` in the Spotlight-excluded
+`~/Library/Application Support/Cadence Release/dev-builds/<version>/` and removes the
+build copy from the checkout. The report records the source commit, branch, clean
+state, SQLite schema version and any migration that differs from `origin/main`.
+
+`install-dev-build.mjs`:
+
+1. Refuses a staged app that no longer matches its report or Developer ID signature,
+   a version at or below the installed one, and migrations that differ from
+   `origin/main`. Pass `--allow-unmerged-migrations` only on the owner's instruction:
+   if such a migration changes before it merges, later builds cannot open the database.
+2. Refuses while any Cadence build runs, including `desktop:dev`. It never quits
+   Cadence, because quitting discards unsaved drafts.
+3. Saves a consistent database copy (`before.sqlite3`) with its integrity,
+   foreign-key, schema and row-count checks, and a ZIP of the installed app. They go
+   to `~/Library/Application Support/Cadence Release/dev-installs/<UTC time>-<version>/`
+   with modes 0700 and 0600. A failed check stops before installation.
+4. Copies the new app beside `/Applications/Cadence.app` and swaps by rename. A failed
+   swap or signature check puts the previous app back. It then removes the staged copy.
+5. Opens the installed path, waits up to 60 seconds for the built schema, and checks
+   an `after.sqlite3` copy. Fewer rows in a table produce a warning, not a failure,
+   because account sync can delete rows. `--no-launch` skips this step.
+
+Output names paths, hashes, versions, counts and check results, never record content.
+
+To roll back, quit Cadence, keep the dev app, and restore the previous app from the
+protected folder:
+
+```bash
+ditto -c -k --keepParent --sequesterRsrc /Applications/Cadence.app "<folder>/Cadence-<dev version>.zip"
+rm -rf /Applications/Cadence.app
+ditto -x -k "<folder>/Cadence-<previous version>.zip" /Applications
+```
+
+If the schema advanced, the previous app refuses the database ("The local database
+needs a newer Cadence version."). Restoring `before.sqlite3` discards every change
+made since the copy, so it needs the owner's instruction. With Cadence quit, delete
+`cadence.sqlite3-wal` and `cadence.sqlite3-shm`, then copy `before.sqlite3` to
+`cadence.sqlite3` with mode 0600.
+
+Dev-signed builds do not establish notarization, Gatekeeper on a downloaded copy, the
+DMG, updater installation from the feed, or macOS 14 compatibility. Those stay release
+gates.
+
 ## Local signature fixture
 
 With Minisign installed, run:
