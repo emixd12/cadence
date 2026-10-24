@@ -223,7 +223,7 @@
     {
       "id": "INT-MKT-012",
       "classification": "external_provider",
-      "reason": "The disclosed macOS preview release and its assets are hosted by GitHub."
+      "reason": "The signed macOS release and its assets are hosted by GitHub."
     },
     {
       "id": "INT-SHELL-001",
