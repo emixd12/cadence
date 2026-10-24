@@ -10,6 +10,7 @@ import {
   diffBriefingConfigs, reviewBriefingReading,
 } from "@cadence/core/services/briefing-review";
 import type { BenchCaseSummary, BenchDisposition, BenchFeedback, BenchPreference, BenchProposal } from "@/lib/services/briefing-bench-store";
+import { isEmptyBriefing } from "@cadence/core/services/daily-brief-presentation";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 
 /** One output shown in a reading column, from a saved run or an unsaved response. */
@@ -50,6 +51,12 @@ type InspectorAnalysis = {
 } | null;
 
 /** Behavior titles by opaque ref, read from the facts the run used. */
+/** The run's configured word cap, so each side's reading target matches its own preset. */
+function configuredMaxWords(inspector: unknown): number | undefined {
+  const value = inspector && typeof inspector === "object" ? (inspector as { config?: { length?: { maxWords?: unknown } } }).config?.length?.maxWords : undefined;
+  return typeof value === "number" ? value : undefined;
+}
+
 export function behaviorTitles(inspector: unknown): Map<string, string> {
   const facts = inspector && typeof inspector === "object" ? (inspector as { facts?: { cadence?: { occurrences?: { behaviorRef?: string; title?: string }[] } } }).facts : null;
   return new Map((facts?.cadence?.occurrences ?? []).flatMap((item) => item.behaviorRef && item.title ? [[item.behaviorRef, item.title] as const] : []));
@@ -91,6 +98,7 @@ function ReadingReview({ run, text }: { run: ViewRun; text: string }) {
   const review = reviewBriefingReading({
     visibleText: text,
     behaviorTitles: [...behaviorTitles(run.inspector).values()],
+    maxWords: configuredMaxWords(run.inspector),
     segments: [
       { label: "overview", text: run.briefing.text },
       ...(run.briefing.suggestions ?? []).map((item, index) => ({ label: `suggestion ${index + 1}`, text: item.text })),
@@ -98,19 +106,21 @@ function ReadingReview({ run, text }: { run: ViewRun; text: string }) {
     ],
   });
   return <div className="space-y-1 text-sm" aria-label="Reading review">
-    <p>{review.visibleWords} visible words · target {review.target.minWords}–{review.target.maxWords}{review.position === "within" ? "" : review.position === "above" ? " · longer than target" : " · shorter than target"}</p>
+    <p>{review.visibleWords} visible words · {review.target.minWords ? `target ${review.target.minWords}–${review.target.maxWords}` : `cap ${review.target.maxWords}`}{review.position === "within" ? "" : review.position === "above" ? " · longer than target" : " · shorter than target"}</p>
     {review.repeated.map((item) => <p key={item.between.join()}>Repeats “{item.phrase}” in {item.between[0]} and {item.between[1]}.</p>)}
     {review.mechanicsTerms.length ? <p>Internal terms: {review.mechanicsTerms.join(", ")}.</p> : null}
   </div>;
 }
 
-export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChanged }: {
+export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChanged, onEstimateReview }: {
   side: "A" | "B";
   title: string;
   run: ViewRun | null;
   runs?: readonly ViewRun[];
   onSelectRun?: (id: string) => void;
   draftChanged: boolean;
+  /** Ticket 188: saves the owner's typical length for one estimated Behavior; absent for unsaved runs. */
+  onEstimateReview?: (input: EstimateReviewInput) => void;
 }) {
   const [visibleText, setVisibleText] = useState("");
   // The wrapper remounts per run (keyed below), so this measures each rendered output once.
@@ -127,9 +137,11 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
       <p className="text-sm">{run.label} · {run.state === "cancelled" ? "cancelled before completion" : `${run.validation}; ${run.latencyMs} ms`}{draftChanged ? " · the draft has changed since this run" : ""}</p>
       <div key={run.id ?? JSON.stringify(run.briefing ?? run.error ?? run.state)} ref={measure} className="bg-background pt-10 font-sans">
         {run.state === "cancelled" ? <p className="text-sm">No output. The request was cancelled.</p>
+          : run.state === "ready" && run.briefing && isEmptyBriefing(run.briefing) ? <p className="text-sm">No brief shown. Nothing needed attention and no tip was selected (recipe 1.2).</p>
           : <DailyBriefBubble state={run.state === "ready" ? "ready" : "error"} briefing={run.briefing} message={run.error} onDismiss={() => undefined} />}
       </div>
       <ReadingReview run={run} text={visibleText} />
+      <DurationEstimates run={run} onSave={onEstimateReview} />
       <details><summary className="min-h-11 cursor-pointer py-2">Evidence and selection</summary><AnalysisSummary inspector={run.inspector} /></details>
       <details><summary className="min-h-11 cursor-pointer py-2">Inputs, duration sources, versions and planner inspector</summary>
         <p className="text-sm">Input decisions show exclusions, source selection and sample coverage. Excluded raw values stay absent. Catalog ID validity does not prove support.</p>
@@ -137,6 +149,49 @@ export function ReadingColumn({ side, title, run, runs, onSelectRun, draftChange
       </details>
     </>}
   </section>;
+}
+
+export type EstimateReviewInput = Readonly<{ runId: string; behaviorRef: string; actualMinutes: number | null; comment: string }>;
+
+type EstimateReport = Readonly<{
+  state: "not_requested" | "none_needed" | "ready" | "failed";
+  items: readonly Readonly<{ behaviorRef: string; title: string; description: string }>[];
+  estimates: readonly Readonly<{ behaviorRef: string; minutes: number | null; basis: "stated" | "inferred" }>[];
+}>;
+
+const ESTIMATE_STATE_LABELS: Record<EstimateReport["state"], string> = {
+  not_requested: "Not requested.",
+  none_needed: "Every Behavior already had a recorded duration or no description.",
+  ready: "Estimated from descriptions.",
+  failed: "The estimate call failed; durations stayed unknown.",
+};
+
+/** Ticket 188 review surface: each description, its estimate, and the owner's typical length. */
+function DurationEstimates({ run, onSave }: { run: ViewRun; onSave?: (input: EstimateReviewInput) => void }) {
+  const report = run.inspector && typeof run.inspector === "object" ? (run.inspector as { durationEstimates?: EstimateReport }).durationEstimates : undefined;
+  const [drafts, setDrafts] = useState<Record<string, { minutes: string; comment: string }>>({});
+  if (!report || report.state === "not_requested") return null;
+  return <details><summary className="min-h-11 cursor-pointer py-2">Duration estimates from descriptions</summary>
+    <p className="text-sm">{ESTIMATE_STATE_LABELS[report.state]} Estimates are lower priority than default durations and tracked sessions.</p>
+    <ul className="space-y-3 text-sm">{report.items.map((item) => {
+      const estimate = report.estimates.find((entry) => entry.behaviorRef === item.behaviorRef);
+      const draft = drafts[item.behaviorRef] ?? { minutes: "", comment: "" };
+      const minutes = draft.minutes.trim() ? Number(draft.minutes) : null;
+      const valid = (minutes === null || (Number.isInteger(minutes) && minutes >= 1 && minutes <= 480)) && (minutes !== null || !!draft.comment.trim());
+      return <li key={item.behaviorRef} className="space-y-1 border-t pt-2">
+        <p><strong>{item.title}</strong> · {estimate?.minutes ? `about ${estimate.minutes} min (${estimate.basis})` : "no estimate"}</p>
+        <p className="whitespace-pre-wrap break-words text-muted-readable">{item.description}</p>
+        {onSave && run.id ? <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1">Your typical minutes<input aria-label={`Typical minutes for ${item.title}`} inputMode="numeric" className="min-h-11 w-28 border p-2" value={draft.minutes}
+            onChange={(event) => setDrafts({ ...drafts, [item.behaviorRef]: { ...draft, minutes: event.target.value } })} /></label>
+          <label className="grid min-w-0 flex-1 gap-1">Comment (optional)<input aria-label={`Estimate comment for ${item.title}`} className="min-h-11 w-full border p-2" value={draft.comment}
+            onChange={(event) => setDrafts({ ...drafts, [item.behaviorRef]: { ...draft, comment: event.target.value } })} /></label>
+          <button type="button" disabled={!valid} className="min-h-11 border px-3 disabled:opacity-50"
+            onClick={() => { onSave({ runId: run.id!, behaviorRef: item.behaviorRef, actualMinutes: minutes, comment: draft.comment.trim() }); setDrafts({ ...drafts, [item.behaviorRef]: { minutes: "", comment: "" } }); }}>Save</button>
+        </div> : null}
+      </li>;
+    })}</ul>
+  </details>;
 }
 
 export function RunDifferences({ a, b }: { a: ViewRun | null; b: ViewRun | null }) {

@@ -657,7 +657,7 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
 
 function validateDurationCandidates(value: unknown): void {
   const candidates = record(value, "occurrence.durationCandidates");
-  exactKeys(candidates, ["configuredDefault", "historicalAverage"], "occurrence.durationCandidates");
+  exactOptionalKeys(candidates, ["configuredDefault", "historicalAverage"], ["descriptionEstimate"], "occurrence.durationCandidates");
   if (candidates.configuredDefault !== null) {
     validateDuration(candidates.configuredDefault);
     const configured = record(candidates.configuredDefault, "occurrence.durationCandidates.configuredDefault");
@@ -666,6 +666,11 @@ function validateDurationCandidates(value: unknown): void {
   validateDuration(candidates.historicalAverage);
   const historical = record(candidates.historicalAverage, "occurrence.durationCandidates.historicalAverage");
   if (historical.kind === "known" && historical.source !== "completed_stopped_occurrence_mean") fail("Historical average duration candidate is invalid.");
+  if (candidates.descriptionEstimate !== undefined && candidates.descriptionEstimate !== null) {
+    validateDuration(candidates.descriptionEstimate);
+    const estimate = record(candidates.descriptionEstimate, "occurrence.durationCandidates.descriptionEstimate");
+    if (estimate.kind !== "known" || estimate.source !== "description_estimate") fail("Description estimate duration candidate is invalid.");
+  }
 }
 
 function validateDuration(value: unknown): void {
@@ -673,7 +678,7 @@ function validateDuration(value: unknown): void {
   if (duration.kind === "known") {
     exactKeys(duration, ["kind", "seconds", "source", "sampleCount", "lookbackDays"], "duration");
     positive(duration.seconds, "duration.seconds");
-    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean") fail("duration.source is invalid.");
+    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean" && duration.source !== "description_estimate") fail("duration.source is invalid.");
   } else if (duration.kind === "unknown") {
     exactKeys(duration, ["kind", "reason", "sampleCount", "lookbackDays"], "duration");
     if (duration.reason !== "insufficient_samples" && duration.reason !== "history_limit_exceeded") fail("duration.reason is invalid.");

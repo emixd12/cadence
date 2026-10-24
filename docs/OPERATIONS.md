@@ -2129,3 +2129,48 @@ consent RPC in place of Ticket 227's future UI. It deletes its synthetic user
 and registrations and stops its own development server. It never reads or
 copies `.env.local`; local Supabase keys enter the child environment in memory.
 A clean isolated database reset and generated-type comparison remain required.
+
+## Agent Calendar grant (Ticket 187)
+
+Implementation checklist: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+The rollout requires corrected AI disclosures and a demonstrated barrier against older AI readers.
+
+Ticket 187 separates AI Calendar access from Timeline Calendar access. Cadence sign-in stays unchanged.
+The existing standard client remains non-agentic; confirm that classification before rollout.
+Daily Brief and private workbench current/historical reads use a new agent client exclusively.
+No Workspace MCP endpoint or additional Google scope is introduced.
+
+Provision the agent client in a different Google Cloud project from both standard Calendar and sign-in.
+Google token revocation affects grants across clients within one project.
+Configure these server-only values alongside the existing Calendar settings:
+
+- `GOOGLE_CALENDAR_PROJECT_ID`: actual standard Calendar project ID.
+- `GOOGLE_CALENDAR_AGENT_PROJECT_ID`: actual, distinct agent Calendar project ID.
+- `GOOGLE_CALENDAR_AGENT_CLIENT_ID` and `GOOGLE_CALENDAR_AGENT_CLIENT_SECRET`: the agent client.
+
+The agent client uses the same HTTPS callback path and encryption keyring as standard Calendar.
+Register the active callback on the agent client. Register the legacy callback only if that origin remains supported.
+Runtime rejects missing agent credentials, equal project IDs, and equal client IDs. It never falls back to standard credentials.
+Project IDs are configuration assertions; verify actual client ownership and agentic classification in Google Console.
+Complete consent-screen branding, authorized domains, Calendar API enablement, and sensitive-scope verification for the new project.
+Do not copy standard refresh tokens or change the standard client ID.
+
+Rollout order:
+1. Confirm both project/client inventories, classification, callbacks, scopes and verification with an authorized Google owner session.
+2. Keep AI Calendar requests unavailable during the migration/application cutover. Do not run old AI readers against newly enabled agent preferences.
+3. Apply `20261022180000_separate_agent_calendar_grant.sql` through the approved Supabase migration workflow, then deploy the matching server source.
+4. Add verified agent configuration. The migration clears old Calendar disclosures and outstanding brief attempts for those accounts only.
+5. Obtain fresh consent in **Google Calendar for Daily Brief**, select calendars, and enable Calendar separately in **Daily Brief**.
+6. Verify web and an installed desktop build with both grants. Disconnect each independently; verify the other still reads Calendar and sign-in works.
+7. Check denied consent, Workspace policy rejection, revoked refresh, missing configuration, replay, wrong account and account deletion.
+8. Record sanitized evidence in `docs/qa/2026-10-12-agentic-calendar.md` before closing Ticket 187.
+
+Agent credentials, attempts, preferences, generations and pending requests are separate from standard Calendar.
+Desktop uses a separate Keychain pending-state entry, the hosted broker, and no agent event cache.
+Account deletion cascades both grants and attempts provider revocation after Auth deletion succeeds.
+A Google revocation outage leaves local credentials deleted and reports the existing manual-removal warning.
+Pre-separation workbench cases containing Calendar data remain locally reviewable, but cannot be rerun against the model.
+
+Rollback removes agent configuration and disables Calendar disclosure. Preserve the standard connection and additive schema.
+Do not roll back to source that sends standard-grant Calendar data to AI. Behavior-only briefing can remain enabled.
+The email's November 11/12 dates remain notice evidence; live classification is a separate verification gate.

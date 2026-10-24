@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isLaneRecipe } from "@cadence/core/types/briefing-config";
 import { Temporal } from "@js-temporal/polyfill";
 import { parseBriefingConfig } from "@cadence/core/services/briefing-config";
 import { BRIEFING_ANALYSIS_LANES } from "@cadence/core/resolvers/briefing-analysis.resolver";
@@ -27,11 +28,12 @@ export type BriefingSequenceResult = Readonly<{
 export type BriefingSequencePlan = Readonly<{
   caseIds: readonly string[]; mode: "daily" | "diagnostic"; plannedCalls: number; callBudget: number;
   warmup: readonly BriefingSequenceHistory[];
-  spacing: "one_tip_per_day_skip_different_tip_next_day";
+  /** One tip per day; whether a different tip may follow the next day is reported per side. */
+  spacing: "one_tip_per_day";
   assumption: "Selected tips are assumed delivered in this no-model simulation; generation records only retained successful tips.";
   days: readonly Readonly<{ caseId: string; localDate: string; evidenceType: BenchCaseDetail["case"]["evidenceType"];
     selections: readonly Readonly<{ side: 0 | 1; candidateId: string; tipId: string | null; fingerprint: string | null;
-      decisions: readonly Readonly<{ findingId: string; decision: string }>[]; eligibleLanes: readonly BriefingAnalysisLaneId[]; cooldownDays: number }>[] }> [];
+      decisions: readonly Readonly<{ findingId: string; decision: string }>[]; eligibleLanes: readonly BriefingAnalysisLaneId[]; cooldownDays: number; nextDaySpacing: boolean }>[] }> [];
   budget: BriefingBenchBudgetSnapshot;
 }>;
 export type BriefingSequenceStatus = Readonly<{
@@ -108,12 +110,12 @@ function planSequence(input: SequenceInput, details: BenchCaseDetail[]) {
         label: `${input.candidates[index]!.label.slice(0, 45)} · ${laneId}`, parentCandidateId: detail.candidates.some(candidate => candidate.id === input.candidates[index]!.id) ? input.candidates[index]!.id : null },
         config: parseBriefingConfig({ ...config, analysis: { ...config.analysis, lanes: [laneId], maxTips: 1 } }), laneId });
       return { side, candidateId: input.candidates[index]!.id, tipId: prepared.analysis?.selection.tipId ?? null,
-        fingerprint: prepared.analysis?.fingerprint ?? null, decisions: prepared.analysis?.selection.decisions ?? [], eligibleLanes, cooldownDays: config.analysis.cooldownDays };
+        fingerprint: prepared.analysis?.fingerprint ?? null, decisions: prepared.analysis?.selection.decisions ?? [], eligibleLanes, cooldownDays: config.analysis.cooldownDays, nextDaySpacing: !isLaneRecipe(config.recipe) };
     });
     return { caseId: detail.case.id, localDate: detail.case.localDate, evidenceType: detail.case.evidenceType, selections };
   });
   const plan: BriefingSequencePlan = { caseIds: details.map(detail => detail.case.id), mode: input.mode, plannedCalls: tasks.length, callBudget: input.callBudget,
-    warmup: input.warmup, spacing: "one_tip_per_day_skip_different_tip_next_day",
+    warmup: input.warmup, spacing: "one_tip_per_day",
     assumption: "Selected tips are assumed delivered in this no-model simulation; generation records only retained successful tips.", days, budget: briefingBenchBudget().snapshot() };
   return { plan, tasks };
 }

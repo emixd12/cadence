@@ -12,10 +12,20 @@ export type DailyBriefing = Readonly<{
   expiresAt: string;
   coverage: "complete" | "partial";
   warnings: readonly string[];
-  suggestions?: readonly Readonly<{ text: string; occurrenceRefs: readonly string[]; referenceIds: readonly string[]; optionId: string | null; option?: BriefingPlanOption }>[];
+  /** Recipe 1.2 adds `behavior`, the moved Behavior's title, taken from the facts rather than model text. */
+  suggestions?: readonly Readonly<{ text: string; occurrenceRefs: readonly string[]; referenceIds: readonly string[]; optionId: string | null; option?: BriefingPlanOption; behavior?: string }>[];
   references?: readonly BriefingReference[];
-  /** Optional pattern tip (Ticket 173). `basis` and `limitation` are deterministic, not model text. */
-  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null }>;
+  /**
+   * Optional pattern tip (Ticket 173). `basis`, `limitation` and `category` are
+   * deterministic, not model text. Recipes 1.1 and 1.2 set `category`; absent means a pattern tip.
+   * Recipe 1.2's `setup` tip is written by Cadence, not the model.
+   */
+  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null; category?: "pattern" | "logging" | "setup" }>;
+  /**
+   * Recipe 1.2: today's Behavior titles that appear in the visible text, longest first,
+   * so the bubble can highlight them. Deterministic; never model text.
+   */
+  behaviorNames?: readonly string[];
   versions?: Readonly<{ configuration: string; references: string; planner: string; pipeline: string; recipe?: string; policy?: string }>;
 }>;
 

@@ -91,8 +91,9 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
       window.dispatchEvent(new CustomEvent("cadence:daily-brief-settings", { detail: updated }));
     }).catch((failure: unknown) => {
       setError(!(failure instanceof DailyBriefRequestError) ? "Daily Brief settings are unavailable."
-        : failure.code === "source_unavailable" ? "That source is not connected or has no selected calendar, so Cadence could not allow it. Check Connectors, then try again."
-          : "Cadence could not save Daily Brief settings.");
+        : failure.code === "calendar_unavailable" ? "Connect Google Calendar for Daily Brief and select calendars before enabling Calendar here."
+          : failure.code === "source_unavailable" ? "That source is not connected or has no selected calendar, so Cadence could not allow it. Check Connectors, then try again."
+            : "Cadence could not save Daily Brief settings.");
     }).finally(() => setSaving(false));
   };
 
@@ -103,10 +104,13 @@ export function DailyBriefSettingsPanel({ client, desktop = false }: Readonly<{ 
           <input type="checkbox" checked={settings.enabled} disabled={saving} onChange={(event) => save({ enabled: event.target.checked })} />
           <span>Enable Daily Brief</span>
         </label>
-        <label className="flex min-h-11 items-center gap-3">
-          <input type="checkbox" checked={settings.includeCalendar} disabled={!settings.enabled || saving} onChange={(event) => save({ includeCalendar: event.target.checked })} />
-          <span>Include selected Google Calendar timing</span>
-        </label>
+        <div>
+          <label className="flex min-h-11 items-center gap-3">
+            <input type="checkbox" checked={settings.includeCalendar} disabled={!settings.enabled || saving} aria-describedby="daily-brief-calendar-disclosure" onChange={(event) => save({ includeCalendar: event.target.checked })} />
+            <span>Include calendars selected in Google Calendar for Daily Brief</span>
+          </label>
+          <p id="daily-brief-calendar-disclosure" className="max-w-2xl pl-7 text-muted-readable">Sends today’s event times, timezone, availability and your response for those calendars. Event titles, descriptions, locations and attendees are not sent. Your Timeline Google Calendar connection is never used.</p>
+        </div>
         {settings.optionalSources?.reminders ? <div>
           <label className="flex min-h-11 items-center gap-3">
             <input type="checkbox" checked={settings.includeReminderHistory === true} disabled={!settings.enabled || saving} aria-describedby="daily-brief-reminder-disclosure" onChange={(event) => save({ includeReminderHistory: event.target.checked })} />

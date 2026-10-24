@@ -923,7 +923,7 @@ The accepted criteria and exact profile definition are in
 
 | Profile | Iteration | Coverage | Evaluation state | Outcome |
 |---|---|---|---|---|
-| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Pending; no new model runs | No candidate accepted |
+| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Freeze refreshed October 16 at `575a48d`; no model runs yet | No candidate accepted |
 
 Future records identify profile revision and iteration separately. Keep exact
 candidate/baseline versions, source freeze, local report references, reading burden,
@@ -931,3 +931,142 @@ repeat rationale and failures with each iteration. Retain prior rows and profile
 revisions. Do not count seven days as seven independent sequence-quality votes.
 This update records criteria and starts the existing workbench; it does not change
 runtime prompts, presets, cooldowns or the production reading policy.
+
+### Ticket 184 iteration 1 — tuning pass 1, October 16, 2026
+
+Profile `daily-brief-balanced@1`, iteration 1, source `575a48d` (freeze
+`ticket184-iter1-20261016`). A `cadence-default`, B `advisor-analysis`, model
+`gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`. The local server ran on
+Node 22.22.3 at `127.0.0.1:4323` because Node 24 is not installed and Docker holds 4321.
+T1–T6 ran once each: 12 calls, 12 passed, none withheld. Held-out H1–H10 and S1 were not run.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| T1 | Neither | Remove "no scheduled change" statements; suggest or stay silent. |
+| T2 | No explicit pick; prefers B's sections | Too technical in both; nest tip evidence; drop causal disclaimer. |
+| T3 | B | Repetition. |
+| T4 | B (best) | Future one-click rescheduling logged in `docs/FUTURE_UPDATES.md`. |
+| T5 | B (best overall) | Give logging-habit tips distinct formatting. |
+| T6 | Neither | Do not mention the absence of conflicts. |
+
+Exact comments are stored as feedback records in the local synthetic cases.
+Eight proposals (P0–P7) for candidate 2 are stored beside them and pass the workbench validator.
+Not proposed for candidate 2: duration estimates from Behavior descriptions conflict with
+the current duration contract (`docs/PRODUCT_SPEC.md`) and need a separate decision.
+Suggesting a refresh after a brief's times pass belongs with Ticket 185's expiry choices.
+No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 2 (candidate 2), October 16, 2026
+
+Source `600f423`. Rerun candidate on each saved T1–T6 case with `advisor-analysis-2`
+(recipe `daily_brief@1.1`, label "Candidate 2", parent = the pass 1 candidate).
+6 calls, 6 passed. Synthetic fixtures carry no descriptions, so no estimate calls ran.
+Agent observations, pending owner review: T1–T3 now give one concrete suggested time;
+T6 says "Nothing is left on today's schedule."; T4 and T5 still say "buffer"; T4 still
+mentions an opening it does not suggest; the T5 realistic-timing tip mixes scheduling
+and logging advice; T2 calls a recorded 20-minute length "approximate".
+
+### Ticket 184 iteration 1 — owner review of candidate 2, October 23, 2026
+
+The owner reviewed one account comparison and T1–T6 pass 2. A was `cadence-default`
+and B was candidate 2. The account comparison ran October 16 on live account data,
+with Calendar and Behavior descriptions included. The review made no new model calls.
+Exact comments are stored as feedback records in each local case. Agent notes inside
+a comment are labeled.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| Account | Neither | The B logging tip is repetitive; remove superfluous text. |
+| T1 | B | Give each kind of suggestion its own formatting. |
+| T2 | B | Still robotic. State the overlap length. Use what the Behavior is to judge whether it needs time between items. |
+| T3 | B | Overlap length is still missing. The move is unclear. Replace the repeated time with one "New suggested time". |
+| T4 | B (closest to the target) | Logging tip formatting and natural move wording work. B offers 7:00 AM, then suggests 12:25 PM; mention one move once. |
+| T5 | No pick | Do not describe a free slot for a Behavior that has no conflict. The tip mixes logging and scheduling advice. Use defined advice lanes, such as Logging tip and New suggested time. Format Behavior names. |
+| T6 | Neither | Do not say there is no issue, and do not show this brief. Show a logging tip or other history-based advice instead. |
+
+The T4 and T6 preferences were inferred from the owner's wording, not stated as a pick.
+The agreed agent observations were: one move stated two or three times, "buffer" and
+"transition room", "approximate" for recorded lengths, and the T5 tip mixing advice types.
+
+Requirements for candidate 3:
+- One labeled block per advice type. Each block carries one kind of advice only.
+- One move per Behavior, stated once, as a "New suggested time" with the original time.
+- Every overlap states how long it is.
+- Behavior titles and descriptions inform whether a move or spacing matters.
+- Behavior names get distinct formatting in brief text.
+- No sentence reports an absent conflict, a fitting slot or a quiet day.
+- No "buffer", "transition room", "reserved", or "approximate" for recorded lengths.
+
+Owner decision, October 23: relax tip spacing so quiet days can show a history-based
+tip. T6 asked for that advice, but the current policy allows at most one tip, with a
+7–30 day cooldown and one-day spacing. Quiet days would often have no allowed tip and
+an empty brief. Candidate 3 relaxes spacing in its own preset only; production is unchanged.
+
+Agent observation, not owner-reviewed: every brief shows "Suggestions only. No
+changes were applied." even when it has no suggestions.
+
+No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 3 (candidate 3), October 23, 2026
+
+Source: work on `claude/nostalgic-khayyam-34bf80` after `b7ea8af`, committed with this record. Rerun
+candidate on each saved T1–T6 case with `advisor-analysis-3` (recipe `daily_brief@1.2`,
+label "Candidate 3"), model `gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`.
+The local server ran at `127.0.0.1:4325`. 6 calls, 6 passed, none withheld.
+
+| Case | Words | Result |
+|---|---|---|
+| T1 | 35 | Overlap by 20 minutes; one New suggested time block (12:30 → 1:10 PM). |
+| T2 | 102 | Overlap length stated; one move for Behavior 6; a schedule-load Pattern tip. |
+| T3 | 37 | Same shape as T1. |
+| T4 | 89 | One move only (12:25 PM); the 7:00 AM opening is gone; a recording-only Logging tip. |
+| T5 | 51 | Tip only; no sentence about Walk's free slot. |
+| T6 | 0 | No brief shown: no conflict, and the fixture has no tip finding. |
+
+Agent observations, pending owner review: T4 repeats "minutes before your calendar event"
+in the overview and reason, and "ten minutes is preferred" reads mechanically. The T2
+tip is general advice. T6 shows nothing because the `no_issue` fixture offers no
+history finding, so the quiet-day tip path is exercised only by T5. Synthetic names
+such as "Synthetic behavior 6" give the effort rule nothing to judge. Product type is
+weight 400 only, so names use a Cold Surface fill instead of bold.
+
+### Ticket 184 iteration 1 — candidate 3 owner review rounds, October 23, 2026
+
+Same day, the owner reviewed candidate 3 revisions on T1–T2 and on a fresh account case.
+Exact comments are stored as feedback records in each local case.
+
+Synthetic: T1 preferred B, and later B 3.1. The owner asked for overlap placement
+(start, end, all), name chips, and no reason line under a move. T2 (3.2, no pick) asked
+for moves for every conflicting Behavior, not only the smallest change. T3–T6 were
+rerun but not reviewed in this round.
+
+Account case: live account data, captured 12:25 PM New York, with Calendar and
+owner-confirmed workbench-only descriptions. Later revisions reran on the same
+captured inputs and clock. A was `cadence-default` in every row.
+
+| Revision | Owner | What changed after it |
+|---|---|---|
+| 3.3 | B | No moves: one Behavior with no length blocked the rest of the day. The owner asked that unknown lengths block nothing, titles be estimated, a Setup tip nudge for lengths, and the noticed issues be fixed. |
+| 3.4 | — | Lost its estimate call to a stale dev-server module; not reviewed. |
+| 3.5 | B | The helmet overlap was still raised, a move had no reason, one move went unused, and a shortened name got no chip. All agreed. |
+| 3.6 | No pick | All moves went to Behaviors whose time had passed, and the overview was empty. The owner kept those moves: place them in future free time, and let ranges hold only their estimated length. |
+| 3.7 | — | Agent-found planner bugs: ranges were packed into the moved Behavior's slot, and colliding moves jumped to a later gap. |
+| 3.8 | No pick | Correct moves (12:25, 12:38, 1:18 PM). The owner asked for natural sentences instead of three near-identical ones. |
+| 3.9 | B | One combined overview sentence. The owner asked for one "New suggested time" heading with bullets, and for repetition review to ignore Behavior names. |
+
+The owner's broader request is a Behavior profile for the model, weighted per advice
+lane: description, category, duration, location and Note history. It is not implemented.
+It changes the day-context contract and disclosures, so it needs its own ticket.
+The first bullet of the owner's 3.3 feedback was cut off ("We should include") and is unresolved.
+
+Revision 3.9 also covers the 3.9 display follow-ups: one heading with bullets, and names
+skipped in repetition review. Medication timing: the owner kept moves for overdue
+Behaviors, including Daily Injections. Account runs used `cadence-ticket184-account-run`,
+the pre-Ticket-187 worktree, with this candidate patched in uncommitted. This branch's
+Ticket 187 Calendar migration is not on hosted.
+
+Verification at commit: agents, interactions, resolvers, design-system and core checks,
+lint with zero warnings, web and desktop TypeScript, Vitest (3,153 passed, 94 skipped) and
+the web build pass. Earlier full runs had one desktop release test file exceed its 5 s
+limit under load; it passed alone. No candidate is accepted. No production preset,
+schema or hosted change.

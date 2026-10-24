@@ -238,3 +238,20 @@ describe("GoogleCalendarPanel", () => {
     expect(container.textContent).not.toContain("raw OAuth provider detail");
   });
 });
+
+
+it("keeps agent selection separate from Timeline display and model disclosure", async () => {
+  const adapter = coordinator();
+  await act(() => root.render(<GoogleCalendarPanel agent coordinator={adapter} refreshRange={{ startLocalDate: "2026-10-12", endLocalDate: "2026-10-12" }} />));
+  expect(container.textContent).toContain("Google Calendar for Daily Brief");
+  expect(container.textContent).toContain("Connecting does not enable sharing with OpenAI");
+  expect(container.textContent).not.toContain("Show Calendar context on Timeline");
+  expect(container.textContent).not.toContain("Visible on Timeline");
+  await act(() => checkbox("Personal").click());
+  await act(() => button("Save Calendar settings").click());
+  expect(adapter.savePreferences).toHaveBeenCalledWith({ ...defaults(), selectedCalendarIds: ["work", "personal"] });
+  await act(() => button("Refresh Calendar").click());
+  expect(adapter.refreshEvents).not.toHaveBeenCalled();
+  await act(() => button("Disconnect Google Calendar").click());
+  expect(adapter.disconnect).toHaveBeenCalledOnce();
+});

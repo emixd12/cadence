@@ -331,3 +331,25 @@ request verifies a Cadence Bearer token before protocol handling. Cookie session
 never authorize MCP. Scope/rate admission calls the shared integration operation
 layer; user data remains RLS-scoped. Transport limits and verified protocol versions
 are recorded in `MCP_INTEGRATION.md` and `qa/mcp-server.md`.
+
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
+
+## Calendar purpose routing (Ticket 187)
+
+`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
+Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
+`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
+The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
+Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
+Desktop Keychain entries isolate pending standard and agent consent.

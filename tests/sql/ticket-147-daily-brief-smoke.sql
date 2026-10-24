@@ -181,13 +181,13 @@ $$;
 
 reset role;
 
-insert into public.google_calendar_connections (
+insert into public.google_calendar_agent_connections (
   user_id, google_subject, generation, status
 )
 values (
   '14700000-0000-4000-8000-000000000001', 'ticket-147-calendar', 7, 'connected'
 );
-insert into public.google_calendar_preferences (user_id)
+insert into public.google_calendar_agent_preferences (user_id)
 values ('14700000-0000-4000-8000-000000000001');
 
 set local role authenticated;
@@ -209,7 +209,7 @@ begin
 end;
 $$;
 
-update public.google_calendar_preferences
+update public.google_calendar_agent_preferences
 set selected_calendar_ids = array['changed-selection']
 where user_id = '14700000-0000-4000-8000-000000000001';
 

@@ -7,8 +7,9 @@ import { authRequestUrl } from "@/lib/auth/redirects";
 import { listBriefingWorkbenchBehaviors, listDailyBriefBehaviorIds, readDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { briefingFixture, BRIEFING_FIXTURE_IDS, BRIEFING_FIXTURE_VERSION, type BriefingFixtureId } from "./briefing-fixtures";
 import { BRIEFING_PIPELINE_VERSION, briefingConfigurationRevision, prepareBriefing } from "./briefing-pipeline";
-import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefGenerator } from "./daily-brief-consumer";
-import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief } from "./daily-brief-openai";
+import { DAILY_BRIEF_PROMPT_REVISION, generateDailyBrief, DailyBriefError, raceBriefAbort, type DailyBriefGenerator, type DurationEstimateReport } from "./daily-brief-consumer";
+import { DAILY_BRIEF_MODEL, generateOpenAIDailyBrief, generateOpenAIDurationEstimates } from "./daily-brief-openai";
+import { isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import { getDailyBriefSettings } from "./daily-brief.service";
 import { briefingAccountRef, prepareAccountBriefingContexts, workbenchBehaviorRef } from "./briefing-account-context.service";
@@ -64,6 +65,8 @@ export type BriefingComparisonOptions = Readonly<{
   sequenceId?: string;
   diagnosticLane?: BriefingAnalysisLaneId;
   onRetainedTip?: (index: number, fingerprints: readonly string[], localDate: string) => void;
+  /** Ticket 188 estimate call; tests inject it. Defaults to the injected generator or OpenAI. */
+  estimate?: DailyBriefGenerator;
 }>;
 
 export type ReviewCandidateInput = Readonly<{ id: string; label: string; role: "baseline" | "candidate"; parentCandidateId: string | null; proposalId: string | null; rationale: string }>;
@@ -86,7 +89,8 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
     const savedMode = isObject && value.mode === "saved";
     const keys = isObject ? Object.keys(value).filter((key) => key !== "review").sort().join() : "";
     if (!isObject ||
-        (savedMode ? keys !== "accountRef,configs,mode" : accountMode ? keys !== "accountRef,configs,mode,preferenceRevision" : keys !== "configs,fixtureId" && keys !== "analysisFixtureId,configs,fixtureId") ||
+        (savedMode ? keys !== "accountRef,configs,mode" : accountMode ? keys !== "accountRef,configs,mode,preferenceRevision" && keys !== "accountRef,configs,descriptionsConfirmed,mode,preferenceRevision" : keys !== "configs,fixtureId" && keys !== "analysisFixtureId,configs,fixtureId") ||
+        (accountMode && value.descriptionsConfirmed !== undefined && value.descriptionsConfirmed !== true) ||
         (!accountMode && !savedMode && !BRIEFING_FIXTURE_IDS.includes(value.fixtureId)) ||
         (!accountMode && !savedMode && value.analysisFixtureId !== undefined && !BRIEFING_ANALYSIS_FIXTURE_IDS.includes(value.analysisFixtureId)) ||
         (accountMode && (typeof value.accountRef !== "string" || value.accountRef.length > 128 || !Number.isSafeInteger(value.preferenceRevision) || value.preferenceRevision < 0)) ||
@@ -94,6 +98,9 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         !Array.isArray(value.configs) || (savedMode ? value.configs.length < 1 || value.configs.length > 2 : value.configs.length !== 2) ||
         (savedMode && value.review === undefined)) throw new DailyBriefError("invalid_request");
     const configs = value.configs.map(parseBriefingConfig) as BriefingConfig[];
+    // Ticket 188: descriptions leave the server only for configurations that estimate durations.
+    const estimating = configs.map((config) => isPlainRecipe(config.recipe) && config.context.duration.includeDescriptionEstimate === true);
+    const descriptionsConfirmed = accountMode && value.descriptionsConfirmed === true && estimating.some(Boolean);
     const review = value.review === undefined ? null : parseReview(value.review, configs.length);
     if (!generate && !process.env.OPENAI_API_KEY) return json({ error: "not_configured" }, 503);
     const compare = async (caller?: CalendarCaller) => {
@@ -111,7 +118,8 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
       if (preferences && accountMode && preferences.revision !== value.preferenceRevision) throw new DailyBriefError("access_denied");
       if (saved && caller && preferences) await assertSavedCaseAuthorized(caller, preferences, saved.case, signal);
       let reservation: BriefingBenchReservation;
-      try { reservation = options.reservation ?? briefingBenchBudget().reserve(configs.length); }
+      const estimateCalls = descriptionsConfirmed || saved?.case.inputs?.descriptions ? estimating.filter(Boolean).length : 0;
+      try { reservation = options.reservation ?? briefingBenchBudget().reserve(configs.length + estimateCalls); }
       catch (error) { if (caller) throw new DailyBriefError("rate_limited", 3600); throw error; }
       try {
         const account = caller && !saved ? await raceBriefAbort(prepareAccountBriefingContexts(caller, {
@@ -122,6 +130,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             includeReminders: configs.some(config => config.analysis.lanes.includes("reminder-effectiveness")),
             includeNotes: configs.some(config => config.analysis.lanes.includes("notes-failure-themes")),
           } } : {}),
+          ...(descriptionsConfirmed ? { descriptions: { ownerConfirmed: true as const } } : {}),
         }), signal) : null;
         // The workbench never requests separately disclosed connector sources, so account contexts stay Google-only `1.0`.
         const accountContexts = account ? account.contexts.map((context) => validateAdvisorDayContext(context)) : null;
@@ -138,6 +147,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
           source: account ? { mode: "account", accountRef: ownerRef!, preferenceRevision: preferences!.revision }
             : { mode: "synthetic", fixtureId, fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
           capture: account ? {
+            calendarGrantPurpose: "agent",
             historyDays: [...new Set(configs.map(config => config.scope.historyDays))],
             includeCalendar: configs.some(config => config.scope.includeCalendar) && account.preferences.includeCalendar,
             calendarDisclosed: account.preferences.includeCalendar,
@@ -148,8 +158,10 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             remindersDisclosed: account.preferences.includeReminderHistory,
             includeNotes: configs.some(config => config.analysis.lanes.includes("notes-failure-themes")) && account.preferences.includeNotes,
             notesDisclosed: account.preferences.includeNotes,
+            ...(account.descriptions ? { descriptionsDisclosed: "workbench_owner_confirmed" as const } : {}),
           } : null,
-          inputs: account && accountContexts ? { contexts: accountContexts, analysisSource: account.analysisSource, configurationRefs: account.configurationRefs } : null,
+          inputs: account && accountContexts ? { contexts: accountContexts, analysisSource: account.analysisSource, configurationRefs: account.configurationRefs,
+            ...(account.descriptions ? { descriptions: account.descriptions } : {}) } : null,
         }) : null;
         const attemptId = randomUUID();
         const runIds: string[] = [];
@@ -161,6 +173,10 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             shown: options.diagnosticLane ? [] : options.shown?.[index] ?? [], fingerprintOf: benchCaseFingerprint(saved?.case),
             ...(saved?.case.evidenceType === "retrospective" ? { cadenceComplete: false } : {}) };
           const prepared = prepareBriefing(context, config, context.capturedAt, analysis);
+          const descriptions = estimating[index] ? replay?.descriptions ?? account?.descriptions ?? undefined : undefined;
+          // The estimate step can change durations, so inspect what was actually planned.
+          let planned: Readonly<{ prepared: typeof prepared; estimates: DurationEstimateReport }> | null = null;
+          const inspected = () => planned ? { ...planned.prepared, durationEstimates: planned.estimates } : prepared;
           const start = Date.now();
           let retainedFingerprints: readonly string[] = [];
           const record = async (entry: { state: "ready" | "error" | "cancelled"; briefing?: DailyBriefing; error?: string; validation: string }) => {
@@ -168,7 +184,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             const id = randomUUID();
             const run: BenchRun = { schemaVersion: BRIEFING_BENCH_SCHEMA_VERSION, kind: "run", id, caseId: review.caseId, candidateId: review.candidates[index]!.id, attemptId,
               createdAt: new Date().toISOString(), ...entry, latencyMs: Date.now() - start, model: DAILY_BRIEF_MODEL, promptRevision: DAILY_BRIEF_PROMPT_REVISION,
-              configurationRevision: revisions[index]!, pipelineVersion: BRIEFING_PIPELINE_VERSION, inspector: prepared,
+              configurationRevision: revisions[index]!, pipelineVersion: BRIEFING_PIPELINE_VERSION, inspector: inspected(),
               ...(options.sequenceId ? { evaluation: { sequenceId: options.sequenceId, mode: options.diagnosticLane ? "diagnostic" as const : "daily" as const,
                 ...(options.diagnosticLane ? { laneId: options.diagnosticLane, label: "Diagnostic preview: bypasses cross-lane ranking and cooldown. Evidence and validation still apply." } : {}), retainedFingerprints } } : {}) };
             try { await store.append(partition, review.caseId, "runs", run); runIds.push(id); return id; } catch { persisted = false; return null; }
@@ -178,28 +194,32 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
             if (account) await raceBriefAbort(account.assertCurrent(), signal);
             if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, signal), signal);
             const modelSignal = AbortSignal.any([signal, AbortSignal.timeout(25_000)]);
+            // Authorization may change while another tab holds both provider permits.
+            const recheck = (input: Parameters<DailyBriefGenerator>[0]) => async () => {
+              if (!generate && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
+              if (account) await raceBriefAbort(account.assertCurrent(), input.signal);
+              if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, input.signal), input.signal);
+            };
+            const estimate = options.estimate ?? generate ?? ((payload: Parameters<DailyBriefGenerator>[0]) => generateOpenAIDurationEstimates(payload, { apiKey: process.env.OPENAI_API_KEY! }));
             const briefing = await generateDailyBrief(context, { config, signal: modelSignal, analysis,
               // Saved and synthetic cases replay on their captured clock; production keeps live freshness checks.
               planningNow: context.capturedAt, now: frozenClock ? () => captured : () => Temporal.Now.instant(),
-              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY! })))(input), async () => {
-                // Authorization may change while another tab holds both provider permits.
-                if (!generate && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
-                if (account) await raceBriefAbort(account.assertCurrent(), input.signal);
-                if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, input.signal), input.signal);
-              }) });
+              generate: (input) => reservation.dispatch(input.signal, () => (generate ?? ((payload) => generateOpenAIDailyBrief(payload, { apiKey: process.env.OPENAI_API_KEY! })))(input), recheck(input)),
+              ...(descriptions ? { descriptions, estimate: (input: Parameters<DailyBriefGenerator>[0]) => reservation.dispatch(input.signal, () => estimate(input), recheck(input)) } : {}),
+              onPrepared: (value) => { planned = value; } });
             if (account) await raceBriefAbort(account.assertCurrent(), signal);
             if (saved && caller && preferences) await raceBriefAbort(assertSavedCaseAuthorized(caller, preferences, saved.case, signal), signal);
             retainedFingerprints = briefing.tip ? prepared.analysis?.recordFingerprints ?? [] : [];
             if (!options.diagnosticLane) options.onRetainedTip?.(index, retainedFingerprints, context.localDate);
             const runId = await record({ state: "ready", briefing, validation: "passed" });
-            results.push({ state: "ready", briefing, inspector: prepared, latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints });
+            results.push({ state: "ready", briefing, inspector: inspected(), latencyMs: Date.now() - start, validation: "passed", runId, saved: !!runId, retainedFingerprints });
           } catch (error) {
             const cancelled = signal.aborted;
             const code = cancelled ? "cancelled" : error instanceof DailyBriefError ? error.code : "generation_failed";
             const state = cancelled ? "cancelled" as const : "error" as const;
             const validation = cancelled ? "not_completed" : "withheld";
             const runId = await record({ state, error: code, validation });
-            results.push({ state, error: code, inspector: prepared, latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [] });
+            results.push({ state, error: code, inspector: inspected(), latencyMs: Date.now() - start, validation, runId, saved: !!runId, retainedFingerprints: [] });
             if (code === "access_denied" || code === "context_changed") throw error;
           }
         }
@@ -322,6 +342,7 @@ export function replaySavedCase(saved: BenchCase, configs: readonly BriefingConf
   return {
     contexts,
     analysisSource: inputs.analysisSource,
+    descriptions: inputs.descriptions,
     configs: saved.source.mode === "synthetic" ? configs : configs.map((config) => accountConfig(config, inputs.configurationRefs, saved.history ? capture.calendarDisclosed : capture.includeCalendar)),
   };
 }
@@ -335,7 +356,8 @@ export async function assertSavedCaseAuthorized(caller: CalendarCaller, preferen
       (saved.capture.includeReminders && !current.includeReminderHistory) ||
       (saved.capture.includeNotes && !current.includeNotes)) throw new DailyBriefError("access_denied");
   if (saved.capture.includeCalendar) {
-    const connection = await getCalendarConnection(caller);
+    if (saved.capture.calendarGrantPurpose !== "agent") throw new DailyBriefError("review_only");
+    const connection = await getCalendarConnection(caller, "agent");
     if (connection.status !== "connected" || connection.generation !== current.calendarConnectionGeneration ||
         connection.selectionRevision !== current.calendarSelectionRevision) throw new DailyBriefError("access_denied");
     const contexts = saved.inputs?.contexts;

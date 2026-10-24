@@ -7,6 +7,7 @@ import { projectBriefingAnalysisSource } from "./briefing-analysis-source";
 
 import { readAdvisorCadenceRevision, readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
 import {
+  listDailyBriefBehaviorDescriptions,
   listDailyBriefBehaviorIds,
   readDailyBriefPreferences,
   type DailyBriefPreferences,
@@ -45,6 +46,11 @@ export async function prepareAccountBriefingContexts(
     /** Reads analysis history only when a configuration selects lanes. Optional sources also need their disclosure. */
     analysis?: Readonly<{ includeReminders: boolean; includeNotes: boolean }>;
     /**
+     * Ticket 188: read Behavior descriptions for duration estimates. Only the private
+     * workbench sets this, after the owner confirms its local disclosure.
+     */
+    descriptions?: Readonly<{ ownerConfirmed: true }>;
+    /**
      * Ticket 239: only the live Daily Brief passes this. Each source is read
      * only with its own disclosure; `deadlineAt` (epoch ms) ends provider reads
      * before the generation reserve. Workbench and history omit it, so older
@@ -60,6 +66,8 @@ export async function prepareAccountBriefingContexts(
   analysisSource: BriefingAnalysisSource | null;
   /** Stable, account-scoped one-way fingerprint for tip repetition control. */
   tipFingerprint: (finding: BriefingFinding) => string;
+  /** Descriptions keyed by the contexts' opaque behaviorRef; null when not requested. */
+  descriptions: Readonly<Record<string, string>> | null;
 }>> {
   const clock = input.clock ?? (() => Temporal.Now.instant());
   input.signal.throwIfAborted();
@@ -82,7 +90,7 @@ export async function prepareAccountBriefingContexts(
     signal.throwIfAborted();
     let calendar: AdvisorAuthorizationFence["calendar"] = null;
     if (preferences.includeCalendar) {
-      const connection = await getCalendarConnection(caller);
+      const connection = await getCalendarConnection(caller, "agent");
       signal.throwIfAborted();
       if (connection.status !== "connected" || connection.generation !== preferences.calendarConnectionGeneration ||
           connection.selectionRevision !== preferences.calendarSelectionRevision) {
@@ -171,6 +179,11 @@ export async function prepareAccountBriefingContexts(
       context: firstContext, makeOpaqueRef, startLocalDate: analysisRequest.historyStartLocalDate,
     });
   }
+  const descriptions = input.descriptions?.ownerConfirmed
+    ? Object.fromEntries(Object.entries(await listDailyBriefBehaviorDescriptions(caller.client, caller.user.id, authorization.behaviorIds, input.signal))
+      .map(([behaviorId, description]) => [makeOpaqueRef("behavior", behaviorId), description]))
+    : null;
+  input.signal.throwIfAborted();
   const tipFingerprint = (finding: BriefingFinding) => {
     const behaviorId = finding.behaviorRef ? behaviorIdByRef.get(finding.behaviorRef) : "all";
     if (!behaviorId) throw new DailyBriefError("context_changed");
@@ -203,7 +216,7 @@ export async function prepareAccountBriefingContexts(
     input.signal.throwIfAborted();
   };
 
-  return { contexts, assertCurrent, configurationRefs, preferences, analysisSource, tipFingerprint };
+  return { contexts, assertCurrent, configurationRefs, preferences, analysisSource, tipFingerprint, descriptions };
 }
 
 function samePreferences(left: DailyBriefPreferences, right: DailyBriefPreferences): boolean {
