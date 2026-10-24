@@ -295,11 +295,32 @@ native fixtures and multi-day resume remain open.
 The interaction registry records implemented controls separately from Ticket 137
 release acceptance. Marketing has no runtime change; native mobile remains deferred.
 
+## Connector expansion (Tickets 233–241)
+
+Implemented and independently verified locally through Ticket 240 at `40b1dc2`.
+Evidence includes source, synthetic fixtures and native cache unit tests; it does
+not establish installed application behavior. In linked-account mode, desktop uses
+the same Settings library and Timeline components and calls hosted Outlook,
+iCloud, and Hevy brokers with its Supabase session. Outlook consent uses the
+existing external-browser and opaque Keychain-state pattern. iCloud and Hevy
+credentials are posted once to the hosted service and never stored on the Mac.
+Per-source disposable caches stay outside `cadence.sqlite3` and user-created
+backups. Disconnect, sign-out, and account switching clear them. Local mode shows
+connectors as requiring a linked account. There is no EventKit bridge. Installed
+acceptance remains open; Ticket 241 records that gap without claiming release.
+Microsoft/Apple/Hevy live access, Microsoft
+publisher verification and deployment remain unverified. Hevy requires Pro and
+scans at most 500 workouts globally even for today; count stability is not an
+atomic snapshot. Each source requires its own default-off Daily Brief disclosure.
+Source timing never automatically completes a Behavior.
+
 ## Travel implementation — Tickets 162–165
 
 `apps/desktop/src/product.tsx` uses the shared Settings and Timeline travel
-presentation. `INT-TRAVEL-001/002/003` in `interaction-registry.json` owns the
-implemented intents; the existing design catalog owns the Settings and Calendar
+presentation. `INT-TRAVEL-001` through `INT-TRAVEL-005` in `interaction-registry.json`
+own the implemented intents; Ticket 215's toggle, Home, usual travel and Behavior
+Where use the shared Settings panel and Behavior form, SQLite migration 0018 and the
+account synchronization contract. Desktop map links always open Apple Maps; the existing design catalog owns the Settings and Calendar
 bench evidence. `apps/desktop/src/travel.ts` permits hosted estimates only for a
 linked, synchronized online account. Local location preferences and tracking work
 offline. Foreground Core Location is implemented in `native/location.m`.
@@ -307,7 +328,24 @@ offline. Foreground Core Location is implemented in `native/location.m`.
 Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390px
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in
-`docs/qa/travel-release.md`; existing distribution gates remain unchanged.
+`docs/qa/travel-release.md`. Signed Cadence for Mac 0.1.3 was published October 22,
+2026 (Tickets 115, 178 and 181); the manual macOS location permission path is handled
+under Ticket 165.
+
+
+Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and
+consumes the hosted 1.1 snapshot through `calendar/icloud-calendar.ts` and
+`calendar/use-connectors.ts`. The disposable iCloud cache binds account,
+generation, selection revision, range, timezone and display choices. Logout,
+account switch, disconnect and permission withdrawal clear source context.
+Daily Brief reuses the hosted, separately consented projection. Installed
+Keychain/cache behavior and live Apple access remain unverified; no native
+EventKit or local-calendar permission exists.
+
+Ticket 240 review correction: web and desktop retain a known failed or incomplete
+refresh warning across cache hits until a complete read succeeds. Desktop cold
+opens verify the provider before treating a saved snapshot as current. The shared
+rule also applies to Outlook and Hevy desktop snapshots. No native schema changed.
 
 ## Hosted client access (Ticket 227)
 

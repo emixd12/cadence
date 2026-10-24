@@ -1,0 +1,11 @@
+{
+  "data": {
+    "id": "synthetic-hevy-user-0001",
+    "username": "SECRET-USERNAME",
+    "name": "SECRET-NAME",
+    "url": "https://hevy.com/user/SECRET-USERNAME",
+    "weight_unit": "kg",
+    "distance_unit": "kilometers",
+    "is_pro": true
+  }
+}

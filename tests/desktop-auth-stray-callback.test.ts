@@ -33,7 +33,7 @@ beforeEach(() => {
     if (command === "auth_secret_set") { native.secrets.set(args!.name!, args!.value!); return; }
     if (command === "auth_secret_remove") { native.secrets.delete(args!.name!); return; }
     if (command === "auth_account_metadata") return { hostedUserId: "hosted-one", localProfileId: "local-profile" };
-    if (command === "auth_record_account_metadata" || command === "calendar_cache_clear") return;
+    if (command === "auth_record_account_metadata" || command === "calendar_cache_clear" || command === "connector_cache_clear") return;
     throw new Error(`Unexpected native command: ${command}`);
   });
   native.callback = null;

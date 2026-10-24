@@ -80,7 +80,7 @@ export function normalizeBehaviorConfiguration(
 
   return {
     categoryId: normalizeOptionalId(configuration.categoryId),
-    locationText: configuration.locationText?.trim() || null,
+    ...normalizeWhere(configuration),
     scheduleGraph: configuration.scheduleGraph
       .map(normalizeSchedule)
       .sort(compareSchedules),
@@ -134,6 +134,9 @@ function findChangedFields(
   if (previous.locationText !== next.locationText) {
     changedFields.push("location_text");
   }
+  if (previous.whereKind !== next.whereKind) {
+    changedFields.push("where_kind");
+  }
   if (!jsonEqual(previous.scheduleGraph, next.scheduleGraph)) {
     changedFields.push("schedule_graph");
   }
@@ -154,6 +157,17 @@ function findChangedFields(
   }
 
   return changedFields;
+}
+
+// Snapshots written before Ticket 215 carry only location text, which meant A place.
+function normalizeWhere(
+  configuration: BehaviorConfigurationSnapshot,
+): Pick<BehaviorConfigurationSnapshot, "locationText" | "whereKind"> {
+  const locationText = configuration.locationText?.trim() || null;
+  const whereKind = configuration.whereKind === undefined
+    ? (locationText ? "place" : null)
+    : configuration.whereKind;
+  return { locationText: whereKind === "place" ? locationText : null, whereKind };
 }
 
 function normalizeSchedule(

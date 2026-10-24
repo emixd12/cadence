@@ -1,0 +1,158 @@
+{
+  "schemaVersion": "1.1.0",
+  "adapterVersion": "outlook-calendar-v1",
+  "accountId": "account-1",
+  "connectionGeneration": 2,
+  "source": "outlook_calendar",
+  "requestedRange": {
+    "startLocalDate": "2026-11-01",
+    "endLocalDate": "2026-11-03",
+    "timezone": "America/New_York",
+    "selectedCalendarIds": [
+      "calendar-1"
+    ]
+  },
+  "fetchedAt": "2026-11-01T13:00:00Z",
+  "completeness": "complete",
+  "freshness": {
+    "state": "current",
+    "refreshedAt": "2026-11-01T13:00:00Z",
+    "label": "Calendar current",
+    "canAssertNoOverlap": true
+  },
+  "capabilities": {
+    "calendar_listing": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "timed_events": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "all_day_events": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "recurrence": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "details": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    },
+    "source_links": {
+      "support": "supported",
+      "permission": "granted",
+      "availability": "available"
+    }
+  },
+  "coverage": [
+    {
+      "calendarId": "calendar-1",
+      "startLocalDate": "2026-11-01",
+      "endLocalDate": "2026-11-03",
+      "paginationComplete": true,
+      "itemCount": 2
+    }
+  ],
+  "failures": [],
+  "events": [
+    {
+      "id": "outlook_calendar/calendar-1/timed-1",
+      "providerEventId": "timed-1",
+      "logicalInstanceId": "outlook_calendar/calendar-1/timed-1",
+      "calendarId": "calendar-1",
+      "source": "outlook_calendar",
+      "calendarName": "Personal",
+      "sourceTimezone": "America/New_York",
+      "sourceTimezoneFallback": "none",
+      "state": "unknown",
+      "availability": "busy",
+      "currentUserResponse": "accepted",
+      "revision": {
+        "availability": "available",
+        "providerUpdatedAt": "2026-10-30T12:00:00Z",
+        "providerEtag": "change-key-1"
+      },
+      "title": "Overnight shift",
+      "description": "",
+      "location": "",
+      "sourceUrl": "https://outlook.live.com/calendar/item/timed-1",
+      "fieldAvailability": {
+        "description": "unsupported",
+        "location": "unsupported",
+        "organizer": "unsupported",
+        "attendees": "unsupported",
+        "conference": "unsupported",
+        "attachments": "unsupported"
+      },
+      "detailCompleteness": {},
+      "organizer": null,
+      "attendees": null,
+      "attendeesOmitted": false,
+      "conference": null,
+      "recurrence": null,
+      "attachments": null,
+      "kind": "timed",
+      "startAt": "2026-11-01T03:00:00Z",
+      "endAt": "2026-11-01T07:00:00Z",
+      "endUnspecified": false,
+      "duration": {
+        "kind": "known",
+        "seconds": 14400
+      }
+    },
+    {
+      "id": "outlook_calendar/calendar-1/all-day-pacific",
+      "providerEventId": "all-day-pacific",
+      "logicalInstanceId": "outlook_calendar/calendar-1/all-day-pacific",
+      "calendarId": "calendar-1",
+      "source": "outlook_calendar",
+      "calendarName": "Personal",
+      "sourceTimezone": "America/Los_Angeles",
+      "sourceTimezoneFallback": "none",
+      "state": "unknown",
+      "availability": "free",
+      "currentUserResponse": null,
+      "revision": {
+        "availability": "available",
+        "providerUpdatedAt": "2026-10-29T08:00:00Z",
+        "providerEtag": "change-key-2"
+      },
+      "title": "Pacific holiday",
+      "description": "",
+      "location": "",
+      "sourceUrl": null,
+      "fieldAvailability": {
+        "description": "unsupported",
+        "location": "unsupported",
+        "organizer": "unsupported",
+        "attendees": "unsupported",
+        "conference": "unsupported",
+        "attachments": "unsupported",
+        "source_url": "not_provided"
+      },
+      "detailCompleteness": {},
+      "organizer": null,
+      "attendees": null,
+      "attendeesOmitted": false,
+      "conference": null,
+      "recurrence": null,
+      "attachments": null,
+      "kind": "all_day",
+      "startLocalDate": "2026-11-02",
+      "endLocalDate": "2026-11-03",
+      "duration": {
+        "kind": "calendar_days",
+        "days": 1
+      }
+    }
+  ],
+  "tombstones": []
+}

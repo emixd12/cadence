@@ -61,7 +61,10 @@ describe("travel settings persistence", () => {
     const rows = {
       travel_settings: { data: [{ enabled: true, base_location_text: "Base", mode: "driving", navigation_preference: "google_maps",
         routing_consent_at: "2026-09-22T01:00:00+00:00", onboarding_completed_at: "2026-09-22T01:00:00+00:00", updated_at: "2026-09-22T01:00:00+00:00" }], error: null },
-      behaviors: { data: [{ id: "behavior", location_text: "Library", updated_at: "2026-09-22T01:02:00Z" }], error: null },
+      behaviors: { data: [
+        { id: "behavior", where_kind: "place", location_text: "Library", updated_at: "2026-09-22T01:02:00Z" },
+        { id: "home-behavior", where_kind: "home", location_text: null, updated_at: "2026-09-22T01:02:00Z" },
+      ], error: null },
     };
     const client = { from(table: keyof typeof rows) {
       const result = rows[table];
@@ -75,7 +78,10 @@ describe("travel settings persistence", () => {
       settings: { enabled: true, baseLocationText: "Base", mode: "driving", navigationPreference: "google_maps",
         routingConsentAt: "2026-09-22T01:00:00.000000Z", onboardingCompletedAt: "2026-09-22T01:00:00.000000Z", updatedAt: "2026-09-22T01:00:00.000000Z" },
       settingsRevision: "2026-09-22T01:00:00.000000Z",
-      behaviors: [{ id: "behavior", locationText: "Library", updatedAt: "2026-09-22T01:02:00.000000Z" }],
+      behaviors: [
+        { id: "behavior", whereKind: "place", locationText: "Library", updatedAt: "2026-09-22T01:02:00.000000Z" },
+        { id: "home-behavior", whereKind: "home", locationText: null, updatedAt: "2026-09-22T01:02:00.000000Z" },
+      ],
     });
   });
 });

@@ -6,6 +6,7 @@ import { parseArchiveNotes } from "../resolvers/archive-note.resolver";
 import { formatScheduledTimeLabel, normalizeRecurrenceRule, normalizeScheduledTime,
   recurrenceDefaultsFromRule, summarizeRecurrenceRule, summarizeReminders } from "./behavior-values";
 import { compareScheduleSlots, formatScheduleSlotsSummary, toScheduleSlotView } from "./schedule";
+import { storedBehaviorWhere } from "./behavior-where";
 
 export function assembleBehaviorPageData(input: {
   behaviors: BehaviorGraphRecord[]; categories: CategoryOption[]; profileTimezone: string | null;
@@ -33,7 +34,8 @@ export function toBehaviorView(behavior: BehaviorGraphRecord): BehaviorView {
     autoArchivedAt: behavior.auto_archived_at ?? null,
     title: behavior.title,
     description: behavior.description ?? "",
-    locationText: behavior.location_text ?? null,
+    whereKind: storedBehaviorWhere(behavior).where_kind,
+    locationText: storedBehaviorWhere(behavior).location_text,
     categoryId: behavior.category_id ?? "",
     categoryName: behavior.category?.name ?? "No category",
     recurrenceSummary:

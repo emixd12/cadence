@@ -1,8 +1,10 @@
+import type { BehaviorWhereKind } from "./behavior";
 import type { Json } from "./json";
 
 export const BEHAVIOR_CONFIGURATION_CHANGED_FIELDS = [
   "category_id",
   "location_text",
+  "where_kind",
   "schedule_graph",
   "browser_reminder_enabled",
   "email_reminder_enabled",
@@ -35,6 +37,8 @@ export type BehaviorConfigurationSchedule = {
 export type BehaviorConfigurationSnapshot = {
   categoryId: string | null;
   locationText?: string | null;
+  /** Absent in snapshots written before Ticket 215; normalization derives it. */
+  whereKind?: BehaviorWhereKind | null;
   scheduleGraph: BehaviorConfigurationSchedule[];
   browserReminderEnabled: boolean;
   emailReminderEnabled: boolean;

@@ -401,6 +401,7 @@ describe("Daily Brief workbench: My account", () => {
     expect(container.textContent).toContain("Travel usage for 2026-11: US$0.125 reserved at list price (US$5 monthly limit).");
     expect(fetcher).toHaveBeenCalledOnce();
   });
+
   it("shows account sign-in requirements without generating or persisting anything", async () => {
     server.account = () => Response.json({ error: "unauthenticated" }, { status: 401 });
     await selectAccount();

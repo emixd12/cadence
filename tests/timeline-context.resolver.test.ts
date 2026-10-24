@@ -390,3 +390,16 @@ it("prefers the explicit default without creating tracked-time samples", () => {
   expect(resolveBehaviorDurationEstimate({ ...input, defaultDurationMinutes: null })).toMatchObject({ kind: "unknown" });
   expect(() => resolveBehaviorDurationEstimate({ ...input, defaultDurationMinutes: 0 })).toThrow("Default duration");
 });
+
+it("treats Outlook and iCloud scheduled events exactly like Google events with distinct namespaced IDs", () => {
+  const google = timedEvent("google_calendar/calendar-1/shared", "2026-09-16T16:00:00Z", "2026-09-16T16:45:00Z");
+  const outlook = { ...google, id: "outlook_calendar/calendar-1/shared", source: "outlook_calendar" as const, state: "unknown" as const };
+  const icloud = { ...google, id: "icloud_calendar/account-1/calendar-1/shared", source: "icloud_calendar" as const };
+  const input = { occurrenceId: "one", scheduledFor: "2026-09-16T16:30:00Z", runningStartedAt: null,
+    estimate: knownEstimate(600), freshness: CURRENT, now: NOW };
+  const merged = resolveTimelineOccurrenceContext({ ...input, events: [google, outlook, icloud].map(projectExternalEventSchedulingEvent) });
+  expect(google.duration).toEqual({ kind: "known", seconds: 2_700 });
+  expect(merged.overlappingEventIds).toEqual([google.id, outlook.id, icloud.id].sort());
+  expect(merged.overlapAssessment).toBe("possible");
+  expect(resolveTimelineOccurrenceContext({ ...input, events: [outlook] }).overlappingEventIds).toEqual([outlook.id]);
+});
