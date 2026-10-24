@@ -694,7 +694,10 @@ starting values; a changed value needs a new version.
   after a fixed return departure. It comes from planned timing, never from a route
   estimate, so a margin never depends on route duration and weather facts reveal
   none (`docs/LEGAL.md` L-001). Forecast hours that overlap the window count.
-  Missing values never match; a window without reported values is unknown, not clear.
+  Missing values never match. A clear result requires complete hourly coverage of
+  the window and every rule measurement; gaps or missing measurements stay unknown.
+  A reported adverse condition still contributes its margin when other data is
+  missing. Rain plus showers stays unknown if either component is missing.
 - The margin is its own resolver input beside the travel buffers. It sits
   immediately before an arrive-by departure, or after a fixed-departure arrival, as
   a `weather_margin` occupancy segment. It moves the shown leave time or return time

@@ -249,12 +249,13 @@ arrives, fees reduce the US$5:
   US$10 per UTC day (assumed for a small user count; raise it as users grow). The ceiling is permissive. The target is
   the efficient design above, about US$1.30–2.14 for a typical user. Heavy
   drivers (about US$5.73 estimated) would reach the ceiling before month end.
-  Assumed, not confirmed: the ceiling covers Google Maps calls only.
+  Confirmed by the owner on 2026-10-22: the ceiling applies per user per calendar
+  month, in the user's timezone, and covers Google Maps calls only.
 - 2026-10-18: Open-Meteo is the weather provider (Ticket 218). This file assumes
-  the API Standard plan, US$29 per month; not subscribed. The plan choice stays open
-  (`docs/LEGAL.md` L-008).
-- 2026-10-22: the free Open-Meteo API for development and testing; the paid API
-  Standard plan before commercial use (Ticket 218).
+  the API Standard plan, US$29 per month; not subscribed.
+- 2026-10-22: development and testing use the free Open-Meteo plan. The paid API
+  Standard plan is required before commercial use (`docs/LEGAL.md` L-008, open until
+  subscribed).
 
 ## Proposals awaiting owner decision
 
@@ -275,6 +276,8 @@ arrives, fees reduce the US$5:
 - 2026-10-22: Ticket 218 in source. Weather uses the free API for testing, one
   48-hour forecast per area per hour per server instance, and costs nothing until the
   paid plan starts.
+- 2026-10-22: Recorded the confirmed travel budget posture, the free Open-Meteo plan
+  for development and testing, and backlog Ticket 243 for six-leg speed.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
@@ -293,7 +296,8 @@ used five geocodes and no routes; two temporary street-address corrections used
 two geocodes and two routes. Each of three identical refreshes then used zero
 geocodes and two routes. Calendar and saved-place records stayed unchanged.
 Four successful two-leg requests measured server p50 3.3562 s and nearest-rank
-p95 3.5984 s. Six-leg and multi-user loads were not measured. See
+p95 3.5984 s. Six-leg and multi-user loads were not measured; Ticket 243 tracks the
+six-leg and before/after measurements. See
 `docs/qa/travel-release.md` for sample counts, dates and baseline limits.
 
 Final review-fix verification added two cached-place routes and zero geocodes.

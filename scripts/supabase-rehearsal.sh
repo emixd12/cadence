@@ -122,6 +122,10 @@ while IFS= read -r volume; do
 done <<< "$volume_names"
 
 export SUPABASE_TELEMETRY_DISABLED=1 SUPABASE_ACCESS_TOKEN="" SUPABASE_DB_PASSWORD=""
+# Anonymous public.ecr.aws pulls hit "toomanyrequests" on some shared runner
+# addresses (October 22-23, 2026), failing both start attempts. GHCR serves the
+# same pinned manifests; the Docker proxy accepts exactly those images.
+export SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io
 export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-linux-x64/bin/supabase-go"
 test "$(npm run --silent supabase -- --version)" = 2.105.0
 
@@ -163,14 +167,17 @@ start_stack() {
     --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
     > "$output" 2>&1 || status=$?
   if ((status != 0)); then
+    # Most specific cause first: CLI cleanup after any failure also reaches the
+    # proxy, so a rejection alone does not explain the start failure. The proxy
+    # logs each rejected method and path itself.
     local category='an unclassified error'
     if ((status == 124)); then category='the 8-minute limit'
-    elif grep -q 'Cadence Docker request rejected' "$output"; then category='a Docker proxy rejection'
     elif grep -qiE 'toomanyrequests|rate limit' "$output"; then category='an image registry rate limit'
-    elif grep -qiE 'unhealthy|not healthy|health check' "$output"; then category='a service health check'
+    elif grep -qiE 'failed to pull|manifest unknown' "$output"; then category='an image pull'
+    elif grep -qiE 'is not ready|unhealthy' "$output"; then category='a service health check'
+    elif grep -qiE 'SQLSTATE|failed to apply migration|seed' "$output"; then category='a migration or seed error'
     elif grep -qiE 'deadline exceeded|timed out|timeout' "$output"; then category='a timeout'
-    elif grep -qiE 'SQLSTATE|migration|seed' "$output"; then category='a migration or seed error'
-    elif grep -qiE 'pull|manifest' "$output"; then category='an image pull'
+    elif grep -q 'Cadence Docker request rejected' "$output"; then category='a Docker proxy rejection'
     fi
     printf '::warning::Local stack start attempt %s failed with exit %s after %s.\n' "$1" "$status" "$category"
   fi
@@ -179,8 +186,9 @@ start_stack() {
 }
 
 begin_phase 'starting the local stack (2 attempts, 8-minute limit each)'
-# First starts on fresh runners intermittently failed after about three minutes
-# and passed on rerun (October 21-22, 2026). Retry once from a clean stack.
+# Some runners failed both starts after about three minutes with no container
+# left behind, and passed on another runner (October 21-23, 2026). Retry once
+# from a clean stack; the proxy now permits the CLI's project-scoped cleanup.
 if ! start_stack 1; then
   timeout --kill-after=5s 2m npm run --silent supabase -- stop --no-backup \
     --workdir "$SUPABASE_WORKDIR" >/dev/null 2>&1 || true

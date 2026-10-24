@@ -45,6 +45,7 @@ const MAX_CALENDAR_PAGE_BYTES = 1_000_000;
 const MAX_TEXT = 1_024;
 // Graph documents that lastModifiedDateTime does not support $select on calendarView,
 // so the revision normally comes from changeKey; a returned lastModifiedDateTime is still used.
+const CALENDAR_SELECT = "id,name,isDefaultCalendar";
 const EVENT_SELECT = "id,subject,isAllDay,isCancelled,showAs,type,seriesMasterId,originalStart,originalStartTimeZone,responseStatus,changeKey,webLink,start,end";
 /** Outlook on the web hosts that Graph returns in `webLink`. Any other host is dropped. */
 const WEB_LINK_HOSTS = new Set(["outlook.office365.com", "outlook.office.com", "outlook.live.com"]);
@@ -100,11 +101,30 @@ export function outlookGraphUrlAllowed(value: string, kind: "calendars" | "calen
   try { url = new URL(value); } catch { return null; }
   if (url.origin !== GRAPH_ORIGIN || url.protocol !== "https:" || url.port || url.username || url.password || url.hash) return null;
   const path = url.pathname.toLowerCase();
-  if (kind === "calendars") return path === CALENDARS_PATH.toLowerCase() ? url : null;
+  if (kind === "calendars") return path === CALENDARS_PATH.toLowerCase() ? minimalSelect(url, CALENDAR_SELECT) : null;
   const prefix = `${CALENDARS_PATH.toLowerCase()}/`;
   if (!path.startsWith(prefix) || !path.endsWith("/calendarview")) return null;
   const middle = path.slice(prefix.length, -"/calendarview".length);
-  return middle && !middle.includes("/") ? url : null;
+  return middle && !middle.includes("/") ? minimalSelect(url, EVENT_SELECT) : null;
+}
+
+/**
+ * Ticket 242: Calendars.Read lets Graph return bodies, attachments, and
+ * extensions, so every request, including provider-supplied next links, must
+ * select only contract fields. A next link that expands or selects anything
+ * else is refused; one without `$select` gets the contract list appended.
+ */
+function minimalSelect(url: URL, select: string): URL | null {
+  const allowed = new Set(select.split(","));
+  for (const [key, value] of url.searchParams) {
+    const name = key.toLowerCase();
+    if (name === "$expand" || name === "expand") return null;
+    if ((name === "$select" || name === "select") && (key !== "$select" || !value.split(",").every((field) => allowed.has(field)))) return null;
+  }
+  if (url.searchParams.getAll("$select").length > 1) return null;
+  // Append rather than re-serialize, so an opaque skip token keeps its exact encoding.
+  if (!url.searchParams.has("$select")) url.search = `${url.search ? `${url.search}&` : "?"}$select=${select}`;
+  return url;
 }
 
 /**
@@ -225,7 +245,7 @@ function nextLinkOf(page: Record<string, unknown>): string | null {
 export async function listOutlookCalendars(options: OutlookGraphRequestOptions): Promise<OutlookCalendar[]> {
   if (!options.accessToken) throw new TypeError("Outlook Calendar listing requires an access token.");
   const first = new URL(`${GRAPH_ORIGIN}${CALENDARS_PATH}`);
-  first.searchParams.set("$select", "id,name,isDefaultCalendar");
+  first.searchParams.set("$select", CALENDAR_SELECT);
   let url: URL | null = first;
   const seen = new Set<string>();
   const calendars = new Map<string, OutlookCalendar>();

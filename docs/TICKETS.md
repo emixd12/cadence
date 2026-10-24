@@ -8463,7 +8463,12 @@ Only synthetic local data was used. No deployment or hosted data operation ran.
 
 ## Ticket 115: Apple-trusted macOS distribution acceptance
 
-Current state (2026-09-27): in progress. The owner authorized every execution step.
+Current state (2026-10-22): complete. Cadence for Mac 0.1.3 is published on the public
+`desktop-stable` release and verified; see Ticket 181 and
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`. macOS 14 runtime testing stays
+owner-deferred. History follows.
+
+Earlier state (2026-09-27): in progress. The owner authorized every execution step.
 The owner's account page confirms Apple Developer Program membership. The Developer
 ID identity and matching profile are installed; Apple accepted the notarization
 credentials. Apple accepted the `0.1.1-rc.1` app and DMG. Both staples, Gatekeeper, and strict
@@ -12262,6 +12267,9 @@ revision races, two-owner isolation and excluded-field absence. Apply shared che
 Status: deterministic display implemented in source September 26, 2026. Model
 projection of travel remains disabled pending provider-use clearance and revised
 disclosure; native and live gates stay with Tickets 165 and 174. Filed September 26, 2026.
+October 22, 2026: Ticket 219 owns travel model projection. Google terms are an accepted
+risk (`docs/LEGAL.md` L-001); the disclosure update is logged as
+`docs/PRIVACY_CHANGES.md` P-004 and does not block development.
 Dependencies: 169 and existing 159, 162–167 implementation. Coordinate with 165 and 174.
 
 Goal: explain departure, onward travel and return constraints alongside feasible
@@ -12691,7 +12699,11 @@ second acceptance inventory. Filing these tickets performs no release or live te
 
 ## Ticket 178: Signed account and Calendar lifecycle acceptance
 
-Status: in progress September 28. The dedicated test Calendar contains a
+Status: complete October 21, 2026. Installed acceptance on signed 0.1.3 covered
+sign-in renewal, callback replay, revoked-session recovery and reconnection without
+data loss. Calendar expiry is covered by a unit test; see
+`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+Earlier status: in progress September 28. The dedicated test Calendar contains a
 timed public-landmark fixture with no guests or notifications. The owner selected
 Chrome and confirmed the test account is signed in. Native lifecycle execution
 resumed with isolated data. Notification-independent account checks now pass:
@@ -12883,12 +12895,12 @@ and crypto checks, database comparison and restoration. Apply required checks to
 
 ## Ticket 181: Final signed-release acceptance and publication
 
-Status: published October 22, 2026. By owner decision, 0.1.3 is live on the public
+Status: complete October 22, 2026. By owner decision, 0.1.3 is live on the public
 `desktop-stable` release, and both update feeds name it. Public download, hash,
-feed-signature and quarantined Gatekeeper readback pass. Open: verify the marketing
-**Download for Mac** link in production, then refresh the app's Trust marketing
-deployment ID. 0.1.4 follows as the first stable update. Packet:
-`docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
+feed-signature and quarantined Gatekeeper readback pass. Production marketing
+(cadence-me.com) links **Download for Mac** to the stable DMG, and the app's Trust
+marketing deployment ID was refreshed and the app redeployed. 0.1.4 follows as the
+first stable update. Packet: `docs/qa/2026-10-21-desktop-0.1.3-release-packet.md`.
 Earlier status: verification in progress September 28; publication remains gated.
 All 76 current migrations replayed cleanly in a separate local project. The real
 authenticated adapter contract and 92 RLS ownership checks passed. Temporary users
@@ -13283,9 +13295,15 @@ On October 18 the owner limited Google route data in model input to Cadence's ow
 deterministic conclusions and accepted the remaining risk (`docs/LEGAL.md` L-001). The
 owner also selected Open-Meteo for weather (`docs/DECISIONS.md`, 2026-10-18).
 
-Assumption, not confirmed by the owner: the US$5 ceiling applies per user per calendar
-month in the user's timezone and covers Google Maps calls only. Hosting, the Daily
-Brief model and weather are tracked separately in `docs/COSTS.md`.
+Budget posture, confirmed by the owner on October 22, 2026: the US$5 ceiling applies
+per user per calendar month, in the user's timezone, and covers Google Maps calls
+only. Hosting, the Daily Brief model and weather are tracked separately in
+`docs/COSTS.md`.
+
+On October 22 the owner also decided the next steps for Tickets 165 and 216–219
+(`docs/DECISIONS.md`, 2026-10-22). Until the pre-launch privacy pass, privacy,
+disclosure and marketing-language conflicts are logged in `docs/PRIVACY_CHANGES.md`
+and never block development. Backlog Tickets 243 and 244 follow Ticket 219.
 
 End state: each located Calendar event and each Behavior with a Where gets a travel
 estimate from the user's current position or previous stop. Estimates refresh when
@@ -13300,7 +13318,8 @@ Storage boundary for every ticket below:
 | Home and saved places: typed text and place ID | Device position |
 | Behavior Where | Route estimates |
 | Usual mode per place, get-ready time, arrival buffer, feedback taps | Weather forecasts |
-| Completion place labels, only after opt-in (Ticket 216) | Place coordinates: server cache, at most 30 days |
+| Completion place labels, only after opt-in, kept for the period the user chooses (Ticket 216) | Google place coordinates: none fetched (L-002); any later cache at most 30 days |
+| "I'm here" place positions recorded by the device (Ticket 216) | |
 
 The advisor reads stored preferences when it writes a brief. It never writes memory.
 Cadence's own rules turn feedback into preferences. Google terms allow place IDs to be
@@ -13314,14 +13333,17 @@ reused (`docs/COSTS.md`, caching terms).
 | 215 | Three-input travel Settings and optional Behavior Where | 214; Ticket 212 reuses its controls |
 | 216 | Completion place labels and Where suggestions | 215 |
 | 217 | Learned travel habits: mode per place, get-ready time, arrival buffer | 215 |
-| 218 | Weather provider selection and travel margin | Open-Meteo selected; 217 for margin |
-| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure gate (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 218 | Weather provider selection and travel margin | Open-Meteo selected, free plan for development and testing (`docs/LEGAL.md` L-008); 217 for margin |
+| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/PRIVACY_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 243 | Backlog, low priority: six-leg refresh speed and before/after comparison | 214 |
+| 244 | Backlog: place labels and "I'm here" markers in Full JSON | 216 |
 
 These tickets supersede Ticket 166's 24-per-day owner limit and Ticket 167's refresh
 policy (213–214), Ticket 162's Settings layout (215) and the disabled travel model
-projection in Tickets 164 and 170 once Ticket 219's gates pass. Ticket 165 keeps the
-native location and navigation gates. Desktop device location stays blocked until
-Ticket 115 provides Developer ID signing.
+projection in Tickets 164 and 170 once Ticket 219 ships. Ticket 165 keeps the
+native location and navigation gates. Signed Cadence for Mac 0.1.3 was published
+October 22, 2026; the manual macOS location permission path is handled under
+Ticket 165.
 
 The shared verification and authorization rules for Tickets 168–174 apply. Filing
 these tickets grants no provider spending, hosted migration, deployment, private-data
@@ -13376,8 +13398,9 @@ Calendar context, foreground activation and Refresh travel pass.
 Whole-day routing runs once per generated Daily Brief within the existing eight-leg
 safety bound. Four two-leg production samples measured p50 3.3562 s and p95 3.5984 s.
 Six-leg and before/after performance remain unmeasured; the old exhausted pilot
-could not provide a successful baseline. Evidence: `docs/qa/travel-release.md`,
-October 18.
+could not provide a successful baseline. Two-leg speed is confirmed; backlog Ticket
+243 tracks the six-leg and before/after measurements at low priority. Evidence:
+`docs/qa/travel-release.md`, October 18.
 Dependencies: 213. The refresh-trigger change ships with 213.
 
 Goal: a refresh pays only for route legs that need travel and returns quickly.
@@ -13413,8 +13436,9 @@ Scope and acceptance:
 Platform impact:
 - Web: `lib/services/travel-route-refresh.service.ts`, `travel-routing.service.ts`,
   `travel-provider.ts`, `lib/ui/travel.ts` and a place-cache migration.
-- Desktop: shares the hook and hosted route. Native device position stays gated by
-  Tickets 115 and 165; saved places and Calendar legs still work.
+- Desktop: shares the hook and hosted route. Signed Cadence for Mac 0.1.3 was
+  published October 22, 2026; the manual macOS location permission path is handled
+  under Ticket 165. Saved places and Calendar legs still work.
 - Marketing: not applicable.
 - Future mobile: inherits the hosted behavior.
 
@@ -13708,6 +13732,59 @@ Platform impact:
 - Marketing: review AI and privacy claims, including the public no-AI disclosure
   conflict recorded under Ticket 187.
 - Future mobile: inherits hosted generation.
+
+## Ticket 243: Six-leg travel refresh speed and before/after comparison
+
+Status: filed October 22, 2026 from owner direction; backlog, low priority. Numbered
+after connector Tickets 233–242 to avoid collisions.
+Dependencies: 214 (complete).
+
+Goal: finish Ticket 214's speed target for larger days. Two-leg speed is already
+confirmed: four production samples measured p50 3.3562 s and p95 3.5984 s on
+October 18 (`docs/COSTS.md`).
+
+Scope and acceptance:
+
+- Measure server refresh duration p50 and p95 on the owner account for a day with up
+  to six legs. Ticket 214's target applies: p95 under 5 seconds.
+- Compare before and after Ticket 214 on the owner account. The exhausted pilot could
+  not provide a successful baseline, so record where the baseline comes from and its
+  limits.
+- Use the existing `CADENCE_PERF_LOG=1` counts and durations. Record sample counts,
+  dates and limits in `docs/qa/travel-release.md`, and update `docs/COSTS.md`.
+- Paid calls run only within a cap the owner approves for this test.
+
+Platform impact:
+- Web: measurement only; no code change is planned.
+- Desktop: not applicable; desktop uses the same hosted route.
+- Marketing: not applicable; no public speed claim.
+- Future mobile: not applicable; mobile would use the same hosted route.
+
+## Ticket 244: Place labels and "I'm here" markers in Full JSON export
+
+Status: filed October 22, 2026 from owner direction; backlog. Not a blocker for
+Ticket 216.
+Dependencies: 216.
+
+Goal: a user's Full JSON export holds the place data Ticket 216 stores with the account.
+
+Scope and acceptance:
+
+- Include completion place labels and "I'm here" place markers in Full JSON.
+- Include them in any total export file that survives the planned export refactor.
+  The repository does not yet document that refactor; confirm the surviving formats
+  first.
+- CSV, JSONL and BehaviorLog keep their current place-text omissions unless the owner
+  decides otherwise.
+- Update `docs/EXPORT_FORMATS.md`, `docs/user-guide/data-portability.md`, export
+  resolver tests and the privacy entry `docs/PRIVACY_CHANGES.md` P-001.
+
+Platform impact:
+- Web: `packages/core/src/resolvers/export.resolver.ts` (re-exported by
+  `lib/resolvers/export.resolver.ts`) and `lib/services/export.service.ts`.
+- Desktop: the shared export path, after Ticket 216 adds the data to SQLite.
+- Marketing: not applicable.
+- Future mobile: inherits the export contract.
 
 ## Cadence MCP server and AI plugins: Tickets 220–232
 
@@ -14182,15 +14259,16 @@ connector framework, background polling, new primary route, or mobile app.
 
 | Ticket | Delivery slice | Dependencies |
 |---|---|---|
-| 220 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
-| 221 | Shared calendar-source and recorded-activity contracts | 220 |
-| 222 | Secure lifecycle for new connectors | 221 |
-| 223 | Hevy workout timing connector | 222 |
-| 224 | Outlook Calendar connector | 222 |
-| 225 | Connector library and Timeline on web and desktop | 223, 224; 227 when ready |
-| 226 | Separately approved connector context in Daily Brief | 225 |
-| 227 | iCloud Calendar connector | 222 |
-| 228 | Verification and disclosure reconciliation | 221–227 |
+| 233 | Connector scope, provider research, and contracts | Existing Tickets 132–137 and 144–148 |
+| 234 | Shared calendar-source and recorded-activity contracts | 233 |
+| 235 | Secure lifecycle for new connectors | 234 |
+| 236 | Hevy workout timing connector | 235 |
+| 237 | Outlook Calendar connector | 235 |
+| 238 | Connector library and Timeline on web and desktop | 236, 237; 240 when ready |
+| 239 | Separately approved connector context in Daily Brief | 238 |
+| 240 | iCloud Calendar connector | 235 |
+| 241 | Verification and disclosure reconciliation | 234–240 |
+| 242 | Outlook personal-account support via `Calendars.Read` | 237, 241 live evidence |
 
 Tickets 236 and 237 may run in parallel in separate provider files. Shared schema,
 registry, Settings, Timeline, and briefing files are edited serially.
@@ -14367,7 +14445,7 @@ session and Keychain client state; the desktop client itself belongs to Ticket 2
 App registration, live personal or work/school access and publisher verification
 remain unverified. Tickets 238–239 added UI and separate Daily Brief disclosure.
 
-Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
+Live acceptance (2026-10-19 to 10-21, local web app over a disposable Supabase stack with development test-login; details in `STATUS.md` (Owner-run live acceptance).): personal Microsoft account **failed**. Graph returns an empty 401 for a token that carries only `Calendars.ReadBasic`. A separate probe app got 200 once `Calendars.Read` was granted, so a fix needs an owner scope decision. Work/school account **passed** in the app's home tenant, first with tenant-wide admin consent (since removed) and then after the user-consent screen (unverified app) was shown, although the resulting stored grant was again tenant-wide AllPrincipals, for an unclear reason; per-user consent is not verified: series expansion, the event-zone all-day rule, other-zone timing, refresh, and disconnect cleanup. Not exercised: verified per-user consent, cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect. Ticket 242 retest (2026-10-22, `Calendars.Read`): personal account **passed** and work/school account **passed** with verified per-user (`Principal`) consent in the home tenant; see Ticket 242 and `STATUS.md`. Still not exercised: cross-tenant consent, `admin_approval_required`, a tenant that blocks unverified apps, and wrong-account reconnect.
 
 Goal: show selected Outlook calendars with the same scheduled-event semantics as
 Google.
@@ -14556,8 +14634,8 @@ Platform impact:
 ## Ticket 241: Verification and disclosure reconciliation
 
 Status: independently approved at `a10b461` for local implementation and
-synthetic verification. Live providers, installed desktop, iCloud
-custody acceptance and release remain open.
+synthetic verification. Live providers, installed desktop and release remain
+open; the owner accepted iCloud custody on 2026-10-19.
 
 Live evidence: Hevy and iCloud passed live; Outlook work/school passed in an admin-consented home tenant; Outlook personal failed (Graph rejects ReadBasic-only consumer tokens); Daily Brief with the Outlook disclosure passed live; installed desktop is blocked by Ticket 115. Deployment, hosted migration and release remain open.
 
@@ -14577,4 +14655,68 @@ Platform impact:
 | Web | `components/settings/LegalContent.tsx`; source/fixture verification with unchanged connector runtime. |
 | Desktop | `docs/DESKTOP_PARITY.md` and shared UI/broker checks; installed acceptance remains open. |
 | Marketing | Existing FAQ, homepage, About/docs and generated mirrors under `apps/marketing/src`; no deployment. |
+| Future mobile | Not applicable: no mobile surface. |
+
+## Ticket 242: Outlook Calendar personal-account support via Calendars.Read
+
+Status: approved by the owner on 2026-10-21; implemented and live-verified on
+2026-10-22 on a disposable local stack. A personal account and a work/school
+account (home tenant, per-user `Principal` grant) connected, listed calendars,
+read events with titles and times only, showed them on Timeline and
+disconnected. Live finding: Microsoft co-grants an earlier `Calendars.ReadBasic`
+consent with `Calendars.Read`; it is accepted only alongside `Calendars.Read`
+(`06fc275`). Not exercised: cross-tenant consent, tenants that block unverified
+apps, installed desktop. Details in `STATUS.md`.
+
+Problem: live acceptance (Ticket 237) showed that Microsoft Graph rejects
+personal-account (MSA) access tokens that carry only `Calendars.ReadBasic`:
+every calendar endpoint returns 401 with an empty body. The same personal
+account read its calendars with a token carrying `Calendars.Read`, through a
+fresh test app. Work/school accounts work with either permission. Most people
+will connect personal Outlook.com, Hotmail or Live accounts, so the connector
+must support them. Owner direction: anyone with a Microsoft account must be able
+to connect it.
+
+Decision: request `openid offline_access Calendars.Read` for every Microsoft
+account (one Entra app, authority `common`). Do not branch scopes by account
+type. This matches the Google Calendar connector, whose read-only scope also
+covers event details. Data minimization moves from the permission to the
+request: Cadence keeps `$select` limited to the fields the contract already
+allows, never requests bodies, attachments or extensions, and discards any
+field outside the contract.
+
+Acceptance:
+
+- `OUTLOOK_CALENDAR_SCOPES` and granted-scope validation accept exactly one
+  effective Graph data permission, `Calendars.Read`; OIDC scopes may be echoed,
+  and a co-granted `Calendars.ReadBasic` from earlier consent is accepted (live,
+  October 22, 2026: Microsoft returned `openid Calendars.Read Calendars.ReadBasic`
+  for a personal account that had consented to ReadBasic before; it grants
+  nothing beyond `Calendars.Read`). A token
+  whose scope adds write or other Graph permissions is still rejected. An
+  existing connection granted only `Calendars.ReadBasic` moves to
+  `reconnect_required` on its next read, without crashing.
+- Graph requests keep explicit `$select` lists. Tests prove no request asks
+  for `body`, `bodyPreview`, `attachments` or extensions, and that unexpected
+  response fields are dropped before validation output.
+- Update `docs/EXTERNAL_EVENT_CONTRACT.md`, `docs/INTEGRATION_PLAYBOOK.md`
+  (Outlook brief: scopes, rationale and the live evidence), `docs/OPERATIONS.md`,
+  `.env.example`, `docs/DECISIONS.md`, Settings legal text
+  (`components/settings/LegalContent.tsx`), the Outlook Settings disclosure, and
+  marketing FAQ/Privacy copy: Microsoft's permission allows reading event
+  details; Cadence requests only titles, times, calendar and response fields.
+- The Entra app "Cadence Calendar" lists `Calendars.Read` (delegated) instead of
+  `Calendars.ReadBasic` in its configured permissions.
+- Live retest on a disposable local stack: one personal account and one
+  work/school account connect, list calendars, read events and disconnect.
+  Agents drive the UI; the owner only signs in and consents.
+- Required checks, interaction registry and design-system checks pass.
+
+Platform impact:
+
+| Platform | Implementation or not-applicable reason |
+|---|---|
+| Web | `lib/services/outlook-calendar-oauth.ts`, Outlook service and adapter, Settings Outlook panel disclosure and legal text. |
+| Desktop | Same hosted broker and shared contracts; no desktop-specific scope handling. Installed acceptance stays with Ticket 238/115. |
+| Marketing | FAQ and Privacy wording for the broader Microsoft permission. |
 | Future mobile | Not applicable: no mobile surface. |

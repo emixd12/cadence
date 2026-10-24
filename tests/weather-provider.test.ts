@@ -92,6 +92,20 @@ describe("Open-Meteo adapter", () => {
     malformed(payload(0));
   });
 
+  it("keeps total rain unknown when either precipitation component is missing", () => {
+    const hours = parseOpenMeteoHours(payload(3, { rain: [null, 0, 0.4], showers: [0, null, 0.3] }));
+    expect(hours.map((hour) => hour.rainMillimeters)).toEqual([null, null, 0.7]);
+  });
+
+  it("rejects invalid time units and malformed hourly timestamps", () => {
+    const first = Date.parse("2026-10-22T14:00:00Z") / 1000;
+    expect(() => parseOpenMeteoHours({ ...payload(2), hourly_units: { ...payload().hourly_units, time: "iso8601" } }))
+      .toThrow(WeatherProviderError);
+    for (const time of [[first, first], [first + 3600, first], [first, first + 1], [first, Number.MAX_SAFE_INTEGER]]) {
+      expect(() => parseOpenMeteoHours(payload(2, { time }))).toThrow(WeatherProviderError);
+    }
+  });
+
   it("reports provider errors and timeouts without the response body", async () => {
     const options = { config: READY, now: NOW };
     await expect(fetchOpenMeteoForecast(AREA, "2026-10-22T14:00:00Z", { ...options,

@@ -115,8 +115,11 @@ export function parseOpenMeteoHours(body: unknown): WeatherForecastHour[] {
   const hourly = body.hourly;
   const units = body.hourly_units;
   const times = hourly.time;
-  if (!Array.isArray(times) || times.length === 0 || times.length > WEATHER_FORECAST_HOURS ||
-    !times.every((value) => Number.isSafeInteger(value))) throw new WeatherProviderError("malformed_provider_response");
+  if (units.time !== "unixtime" || !Array.isArray(times) || times.length === 0 || times.length > WEATHER_FORECAST_HOURS ||
+    !times.every((value, index) => Number.isSafeInteger(value) && Math.abs(value) <= 8_640_000_000_000 &&
+      value % 3600 === 0 && (index === 0 || value > times[index - 1]))) {
+    throw new WeatherProviderError("malformed_provider_response");
+  }
   const columns = {} as Record<HourlyVariable, (number | null)[]>;
   for (const [name, unit] of Object.entries(HOURLY_VARIABLES) as [HourlyVariable, string][]) {
     const values = hourly[name];
@@ -133,7 +136,7 @@ export function parseOpenMeteoHours(body: unknown): WeatherForecastHour[] {
       time: Temporal.Instant.fromEpochMilliseconds(seconds * 1000).toString(),
       weatherCode: columns.weather_code[index] ?? null,
       // Rounded to 0.01 mm so float noise cannot cross a table threshold.
-      rainMillimeters: rain === null && showers === null ? null : Math.round(((rain ?? 0) + (showers ?? 0)) * 100) / 100,
+      rainMillimeters: rain === null || showers === null ? null : Math.round((rain + showers) * 100) / 100,
       snowfallCentimeters: columns.snowfall[index] ?? null,
       precipitationProbabilityPercent: columns.precipitation_probability[index] ?? null,
       apparentTemperatureCelsius: columns.apparent_temperature[index] ?? null,

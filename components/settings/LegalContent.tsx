@@ -38,7 +38,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
     title: "Privacy",
     summary:
       "Privacy policy for the Cadence marketing site and hosted personal behavior tracker.",
-    updated: "October 18, 2026",
+    updated: "October 21, 2026",
     sections: [
       {
         title: "Scope and operator",
@@ -77,7 +77,7 @@ export const LEGAL_PAGES: Readonly<Record<LegalPageKey, LegalPage>> = {
         title: "Outlook Calendar, iCloud Calendar, and Hevy",
         paragraphs: [
           "These connectors have local source and synthetic verification on web and linked desktop. Live Microsoft, Apple, and Hevy access, installed desktop behavior, and deployment remain unverified. Local checks do not establish public availability.",
-          "Where enabled, Outlook Calendar uses separate Microsoft consent with Calendars.ReadBasic. iCloud Calendar uses an Apple Account email and app-specific password for hosted CalDAV reads. Cadence reads selected calendars and normalizes event titles, times, timezone and availability. It discards unsupported details. Neither connector edits events. iCloud calendars stored only on a Mac are excluded.",
+          "Where enabled, Outlook Calendar uses separate Microsoft consent with Calendars.Read. Microsoft's permission allows reading event details such as descriptions and attachments; Cadence requests only event titles, times, timezone, availability, response, and calendar names. iCloud Calendar uses an Apple Account email and app-specific password for hosted CalDAV reads. Cadence reads selected calendars and normalizes event titles, times, timezone and availability. It discards unsupported details. Neither connector edits events. iCloud calendars stored only on a Mac are excluded.",
           "Apple does not limit this app-specific password to Calendar; it can also reach Mail, Contacts and other iCloud data. Cadence restricts its use to Calendar reads. Never enter a primary Apple Account password. Cadence seals the email and app-specific password on the server.",
           "Hevy requires Hevy Pro and an API key. The key has no documented read-only scope; Cadence permits only its allowlisted reads. Provider responses can contain workout titles, exercises, sets, weights, routines and notes. Cadence discards these details and exposes only recorded workout timing and duration. Location is unsupported. Workouts never automatically complete or change a Behavior or Occurrence.",
           "Hevy reads scan the account's workout history, even for a request covering today. Accounts above 500 workouts return incomplete coverage without reading workout pages. Within that global bound, count and page checks detect some changes during a read. A complete result means no change was detected; it is not an atomic snapshot and concurrent changes can still escape detection.",
