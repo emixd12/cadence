@@ -502,6 +502,93 @@ Dev-signed builds do not establish notarization, Gatekeeper on a downloaded copy
 DMG, updater installation from the feed, or macOS 14 compatibility. Those stay release
 gates.
 
+## Agent-run installed acceptance
+
+The order of methods and the owner-only steps are in `AGENTS.md`, "Installed and live
+acceptance". This procedure is what the agent ran for `0.1.6-dev.2` on October 24,
+2026 ([0.1.5 packet](qa/2026-10-23-desktop-0.1.5-release-packet.md)). The owner's
+hands were needed only to quit Cadence, sign in on the web and edit four Behaviors
+on the Mac; window automation can replace the last of these.
+
+### Install and readback
+
+1. Build with `dev-build` (above). When it passes, ask the owner to quit Cadence,
+   then run `node apps/desktop/scripts/install-dev-build.mjs <version>`.
+2. Confirm the install: the installed `CFBundleShortVersionString`, the executable's
+   SHA-256 against `binarySha256` in `dev-verification.json`, `codesign --verify
+   --strict /Applications/Cadence.app`, and the before/after counts in the protected
+   folder's `manifest.json`.
+3. Wait for the launch sync (about 30 seconds) with a bounded loop on the sync cursor
+   below. Do not poll by hand.
+
+### Read-only database queries
+
+```bash
+DB="$HOME/Library/Application Support/app.cadence.desktop/cadence.sqlite3"
+q() { sqlite3 -readonly "file:$DB?mode=ro" "$1"; }
+q "SELECT max(version) FROM schema_migrations;"                                # schema
+q "SELECT max(updated_at) FROM sync_cursors WHERE name = 'account-sync';"     # last sync
+q "SELECT count(*) FROM mutation_outbox WHERE synced_at IS NULL;"              # pending writes
+q "SELECT operation, count(*), max(synced_at) FROM mutation_outbox WHERE created_at > '<UTC time>' GROUP BY operation;"
+```
+
+These work while Cadence runs. Once it has quit and removed its `-shm` file, a
+read-only open fails with "unable to open database file (14)". Read the installer's
+protected copies instead. A `sqlite3 .backup` copy keeps WAL mode and fails the same
+way until it is set to `PRAGMA journal_mode=DELETE`. Never write to the live database.
+To confirm the web session and the Mac use one account, compare the SHA-256 of the
+lowercased email in `account_link_metadata` with the web session's. Never print the
+address.
+
+### How desktop sync runs
+
+Account sync runs at launch, after a local edit, when the network comes back, on
+Timeline reload, and on Settings › Account synchronization › **Sync now**. A failed
+sync retries with backoff of up to 30 seconds. There is no periodic timer, so a web
+change reaches the Mac only after one of these (`apps/desktop/src/product.tsx`).
+
+### Where round trip
+
+1. Web, in the in-app browser after the owner signs in: create `Where test 1`–`4` with
+   Where Not set, Anywhere, Home and A place (with place text). Turn off Browser
+   notifications and leave Email reminder off. The "Create behavior" section closes
+   after each save, so open it again. Click the checkboxes, because filling them
+   programmatically does not update the form state. A save can take about 5 seconds.
+2. Mac: **Sync now**. Then read
+   `SELECT title, coalesce(where_kind, 'not set'), coalesce(location_text, '-'), browser_reminder_enabled FROM behaviors WHERE title LIKE 'Where test %' ORDER BY title;`.
+3. Mac: change test 1 to A place, 2 to Home, 3 to Not set and 4 to Anywhere, then
+   **Sync now**. Expect `updateBehaviorGraph` rows synced and no pending rows.
+4. Web: reload, open **Details and Settings** for each, and read the Where select and
+   place text.
+5. Archive the four on the web with **Archive behavior**; never delete. Check that the
+   active and archived counts return. After the next Mac sync, the rows have
+   `active = 0` and an `archived_at`.
+
+### Connector check
+
+- Hosted state, through the web session:
+  `GET /api/{hevy,outlook-calendar,icloud-calendar,google-calendar}/connection`
+  returns `not_configured`, `disconnected`, `connected` or `reconnect_required`. The
+  desktop reads the same routes.
+- Production configuration, names only: `vercel env ls production` lists
+  `CONNECTOR_CREDENTIAL_*` and `OUTLOOK_CALENDAR_*` when the connectors are set up.
+- Desktop cache, counts only: `calendar-cache.sqlite3` has one `connector_fence` row
+  per source once the connector code has run. `connector_snapshot` gains rows after
+  a connected source refreshes. Disconnecting or switching accounts clears them.
+- Panels: read the Settings text through the window's accessibility tree (below).
+
+### Reading the Mac window
+
+System Events exposes the WKWebView accessibility tree to JavaScript for Automation:
+process `cadence-desktop-spike`, `windows[0]`, then walk `uiElements()` and read each
+element's `role()`, `name()`, `description()` and `value()`. Reading the visible
+screen needs no click. This is how the agent confirmed the three Connect buttons and
+"Device location: not yet allowed." on dev.2. The host app needs macOS Accessibility
+permission, and the Cadence window must be open. Use Computer Use, when this session
+has it, for clicks such as **Sync now**. The location prompt itself stays with the
+owner: it answers a permission prompt, and turning Travel estimates on changes a
+synced setting.
+
 ## Local signature fixture
 
 With Minisign installed, run:

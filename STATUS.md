@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Agent-run installed acceptance — October 24, 2026
+
+Documentation and agent guidance only; no runtime, schema or hosted change. The owner
+asked agents to run installed and live checks themselves before asking.
+
+- `AGENTS.md`, new "Installed and live acceptance" section, in this order: read state
+  without the UI (read-only SQLite, app APIs as the user, logs); the web app in the
+  in-app browser; the Mac app window through Computer Use or the apple-automation
+  skill; the owner last. Owner-only steps: quitting Cadence, sign-ins and credentials,
+  consent or permission prompts, provider revocation, settings that change synced data
+  or send data to a provider, and creating macOS users. Asks go out as one numbered
+  list; a missing tool is named so the owner can enable it.
+- `docs/DESKTOP_RELEASE.md`, new "Agent-run installed acceptance" after "Dev-signed
+  builds": install and readback, read-only database queries, how desktop sync runs
+  (launch, local edits, reconnect, Timeline reload, Sync now; no timer), the Where
+  round trip, the connector check, and reading the Mac window through its
+  accessibility tree. Written from the `0.1.6-dev.2` acceptance run (PR #140).
+- New project skill `.claude/skills/desktop-acceptance/SKILL.md`. `.gitignore` now
+  ignores `.claude/*` except `.claude/skills/`; worktrees, launch configuration and
+  codex-bridge state stay ignored.
+- No test hook was added to the app.
+
+Platform impact: agent process for desktop acceptance; web, marketing and future
+mobile have no change.
+
 ## Dev-signed desktop builds — October 23, 2026
 
 The owner approved dev-signed builds for installed desktop testing. Apple notarization
