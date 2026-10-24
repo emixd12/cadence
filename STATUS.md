@@ -1,5 +1,24 @@
 # Implementation Status
 
+## Test device pathway — October 24, 2026
+
+The owner kept the test Mac's SSH accessibility grant from the 0.1.5 release and
+asked for a standing, multi-device pathway.
+
+- `docs/TEST_DEVICES.md`: setup per device (Tailscale, Remote Login, labelled SSH
+  key, Accessibility for `sshd-keygen-wrapper`, the System Events prompt), commands,
+  rules and known behavior.
+- `scripts/test-device.mjs` with `list`, `check`, `exec` and `ax`; JXA helpers in
+  `scripts/test-device-ax/`. The inventory lives outside the public repository in
+  `~/Library/Application Support/Cadence Release/test-devices.json`; the format is
+  `docs/examples/test-devices.example.json`.
+- `AGENTS.md` and `docs/DESKTOP_RELEASE.md` point to it.
+- Verified against the test Mac: `check` reported macOS 27.0.1, Cadence 0.1.5 running
+  and working accessibility; `exec` and `ax find` returned results.
+
+Platform impact: desktop acceptance tooling only. Web, marketing and future mobile
+have no change; a future mobile device would need its own driver.
+
 ## PR 124: paired Tauri dependency upgrade — October 24, 2026
 
 The API-only update selected JavaScript `@tauri-apps/api` 2.12.4 while the

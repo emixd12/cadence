@@ -93,7 +93,9 @@ order that can answer the question:
    that change synced data or send data to a provider, and creating macOS users.
 
 Send owner asks as one numbered list. If a tool is missing, name it and ask the
-owner to enable it instead of handing its work to the owner. Procedure:
+owner to enable it instead of handing its work to the owner. Test devices other
+than the owner's Mac are driven over Tailscale SSH with `scripts/test-device.mjs`
+(`docs/TEST_DEVICES.md`). Procedure:
 `docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance".
 
 ## Source-of-truth documents

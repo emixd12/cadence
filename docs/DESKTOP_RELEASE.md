@@ -511,6 +511,10 @@ this section says how an agent runs installed checks. It is what the agent ran f
 owner's hands were needed only to quit Cadence, sign in on the web and edit four Behaviors
 on the Mac; window automation can replace the last of these.
 
+Test devices, such as the test Mac on the last published release, are reached over
+Tailscale SSH with `scripts/test-device.mjs`; setup and rules are in
+[TEST_DEVICES.md](TEST_DEVICES.md).
+
 ### Install and readback
 
 1. Build with `dev-build` (above). When it passes, ask the owner to quit Cadence,
