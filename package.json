@@ -16,6 +16,7 @@
     "desktop:dev": "npm --workspace apps/desktop run dev",
     "desktop:dev:web": "npm --workspace apps/desktop run dev:web",
     "desktop:build": "npm --workspace apps/desktop run build",
+    "desktop:dependencies:check": "node scripts/check-desktop-dependencies.mjs",
     "desktop:typecheck": "npm --workspace apps/desktop run typecheck",
     "desktop:native:test": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "desktop:native:build": "npm --workspace apps/desktop run tauri -- build --debug --bundles app --config src-tauri/tauri.local.conf.json",
@@ -95,10 +96,10 @@
     "@modelcontextprotocol/server": "2.3.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
-    "lucide-react": "^1.57.0",
+    "lucide-react": "^1.59.0",
     "next": "16.4.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

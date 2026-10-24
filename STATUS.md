@@ -1,5 +1,37 @@
 # Implementation Status
 
+## PR 124: paired Tauri dependency upgrade — October 24, 2026
+
+The API-only update selected JavaScript `@tauri-apps/api` 2.12.4 while the
+native `tauri` crate stayed at 2.11.5. Tauri requires matching core minor
+versions. Separate Vite and Cargo checks did not enforce that relationship.
+
+- Pin JavaScript API and CLI to 2.12.4, pair native `tauri` 2.12.4 with
+  `tauri-build` 2.7.3, and regenerate their lockfiles. Existing deep-link and
+  updater plugin pairs stay at 2.4.9 and 2.10.1.
+- `desktop:dependencies:check` rejects core minor drift and exact plugin
+  version drift across the npm and Cargo locks. `agents:check` and the desktop
+  frontend build run it. Six regression tests include the original mismatch.
+- Refresh this PR against main `ae17936` without rewriting its history.
+
+Verification on Node 24 and Rust 1.97.1: agents, interactions, resolvers, lint,
+both TypeScript checks, web/desktop frontend/marketing builds, marketing check,
+public-source and Trust checks pass. Full Vitest: 3,482 passed, 176 skipped.
+`cargo metadata --locked` resolves the new dependency graph. Local npm installs
+use `--ignore-scripts` because AgentMail's unrelated binary download cannot
+resolve GitHub from this environment.
+
+Native macOS compilation and installed acceptance are not verified here; this
+review environment is Linux. Require the updated PR's native macOS workflow,
+then a fresh desktop candidate and applicable release acceptance. Do not reuse
+the existing 0.1.5 binary as evidence for these new dependencies. If retaining
+that notarized candidate, finish its acceptance and release before merging
+dependency upgrades.
+
+Platform impact: desktop native runtime/tooling only. Web and marketing keep
+their runtime dependency versions; future mobile is not implemented. No schema,
+hosted setting, signing, publication or feed change.
+
 ## Agent-run installed acceptance — October 24, 2026
 
 Documentation and agent guidance only; no runtime, schema or hosted change. The owner
