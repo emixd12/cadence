@@ -226,7 +226,8 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
       titleOf: (ref) => context.cadence.occurrences.find((occurrence) => occurrence.ref === ref)?.title ?? null })
     : value.text.trim();
   const tip = validateTip(value.tip ?? null, analysis);
-  const combined = [value.text, ...suggestions.map((item) => item.text), ...(tip ? [tip.text] : [])].join(" ");
+  // Count the text actually shown, including a recipe 1.2 overview Cadence wrote.
+  const combined = [text, ...suggestions.map((item) => item.text), ...(tip ? [tip.text] : [])].join(" ");
   if (combined.length > 2600 || combined.trim().split(/\s+/u).filter(Boolean).length > config.length.maxWords || /https?:|www\./i.test(combined)) throw new DailyBriefError("advisor_unavailable");
   const tipFinding = tip ? analysis!.tip! : null;
   if (tipFinding && analysis?.recordFingerprints.length) input.onTip?.(analysis.recordFingerprints);

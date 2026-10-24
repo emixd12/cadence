@@ -1,5 +1,28 @@
 # Implementation Status
 
+## PR #150 review follow-ups — October 24, 2026
+
+Fixes the two chatgpt-codex P2 findings that PR #150 resolved as follow-ups. Both
+touch gated paths only: the loopback briefing workbench and recipe 1.2.
+
+- Workbench sequences: `startBriefingSequence` now plans and reserves one estimate
+  call for each task whose configuration estimates durations and whose saved case
+  holds descriptions. It used to reserve one call per task, so the first estimate
+  used up a later task's call and that task recorded `comparison_limit`. "Planned
+  calls" now includes the estimate calls. The single comparison and the sequence
+  share one `estimatesDurations` rule.
+- Recipe 1.2 word limit: the combined check now counts the final text, including
+  the overview Cadence writes when the model leaves it empty.
+
+New regressions in `tests/briefing-sequence.test.ts` and
+`tests/briefing-recipe-v1-2.test.ts` fail without the fixes and pass with them. This
+branch also merges the updated #138 (next entry): the travel migrations now sort
+after the applied `20261022180000`. The production recipe stays 1.0. No migration
+content, provider setting or hosted state changed.
+
+Platform impact: web and linked desktop share the generation fix; the workbench is
+development-only. Marketing: no change. Future mobile: not applicable.
+
 ## PR #138 brought in line with main after the Ticket 187 release — October 24, 2026
 
 Main gained PR #150 (Tickets 187, 184 candidates 2–3 and 188), which shipped without

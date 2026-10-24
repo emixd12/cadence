@@ -17,7 +17,7 @@ import { DAILY_BRIEF_MODEL } from "./daily-brief-openai";
 import { DAILY_BRIEF_PROMPT_REVISION, DailyBriefError, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { runDailyBriefRequest } from "./daily-brief-request";
 import type { CalendarCaller } from "./google-calendar.service";
-import { assertSavedCaseAuthorized, benchCaseFingerprint, guard, json, parseReview, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
+import { assertSavedCaseAuthorized, benchCaseFingerprint, estimatesDurations, guard, json, parseReview, readComparisonBody, replaySavedCase, runBriefingComparison, type ReviewCandidateInput } from "./briefing-workbench.service";
 
 export type BriefingSequenceHistory = Readonly<{ fingerprint: string; lastShownLocalDate: string }>;
 export type BriefingSequenceResult = Readonly<{
@@ -114,7 +114,9 @@ function planSequence(input: SequenceInput, details: BenchCaseDetail[]) {
     });
     return { caseId: detail.case.id, localDate: detail.case.localDate, evidenceType: detail.case.evidenceType, selections };
   });
-  const plan: BriefingSequencePlan = { caseIds: details.map(detail => detail.case.id), mode: input.mode, plannedCalls: tasks.length, callBudget: input.callBudget,
+  // The comparison dispatches a description estimate through this reservation, so admit and reserve it too.
+  const plannedCalls = tasks.reduce((calls, task) => calls + (estimatesDurations(task.config) && task.detail.case.inputs?.descriptions ? 2 : 1), 0);
+  const plan: BriefingSequencePlan = { caseIds: details.map(detail => detail.case.id), mode: input.mode, plannedCalls, callBudget: input.callBudget,
     warmup: input.warmup, spacing: "one_tip_per_day",
     assumption: "Selected tips are assumed delivered in this no-model simulation; generation records only retained successful tips.", days, budget: briefingBenchBudget().snapshot() };
   return { plan, tasks };
