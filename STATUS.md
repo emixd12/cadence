@@ -1,5 +1,61 @@
 # Implementation Status
 
+## Desktop release acceptance and version-free download link — October 24, 2026
+
+The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
+2026-10-24). This change covers documentation, one marketing link and its test. Nothing
+was notarized, published or deployed, and no feed changed. The one authorized upload is
+recorded below.
+
+- `docs/DESKTOP_RELEASE.md` gains "Release acceptance" and "Publication". Every
+  notarized release after 0.1.3 needs four checks: the 14 artifact checks,
+  notarization and Gatekeeper on a quarantined download, an upgrade from the last
+  published version with the data comparison, and the real updater when the SQLite
+  schema or the last release's updater files changed. Area checks run only when
+  `git diff` from the last published commit touches their files. Dev-build evidence
+  counts while those files are unchanged. The test Mac stays on the published release.
+- Published builds read only the stable feed, so the real-updater test runs during
+  publication: the stable feed changes first, the test Mac updates and passes the
+  comparison, then the download link and the preview feed move.
+- `docs/qa/desktop-release-packet-template.md` is the one-page packet.
+  `docs/OPERATIONS.md` points the release gates at the new sections.
+- **Download for Mac** (`apps/marketing/src/data/site.ts`) links to the version-free
+  `desktop-stable/Cadence_aarch64.dmg`. Each publication replaces that asset, so it
+  needs no marketing PR, deployment or Trust marketing-ID refresh.
+  `tests/marketing-layout.test.ts` pins the link and rejects versioned names;
+  `INT-MKT-012` is updated.
+
+Trust audit: the public Trust evidence does not depend on the versioned DMG name. Route
+and artifact checks fetch only the named application and marketing deployments. A fresh
+marketing build before and after the change produced byte-identical `robots.txt`,
+`llms.txt`, `llms-full.txt`, `data/route-manifest.json` and example ZIP; the link
+appears only in the header of 34 HTML pages. Every merge to `main` still rebuilds
+marketing and needs the Trust refresh in `docs/VERCEL_WORKFLOW.md`.
+
+**Version-free asset uploaded October 24, 2026, at 01:44:18Z.** The release-process
+session uploaded it on the owner's authorization, from the retained 0.1.3 copy, which
+it hashed before the upload. Readback:
+- GitHub lists `Cadence_aarch64.dmg` at 8,063,145 bytes, with the same SHA-256 as
+  `Cadence_0.1.3_aarch64.dmg`:
+  `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`.
+- The public URL returns 200 after one redirect, and its download has that hash.
+- Gatekeeper accepts a quarantined copy of the download as Notarized Developer ID, both
+  the DMG and the app inside. Both staples validate, and `syspolicy_check distribution`
+  passes.
+- Every earlier asset and `latest.json` is unchanged. No feed changed.
+
+Merging waits for the owner's instruction. A merge deploys marketing to production, and
+then needs the Trust marketing-ID refresh in `docs/VERCEL_WORKFLOW.md`.
+
+Applied to 0.1.5 (PR #140; `dcefe7e` to `ed93fff`): schema 17 to 18 requires the
+real-updater upgrade from 0.1.3 during publication. `auth.ts` and `auth.rs` require the
+sign-in callback, session renewal and revoked-session checks. The Calendar files require
+the Calendar replay. `Entitlements.plist` and `first-account-link.ts` require a new
+macOS user or the second Mac. Native reminder and updater files did not change.
+
+Platform impact: desktop release process and the marketing download link. Web and
+future mobile are not affected. No schema, migration or hosted configuration change.
+
 ## Connector and Where hosted migrations applied — October 23, 2026
 
 PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
