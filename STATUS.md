@@ -1,5 +1,41 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.5 published — October 24, 2026
+
+The owner instructed the merge and release of the retained 0.1.5 candidate (source
+`41e4549`, SQLite schema 18). It is the published stable release. Packet:
+`docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`, "Publication and acceptance".
+
+- The retained artifacts matched their recorded hashes and passed strict codesign,
+  staple, Gatekeeper and updater-signature checks again.
+- 16:18–16:19Z: the versioned DMG, updater archive, signature and verification JSON
+  were uploaded to `desktop-stable`, and the stable feed moved to 0.1.5. The saved 0.1.3
+  feeds are kept for rollback.
+- On the test Mac (macOS 27.0.1), published 0.1.3 offered exactly 0.1.5. Review update,
+  Install update and Restart Cadence produced the 0.1.5 executable `e553d81d…`. The
+  data comparison passed: schema 17 → 18, integrity `ok`, no backfill misses, same
+  profile, no table lost rows, no secret findings, every change classified. Sync ran
+  without "Update Cadence".
+- Area checks: sign-in and Calendar callback replays passed on `0.1.6-dev.2` (same
+  application source) and on 0.1.5. Session renewal passed. The test account's
+  hosted session was deleted with the owner's authorization; after token expiry,
+  0.1.5 showed the revoked state, and reconnecting synced with no row loss. Native
+  reminders were not required. The never-run macOS user check was not run, by the
+  owner's decision.
+- 17:30Z: `Cadence_aarch64.dmg` and the preview feed moved to 0.1.5. Every public asset
+  and both feeds read back with the recorded bytes. A quarantined download of the
+  version-free DMG passes Gatekeeper, both staples and `syspolicy_check distribution`.
+- The owner decided connector release steps 6–7 do not block this release; they remain
+  open with installed connector acceptance.
+
+Not changed: no hosted SQL, web deployment, marketing source or Trust variable. #145
+merged separately at 15:39Z and deployed app `dpl_2wXoZFy1…` and marketing
+`dpl_FQiHLT3A…`. The app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` still names
+`dpl_KvQhmkFy…`, so the Trust marketing-ID refresh is pending the owner's instruction.
+
+Platform impact: desktop distribution only. Web and marketing source are unchanged;
+future mobile is not affected.
+
 ## PR stack review: Calendar candidates with travel — October 24, 2026
 
 Integrated the reviewed release records, dependency upgrades and travel train before
