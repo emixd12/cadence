@@ -1,5 +1,32 @@
 # Implementation Status
 
+## Agent-run installed acceptance — October 24, 2026
+
+Documentation and agent guidance only; no runtime, schema or hosted change. The owner
+asked agents to run installed and live checks themselves before asking.
+
+- `AGENTS.md`, new "Installed and live acceptance" section, in this order: read state
+  without the UI (read-only SQLite, app APIs as the user, logs); the web app in the
+  in-app browser; the Mac app window through Computer Use or the apple-automation
+  skill; the owner last. Owner-only steps: quitting Cadence, sign-ins and credentials,
+  consent or permission prompts, provider revocation, settings that change synced data
+  or send data to a provider, and creating macOS users. Asks go out as one numbered
+  list; a missing tool is named so the owner can enable it.
+- `docs/DESKTOP_RELEASE.md`, new "Agent-run installed acceptance" after "Dev-signed
+  builds": install and readback, read-only database queries, how desktop sync runs
+  (launch, local edits, reconnect, Timeline reload, Sync now; no timer), the Where
+  round trip, the connector check, reading the Mac window through its
+  accessibility tree, and location checks from the unified log. Written from the
+  `0.1.6-dev.2` acceptance run (PR #140). It also records that the install script's
+  rename swap needs no Launch Services refresh.
+- New project skill `.claude/skills/desktop-acceptance/SKILL.md`. `.gitignore` now
+  ignores `.claude/*` except `.claude/skills/`; worktrees, launch configuration and
+  codex-bridge state stay ignored.
+- No test hook was added to the app.
+
+Platform impact: agent process for desktop acceptance; web, marketing and future
+mobile have no change.
+
 ## Desktop release acceptance and version-free download link — October 24, 2026
 
 The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
@@ -148,6 +175,99 @@ persisting across two dev builds. The 0.1.5 candidate's prepared upgrade check
 
 Platform impact: desktop release tooling only. Web, marketing and future mobile are not
 affected. No schema, migration, hosted configuration or interaction change.
+
+## Connector production secrets and redeploy — October 23, 2026
+
+The owner approved release steps 1–5 at 16:19 UTC. Steps 1–3 (preflight, dry
+run and the hosted push of the three connector and Where migrations) were
+already done by another session; see PR #139. This session did not run
+`supabase link`, `db push` or the hosted RLS smoke. `npm run smoke:rls` was
+skipped because it creates hosted auth users, which was not approved.
+
+- Vercel project `cadence`, Production only. The session added
+  `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (new random 32-byte key, sensitive),
+  `CONNECTOR_CREDENTIAL_KEY_ID`, `OUTLOOK_CALENDAR_CLIENT_ID`,
+  `OUTLOOK_CALENDAR_CALLBACK_URL` and `OUTLOOK_CALENDAR_CLIENT_SECRET`
+  (sensitive). `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS` stays unset. No values
+  were printed, logged or written to disk. `vercel env ls production` lists all
+  five names.
+- Outlook secret: the first `cadence-production` client secret on the Entra app
+  was created, but `vercel env add` did not store it. With coordinator approval
+  the session deleted that unused credential and created a new
+  `cadence-production` secret (expires 2027-10-23), which Vercel stored. The
+  app now holds `cadence-production` and the local test secret
+  `cadence-live-local`.
+- The app redeployed from `dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2` (commit `f922685`)
+  as `dpl_5UTt75NNMvovbABshuusrGkyXNAH`. The live marketing deployment was
+  `dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv` (the `f922685` build), so
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` to that ID; the readback matched. The app
+  was redeployed again as `dpl_4dgT9AH9ZtzPwi2ggfr7ZBxXeqmd`, Ready on
+  app.cadence-me.com at commit `f922685`.
+- An unauthenticated `GET /api/outlook-calendar/connection` returns 401
+  `unauthenticated`. Production logs from 16:24 to 18:50 UTC show no 5xx
+  responses or error-level entries. The coordinator separately observed the
+  expected disabled `/mcp` 503, and `GET` 200 on the Outlook, Hevy and iCloud
+  connection routes at 17:52 UTC.
+
+Still pending: step 6 (production smoke on the owner's accounts, then revoking
+test credentials) and step 7 (public disclosure copy, owner approves the
+wording). Desktop connectors arrive with the next signed release.
+
+## Cadence for Mac 0.1.5 candidate — October 23, 2026
+
+The hosted Where migration (PR #112) went live October 23. Published 0.1.3 does not
+send `where_kind`, so its Behavior sync now fails closed with "Update Cadence".
+Version 0.1.5, built from main, restores sync. It carries SQLite schema 18 (Where),
+the 0.1.4 session fix (never built or published) and the Ticket 165 location
+entitlement. The owner approved signing and notarizing the candidate; publication
+needs a separate instruction. Nothing was published.
+
+Built from `41e4549` (PR #140). Apple accepted the app and the DMG; both staples,
+Gatekeeper (including a quarantined copy), strict verification and all 14 release
+checks pass. The signed entitlements include the location entitlement with Hardened
+Runtime. The binary embeds schema 18 and only the stable feed. The updater archive
+and signature verify but were not uploaded. DMG SHA-256
+`9518085a0c27e950e709523925144d07a2f697a823bc83f8a5c719ca1c6bc686`.
+Native library tests (115) and repository checks pass. Main since then (`ed93fff`)
+changed only release tooling and documents, so the 0.1.5 artifacts still match main's
+application source.
+
+Installed acceptance on the owner's Mac moved to the dev-signed `0.1.6-dev.2` (built
+from `ed93fff`, executable SHA-256 `94dbaf1d…a991`), because that Mac already ran
+`0.1.6-dev.1`. October 24: the install script replaced dev.1 at 00:59Z (schema 18, all
+30 tables kept their rows), and the app synced 30 s after launch. Where sync passes
+both ways: four test Behaviors created on the web with Not set, Anywhere, Home and A
+place reached the Mac, and the owner's four Mac edits reached the web. The test
+Behaviors are archived. Read through the macOS accessibility tree, the Mac shows
+connect controls for Outlook, iCloud and Hevy, and "Device location: not yet allowed."
+with Travel estimates on. Ticket 165 on this Mac: the signed entitlement produced the
+first macOS location prompt (02:42 BST), the owner allowed it, and with Cadence
+frontmost a current position was available. A follow-up defect: the desktop
+permission check runs a full location request, which times out right after a read and
+clears the "Device location" line. Open: the denied state, the 0.1.5 upgrade from
+0.1.3 on the test Mac, the prompt on a never-authorized user, and publication.
+
+Connector gating: when the candidate was built, production had no
+`CONNECTOR_CREDENTIAL_*` or `OUTLOOK_CALENDAR_*` settings, and the three connectors
+showed "not configured". Those secrets were set later on October 23 (PR #141). Hevy,
+iCloud Calendar and Outlook Calendar now report `disconnected` for the owner's account,
+so a linked desktop offers connect controls for all three. Connector release steps
+6–7 are still pending; the owner decides whether they must finish before publication.
+
+The travel release train (PR #138) moves from 0.1.5 to 0.1.6. Evidence, hashes,
+owner steps and rollback: `docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`.
+
+October 24 review: the packet now follows the merged release policy. The 0.1.3
+test Mac must upgrade through the real stable-feed updater during authorized
+publication, before the version-free DMG and preview feed move. Callback, session,
+new-user and public-download checks remain explicitly open. Source and notarized
+artifacts are unchanged; no publication or hosted action occurred. The evidence
+matrix preserves the owner's recorded dev.2 location prompt and foreground-position
+passes, while the denied state and never-authorized user checks remain open.
+
+Platform impact: desktop version and release records only. Web, marketing and
+future mobile have no change. No schema, migration or hosted configuration changed.
 
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
