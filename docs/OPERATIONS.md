@@ -1429,6 +1429,9 @@ an ad hoc signed development app with a bound bundle identity; it does not
 satisfy Developer ID signing, notarization, or final-release gates. The local
 signing config must not be used for final release builds. Ticket 113's separate
 ad hoc preview procedure is recorded in `docs/DESKTOP_RELEASE.md`.
+For installed testing on the owner's Macs, `release.mjs dev-build` and
+`install-dev-build.mjs` build and install Developer ID signed, unnotarized apps; see
+`docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
 `desktop:dev:web` exposes the
 developer bench without claiming native APIs work in a browser. For Codex local QA, select the first free port
 in 4321–4330 and bind loopback. Never let the server choose outside that pool.
