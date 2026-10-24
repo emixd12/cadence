@@ -129,7 +129,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   const planningNow = input.planningNow ?? input.now().toString();
   const prepared = prepareBriefing(planned, config, planningNow, input.analysis, alongside);
   input.onPrepared?.({ prepared, estimates: report });
-  const { facts, references, plan, configurationRevision, pipelineVersion, analysis } = prepared;
+  const { facts, contextControls, references, plan, configurationRevision, pipelineVersion, analysis } = prepared;
   const v11 = isPlainRecipe(config.recipe);
   const v12 = isLaneRecipe(config.recipe);
   const instructions = `${DAILY_BRIEF_INSTRUCTIONS}${analysis ? `\n${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}` : ""}${"connectorSources" in facts ? `\n${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}` : ""}${v11 ? `\n${DAILY_BRIEF_V1_1_INSTRUCTIONS}` : ""}${v12 ? `\n${DAILY_BRIEF_V1_2_INSTRUCTIONS}` : ""}\nPresentation: ${JSON.stringify({ tone: config.tone, directness: config.directness, encouragement: config.encouragement, maxWords: config.length.maxWords, priorities: config.priorities })}. Hard limit: at most ${config.length.maxWords} words across ${analysis ? "text, all suggestion text and tip.text" : "text and all suggestion text"} combined, not per field. Aim below this limit; summarize selectively instead of listing every Behavior. Maximum ${config.alternatives} suggestions. Route: ${plan.route}.`;
@@ -176,6 +176,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   const validRefs = (items: unknown, allowed: Set<string>, max: number): items is string[] => Array.isArray(items) && items.length <= max && items.every((item) => typeof item === "string" && allowed.has(item)) && new Set(items).size === items.length;
   if (!Array.isArray(value.suggestions) || value.suggestions.length > config.alternatives) throw new DailyBriefError("advisor_unavailable");
   const sources = new Set(references.included.map((source) => source.id));
+  const selectedOptionIds = new Set<string>();
   const suggestions = value.suggestions.map((item: unknown) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new DailyBriefError("advisor_unavailable");
     const suggestion = item as Record<string, unknown>;
@@ -185,6 +186,10 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
         (plan.route !== "priority_suggestions" && plan.route !== "scheduling_options")) throw new DailyBriefError("advisor_unavailable");
     const option = plan.options.find((option) => option.id === suggestion.optionId);
     if (plan.route === "scheduling_options" ? !option || !suggestion.occurrenceRefs.includes(option.occurrenceRef) : suggestion.optionId !== null) throw new DailyBriefError("advisor_unavailable");
+    if (option) {
+      if (selectedOptionIds.has(option.id)) throw new DailyBriefError("advisor_unavailable");
+      selectedOptionIds.add(option.id);
+    }
     // Recipe 1.2 shows the moved Behavior's name in the suggestion's own block.
     const behavior = v12 && option ? context.cadence.occurrences.find((occurrence) => occurrence.ref === option.occurrenceRef)?.title : undefined;
     return { text: v12 && option ? "" : suggestion.text.trim(), occurrenceRefs: suggestion.occurrenceRefs, referenceIds: suggestion.referenceIds, optionId: option?.id ?? null, ...(option ? { option } : {}), ...(behavior ? { behavior } : {}) };
@@ -223,7 +228,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     ...(v11 ? { category: briefingTipCategory(tipFinding) } : {}),
   } : null;
   // Recipe 1.2: with no model tip, Cadence may nudge for a missing length, judged after estimates.
-  const shownTip = analysisTip ?? (v12 ? briefingSetupTip(planned) : null);
+  const shownTip = analysisTip ?? (v12 ? briefingSetupTip({ facts, contextControls }) : null);
   return {
     ...(shownTip ? { tip: shownTip } : {}),
     suggestions, references: references.included.filter((source) => suggestions.some((item) => item.referenceIds.includes(source.id))),

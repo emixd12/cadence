@@ -1,5 +1,26 @@
 # Implementation Status
 
+## PR #135 review corrections — October 24, 2026
+
+Recipe 1.2 Setup tips now use the same projected facts and selected duration
+sources as the brief. An accepted estimate, an excluded Behavior or deliberately
+disabled duration inputs no longer produces a false missing-length tip. The output
+validator also rejects repeated planner option IDs, preserving one move per
+Behavior when the model repeats a suggestion. Regression tests cover each case.
+
+`docs/COSTS.md` records Ticket 188's optional second model request and clearly
+labels its usage and price assumptions. The production default remains recipe 1.0.
+No migration, provider configuration, hosted rollout or candidate promotion changed.
+Platform impact: web and linked desktop share generation corrections; marketing
+and future mobile have no implementation change. Existing owner acceptance and
+the Ticket 187 cutover steps remain open.
+
+Validation: agents, interactions and resolvers checks, lint, web and desktop
+typechecks, all 328 active Vitest files (3,542 tests), the web production build and
+desktop renderer build pass. Fifteen test files remain skipped by their existing
+environment gates. This review does not establish live provider, browser or
+installed macOS acceptance.
+
 ## Desktop release acceptance and version-free download link — October 24, 2026
 
 The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
-import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG, parseBriefingConfig, serializeBriefingConfig } from "@cadence/core/services/briefing-config";
+import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG, parseBriefingConfig, projectBriefingContext, serializeBriefingConfig } from "@cadence/core/services/briefing-config";
 import {
   briefingBehaviorNames, briefingMoveText, briefingSuggestionLabel, briefingTextSegments, isEmptyBriefing, isLaneBriefing, isPlainBriefing, visibleDailyBriefText,
 } from "@cadence/core/services/daily-brief-presentation";
@@ -121,6 +121,16 @@ describe("recipe 1.2 output", () => {
     await expect(generateDailyBrief(context, { generate, now, signal: signal(), config: v11, analysis: { source } })).rejects.toThrow("advisor_unavailable");
   });
 
+  it("rejects a repeated move instead of showing the same Behavior twice", async () => {
+    const generate = vi.fn().mockImplementation(async ({ facts }: { facts: string }) => {
+      const optionId = JSON.parse(facts).plan.options[0].id;
+      const suggestion = { text: "", occurrenceRefs: [walk.ref], referenceIds: [], optionId };
+      return { text: "Walk overlaps your meeting.", occurrenceRefs: [walk.ref], suggestions: [suggestion, suggestion], tip: null };
+    });
+    await expect(generateDailyBrief(context, { generate, now, signal: signal(), config: v12 }))
+      .rejects.toThrow("advisor_unavailable");
+  });
+
   it("accepts a tip-only quiet day and an empty brief, but only under recipe 1.2", async () => {
     const tipOnly = vi.fn().mockResolvedValue({ text: "", occurrenceRefs: [], suggestions: [],
       tip: { findingId: "tip", text: "Record a decision for Walk tonight.", noteRefs: [] } });
@@ -210,9 +220,35 @@ describe("recipe 1.2 setup tip", () => {
   it("gives way to a model tip and skips Behaviors that have a length", async () => {
     const withTip = vi.fn().mockResolvedValue({ text: "", occurrenceRefs: [], suggestions: [], tip: { findingId: "tip", text: "Record a decision for Walk right after it.", noteRefs: [] } });
     expect((await generateDailyBrief(missing, { generate: withTip, now, signal: signal(), config: debtConfig(), analysis: { source } })).tip?.category).toBe("logging");
-    expect(briefingSetupTip(context)).toBeNull();
+    expect(briefingSetupTip(projectBriefingContext(context, v12))).toBeNull();
     const later = { ...unknownWalk, ref: "occurrence_later", title: "Read", scheduledFor: "2026-11-01T20:00:00Z" };
-    expect(briefingSetupTip({ ...missing, cadence: { ...missing.cadence, occurrences: [later, unknownWalk] } })?.text).toContain("Walk");
+    expect(briefingSetupTip(projectBriefingContext({ ...missing, cadence: { ...missing.cadence, occurrences: [later, unknownWalk] } }, v12))?.text).toContain("Walk");
+  });
+
+  it("does not ask for a length after an accepted estimate supplies it", async () => {
+    const estimate = vi.fn().mockResolvedValue({ estimates: [{ behaviorRef: walk.behaviorRef, minutes: 20, basis: "inferred", alongside: false }] });
+    const briefing = await generateDailyBrief(missing, { generate: quiet(), estimate, descriptions: {}, now, signal: signal(), config: v12 });
+    expect(briefing.tip).toBeUndefined();
+  });
+
+  it("does not mention Behaviors excluded from the briefing scope", async () => {
+    const selected = { ...walk, ref: "occurrence_selected", behaviorRef: "behavior_selected", title: "Read" };
+    const scoped = parseBriefingConfig({ ...v12, scope: { ...v12.scope, behaviorRefs: [selected.behaviorRef] } });
+    const sourceContext = { ...missing, cadence: { ...missing.cadence, occurrences: [unknownWalk, selected],
+      history: { ...missing.cadence.history, behaviors: [...missing.cadence.history.behaviors,
+        { ...missing.cadence.history.behaviors[0]!, behaviorRef: selected.behaviorRef }] },
+    } };
+    const briefing = await generateDailyBrief(sourceContext, { generate: quiet(), now, signal: signal(), config: scoped });
+    expect(briefing.tip).toBeUndefined();
+    expect(briefing.behaviorNames).not.toContain("Walk");
+  });
+
+  it("does not turn intentionally disabled duration inputs into missing-data advice", async () => {
+    const disabled = parseBriefingConfig({ ...v12, context: { ...v12.context, duration: { ...v12.context.duration,
+      includeConfiguredDefault: false, includeHistoricalAverage: false, includeDescriptionEstimate: false,
+    } } });
+    const briefing = await generateDailyBrief(missing, { generate: quiet(), now, signal: signal(), config: disabled });
+    expect(briefing.tip).toBeUndefined();
   });
 });
 
