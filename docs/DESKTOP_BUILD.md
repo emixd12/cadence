@@ -506,7 +506,9 @@ Required evidence includes:
 Ticket 115 owns acceptance of the Developer ID signed and notarized `.app` and `.dmg`
 artifacts. Tauri requires [signed updater artifacts](https://v2.tauri.app/plugin/updater/).
 Local commands, signing requirements, and installed-upgrade evidence live in
-[`DESKTOP_RELEASE.md`](DESKTOP_RELEASE.md).
+[`DESKTOP_RELEASE.md`](DESKTOP_RELEASE.md). Installed testing between releases uses
+Developer ID signed, unnotarized
+[dev-signed builds](DESKTOP_RELEASE.md#dev-signed-builds).
 
 Apple membership is available as of September 27, 2026. The Developer ID identity
 and matching provisioning profile are installed. Apple accepted the notarization

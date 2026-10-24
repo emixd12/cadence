@@ -1148,3 +1148,35 @@ history. This keeps the retention copy's promise that longer retention lets the
 advisor learn more. Counts carry no place keys, positions or text. Privacy text:
 P-001 and P-004 in `docs/PRIVACY_CHANGES.md`. Recorded from the owner's October 23
 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Dev-signed desktop builds; the owner gates notarization and publication
+
+The owner is Cadence's only user. Each desktop change had been producing its own
+notarized release candidate, with an owner approval, two-Mac installed acceptance, a
+release packet and publication steps. Nine Developer ID candidates were built after
+September 27, and only 0.1.3 was published. Signing and notarization themselves took
+about three minutes for the 0.1.5 candidate.
+
+- A dev-signed build carries the production Developer ID signature, entitlements and
+  provisioning profile, without a secure timestamp. It is not notarized, has no DMG or
+  updater archive, and is never published. Building it contacts no Apple service. `apps/desktop/scripts/release.mjs dev-build` builds it and
+  `apps/desktop/scripts/install-dev-build.mjs` installs it. Commands, version rules
+  and rollback: `docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
+- Standing approval: agents may build dev-signed builds and install them on the
+  owner's Macs without asking each time. Installation goes through the install
+  script, which keeps its protected copies. Cadence must already be quit; agents
+  never quit it. Builds come from main, or from a branch whose SQLite migrations
+  match `origin/main`.
+- A dev-signed build satisfies a ticket's installed desktop acceptance. Checks that
+  need a notarized or downloaded artifact stay with releases: Gatekeeper on a
+  quarantined download, the DMG, and updates from the published feed.
+- Still the owner's call each time: any Apple notarization submission (`release.mjs
+  build`), any upload, feed or marketing-link change, `--allow-unmerged-migrations`,
+  and restoring a protected database copy, which discards later changes.
+- The owner decides when a batch ships as a notarized release. Merging a desktop
+  change no longer implies a signed candidate. The release gates in
+  `docs/DESKTOP_RELEASE.md` are unchanged.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are
+not affected. Recorded from the owner's October 23 instruction in the release-process
+session.

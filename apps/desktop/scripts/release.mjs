@@ -1,10 +1,12 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReleaseBuildEnvironment, createReleaseOverlay, validateReleaseConfiguration, validateSigningEnvironment,
   createPreviewBuildEnvironment, createPreviewOverlay, validatePreviewConfiguration, validatePreviewBuildEnvironment,
+  createDevBuildEnvironment, createDevOverlay, validateDevConfiguration, validateDevBuildEnvironment,
   RELEASE_IDENTIFIER, RELEASE_NAME, RELEASE_TARGET } from "./release-config.mjs";
 import { verifyUpdaterSignature } from "./verify-updater-signature.mjs";
 
@@ -14,9 +16,15 @@ const native = path.join(desktop, "src-tauri");
 const base = JSON.parse(fs.readFileSync(path.join(native, "tauri.conf.json"), "utf8"));
 const command = process.argv[2] ?? "check";
 const preview = command.startsWith("preview-");
-const version = preview ? process.argv[3] : base.version;
-const overlay = preview ? createPreviewOverlay(base, process.env, version) : createReleaseOverlay(base, process.env);
+// Dev-signed builds use the production signature and entitlements, skip notarization, and are never published.
+const dev = command.startsWith("dev-");
+const version = preview || dev ? process.argv[3] : base.version;
+const overlay = preview ? createPreviewOverlay(base, process.env, version)
+  : dev ? createDevOverlay(base, process.env, version) : createReleaseOverlay(base, process.env);
 const releaseDirectory = path.join(desktop, ".release");
+// Staged outside any checkout, in the Spotlight-excluded private release store.
+const devBuildDirectory = path.join(path.resolve(process.env.CADENCE_RELEASE_STORE
+  || path.join(os.homedir(), "Library", "Application Support", "Cadence Release")), "dev-builds", String(version));
 // Verification tools need neither Apple credentials nor the private updater key.
 const verificationEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
   !key.startsWith("APPLE_") && !key.startsWith("TAURI_SIGNING_PRIVATE_KEY") && key !== "TAURI_CONFIG"));
@@ -31,11 +39,13 @@ function capture(binary, args) {
   return result.stdout;
 }
 function configurationErrors() {
-  return preview ? validatePreviewConfiguration(base, overlay) : validateReleaseConfiguration(base, overlay);
+  return preview ? validatePreviewConfiguration(base, overlay)
+    : dev ? validateDevConfiguration(base, overlay) : validateReleaseConfiguration(base, overlay);
 }
 function preflight({ readiness = false, build = false } = {}) {
   const errors = configurationErrors();
-  if (!preview) errors.push(...validateSigningEnvironment(process.env, base));
+  if (dev) errors.push(...validateDevBuildEnvironment(process.env, base));
+  else if (!preview) errors.push(...validateSigningEnvironment(process.env, base));
   else if (build) errors.push(...validatePreviewBuildEnvironment(process.env));
   if (process.platform !== "darwin" || process.arch !== "arm64") errors.push("The initial release must build on an Apple Silicon Mac.");
   if (!preview) {
@@ -47,9 +57,10 @@ function preflight({ readiness = false, build = false } = {}) {
       const identities = capture("security", ["find-identity", "-v", "-p", "codesigning"]);
       if (!process.env.APPLE_SIGNING_IDENTITY || !identities.includes(`"${process.env.APPLE_SIGNING_IDENTITY}"`)) errors.push("The configured Developer ID Application identity is not valid in the local keychain.");
     } catch { errors.push("The local signing keychain could not be verified."); }
-    if (process.env.APPLE_API_KEY_PATH && !fs.existsSync(process.env.APPLE_API_KEY_PATH)) errors.push("APPLE_API_KEY_PATH does not point to an available notarization key.");
+    if (!dev && process.env.APPLE_API_KEY_PATH && !fs.existsSync(process.env.APPLE_API_KEY_PATH)) errors.push("APPLE_API_KEY_PATH does not point to an available notarization key.");
   }
-  for (const [binary, args] of [["xcrun", ["--find", preview ? "vtool" : "stapler"]], ["minisign", ["-v"]], ["python3", ["-c", "import tarfile"]]]) {
+  const tools = [["xcrun", ["--find", preview || dev ? "vtool" : "stapler"]], ...(dev ? [] : [["minisign", ["-v"]]]), ["python3", ["-c", "import tarfile"]]];
+  for (const [binary, args] of tools) {
     try { capture(binary, args); } catch { errors.push(`${binary} is required for release verification.`); }
   }
   // A candidate is needed to test the updater interaction. Final readiness still requires that real evidence.
@@ -69,7 +80,7 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
   const app = path.join(bundleDirectory, "macos", `${RELEASE_NAME}.app`);
   const archive = `${app}.tar.gz`;
   const signatureFile = `${archive}.sig`;
-  const dmg = exactlyOne(path.join(bundleDirectory, "dmg"), ".dmg");
+  const dmg = dev ? null : exactlyOne(path.join(bundleDirectory, "dmg"), ".dmg");
   const plist = path.join(app, "Contents", "Info.plist");
   const value = (key) => capture("/usr/libexec/PlistBuddy", ["-c", `Print :${key}`, plist]).trim();
   if (value("CFBundleIdentifier") !== RELEASE_IDENTIFIER || value("CFBundleShortVersionString") !== version) throw new Error("The signed app identity/version does not match this candidate.");
@@ -94,9 +105,19 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
   if (capture("lipo", ["-archs", executable]).trim() !== "arm64") throw new Error("The initial release must contain only the arm64 executable.");
   if (!/minos\s+14\.0(?:\s|$)/.test(capture("xcrun", ["vtool", "-show-build", executable]))) throw new Error("The executable does not declare macOS 14.0 minimum.");
   run("codesign", ["--verify", "--deep", "--strict", app]);
+  // Production Keychain access depends on these signed entitlements and the profile that authorizes them.
+  if (!preview) run("python3", [path.join(desktop, "scripts", "verify-entitlements.py"), app, path.join(native, "Entitlements.plist")]);
+  const binarySha256 = createHash("sha256").update(fs.readFileSync(executable)).digest("hex");
+  if (dev) {
+    return { milestone: "dev-signed build", identifier: RELEASE_IDENTIFIER, version, target: RELEASE_TARGET, checkedAt: new Date().toISOString(),
+      frontendPublicConfiguration: frontendPublicConfiguration ?? "not verified by this command",
+      checks: ["strict codesign", "hardened runtime", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "Developer ID authority",
+        "production Keychain path", "signed entitlements match Entitlements.plist", "embedded provisioning profile authorizes entitlements"],
+      binarySha256, teamIdentifier: /^TeamIdentifier=(.+)$/m.exec(signing.stderr)?.[1] ?? "not reported",
+      secureTimestamp: "not requested", notarization: "not performed", gatekeeper: "not assessed", distribution: "install only on the owner's Macs; never publish",
+      declaredMinimumMacOS: "14.0", macOS14Compatibility: "not verified by this script", installation: "not performed by this command", publication: "not performed" };
+  }
   if (!preview) {
-    // Production Keychain access depends on these signed entitlements and the profile that authorizes them.
-    run("python3", [path.join(desktop, "scripts", "verify-entitlements.py"), app, path.join(native, "Entitlements.plist")]);
     run("codesign", ["--verify", "--deep", "--strict", dmg]);
     for (const artifact of [app, dmg]) run("xcrun", ["stapler", "validate", artifact]);
     run("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
@@ -112,7 +133,7 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
     checks: ["strict codesign", "hardened runtime", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "read-only DMG contents match app", "updater signature", "updater archive contents match app",
       ...(preview ? ["ad hoc app signature", "legacy macOS login Keychain"] : ["Developer ID authority", "signed entitlements match Entitlements.plist", "embedded provisioning profile authorizes entitlements", "Gatekeeper", "stapled notarization"])],
     artifacts: [dmg, archive, signatureFile].map((file) => ({ file, sha256: createHash("sha256").update(fs.readFileSync(file)).digest("hex") })),
-    binarySha256: createHash("sha256").update(fs.readFileSync(executable)).digest("hex"),
+    binarySha256,
     appleTrust: preview ? "Developer ID, notarization, and Gatekeeper acceptance deferred; not verified" : "artifact checks passed; downloaded launch remains unverified",
     declaredMinimumMacOS: "14.0", macOS14Compatibility: "not verified by this script", downloadedLaunch: "not verified by this script",
     upgradePreservation: "not verified by this script", migrationRecovery: "not verified by this script", feedAvailability: "not verified by this script", publication: "not performed" };
@@ -188,6 +209,52 @@ function stagePreview(bundleDirectory, directory, frontendPublicConfiguration) {
   prunePreviewApps(version);
 }
 
+// Migrations missing from origin/main could leave the owner's database unreadable by later builds,
+// so the install script refuses them unless the owner says otherwise.
+function devSource() {
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: root, env: verificationEnvironment, encoding: "utf8" });
+    return result.status === 0 ? result.stdout.trim() : null;
+  };
+  const migrations = path.join(native, "migrations");
+  const files = fs.existsSync(migrations) ? fs.readdirSync(migrations).filter((file) => /^\d+_[A-Za-z0-9_]+\.sql$/.test(file)).sort() : [];
+  const unmergedMigrations = files.filter((file) => {
+    const merged = spawnSync("git", ["show", `origin/main:${path.relative(root, path.join(migrations, file)).split(path.sep).join("/")}`],
+      { cwd: root, env: verificationEnvironment, maxBuffer: 16 * 1024 * 1024 });
+    return merged.status !== 0 || !merged.stdout.equals(fs.readFileSync(path.join(migrations, file)));
+  });
+  const status = git("status", "--porcelain");
+  return { commit: git("rev-parse", "HEAD"), branch: git("branch", "--show-current") || null, clean: status === null ? null : status === "",
+    sqliteSchemaVersion: files.length ? Number.parseInt(files.at(-1), 10) : null, unmergedMigrations };
+}
+
+function stageDev(bundleDirectory, frontendPublicConfiguration, source) {
+  const parent = path.dirname(devBuildDirectory);
+  fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
+  const temporary = fs.mkdtempSync(path.join(parent, ".candidate-"));
+  const builtApp = path.join(bundleDirectory, "macos", `${RELEASE_NAME}.app`);
+  try {
+    const bundle = path.join(temporary, "bundle");
+    const stagedApp = path.join(bundle, "macos", `${RELEASE_NAME}.app`);
+    fs.mkdirSync(path.join(bundle, "macos"), { recursive: true });
+    fs.cpSync(builtApp, stagedApp, { recursive: true, verbatimSymlinks: true });
+    // Replace Tauri's ad hoc signature. No secure timestamp: only notarization needs one, and requesting it
+    // would contact Apple's timestamp server. One signature covers only a bundle without nested code.
+    if (["Frameworks", "PlugIns", "Helpers", "XPCServices", "Library"].some((name) => fs.existsSync(path.join(stagedApp, "Contents", name)))
+      || fs.readdirSync(path.join(stagedApp, "Contents", "MacOS")).length !== 1) throw new Error("Dev-signed builds support only a single-executable app bundle without nested code.");
+    run("codesign", ["--force", "--sign", process.env.APPLE_SIGNING_IDENTITY, "--options", "runtime", "--timestamp=none",
+      "--entitlements", path.join(native, "Entitlements.plist"), stagedApp]);
+    const report = { ...verify(bundle, frontendPublicConfiguration), source };
+    fs.renameSync(temporary, devBuildDirectory);
+    report.app = path.join(devBuildDirectory, "bundle", "macos", `${RELEASE_NAME}.app`);
+    fs.writeFileSync(path.join(devBuildDirectory, "dev-verification.json"), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+  // Leave no second unpacked Cadence in the checkout for Launch Services to find.
+  fs.rmSync(builtApp, { recursive: true });
+  process.stdout.write(`Dev-signed ${version} passed local verification. It is not notarized; never publish it.\n`
+    + `Install it with: node apps/desktop/scripts/install-dev-build.mjs ${version}\n`);
+}
+
 function containsBytes(directory, value) {
   const expected = Buffer.from(value);
   return fs.readdirSync(directory, { withFileTypes: true }).some((entry) => {
@@ -214,18 +281,22 @@ function verifyBuiltPublicConfiguration(env) {
 
 function buildCandidate() {
   preflight({ build: true });
-  const directory = preview ? path.join(releaseDirectory, "preview", version) : releaseDirectory;
+  if (dev && fs.existsSync(devBuildDirectory)) throw new Error("This dev version already exists. Use the next dev number; existing builds are never replaced.");
+  const source = dev ? devSource() : null;
+  const directory = preview ? path.join(releaseDirectory, "preview", version) : dev ? path.join(releaseDirectory, "dev", version) : releaseDirectory;
   if (preview && fs.existsSync(path.join(directory, "bundle"))) throw new Error("This preview version already has staged artifacts. Use a new version; existing evidence was not replaced.");
   fs.mkdirSync(directory, { recursive: true });
-  const config = path.join(directory, preview ? "tauri.preview.conf.json" : "tauri.release.conf.json");
+  const config = path.join(directory, preview ? "tauri.preview.conf.json" : dev ? "tauri.dev.conf.json" : "tauri.release.conf.json");
   fs.writeFileSync(config, `${JSON.stringify(overlay, null, 2)}\n`);
-  const buildEnvironment = preview ? createPreviewBuildEnvironment(process.env) : createReleaseBuildEnvironment(process.env);
+  const buildEnvironment = preview ? createPreviewBuildEnvironment(process.env)
+    : dev ? createDevBuildEnvironment(process.env) : createReleaseBuildEnvironment(process.env);
   run("npm", ["run", "build"], desktop, buildEnvironment);
   const frontendPublicConfiguration = verifyBuiltPublicConfiguration(buildEnvironment);
   run("npm", ["exec", "--", "tauri", "build", "--ci", "--target", RELEASE_TARGET, "--config", config], desktop,
     buildEnvironment);
   const bundle = path.join(native, "target", RELEASE_TARGET, "release", "bundle");
   if (preview) stagePreview(bundle, directory, frontendPublicConfiguration);
+  else if (dev) stageDev(bundle, frontendPublicConfiguration, source);
   else {
     // Tauri notarizes and staples the app before creating and signing its DMG.
     const dmg = exactlyOne(path.join(bundle, "dmg"), ".dmg");
@@ -261,7 +332,12 @@ try {
   } else if (command === "preview-verify" && process.argv.length === 5) {
     const report = verify(path.resolve(process.argv[4]));
     writeReport(report, path.join(releaseDirectory, "preview", version));
-  } else throw new Error("Usage: release.mjs check|build|verify <bundle-directory> | preview-check|preview-build|preview-prune <version> | preview-verify <version> <bundle-directory>");
+  } else if (command === "dev-check" && process.argv.length === 4) {
+    preflight();
+    process.stdout.write("Dev-signed build prerequisites passed. Nothing was built, notarized or published.\n");
+  } else if (command === "dev-build" && process.argv.length === 4) {
+    buildCandidate();
+  } else throw new Error("Usage: release.mjs check|build|verify <bundle-directory> | preview-check|preview-build|preview-prune <version> | preview-verify <version> <bundle-directory> | dev-check|dev-build <X.Y.Z-dev.N>");
 } catch (error) {
   process.stderr.write(`Desktop release check failed:\n${error.message}\n`);
   process.exitCode = 1;
