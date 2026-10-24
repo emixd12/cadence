@@ -79,9 +79,10 @@ from `ed93fff`, executable SHA-256 `94dbaf1d…a991`), because that Mac already 
 30 tables kept their rows), and the app synced 30 s after launch. Where sync passes
 both ways: four test Behaviors created on the web with Not set, Anywhere, Home and A
 place reached the Mac, and the owner's four Mac edits reached the web. The test
-Behaviors are archived. Open: the Travel location line and Connectors panels on this
-Mac, the 0.1.5 upgrade from 0.1.3 on the test Mac, the location prompt on a
-never-authorized user, and publication.
+Behaviors are archived. Read through the macOS accessibility tree, the Mac shows
+connect controls for Outlook, iCloud and Hevy, and "Device location: not yet allowed."
+with Travel estimates on. Open: the location prompt (owner), the 0.1.5 upgrade from
+0.1.3 on the test Mac, the prompt on a never-authorized user, and publication.
 
 Connector gating: when the candidate was built, production had no
 `CONNECTOR_CREDENTIAL_*` or `OUTLOOK_CALENDAR_*` settings, and the three connectors
