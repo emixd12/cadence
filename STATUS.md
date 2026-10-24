@@ -1,5 +1,81 @@
 # Implementation Status
 
+## Ticket 187 release without the travel train — October 24, 2026
+
+The owner chose, on October 24, 2026, to ship Ticket 187 for Google's demo recording
+without the travel train. PR #135 had absorbed PR #138 (Tickets 165, 212, 216–219)
+at `6cf3c047`. Shipping that would push two more hosted migrations. It would also stop
+sync on the published Mac 0.1.5, which predates Ticket 217. And its signed trip
+conclusions, which name Timeline Calendar events, could reach Daily Brief input.
+
+- Branch `claude/agent-calendar-187-release`: `36aa5bce`, the last PR #135 head before
+  the travel train (Tickets 187, 184 candidates 2–3, 188), merged with main `6f2e770b`,
+  plus the PR #148 disclosure line and verification record.
+- One hosted migration: `20261022180000_separate_agent_calendar_grant.sql`. The travel
+  migrations `20261022160000` and `20261022170000` stay unapplied. They then sort
+  before an applied migration; when the travel train ships, give them later
+  timestamps (or push with `--include-all` after review).
+- Recipe 1.0 stays the production default. Tickets 184 and 188 stay gated.
+- Cutover follows `docs/OPERATIONS.md`, "Agent Calendar grant (Ticket 187)": pause
+  `/api/advisor/*` and `/api/dev/briefing-*`, push the migration, deploy, refresh
+  Trust, then lift the pause.
+- P-005 is resolved: PR #147's text is live.
+
+Not verified: the published Mac 0.1.5 against the 187 server, and installed desktop
+consent for the Daily Brief connection.
+
+Platform impact: web gets the separate Daily Brief Calendar connection and its Settings
+and disclosure. Desktop source changes ship in a later desktop release; the installed
+0.1.5 keeps the Timeline connection. Marketing: no change. Future mobile: not
+applicable.
+
+## Ticket 187: Google verification preparation — October 24, 2026
+
+Prepared Google's sensitive-scope verification for the Daily Brief Calendar client in
+`cadence-calendar-agent-prod`. Nothing is submitted; Google has not accepted a review.
+
+- Readback: branding fields, In production audience, the three declared scopes, the
+  single production callback and the AI-powered agent setting match the owner's
+  October 24 setup. Branding is not yet verified. Search Console still lists
+  `info@identityscaffolding.com` as verified owner of `sc-domain:cadence-me.com`.
+- Daily Brief Settings now has a disclosure line under the Google Calendar choice:
+  today's event times, timezone, availability and response, never titles or details,
+  never the Timeline connection. `tests/daily-brief-ui.dom.test.tsx` asserts it.
+- `docs/qa/2026-10-12-agentic-calendar.md` holds the readback, the 972-character scope
+  justification, the 899-character additional information and the timed video script.
+- PR #147 (to `main`) carries the Privacy, Trust and user-guide text. P-010 is drafted.
+
+Blocked on the owner: Google's policy forbids test redirect URIs on a production
+client, and the video must show this client's ID. Recording therefore needs this PR's
+agent flow on `app.cadence-me.com` (merge, migration `20261022180000`, agent secret,
+cutover), or an owner-accepted alternative. The owner also approves the texts, records
+and uploads the video, authorizes one real Daily Brief call for the test account, and
+confirms OpenAI data sharing is off.
+
+Platform impact: web and linked desktop share the Daily Brief Settings panel, so both
+get the disclosure line. Marketing: no change. Future mobile: not applicable.
+
+## PR #135 review corrections — October 24, 2026
+
+Recipe 1.2 Setup tips now use the same projected facts and selected duration
+sources as the brief. An accepted estimate, an excluded Behavior or deliberately
+disabled duration inputs no longer produces a false missing-length tip. The output
+validator also rejects repeated planner option IDs, preserving one move per
+Behavior when the model repeats a suggestion. Regression tests cover each case.
+
+`docs/COSTS.md` records Ticket 188's optional second model request and clearly
+labels its usage and price assumptions. The production default remains recipe 1.0.
+No migration, provider configuration, hosted rollout or candidate promotion changed.
+Platform impact: web and linked desktop share generation corrections; marketing
+and future mobile have no implementation change. Existing owner acceptance and
+the Ticket 187 cutover steps remain open.
+
+Validation: agents, interactions and resolvers checks, lint, web and desktop
+typechecks, all 328 active Vitest files (3,542 tests), the web production build and
+desktop renderer build pass. Fifteen test files remain skipped by their existing
+environment gates. This review does not establish live provider, browser or
+installed macOS acceptance.
+
 ## Ticket 187: Calendar disclosures for Google verification — October 24, 2026
 
 Google's sensitive-scope review of the Daily Brief Calendar client
@@ -27,32 +103,6 @@ configured but not yet verified; the data-access request is not submitted.
 Platform impact: web public legal pages and user guide. Desktop shares the hosted
 legal pages; no runtime change. Marketing claims stay accurate in both states and
 are not changed (P-006). Future mobile: not applicable.
-
-## Ticket 187: Google verification preparation — October 24, 2026
-
-Prepared Google's sensitive-scope verification for the Daily Brief Calendar client in
-`cadence-calendar-agent-prod`. Nothing is submitted; Google has not accepted a review.
-
-- Readback: branding fields, In production audience, the three declared scopes, the
-  single production callback and the AI-powered agent setting match the owner's
-  October 24 setup. Branding is not yet verified. Search Console still lists
-  `info@identityscaffolding.com` as verified owner of `sc-domain:cadence-me.com`.
-- Daily Brief Settings now has a disclosure line under the Google Calendar choice:
-  today's event times, timezone, availability and response, never titles or details,
-  never the Timeline connection. `tests/daily-brief-ui.dom.test.tsx` asserts it.
-- `docs/qa/2026-10-12-agentic-calendar.md` holds the readback, the 972-character scope
-  justification, the 899-character additional information and the timed video script.
-- PR #147 (to `main`) carries the Privacy, Trust and user-guide text. P-010 is drafted.
-
-Blocked on the owner: Google's policy forbids test redirect URIs on a production
-client, and the video must show this client's ID. Recording therefore needs this PR's
-agent flow on `app.cadence-me.com` (merge, migration `20261022180000`, agent secret,
-cutover), or an owner-accepted alternative. The owner also approves the texts, records
-and uploads the video, authorizes one real Daily Brief call for the test account, and
-confirms OpenAI data sharing is off.
-
-Platform impact: web and linked desktop share the Daily Brief Settings panel, so both
-get the disclosure line. Marketing: no change. Future mobile: not applicable.
 
 ## Cadence for Mac 0.1.5 published — October 24, 2026
 
@@ -221,6 +271,7 @@ the correction. Required repository checks, lint, web and desktop typechecks,
 the full suite (3,525 passed; 167 configured skips), web build and desktop renderer
 build pass on the updated Ticket 215 base. No provider, hosted configuration or
 production deployment changed. These fixes also belong in the combined #138 release.
+
 ## Ticket 216 merge review fixes — October 24, 2026
 
 Place-label collection readers now page through the full retained history using
@@ -266,27 +317,6 @@ Platform impact: desktop fixes permission readback through a native adapter;
 web retains its Permissions API behavior through the shared Settings contract;
 marketing and future mobile have no implementation change. No migration, provider
 configuration, signing or release action.
-
-## PR #135 review corrections — October 24, 2026
-
-Recipe 1.2 Setup tips now use the same projected facts and selected duration
-sources as the brief. An accepted estimate, an excluded Behavior or deliberately
-disabled duration inputs no longer produces a false missing-length tip. The output
-validator also rejects repeated planner option IDs, preserving one move per
-Behavior when the model repeats a suggestion. Regression tests cover each case.
-
-`docs/COSTS.md` records Ticket 188's optional second model request and clearly
-labels its usage and price assumptions. The production default remains recipe 1.0.
-No migration, provider configuration, hosted rollout or candidate promotion changed.
-Platform impact: web and linked desktop share generation corrections; marketing
-and future mobile have no implementation change. Existing owner acceptance and
-the Ticket 187 cutover steps remain open.
-
-Validation: agents, interactions and resolvers checks, lint, web and desktop
-typechecks, all 328 active Vitest files (3,542 tests), the web production build and
-desktop renderer build pass. Fifteen test files remain skipped by their existing
-environment gates. This review does not establish live provider, browser or
-installed macOS acceptance.
 
 ## Desktop release acceptance and version-free download link — October 24, 2026
 
@@ -344,45 +374,6 @@ macOS user or the second Mac. Native reminder and updater files did not change.
 Platform impact: desktop release process and the marketing download link. Web and
 future mobile are not affected. No schema, migration or hosted configuration change.
 
-## Connector and Where hosted migrations applied — October 23, 2026
-
-PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
-15:58 UTC. Both deployed before their hosted migrations, against the rollout
-order in `docs/qa/2026-10-21-behavior-where-rollout.md`. A read-only Data API
-probe of the linked project `qjodzutjxtmtzczbloxa` showed `behaviors.where_kind`
-missing (42703), and `connector_connections` and `connector_preferences` absent
-(PGRST205). Travel settings, route refresh and the connector Settings panels
-were exposed until the push. Production logs for the prior three hours held 50
-entries, one error and no schema-related failures.
-
-The owner authorized the forward fix and accepted that signed Cadence for Mac
-0.1.3 stops synchronizing Behaviors until a Where-compatible 0.1.5 ships.
-
-- `migration list --linked` matched every hosted version through
-  `20261019025157`, with no hosted-only entries. Exactly three local migrations
-  were pending, and the dry run listed the same three.
-- `db push` applied, in order, `20261019040000_connector_lifecycle.sql`,
-  `20261019041000_daily_brief_connector_disclosure.sql` and
-  `20261019180000_add_behavior_where.sql`. The readback lists all three as
-  applied.
-- Probes after the push: `behaviors.where_kind` returns 200. Both connector
-  tables exist and refuse anonymous reads (42501).
-- The project-local CLI 2.105.0 binary was killed at startup (exit 137) in the
-  operator shell, so the hosted commands used Homebrew CLI 2.109.1.
-- PR #134 (location entitlement) merged at 16:06 UTC as `f922685`. Vercel built
-  no web deployment for it.
-- Trust: the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
-  marketing `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` (the PR #112 build), and the
-  readback matched. The app was redeployed as `dpl_A5td86nYSP5Gboe4peeeGif95v3u`
-  on app.cadence-me.com. Provenance shows Stale until the next scheduled
-  collection.
-
-Not verified: an authenticated save of a Behavior's Where and an authenticated
-Travel Settings or connector Settings view on production. The Where backfill
-count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
-Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
-migrations and a signed 0.1.5 before release.
-
 ## PR #135 brought up to date with main — October 23, 2026
 
 Main gained Tickets 215 and 233–242 work, including migration
@@ -428,6 +419,45 @@ Behavior profile for the model needs its own ticket. Rounds:
 `docs/qa/briefing-workbench.md`.
 Platform impact: web and linked desktop share the bubble and hosted generation; marketing
 and future mobile are not affected.
+
+## Connector and Where hosted migrations applied — October 23, 2026
+
+PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
+15:58 UTC. Both deployed before their hosted migrations, against the rollout
+order in `docs/qa/2026-10-21-behavior-where-rollout.md`. A read-only Data API
+probe of the linked project `qjodzutjxtmtzczbloxa` showed `behaviors.where_kind`
+missing (42703), and `connector_connections` and `connector_preferences` absent
+(PGRST205). Travel settings, route refresh and the connector Settings panels
+were exposed until the push. Production logs for the prior three hours held 50
+entries, one error and no schema-related failures.
+
+The owner authorized the forward fix and accepted that signed Cadence for Mac
+0.1.3 stops synchronizing Behaviors until a Where-compatible 0.1.5 ships.
+
+- `migration list --linked` matched every hosted version through
+  `20261019025157`, with no hosted-only entries. Exactly three local migrations
+  were pending, and the dry run listed the same three.
+- `db push` applied, in order, `20261019040000_connector_lifecycle.sql`,
+  `20261019041000_daily_brief_connector_disclosure.sql` and
+  `20261019180000_add_behavior_where.sql`. The readback lists all three as
+  applied.
+- Probes after the push: `behaviors.where_kind` returns 200. Both connector
+  tables exist and refuse anonymous reads (42501).
+- The project-local CLI 2.105.0 binary was killed at startup (exit 137) in the
+  operator shell, so the hosted commands used Homebrew CLI 2.109.1.
+- PR #134 (location entitlement) merged at 16:06 UTC as `f922685`. Vercel built
+  no web deployment for it.
+- Trust: the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+  marketing `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` (the PR #112 build), and the
+  readback matched. The app was redeployed as `dpl_A5td86nYSP5Gboe4peeeGif95v3u`
+  on app.cadence-me.com. Provenance shows Stale until the next scheduled
+  collection.
+
+Not verified: an authenticated save of a Behavior's Where and an authenticated
+Travel Settings or connector Settings view on production. The Where backfill
+count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
+Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
+migrations and a signed 0.1.5 before release.
 
 ## Dev-signed desktop builds — October 23, 2026
 
@@ -957,6 +987,7 @@ Platform impact: web Calendar services, Settings and Daily Brief generation;
 desktop Calendar broker and Settings (187); development workbench and presets
 only (184, 188). Marketing has no change before release acceptance. Future
 mobile is not applicable.
+
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
 Signed Cadence builds enable Hardened Runtime but did not sign the location
