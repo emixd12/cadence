@@ -3,6 +3,25 @@ import { createCalendarAuthorization, exchangeCalendarCode, GOOGLE_CALENDAR_SCOP
 const config = { clientId: "synthetic-client", clientSecret: "synthetic-secret", callbackUrl: "https://cadence.example/auth/google-calendar/callback", key: Buffer.alloc(32, 7), keyId: "v1" };
 const binding = { purpose: "refresh" as const, userId: "owner", googleSubject: "subject", generation: 1 };
 describe("Calendar consent and custody", () => {
+  it("fails closed for an absent agent client and rejects a shared client or project", () => {
+    const env = { GOOGLE_CALENDAR_CLIENT_ID: "standard", GOOGLE_CALENDAR_PROJECT_ID: "standard-project",
+      GOOGLE_CALENDAR_CLIENT_SECRET: "synthetic", GOOGLE_CALENDAR_CALLBACK_URL: config.callbackUrl,
+      GOOGLE_CALENDAR_ENCRYPTION_KEY: config.key.toString("base64"), GOOGLE_CALENDAR_KEY_ID: "v1" };
+    expect(readCalendarOAuthConfig(env, undefined, "agent")).toBeNull();
+    const agent = { ...env, GOOGLE_CALENDAR_AGENT_CLIENT_ID: "agent", GOOGLE_CALENDAR_AGENT_CLIENT_SECRET: "synthetic-agent",
+      GOOGLE_CALENDAR_AGENT_PROJECT_ID: "agent-project" };
+    expect(readCalendarOAuthConfig(agent, undefined, "agent")?.clientId).toBe("agent");
+    expect(readCalendarOAuthConfig({ ...agent, GOOGLE_CALENDAR_AGENT_CLIENT_ID: "standard" }, undefined, "agent")).toBeNull();
+    expect(readCalendarOAuthConfig({ ...agent, GOOGLE_CALENDAR_AGENT_PROJECT_ID: "standard-project" }, undefined, "agent")).toBeNull();
+  });
+  it("binds agent ciphertext to its client and cannot open standard ciphertext", () => {
+    const agent = { ...config, grantPurpose: "agent" as const, clientId: "agent-client" };
+    const sealed = sealCalendarSecret(agent, "synthetic-agent-refresh", binding);
+    expect(openCalendarSecret(agent, sealed, binding)).toBe("synthetic-agent-refresh");
+    expect(() => openCalendarSecret(config, sealed, binding)).toThrow("reconnect_required");
+    expect(() => openCalendarSecret({ ...agent, clientId: "replacement" }, sealed, binding)).toThrow("reconnect_required");
+    expect(() => openCalendarSecret(agent, sealCalendarSecret(config, "standard", binding), binding)).toThrow("reconnect_required");
+  });
   it("authenticates ciphertext and binds it to the account and purpose", () => {
     const sealed = sealCalendarSecret(config, "synthetic-refresh", binding);
     expect(sealed).not.toContain("synthetic-refresh");

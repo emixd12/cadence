@@ -59,7 +59,8 @@ export async function updateDailyBriefSettings(caller: CalendarCaller, value: un
     includeHevy: value.includeHevy === true,
   };
   if (input.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
-  if (input.includeCalendar && (await getCalendarConnection(caller)).status !== "connected") throw new DailyBriefError("calendar_unavailable");
+  // Ticket 187: Daily Brief reads Calendar only through the separate agent grant.
+  if (input.includeCalendar && (await getCalendarConnection(caller, "agent")).status !== "connected") throw new DailyBriefError("calendar_unavailable");
   if (input.includeOutlookCalendar) {
     const outlook = await getOutlookCalendarConnection(caller);
     if (outlook.status !== "connected" || outlook.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");

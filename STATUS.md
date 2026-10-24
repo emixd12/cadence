@@ -1,5 +1,182 @@
 # Implementation Status
 
+## Ticket 187 release without the travel train — October 24, 2026
+
+The owner chose, on October 24, 2026, to ship Ticket 187 for Google's demo recording
+without the travel train. PR #135 had absorbed PR #138 (Tickets 165, 212, 216–219)
+at `6cf3c047`. Shipping that would push two more hosted migrations. It would also stop
+sync on the published Mac 0.1.5, which predates Ticket 217. And its signed trip
+conclusions, which name Timeline Calendar events, could reach Daily Brief input.
+
+- Branch `claude/agent-calendar-187-release`: `36aa5bce`, the last PR #135 head before
+  the travel train (Tickets 187, 184 candidates 2–3, 188), merged with main `6f2e770b`,
+  plus the PR #148 disclosure line and verification record.
+- One hosted migration: `20261022180000_separate_agent_calendar_grant.sql`. The travel
+  migrations `20261022160000` and `20261022170000` stay unapplied. They then sort
+  before an applied migration; when the travel train ships, give them later
+  timestamps (or push with `--include-all` after review).
+- Recipe 1.0 stays the production default. Tickets 184 and 188 stay gated.
+- Cutover follows `docs/OPERATIONS.md`, "Agent Calendar grant (Ticket 187)": pause
+  `/api/advisor/*` and `/api/dev/briefing-*`, push the migration, deploy, refresh
+  Trust, then lift the pause.
+- P-005 is resolved: PR #147's text is live.
+
+Not verified: the published Mac 0.1.5 against the 187 server, and installed desktop
+consent for the Daily Brief connection.
+
+Platform impact: web gets the separate Daily Brief Calendar connection and its Settings
+and disclosure. Desktop source changes ship in a later desktop release; the installed
+0.1.5 keeps the Timeline connection. Marketing: no change. Future mobile: not
+applicable.
+
+## Ticket 187: Google verification preparation — October 24, 2026
+
+Prepared Google's sensitive-scope verification for the Daily Brief Calendar client in
+`cadence-calendar-agent-prod`. Nothing is submitted; Google has not accepted a review.
+
+- Readback: branding fields, In production audience, the three declared scopes, the
+  single production callback and the AI-powered agent setting match the owner's
+  October 24 setup. Branding is not yet verified. Search Console still lists
+  `info@identityscaffolding.com` as verified owner of `sc-domain:cadence-me.com`.
+- Daily Brief Settings now has a disclosure line under the Google Calendar choice:
+  today's event times, timezone, availability and response, never titles or details,
+  never the Timeline connection. `tests/daily-brief-ui.dom.test.tsx` asserts it.
+- `docs/qa/2026-10-12-agentic-calendar.md` holds the readback, the 972-character scope
+  justification, the 899-character additional information and the timed video script.
+- PR #147 (to `main`) carries the Privacy, Trust and user-guide text. P-010 is drafted.
+
+Blocked on the owner: Google's policy forbids test redirect URIs on a production
+client, and the video must show this client's ID. Recording therefore needs this PR's
+agent flow on `app.cadence-me.com` (merge, migration `20261022180000`, agent secret,
+cutover), or an owner-accepted alternative. The owner also approves the texts, records
+and uploads the video, authorizes one real Daily Brief call for the test account, and
+confirms OpenAI data sharing is off.
+
+Platform impact: web and linked desktop share the Daily Brief Settings panel, so both
+get the disclosure line. Marketing: no change. Future mobile: not applicable.
+
+## PR #135 review corrections — October 24, 2026
+
+Recipe 1.2 Setup tips now use the same projected facts and selected duration
+sources as the brief. An accepted estimate, an excluded Behavior or deliberately
+disabled duration inputs no longer produces a false missing-length tip. The output
+validator also rejects repeated planner option IDs, preserving one move per
+Behavior when the model repeats a suggestion. Regression tests cover each case.
+
+`docs/COSTS.md` records Ticket 188's optional second model request and clearly
+labels its usage and price assumptions. The production default remains recipe 1.0.
+No migration, provider configuration, hosted rollout or candidate promotion changed.
+Platform impact: web and linked desktop share generation corrections; marketing
+and future mobile have no implementation change. Existing owner acceptance and
+the Ticket 187 cutover steps remain open.
+
+Validation: agents, interactions and resolvers checks, lint, web and desktop
+typechecks, all 328 active Vitest files (3,542 tests), the web production build and
+desktop renderer build pass. Fifteen test files remain skipped by their existing
+environment gates. This review does not establish live provider, browser or
+installed macOS acceptance.
+
+## Ticket 187: Calendar disclosures for Google verification — October 24, 2026
+
+Google's sensitive-scope review of the Daily Brief Calendar client
+(`cadence-calendar-agent-prod`) reads the live Privacy page. This change prepares
+that text. The owner approved it on October 24, 2026, for merge and deployment.
+
+- Privacy, "Optional Google Calendar": describes the Timeline connection and, where
+  available, the separate Google Calendar for Daily Brief connection. Each has its
+  own consent, calendar selection, credential and Disconnect. Daily Brief reads
+  Calendar only through its own connection. Connecting sends nothing to OpenAI.
+  New statement: Cadence does not use Google API data to develop, improve or train
+  generalized AI or machine-learning models, or transfer it for that purpose.
+- Processor and retention rows name both connections; the desktop event cache
+  belongs to the Timeline connection only.
+- Trust, "Data boundaries": the export sentence no longer reads as a general no-AI
+  promise (P-005, now drafted).
+- `docs/user-guide/privacy-and-account.md` covers both connections, AI use and
+  deletion. `tests/legal-content.test.tsx` asserts the new statements.
+
+The "where available" wording keeps the text true before and after PR #135 deploys.
+Search Console still shows `info@identityscaffolding.com` as verified owner of
+`sc-domain:cadence-me.com` (Domain name provider). The agent project's branding is
+configured but not yet verified; the data-access request is not submitted.
+
+Platform impact: web public legal pages and user guide. Desktop shares the hosted
+legal pages; no runtime change. Marketing claims stay accurate in both states and
+are not changed (P-006). Future mobile: not applicable.
+
+## Cadence for Mac 0.1.5 published — October 24, 2026
+
+The owner instructed the merge and release of the retained 0.1.5 candidate (source
+`41e4549`, SQLite schema 18). It is the published stable release. Packet:
+`docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`, "Publication and acceptance".
+
+- The retained artifacts matched their recorded hashes and passed strict codesign,
+  staple, Gatekeeper and updater-signature checks again.
+- 16:18–16:19Z: the versioned DMG, updater archive, signature and verification JSON
+  were uploaded to `desktop-stable`, and the stable feed moved to 0.1.5. The saved 0.1.3
+  feeds are kept for rollback.
+- On the test Mac (macOS 27.0.1), published 0.1.3 offered exactly 0.1.5. Review update,
+  Install update and Restart Cadence produced the 0.1.5 executable `e553d81d…`. The
+  data comparison passed: schema 17 → 18, integrity `ok`, no backfill misses, same
+  profile, no table lost rows, no secret findings, every change classified. Sync ran
+  without "Update Cadence".
+- Area checks: sign-in and Calendar callback replays passed on `0.1.6-dev.2` (same
+  application source) and on 0.1.5. Session renewal passed. The test account's
+  hosted session was deleted with the owner's authorization; after token expiry,
+  0.1.5 showed the revoked state, and reconnecting synced with no row loss. Native
+  reminders were not required. The never-run macOS user check was not run, by the
+  owner's decision.
+- 17:30Z: `Cadence_aarch64.dmg` and the preview feed moved to 0.1.5. Every public asset
+  and both feeds read back with the recorded bytes. A quarantined download of the
+  version-free DMG passes Gatekeeper, both staples and `syspolicy_check distribution`.
+- The owner decided connector release steps 6–7 do not block this release; they remain
+  open with installed connector acceptance.
+
+Not changed: no hosted SQL, web deployment, marketing source or Trust variable. #145
+merged separately at 15:39Z and deployed app `dpl_2wXoZFy1…` and marketing
+`dpl_FQiHLT3A…`. The app's `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` still names
+`dpl_KvQhmkFy…`, so the Trust marketing-ID refresh is pending the owner's instruction.
+
+Platform impact: desktop distribution only. Web and marketing source are unchanged;
+future mobile is not affected.
+
+## PR stack review: Calendar candidates with travel — October 24, 2026
+
+Integrated the reviewed release records, dependency upgrades and travel train before
+PR #135. Conflict resolution preserves both histories, the 0.1.5 release packet,
+status-only desktop location permission, agent Calendar controls, recipe 1.2
+presentation and Open-Meteo credit. The production recipe stays at 1.0.
+
+The combined review found a behavior neither branch tested alone: recipe 1.2
+restored every planner move the model omitted, including moves that travel rejected.
+A pure core policy now reads the final projected travel facts. Known `does_not_fit`
+options are withheld and rejected during output validation; unknown or scope-withheld
+conclusions cannot add an omitted move. The planner still receives no travel facts.
+Candidate instructions reflect the same rule, and the existing evidence limits hold:
+a suggested time is never proof that travel fits there.
+
+Five regression cases cover blocked and unknown fallbacks, rejected model output,
+permitted fallback, and scope projection. Four failed before the fix. Two combined
+bubble tests preserve weather attribution and calculated travel when recipe 1.2
+returns no model text. Design-system usage locations were refreshed against the
+merged JSX without dropping either branch's entries.
+
+Validation: the first full integrated run passed 3,802 tests with 179 configured
+skips. After final prompt wording alignment, 3,800 passed and two existing tests
+hit their 5-second DOM and 20-second portability limits while the web build ran.
+Both affected files then passed all 42 tests with unchanged timeouts after the build,
+establishing all 3,802 unique tests on the final runtime source. Agents, interactions,
+resolvers, lint, web/desktop typechecks, web/desktop frontend and marketing builds,
+marketing readability, public-source/artifact and Trust checks pass.
+A clean npm install resolves 716 packages. The design-system verifier is unavailable
+because the owner-local `design-system-bench` script is absent; this is not a pass.
+Native macOS compilation, installed acceptance and disposable full database rehearsal
+remain separate merge/release evidence. No hosted schema, provider settings, signing,
+release publication or recipe promotion changed.
+
+Platform impact: web and linked desktop share generation and presentation corrections;
+marketing has no product change, and future mobile is not implemented.
+
 ## Combined travel PR review and merge plan — October 24, 2026
 
 The reviewed #138 tree combines the release records and dependency stack with the
@@ -94,6 +271,7 @@ the correction. Required repository checks, lint, web and desktop typechecks,
 the full suite (3,525 passed; 167 configured skips), web build and desktop renderer
 build pass on the updated Ticket 215 base. No provider, hosted configuration or
 production deployment changed. These fixes also belong in the combined #138 release.
+
 ## Ticket 216 merge review fixes — October 24, 2026
 
 Place-label collection readers now page through the full retained history using
@@ -195,6 +373,52 @@ macOS user or the second Mac. Native reminder and updater files did not change.
 
 Platform impact: desktop release process and the marketing download link. Web and
 future mobile are not affected. No schema, migration or hosted configuration change.
+
+## PR #135 brought up to date with main — October 23, 2026
+
+Main gained Tickets 215 and 233–242 work, including migration
+`20261019041000_daily_brief_connector_disclosure`. That migration makes
+`save_daily_brief_preferences_v2` a wrapper around a new `v3` and adds the Outlook,
+iCloud and Hevy fence to `daily_brief_calendar_fence_is_current`. Ticket 187's later
+migration `20261022180000` used to replace `v2` with a full body and drop that fence.
+It now redefines `v3` on the agent Calendar tables, leaves the `v2` wrapper alone, and
+keeps the connector fence. Desktop and web Settings keep main's Connectors library;
+the agent Google Calendar panel stays with Daily Brief settings. Generated types add
+only the agent tables and functions to main's file. Hosted state is unchanged.
+
+## Ticket 184 candidate 3 — October 23, 2026
+
+In progress. The owner reviewed candidate 2 on the October 16 account comparison
+and T1–T6; the review is in `docs/qa/briefing-workbench.md`. Candidate 3 is recipe
+`daily_brief@1.2` in preset `advisor-analysis-3`. It keeps every 1.1 rule and adds:
+
+- One labeled block per advice type. A move reads "New suggested time" with the
+  Behavior and its current → new times, and no reason line (owner, October 23).
+- Overlap and gap lengths in whole minutes in the model input. The planner now reports
+  which part of each side an overlap covers (all, start, end or middle). The overview states
+  each problem once and never mentions moves, free time or Behaviors without a problem.
+- Behavior names as compact chips, from a deterministic `behaviorNames` list, never model markup.
+- Up to three moves, one per Behavior, overlaps first; chosen times keep the buffer
+  from each other (owner T2 review, October 23).
+- Range-scheduled Behaviors never form overlaps and are never moved; a known or estimated
+  length is packed at the earliest free time in the span, leaving the rest open for moves.
+  Unknown lengths block nothing; titles alone can be estimated (owner account review).
+- A deterministic Setup tip asks for a missing length when no other tip is shown.
+- The estimate step also flags Behaviors that can happen alongside other activities;
+  they get no moves or raised conflicts. Every planner move is shown with its reason;
+  Cadence writes the overview from those reasons if the model leaves it empty.
+- Logging tips advise only on recording. Tip text does not restate its evidence.
+- Quiet days show only a tip; with no tip, the bubble stays hidden.
+- Owner decision (October 23): recipe 1.2 drops next-day tip spacing. One tip per
+  day and the per-tip cooldown remain.
+
+Recipe 1.0 and 1.1 presets and the production default are unchanged. The owner
+preferred revision 3.9 on a live-account case (October 23). T3–T6 review, held-out
+cases, the seven-day sequence, acceptance and promotion remain open. A weighted
+Behavior profile for the model needs its own ticket. Rounds:
+`docs/qa/briefing-workbench.md`.
+Platform impact: web and linked desktop share the bubble and hosted generation; marketing
+and future mobile are not affected.
 
 ## Connector and Where hosted migrations applied — October 23, 2026
 
@@ -725,6 +949,44 @@ existing Daily Brief model-data toggle stays the only gate):
 Platform impact: web briefing pipeline and private workbench; a linked desktop
 shares hosted generation, and account-free desktop sends nothing. Marketing and
 future mobile have no implementation change.
+
+## Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026
+
+Four commits from October 16 never reached main: PR #83 merged a rewritten
+history without them. This branch cherry-picks them onto main `b9012fc` so the
+owner can decide whether they land. Nothing is deployed.
+
+- Ticket 187: a separate agent Google Calendar grant for Daily Brief and
+  private workbench reads.
+- Ticket 184 candidate 2: gated recipe `daily_brief@1.1` in preset
+  `advisor-analysis-2`, plus the tuning pass 2 record.
+- Ticket 188: description-based duration estimates, opt-in for recipe 1.1 only.
+
+The Ticket 187 migration was never applied to hosted. It is renamed from
+`20261012213059` to `20261022180000`, after hosted history (`20261019025157`)
+and after the timestamps claimed by open travel branches. Its preference-save
+replacement predated `20260927173716` and restored retryable errcode 40001; it
+now keeps 55000. The nonretryable-conflicts SQL smoke test now uses the agent
+Calendar tables. Two lint warnings in the recovered code are fixed.
+
+Verification on isolated local project `cadence-port188` (loopback only, removed
+afterwards): a clean start and `db reset` applied all 87 migrations; generated
+types match `lib/db/database.types.ts`; all 20 `tests/sql` files pass. Agents,
+interactions, resolvers and design-system checks, lint (zero warnings), web and
+desktop TypeScript pass. Vitest: 3,125 passed, 94 skipped.
+Web and desktop builds and the public-source boundary check pass, on Node 24.22.0.
+
+Open, owner-gated: the decision to land; hosted migration; the separate Google
+agent project and client; privacy and no-AI disclosure corrections (187) and
+description disclosure (188); installed acceptance. PR #112 redefines the same
+Daily Brief Calendar fence functions and adds `save_daily_brief_preferences_v3`
+on the standard Calendar tables. Whichever merges second must move v3 and the
+connector fence to the agent grant.
+
+Platform impact: web Calendar services, Settings and Daily Brief generation;
+desktop Calendar broker and Settings (187); development workbench and presets
+only (184, 188). Marketing has no change before release acceptance. Future
+mobile is not applicable.
 
 ## Ticket 165: Hardened Runtime location entitlement — October 22, 2026
 
@@ -1693,6 +1955,31 @@ PR's main promotion is `dpl_68Po4U87qX4YXxG9epjkPwU3sdHz` at `f239e72`.
 Six-leg and before/after performance remain unmeasured. Native current-device
 position and Apple-trusted distribution retain Tickets 115/165 gates.
 See `docs/qa/travel-release.md` for evidence and measurement limits.
+
+## Ticket 184 candidate 2 and Ticket 188 — October 16, 2026
+
+In progress. Iteration 1 tuning pass 1 ran T1–T6 (12 calls, all passed). The owner
+preferred B in T3–T5 and neither in T1 and T6. Feedback and eight proposals are stored
+in the local bench cases; non-private IDs are in `docs/qa/briefing-workbench.md`.
+Candidate 2 is recipe `daily_brief@1.1` in preset `advisor-analysis-2`. It adds default
+same-day movability for unresolved Behaviors, plain wording, quiet-day and repetition
+rules, Logging tip labels and nested evidence. Recipe 1.0 presets and the production
+default are unchanged. Ticket 188 (description duration estimates) is filed and in progress.
+Held-out cases, the seven-day sequence, owner acceptance and promotion remain open.
+
+## Ticket 187: Isolate agentic Calendar access — October 12, 2026
+
+In progress: source implemented and locally verified; release acceptance remains open.
+Daily Brief and private workbench reads now require a separate agent grant.
+Standard Calendar grants and sign-in remain unchanged. The migration withdraws
+prior Calendar disclosure and requires fresh consent. Agent setup requires a
+separate Google project to isolate revocation. Independent review, provider
+classification/configuration, hosted deployment, and installed acceptance remain open.
+Evidence and remaining gates: `docs/qa/2026-10-12-agentic-calendar.md`.
+Plan: `docs/plans/2026-10-12-google-agentic-oauth-review.md`.
+Cloud rollout scope: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+Planning found a public no-AI disclosure conflict and an unproven cutover barrier.
+Both are required release gates. No provider or deployment changes occurred during planning.
 
 ## Ticket 186: Cadence project and repository rename — completed October 9, 2026
 

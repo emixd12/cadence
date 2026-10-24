@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { overlapsTravelSpans, type BriefTravelGuidance, type BriefTravelGuidanceItem } from "@cadence/core/services/brief-travel-guidance";
-import { briefingOptionText, briefingReferenceLabel, briefingTipEvidence, formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
+import { briefingMoveText, briefingOptionText, briefingReferenceLabel, briefingSuggestionGroups, briefingTextSegments, briefingTipEvidence, briefingTipLabel, formatBriefingTime, isEmptyBriefing, isLaneBriefing, isPlainBriefing } from "@cadence/core/services/daily-brief-presentation";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 
@@ -34,6 +34,10 @@ export function DailyBriefBubble({
   const travelToday = ready && travel && travel.localDate === briefing.localDate ? travel : null;
   const weatherShown = !!travelToday?.items.some((item) => item.kind === "departure" && item.weather);
   const weatherState = travelWeatherStateText(travelToday?.weather?.state);
+  // Recipe 1.2 quiet day with no tip: nothing to say, so no bubble.
+  if (ready && isEmptyBriefing(briefing) && !travelToday?.items.length) return null;
+  const lanes = ready && isLaneBriefing(briefing);
+  const named = (text: string) => lanes ? <NamedText text={text} names={briefing?.behaviorNames} /> : text;
 
   return (
     <section
@@ -47,21 +51,33 @@ export function DailyBriefBubble({
           <p className="text-sm font-bold">Daily Brief</p>
           {state === "loading" ? <p className="mt-1 text-sm leading-6 text-muted-readable">Preparing today’s read-only briefing…</p> : null}
           {ready ? <>
-            <p role="status" aria-live="polite" className="mt-1 break-words whitespace-pre-wrap text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{briefing.text}</p>
-            {briefing.suggestions?.length ? <ul aria-label="Suggestions only" className="mt-2 space-y-2 text-sm leading-6">
+            {briefing.text.trim() || !lanes ? <p role="status" aria-live="polite" className="mt-1 break-words whitespace-pre-wrap text-sm leading-6 text-foreground [overflow-wrap:anywhere]">{named(briefing.text)}</p> : null}
+            {lanes && briefing.suggestions?.length ? <div aria-label="Suggestions only">
+              {/* Recipe 1.2: one heading per advice type; each move is a bullet with its times only. */}
+              {briefingSuggestionGroups(briefing.suggestions).map((group) => <div key={group.label} className="mt-2 border-t border-line pt-2 text-sm leading-6">
+                <p className="text-xs font-bold text-muted-readable">{group.label}</p>
+                <ul className="list-disc pl-5">
+                  {group.items.map((suggestion, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">
+                    {suggestion.option ? <>{suggestion.behavior ? <><strong className={BEHAVIOR_NAME}>{suggestion.behavior}</strong>: </> : null}{briefingMoveText(suggestion.option, briefing.timezone, !!travelToday && overlapsTravelSpans(suggestion.option.intervals.proposed, travelToday.occupiedSpans))}</> : named(suggestion.text)}
+                  </li>)}
+                </ul>
+              </div>)}
+            </div> : null}
+            {!lanes && briefing.suggestions?.length ? <ul aria-label="Suggestions only" className="mt-2 space-y-2 text-sm leading-6">
               {briefing.suggestions.map((suggestion, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">
                 <p>{suggestion.text}</p>
-                {suggestion.option ? <p className="text-xs text-muted-readable">{briefingOptionText(suggestion.option, briefing.timezone, !!travelToday && overlapsTravelSpans(suggestion.option.intervals.proposed, travelToday.occupiedSpans))}</p> : null}
+                {suggestion.option ? <p className="text-xs text-muted-readable">{briefingOptionText(suggestion.option, briefing.timezone, !!travelToday && overlapsTravelSpans(suggestion.option.intervals.proposed, travelToday.occupiedSpans), isPlainBriefing(briefing))}</p> : null}
                 {suggestion.referenceIds.length ? <p className="text-xs">Sources: {suggestion.referenceIds.map((id) => {
                   const source = briefing.references?.find((source) => source.id === id);
                   return source ? <Fragment key={id}><a href={source.url} target="_blank" rel="noreferrer" className="mr-2 underline">{briefingReferenceLabel(source)}</a>{" "}</Fragment> : null;
                 })}</p> : null}
               </li>)}
             </ul> : null}
-            {briefing.tip ? <div className="mt-3 border-t border-line pt-2">
-              <p className="text-xs font-bold text-muted-readable">Pattern tip</p>
-              <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{briefing.tip.text}</p>
-              <p className="text-xs leading-5 text-muted-readable">{briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation)}</p>
+            {briefing.tip ? <div className="mt-3 border-t border-line pt-2" data-tip-category={briefing.tip.category ?? "pattern"}>
+              <p className="text-xs font-bold text-muted-readable">{briefingTipLabel(briefing.tip)}</p>
+              <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{named(briefing.tip.text)}</p>
+              {/* Recipe 1.1 nests the evidence under its tip so it reads as support, not a separate item. */}
+              <p className={`text-xs leading-5 text-muted-readable ${isPlainBriefing(briefing) ? "mt-1 border-l border-line pl-3" : ""}`}>{briefingTipEvidence(briefing.tip.basis, briefing.tip.limitation)}</p>
             </div> : null}
             {/* Ticket 219: the model used Open-Meteo facts; credit them unless the travel block below already does. */}
             {briefing.attributions?.includes("open_meteo") && !(weatherShown && travelToday?.weather?.attribution)
@@ -89,6 +105,16 @@ export function DailyBriefBubble({
       </div>
     </section>
   );
+}
+
+/** Product type stays at weight 400 (DESIGN.md), so a name is a compact chip: Ash Line hairline, Cold Surface fill, Ink text. */
+const BEHAVIOR_NAME = "border border-line bg-surface px-1 font-normal text-foreground [box-decoration-break:clone]";
+
+/** Recipe 1.2 highlights today's Behavior names, which Cadence lists deterministically. */
+function NamedText({ text, names }: Readonly<{ text: string; names: readonly string[] | undefined }>) {
+  return <>{briefingTextSegments(text, names).map((segment, index) => segment.behavior
+    ? <strong key={index} className={BEHAVIOR_NAME}>{segment.text}</strong>
+    : <Fragment key={index}>{segment.text}</Fragment>)}</>;
 }
 
 function travelLine(item: BriefTravelGuidanceItem, timezone: string): string {

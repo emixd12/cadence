@@ -61,6 +61,7 @@ implement most of it in source; it is not deployed yet.
 | Travel, walking/cycling/transit | US$0.23 | US$1.30 | US$3.45 | Disabled in production since 2026-09-25 |
 | Travel, driving | US$0.37 | US$2.14 | US$5.73 | Disabled in production since 2026-09-25 |
 | Daily Brief model | US$0.06 | US$0.13 | US$0.25 | Live |
+| Duration estimate model, incremental | US$0.015 | US$0.030 | US$0.060 | Opt-in recipe 1.1/1.2 candidates only; excluded from the production-default totals |
 | Weather (Open-Meteo) | US$0 | US$0 | US$0 | Ticket 218 in source; free API for testing only. The paid fixed plan covers up to 1 million calls a month |
 | Email reminders | Unknown | Unknown | Unknown | Live, optional per Behavior |
 | Vercel and Supabase usage beyond included credit | Not measured | Not measured | Not measured | Live |
@@ -78,6 +79,11 @@ implement most of it in source; it is not deployed yet.
 The paid weather plan adds US$0.29 per user at 100 users: totals become US$1.12–1.26
 (light), US$2.26–3.10 (typical) and US$4.53–6.81 (heavy). The free testing API adds
 nothing.
+
+If the description-estimate candidate is promoted, the assumed extra model call
+below adds US$0.015 / US$0.030 / US$0.060 respectively. Before planned weather and
+payment fees, the corresponding scenario totals are about US$0.85–0.99,
+US$2.00–2.84 and US$4.30–6.58. The production default remains recipe 1.0.
 
 Typical users fit under US$5. Heavy drivers do not, unless a per-user travel
 limit applies (see proposals). Payment processing would take more on top of
@@ -199,6 +205,23 @@ About US$0.004 per brief. The database allows one completed attempt per
 installation per day. Token counts are not recorded yet; the workbench reports
 usage as `unavailable`. Replace the assumptions with measured usage.
 
+### Ticket 188 candidate duration estimates
+
+Recipes 1.1 and 1.2 can opt into one additional model request before each brief.
+`generateOpenAIDurationEstimates` uses the same model, transport and 2,000-token
+output ceiling. It sends at most 20 Behavior titles and descriptions, with each
+description capped at 1,000 characters. Recipe 1.2 also requests the `alongside`
+classification. No estimate call runs for recipe 1.0, when the input is disabled,
+or when no Behavior qualifies. The shared abort signal bounds both requests;
+the estimate request adds no automatic retry.
+
+For planning only, assume 2,000 input tokens and 500 output tokens per estimate
+request, and 15 / 30 / 60 requests per month. Using the historical rates above
+(recorded September 7; not rechecked in this review), that adds US$0.001 per
+estimated brief, or US$0.015 / US$0.030 / US$0.060 monthly. Tokens and billed cost
+remain unmeasured. Recheck provider rates and measure both calls before promoting
+the candidate or treating these assumptions as a budget limit.
+
 ## Weather
 
 Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). On 2026-10-22 the owner
@@ -278,6 +301,8 @@ arrives, fees reduce the US$5:
   paid plan starts.
 - 2026-10-22: Recorded the confirmed travel budget posture, the free Open-Meteo plan
   for development and testing, and backlog Ticket 243 for six-leg speed.
+- 2026-10-24: Recorded Ticket 188's optional second model request and incremental
+  candidate cost assumptions. Production-default totals remain unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

@@ -1134,6 +1134,23 @@ When the model's facts held weather trips (Ticket 219 stage 2), a muted Open-Met
 credit line ("Weather data by Open-Meteo.com (CC BY 4.0)" with site and licence
 links) follows the text, unless the Travel section already shows it.
 
+Recipe 1.1 briefs (Ticket 184 candidate) show options as "Suggested time: 7:00 AM–7:20 AM."
+Tips from logging lanes (late logging, marking times, decisions with no record,
+corrections) use the label "Logging tip"; others keep "Pattern tip". The evidence line
+sits indented under its tip behind a hairline left border. Recipe 1.1 omits the
+"A pattern, not proof of a cause." limitation; the model still never claims a cause.
+Recipe 1.2 briefs (Ticket 184 candidate 3) show each kind of advice under one label.
+All moves share one "New suggested time" heading; each is a bullet such as
+"Walk: 12:30 PM–12:50 PM → 1:10 PM–1:30 PM", with no reason line; the overview never repeats the move. Behavior names render as compact chips. On a
+quiet day the bubble shows only the tip; with no tip either, no bubble appears unless
+calculated travel content is present.
+Recipe 1.2 fills omitted move suggestions only when the projected travel facts permit
+that fallback. A `does_not_fit` occurrence receives no move; unknown or withheld travel
+conclusions cannot restore a move the model omitted. The planner still receives no
+travel facts, and a suggested time never proves that travel fits there.
+A "Setup tip" (recipe 1.2, written by Cadence) asks for a typical length for a Behavior
+with none, with its reason as the indented evidence line.
+
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):
 "Include reminder delivery history" and "Include Notes on Not Completed occurrences".
@@ -1170,3 +1187,12 @@ Disconnect has an app-specific accessible name and announces success or failure.
 A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
+
+## Daily Brief Calendar connection (Ticket 187)
+
+Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.
+Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
+Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
+Explain that model sharing requires the separate Daily Brief control after connection and selection.
+Under that Daily Brief control, a disclosure line (`daily-brief-calendar-disclosure`) names what is sent: today's event times, timezone, availability and response, never titles, descriptions, locations or attendees, and never the Timeline connection.
+The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.

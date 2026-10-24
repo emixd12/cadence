@@ -59,3 +59,9 @@ export async function readCalendarRequestBody(request: Request, maxBytes = 70_00
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
   catch { throw new CalendarConnectionError("invalid_request"); }
 }
+
+export function calendarRequestPurpose(request: Request): "standard" | "agent" {
+  const purpose = new URL(request.url).searchParams.get("purpose") ?? "standard";
+  if (purpose !== "standard" && purpose !== "agent") throw new CalendarConnectionError("invalid_request");
+  return purpose;
+}

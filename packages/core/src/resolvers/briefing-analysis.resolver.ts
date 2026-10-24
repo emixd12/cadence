@@ -770,13 +770,16 @@ export type BriefingTipSelection = Readonly<{
 /**
  * Chooses at most one occasional pattern tip. A tip must bear on today, its
  * fingerprint must be outside the cooldown, and no different tip may have been
- * shown on the previous local day. A tip already shown today may be shown again,
- * so a deliberate retry or refresh keeps the same advice. Findings arrive ranked.
+ * shown on the previous local day unless `nextDaySpacing` is false. A tip already
+ * shown today may be shown again, so a deliberate retry or refresh keeps the same
+ * advice. Findings arrive ranked.
  */
 export function selectBriefingTip(input: Readonly<{
   findings: readonly BriefingFinding[];
   maxTips: 0 | 1;
   cooldownDays: number;
+  /** Defaults to true. Recipe 1.2 turns it off so consecutive days may show different tips. */
+  nextDaySpacing?: boolean;
   localDate: string;
   shown: readonly Readonly<{ fingerprint: string; lastShownLocalDate: string }>[];
   fingerprintOf: (finding: BriefingFinding) => string;
@@ -796,7 +799,7 @@ export function selectBriefingTip(input: Readonly<{
     if (shownToday.has(fingerprint)) return null;
     const last = shown.get(fingerprint);
     if (last && age(last) > 0 && age(last) < input.cooldownDays) return "cooldown";
-    if (shownToday.size > 0 || shownYesterday.some((other) => other !== fingerprint)) return "spacing";
+    if (shownToday.size > 0 || (input.nextDaySpacing !== false && shownYesterday.some((other) => other !== fingerprint))) return "spacing";
     return null;
   };
   // Prefer the tip already shown today so retries stay consistent.

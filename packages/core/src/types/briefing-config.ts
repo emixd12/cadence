@@ -13,6 +13,28 @@ import type { BriefingModelTravelFacts, BriefingTravelControl } from "./briefing
 export const BRIEFING_CONFIG_VERSION = "1.3" as const;
 export const LEGACY_BRIEFING_CONFIG_VERSION = "1.0" as const;
 export const DAILY_BRIEF_RECIPE = Object.freeze({ id: "daily_brief", version: "1.0" } as const);
+/**
+ * Ticket 184 candidate recipe. It changes prompt and presentation rules and makes
+ * today's unresolved Behaviors movable for suggestions. Only 1.3 configurations may select it.
+ */
+export const DAILY_BRIEF_RECIPE_V1_1 = Object.freeze({ id: "daily_brief", version: "1.1" } as const);
+/**
+ * Ticket 184 candidate 3. Keeps every recipe 1.1 rule and adds labeled advice
+ * blocks, overlap lengths, highlighted Behavior names, empty quiet days and
+ * relaxed next-day tip spacing. Only 1.3 configurations may select it.
+ */
+export const DAILY_BRIEF_RECIPE_V1_2 = Object.freeze({ id: "daily_brief", version: "1.2" } as const);
+export type DailyBriefRecipe = typeof DAILY_BRIEF_RECIPE | typeof DAILY_BRIEF_RECIPE_V1_1 | typeof DAILY_BRIEF_RECIPE_V1_2;
+
+/** Recipes 1.1 and later share plain wording, movability and description estimates. */
+export function isPlainRecipe(recipe: Readonly<{ version: string }>): boolean {
+  return recipe.version === DAILY_BRIEF_RECIPE_V1_1.version || recipe.version === DAILY_BRIEF_RECIPE_V1_2.version;
+}
+
+/** Recipe 1.2 adds labeled advice blocks and relaxed tip spacing. */
+export function isLaneRecipe(recipe: Readonly<{ version: string }>): boolean {
+  return recipe.version === DAILY_BRIEF_RECIPE_V1_2.version;
+}
 
 export type BriefingTone = "calm" | "warm" | "matter_of_fact";
 export type BriefingDirectness = "gentle" | "balanced" | "direct";
@@ -30,6 +52,11 @@ export type BriefingContextConfig = Readonly<{
     includeConfiguredDefault: boolean;
     preference: BriefingDurationSource;
     fallback: "other_enabled_source" | "none";
+    /**
+     * Recipe 1.1 only (Ticket 188): use a description estimate when no enabled
+     * source is known. Absent on recipe 1.0, which keeps its serialization.
+     */
+    includeDescriptionEstimate?: boolean;
   }>;
 }>;
 
@@ -47,7 +74,7 @@ export type BriefingAnalysisConfig = Readonly<{
 
 export type BriefingConfigV1 = Readonly<{
   version: typeof BRIEFING_CONFIG_VERSION;
-  recipe: typeof DAILY_BRIEF_RECIPE;
+  recipe: DailyBriefRecipe;
   tone: BriefingTone;
   directness: BriefingDirectness;
   encouragement: BriefingEncouragement;
@@ -163,7 +190,7 @@ export type BriefingContextControls = Readonly<{
     historicalAverage: Readonly<{ requested: boolean }>;
     selections: readonly Readonly<{
       behaviorRef: string;
-      source: BriefingDurationSource | null;
+      source: BriefingDurationSource | "description_estimate" | null;
       sampleCount: number;
       reason: "disabled" | "insufficient_samples" | "history_limit_exceeded" | "unavailable" | null;
     }>[];

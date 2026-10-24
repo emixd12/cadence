@@ -193,6 +193,27 @@
       ]
     },
     {
+      "id": "config.context.duration.includeDescriptionEstimate",
+      "label": "Include description duration estimate",
+      "category": "Configuration",
+      "definition": "Recipe 1.1 only (Ticket 188). When no enabled recorded source is known, a validated estimate from the Behavior's title and description may supply duration. Descriptions need disclosure; the estimate is labeled and never overrides a recorded source.",
+      "contracts": [
+        {
+          "path": "packages/core/src/types/briefing-config.ts",
+          "symbol": "BriefingContextConfig"
+        },
+        {
+          "path": "packages/core/src/services/description-duration.ts",
+          "symbol": "applyDescriptionEstimates"
+        }
+      ],
+      "relatedIds": [
+        "config.context.duration",
+        "config.context.duration.includeHistoricalAverage",
+        "config.recipe.version"
+      ]
+    },
+    {
       "id": "config.context.duration.includeConfiguredDefault",
       "label": "Include configured default duration",
       "category": "Configuration",

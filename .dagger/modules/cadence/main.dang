@@ -1,0 +1,175 @@
+"""
+Cadence repository checks: the npm scripts the GitHub Actions CI workflow runs.
+
+Each check runs one or more npm scripts from package.json on Node 24, the
+version the engines field and the GitHub Actions workflow use. All checks share
+one dependency install, keyed only on the package manifests and the lockfile,
+so editing source files does not reinstall node_modules.
+
+Lint and tests run here rather than through the dagger.io/js/eslint and
+dagger.io/js/vitest modules. Vitest v0.3.0 finds test files with a brace glob,
+and Workspace.search in Dagger v1.0.0-beta.21 matches nothing for brace globs,
+so that module would skip every test without failing.
+"""
+type Cadence {
+  """
+  Node image the checks run on. Keep it on the engines.node major. The full
+  image, unlike -slim, ships git and python3, which tests call the way they do
+  on the GitHub Actions runner.
+  """
+  nodeImage: String! = "node:24-bookworm"
+
+  """
+  The repository without dependencies, build output, or ignored local files.
+  """
+  pub source: Directory!
+
+  """
+  The files npm ci reads: root and workspace manifests plus the lockfile.
+  """
+  pub manifests: Directory!
+
+  new(ws: Workspace!) {
+    self.source = ws.directory("/", gitignore: true, exclude: [
+      "**/node_modules",
+      "**/.git",
+      ".dagger",
+      ".claude",
+      ".local",
+      ".next",
+      ".vercel",
+      "**/.env",
+      "**/.env.local",
+      "**/.env.*.local",
+      "**/dist",
+      "apps/desktop/src-tauri/target",
+      "load-tests/.venv",
+      "*.tsbuildinfo",
+    ])
+    self.manifests = ws.directory("/", include: [
+      "package.json",
+      "package-lock.json",
+      "apps/*/package.json",
+      "packages/*/package.json",
+    ])
+    self
+  }
+
+  """
+  Agent drift check (npm run agents:check).
+  """
+  pub agents: Void @check {
+    run(["agents:check"])
+  }
+
+  """
+  Interaction registry check (npm run interactions:check).
+  """
+  pub interactions: Void @check {
+    run(["interactions:check"])
+  }
+
+  """
+  Resolver boundary check (npm run resolvers:check).
+  """
+  pub resolvers: Void @check {
+    run(["resolvers:check"])
+  }
+
+  """
+  ESLint across the repository (npm run lint).
+  """
+  pub lint: Void @check {
+    run(["lint"])
+  }
+
+  """
+  The Vitest suite (npm run test). The agent reporter prints only failures and
+  the summary, and console output only from failing tests, so a failure log
+  stays short enough for an agent to read.
+  """
+  pub test: Void @check {
+    app
+      .withExec(["npm", "run", "test", "--", "--reporter=agent", "--silent=passed-only"])
+      .sync
+    null
+  }
+
+  """
+  Public trust evidence check and fixture collection.
+  """
+  pub publicTrust: Void @check {
+    run(["public-trust:check", "public-trust:fixtures"])
+  }
+
+  """
+  Next.js route types and the TypeScript compiler (npm run typecheck).
+  """
+  pub typecheck: Void @check {
+    run(["typecheck"])
+  }
+
+  """
+  Production web build (npm run build). Reuses the Next.js build cache.
+  """
+  pub build: Void @check {
+    app
+      .withMountedCache("/src/.next/cache", cacheVolume("cadence-next-build"))
+      .withExec(["npm", "run", "build"])
+      .sync
+    null
+  }
+
+  """
+  Desktop frontend dependency check, typecheck, and Vite build.
+  """
+  pub desktopBuild: Void @check {
+    run(["desktop:build"])
+  }
+
+  """
+  Marketing site build, then the checks that read its dist output.
+  """
+  pub marketing: Void @check {
+    run(["marketing:build", "marketing:check"])
+  }
+
+  """
+  A shell in the checks' container, for debugging a failure.
+  """
+  pub shell: Container! {
+    app.withDefaultTerminalCmd(["bash"])
+  }
+
+  """
+  Runs npm scripts in order in one container; the first failure fails the check.
+  """
+  let run(scripts: [String!]!): Void {
+    scripts
+      .reduce(app) { ctr, script => ctr.withExec(["npm", "run", script]) }
+      .sync
+    null
+  }
+
+  """
+  Installed dependencies with the full source copied over them.
+  """
+  let app: Container! {
+    deps.withDirectory("/src", source)
+  }
+
+  """
+  Node with dependencies installed from the manifests alone.
+  """
+  let deps: Container! {
+    container
+      .from(nodeImage)
+      .withEnvVariable("CI", "true")
+      .withEnvVariable("NEXT_TELEMETRY_DISABLED", "1")
+      .withEnvVariable("ASTRO_TELEMETRY_DISABLED", "1")
+      .withMountedCache("/root/.npm", cacheVolume("cadence-npm"))
+      .withWorkdir("/src")
+      .withDirectory("/src", manifests)
+      .withExec(["npm", "ci", "--no-audit", "--no-fund"])
+  }
+}

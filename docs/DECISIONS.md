@@ -1229,3 +1229,22 @@ release as Cadence_aarch64.dmg."
 Platform impact: the desktop release process, and the marketing download link
 (`INT-MKT-012`). Web and future mobile are not affected. Recorded from the owner's
 October 24 sign-off, relayed by the orchestrating agent session.
+
+## 2026-10-24: Local Dagger checks before every push; no Dagger Cloud
+
+The repository defines its CI checks as a Dagger module (`dagger.toml`,
+`.dagger/modules/cadence/main.dang`). The owner chose to run them locally only:
+
+- The owner and agents run `dagger check` before every push. Unchanged checks
+  return from cache, so repeat verification costs about 1 s on the owner's Mac.
+- GitHub Actions `CI` stays the free merge gate.
+- Dagger Cloud and Cloud Checks are not used. They cost at least US$20 per month.
+- A `ci.yml` step that runs `dagger check` on the GitHub runner is optional and
+  not added. The runner starts with an empty cache, so each run would take about
+  as long as a cold local run.
+
+The owner's words: "I want us to skip Cloud Checks."
+
+Platform impact: development tooling only. Web, desktop, marketing and future
+mobile behavior is unchanged; the Dagger checks build web, desktop frontend and
+marketing exactly as `CI` does.

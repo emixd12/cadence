@@ -242,6 +242,101 @@ describe("planBriefing", () => {
     }));
   });
 
+  it("gives one move per occurrence, overlaps first, without colliding chosen times", () => {
+    // Event 10:00–11:00. "overlapping" (10:00–10:20) sits inside it; "tight" (11:00–11:20) starts as it ends.
+    const window = permittedRange("2026-09-20T08:30:00Z", "2026-09-20T12:00:00Z");
+    const base = input(dayContext({
+      occurrences: [occurrence("tight", "2026-09-20T11:00:00Z", 1_200), occurrence("overlapping", "2026-09-20T10:00:00Z", 1_200)],
+      events: [timedEvent("meeting", "2026-09-20T10:00:00Z", "2026-09-20T11:00:00Z")],
+    }), { policy: { bufferMinutes: 10, preference: "least_change" } });
+    const movable = ["tight", "overlapping"].map((occurrenceRef) => ({ occurrenceRef, permittedWindows: [window] }));
+    const pooled = planBriefing({ ...base, alternatives: 1, movableOccurrences: movable });
+    expect(pooled.options.map((option) => option.occurrenceRef)).toEqual(["tight"]);
+
+    const plan = planBriefing({ ...base, alternatives: 3, movableOccurrences: movable, policy: { ...base.policy, onePerOccurrence: true } });
+    expect(plan.options.map((option) => option.occurrenceRef)).toEqual(["overlapping", "tight"]);
+    const [first, second] = plan.options.map((option) => [Date.parse(option.intervals.proposed.startAt), Date.parse(option.intervals.proposed.endAt)] as const);
+    // Chosen moves keep the 10-minute buffer from each other.
+    expect(second![0] >= first![1] + 600_000 || first![0] >= second![1] + 600_000).toBe(true);
+    expect(planBriefing({ ...base, alternatives: 1, movableOccurrences: movable, policy: { ...base.policy, onePerOccurrence: true } }).options.map((option) => option.occurrenceRef)).toEqual(["overlapping"]);
+  });
+
+  it("with flexible schedules, an unknown length blocks nothing and a range forms no overlap", () => {
+    // "unknown" starts 9:00 with no length; "target" (45 min, 10:00) overlaps a 10:00–10:30 event.
+    const context = dayContext({
+      occurrences: [occurrence("target", "2026-09-20T10:00:00Z", 2_700), occurrence("unknown", "2026-09-20T09:00:00Z", null)],
+      events: [timedEvent("meeting", "2026-09-20T10:00:00Z", "2026-09-20T10:30:00Z")],
+    });
+    const strict = planBriefing(input(context));
+    expect(strict.options).toEqual([]);
+    const flexible = planBriefing({ ...input(context), policy: { bufferMinutes: 0, preference: "earliest", flexibleSchedules: true } });
+    expect([flexible.options[0]!.occurrenceRef, flexible.options[0]!.intervals.proposed.startAt]).toEqual(["target", "2026-09-20T08:30:00Z"]);
+
+    const ranged = { ...occurrence("window", "2026-09-20T09:00:00Z", 1_800), schedule: { kind: "range" as const, startTime: "09:00:00", endTime: "11:00:00" } };
+    const rangeContext = dayContext({ occurrences: [ranged, occurrence("inside", "2026-09-20T10:00:00Z", 600)] });
+    const overlapsOf = (plan: ReturnType<typeof planBriefing>) => plan.dayEvidence.findings.filter((item) => item.kind === "known_overlap").length;
+    expect(overlapsOf(planBriefing(input(rangeContext)))).toBe(1);
+    expect(overlapsOf(planBriefing({ ...input(rangeContext), policy: { bufferMinutes: 0, preference: "earliest", flexibleSchedules: true } }))).toBe(0);
+  });
+
+  it("with flexible schedules, a range holds only its length, packed at its earliest free time", () => {
+    // "window" may happen 9:00–11:00 and takes 30 minutes; it is packed at 9:00–9:30.
+    // "target" (45 min) overlaps a 10:00–10:30 event; 8:30–9:00 and 9:30–10:00 are too short, so 10:30.
+    const ranged = { ...occurrence("window", "2026-09-20T09:00:00Z", 1_800), schedule: { kind: "range" as const, startTime: "09:00:00", endTime: "11:00:00" } };
+    const context = dayContext({
+      occurrences: [occurrence("target", "2026-09-20T10:00:00Z", 2_700), ranged],
+      events: [timedEvent("meeting", "2026-09-20T10:00:00Z", "2026-09-20T10:30:00Z")],
+    });
+    const plan = planBriefing({ ...input(context), policy: { bufferMinutes: 0, preference: "earliest", flexibleSchedules: true } });
+    expect(plan.options[0]!.intervals.proposed.startAt).toBe("2026-09-20T10:30:00Z");
+    const strict = planBriefing(input(context));
+    // Without flexible schedules the range reserves its whole span.
+    expect(strict.options.every((option) => Date.parse(option.intervals.proposed.startAt) >= Date.parse("2026-09-20T11:00:00Z") || Date.parse(option.intervals.proposed.endAt) <= Date.parse("2026-09-20T09:00:00Z"))).toBe(true);
+  });
+
+  it("with flexible schedules, a range is never packed into the slot of the Behavior being moved", () => {
+    const ranged = { ...occurrence("window", "2026-09-20T09:00:00Z", 1_800), schedule: { kind: "range" as const, startTime: "09:00:00", endTime: "11:00:00" } };
+    const context = dayContext({ occurrences: [occurrence("target", "2026-09-20T09:00:00Z", 600), ranged] });
+    const plan = planBriefing({ ...input(context), policy: { bufferMinutes: 0, preference: "earliest", flexibleSchedules: true } });
+    expect(plan.options).toEqual([]);
+    expect(plan.rejections).toContainEqual(expect.objectContaining({ occurrenceRef: "target", code: "no_change_needed" }));
+  });
+
+  it("slides a colliding move later within its free range instead of jumping to a later gap", () => {
+    // Both overlap a 9:00–10:00 event; the 10:00–12:00 gap takes "first" at 10:00, then "second" at 10:30.
+    const context = dayContext({
+      occurrences: [occurrence("first", "2026-09-20T09:00:00Z", 1_800), occurrence("second", "2026-09-20T09:30:00Z", 1_800)],
+      events: [timedEvent("meeting", "2026-09-20T08:30:00Z", "2026-09-20T10:00:00Z")],
+    });
+    const window = permittedRange("2026-09-20T08:30:00Z", "2026-09-20T12:00:00Z");
+    const plan = planBriefing({ ...input(context), alternatives: 3, policy: { bufferMinutes: 0, preference: "least_change", onePerOccurrence: true, flexibleSchedules: true },
+      movableOccurrences: ["first", "second"].map((occurrenceRef) => ({ occurrenceRef, permittedWindows: [window] })) });
+    expect(plan.options.map((option) => [option.occurrenceRef, option.intervals.proposed.startAt])).toEqual([
+      ["first", "2026-09-20T10:00:00Z"], ["second", "2026-09-20T10:30:00Z"],
+    ]);
+  });
+
+  it("says which part of each side an overlap covers", () => {
+    // Behavior 9:00–9:30. Event a (9:10–9:40) takes its end; event b (9:05–9:15) sits inside it.
+    const plan = planBriefing({
+      ...input(dayContext({
+        occurrences: [occurrence("behavior", "2026-09-20T09:00:00Z", 1_800)],
+        events: [
+          timedEvent("calendar-a", "2026-09-20T09:10:00Z", "2026-09-20T09:40:00Z"),
+          timedEvent("calendar-b", "2026-09-20T09:05:00Z", "2026-09-20T09:15:00Z"),
+        ],
+      })),
+      allowedSuggestionTypes: ["recap"],
+      movableOccurrences: [],
+    });
+    const parts = (eventRef: string) => {
+      const finding = plan.dayEvidence.findings.find((item) => item.kind === "known_overlap" && item.refs.occurrenceRefs.includes("behavior") && item.refs.calendarEventRefs.includes(eventRef));
+      return finding?.kind === "known_overlap" ? finding.participants.map((item) => [item.ref, item.source, item.part]) : null;
+    };
+    expect(parts("calendar-a")).toEqual([["behavior", "occurrence", "end"], ["calendar-a", "calendar_event", "start"]]);
+    expect(parts("calendar-b")).toEqual([["behavior", "occurrence", "middle"], ["calendar-b", "calendar_event", "all"]]);
+  });
+
   it("reports tight transitions from the configured buffer", () => {
     const plan = planBriefing(input(dayContext({
       occurrences: [occurrence("target", "2026-09-20T09:00:00Z", 1_800)],

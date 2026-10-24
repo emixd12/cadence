@@ -73,7 +73,8 @@ export type AdvisorDuration =
   | Readonly<{
       kind: "known";
       seconds: number;
-      source: "behavior_default" | "completed_stopped_occurrence_mean";
+      /** `description_estimate` comes from Ticket 188's estimate step, never from stored history. */
+      source: "behavior_default" | "completed_stopped_occurrence_mean" | "description_estimate";
       sampleCount: number;
       lookbackDays: 90;
     }>
@@ -87,6 +88,8 @@ export type AdvisorDuration =
 export type AdvisorDurationCandidates = Readonly<{
   configuredDefault: Extract<AdvisorDuration, { kind: "known" }> | null;
   historicalAverage: AdvisorDuration;
+  /** Ticket 188: lowest-priority estimate from the Behavior's title and description. */
+  descriptionEstimate?: Extract<AdvisorDuration, { kind: "known" }> | null;
 }>;
 
 export type AdvisorRecordedElapsedDuration = Readonly<{

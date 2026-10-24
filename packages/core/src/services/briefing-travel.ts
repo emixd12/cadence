@@ -188,3 +188,20 @@ export function projectBriefingTravelFacts(travel: AdvisorTravelContext, visible
 export function briefingUsesWeather(travel: BriefingModelTravelFacts | undefined): boolean {
   return travel?.weather?.state === "applied" && travel.weather.trips.length > 0;
 }
+
+/**
+ * Apply the travel policy to final projected facts, never undisclosed context.
+ * The planner stays travel-free: a fit describes the scheduled occurrence, not
+ * proof that a proposed time avoids travel. Unknown or withheld conclusions may
+ * inform a model-selected suggestion, but cannot justify adding an omitted move.
+ */
+export function briefingTravelOptionPolicy(travel: BriefingModelTravelFacts | undefined, occurrenceRef: string): Readonly<{
+  offer: boolean;
+  fallback: boolean;
+}> {
+  if (!travel || travel.routing === "off") return { offer: true, fallback: true };
+  const conclusion = travel.route.state === "available"
+    ? travel.route.conclusions.fits.find(({ ref }) => ref === occurrenceRef)?.conclusion
+    : undefined;
+  return { offer: conclusion !== "does_not_fit", fallback: conclusion === "fits" };
+}

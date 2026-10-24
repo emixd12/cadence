@@ -478,7 +478,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block."
+      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Recipe 1.1 (Ticket 184 candidate) shows plain Suggested time lines and a Logging or Pattern tip label with evidence indented under the tip. Recipe 1.2 (candidate 3) lists every move as a bullet under one New suggested time heading with current → new times, Behavior names as compact chips, and hides an empty brief. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block."
     },
     {
       "id": "module.daily-brief-settings-panel",
@@ -492,7 +492,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Settings enablement and optional Calendar-context disclosure; the bench uses a fixture client only."
+      "notes": "Settings enablement and optional Calendar-context disclosure from the separate agent grant; the bench uses a fixture client only."
     },
     {
       "id": "module.google-calendar-panel",
@@ -506,7 +506,7 @@
       "benchAnchor": "design-system#ds-module-google-calendar-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Tickets 133\u2013137; synthetic bench never contacts a provider."
+      "notes": "Tickets 133\u2013137 and 187; shared standard/agent consent panel. Agent mode has its own selection and omits Timeline display controls. Synthetic bench covers connected, disconnected, reconnect and unconfigured states without provider calls."
     },
     {
       "id": "module.connector-library",

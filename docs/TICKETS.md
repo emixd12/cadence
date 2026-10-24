@@ -13106,9 +13106,15 @@ between jobs; partial-result and draft retention; all required checks and browse
 Status: evaluation criteria and initial coverage accepted September 30, 2026.
 The criteria and versioned profile `daily-brief-balanced@1` live in
 `docs/plans/2026-09-28-briefing-owner-review.md`. Coverage is six tuning cases,
-ten reserved cases and one seven-day sequence. Evaluation iteration 1 has not run;
-quality acceptance, promotion and rollback execution remain open. Phase 5 of the
-briefing-bench plan.
+ten reserved cases and one seven-day sequence. Iteration 1 tuning pass 1 ran October 16,
+2026 (T1–T6, 12 calls). Owner feedback produced candidate 2: recipe `daily_brief@1.1`
+in preset `advisor-analysis-2`, with Behavior-description duration estimates under
+Ticket 188. The owner reviewed candidate 2 on October 23 (account case plus T1–T6).
+That review produced candidate 3: recipe `daily_brief@1.2` in preset
+`advisor-analysis-3`, with labeled advice blocks, overlap lengths, highlighted Behavior
+names, empty quiet days and relaxed next-day tip spacing (owner decision October 23).
+Held-out cases, quality acceptance, promotion and rollback execution remain open.
+Phase 5 of the briefing-bench plan.
 Dependencies: Tickets 175–177 and 182–183. Coordinate release evidence with Tickets 155, 161 and
 174; do not duplicate or silently close their outstanding gates.
 
@@ -13154,7 +13160,7 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Existing hosted Daily Brief and 390 px acceptance; update existing QA and interaction evidence for changed behavior. |
-| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. |
+| Desktop | Hosted generation and shared bubble affect linked desktop; use installed acceptance under Tickets 155/174 and `docs/DESKTOP_PARITY.md`. Candidate 3's empty-brief hiding and labeled blocks are in the shared `DailyBriefBubble`. |
 | Marketing | No automatic copy change. Review existing claims only if the accepted production behavior changes them. |
 | Future mobile | Responsive web acceptance only; native mobile remains deferred. |
 
@@ -13245,6 +13251,80 @@ Platform impact:
 | Future mobile | Not applicable: no mobile implementation or identifiers change. |
 
 Execution evidence: `docs/qa/cadence-project-rename.md`.
+
+## Ticket 187: Isolate agentic Calendar access
+
+Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
+October 22, 2026: recovered from a local backup for owner review; the migration is now
+`20261022180000_separate_agent_calendar_grant.sql` (see `STATUS.md`).
+Privacy log: P-005, P-006 and P-010 in `docs/PRIVACY_CHANGES.md`.
+Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
+Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+
+Implement Branch B of `docs/plans/2026-10-12-google-agentic-oauth-review.md`.
+The implementation uses a separate agent Calendar grant and Google project.
+It keeps ordinary Calendar display and Google sign-in on their existing clients.
+It does not add MCP, broaden scopes, or grant model tools.
+
+Acceptance: isolate OAuth attempts, encrypted grants, refresh, reads, caches,
+Daily Brief disclosure, private comparisons, history, saved inputs, and revocation.
+Missing agent configuration or consent must never fall back to standard credentials.
+Prior Calendar disclosure must require renewal for the agent grant.
+Run repository checks, local SQL ownership/race tests, and web/desktop UI tests.
+Provider classification, live configuration, hosted deployment, and installed
+acceptance remain separate rollout gates.
+Release scope includes correcting public no-AI disclosures and proving a cutover
+barrier across older production-backed readers. New-project verification and
+fresh user consent must precede public Calendar-to-AI availability.
+
+Platform impact:
+- Web: Calendar services, callback/API routes, and existing Settings controls.
+- Desktop: hosted broker and agent consent controls; preserve offline tracking/cache.
+- Marketing: verify homepage/legal links and accurate claims against updated app
+  legal content; no public availability claim before provider and release acceptance.
+- Future mobile: document the shared grant distinction; implementation remains deferred.
+
+Use the existing interaction registry and design-system catalog for affected controls.
+This ticket supersedes the single Calendar-grant assumption in the Daily Brief plan.
+
+## Ticket 188: Estimate Behavior durations from descriptions
+
+Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
+October 22, 2026: recovered from a local backup for owner review (see `STATUS.md`).
+Privacy log: P-011 in `docs/PRIVACY_CHANGES.md`.
+The unmerged iOS plan also uses the label "Ticket 188" for its activation step; renumber that
+step if the plan lands.
+Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate
+estimate step; add a review surface for iterating on the mechanism; update privacy
+disclosures.
+
+Goal: when a Behavior has no default duration and too few tracked sessions, estimate
+its length from its title and description so the planner can check fits and suggest times.
+
+Scope and acceptance:
+
+- Only recipe `daily_brief@1.1` configurations that select description estimates use them.
+  Descriptions reach the model only after the account discloses them in Daily Brief
+  Settings. The private workbench may use an owner-confirmed, local-only disclosure.
+- One bounded model call returns, per eligible Behavior, whole minutes (1–480) or null,
+  and whether the description states the length or the model inferred it. Cadence
+  validates refs and bounds and discards anything else. Descriptions are untrusted text.
+- Estimates are a third duration source, `description_estimate`, below the Behavior's
+  default and tracked-session averages. The deterministic planner checks fits; the model
+  never calculates intervals. Evidence labels the estimate's source.
+- The estimate call counts against the workbench budget and production limits.
+  A failed estimate call leaves durations unknown; it never fails the brief.
+- The workbench shows each description, estimate and basis. The owner can record the
+  real typical length; records stay in the local bench store for later tuning.
+- Production disclosure needs a migration, Settings control, legal/privacy text and
+  `docs/DATA_MODEL.md`. Hosted deployment follows Ticket 187's migration order.
+
+Platform impact:
+- Web: Daily Brief Settings disclosure, hosted generation and privacy content.
+- Desktop: linked desktop shares hosted generation and the Settings panel; no local
+  description transmission in account-free mode.
+- Marketing: review privacy and AI claims before release; no copy change before acceptance.
+- Future mobile: not applicable; native mobile remains deferred.
 
 ## Ticket 212: Home address and usual travel in first-run onboarding
 

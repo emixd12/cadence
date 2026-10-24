@@ -2,15 +2,22 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import type { ExternalEventErrorCode } from "@cadence/core/types/external-event";
 import type { User } from "@supabase/supabase-js";
 
+import type { CalendarPurpose } from "@/lib/types/google-calendar";
+
 export const GOOGLE_CALENDAR_SCOPES = ["openid", "https://www.googleapis.com/auth/calendar.calendarlist.readonly", "https://www.googleapis.com/auth/calendar.events.readonly"] as const;
-export type CalendarOAuthConfig = { clientId: string; clientSecret: string; callbackUrl: string; key: Buffer; keyId: string; decryptionKeys?: Record<string, Buffer> };
+export type CalendarOAuthConfig = { grantPurpose?: CalendarPurpose; clientId: string; clientSecret: string; callbackUrl: string; key: Buffer; keyId: string; decryptionKeys?: Record<string, Buffer> };
 export class CalendarConnectionError extends Error {
   constructor(public readonly code: ExternalEventErrorCode | "not_configured" | "same_account_required" | "consent_denied" | "expired_attempt" | "connection_changed") {
     super(code); this.name = "CalendarConnectionError";
   }
 }
-export function readCalendarOAuthConfig(env: Record<string, string | undefined> = process.env, requestOrigin?: string): CalendarOAuthConfig | null {
-  const { GOOGLE_CALENDAR_CLIENT_ID: clientId, GOOGLE_CALENDAR_CLIENT_SECRET: clientSecret,
+export function readCalendarOAuthConfig(env: Record<string, string | undefined> = process.env, requestOrigin?: string, grantPurpose: CalendarPurpose = "standard"): CalendarOAuthConfig | null {
+  const clientId = grantPurpose === "agent" ? env.GOOGLE_CALENDAR_AGENT_CLIENT_ID : env.GOOGLE_CALENDAR_CLIENT_ID;
+  const clientSecret = grantPurpose === "agent" ? env.GOOGLE_CALENDAR_AGENT_CLIENT_SECRET : env.GOOGLE_CALENDAR_CLIENT_SECRET;
+  // Separate projects keep agent revocation from invalidating ordinary Calendar grants.
+  if (grantPurpose === "agent" && (!env.GOOGLE_CALENDAR_PROJECT_ID || !env.GOOGLE_CALENDAR_AGENT_PROJECT_ID ||
+      env.GOOGLE_CALENDAR_AGENT_PROJECT_ID === env.GOOGLE_CALENDAR_PROJECT_ID || clientId === env.GOOGLE_CALENDAR_CLIENT_ID)) return null;
+  const {
     GOOGLE_CALENDAR_CALLBACK_URL: callbackUrl, GOOGLE_CALENDAR_ENCRYPTION_KEY: encoded,
     GOOGLE_CALENDAR_KEY_ID: keyId } = env;
   if (!clientId || !clientSecret || !callbackUrl || !encoded || !keyId) return null;
@@ -34,7 +41,7 @@ export function readCalendarOAuthConfig(env: Record<string, string | undefined> 
       decryptionKeys[id] = decoded;
     }
     if (key.length !== 32 || !/^[a-zA-Z0-9_-]{1,32}$/.test(keyId)) return null;
-    return { clientId, clientSecret, callbackUrl: selectedCallback, key, keyId, decryptionKeys };
+    return { ...(grantPurpose === "agent" ? { grantPurpose } : {}), clientId, clientSecret, callbackUrl: selectedCallback, key, keyId, decryptionKeys };
   } catch { return null; }
 }
 export function calendarGoogleSubject(user: User): string {
@@ -43,13 +50,14 @@ export function calendarGoogleSubject(user: User): string {
   return subjects[0];
 }
 export type CalendarSecretBinding = Readonly<{ purpose: "refresh" | "verifier"; userId: string; googleSubject: string; generation: number; stateHash?: string }>;
-function associatedData(binding: CalendarSecretBinding): Buffer {
+function associatedData(binding: CalendarSecretBinding, config: CalendarOAuthConfig): Buffer {
+  if (config.grantPurpose === "agent") return Buffer.from(JSON.stringify(["cadence-calendar-agent-v1", config.clientId, binding.purpose, binding.userId, binding.googleSubject, binding.generation, binding.stateHash ?? null]));
   return Buffer.from(JSON.stringify(["cadence-calendar-v1", binding.purpose, binding.userId, binding.googleSubject, binding.generation, binding.stateHash ?? null]));
 }
 export function sealCalendarSecret(config: CalendarOAuthConfig, value: string, owner: CalendarSecretBinding): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", config.key, iv);
-  cipher.setAAD(associatedData(owner));
+  cipher.setAAD(associatedData(owner, config));
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   return [config.keyId, iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), ciphertext.toString("base64url")].join(".");
 }
@@ -60,7 +68,7 @@ export function openCalendarSecret(config: CalendarOAuthConfig, sealed: string, 
     const key = version === config.keyId ? config.key : config.decryptionKeys?.[version];
     if (!key) throw new Error();
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
-    decipher.setAAD(associatedData(owner)); decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    decipher.setAAD(associatedData(owner, config)); decipher.setAuthTag(Buffer.from(tag, "base64url"));
     return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8");
   } catch { throw new CalendarConnectionError("reconnect_required"); }
 }

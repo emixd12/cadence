@@ -27,7 +27,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-010` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-012` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -53,11 +53,13 @@ Status values:
 | [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, Travel Settings, user guide |
 | [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, Settings, marketing, user guide, interface |
 | [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Daily Brief and Travel Settings, user guide |
-| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | logged | 187 | Trust page, test |
+| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | resolved | 187 | Trust page, test |
 | [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | logged | 219, 165, 187 | Marketing |
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
 | [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
 | [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
+| [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | drafted | 187 | Privacy, Settings |
+| [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -292,8 +294,8 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Change:** none new. Daily Brief already sends Behavior schedule and completion
   history to OpenAI, and connected AI clients read tracking records through MCP. A
   public statement suggests the opposite.
-- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187, but
-  `docs/TICKETS.md` has no Ticket 187 section yet. Files:
+- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187; its
+  section in `docs/TICKETS.md` names the public no-AI disclosure as a release gate. Files:
   `components/settings/LegalContent.tsx` (Trust, "Data boundaries"),
   `tests/legal-content.test.tsx`.
 - **Conflicting current text:** Trust, "Data boundaries": "Cadence does not send
@@ -302,7 +304,18 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Update needed:** rewrite the sentence so that it agrees with the Daily Brief and MCP
   disclosures, and update the test. The rewrite must also cover Ticket 219's travel
   facts in model input (P-004).
-- **Status:** logged.
+- **Status:** resolved. The text below went live on October 24, 2026 at 18:16 UTC
+  (PR #147, main `6f2e770b`, app deployment `dpl_GGNbBrLyA7knWGzghH6gWKp7vq5X`, then
+  `dpl_9SvrL4ekjjQg5utxsH7hpvnnvrR6` for the Trust refresh). Earlier record: on
+  October 24, 2026, for Google's verification of the Daily
+  Brief Calendar client (Ticket 187), the Trust sentence was rewritten: exports go only
+  where the user sends them; Daily Brief sends the context the Privacy Policy describes,
+  Calendar timing only after a separate choice; MCP clients receive records only after
+  authorization; Cadence does not use Google user data to train AI models. The same
+  change describes both Google Calendar connections in Privacy, "Optional Google
+  Calendar", and adds the AI training limit there and in
+  `docs/user-guide/privacy-and-account.md`. The owner approved the text on October 24,
+  2026. Travel facts stay with P-004.
 
 ## P-006: Marketing review of AI and travel claims
 
@@ -377,4 +390,47 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     in native database backups".
   - `docs/user-guide/desktop-local.md`: "Import preserves the saved base".
 - **Update needed:** use Home, Where and usual travel, the words the interface shows.
+- **Status:** logged.
+
+## P-010: Separate Google Calendar grant for Daily Brief
+
+- **Change:** Ticket 187 (PR #135) gives Daily Brief its own Google Calendar connection.
+  It uses a separate Google Cloud project and client, separate consent, calendar selection,
+  encrypted credential and Disconnect. The Timeline Calendar connection never reaches the
+  model. The migration withdraws existing Daily Brief Calendar choices, so users must
+  connect again and allow Calendar again.
+- **Affected:** Ticket 187. Files: `components/settings/LegalContent.tsx` (Privacy,
+  "Optional Google Calendar" and "Optional Daily Brief").
+- **Conflicting current text:**
+  - Privacy, "Optional Google Calendar": "The Google Calendar connector is optional",
+    "encrypted Google refresh credential" and "Disconnect Google Calendar marks the
+    account connection disconnected" describe one connection.
+  - Privacy, "Optional Daily Brief": "Connecting a source or displaying it on Timeline
+    does not grant model access." Daily Brief now also needs its own Google connection.
+- **Update needed:** describe both Google Calendar connections, their separate consent,
+  selection, credential and Disconnect, and the one-time renewed choice.
+- **Status:** drafted. PR #147 (October 24, 2026, to `main`) describes both connections
+  in Privacy, "Optional Google Calendar", and in `docs/user-guide/privacy-and-account.md`,
+  for Google's verification of the Daily Brief Calendar client. That text is live
+  since October 24, 2026 (see P-005). It does not yet mention the one-time renewed
+  choice. Daily Brief Settings now has its own Calendar disclosure line.
+
+## P-011: Behavior descriptions sent for duration estimates
+
+- **Change:** Ticket 188 (PR #135) sends Behavior titles and descriptions to OpenAI in
+  one bounded call that estimates session lengths. It applies only to recipes 1.1 and
+  1.2 (Ticket 184 candidates), when a Behavior has no default duration and too few
+  tracked sessions. Today only the private workbench uses it, after a page-session owner
+  confirmation. Production use needs a promoted recipe, a Daily Brief Settings choice
+  and a migration for that disclosure.
+- **Affected:** Tickets 188 and 184. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Optional Daily Brief" and the processor table's OpenAI row).
+- **Conflicting current text:**
+  - Privacy, "Optional Daily Brief": "Cadence sends today's Behavior schedule and
+    completion history, including findings calculated from it, to OpenAI."
+  - Processor table, OpenAI: "Behavior schedule, completion history and calculated
+    findings; separately enabled Calendar timing, reminder counts, and selected note
+    excerpts". Neither names Behavior titles or descriptions.
+- **Update needed:** when a recipe with estimates is promoted, name Behavior titles and
+  descriptions as a separate Daily Brief choice and add them to the OpenAI row.
 - **Status:** logged.
