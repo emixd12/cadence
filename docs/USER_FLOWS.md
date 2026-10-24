@@ -922,6 +922,25 @@ provider call. Where joins Behavior configuration history and account sync. A
 Where suggestion (Ticket 216) never changes a Behavior on its own. Ticket 212
 reuses Home and usual travel in onboarding.
 
+### Completion places and Where suggestions (Ticket 216)
+
+1. In Settings, Completion places, the user selects Set up completion places,
+   chooses how long labels are kept (90 days by default) and selects Save where I
+   complete Behaviors. Labels stay off until then.
+2. At Home or a saved place the user selects I'm here: beside Home in Travel
+   Settings, below Where in the Behavior form, or in a Behavior's one-line marker
+   prompt. That tap may show the location prompt; Cadence stores the position as the
+   place's marker. Not now turns the prompts off on every device.
+3. The user marks an Occurrence Completed from Unresolved near its scheduled time on
+   its own day. If location is already allowed, Cadence reads one position, compares
+   it with the markers on the device, stores Home, a saved place or elsewhere, and
+   discards the position. It never prompts here. Changing the status away from
+   Completed deletes the label.
+4. After six labels in 60 days, a Behavior may show a Where suggestion. Review Where
+   fills the form; the user saves to apply it. Dismiss hides it until six more labels.
+5. Settings deletes labels or markers on request; Turn off deletes both and every
+   dismissal. A shorter retention asks first and deletes older labels.
+
 ## Connect and disconnect an AI client
 
 1. Start a Cadence connection from the AI client.

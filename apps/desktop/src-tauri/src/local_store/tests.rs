@@ -1483,6 +1483,7 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
     fixture.db.execute_batch(db::MIGRATIONS[14].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[15].2).unwrap();
     fixture.db.execute_batch(db::MIGRATIONS[17].2).unwrap();
+    fixture.db.execute_batch(db::MIGRATIONS[18].2).unwrap();
     let mut plan = import_plan(&fixture.profile);
     let intervention = imported_intervention(&fixture.profile, 200, "browser_push", "sent");
     plan["importedInterventionWrites"] = json!([{"expected":null,"next":intervention}]);
@@ -1543,7 +1544,11 @@ fn passive_intervention_migration_preserves_history_provenance_and_revision_afte
              DROP TRIGGER behaviors_where_place_text_insert;
              DROP TRIGGER behaviors_where_place_text_update;
              ALTER TABLE behaviors DROP COLUMN where_kind;
-             ALTER TABLE behaviors DROP COLUMN location_text;",
+             ALTER TABLE behaviors DROP COLUMN location_text;
+             DROP TABLE completion_place_labels;
+             DROP TABLE where_suggestion_dismissals;
+             DROP TABLE place_markers;
+             DROP TABLE place_label_settings;",
         )
         .unwrap();
     db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
@@ -2086,4 +2091,131 @@ fn behavior_where_migration_backfills_place_without_rewriting_history() {
         .db
         .execute("UPDATE behaviors SET where_kind = 'elsewhere', location_text = NULL", [])
         .is_err());
+}
+
+fn place_settings(profile: &str, enabled: bool) -> Value {
+    json!({"user_id":profile,"id":"place_labels","enabled":enabled,"retention":"90_days",
+        "enabled_at":if enabled { json!(NOW) } else { Value::Null },"marker_prompt_dismissed_at":null,"updated_at":NOW})
+}
+fn place_mutation(mutation: Value) -> Value {
+    json!({"operation":"commitPlaceLabels","mutation":mutation})
+}
+
+#[test]
+fn place_labels_follow_opt_in_completion_and_opt_out() {
+    let mut fixture = Fixture::new();
+    fixture.create();
+    fixture.occurrence();
+    let profile = fixture.profile.clone();
+    let marker = json!({"user_id":profile,"id":"home","place_key":"k".repeat(43),"latitude_e6":41878100,
+        "longitude_e6":-87629800,"accuracy_meters":20,"rule_version":"place-label-rules@1","recorded_at":NOW});
+    let label = json!({"id":id(10),"user_id":profile,"behavior_id":id(1),"local_date":"2026-08-31","label":"home",
+        "rule_version":"place-label-rules@1","recorded_at":NOW});
+    let upsert_marker = place_mutation(json!({"kind":"upsertMarker","marker":marker}));
+    let insert_label = place_mutation(json!({"kind":"insertLabel","label":label}));
+    // Off by default: nothing location-derived can be stored.
+    assert!(fixture.run(upsert_marker.clone(), 300).unwrap_err().contains("constraint"));
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":null,
+        "next":place_settings(&profile, true),"retentionCutoff":null})), 301).unwrap();
+    fixture.run(upsert_marker.clone(), 302).unwrap();
+    assert!(fixture.run(insert_label.clone(), 303).unwrap_err().contains("constraint"));
+    fixture.run(status_request(&profile, "unresolved", None, "completed", 20, "2026-08-31T13:05:00Z"), 304).unwrap();
+    fixture.run(insert_label.clone(), 305).unwrap();
+    assert_eq!(fixture.count("completion_place_labels"), 1);
+    // Leaving Completed deletes the label in the same transaction.
+    fixture.run(status_request(&profile, "completed", Some(20), "not_completed", 21, "2026-08-31T13:06:00Z"), 306).unwrap();
+    assert_eq!(fixture.count("completion_place_labels"), 0);
+    fixture.run(status_request(&profile, "not_completed", Some(21), "completed", 22, "2026-08-31T13:07:00Z"), 307).unwrap();
+    fixture.run(insert_label.clone(), 308).unwrap();
+    // A shorter retention deletes older labels in the same save.
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":NOW,
+        "next":place_settings(&profile, true),"retentionCutoff":"2026-09-01"})), 309).unwrap();
+    assert_eq!(fixture.count("completion_place_labels"), 0);
+    fixture.run(insert_label, 310).unwrap();
+    let state = place_labels::read(&fixture.db, &profile).unwrap();
+    assert_eq!(state["markers"].as_array().unwrap().len(), 1);
+    assert_eq!(state["labels"][0]["label"], "home");
+    // Turning labels off deletes labels and markers; settings must match the stored revision.
+    assert!(fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":null,
+        "next":place_settings(&profile, false),"retentionCutoff":null})), 311).unwrap_err().contains("changed"));
+    fixture.run(place_mutation(json!({"kind":"saveSettings","expectedUpdatedAt":NOW,
+        "next":place_settings(&profile, false),"retentionCutoff":null})), 312).unwrap();
+    assert_eq!(fixture.count("completion_place_labels"), 0);
+    assert_eq!(fixture.count("place_markers"), 0);
+    // The mutation journal keeps only request hashes, never marker positions.
+    let journal: String = fixture.db.query_row("SELECT group_concat(request_json || result_json) FROM mutation_outbox WHERE operation='commitPlaceLabels'", [], |row| row.get(0)).unwrap();
+    assert!(!journal.contains("41878100") && !journal.contains("latitude"));
+    assert!(fixture.run(upsert_marker, 313).unwrap_err().contains("constraint"));
+}
+
+#[test]
+fn place_label_migration_adds_constrained_tables_without_touching_tracking() {
+    let mut fixture = Fixture::at_schema(18);
+    fixture.create();
+    let before: i64 = fixture.db.query_row("SELECT count(*) FROM behaviors", [], |row| row.get(0)).unwrap();
+    db::migrate(&mut fixture.db, db::MIGRATIONS).unwrap();
+    assert_eq!(fixture.count("behaviors"), before);
+    assert_eq!(fixture.count("place_label_settings"), 0);
+    let profile = fixture.profile.clone();
+    fixture.db.execute("INSERT INTO place_label_settings(user_id,enabled,retention,enabled_at,updated_at) VALUES(?1,1,'90_days',?2,?2)", params![profile, NOW]).unwrap();
+    for (id, key, accuracy) in [("saved_place:".to_string() + &"a".repeat(43), "b".repeat(43), 10), ("home".into(), "c".repeat(43), 101), ("home".into(), "bad key".into(), 10)] {
+        assert!(fixture.db.execute("INSERT INTO place_markers VALUES(?1,?2,?3,0,0,?4,'place-label-rules@1',?5)", params![profile, id, key, accuracy, NOW]).is_err());
+    }
+    fixture.db.execute("INSERT INTO place_markers VALUES(?1,'home',?2,0,0,100,'place-label-rules@1',?3)", params![profile, "c".repeat(43), NOW]).unwrap();
+    assert!(fixture.db.execute("INSERT INTO where_suggestion_dismissals VALUES(?1,?2,'nearby','where-suggestion-rules@1',?3)", params![id(1), profile, NOW]).is_err());
+    fixture.db.execute("INSERT INTO where_suggestion_dismissals VALUES(?1,?2,'anywhere','where-suggestion-rules@1',?3)", params![id(1), profile, NOW]).unwrap();
+}
+
+#[test]
+fn account_sync_applies_place_label_rows_in_dependency_order() {
+    use super::sync_apply::{AccountSyncEntityKind as Kind, AccountSyncOperation as Op};
+    let mut fixture = Fixture::new();
+    fixture.create();
+    let occurrence = fixture.occurrence();
+    let profile = fixture.profile.clone();
+    let mut completed = serde_json::to_value(&occurrence).unwrap();
+    let expected_occurrence = {
+        let mut value = completed.clone();
+        value.as_object_mut().unwrap().remove("user_id");
+        value.as_object_mut().unwrap().remove("schedule_range_identity");
+        for key in ["created_at", "updated_at", "scheduled_for"] {
+            value[key] = json!(value[key].as_str().unwrap().replace("Z", ".000000Z"));
+        }
+        value
+    };
+    completed.as_object_mut().unwrap().remove("user_id");
+    completed.as_object_mut().unwrap().remove("schedule_range_identity");
+    completed["status"] = json!("completed");
+    completed["completed_at"] = json!("2026-08-31T13:05:00.000000Z");
+    completed["status_marked_at"] = json!("2026-08-31T13:05:00.000000Z");
+    let event = json!({"id":id(20),"occurrence_id":id(10),"behavior_id":id(1),"previous_status":"unresolved","status":"completed",
+        "status_semantics":"explicit_user_mark","recorded_at":"2026-08-31T13:05:00.000000Z","effective_at":"2026-08-31T13:05:00.000000Z",
+        "local_date":"2026-08-31","timezone":"America/New_York","source_capture_method":"manual_tap","source_confidence":"high",
+        "revises_event_id":null,"reason_code":null,"created_at":"2026-08-31T13:05:00.000000Z","updated_at":"2026-08-31T13:05:00.000000Z"});
+    let write = |kind: Kind, id: &str, value: Value| AccountSyncWrite { kind, id: id.into(), operation: Op::Upsert, expected: None, value: Some(value) };
+    let settings = {
+        let mut value = place_settings(&profile, true);
+        value.as_object_mut().unwrap().remove("user_id");
+        value
+    };
+    let label = json!({"id":id(10),"behavior_id":id(1),"local_date":"2026-08-31","label":"elsewhere","rule_version":"place-label-rules@1","recorded_at":NOW});
+    let marker_id = format!("saved_place:{}", "a".repeat(43));
+    let marker = json!({"id":marker_id,"place_key":"a".repeat(43),"latitude_e6":1,"longitude_e6":2,"accuracy_meters":3,"rule_version":"place-label-rules@1","recorded_at":NOW});
+    let mut occurrence_write = write(Kind::Occurrence, &id(10), completed);
+    occurrence_write.expected = Some(expected_occurrence);
+    execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![
+        write(Kind::CompletionPlaceLabel, &id(10), label),
+        write(Kind::PlaceMarker, &marker_id, marker),
+        write(Kind::StatusEvent, &id(20), event),
+        occurrence_write,
+        write(Kind::PlaceLabelSettings, "place_labels", settings),
+    ] }).unwrap();
+    assert_eq!(fixture.count("completion_place_labels"), 1);
+    assert_eq!(fixture.count("place_markers"), 1);
+    assert!(sync_apply::validate_snapshot(&profile, &[]).is_ok());
+    // An unknown marker name is rejected before any write.
+    let failure = execute(&mut fixture.db, Request::ApplyAccountSync { profile_id: profile, writes: vec![
+        write(Kind::PlaceMarker, "office", json!({"id":"office"})),
+    ] }).unwrap_err();
+    assert!(!failure.is_empty());
 }

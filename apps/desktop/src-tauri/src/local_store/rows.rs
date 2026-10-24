@@ -504,3 +504,71 @@ impl StoredRow for ImportedIntervention {
     const JSON_COLUMNS: &'static [&'static str] = &["metadata", "redacted_sensitivity_indicators"];
     const BOOL_COLUMNS: &'static [&'static str] = &[];
 }
+
+// Ticket 216: completion place labels. Positions are integer microdegrees.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceLabelSettings {
+    pub user_id: String,
+    pub id: String,
+    pub enabled: bool,
+    pub retention: String,
+    pub enabled_at: Option<String>,
+    pub marker_prompt_dismissed_at: Option<String>,
+    pub updated_at: String,
+}
+impl StoredRow for PlaceLabelSettings {
+    const TABLE: &'static str = "place_label_settings";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &["enabled"];
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceMarker {
+    pub user_id: String,
+    pub id: String,
+    pub place_key: String,
+    pub latitude_e6: i64,
+    pub longitude_e6: i64,
+    pub accuracy_meters: i64,
+    pub rule_version: String,
+    pub recorded_at: String,
+}
+impl StoredRow for PlaceMarker {
+    const TABLE: &'static str = "place_markers";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CompletionPlaceLabel {
+    pub id: String,
+    pub user_id: String,
+    pub behavior_id: String,
+    pub local_date: String,
+    pub label: String,
+    pub rule_version: String,
+    pub recorded_at: String,
+}
+impl StoredRow for CompletionPlaceLabel {
+    const TABLE: &'static str = "completion_place_labels";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WhereSuggestionDismissal {
+    pub id: String,
+    pub user_id: String,
+    pub suggestion: String,
+    pub rule_version: String,
+    pub dismissed_at: String,
+}
+impl StoredRow for WhereSuggestionDismissal {
+    const TABLE: &'static str = "where_suggestion_dismissals";
+    const JSON_COLUMNS: &'static [&'static str] = &[];
+    const BOOL_COLUMNS: &'static [&'static str] = &[];
+}

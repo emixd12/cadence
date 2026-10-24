@@ -67,8 +67,10 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
-Device samples and route results remain transient. Exclude them from account sync,
-exports, backups, logs and analytics. Since Ticket 214, a provider geocode persists
+Device samples used for travel and route results remain transient. Exclude them
+from account sync, exports, backups, logs and analytics. Ticket 216 place markers
+are the one stored device position: the user records each with "I'm here", and
+they sync and enter desktop backups (see `place_markers` below). Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive
 travel occupancy and collisions without changing scheduled times or statuses.
 Each leg carries its own endpoints, timing, mode, provenance and freshness so one
@@ -290,6 +292,84 @@ The profile update, active-Behavior updates, configuration events, and one
 transaction. A failed Behavior precondition rolls back the profile update.
 Occurrence generation stays outside that transaction and can be retried while
 the committed sync state remains stale.
+
+### Completion place labels (Ticket 216)
+
+Migration `20261022160000_completion_place_labels.sql` adds four owner-scoped
+tables. Owner RLS permits each table's own reads and writes; nothing reads another
+account. Cadence never fetches, stores or compares Google coordinates here.
+
+```sql
+create table place_label_settings (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  id text not null default 'place_labels',      -- constant sync identity
+  enabled boolean not null default false,
+  retention text not null default '90_days',    -- 90_days | 1_year | until_deleted
+  enabled_at timestamptz,                       -- required while enabled
+  marker_prompt_dismissed_at timestamptz,       -- "Not now" on marker prompts
+  updated_at timestamptz not null
+);
+create table place_markers (
+  user_id uuid not null references profiles(id) on delete cascade,
+  id text not null,                             -- 'home' or 'saved_place:' || place_key
+  place_key text not null,                      -- base64url SHA-256 of normalized text
+  latitude_e6 integer not null,                 -- microdegrees
+  longitude_e6 integer not null,
+  accuracy_meters integer not null,             -- 0 through 100
+  rule_version text not null,                   -- place-label-rules@1
+  recorded_at timestamptz not null,
+  primary key (user_id, id)
+);
+create table completion_place_labels (
+  id uuid primary key,                          -- the occurrence ID
+  user_id uuid not null references profiles(id) on delete cascade,
+  behavior_id uuid not null,
+  local_date date not null,
+  label text not null,                          -- home | elsewhere | saved_place:<place key>
+  rule_version text not null,                   -- place-label-rules@1
+  recorded_at timestamptz not null,
+  foreign key (user_id, id) references occurrences(user_id, id) on delete cascade,
+  foreign key (user_id, behavior_id) references behaviors(user_id, id) on delete cascade
+);
+create table where_suggestion_dismissals (
+  id uuid primary key,                          -- the Behavior ID
+  user_id uuid not null references profiles(id) on delete cascade,
+  suggestion text not null,                     -- home | anywhere | add_place | saved_place:<key>
+  rule_version text not null,                   -- where-suggestion-rules@1
+  dismissed_at timestamptz not null,
+  foreign key (user_id, id) references behaviors(user_id, id) on delete cascade
+);
+```
+
+A saved place has no table of its own. Its place key is the same one-way key as
+`travel_place_cache.text_key`, so Behaviors with equally normalized place text
+share a marker. A Home marker stores the place key of the Home text when it was
+recorded; readers ignore it after Home changes.
+
+Triggers keep every writer consistent, including MCP and account sync:
+
+- Markers, labels and dismissals require `place_label_settings.enabled`, read
+  under a share lock held until the write commits. A concurrent opt-out either
+  deletes the admitted write or completes first and makes the write fail.
+- A label requires a Completed occurrence of the same Behavior and local date,
+  read under a share lock.
+- A status change away from Completed deletes that occurrence's label.
+- Turning labels off deletes the owner's labels, markers and dismissals.
+
+Check constraints accept only known rule versions, so a new rule value needs a
+migration. `public.save_place_label_settings(...)` is the web settings save: a
+compare-and-set on `updated_at` that also deletes labels older than the caller's
+retention cutoff in the same transaction. `public.purge_expired_completion_place_labels()`
+is executable by `service_role` only; the daily occurrence-sync cron calls it to
+delete labels past each owner's retention in the profile's local date.
+
+Account sync adds four entity kinds: `place_label_settings` (ID `place_labels`),
+`place_marker` (ID `home` or `saved_place:<key>`), `completion_place_label` and
+`where_suggestion_dismissal`. Conflicts on these kinds resolve without review: a
+deletion wins over an edit, and otherwise the later record wins. The planner drops
+labels whose merged occurrence is not Completed and every row while labels are
+off, matching the triggers, so the post-apply fingerprint matches. Exports omit
+all four tables (export inclusion is a backlog decision, not Ticket 216).
 
 ### `behavior_definition_events`
 

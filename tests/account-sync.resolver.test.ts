@@ -777,3 +777,70 @@ describe("independent occurrence generation", () => {
     expect(result.mergedEntities.filter(e => e.kind === "occurrence")).toHaveLength(2);
   });
 });
+
+describe("Ticket 216 place label synchronization", () => {
+  const key = "k".repeat(43);
+  const settings = (enabled: boolean, updatedAt: string): AccountSyncEntity => ({ kind: "place_label_settings", id: "place_labels", value: {
+    id: "place_labels", user_id: "owner", enabled, retention: "90_days", enabled_at: enabled ? "2026-10-01T00:00:00Z" : null,
+    marker_prompt_dismissed_at: null, updated_at: updatedAt,
+  } });
+  const marker = (recordedAt: string, latitude = 41_878_100): AccountSyncEntity => ({ kind: "place_marker", id: "home", value: {
+    id: "home", user_id: "owner", place_key: key, latitude_e6: latitude, longitude_e6: -87_629_800, accuracy_meters: 20,
+    rule_version: "place-label-rules@1", recorded_at: recordedAt,
+  } });
+  const completed: AccountSyncEntity = { kind: "occurrence", id: "o", value: { id: "o", behavior_id: "b", status: "completed", local_date: "2026-10-22" } };
+  const label = (value = "home", recordedAt = "2026-10-22T13:00:00Z"): AccountSyncEntity => ({ kind: "completion_place_label", id: "o", value: {
+    id: "o", user_id: "owner", behavior_id: "b", local_date: "2026-10-22", label: value, rule_version: "place-label-rules@1", recorded_at: recordedAt,
+  } });
+  const base = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z")]));
+
+  it("uploads labels and markers recorded on the desktop", () => {
+    const local = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), marker("2026-10-22T12:00:00Z"), label()]));
+    const result = plan(base, local, base);
+    expect(result.conflicts).toEqual([]);
+    expect(result.hostedWrites.map(({ kind, operation }) => `${kind}:${operation}`).sort()).toEqual(["completion_place_label:upsert", "place_marker:upsert"]);
+  });
+
+  it("lets the later marker win and a deletion beat an edit without review", () => {
+    const local = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), marker("2026-10-22T12:00:00Z", 41_000_000)]));
+    const hosted = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), marker("2026-10-22T12:05:00Z")]));
+    const result = plan(base, local, hosted);
+    expect(result.conflicts).toEqual([]);
+    expect(result.localWrites).toMatchObject([{ kind: "place_marker", operation: "upsert", value: { latitude_e6: 41_878_100 } }]);
+    const withLabel = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), label("home")]));
+    const relabeled = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), label("elsewhere", "2026-10-22T13:01:00Z")]));
+    const deleted = plan(withLabel, relabeled, base);
+    expect(deleted.conflicts).toEqual([]);
+    expect(deleted.localWrites).toMatchObject([{ kind: "completion_place_label", operation: "delete" }]);
+  });
+
+  it("drops every location-derived row while labels are off", () => {
+    const disabled = snapshot(completeRows([completed, settings(false, "2026-10-02T00:00:00Z")]));
+    const local = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), marker("2026-10-22T12:00:00Z"), label()]));
+    const result = plan(base, local, disabled);
+    expect(result.conflicts).toEqual([]);
+    expect(result.hostedWrites).toEqual([]);
+    expect(result.localWrites.map(({ kind, operation }) => `${kind}:${operation}`).sort())
+      .toEqual(["completion_place_label:delete", "place_label_settings:upsert", "place_marker:delete"]);
+  });
+
+  it("drops a label when its occurrence leaves Completed on the other side", () => {
+    const withLabel = snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), label()]));
+    const reopened = snapshot(completeRows([{ ...completed, value: { ...(completed.value as object), status: "not_completed" } }, settings(true, "2026-10-01T00:00:00Z"),
+      history("event", "o", null, "not_completed")]));
+    const result = plan(withLabel, withLabel, reopened);
+    expect(result.conflicts).toEqual([]);
+    expect(result.mergedEntities.some(({ kind }) => kind === "completion_place_label")).toBe(false);
+    expect(result.localWrites.some(({ kind, operation }) => kind === "completion_place_label" && operation === "delete")).toBe(true);
+  });
+
+  it("rejects malformed rows and unknown rule versions", () => {
+    const bad = (entity: AccountSyncEntity) => () => plan(base, snapshot(completeRows([completed, settings(true, "2026-10-01T00:00:00Z"), entity])), base);
+    expect(bad({ ...marker("2026-10-22T12:00:00Z"), value: { ...(marker("2026-10-22T12:00:00Z").value as object), accuracy_meters: 101 } })).toThrow(/place marker is invalid/);
+    expect(bad({ ...label(), value: { ...(label().value as object), rule_version: "place-label-rules@2" } })).toThrow(/completion place label is invalid/);
+    expect(bad({ ...label(), value: { ...(label().value as object), latitude_e6: 1 } })).toThrow(/Update Cadence/);
+    // A label for another Behavior than its occurrence's never survives the merge.
+    expect(bad({ ...label(), value: { ...(label().value as object), behavior_id: "other" } })().mergedEntities
+      .some(({ kind }) => kind === "completion_place_label")).toBe(false);
+  });
+});

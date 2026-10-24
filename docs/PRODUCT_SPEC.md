@@ -664,6 +664,15 @@ Provider review, credentials, live acceptance and model projection remain unappr
 See `qa/travel-release.md`. Route expiry clears evidence; the next meaningful
 foreground change can refresh within quota. It never polls or regenerates Daily Brief.
 
+Completion place labels (Ticket 216) are a separate opt-in, off by default. The user
+records each place's reference position on their own device ("I'm here"); Cadence
+never fetches, stores or compares Google coordinates for labels. A qualifying
+completion stores one label (Home, a saved place or elsewhere) and discards the
+position. Fixed, versioned rules (`place-label-rules@1`, `where-suggestion-rules@1`)
+turn labels into Where suggestions that the user must apply. The user chooses label
+retention (90 days, 1 year or until deleted). Labels sync with the account and stay
+out of exports and Daily Brief model input until Ticket 219 decides model use.
+
 `docs/plans/first-external-consumer.md` retains its filename but now defines this
 in-app contract, daily presentation default, first-party route, limits and data use.
 Ticket 146 is reopened for completion-history projection and first-party fences.

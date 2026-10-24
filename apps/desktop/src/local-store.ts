@@ -52,6 +52,11 @@ export type LocalCommandMap = {
     result: TravelSettings;
   };
   readNoteShortcutStates: { input: Owned; result: NoteShortcutState[] };
+  readPlaceLabels: { input: Owned; result: import("./local-place-labels.service").LocalPlaceLabelRows };
+  commitPlaceLabels: {
+    input: Mutation & { mutation: import("./local-place-labels.service").LocalPlaceLabelMutation };
+    result: import("./local-place-labels.service").LocalPlaceLabelRows;
+  };
   readNoteShortcutContext: { input: Owned & { behaviorId: string | null }; result: NoteShortcutContext };
   commitNoteShortcutState: {
     input: Mutation & { expected: NoteShortcutContext; next: NoteShortcutState; requireEnabled: boolean };

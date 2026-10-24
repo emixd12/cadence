@@ -10,6 +10,8 @@ import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createLocalTravelSettingsClient } from "./local-travel-settings.service";
+import { createLocalPlaceLabelClient } from "./local-place-labels.service";
+import { CompletionPlacesPanel, PlaceLabelProvider } from "@/components/travel/PlaceLabels";
 import { readMacForegroundLocation } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
@@ -310,6 +312,8 @@ export function Product() {
     } };
   }, []);
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 216: place labels live in SQLite; each change asks account sync to run.
+  const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
   const calendarRange = {
     startLocalDate: bundle?.timeline.timeline.todayLocalDate ?? "1970-01-01",
     endLocalDate: bundle?.timeline.timeline.daySections.at(-1)?.localDate ?? "1970-01-01",
@@ -497,6 +501,7 @@ export function Product() {
     {account.status === "linked" || syncReady || disconnectResult ? <AccountDisconnectPanel busy={accountBusy} result={disconnectResult} error={disconnectError} onDisconnect={disconnect} /> : null}</>;
 
   return <DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0}>
+    <PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
     <DesktopUpdateNotice required={syncStatus.state === "update_required"} {...restartActions} />
@@ -537,7 +542,8 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
-        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />}
+        travelControls={<><TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />
+          <CompletionPlacesPanel /></>}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}
@@ -545,6 +551,7 @@ export function Product() {
         onReconcile={() => refreshReminders()} onShowOnboarding={() => { setGuideRequest((value) => value + 1); navigate("timeline"); }} /> : null}
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
     </> : null}
+    </PlaceLabelProvider>
   </DesktopApp>;
 }
 

@@ -4,7 +4,7 @@ import { NOTE_SHORTCUT_LIMITS, validateNoteShortcutState } from "./note-suggesti
 import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
-export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state"] as const;
+export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"] as const;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;
@@ -18,6 +18,9 @@ export type AccountSyncConflictDecision = Readonly<{ kind: AccountSyncEntityKind
 export type AccountSyncPlan = Readonly<{ localWrites: readonly AccountSyncWrite[]; hostedWrites: readonly AccountSyncWrite[]; conflicts: readonly AccountSyncConflict[]; mergedEntities: readonly AccountSyncEntity[]; fingerprints: Readonly<{ baseline: string; local: string; hosted: string; merged: string | null }>; idempotencyKey: string | null }>;
 export type NoteShortcutExclusionPolicy = "preserve" | "discard_local";
 
+// Ticket 216 rows. Conflicts resolve without review: a deletion wins, otherwise the later record.
+const PLACE_LABEL_KINDS = new Set<AccountSyncEntityKind>(["place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"]);
+const PLACE_LABEL_RECORDED_AT: Readonly<Record<string, string>> = { place_label_settings: "updated_at", place_marker: "recorded_at", completion_place_label: "recorded_at", where_suggestion_dismissal: "dismissed_at" };
 const HISTORY = new Set<AccountSyncEntityKind>(["definition_event", "configuration_event", "status_event", "mapping"]);
 const PROTECTED_DELETE = new Set<AccountSyncEntityKind>(["behavior", "import_run", "imported_note", "imported_intervention", "reminder_delivery", "time_session"]);
 // Sync strips source ownership; this placeholder only enables shared state validation.
@@ -64,13 +67,14 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
     else if (same(right, base)) { if (left) mergedEntities.push(left); }
     else if (left?.kind === "occurrence" && compatibleMarks.has(left.id)) mergedEntities.push(compatibleMarks.get(left.id)!);
     else if (hostedSendSupersedesCancellation(base, left, right)) mergedEntities.push(right);
+    else if (PLACE_LABEL_KINDS.has((left ?? right ?? base)!.kind)) { const winner = placeLabelConflictWinner(left, right); if (winner) mergedEntities.push(winner); }
     else conflicts.push(conflict(base, left, right, !base ? "append_id_collision" : !left || !right ? "delete_vs_update" : "concurrent_update"));
   }
   historyBranches(baseline, local, hosted, input.firstHostedHydration === true, compatibleMarks);
   if (conflicts.length) return { localWrites: [], hostedWrites: [], conflicts: uniqueConflicts(conflicts), mergedEntities: [], fingerprints: { ...fingerprints, merged: null }, idempotencyKey: null };
-  const retained = reconcileOccurrenceReminders(
+  const retained = retainPlaceLabelInvariants(reconcileOccurrenceReminders(
     retainReminderProcessingClaims(retainNoteShortcutExclusions(coalesceGeneratedOccurrences(mergedEntities, baseline, local, hosted), exclusionSources(input.noteShortcutExclusionPolicy, baseline, local, hosted)), baseline, local, hosted),
-  );
+  ));
   const merged = prepare({ entities: retained }), mergedRows = [...merged.values()].sort(compareEntity), mergedFingerprint = fingerprint(mergedRows);
   validateInputGraphs(false, merged);
   return { localWrites: writesBetween(local, merged), hostedWrites: writesBetween(hosted, merged), conflicts: [], mergedEntities: mergedRows, fingerprints: { ...fingerprints, merged: mergedFingerprint }, idempotencyKey: sha256(`${accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${mergedFingerprint}`) };
@@ -357,6 +361,9 @@ function dependencies(entity: AccountSyncEntity): readonly (readonly [string, Ac
     case "imported_intervention": return [["import_run_id", "import_run"], ["behavior_id", "behavior"], ["occurrence_id", "occurrence"]];
     case "reminder_delivery": return [["occurrence_id", "occurrence"], ["import_run_id", "import_run"], ["imported_intervention_id", "imported_intervention"]];
     case "note_shortcut_state": return [["behavior_id", "behavior"]];
+    // A label's ID is its occurrence ID; a dismissal's ID is its Behavior ID.
+    case "completion_place_label": return [["id", "occurrence"], ["behavior_id", "behavior"]];
+    case "where_suggestion_dismissal": return [["id", "behavior"]];
     default: return [];
   }
 }
@@ -412,7 +419,72 @@ function normalize(entity: AccountSyncEntity): AccountSyncEntity {
     parseArchiveNotes(value.archive_notes);
     validateBehaviorPersistenceFields(value);
   }
+  if (PLACE_LABEL_KINDS.has(entity.kind)) validatePlaceLabelRow(entity.kind, entity.id, value);
   return { kind: entity.kind, id: entity.id, value };
+}
+
+const PLACE_LABEL_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  place_label_settings: ["id", "enabled", "retention", "enabled_at", "marker_prompt_dismissed_at", "updated_at"],
+  place_marker: ["id", "place_key", "latitude_e6", "longitude_e6", "accuracy_meters", "rule_version", "recorded_at"],
+  completion_place_label: ["id", "behavior_id", "local_date", "label", "rule_version", "recorded_at"],
+  where_suggestion_dismissal: ["id", "suggestion", "rule_version", "dismissed_at"],
+};
+const PLACE_KEY = /^[A-Za-z0-9_-]{43}$/;
+
+/** Mirrors the hosted and SQLite constraints so an invalid row never reaches either database. */
+function validatePlaceLabelRow(kind: AccountSyncEntityKind, id: string, value: Json): void {
+  const fields = PLACE_LABEL_FIELDS[kind]!;
+  if (!value || Array.isArray(value) || typeof value !== "object" || value.id !== id
+    || Object.keys(value).length !== fields.length || !fields.every((name) => name in value)) {
+    throw new Error("Update Cadence before synchronizing place labels.");
+  }
+  const instant = (name: string, nullable = false) => {
+    const item = value[name];
+    if (nullable && item === null) return true;
+    try { return typeof item === "string" && Boolean(Temporal.Instant.from(item)); } catch { return false; }
+  };
+  const integer = (name: string, limit: number, minimum = -limit) => Number.isInteger(value[name]) && (value[name] as number) >= minimum && (value[name] as number) <= limit;
+  const valid = kind === "place_label_settings"
+    ? id === "place_labels" && typeof value.enabled === "boolean" && ["90_days", "1_year", "until_deleted"].includes(String(value.retention))
+      && instant("enabled_at", true) && instant("marker_prompt_dismissed_at", true) && instant("updated_at")
+      && (!value.enabled || value.enabled_at !== null)
+    : kind === "place_marker"
+      ? typeof value.place_key === "string" && PLACE_KEY.test(value.place_key) && (id === "home" || id === `saved_place:${value.place_key}`)
+        && integer("latitude_e6", 90_000_000) && integer("longitude_e6", 180_000_000) && integer("accuracy_meters", 100, 0)
+        && value.rule_version === "place-label-rules@1" && instant("recorded_at")
+      : kind === "completion_place_label"
+        ? typeof value.behavior_id === "string" && typeof value.local_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.local_date)
+          && typeof value.label === "string" && (["home", "elsewhere"].includes(value.label) || (value.label.startsWith("saved_place:") && PLACE_KEY.test(value.label.slice(12))))
+          && value.rule_version === "place-label-rules@1" && instant("recorded_at")
+        : typeof value.suggestion === "string" && (["home", "anywhere", "add_place"].includes(value.suggestion) || (value.suggestion.startsWith("saved_place:") && PLACE_KEY.test(value.suggestion.slice(12))))
+          && value.rule_version === "where-suggestion-rules@1" && instant("dismissed_at");
+  if (!valid) throw new Error(`The synced ${kind.replaceAll("_", " ")} is invalid.`);
+}
+
+/** A deletion wins: deleted location data stays deleted. Otherwise the later record wins; a tie keeps hosted. */
+function placeLabelConflictWinner(local: AccountSyncEntity | null, hosted: AccountSyncEntity | null): AccountSyncEntity | null {
+  if (!local || !hosted) return null;
+  const at = (entity: AccountSyncEntity) => Temporal.Instant.from(field(entity.value, PLACE_LABEL_RECORDED_AT[entity.kind]!)!);
+  return Temporal.Instant.compare(at(local), at(hosted)) > 0 ? local : hosted;
+}
+
+/**
+ * Matches the hosted and SQLite triggers: nothing location-derived survives while labels
+ * are off, and a label needs a Completed occurrence of its Behavior and local date.
+ */
+function retainPlaceLabelInvariants(entities: readonly AccountSyncEntity[]): AccountSyncEntity[] {
+  const settings = entities.find(({ kind }) => kind === "place_label_settings");
+  const enabled = Boolean(settings && settings.value && typeof settings.value === "object" && !Array.isArray(settings.value) && settings.value.enabled === true);
+  const occurrences = new Map(entities.filter(({ kind }) => kind === "occurrence").map((entity) => [entity.id, entity]));
+  return entities.filter((entity) => {
+    if (!PLACE_LABEL_KINDS.has(entity.kind) || entity.kind === "place_label_settings") return true;
+    if (!enabled) return false;
+    if (entity.kind !== "completion_place_label") return true;
+    const occurrence = occurrences.get(entity.id);
+    return Boolean(occurrence) && field(occurrence!.value, "status") === "completed"
+      && field(occurrence!.value, "behavior_id") === field(entity.value, "behavior_id")
+      && field(occurrence!.value, "local_date") === field(entity.value, "local_date");
+  });
 }
 
 function validateProfileSyncValue(value: Json): void {

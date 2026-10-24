@@ -107,6 +107,11 @@ pub(super) const MIGRATIONS: &[(i64, &str, &str)] = &[
         "behavior_where",
         include_str!("../../migrations/0018_behavior_where.sql"),
     ),
+    (
+        19,
+        "completion_place_labels",
+        include_str!("../../migrations/0019_completion_place_labels.sql"),
+    ),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {
@@ -601,8 +606,26 @@ pub fn owned<T: StoredRow>(db: &Connection, profile_id: &str) -> Result<Vec<T>> 
     )
 }
 
+/// Rows whose ID is a fixed or derived name rather than a UUID.
+pub fn named_row_id(table: &str, id: &str) -> bool {
+    (table == "note_shortcut_states" && id == "global")
+        || (table == "place_label_settings" && id == "place_labels")
+        || (table == "place_markers" && valid_place_ref(id))
+}
+
+/// `home` or `saved_place:` plus an unpadded base64url SHA-256 place key.
+pub fn valid_place_ref(id: &str) -> bool {
+    id == "home"
+        || id.strip_prefix("saved_place:").is_some_and(|key| {
+            key.len() == 43
+                && key
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        })
+}
+
 pub fn by_id<T: StoredRow>(db: &Connection, profile_id: &str, id: &str) -> Result<T> {
-    if !(T::TABLE == "note_shortcut_states" && id == "global") {
+    if !named_row_id(T::TABLE, id) {
         valid_id(id)?;
     }
     read(
@@ -711,7 +734,7 @@ pub fn validate_row<T: StoredRow>(profile_id: &str, row: &T) -> Result<()> {
         return Err("A row belongs to another profile.".into());
     }
     if let Some(id) = value.get("id").and_then(Value::as_str) {
-        if !(T::TABLE == "note_shortcut_states" && id == "global") {
+        if !named_row_id(T::TABLE, id) {
             valid_id(id)?;
         }
     }
