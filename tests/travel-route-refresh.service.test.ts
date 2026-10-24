@@ -56,6 +56,7 @@ beforeEach(() => {
   mocks.geocode.mockImplementation(async (text: string) => ({ kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } }));
   mocks.route.mockImplementation(routeAll);
   mocks.historySessions.mockResolvedValue([]);
+  mocks.timezone.mockResolvedValue("America/New_York");
   mocks.weather.mockResolvedValue(null);
 });
 
@@ -256,14 +257,83 @@ describe("refreshTravelRoutes", () => {
     expect(mocks.route.mock.calls.at(-1)![0].routes.some((route: { request: { timing: { at: string } } }) => route.request.timing.at === "2026-09-22T10:10:00Z")).toBe(true);
   });
 
-  it("does not discard paid work when a Note or status changes during routing", async () => {
+  it("does not discard paid work when only a Note changes during routing", async () => {
     located();
     let reads = 0;
     mocks.occurrences.mockImplementation(async (_client: unknown, _user: unknown, start: string) => start === day.startLocalDate
       ? [{ ...occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"),
-        status: ++reads > 1 ? "completed" : "unresolved", updated_at: `revision-${reads}`, note: `note-${reads}` }]
+        updated_at: `revision-${++reads}`, note: `note-${reads}` }]
       : []);
     await expect(refreshTravelRoutes(caller, day, config, now)).resolves.toMatchObject({ accountId: "owner" });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a status change after the original unresolved stop was routed", async () => {
+    located();
+    let completed = false;
+    mocks.occurrences.mockImplementation(async (_client: unknown, _user: unknown, start: string) => start === day.startLocalDate
+      ? [{ ...occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"), status: completed ? "completed" : "unresolved" }]
+      : []);
+    mocks.route.mockImplementation(async (input) => {
+      completed = true;
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it.each(["connected", "disconnected"] as const)("rejects a timezone change during routing when Calendar is %s", async (status) => {
+    located();
+    mocks.calendar.mockResolvedValue({ status, generation: 1, selectionRevision: 1 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [] });
+    mocks.route.mockImplementation(async (input) => {
+      mocks.timezone.mockResolvedValue("Europe/London");
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(mocks.timezone).toHaveBeenLastCalledWith(caller.client, "owner");
+  });
+
+  it("rejects a changed Home value even when the settings revision is unchanged", async () => {
+    located();
+    let moved = false;
+    mocks.source.mockImplementation(async () => moved
+      ? { ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } }
+      : source);
+    mocks.route.mockImplementation(async (input) => {
+      moved = true;
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it("fences stored inputs after the final Calendar reread finishes", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+    const snapshot = { requestedRange: { timezone: "America/New_York" }, events: [] };
+    let releaseCalendar = () => {};
+    const pendingCalendar = new Promise<typeof snapshot>((resolve) => {
+      releaseCalendar = () => resolve(snapshot);
+    });
+    let calendarStarted = () => {};
+    const rereading = new Promise<void>((resolve) => { calendarStarted = resolve; });
+    mocks.events.mockResolvedValueOnce(snapshot).mockImplementation(async () => {
+      calendarStarted();
+      return pendingCalendar;
+    });
+
+    const pending = refreshTravelRoutes(caller, day, config, now);
+    await rereading;
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } });
+    releaseCalendar();
+
+    await expect(pending).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.events).toHaveBeenCalledTimes(2);
     expect(mocks.route).toHaveBeenCalledOnce();
   });
 
@@ -369,6 +439,30 @@ describe("refreshTravelRoutes weather (Ticket 218)", () => {
     await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
     expect(mocks.weather).not.toHaveBeenCalled();
   });
+
+  it("fences stored inputs after a slower weather request finishes", async () => {
+    located();
+    let releaseWeather = () => {};
+    mocks.weather.mockReturnValue(new Promise<null>((resolve) => {
+      releaseWeather = () => resolve(null);
+    }));
+    let routingFinished = () => {};
+    const routed = new Promise<void>((resolve) => { routingFinished = resolve; });
+    mocks.route.mockImplementation(async (input) => {
+      routingFinished();
+      return routeAll(input);
+    });
+
+    const pending = refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    await routed;
+    // Drain the completed route work while the weather provider remains pending.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } });
+    releaseWeather();
+
+    await expect(pending).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
 });
 
 describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
@@ -423,6 +517,49 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
     expect(payload.events).toEqual({ "event:primary\u0000provider-1": JSON.stringify({ providerEtag: "etag-1", providerUpdatedAt: null }) });
     expect(JSON.stringify(payload)).not.toContain("3 Event St");
     expect(JSON.stringify(payload)).not.toContain("event-row-1");
+  });
+
+  it("binds past and cancelled Calendar events that do not appear in named conclusions", async () => {
+    located();
+    const future = {
+      id: "event-row-future", calendarId: "primary", providerEventId: "provider-future", kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T11:00:00Z", endAt: "2026-09-22T11:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: "etag-future", providerUpdatedAt: null },
+    };
+    const events = [future,
+      { ...future, id: "event-row-past", providerEventId: "provider-past", startAt: "2026-09-22T07:00:00Z", endAt: "2026-09-22T07:30:00Z",
+        revision: { providerEtag: "etag-past", providerUpdatedAt: null } },
+      { ...future, id: "event-row-cancelled", providerEventId: "provider-cancelled", state: "cancelled",
+        revision: { providerEtag: "etag-cancelled", providerUpdatedAt: null } },
+    ];
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events });
+
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+
+    expect(payload).not.toBeNull();
+    expect(payload!.events).toEqual(Object.fromEntries(events.map((event) => [
+      `event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision),
+    ])));
+    expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-past");
+    expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-cancelled");
+  });
+
+  it("keeps route evidence but omits a token when the complete Calendar snapshot is oversized", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: Array.from({ length: 500 }, (_, index) => ({
+      id: `event-row-${index}`, calendarId: "primary", providerEventId: `provider-${index}`, kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T07:00:00Z", endAt: "2026-09-22T07:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: `etag-${index}`, providerUpdatedAt: null },
+    })) });
+
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(result.evidence?.legs[0]?.state).toBe("current");
+    expect(result).not.toHaveProperty("conclusionsToken");
   });
 
   it("issues no token without a secret or for a two-day view", async () => {

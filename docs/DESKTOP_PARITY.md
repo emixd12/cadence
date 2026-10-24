@@ -331,6 +331,11 @@ adds the fixed-URL `open_location_settings` command behind Open Location Service
 (`INT-TRAVEL-007`) and signs production builds with the Hardened Runtime location
 entitlement.
 
+Settings reads permission through the separate `location_permission` native
+command, which returns only authorization state and never requests coordinates or
+a prompt. The foreground-position command and Timeline location reads remain
+separate; a position timeout does not change the displayed OS grant.
+
 Native storage tests pass 108/108. Web/desktop builds and synthetic desktop/390px
 UI checks pass. Those checks do not establish installed permission, restart,
 account-switch or navigation acceptance. Ticket 165 keeps those gates open in

@@ -943,6 +943,30 @@ baseline. Current-device native location and Apple-trusted distribution remain
 separate Tickets 115/165 gates. The main promotion follows PR #107 and the
 existing matching-marketing-deployment procedure.
 
+## Ticket 165: signed location entitlement on the first Mac — October 24, 2026
+
+Build: dev-signed `0.1.6-dev.2` from main `ed93fff`, with the Hardened Runtime
+location entitlement (PR #134) and the production Developer ID signature. Host: the
+first Mac, macOS 27.0.1. Coordinates were not recorded, no agent answered a system
+dialog, and no TCC or Location Services setting changed. Details:
+[0.1.5 packet](2026-10-23-desktop-0.1.5-release-packet.md), "Location prompt on the
+owner's Mac".
+
+- **First prompt appears.** Turning on Travel estimates asked for authorization
+  with status NotDetermined, and macOS showed its location prompt. September's
+  Developer ID builds without the entitlement timed out on this Mac with no prompt.
+  The answer was Allow, and the status has stayed `AuthorizedAlways` since.
+- **Foreground position available.** With Cadence frontmost, turning Travel
+  estimates off and on showed "A current position is available. Cadence did not save
+  it." locationd sent a position within 17 ms.
+- **Follow-up defect, not a Ticket 165 blocker.** On desktop the Travel panel's
+  permission check runs a full location request. Right after a successful read that
+  second request waited for a new fix, timed out after 12 seconds and cleared the
+  "Device location" line. Opening Travel settings while authorized also requests a
+  position. A status-only native permission query would fix both.
+- Still open: the denied state on this Mac, and the never-authorized macOS user test
+  with the notarized 0.1.5 DMG.
+
 ## Ticket 165 permission path, prompt investigation and directions plan — October 22, 2026
 
 Owner decisions on October 22: accept the manual macOS permission path and make it
@@ -1124,3 +1148,33 @@ route durations or provider responses.
 - Search handoff passed on September 28; manual grant, retry and foreground
   acquisition passed on September 29. They need no rerun unless the native path
   changes again.
+
+## October 24 review: permission status and position requests
+
+PR #140's dev.2 record establishes the first location prompt and a successful
+foreground position on the owner's Mac. It also records a second request timing
+out immediately after the successful read. Travel Settings used
+`readLocation(false)` to refresh the permission label after saving and after a
+position request. That function reads coordinates once authorized, so a permission
+refresh could compete with the first request or clear the label after a timeout.
+
+PR #131 now separates those operations. `location_permission` reads only Core
+Location authorization on the main queue and global Location Services state on a
+blocking worker. It
+has no delegate, position request, permission prompt or coordinate result.
+Settings uses that reader, while toggle/Check again and Timeline retain the
+foreground-location command. Browser Settings still queries the Permissions API.
+No 0.1.5 source artifact, signature or release feed changed.
+
+Automated coverage checks that mount and save refreshes request no positions,
+that one explicit request can complete or time out while the allowed grant stays
+visible, and that Timeline can still read coordinates without a new prompt.
+The Rust status mapping handles not determined, restricted, denied, allowed,
+globally disabled and unknown states.
+
+Installed regression remains open on a future dev build containing this change:
+with Cadence frontmost, confirm the permission line survives both a successful
+position and an unavailable position; refresh Settings while a position request is
+active; then verify a changed OS grant is reflected. Use only the existing
+owner-authorized permission-test flow, and record no coordinates. Linux tests do
+not establish macOS native compilation, actual prompts or Core Location delivery.

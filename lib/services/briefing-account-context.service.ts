@@ -10,10 +10,13 @@ import { PLACE_LABEL_RETENTIONS, type PlaceLabelRetention, type PlaceLabelValue 
 import { readTravelBehaviorLocations, readTravelSettingsRow } from "@/lib/db/travelSettings.repo";
 import { readCompletionPlaceLabelRows, readPlaceLabelSettingsRow } from "@/lib/db/placeLabels.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
+import { listTimeSessionHistory } from "@/lib/db/timeSessions.repo";
 import { readTravelRouteSource } from "./travel-settings.service";
 import {
   renameTravelConclusionRefs,
   travelConclusionsSourceKey,
+  travelDurationHistoryRange,
+  travelDurationRevision,
   verifyTravelConclusionsToken,
   type TravelConclusionsPayload,
   type TravelConclusionsSecrets,
@@ -39,6 +42,7 @@ import { getConnectorConnection } from "./connector-credentials";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
 
 const CLIENT_ID = "cadence-daily-brief";
+type VerifiedTravelConclusions = TravelConclusionsPayload & Readonly<{ calendarRequired: boolean }>;
 
 export function briefingAccountRef(userId: string): string {
   return createHash("sha256").update(`cadence-daily-brief-account\0${userId}`).digest("base64url");
@@ -178,7 +182,7 @@ export async function prepareAccountBriefingContexts(
     ? await readSuppliedTravelConclusions(caller, input.travelConclusions, capturedContexts[0]!.localDate, clock()).catch(() => null)
     : null;
   input.signal.throwIfAborted();
-  // The delivery fence compares stored facts only, so a token that expires mid-generation never fails the brief.
+  // Expiry is checked on admission; delivery still fences the stored inputs behind accepted conclusions.
   const contexts = capturedContexts.map((context) => withTravel(context, travel, supplied, makeOpaqueRef));
   const configurationRefs = Object.fromEntries(authorization.behaviorIds.map((behaviorId) => [
     workbenchBehaviorRef(caller.user.id, behaviorId),
@@ -231,6 +235,10 @@ export async function prepareAccountBriefingContexts(
     }
     // Where edits do not change the Cadence revision, so travel facts are fenced directly.
     if (JSON.stringify(await readTravel()) !== JSON.stringify(travel)) throw new DailyBriefError("context_changed");
+    if (supplied && contexts.some((candidate) => candidate.travel?.route.state === "available")) {
+      const currentSource = await readCurrentTravelSource(caller, context.localDate, clock());
+      if (currentSource.key !== supplied.src) throw new DailyBriefError("context_changed");
+    }
     if (analysisRequest && await readAdvisorAnalysisRevision(caller.client, analysisRequest) !== analysisRevision) {
       throw new DailyBriefError("context_changed");
     }
@@ -279,7 +287,7 @@ async function readBriefingTravel(caller: CalendarCaller, behaviorIds: readonly 
 }
 
 /** Keeps only Behaviors this context carries, as the strict context validator requires. */
-function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: TravelConclusionsPayload | null,
+function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions | null,
   makeOpaqueRef: AdvisorOpaqueRef): AdvisorDayContext {
   const refs = new Set([...context.cadence.occurrences.map(({ behaviorRef }) => behaviorRef), ...context.cadence.history.behaviors.map(({ behaviorRef }) => behaviorRef)]);
   const placeLabels = travel.placeLabels ? { ...travel.placeLabels,
@@ -307,26 +315,45 @@ function withTravel(context: AdvisorDayContext, travel: AdvisorTravelContext, su
  * current stored travel inputs. Returns null on any mismatch.
  */
 async function readSuppliedTravelConclusions(caller: CalendarCaller, supplied: Readonly<{ token: unknown; secrets: TravelConclusionsSecrets }>,
-  localDate: string, now: Temporal.Instant): Promise<TravelConclusionsPayload | null> {
+  localDate: string, now: Temporal.Instant): Promise<VerifiedTravelConclusions | null> {
   const payload = verifyTravelConclusionsToken(supplied.token, { secrets: supplied.secrets, userId: caller.user.id, localDate, now });
   if (!payload) return null;
-  const [source, calendar, occurrences] = await Promise.all([
+  const current = await readCurrentTravelSource(caller, localDate, now);
+  return current.key === payload.src ? { ...payload, calendarRequired: current.calendarRequired } : null;
+}
+
+async function readCurrentTravelSource(caller: CalendarCaller, localDate: string, now: Temporal.Instant): Promise<Readonly<{ key: string; calendarRequired: boolean }>> {
+  const historyRange = travelDurationHistoryRange(localDate);
+  const [source, calendar, occurrences, timezone, historyOccurrences, historySessions] = await Promise.all([
     readTravelRouteSource(caller.client, caller.user.id),
     getCalendarConnection(caller),
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, localDate, localDate),
+    readAdvisorProfileTimezone(caller.client, caller.user.id),
+    listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
+    listTimeSessionHistory(caller.client, { userId: caller.user.id, ...historyRange, includeArchived: false, throughStartedAt: now.toString() }),
   ]);
-  const current = travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
+  if (!timezone) throw new DailyBriefError("context_changed");
+  const key = travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
     enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
-    calendar, behaviors: source.behaviors, occurrences });
-  return current === payload.src ? payload : null;
+    baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
+    calendar, behaviors: source.behaviors, occurrences, timezone, durationRevision: travelDurationRevision(historyOccurrences, historySessions) });
+  return { key, calendarRequired: calendar.status === "connected" };
 }
 
 /** Maps the token's commitments to this context's opaque refs; a changed Calendar event throws. */
-function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: TravelConclusionsPayload,
+function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
   makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
+  const calendar = context.connectors.find((connector) => connector.source === "google_calendar");
+  if (supplied.calendarRequired && (!calendar || calendar.state !== "current" || !calendar.complete)) {
+    throw new Error("Current Calendar snapshot is required for travel conclusions.");
+  }
   const eventRevisions = new Map(context.connectors.flatMap((connector) =>
     connector.source === "google_calendar" && connector.state !== "not_requested" && "events" in connector
       ? connector.events.map((event) => [event.ref, event.revision] as const) : []));
+  if (Object.keys(supplied.events).length !== eventRevisions.size || Object.entries(supplied.events).some(([key, revision]) =>
+    !key.startsWith("event:") || eventRevisions.get(makeOpaqueRef("event", key.slice("event:".length))) !== makeOpaqueRef("revision", revision))) {
+    throw new Error("Calendar event set changed after travel was planned.");
+  }
   const rename = (key: string) => {
     if (key.startsWith("occurrence:")) return makeOpaqueRef("occurrence", key.slice("occurrence:".length));
     if (!key.startsWith("event:")) throw new Error("Unknown travel commitment.");

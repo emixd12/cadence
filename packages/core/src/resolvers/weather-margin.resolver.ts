@@ -111,11 +111,11 @@ export function resolveWeatherMargin(input: Readonly<{
     return Temporal.Instant.compare(time, start) > 0 &&
       Temporal.Instant.compare(time.subtract({ seconds: HOUR_SECONDS }), end) < 0;
   });
-  if (!relevant.some(reported)) {
-    return { tableVersion: WEATHER_MARGIN_TABLE_VERSION, state: "unknown", conditions: [], marginSeconds: 0, suggestion: null };
-  }
   const matched = new Set(relevant.flatMap(resolveWeatherConditions));
   const rules = WEATHER_MARGIN_TABLE.filter((rule) => matched.has(rule.id));
+  if (!rules.length && !coversPeriod(relevant, start, end)) {
+    return { tableVersion: WEATHER_MARGIN_TABLE_VERSION, state: "unknown", conditions: [], marginSeconds: 0, suggestion: null };
+  }
   const marginMinutes = rules.reduce((largest, rule) => Math.max(largest, rule.marginMinutes), 0);
   const suggesting = rules.find((rule) => rule.insteadOf.includes(input.mode));
   return {
@@ -244,9 +244,22 @@ function ruleMatches(rule: WeatherMarginRule, hour: WeatherForecastHour): boolea
   });
 }
 
-function reported(hour: WeatherForecastHour): boolean {
+function fullyReported(hour: WeatherForecastHour): boolean {
   return [hour.weatherCode, hour.rainMillimeters, hour.snowfallCentimeters, hour.precipitationProbabilityPercent,
-    hour.apparentTemperatureCelsius, hour.windGustsKilometersPerHour].some((value) => value !== null && Number.isFinite(value));
+    hour.apparentTemperatureCelsius, hour.windGustsKilometersPerHour].every((value) => value !== null && Number.isFinite(value));
+}
+
+/** Missing hours or measurements cannot establish that the entire departure period is clear. */
+function coversPeriod(hours: readonly WeatherForecastHour[], start: Temporal.Instant, end: Temporal.Instant): boolean {
+  const ends = hours.filter(fullyReported).map((hour) => instant(hour.time, "Forecast hour"))
+    .sort(Temporal.Instant.compare);
+  let coveredThrough = start;
+  for (const hourEnd of ends) {
+    if (Temporal.Instant.compare(hourEnd.subtract({ seconds: HOUR_SECONDS }), coveredThrough) > 0) return false;
+    if (Temporal.Instant.compare(hourEnd, coveredThrough) > 0) coveredThrough = hourEnd;
+    if (Temporal.Instant.compare(coveredThrough, end) >= 0) return true;
+  }
+  return false;
 }
 
 /** Nearest 0.1° cell centre; the grid and the key's one decimal place change together. */

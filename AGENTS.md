@@ -70,11 +70,31 @@ Before implementing a task, read in this order:
 
 If a user prompt conflicts with the docs, report the conflict before editing. If the user intentionally changes product direction, update the relevant docs in the same task.
 
+Installed desktop testing uses dev-signed builds under the owner's standing approval (`docs/DECISIONS.md`, 2026-10-23; commands in `docs/DESKTOP_RELEASE.md`, "Dev-signed builds"). Apple notarization submissions and any publication still need the owner's instruction each time.
+
 Every new or materially changed product/design ticket must state its impact on
 web, desktop, marketing, and future mobile. Each platform entry needs an
 implementation reference, a follow-up ticket, or an explicit not-applicable
 reason. Use the existing interaction registry and design-system catalog for
 cross-platform evidence; do not create a parallel decision inventory.
+
+## Installed and live acceptance
+
+Agents run installed desktop and live checks themselves. Use the first step in this
+order that can answer the question:
+
+1. Read state without the UI: read-only SQLite on the installed database, the app's
+   APIs as the signed-in user, and logs.
+2. Use the web app in the in-app browser. Desktop Settings and Behaviors use the
+   same components and the same hosted server.
+3. Drive the Mac app window with Computer Use or the apple-automation skill.
+4. Ask the owner only for steps that stay the owner's: quitting Cadence, sign-ins
+   and credentials, consent or permission prompts, provider revocation, settings
+   that change synced data or send data to a provider, and creating macOS users.
+
+Send owner asks as one numbered list. If a tool is missing, name it and ask the
+owner to enable it instead of handing its work to the owner. Procedure:
+`docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance".
 
 ## Source-of-truth documents
 

@@ -1,5 +1,14 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { validateForegroundLocation, type ForegroundLocation } from "@/lib/ui/foreground-location";
+import { validateForegroundLocation, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
+
+/** Reads the OS grant without starting a position request or competing with one. */
+export async function readMacLocationPermission(): Promise<LocationPermission> {
+  if (!isTauri()) return "unavailable";
+  try {
+    const value = await invoke<unknown>("location_permission");
+    return value === "granted" || value === "prompt" || value === "denied" ? value : "unavailable";
+  } catch { return "unavailable"; }
+}
 
 export async function readMacForegroundLocation(requestPermission = false): Promise<ForegroundLocation> {
   if (!isTauri()) return { state: "unavailable", reason: "bridge" };

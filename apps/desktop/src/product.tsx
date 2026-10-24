@@ -12,7 +12,7 @@ import { createDesktopTravelClient } from "./travel";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
-import { openMacLocationSettings, readMacForegroundLocation } from "./foreground-location";
+import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPermission } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
@@ -549,7 +549,7 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
-        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} openLocationSettings={openMacLocationSettings} desktop />}
+        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}

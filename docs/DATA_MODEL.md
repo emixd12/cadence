@@ -387,7 +387,9 @@ recorded; readers ignore it after Home changes.
 
 Triggers keep every writer consistent, including MCP and account sync:
 
-- Markers, labels and dismissals require `place_label_settings.enabled`.
+- Markers, labels and dismissals require `place_label_settings.enabled`, read
+  under a share lock held until the write commits. A concurrent opt-out either
+  deletes the admitted write or completes first and makes the write fail.
 - A label requires a Completed occurrence of the same Behavior and local date,
   read under a share lock.
 - A status change away from Completed deletes that occurrence's label.

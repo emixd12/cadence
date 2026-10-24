@@ -5,6 +5,8 @@ import {
   issueTravelConclusionsToken,
   readTravelConclusionsSecrets,
   travelConclusionsSourceKey,
+  travelDurationHistoryRange,
+  travelDurationRevision,
   verifyTravelConclusionsToken,
   type TravelConclusionsPayload,
 } from "@/lib/services/travel-conclusions-token";
@@ -85,6 +87,8 @@ describe("travel conclusions token", () => {
   it("changes the source key when any stored travel input changes", () => {
     const base = {
       settingsRevision: "s1", habitsRevision: "h1", enabled: true, mode: "cycling", routingConsentAt: "2026-10-01T00:00:00Z",
+      timezone: "Europe/London", durationRevision: "d1",
+      baseLocationText: "1 Home Road", habits: null,
       calendar: { status: "connected", generation: 1, selectionRevision: 1 },
       behaviors: [{ id: "b1", whereKind: "place", locationText: "2 Gym Road", updatedAt: "2026-10-01T00:00:00Z" }],
       occurrences: [
@@ -98,6 +102,9 @@ describe("travel conclusions token", () => {
     for (const changed of [
       { ...base, settingsRevision: "s2" },
       { ...base, habitsRevision: "h2" },
+      { ...base, timezone: "America/New_York" },
+      { ...base, durationRevision: "d2" },
+      { ...base, baseLocationText: "2 Home Road" },
       { ...base, mode: "transit" },
       { ...base, calendar: { ...base.calendar, generation: 2 } },
       { ...base, calendar: { ...base.calendar, selectionRevision: 2 } },
@@ -105,5 +112,23 @@ describe("travel conclusions token", () => {
       { ...base, occurrences: [{ ...base.occurrences[0]!, status: "completed" }, base.occurrences[1]!] },
       { ...base, occurrences: [{ ...base.occurrences[0]!, scheduled_for: "2026-11-01T18:30:00Z" }, base.occurrences[1]!] },
     ]) expect(travelConclusionsSourceKey(changed)).not.toBe(key);
+  });
+
+  it("uses the same completed-day duration window and stable history revision", () => {
+    expect(travelDurationHistoryRange("2026-11-01")).toEqual({ startLocalDate: "2026-08-03", endLocalDate: "2026-10-31" });
+    const occurrences = [{ id: "o1", updated_at: "2026-10-30T12:00:00Z" }, { id: "o2", updated_at: "2026-10-31T12:00:00Z" }];
+    const sessions = [{ id: "s1", occurrence_id: "o1", behavior_id: "b1", started_at: "2026-10-30T11:00:00Z", stopped_at: "2026-10-30T12:00:00Z" }];
+    const revision = travelDurationRevision(occurrences, sessions);
+    expect(travelDurationRevision([...occurrences].reverse(), sessions)).toBe(revision);
+    for (const changed of [
+      { ...sessions[0]!, stopped_at: "2026-10-30T12:30:00Z" },
+      { ...sessions[0]!, occurrence_id: "o2" },
+      { ...sessions[0]!, behavior_id: "b2" },
+    ]) expect(travelDurationRevision(occurrences, [changed])).not.toBe(revision);
+  });
+
+  it("refuses to issue a token larger than the verifier accepts", () => {
+    expect(() => issueTravelConclusionsToken({ ...payload, events: { ["event:" + "x".repeat(40_000)]: "revision" } }, SECRET))
+      .toThrow("Travel conclusions exceed the token size limit.");
   });
 });

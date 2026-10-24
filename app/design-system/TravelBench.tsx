@@ -38,8 +38,8 @@ const benchOnly = async () => {};
 export function TravelSettingsBench() {
   return <div className="grid gap-8">
     {/* The complete panel: setup, How you travel and Completion places (Tickets 215–217). */}
-    <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} /></PlaceLabelBench>
-    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} openLocationSettings={benchOnly} desktop />
+    <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} readPermission={async () => "denied"} /></PlaceLabelBench>
+    <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} readPermission={async () => "prompt"} openLocationSettings={benchOnly} desktop />
   </div>;
 }
 

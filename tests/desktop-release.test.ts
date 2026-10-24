@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createReleaseBuildEnvironment, createReleaseOverlay, validateReleaseConfiguration, validateSigningEnvironment, decodeUpdaterPublicKey,
   createPreviewBuildEnvironment, createPreviewOverlay, validatePreviewConfiguration, validatePreviewBuildEnvironment,
-  validateDesktopPublicServiceEnvironment, PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT } from "../apps/desktop/scripts/release-config.mjs";
+  createDevBuildEnvironment, createDevOverlay, validateDevConfiguration, validateDevBuildEnvironment, compareVersions,
+  validateDesktopPublicServiceEnvironment, PREVIEW_ENDPOINT, STABLE_ENDPOINT, UPDATER_QA_ENDPOINT } from "../apps/desktop/scripts/release-config.mjs";
 
 const publicKey = Buffer.from("untrusted comment: test public key\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\n").toString("base64");
 const env = { CADENCE_UPDATER_PUBLIC_KEY: publicKey, CADENCE_UPDATER_ENDPOINT: "https://updates.cadence-test.org/latest.json" };
@@ -131,6 +132,63 @@ describe("desktop release preparation", () => {
       { ...good, plugins: { updater: { ...good.plugins.updater, dangerousAcceptInvalidCerts: true } } },
     ]) expect(validateReleaseConfiguration(base, overlay).length).toBeGreaterThan(0);
     expect(validateReleaseConfiguration({ ...base, bundle: { macOS: { minimumSystemVersion: "13.0", hardenedRuntime: false } } }, good).length).toBeGreaterThan(0);
+  });
+  it("builds dev-signed apps with production entitlements, the stable feed and no release artifacts", () => {
+    const signing = { ...env, CADENCE_UPDATER_ENDPOINT: STABLE_ENDPOINT, CADENCE_APPLE_PROVISIONING_PROFILE: "/protected/Cadence.provisionprofile" };
+    const overlay = createDevOverlay(base, signing, "0.1.1-dev.1");
+    expect(overlay).toMatchObject({ version: "0.1.1-dev.1", identifier: "app.cadence.desktop", productName: "Cadence",
+      bundle: { targets: ["app"], createUpdaterArtifacts: false, macOS: { entitlements: "Entitlements.plist", signingIdentity: "-",
+        files: { "embedded.provisionprofile": signing.CADENCE_APPLE_PROVISIONING_PROFILE } } } });
+    expect(validateDevConfiguration(base, overlay)).toEqual([]);
+    expect(base.version).toBe("0.1.0");
+  });
+  it("rejects dev versions that a release from the same source could precede, other feeds and release artifacts", () => {
+    const signing = { ...env, CADENCE_UPDATER_ENDPOINT: STABLE_ENDPOINT, CADENCE_APPLE_PROVISIONING_PROFILE: "/protected/Cadence.provisionprofile" };
+    for (const version of ["", "0.1.1", "0.1.0-dev.1", "0.0.9-dev.4", "0.1.1-dev.0", "0.1.1-dev.01", "0.1.1-preview.1", "../0.1.1-dev.1"]) {
+      expect(validateDevConfiguration(base, createDevOverlay(base, signing, version)).length).toBeGreaterThan(0);
+    }
+    expect(validateDevConfiguration(base, createDevOverlay(base, signing, "0.1.0-dev.1")).join(" ")).toContain("above the source version 0.1.0");
+    for (const endpoint of [PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT, "https://updates.cadence-test.org/latest.json"]) {
+      expect(validateDevConfiguration(base, createDevOverlay(base, { ...signing, CADENCE_UPDATER_ENDPOINT: endpoint }, "0.1.1-dev.1")).join(" ")).toContain("stable feed");
+    }
+    const good = createDevOverlay(base, signing, "0.1.1-dev.1");
+    for (const overlay of [
+      { ...good, bundle: { ...good.bundle, targets: ["app", "dmg"] } },
+      { ...good, bundle: { ...good.bundle, createUpdaterArtifacts: true } },
+      createDevOverlay(base, { ...signing, CADENCE_APPLE_PROVISIONING_PROFILE: undefined }, "0.1.1-dev.1"),
+      { ...good, bundle: { ...good.bundle, macOS: { ...good.bundle.macOS, signingIdentity: "Developer ID Application: Example (ABCDEFGHIJ)" } } },
+      { ...good, identifier: base.identifier },
+    ]) expect(validateDevConfiguration(base, overlay).length).toBeGreaterThan(0);
+    expect(validateDevConfiguration({ ...base, version: "not-semver" }, good).join(" ")).toContain("source version");
+  });
+  it("gives the dev Tauri build no Apple credential or updater key, so it cannot notarize or sign release artifacts", () => {
+    const caller = { PATH: "/release/tools", CI: "false", APPLE_ID: "secret-id", APPLE_PASSWORD: "secret-password", APPLE_TEAM_ID: "ABCDEFGHIJ",
+      APPLE_API_ISSUER: "issuer", APPLE_API_KEY: "key-id", APPLE_API_KEY_PATH: "/private/key", APPLE_CERTIFICATE: "secret-certificate",
+      APPLE_SIGNING_IDENTITY: "Developer ID Application: Example (ABCDEFGHIJ)", TAURI_SIGNING_PRIVATE_KEY: "updater-private-key",
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "updater-password", TAURI_CONFIG: "unreviewed", CADENCE_LEGACY_KEYCHAIN_QA: "1",
+      VITE_SUPABASE_URL: "https://project.supabase.co" };
+    expect(createDevBuildEnvironment(caller)).toEqual({ PATH: "/release/tools", CI: "true", TAURI_BUNDLER_DMG_IGNORE_CI: "false",
+      VITE_SUPABASE_URL: caller.VITE_SUPABASE_URL });
+    expect(caller.APPLE_PASSWORD).toBe("secret-password");
+    const publicValues = { VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
+      VITE_CALENDAR_BROKER_ORIGIN: "https://app.cadence-me.com" };
+    expect(validateDevBuildEnvironment({ ...publicValues, APPLE_SIGNING_IDENTITY: caller.APPLE_SIGNING_IDENTITY })).toEqual([]);
+    expect(validateDevBuildEnvironment(publicValues).join(" ")).toContain("APPLE_SIGNING_IDENTITY");
+    expect(validateDevBuildEnvironment({ ...publicValues, APPLE_SIGNING_IDENTITY: "-" }).join(" ")).toContain("Developer ID Application");
+    expect(validateDevBuildEnvironment({ APPLE_SIGNING_IDENTITY: caller.APPLE_SIGNING_IDENTITY }).join(" ")).toMatch(/VITE_SUPABASE_URL.*VITE_CALENDAR_BROKER_ORIGIN/);
+    expect(validateDevBuildEnvironment({ ...publicValues, APPLE_SIGNING_IDENTITY: caller.APPLE_SIGNING_IDENTITY, TAURI_CONFIG: "{}" }).join(" ")).toContain("TAURI_CONFIG");
+  });
+  it("orders versions by SemVer precedence, so the next release supersedes its dev builds", () => {
+    const ordered = ["0.1.2", "0.1.5", "0.1.6-dev.1", "0.1.6-dev.2", "0.1.6-dev.10", "0.1.6-rc.1", "0.1.6", "0.1.10", "1.0.0-dev.1"];
+    for (const [index, version] of ordered.entries()) {
+      for (const later of ordered.slice(index + 1)) {
+        expect(compareVersions(version, later)).toBe(-1);
+        expect(compareVersions(later, version)).toBe(1);
+      }
+      expect(compareVersions(version, version)).toBe(0);
+    }
+    expect(compareVersions("0.1.6-dev", "0.1.6-dev.1")).toBe(-1);
+    expect(() => compareVersions("0.1", "0.1.6")).toThrow();
   });
   it("requires real signing and one complete notarization credential set without printing values", () => {
     expect(validateSigningEnvironment({})).toHaveLength(6);

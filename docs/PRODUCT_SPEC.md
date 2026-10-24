@@ -673,8 +673,9 @@ completion stores one label (Home, a saved place or elsewhere) and discards the
 position. Fixed, versioned rules (`place-label-rules@1`, `where-suggestion-rules@1`)
 turn labels into Where suggestions that the user must apply. The user chooses label
 retention (90 days, 1 year or until deleted). Labels sync with the account and stay
-out of exports. Ticket 219 stage 2 sends only per-Behavior label counts in the
-`where-suggestion-rules@1` window to Daily Brief model input.
+out of exports. Ticket 219 stage 2 sends per-Behavior label counts for both the
+`where-suggestion-rules@1` 60-day window and all retained history to Daily Brief model
+input. Each count names its window; keys, positions and place text stay out.
 
 ### Weather travel margin (Ticket 218)
 
@@ -706,7 +707,10 @@ starting values; a changed value needs a new version.
   after a fixed return departure. It comes from planned timing, never from a route
   estimate, so a margin never depends on route duration and weather facts reveal
   none (`docs/LEGAL.md` L-001). Forecast hours that overlap the window count.
-  Missing values never match; a window without reported values is unknown, not clear.
+  Missing values never match. A clear result requires complete hourly coverage of
+  the window and every rule measurement; gaps or missing measurements stay unknown.
+  A reported adverse condition still contributes its margin when other data is
+  missing. Rain plus showers stays unknown if either component is missing.
 - The margin is its own resolver input beside the travel buffers. It sits
   immediately before an arrive-by departure, or after a fixed-departure arrival, as
   a `weather_margin` occupancy segment. It moves the shown leave time or return time
@@ -732,7 +736,9 @@ starting values; a changed value needs a new version.
   references, mode, conditions, margin minutes, suggestion and table version. It
   carries no area, coordinates, times or durations. Ticket 219 stage 2 maps it to
   the Daily Brief weather facts (`advisorWeatherOutlook`) only with supplied travel
-  evidence; the live brief has none yet, so it says `not_supplied`.
+  evidence. The live brief returns the server-signed conclusions token from its
+  one-day route view. Invalid, stale, missing or oversized evidence leaves route and
+  weather facts `not_supplied`; stored facts still support the brief.
 
 Platform impact: web uses the hosted adapter in `lib/services`; a linked desktop
 receives weather through the same travel route and makes no provider call; marketing

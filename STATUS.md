@@ -1,11 +1,393 @@
 # Implementation Status
 
+## Combined travel PR review and merge plan — October 24, 2026
+
+The reviewed #138 tree combines the release records and dependency stack with the
+location-permission, weather and completion-label corrections. Signed travel
+conclusions now bind actual settings, duration history and the complete Calendar
+snapshot, and recheck stored inputs after outstanding provider reads. The brief
+falls back to stored facts when a conclusion token is stale or too large.
+
+Final local validation of `8ecbe338`: 3,729 tests passed, 179 configured skips;
+agents, interactions, resolvers, lint, both TypeScript checks, web and desktop
+renderer builds, marketing build/check and public-source audit passed. Fresh npm
+audits reported zero advisories in production-only and all-dependency scopes.
+The configured design-system verifier is an unavailable owner-local external
+script; it is not reported as passing. Fresh GitHub macOS native checks passed
+for the reviewed Tauri and location-permission branches. Installed acceptance and
+coordinated hosted SQL/desktop rollout remain separate release requirements.
+
+The all-PR assessment, resolved merge order, schema compatibility break, provider
+configuration, Calendar-grant cutover and rollback plan are recorded in
+`docs/qa/2026-10-24-pr-merge-readiness.md`. #135 is integrated after this train and
+records its own final combined checks. No main merge, hosted migration, production
+deployment, notarization, feed publication or recipe promotion was performed.
+
+## PR 124: paired Tauri dependency upgrade — October 24, 2026
+
+The API-only update selected JavaScript `@tauri-apps/api` 2.12.4 while the
+native `tauri` crate stayed at 2.11.5. Tauri requires matching core minor
+versions. Separate Vite and Cargo checks did not enforce that relationship.
+
+- Pin JavaScript API and CLI to 2.12.4, pair native `tauri` 2.12.4 with
+  `tauri-build` 2.7.3, and regenerate their lockfiles. Existing deep-link and
+  updater plugin pairs stay at 2.4.9 and 2.10.1.
+- `desktop:dependencies:check` rejects core minor drift and exact plugin
+  version drift across the npm and Cargo locks. `agents:check` and the desktop
+  frontend build run it. Six regression tests include the original mismatch.
+- Refresh this PR against main `ae17936` without rewriting its history.
+
+Verification on Node 24 and Rust 1.97.1: agents, interactions, resolvers, lint,
+both TypeScript checks, web/desktop frontend/marketing builds, marketing check,
+public-source and Trust checks pass. Full Vitest: 3,482 passed, 176 skipped.
+`cargo metadata --locked` resolves the new dependency graph. Local npm installs
+use `--ignore-scripts` because AgentMail's unrelated binary download cannot
+resolve GitHub from this environment.
+
+Native macOS compilation and installed acceptance are not verified here; this
+review environment is Linux. Require the updated PR's native macOS workflow,
+then a fresh desktop candidate and applicable release acceptance. Do not reuse
+the existing 0.1.5 binary as evidence for these new dependencies. If retaining
+that notarized candidate, finish its acceptance and release before merging
+dependency upgrades.
+
+Platform impact: desktop native runtime/tooling only. Web and marketing keep
+their runtime dependency versions; future mobile is not implemented. No schema,
+hosted setting, signing, publication or feed change.
+
+## Agent-run installed acceptance — October 24, 2026
+
+Documentation and agent guidance only; no runtime, schema or hosted change. The owner
+asked agents to run installed and live checks themselves before asking.
+
+- `AGENTS.md`, new "Installed and live acceptance" section, in this order: read state
+  without the UI (read-only SQLite, app APIs as the user, logs); the web app in the
+  in-app browser; the Mac app window through Computer Use or the apple-automation
+  skill; the owner last. Owner-only steps: quitting Cadence, sign-ins and credentials,
+  consent or permission prompts, provider revocation, settings that change synced data
+  or send data to a provider, and creating macOS users. Asks go out as one numbered
+  list; a missing tool is named so the owner can enable it.
+- `docs/DESKTOP_RELEASE.md`, new "Agent-run installed acceptance" after "Dev-signed
+  builds": install and readback, read-only database queries, how desktop sync runs
+  (launch, local edits, reconnect, Timeline reload, Sync now; no timer), the Where
+  round trip, the connector check, reading the Mac window through its
+  accessibility tree, and location checks from the unified log. Written from the
+  `0.1.6-dev.2` acceptance run (PR #140). It also records that the install script's
+  rename swap needs no Launch Services refresh.
+- New project skill `.claude/skills/desktop-acceptance/SKILL.md`. `.gitignore` now
+  ignores `.claude/*` except `.claude/skills/`; worktrees, launch configuration and
+  codex-bridge state stay ignored.
+- No test hook was added to the app.
+
+Platform impact: agent process for desktop acceptance; web, marketing and future
+mobile have no change.
+
+## PR review: preserve unknown weather evidence — October 24, 2026
+
+PR #133 now requires complete hourly coverage and every rule measurement before
+reporting clear weather. A missing rain or showers component remains unknown;
+observed adverse conditions still contribute their margin. The adapter validates
+Unix time units, range, hourly alignment and increasing timestamps.
+
+Three new regression tests fail against the original implementation and pass with
+the correction. Required repository checks, lint, web and desktop typechecks,
+the full suite (3,525 passed; 167 configured skips), web build and desktop renderer
+build pass on the updated Ticket 215 base. No provider, hosted configuration or
+production deployment changed. These fixes also belong in the combined #138 release.
+## Ticket 216 merge review fixes — October 24, 2026
+
+Place-label collection readers now page through the full retained history using
+the existing repository helper. The opt-in trigger holds a share lock on the
+settings row so concurrent opt-out cannot leave newly inserted markers, labels
+or dismissals behind. Six repository regressions cover the 1,000-row boundary,
+recent suggestions after older history, and later-page failures.
+
+The original review passed the full web checks and a real PostgreSQL race
+regression. An unexpected scratch reset required reconstruction of the fixes;
+`docs/qa/2026-10-24-place-label-review.md` distinguishes the prior executed
+evidence from validation of the recovered commit. No hosted database was changed.
+
+## Ticket 165 review: status-only device location permission — October 24, 2026
+
+The owner's dev.2 evidence in PR #140 exposed a separate permission-refresh bug:
+Travel Settings called the foreground-position command to read the OS grant. Its
+save and position-completion refreshes could compete with the active request or
+time out on a second position read, clearing the permission line after success.
+
+The desktop now uses `location_permission`, a read of Core Location authorization
+and Location Services state that requests no coordinates or permission prompt.
+Travel Settings accepts a separate permission reader; browser permission queries
+keep their existing behavior. Toggle and Check again still request one position,
+and Timeline's `readLocation(false)` still reads coordinates without asking for a
+new grant. Synthetic bench adapters supply their own permission states.
+
+Regression coverage separates an allowed grant from both an available position and
+a timed-out position, checks the native bridge contract and preserves Timeline
+reads. Native Rust tests cover denied, restricted, unknown and granted status
+mapping. The native macOS CI and an installed dev-build check remain required;
+this Linux review cannot establish the real permission or Core Location behavior.
+The notarized 0.1.5 candidate and its evidence remain unchanged.
+
+Validation: agents, interactions, resolvers, lint, web and desktop typechecks,
+the full Vitest suite (324 files, 3,498 tests; 15 files/176 tests skipped), web and
+desktop renderer builds, public-source audit and diff check pass. The exact pure
+Rust mapping and its source unit test also pass in an isolated Rust 1.97.1 harness.
+The design-system check cannot run here because its external
+`design-system-bench` verifier is absent; the existing bench and manifest are updated.
+
+Platform impact: desktop fixes permission readback through a native adapter;
+web retains its Permissions API behavior through the shared Settings contract;
+marketing and future mobile have no implementation change. No migration, provider
+configuration, signing or release action.
+
+## Desktop release acceptance and version-free download link — October 24, 2026
+
+The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
+2026-10-24). This change covers documentation, one marketing link and its test. Nothing
+was notarized, published or deployed, and no feed changed. The one authorized upload is
+recorded below.
+
+- `docs/DESKTOP_RELEASE.md` gains "Release acceptance" and "Publication". Every
+  notarized release after 0.1.3 needs four checks: the 14 artifact checks,
+  notarization and Gatekeeper on a quarantined download, an upgrade from the last
+  published version with the data comparison, and the real updater when the SQLite
+  schema or the last release's updater files changed. Area checks run only when
+  `git diff` from the last published commit touches their files. Dev-build evidence
+  counts while those files are unchanged. The test Mac stays on the published release.
+- Published builds read only the stable feed, so the real-updater test runs during
+  publication: the stable feed changes first, the test Mac updates and passes the
+  comparison, then the download link and the preview feed move.
+- `docs/qa/desktop-release-packet-template.md` is the one-page packet.
+  `docs/OPERATIONS.md` points the release gates at the new sections.
+- **Download for Mac** (`apps/marketing/src/data/site.ts`) links to the version-free
+  `desktop-stable/Cadence_aarch64.dmg`. Each publication replaces that asset, so it
+  needs no marketing PR, deployment or Trust marketing-ID refresh.
+  `tests/marketing-layout.test.ts` pins the link and rejects versioned names;
+  `INT-MKT-012` is updated.
+
+Trust audit: the public Trust evidence does not depend on the versioned DMG name. Route
+and artifact checks fetch only the named application and marketing deployments. A fresh
+marketing build before and after the change produced byte-identical `robots.txt`,
+`llms.txt`, `llms-full.txt`, `data/route-manifest.json` and example ZIP; the link
+appears only in the header of 34 HTML pages. Every merge to `main` still rebuilds
+marketing and needs the Trust refresh in `docs/VERCEL_WORKFLOW.md`.
+
+**Version-free asset uploaded October 24, 2026, at 01:44:18Z.** The release-process
+session uploaded it on the owner's authorization, from the retained 0.1.3 copy, which
+it hashed before the upload. Readback:
+- GitHub lists `Cadence_aarch64.dmg` at 8,063,145 bytes, with the same SHA-256 as
+  `Cadence_0.1.3_aarch64.dmg`:
+  `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`.
+- The public URL returns 200 after one redirect, and its download has that hash.
+- Gatekeeper accepts a quarantined copy of the download as Notarized Developer ID, both
+  the DMG and the app inside. Both staples validate, and `syspolicy_check distribution`
+  passes.
+- Every earlier asset and `latest.json` is unchanged. No feed changed.
+
+Merging waits for the owner's instruction. A merge deploys marketing to production, and
+then needs the Trust marketing-ID refresh in `docs/VERCEL_WORKFLOW.md`.
+
+Applied to 0.1.5 (PR #140; `dcefe7e` to `ed93fff`): schema 17 to 18 requires the
+real-updater upgrade from 0.1.3 during publication. `auth.ts` and `auth.rs` require the
+sign-in callback, session renewal and revoked-session checks. The Calendar files require
+the Calendar replay. `Entitlements.plist` and `first-account-link.ts` require a new
+macOS user or the second Mac. Native reminder and updater files did not change.
+
+Platform impact: desktop release process and the marketing download link. Web and
+future mobile are not affected. No schema, migration or hosted configuration change.
+
+## Connector and Where hosted migrations applied — October 23, 2026
+
+PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
+15:58 UTC. Both deployed before their hosted migrations, against the rollout
+order in `docs/qa/2026-10-21-behavior-where-rollout.md`. A read-only Data API
+probe of the linked project `qjodzutjxtmtzczbloxa` showed `behaviors.where_kind`
+missing (42703), and `connector_connections` and `connector_preferences` absent
+(PGRST205). Travel settings, route refresh and the connector Settings panels
+were exposed until the push. Production logs for the prior three hours held 50
+entries, one error and no schema-related failures.
+
+The owner authorized the forward fix and accepted that signed Cadence for Mac
+0.1.3 stops synchronizing Behaviors until a Where-compatible 0.1.5 ships.
+
+- `migration list --linked` matched every hosted version through
+  `20261019025157`, with no hosted-only entries. Exactly three local migrations
+  were pending, and the dry run listed the same three.
+- `db push` applied, in order, `20261019040000_connector_lifecycle.sql`,
+  `20261019041000_daily_brief_connector_disclosure.sql` and
+  `20261019180000_add_behavior_where.sql`. The readback lists all three as
+  applied.
+- Probes after the push: `behaviors.where_kind` returns 200. Both connector
+  tables exist and refuse anonymous reads (42501).
+- The project-local CLI 2.105.0 binary was killed at startup (exit 137) in the
+  operator shell, so the hosted commands used Homebrew CLI 2.109.1.
+- PR #134 (location entitlement) merged at 16:06 UTC as `f922685`. Vercel built
+  no web deployment for it.
+- Trust: the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+  marketing `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` (the PR #112 build), and the
+  readback matched. The app was redeployed as `dpl_A5td86nYSP5Gboe4peeeGif95v3u`
+  on app.cadence-me.com. Provenance shows Stale until the next scheduled
+  collection.
+
+Not verified: an authenticated save of a Behavior's Where and an authenticated
+Travel Settings or connector Settings view on production. The Where backfill
+count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
+Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
+migrations and a signed 0.1.5 before release.
+
+## Dev-signed desktop builds — October 23, 2026
+
+The owner approved dev-signed builds for installed desktop testing. Apple notarization
+and publication stay the owner's decision each time (`docs/DECISIONS.md`, 2026-10-23).
+
+- `release.mjs dev-check|dev-build <X.Y.Z-dev.N>`: Tauri signs ad hoc without any Apple
+  credential. The command then signs with the Developer ID identity, hardened runtime
+  and production entitlements, without a secure timestamp, and verifies the result. No
+  step contacts Apple. The app and its report go to
+  `~/Library/Application Support/Cadence Release/dev-builds/<version>/`.
+- `install-dev-build.mjs <version>` refuses unmerged migrations, downgrades, changed or
+  unsigned builds and a running Cadence. It saves the database and the installed app,
+  swaps the app, opens it and checks the migrated database.
+- `docs/DESKTOP_RELEASE.md` ("Dev-signed builds") has the commands, version rules and
+  rollback. `AGENTS.md`, `docs/OPERATIONS.md` and `docs/DESKTOP_BUILD.md` point to it.
+  `.env.example` lists the three path overrides.
+- The owner-private helper `~/Library/Application Support/Cadence Release/dev-signed-env.sh`
+  holds public values, the identity name and the profile path only.
+
+Verification:
+
+- Real `dev-build 0.1.6-dev.1` from `f922685`: Developer ID authority, team
+  `HK26VT477G`, hardened runtime, production entitlements and embedded profile;
+  `spctl` rejects it as "Unnotarized Developer ID". The first attempt failed: codesign
+  could not reach Apple's timestamp server from the agent sandbox. That failure led to
+  the timestamp-free signature.
+- The installer and the documented rollback ran with real tools on scratch copies of
+  the build, the installed 0.1.2 app and a synthetic database.
+- Focused release and installer tests: 51 passed. A deliberately broken downgrade guard
+  failed its test.
+- `agents:check`, `interactions:check`, `resolvers:check`, `lint`, `typecheck`,
+  `desktop:typecheck`, `core:check`, `design-system:check`, `public-source:check`,
+  `git diff --check` and the web build pass.
+- Full Vitest: 3,555 passed, 96 skipped, 1 failed. The failure was
+  `tests/desktop-release-acceptance.test.ts`, which timed out at 5 seconds under
+  full-suite load; it passes alone (46 of 46). This change does not touch that test or
+  its script.
+
+Installed on the owner's Mac at 20:42 UTC on the owner's instruction, with Cadence
+quit. `install-dev-build.mjs` replaced 0.1.2 with 0.1.6-dev.1 and opened it. The
+database moved from schema 17 to 18; integrity and foreign-key checks pass, and no
+table lost rows. About 30 seconds after launch the app completed an account sync with
+the saved Keychain session and no sign-in prompt; the previous sync was at 15:42 UTC.
+macOS therefore accepts the timestamp-free Developer ID signature with the Keychain
+group entitlement. Protected copy:
+`~/Library/Application Support/Cadence Release/dev-installs/20261023T204210Z-0.1.6-dev.1/`.
+
+Not verified: location permission and notifications on a dev build, and grants
+persisting across two dev builds. The 0.1.5 candidate's prepared upgrade check
+(PR #140) expected 0.1.2 on this Mac; installing 0.1.5 here now needs a rollback first.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are not
+affected. No schema, migration, hosted configuration or interaction change.
+
+## Connector production secrets and redeploy — October 23, 2026
+
+The owner approved release steps 1–5 at 16:19 UTC. Steps 1–3 (preflight, dry
+run and the hosted push of the three connector and Where migrations) were
+already done by another session; see PR #139. This session did not run
+`supabase link`, `db push` or the hosted RLS smoke. `npm run smoke:rls` was
+skipped because it creates hosted auth users, which was not approved.
+
+- Vercel project `cadence`, Production only. The session added
+  `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (new random 32-byte key, sensitive),
+  `CONNECTOR_CREDENTIAL_KEY_ID`, `OUTLOOK_CALENDAR_CLIENT_ID`,
+  `OUTLOOK_CALENDAR_CALLBACK_URL` and `OUTLOOK_CALENDAR_CLIENT_SECRET`
+  (sensitive). `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS` stays unset. No values
+  were printed, logged or written to disk. `vercel env ls production` lists all
+  five names.
+- Outlook secret: the first `cadence-production` client secret on the Entra app
+  was created, but `vercel env add` did not store it. With coordinator approval
+  the session deleted that unused credential and created a new
+  `cadence-production` secret (expires 2027-10-23), which Vercel stored. The
+  app now holds `cadence-production` and the local test secret
+  `cadence-live-local`.
+- The app redeployed from `dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2` (commit `f922685`)
+  as `dpl_5UTt75NNMvovbABshuusrGkyXNAH`. The live marketing deployment was
+  `dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv` (the `f922685` build), so
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` to that ID; the readback matched. The app
+  was redeployed again as `dpl_4dgT9AH9ZtzPwi2ggfr7ZBxXeqmd`, Ready on
+  app.cadence-me.com at commit `f922685`.
+- An unauthenticated `GET /api/outlook-calendar/connection` returns 401
+  `unauthenticated`. Production logs from 16:24 to 18:50 UTC show no 5xx
+  responses or error-level entries. The coordinator separately observed the
+  expected disabled `/mcp` 503, and `GET` 200 on the Outlook, Hevy and iCloud
+  connection routes at 17:52 UTC.
+
+Still pending: step 6 (production smoke on the owner's accounts, then revoking
+test credentials) and step 7 (public disclosure copy, owner approves the
+wording). Desktop connectors arrive with the next signed release.
+
+## Cadence for Mac 0.1.5 candidate — October 23, 2026
+
+The hosted Where migration (PR #112) went live October 23. Published 0.1.3 does not
+send `where_kind`, so its Behavior sync now fails closed with "Update Cadence".
+Version 0.1.5, built from main, restores sync. It carries SQLite schema 18 (Where),
+the 0.1.4 session fix (never built or published) and the Ticket 165 location
+entitlement. The owner approved signing and notarizing the candidate; publication
+needs a separate instruction. Nothing was published.
+
+Built from `41e4549` (PR #140). Apple accepted the app and the DMG; both staples,
+Gatekeeper (including a quarantined copy), strict verification and all 14 release
+checks pass. The signed entitlements include the location entitlement with Hardened
+Runtime. The binary embeds schema 18 and only the stable feed. The updater archive
+and signature verify but were not uploaded. DMG SHA-256
+`9518085a0c27e950e709523925144d07a2f697a823bc83f8a5c719ca1c6bc686`.
+Native library tests (115) and repository checks pass. Main since then (`ed93fff`)
+changed only release tooling and documents, so the 0.1.5 artifacts still match main's
+application source.
+
+Installed acceptance on the owner's Mac moved to the dev-signed `0.1.6-dev.2` (built
+from `ed93fff`, executable SHA-256 `94dbaf1d…a991`), because that Mac already ran
+`0.1.6-dev.1`. October 24: the install script replaced dev.1 at 00:59Z (schema 18, all
+30 tables kept their rows), and the app synced 30 s after launch. Where sync passes
+both ways: four test Behaviors created on the web with Not set, Anywhere, Home and A
+place reached the Mac, and the owner's four Mac edits reached the web. The test
+Behaviors are archived. Read through the macOS accessibility tree, the Mac shows
+connect controls for Outlook, iCloud and Hevy, and "Device location: not yet allowed."
+with Travel estimates on. Ticket 165 on this Mac: the signed entitlement produced the
+first macOS location prompt (02:42 BST), the owner allowed it, and with Cadence
+frontmost a current position was available. A follow-up defect: the desktop
+permission check runs a full location request, which times out right after a read and
+clears the "Device location" line. Open: the denied state, the 0.1.5 upgrade from
+0.1.3 on the test Mac, the prompt on a never-authorized user, and publication.
+
+Connector gating: when the candidate was built, production had no
+`CONNECTOR_CREDENTIAL_*` or `OUTLOOK_CALENDAR_*` settings, and the three connectors
+showed "not configured". Those secrets were set later on October 23 (PR #141). Hevy,
+iCloud Calendar and Outlook Calendar now report `disconnected` for the owner's account,
+so a linked desktop offers connect controls for all three. Connector release steps
+6–7 are still pending; the owner decides whether they must finish before publication.
+
+The travel release train (PR #138) moves from 0.1.5 to 0.1.6. Evidence, hashes,
+owner steps and rollback: `docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`.
+
+October 24 review: the packet now follows the merged release policy. The 0.1.3
+test Mac must upgrade through the real stable-feed updater during authorized
+publication, before the version-free DMG and preview feed move. Callback, session,
+new-user and public-download checks remain explicitly open. Source and notarized
+artifacts are unchanged; no publication or hosted action occurred. The evidence
+matrix preserves the owner's recorded dev.2 location prompt and foreground-position
+passes, while the denied state and never-authorized user checks remain open.
+
+Platform impact: desktop version and release records only. Web, marketing and
+future mobile have no change. No schema, migration or hosted configuration changed.
+
 ## Travel release train: Tickets 165, 212 and 216–219 on Ticket 215 — October 23, 2026
 
 **Owner decision (October 23):** combine the travel ticket branches into one
 release with one hosted migration window and one signed desktop release newer
 than every published version. Branch `claude/travel-release-train-15ebed`, one
-draft PR with base `claude/unruffled-babbage-e830a5` (PR #112). Not deployed,
+draft PR #138 against `main`, incorporating the merged Ticket 215 base. Not deployed,
 signed or published. The per-ticket sections below keep their own detail.
 
 Included, merged in this order with `--no-ff`: PR #131 (165, location permission
@@ -82,11 +464,12 @@ Verification (local, October 23; Vitest and ESLint exclude `.claude/**`):
   builds pass. The suite ran 3,750 passed; three load timeouts in unchanged desktop
   release tests pass alone (71/71). GitHub CI passed on the previous head.
 
-Owner-gated: the decisions above, privacy disclosures (logged on main's PR #129;
-new stage 2 entries in the PR description), provisioning
+Remaining release work: provisioning
 `TRAVEL_CONCLUSIONS_SIGNING_SECRET` in Vercel, the version bump, the hosted
 migration window, web deployment, desktop signing and publication, installed and
-live acceptance, and operator weather clearance. Platform impact: web and desktop
+live acceptance, and operator weather clearance. Privacy and disclosure changes are
+logged in `docs/PRIVACY_CHANGES.md` and do not block development under current policy.
+Platform impact: web and desktop
 as in each ticket section; marketing not applicable until privacy claims are
 reviewed; future mobile inherits the shared model and hosted facts.
 
@@ -280,7 +663,7 @@ layout. QA found and fixed a stale suggestion draft after save; the contract tes
 found and fixed a desktop settings-save timestamp mismatch.
 
 Open: hosted migration after `20261019180000_add_behavior_where.sql`, then web, then
-a desktop release with schema 19 (older desktops fail closed on sync); iPhone
+a desktop release with schema 20 in the combined train (older desktops fail closed on sync); iPhone
 Safari re-prompt check (needs the owner's simulator or device approval); installed
 signed-desktop CoreLocation acceptance; approved privacy text and marketing privacy
 review for the listed conflicts.

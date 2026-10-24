@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
 
 import type { AdvisorWeatherOutlook } from "@cadence/core/types/briefing-travel";
-import type { TravelTimingModelProjection } from "@cadence/core/types/travel";
+import type { TravelHabits, TravelTimingModelProjection } from "@cadence/core/types/travel";
 
 /**
  * Ticket 219 Option A (owner decision, October 23, 2026). The routes response carries
@@ -43,7 +43,7 @@ export type TravelConclusionsPayload = Readonly<{
   exp: string;
   conclusions: TravelTimingModelProjection;
   weather: AdvisorWeatherOutlook | null;
-  /** Provider revision of each named Calendar event, checked against the brief's own events. */
+  /** Complete Calendar snapshot, including events that did not become a named trip. */
   events: Readonly<Record<string, string>>;
 }>;
 
@@ -58,6 +58,8 @@ export function readTravelConclusionsSecrets(env: Readonly<Record<string, string
 
 export function issueTravelConclusionsToken(payload: Omit<TravelConclusionsPayload, "v">, secret: string): string {
   const body = Buffer.from(JSON.stringify({ v: TRAVEL_CONCLUSIONS_TOKEN_VERSION, ...payload }), "utf8").toString("base64url");
+  // The route service omits oversized snapshots; never send a token its verifier will reject.
+  if (body.length + 44 > MAX_TOKEN_LENGTH) throw new RangeError("Travel conclusions exceed the token size limit.");
   return `${body}.${sign(body, secret)}`;
 }
 
@@ -99,17 +101,40 @@ export function travelConclusionsSourceKey(input: Readonly<{
   enabled: boolean;
   mode: string | null;
   routingConsentAt: string | null;
+  baseLocationText: string | null;
+  habits: TravelHabits | null;
+  timezone: string;
+  durationRevision: string;
   calendar: Readonly<{ status: string; generation: number | null; selectionRevision: number | null }>;
   behaviors: readonly Readonly<{ id: string; whereKind: string | null; locationText: string | null; updatedAt: string }>[];
   occurrences: readonly Readonly<{ id: string; behavior_id: string; scheduled_for: string; local_date: string; schedule_kind: string; schedule_end_time: string | null; status: string }>[];
 }>): string {
   return createHash("sha256").update(JSON.stringify([
-    input.settingsRevision, input.habitsRevision, input.enabled, input.mode, input.routingConsentAt,
+    input.settingsRevision, input.habitsRevision, input.enabled, input.mode, input.routingConsentAt, input.timezone, input.durationRevision,
+    input.baseLocationText, input.habits,
     [input.calendar.status, input.calendar.generation, input.calendar.selectionRevision],
-    input.behaviors.map((behavior) => [behavior.id, behavior.whereKind, behavior.locationText, behavior.updatedAt]),
+    [...input.behaviors].sort((left, right) => left.id.localeCompare(right.id))
+      .map((behavior) => [behavior.id, behavior.whereKind, behavior.locationText, behavior.updatedAt]),
     [...input.occurrences].sort((left, right) => left.id.localeCompare(right.id)).map((occurrence) => [occurrence.id, occurrence.behavior_id,
       occurrence.scheduled_for, occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time, occurrence.status]),
   ])).digest("base64url");
+}
+
+/** The same completed-day history window feeds route planning and token validation. */
+export function travelDurationHistoryRange(localDate: string): { startLocalDate: string; endLocalDate: string } {
+  const start = Temporal.PlainDate.from(localDate);
+  return { startLocalDate: start.subtract({ days: 90 }).toString(), endLocalDate: start.subtract({ days: 1 }).toString() };
+}
+
+export function travelDurationRevision(
+  occurrences: readonly Readonly<{ id: string; updated_at: string }>[],
+  sessions: readonly Readonly<{ id: string; occurrence_id: string; behavior_id: string; started_at: string; stopped_at: string | null }>[],
+): string {
+  return createHash("sha256").update(JSON.stringify({
+    occurrences: [...occurrences].sort((left, right) => left.id.localeCompare(right.id)).map((occurrence) => [occurrence.id, occurrence.updated_at]),
+    sessions: [...sessions].sort((left, right) => left.id.localeCompare(right.id))
+      .map((session) => [session.id, session.occurrence_id, session.behavior_id, session.started_at, session.stopped_at]),
+  })).digest("base64url");
 }
 
 function sign(body: string, secret: string): string {

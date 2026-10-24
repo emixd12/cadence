@@ -143,10 +143,12 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not exists (
-    select 1 from public.place_label_settings settings
-    where settings.user_id = new.user_id and settings.enabled
-  ) then
+  -- Hold consent through the write. An opt-out must either delete this write
+  -- afterwards or complete first and make this check reject it.
+  perform 1 from public.place_label_settings settings
+  where settings.user_id = new.user_id and settings.enabled
+  for share;
+  if not found then
     raise exception 'Completion place labels are off.' using errcode = 'P0001';
   end if;
   return new;

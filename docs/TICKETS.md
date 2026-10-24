@@ -13919,7 +13919,8 @@ Staging:
     margin and the mode suggestion. It comes from the same evidence and the same
     model-projection gate as the route conclusions, and is withheld whole for an
     excluded Calendar or stop. The validator accepts only the table margin for the
-    listed conditions. The live brief has no evidence, so it sends `not_supplied`.
+    listed conditions. Live evidence is admitted through the verified Option A token
+    below; missing or invalid evidence stays `not_supplied`.
   - `placeLabels` (216): per-Behavior counts in the `where-suggestion-rules@1` 60-day
     window (home, the Behavior's own place, another saved place, elsewhere, total), and
     in `retained`, the same counts over everything kept under the user's retention
@@ -13938,20 +13939,23 @@ Staging:
       payload of the view's yes/no fits, trips, unknowns and weather rule conclusions.
       Commitments are named by occurrence ID or Calendar event identity, never places
       or keys. It is bound to the user, local date, a hash of the stored travel inputs
-      (settings and habit revisions, Calendar connection, Behavior places, the day's
-      occurrences and statuses), issue time and the view's expiry.
+      (settings and habit values and revisions, Home, timezone, Calendar connection,
+      Behavior places, the day's occurrences and statuses, and duration history),
+      issue time and the view's expiry.
     - Web and linked desktop keep the latest token per account and day in page memory
       and return it unchanged as `travelConclusions` with the Daily Brief request.
       Account-free desktop sends nothing.
     - The server verifies the signature (current or previous key), owner, date, expiry
       and current stored inputs. It then maps commitments to the context's opaque refs
-      and checks each named Calendar event's provider revision against the brief's own
-      events.
+      and checks the complete Calendar event set and provider revisions against the
+      brief's current, complete snapshot, including events that did not become trips.
     - Any failure leaves route and weather `not_supplied` and never fails the brief:
       tampered, other user, other day, expired, stale inputs, malformed, an unknown or
       missing commitment, a changed event, or no secret.
-    - The delivery fence compares stored facts only, so a token that expires during
-      generation never fails the brief.
+    - The delivery fence rechecks stored source values and duration history when the
+      token supplied conclusions. A token that expires during generation still never
+      fails the brief. Snapshots exceeding the existing token size limit are omitted;
+      the brief continues with stored facts.
     - The workbench never receives a token.
     - Implementation: `lib/services/travel-conclusions-token.ts`, the refresh service,
       `readSuppliedTravelConclusions` in `briefing-account-context.service.ts` and

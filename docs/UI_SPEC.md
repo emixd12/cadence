@@ -273,6 +273,10 @@ not during the toggle's own first request. Desktop names System Settings › Pri
 Security › Location Services and offers Open Location Services; browsers name the
 site setting (Safari Websites on iPhone and iPad). Both offer Check again, disabled
 while a request runs, and state that saved places and Calendar trips keep working.
+The permission line reads the OS grant without requesting coordinates. Position
+availability and permission stay separate: a position timeout does not revoke an
+allowed grant or erase its status line. When permission is allowed, timeout
+guidance offers another position request rather than asking to enable permission.
 
 Learned travel habits (Ticket 217) follow as a How you travel subsection under a
 rule. Each value is a sentence with an inline select: "You usually need [10 minutes]

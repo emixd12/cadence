@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
-import { issueTravelConclusionsToken, travelConclusionsSourceKey, type TravelConclusionsPayload, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
+import { issueTravelConclusionsToken, travelConclusionsSourceKey, travelDurationRevision, type TravelConclusionsPayload, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
 
 const mocks = vi.hoisted(() => ({
   preferences: vi.fn(),
@@ -23,9 +23,11 @@ const mocks = vi.hoisted(() => ({
   labels: vi.fn(),
   routeSource: vi.fn(),
   dayOccurrences: vi.fn(),
+  historySessions: vi.fn(),
 }));
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.routeSource }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.dayOccurrences }));
+vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
 vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readTravelBehaviorLocations: mocks.whereKinds }));
 vi.mock("@/lib/db/placeLabels.repo", () => ({ readPlaceLabelSettingsRow: mocks.labelSettings, readCompletionPlaceLabelRows: mocks.labels }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
@@ -95,6 +97,7 @@ beforeEach(() => {
   mocks.labels.mockResolvedValue([]);
   mocks.routeSource.mockResolvedValue(null);
   mocks.dayOccurrences.mockResolvedValue([]);
+  mocks.historySessions.mockResolvedValue([]);
 });
 
 describe("stored travel facts (Ticket 219)", () => {
@@ -180,13 +183,15 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
   const secrets = { current: SECRET, previous: null };
   const routing = { enabled: true, routing_consent_at: "2026-10-01T00:00:00Z", mode: "transit", base_location_text: "1 Main Street",
     navigation_preference: null, onboarding_completed_at: null, updated_at: "2026-10-01T00:00:00Z" };
-  const routeSource = { settings: { enabled: true, mode: "transit", routingConsentAt: "2026-10-01T00:00:00.000000Z" },
+  const routeSource = { settings: { enabled: true, mode: "transit", routingConsentAt: "2026-10-01T00:00:00.000000Z", baseLocationText: "1 Main Street" },
     settingsRevision: "2026-10-01T00:00:00.000000Z", habitsRevision: null,
     behaviors: [{ id: "fixture", whereKind: "home", locationText: null, updatedAt: "2026-10-01T00:00:00.000000Z" }] };
   const calendar = { status: "connected", generation: 1, selectionRevision: 1 };
   const dayOccurrence = { id: "fixture", behavior_id: "fixture", scheduled_for: fixture.cadence.occurrences[0]!.scheduledFor, local_date: fixture.localDate,
     schedule_kind: "exact", schedule_end_time: null, status: "unresolved", updated_at: "2026-10-01T00:00:00Z" };
   const sourceKey = () => travelConclusionsSourceKey({ settingsRevision: routeSource.settingsRevision, habitsRevision: null, enabled: true, mode: "transit",
+    timezone: fixture.timezone, durationRevision: travelDurationRevision([], []),
+    baseLocationText: routeSource.settings.baseLocationText, habits: null,
     routingConsentAt: routeSource.settings.routingConsentAt, calendar, behaviors: routeSource.behaviors, occurrences: [dayOccurrence] });
   const payload = (overrides: Partial<Omit<TravelConclusionsPayload, "v">> = {}): Omit<TravelConclusionsPayload, "v"> => ({
     sub: "owner-1", date: fixture.localDate, src: sourceKey(), iat: "2026-11-01T11:58:00Z", exp: "2026-11-01T12:03:00Z",
@@ -210,7 +215,7 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
     mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: "home", location_text: null }]);
     mocks.routeSource.mockResolvedValue(routeSource);
     mocks.calendar.mockResolvedValue(calendar);
-    mocks.dayOccurrences.mockResolvedValue([dayOccurrence]);
+    mocks.dayOccurrences.mockImplementation(async (_client, _owner, start) => start === fixture.localDate ? [dayOccurrence] : []);
   });
 
   it("fills route and weather conclusions from a verified token, mapped to this context's refs", async () => {
@@ -250,7 +255,7 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
         trips: [{ destinationRef: "place:1 Main Street", role: "outbound", mode: "transit", estimate: "current" }] } }), SECRET)],
     ];
     for (const [label, token, arrange, tokenSecrets] of cases) {
-      mocks.dayOccurrences.mockResolvedValue([dayOccurrence]);
+      mocks.dayOccurrences.mockImplementation(async (_client, _owner, start) => start === fixture.localDate ? [dayOccurrence] : []);
       mocks.routeSource.mockResolvedValue(routeSource);
       arrange?.();
       const prepared = await prepare(token, tokenSecrets);
@@ -268,6 +273,48 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
     const off = await prepare(issueTravelConclusionsToken(payload(), SECRET));
     expect(off.contexts[0]!.travel?.route).toEqual({ state: "unavailable", reason: "routing_off" });
     expect(mocks.routeSource).not.toHaveBeenCalled();
+  });
+
+  it("rejects delivery when Home changes without changing the projected travel facts", async () => {
+    const prepared = await prepare(issueTravelConclusionsToken(payload(), SECRET));
+    expect(prepared.contexts[0]!.travel?.route.state).toBe("available");
+    mocks.routeSource.mockResolvedValue({ ...routeSource, settingsRevision: "2026-11-01T12:00:02Z" });
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+  });
+
+  it("withholds stale duration history and fences changes during generation", async () => {
+    const token = issueTravelConclusionsToken(payload(), SECRET);
+    const prepared = await prepare(token);
+    expect(prepared.contexts[0]!.travel?.route.state).toBe("available");
+    mocks.historySessions.mockResolvedValue([{ id: "session-1", occurrence_id: "past-1", behavior_id: "fixture",
+      started_at: "2026-10-30T10:00:00Z", stopped_at: "2026-10-30T11:00:00Z" }]);
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+    expect((await prepare(token)).contexts[0]!.travel).toMatchObject(notSupplied);
+  });
+
+  it("binds the Home value even when a sync write preserves its revision", async () => {
+    const token = issueTravelConclusionsToken(payload(), SECRET);
+    const prepared = await prepare(token);
+    mocks.routeSource.mockResolvedValue({ ...routeSource, settings: { ...routeSource.settings, baseLocationText: "2 Main Street" } });
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: "context_changed" });
+    expect((await prepare(token)).contexts[0]!.travel).toMatchObject(notSupplied);
+  });
+
+  it("requires a current Calendar snapshot when routing used a connected Calendar", async () => {
+    mocks.contexts.mockResolvedValue([{ ...fixture, connectors: [{ source: "google_calendar", state: "not_requested" }] }]);
+    const prepared = await prepare(issueTravelConclusionsToken(payload({ conclusions: {
+      version: "2.0", travelDay: "no", calendarEvents: false, trips: [], fits: [],
+    }, weather: null, events: {} }), SECRET));
+    expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+  });
+
+  it("withholds conclusions when the complete Calendar event set changes", async () => {
+    const withoutNamedTrips = payload({ conclusions: { version: "2.0", travelDay: "no", calendarEvents: false, trips: [], fits: [] }, weather: null });
+    const removed = await prepare(issueTravelConclusionsToken({ ...withoutNamedTrips,
+      events: { "event:fixture": "event", "event:removed": "event" } }, SECRET));
+    expect(removed.contexts[0]!.travel).toMatchObject(notSupplied);
+    const added = await prepare(issueTravelConclusionsToken({ ...withoutNamedTrips, events: {} }, SECRET));
+    expect(added.contexts[0]!.travel).toMatchObject(notSupplied);
   });
 });
 

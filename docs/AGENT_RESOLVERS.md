@@ -561,13 +561,13 @@ Recipe/policy versions contribute to the effective revision and result metadata.
 
 ### Travel facts in Daily Brief model input (Ticket 219)
 
-Stage 1 implemented in source October 22, 2026. `docs/LEGAL.md` L-001 bounds it:
+Stages 1 and 2 are implemented on the combined travel release branch. `docs/LEGAL.md` L-001 bounds them:
 Google route data reaches the model only as Cadence's own conclusions.
 
 - `packages/core/src/types/briefing-travel.ts` defines `AdvisorTravelContext`, the
   optional `travel` block of a day context: Behavior Where (`not_set` means
   "location not set"), routing on/off, usual travel, route conclusions or an
-  unavailable reason, and typed stage-2 slots for Tickets 216–218.
+  unavailable reason, learned habits, weather rule conclusions and both recent and retained label counts.
 - `validateAdvisorDayContext` closes that block: enums, refs already in the
   context and bounded whole minutes or counts in the slots. It rejects any
   instant, duration, extra field or free text.
@@ -578,11 +578,20 @@ Google route data reaches the model only as Cadence's own conclusions.
   a trip to an excluded stop withholds all conclusions, never part of them.
 - `scopeBriefingContext` drops travel, so the planner never sees it; planner
   intervals would otherwise reveal travel timing.
-- `lib/services/briefing-account-context.service.ts` reads Where kinds and travel
-  settings, never place text, and fences them in `assertCurrent`. It never adds
-  route conclusions, so the account workbench sends no Maps-derived facts. The
-  live brief currently has no route evidence either: estimates stay on the client
-  and are never stored. Stage 2 decides how conclusions reach the live brief.
+- `lib/services/briefing-account-context.service.ts` derives stored Where, habit and
+  label-count facts. Home and place text are read only to derive keys and references;
+  neither reaches model input. The account workbench receives stored facts only.
+- The live brief can return the route service's signed conclusions token. Admission
+  verifies owner, local date, expiry, current source values and the complete Calendar
+  snapshot, including events that did not become trips. Home, habits, timezone,
+  occurrences and duration history are bound to the token. Delivery rechecks those
+  stored sources when conclusions were admitted; token expiry during generation is
+  still allowed. Missing or invalid evidence supplies no route or weather facts.
+- `travelDurationHistoryRange` and `travelDurationRevision` share the planning and
+  verification history definition. The route service also fences Home, habits,
+  timezone and occurrence status before spending and before returning. Note edits
+  alone do not invalidate paid routing work. Oversized signed snapshots are omitted
+  within the existing token limit; the brief retains its stored facts.
 - `lib/services/briefing-fixtures.ts` builds `travel_day` and `travel_unknown` from
   invented places and estimates through the real travel resolver (Maps Terms
   3.2.3(c)(vii)). `daily-brief-consumer.ts` appends `DAILY_BRIEF_TRAVEL_INSTRUCTIONS`

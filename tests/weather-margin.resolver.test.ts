@@ -165,6 +165,22 @@ describe("resolveWeatherMargin", () => {
     expect(() => resolveWeatherMargin({ hours: [], period: { startAt: PERIOD.startAt, endAt: PERIOD.startAt }, mode: "walking" }))
       .toThrow("Weather period end must follow its start.");
   });
+
+  it("requires complete coverage and measurements before reporting clear", () => {
+    const period = { startAt: "2026-10-22T14:30:00Z", endAt: "2026-10-22T16:30:00Z" };
+    const hours = [15, 16, 17].map((value) => hour(`2026-10-22T${value}:00:00Z`));
+    const resolve = (values: WeatherForecastHour[]) => resolveWeatherMargin({ hours: values, period, mode: "cycling" });
+    expect(resolve(hours).state).toBe("clear");
+    expect(resolve([hours[2], hours[0], hours[1]]).state).toBe("clear");
+    expect(resolve(hours.slice(0, 2)).state).toBe("unknown");
+    expect(resolve([hours[0], hours[2]]).state).toBe("unknown");
+    expect(resolve([hours[1], hours[2]]).state).toBe("unknown");
+    for (const field of ["weatherCode", "rainMillimeters", "snowfallCentimeters", "precipitationProbabilityPercent",
+      "apparentTemperatureCelsius", "windGustsKilometersPerHour"] as const) {
+      expect(resolve([hours[0], { ...hours[1], [field]: null }, hours[2]]).state).toBe("unknown");
+    }
+    expect(resolve([{ ...hours[0], rainMillimeters: 5 }])).toMatchObject({ state: "margin", marginSeconds: 900 });
+  });
 });
 
 describe("weather area and cache hour", () => {

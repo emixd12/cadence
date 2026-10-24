@@ -1429,6 +1429,9 @@ an ad hoc signed development app with a bound bundle identity; it does not
 satisfy Developer ID signing, notarization, or final-release gates. The local
 signing config must not be used for final release builds. Ticket 113's separate
 ad hoc preview procedure is recorded in `docs/DESKTOP_RELEASE.md`.
+For installed testing on the owner's Macs, `release.mjs dev-build` and
+`install-dev-build.mjs` build and install Developer ID signed, unnotarized apps; see
+`docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
 `desktop:dev:web` exposes the
 developer bench without claiming native APIs work in a browser. For Codex local QA, select the first free port
 in 4321–4330 and bind loopback. Never let the server choose outside that pool.
@@ -1486,11 +1489,13 @@ of rollback: deterministic stale writes must return application conflicts.
 
 Before broad extraction, verify persistent SQLite writes, atomic rollback,
 native scheduling/cancellation, notification activation, and restart behavior.
-Before a production release, verify the shared local-Supabase/real-SQLite
+The first production release, 0.1.3, verified the shared local-Supabase/real-SQLite
 contract suite, full tracking parity, offline launch, actual WKWebView rendering,
-upgrade preservation, and accurate verified native reminder coverage. For the
-first schema-changing desktop update, also test an older installed version
-upgrading through the real updater with a protected database backup.
+upgrade preservation, and accurate verified native reminder coverage. Later releases
+follow `docs/DESKTOP_RELEASE.md`, "Release acceptance": four checks on every release,
+including the real updater when the SQLite schema changes, and area checks only when
+the release changes that area's files. Publication follows "Publication" in the same
+file and changes no marketing source.
 
 Native reminders target the next 30 days and prioritize nearest eligible
 reminders. The owner accepted a clearly displayed OS-limited horizon on
