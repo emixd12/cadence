@@ -1,5 +1,31 @@
 # Implementation Status
 
+## Ticket 187: Google verification preparation — October 24, 2026
+
+Prepared Google's sensitive-scope verification for the Daily Brief Calendar client in
+`cadence-calendar-agent-prod`. Nothing is submitted; Google has not accepted a review.
+
+- Readback: branding fields, In production audience, the three declared scopes, the
+  single production callback and the AI-powered agent setting match the owner's
+  October 24 setup. Branding is not yet verified. Search Console still lists
+  `info@identityscaffolding.com` as verified owner of `sc-domain:cadence-me.com`.
+- Daily Brief Settings now has a disclosure line under the Google Calendar choice:
+  today's event times, timezone, availability and response, never titles or details,
+  never the Timeline connection. `tests/daily-brief-ui.dom.test.tsx` asserts it.
+- `docs/qa/2026-10-12-agentic-calendar.md` holds the readback, the 972-character scope
+  justification, the 899-character additional information and the timed video script.
+- PR #147 (to `main`) carries the Privacy, Trust and user-guide text. P-010 is drafted.
+
+Blocked on the owner: Google's policy forbids test redirect URIs on a production
+client, and the video must show this client's ID. Recording therefore needs this PR's
+agent flow on `app.cadence-me.com` (merge, migration `20261022180000`, agent secret,
+cutover), or an owner-accepted alternative. The owner also approves the texts, records
+and uploads the video, authorizes one real Daily Brief call for the test account, and
+confirms OpenAI data sharing is off.
+
+Platform impact: web and linked desktop share the Daily Brief Settings panel, so both
+get the disclosure line. Marketing: no change. Future mobile: not applicable.
+
 ## Cadence for Mac 0.1.5 published — October 24, 2026
 
 The owner instructed the merge and release of the retained 0.1.5 candidate (source
