@@ -333,7 +333,8 @@
         "INT-BRIEF-001",
         "INT-BRIEF-002",
         "INT-BRIEF-003",
-        "INT-BRIEF-005"
+        "INT-BRIEF-005",
+        "INT-WEATHER-001"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -792,7 +793,8 @@
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
         "INT-CALENDAR-007",
-        "INT-TRAVEL-003"
+        "INT-TRAVEL-003",
+        "INT-WEATHER-001"
       ]
     },
     {
@@ -823,7 +825,8 @@
       "interaction_ids": [
         "INT-BRIEF-002",
         "INT-BRIEF-003",
-        "INT-BRIEF-005"
+        "INT-BRIEF-005",
+        "INT-WEATHER-001"
       ]
     },
     {
@@ -931,6 +934,14 @@
         "INT-CALENDAR-013",
         "INT-CALENDAR-014",
         "INT-CALENDAR-015"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelWeather.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-WEATHER-001"
       ]
     }
   ],
@@ -13673,6 +13684,92 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Marketing cannot edit authenticated Behaviors."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-WEATHER-001",
+      "name": "Open the weather data credit",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#weather-margin"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Open Open-Meteo or the CC BY 4.0 licence from the credit beside weather-margin lines in travel timing and the Daily Brief travel block.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Weather data by Open-Meteo.com"
+        },
+        {
+          "kind": "activate",
+          "control": "CC BY 4.0"
+        }
+      ],
+      "availability": "The deployment enables weather, the device position gave a forecast area and a travel leg carries a weather margin.",
+      "success_result": "Opens the Open-Meteo site or the licence in a new tab, or in the system browser on desktop. No account, location or route data is sent.",
+      "failure_result": "Without a weather margin no credit renders; travel timing is unchanged.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelWeather.tsx#TravelWeatherCredit",
+        "components/timeline/ExternalEventDetails.tsx#renderTravelTiming",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-weather-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic forecasts only. Live Open-Meteo and installed desktop acceptance remain open."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelWeather.tsx#TravelWeatherCredit"
+          ],
+          "evidence": [
+            "tests/travel-weather-ui.dom.test.tsx"
+          ],
+          "reason": "Shared travel timing and Daily Brief travel block."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelWeather.tsx#TravelWeatherCredit",
+            "apps/desktop/src/timeline-screen.tsx#TimelineScreen"
+          ],
+          "evidence": [
+            "tests/travel-weather-ui.dom.test.tsx"
+          ],
+          "reason": "Shared components; a linked desktop receives weather from the hosted travel route. Timeline links open through the system browser. Installed acceptance remains pending."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing shows no account travel."
         },
         "mobile": {
           "applicability": "not_applicable",

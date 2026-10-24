@@ -61,6 +61,8 @@ import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
 import { Timeline } from "@/components/timeline/Timeline";
+import { TravelWeatherCredit } from "@/components/timeline/TravelWeather";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
@@ -1625,6 +1627,7 @@ const previewFactories: Record<
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
   "composite.external-event-details": () => <ProductPreview><CalendarDetailsBench /></ProductPreview>,
   "composite.external-event-preview": () => <ProductPreview><CalendarDetailsBench preview /></ProductPreview>,
+  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
   "module.day-progress-timeline": () => <ProductPreview maxHeight="48rem"><CalendarTimelineBench /></ProductPreview>,
   "module.timeline": () => (
       <ProductPreview maxHeight="48rem">

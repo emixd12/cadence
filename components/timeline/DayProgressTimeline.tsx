@@ -26,6 +26,7 @@ import type {
 } from "@cadence/core/types/day-progress";
 
 import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming } from "./ExternalEventDetails";
+import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
@@ -296,6 +297,7 @@ export function DayProgressTimeline({
         activity={section.localDate === timeline.todayLocalDate ? (context ? context.recordedActivity ?? null : hevy) : null}
         travel={travel}
         timezone={timeline.timezone}
+        onOpenExternal={onOpenExternal}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel)}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
@@ -365,6 +367,7 @@ function DayProgressDay({
   contexts,
   travel,
   timezone,
+  onOpenExternal,
   onMeasure,
   registerMeasurement,
   onPreview,
@@ -489,7 +492,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={contexts.get(occurrence.id)}
-                  travelDetails={renderTravelTiming({ eventId: occurrence.id, travel, timezone })}
+                  travelDetails={renderTravelTiming({ eventId: occurrence.id, travel, timezone, onOpenExternal })}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -659,7 +662,10 @@ export function travelStatusText(status: TravelState | null, fallbackMessage: st
   if (status.view?.evidence && status.observedAt) {
     const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
     const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
-    return message ? `${prefix} ${message}` : prefix;
+    const text = message ? `${prefix} ${message}` : prefix;
+    // Ticket 218: say plainly when no weather margin could be added.
+    const weather = travelWeatherStateText(status.view.evidence.weather?.state);
+    return weather ? `${text.endsWith(".") ? text : `${text}.`} ${weather}` : text;
   }
   return message;
 }

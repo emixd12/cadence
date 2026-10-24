@@ -23,6 +23,8 @@ import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReserv
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
+import { readTravelWeather } from "@/lib/services/weather-forecast.service";
+import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
 
 const ZERO_BUFFERS = { arrivalSeconds: 0, exitSeconds: 0, settlingSeconds: 0 } as const;
 const PLACE_LOOKUP_CONCURRENCY = 4;
@@ -33,12 +35,14 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 214 refresh: reuse stored place lookups, fence the sources once before the
  * first paid call and once before returning, and route only legs in the window.
  * Ticket 213: every provider call reserves its list price first.
+ * Ticket 218: weather comes from the device position only, through a shared hourly cache.
  */
 export async function refreshTravelRoutes(
   caller: CalendarCaller,
   raw: unknown,
   config: TravelProviderConfig,
   now = Temporal.Now.instant(),
+  weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
 ): Promise<TravelRoutesResponse> {
   assertTravelProviderReady(config);
   const request = parseTravelRouteRefreshRequest(raw);
@@ -136,6 +140,10 @@ export async function refreshTravelRoutes(
     commitments,
     buffers: ZERO_BUFFERS,
   });
+  // Weather never blocks routing; it runs beside the route calls and falls back to unavailable.
+  const weatherRequest = plan.legs.length
+    ? readTravelWeather({ device: request.device, config: weatherConfig, now }).catch(() => ({ state: "unavailable" as const }))
+    : Promise.resolve(null);
   const { due, later } = request.scope === "day"
     ? { due: plan.legs, later: [] }
     : partitionTravelLegsByWindow(plan.legs, now);
@@ -151,7 +159,8 @@ export async function refreshTravelRoutes(
     ...routed.map((result) => ({ legId: result.id, provenance: provenance.get(result.id)!, estimate: result.estimate, unavailableReason: result.failure?.code })),
     ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
   ];
-  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
+  const weather = await weatherRequest;
+  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
   return response(caller.user.id, source, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
       const duration = durationEstimates.get(occurrence.behavior_id);

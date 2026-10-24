@@ -285,6 +285,7 @@ pure owner with paired tests; current runtime owners are listed below.
 | Duration and external context | `packages/core/src/resolvers/timeline-context.resolver.ts` | Shared Timeline assembly, owner-scoped web/desktop services, synthetic fixtures, and resolver tests | Averaging sessions instead of Occurrences, treating unknown as zero, running samples, automatic decisions or schedule writes | `docs/PRODUCT_SPEC.md` | `tests/timeline-context.resolver.test.ts` | Positive stopped Completed totals, optional default duration, explicit unknown/freshness, half-open timed overlaps |
 | Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
 | Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and timing-only model projection |
+| Weather travel margin | `packages/core/src/resolvers/weather-margin.resolver.ts` | `travel.resolver.ts`, `lib/services/weather-forecast.service.ts` (area and cache hour), synthetic fixtures, and resolver tests | Provider I/O, location reads, Google coordinates as an area, margins scaled by route duration, stacked margins, or a model inventing rules | `docs/TICKETS.md` (Ticket 218) | `tests/weather-margin.resolver.test.ts` | Versioned `weather-margin@1` table, largest single margin, planned-timing windows, 0.1° device grid, injected instants |
 
 - `packages/core/src/resolvers/timeline.resolver.ts` retains day selection,
   Needs decision, Occurrence status projection, and future-range ownership.
@@ -326,6 +327,17 @@ disabled until Ticket 165 clears provider/model use.
 affected by manual decisions, preserves unaffected estimates, and withholds a
 complete-trip claim until routing refreshes. The shared Timeline calls it;
 `tests/travel.resolver.test.ts` covers removal and restoration without mutation.
+
+`packages/core/src/resolvers/weather-margin.resolver.ts` (Ticket 218) owns the
+versioned `weather-margin@1` table, the departure window, the 0.1° device-position
+grid and the hourly cache key. `resolveTravelEvidence` takes its weather input beside
+the buffers, never inside them, and records the table version on every margin. The
+window comes from planned timing, so weather facts reveal no route duration.
+`packages/core/src/services/weather-outlook.ts` projects model-safe weather facts
+for Ticket 219, paired with `tests/weather-outlook.test.ts`; nothing sends them to a
+model yet. The Open-Meteo adapter `lib/services/weather-provider.ts` owns the request,
+units and payload validation; `lib/services/weather-forecast.service.ts` owns the
+shared hourly cache. Neither restates a table value.
 
 `packages/core/src/services/travel-refresh-policy.ts` (Tickets 213–214) owns the
 three-hour routing window, place-lookup reuse periods, typed-text normalization

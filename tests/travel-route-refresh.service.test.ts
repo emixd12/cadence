@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   source: vi.fn(), calendar: vi.fn(), events: vi.fn(), spend: vi.fn(), readPlaces: vi.fn(), writePlaces: vi.fn(),
   occurrences: vi.fn(), behaviors: vi.fn(), timezone: vi.fn(), geocode: vi.fn(), route: vi.fn(),
-  historySessions: vi.fn(),
+  historySessions: vi.fn(), weather: vi.fn(),
 }));
 
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.source }));
@@ -19,6 +19,7 @@ vi.mock("@/lib/services/travel-provider", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-provider")>()),
   geocodeGoogleAddress: mocks.geocode,
 }));
+vi.mock("@/lib/services/weather-forecast.service", () => ({ readTravelWeather: mocks.weather }));
 vi.mock("@/lib/services/travel-routing.service", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-routing.service")>()),
   routeTravelLegs: mocks.route,
@@ -53,6 +54,7 @@ beforeEach(() => {
   mocks.geocode.mockImplementation(async (text: string) => ({ kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } }));
   mocks.route.mockImplementation(routeAll);
   mocks.historySessions.mockResolvedValue([]);
+  mocks.weather.mockResolvedValue(null);
 });
 
 const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
@@ -277,5 +279,53 @@ describe("refreshTravelRoutes", () => {
     let reads = 0;
     mocks.source.mockImplementation(async () => (reads += 1) < 3 ? source : { ...source, settingsRevision: "settings-2" });
     await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+  });
+});
+
+describe("refreshTravelRoutes weather (Ticket 218)", () => {
+  const ready = { status: "ready" as const, baseUrl: "https://api.open-meteo.com/v1/forecast", apiKey: null };
+  // Synthetic sample near a public landmark; never a real user position.
+  const device = { latitude: 40.7484, longitude: -73.9857, accuracyMeters: 20, sampledAt: "2026-09-22T07:59:40Z" };
+  const rainy = { state: "forecast" as const, forecast: { provider: "open-meteo" as const, areaKey: "40.7,-74.0",
+    hourStart: "2026-09-22T08:00:00Z", fetchedAt: now.toString(), expiresAt: "2026-09-22T09:00:00Z",
+    hours: Array.from({ length: 48 }, (_, index) => ({ time: now.add({ hours: index }).toString(), weatherCode: 61, rainMillimeters: 1.2,
+      snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 })) } };
+
+  it("keeps weather off by default", async () => {
+    located();
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now);
+    expect(mocks.weather).toHaveBeenCalledWith({ device, config: { status: "off" }, now });
+    expect(result.evidence && "weather" in result.evidence).toBe(false);
+  });
+
+  it("passes only the request's device sample and applies the fixed margin", async () => {
+    located();
+    mocks.weather.mockResolvedValue(rainy);
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(mocks.weather).toHaveBeenCalledOnce();
+    expect(mocks.weather).toHaveBeenCalledWith({ device, config: ready, now });
+    expect(result.evidence?.weather).toMatchObject({ state: "applied", tableVersion: "weather-margin@1" });
+    expect(result.evidence?.legs[0]?.weather).toMatchObject({ conditions: ["rain"], marginSeconds: 600, suggestion: null,
+      departureAt: "2026-09-22T09:40:00Z", arrivalAt: "2026-09-22T10:00:00Z" });
+    expect(result.evidence?.legs[0]?.estimate?.departureAt).toBe("2026-09-22T09:50:00Z");
+  });
+
+  it("says when there is no position and never blocks routes on a weather failure", async () => {
+    located();
+    mocks.weather.mockResolvedValue({ state: "no_position" });
+    const noPosition = await refreshTravelRoutes(caller, day, config, now, ready);
+    expect(mocks.weather).toHaveBeenCalledWith({ device: null, config: ready, now });
+    expect(noPosition.evidence?.weather?.state).toBe("no_position");
+    mocks.weather.mockRejectedValue(new Error("unexpected"));
+    const failed = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(failed.evidence?.weather?.state).toBe("unavailable");
+    expect(failed.evidence?.legs[0]?.state).toBe("current");
+  });
+
+  it("asks for no weather when no leg needs travel", async () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(mocks.weather).not.toHaveBeenCalled();
   });
 });

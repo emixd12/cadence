@@ -276,6 +276,22 @@
       "confidence": "exact"
     },
     {
+      "componentId": "composite.travel-weather-credit",
+      "file": "components/briefing/DailyBriefBubble.tsx",
+      "line": 71,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
+      "componentId": "composite.travel-weather-credit",
+      "file": "components/timeline/ExternalEventDetails.tsx",
+      "line": 220,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "flow.account-deletion-panel",
       "file": "app/(app)/settings/page.tsx",
       "line": 86,
@@ -1757,7 +1773,7 @@
     }
   ],
   "summary": {
-    "productUsages": 219,
+    "productUsages": 221,
     "benchPreviews": 0
   }
 }

@@ -1,5 +1,18 @@
 # Implementation Status
 
+## PR review: preserve unknown weather evidence — October 24, 2026
+
+PR #133 now requires complete hourly coverage and every rule measurement before
+reporting clear weather. A missing rain or showers component remains unknown;
+observed adverse conditions still contribute their margin. The adapter validates
+Unix time units, range, hourly alignment and increasing timestamps.
+
+Three new regression tests fail against the original implementation and pass with
+the correction. Required repository checks, lint, web and desktop typechecks,
+the full suite (3,525 passed; 167 configured skips), web build and desktop renderer
+build pass on the updated Ticket 215 base. No provider, hosted configuration or
+production deployment changed. These fixes also belong in the combined #138 release.
+
 ## Travel decisions and privacy-change log — October 22, 2026
 
 Documentation only; no runtime, schema, hosted text or deployment change.
@@ -74,6 +87,44 @@ incomplete.
 
 Platform impact: marketing's existing Astro upgrade and test tooling only;
 web and desktop runtime behavior is unchanged. Future mobile is not implemented.
+
+## Ticket 218: weather travel margin in source — October 22, 2026
+
+Implemented in source on the Ticket 215 branch; not deployed. Weather stays off until
+the operator sets `CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`.
+
+Owner decisions (October 22): the free Open-Meteo API for development and testing,
+the paid API Standard plan before commercial use (`docs/LEGAL.md` L-008), a versioned
+fixed margin table with orchestrator-set starting values, and privacy items logged
+instead of blocking.
+
+- Core: `weather-margin@1` in `packages/core/src/resolvers/weather-margin.resolver.ts`.
+  The largest single margin applies, margins never stack, and each records the table
+  version. The departure window comes from planned timing, so margins never depend on
+  route duration. `resolveTravelEvidence` takes weather beside the buffers, adds a
+  `weather_margin` segment and shifts the shown leave or return time.
+- Area: the request's device sample rounded to 0.1°; never Google coordinates
+  (L-002). Without a position the status line says "No weather margin: device
+  location is unavailable."
+- Provider: server-only Open-Meteo adapter with a configurable Open-Meteo base URL and
+  optional key. One 48-hour forecast per area per UTC hour is shared across users in
+  server memory, per instance. Failures never block routing.
+- UI: shared travel timing, status line and Daily Brief travel block show the margin,
+  the suggestion and the CC BY 4.0 credit (`INT-WEATHER-001`,
+  `composite.travel-weather-credit`).
+- Ticket 219 input: `projectWeatherOutlook` (`weather-outlook@1`) carries no times,
+  durations, area or coordinates; nothing sends it to a model.
+
+Evidence: fixture tests for every table row and boundary, the adapter, cache, refresh
+service, outlook projection and UI. A live check through the adapter read the free API
+for two public-landmark areas (Willis Tower, Big Ben): 48 validated hours each, and a
+nearby point reused the cached forecast. Bench scenarios for thunderstorms and no
+device location were checked in the browser at desktop and 375 px.
+
+Open: privacy content naming Open-Meteo and its 90-day logs (L-011); the paid plan;
+deployment clearance; deployed-web and installed-desktop acceptance; merging with
+Ticket 217's `preparationSeconds`. Platform impact: web and linked desktop share the
+hosted adapter and components; marketing makes no claim; future mobile inherits it.
 
 ## Ticket 181: Cadence for Mac 0.1.3 published — October 22, 2026
 

@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { overlapsTravelSpans, type BriefTravelGuidance, type BriefTravelGuidanceItem } from "@cadence/core/services/brief-travel-guidance";
 import { briefingOptionText, briefingReferenceLabel, briefingTipEvidence, formatBriefingTime } from "@cadence/core/services/daily-brief-presentation";
+import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 
 type DailyBriefBubbleProps = Readonly<{
   state: "loading" | "ready" | "error";
@@ -30,6 +31,8 @@ export function DailyBriefBubble({
 }: DailyBriefBubbleProps) {
   const ready = state === "ready" && briefing;
   const travelToday = ready && travel && travel.localDate === briefing.localDate ? travel : null;
+  const weatherShown = !!travelToday?.items.some((item) => item.kind === "departure" && item.weather);
+  const weatherState = travelWeatherStateText(travelToday?.weather?.state);
 
   return (
     <section
@@ -65,6 +68,8 @@ export function DailyBriefBubble({
                 {travelToday.items.map((item, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">{travelLine(item, briefing.timezone)}</li>)}
               </ul>
               <p className="text-xs leading-5 text-muted-readable">Calculated by Cadence from travel estimates as of <time dateTime={travelToday.observedAt}>{formatBriefingTime(travelToday.observedAt, briefing.timezone)}</time>{travelToday.attribution ? `, ${travelToday.attribution}` : ""}. Not written by the model.</p>
+              {weatherShown && travelToday.weather?.attribution ? <div className="text-xs leading-5 text-muted-readable"><TravelWeatherCredit attribution={travelToday.weather.attribution} /></div> : null}
+              {weatherState ? <p className="text-xs leading-5 text-muted-readable">{weatherState}</p> : null}
             </div> : null}
             <p className="mt-2 text-xs leading-5 text-muted-readable">
               Generated <time dateTime={briefing.generatedAt}>{formatBriefingTime(briefing.generatedAt, briefing.timezone)}</time>.
@@ -85,7 +90,10 @@ export function DailyBriefBubble({
 function travelLine(item: BriefTravelGuidanceItem, timezone: string): string {
   switch (item.kind) {
     case "overlap": return `Travel to ${item.travelLabel} overlaps ${item.behaviorLabel}.`;
-    case "departure": return `Leave by ${formatBriefingTime(item.at, timezone)} for ${item.label} (${item.mode}).`;
+    case "departure": {
+      const line = `Leave by ${formatBriefingTime(item.at, timezone)} for ${item.label} (${item.mode}).`;
+      return item.weather ? `${line} ${travelWeatherMarginText(item.weather)}` : line;
+    }
     case "return": return `Back around ${formatBriefingTime(item.at, timezone)}.`;
     case "return_unknown": return "Return time is unknown.";
   }

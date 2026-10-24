@@ -233,8 +233,8 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
     travel={{ localDate: settings.localDate, observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit" }, { kind: "return_unknown" }],
-      conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
+      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit", weather: null }, { kind: "return_unknown" }],
+      weather: null, conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
     briefing={{
       text: "Dentist anchors the afternoon.", localDate: settings.localDate, timezone: settings.timezone,
       generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [],
@@ -256,7 +256,7 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
 it("omits travel from another day", async () => {
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
-    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
+    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, weather: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
     briefing={{ text: "Quiet day.", localDate: settings.localDate, timezone: settings.timezone, generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] }} />));
   expect(container.textContent).not.toContain("Travel");
 });

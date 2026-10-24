@@ -10,6 +10,7 @@ import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigat
 import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelCorrection } from "@/lib/ui/travel";
 import { platformNavigationPreference } from "@/lib/ui/navigation-platform";
+import { TravelWeatherCredit, travelWeatherMarginText } from "./TravelWeather";
 
 import styles from "./day-progress-timeline.module.css";
 
@@ -170,7 +171,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
               <dt>Updated</dt><dd>{event.revision.providerUpdatedAt ?? "Not provided"}</dd>
             </dl>
             {navigation ? <><a href={navigation.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline" onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(navigation.href); } : undefined}>{navigation.label}</a>{navigation.modeNotice ? <p>{navigation.modeNotice}</p> : null}</> : null}
-            {renderTravelTiming({ eventId: event.id, travel, timezone })}
+            {renderTravelTiming({ eventId: event.id, travel, timezone, onOpenExternal })}
             {onTravelCorrection && event.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt) ? <form key={`${event.id}-${event.revision.providerEtag ?? event.revision.providerUpdatedAt}`} className="grid gap-2 border-t border-line pt-3" onSubmit={(submit) => {
               submit.preventDefault();
               const data = new FormData(submit.currentTarget);
@@ -198,22 +199,25 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
   },
 );
 
-export function renderTravelTiming({ eventId, travel, timezone, compact = false }: Readonly<{
+export function renderTravelTiming({ eventId, travel, timezone, compact = false, onOpenExternal }: Readonly<{
   eventId: string; travel?: Omit<TravelEvidenceResult, "modelProjection"> | null; timezone: string; compact?: boolean;
+  onOpenExternal?: (url: string) => void | Promise<void>;
 }>) {
   const legs = travel?.legs.filter((item) => item.leg.originCommitmentRef === eventId || item.leg.destinationCommitmentRef === eventId) ?? [];
   if (!legs.length) return null;
   const label = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const originLabels = { device: "current device position", saved_base: "Home", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
-    {legs.map(({ leg, state, estimate, reason }) => <p key={leg.id}>
-      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return home" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(estimate.departureAt)}, arrive ${label(estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
+    {legs.map(({ leg, state, estimate, reason, weather }) => <p key={leg.id}>
+      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return home" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(weather?.departureAt ?? estimate.departureAt)}, arrive ${label(weather?.arrivalAt ?? estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
+      {weather?.state === "margin" ? ` ${travelWeatherMarginText({ marginMinutes: weather.marginSeconds / 60, conditions: weather.conditions, suggestion: weather.suggestion })}` : ""}
       {!compact ? ` Origin: ${(leg.originCommitmentRef ? "planned prior stop" : originLabels[leg.provenance.originSource])}.` : ""}
     </p>)}
     {!travel?.completeTrip ? <p>Full-trip availability is unknown. Known travel spans still apply.</p> : travel.finalAvailabilityAt ? <p>Available again {label(travel.finalAvailabilityAt)}.</p> : null}
     {!compact ? <>{legs.flatMap((item) => item.estimate?.warnings ?? []).filter((warning, index, all) => all.indexOf(warning) === index).map((warning) => <p key={warning}>{warning}</p>)}
       </> : null}
       {legs.some((item) => item.estimate) ? <p>Google Maps · {legs.find((item) => item.estimate)?.estimate?.observedAt ? `Checked ${label(legs.find((item) => item.estimate)!.estimate!.observedAt)}. ` : ""}Estimates depend on attendance and current conditions.</p> : null}
+      {travel?.weather?.attribution && legs.some((item) => item.weather?.state === "margin") ? <TravelWeatherCredit attribution={travel.weather.attribution} onOpenExternal={onOpenExternal} /> : null}
   </div>;
 }
 
