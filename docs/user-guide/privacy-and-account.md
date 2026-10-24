@@ -66,9 +66,19 @@ identity used for the Cadence account. If Settings says Calendar is not
 configured, the deployment has not enabled provider access. See the current
 release evidence for deployment and installed-client acceptance.
 
-Cadence requests read-only Calendar-list and event scopes through a separate
-consent flow. It reads your subscribed calendar list for selection, then reads
-events from selected calendars within the displayed inclusive date range. Depending on Google data and permissions, normalized event details can
+Cadence can offer two Google Calendar connections. Each asks for read-only
+Calendar-list and event access through its own Google consent:
+
+- **Google Calendar** shows events in Timeline.
+- **Google Calendar for Daily Brief**, where available, gives Daily Brief
+  today's event timing. Daily Brief then reads Calendar only through this
+  connection, never through the Timeline connection, and Timeline does not show
+  its events.
+
+Each connection reads your subscribed calendar list so you can choose its
+calendars. It then reads events from those calendars: the Timeline connection
+for the displayed inclusive date range, the Daily Brief connection for today.
+Depending on Google data and permissions, normalized event details can
 include title, description, time or date span, timezone, location, organizer,
 attendees, conference links, recurrence facts, response, busy/free state,
 attachment links, revision, and a source URL. Cadence does not download
@@ -78,15 +88,26 @@ terms and privacy policy. Cadence's use and transfer of Google API information
 adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
 including its Limited Use requirements.
 
+**AI use:** Connecting a calendar sends nothing to OpenAI. Daily Brief sends
+Calendar timing only after you also turn Calendar on under **Daily Brief**. It
+then sends today's event timing, timezone, availability and response state,
+without titles or other event details. Cadence does not use information from
+Google APIs to develop, improve, or train generalized AI or machine-learning
+models, and does not transfer it to anyone for that purpose.
+
 **Data custody:** Vercel runtime processes Calendar API requests and returned
-event details while serving a refresh. Supabase stores the Calendar connection
-and display preferences with the Cadence account. It stores the Google refresh
-credential as account-bound encrypted ciphertext in a private database schema.
+event details while serving a refresh or preparing a briefing. Supabase stores
+each connection, its calendar selections and, for the Timeline connection,
+display preferences with the Cadence account. It stores each Google refresh
+credential separately as account-bound encrypted ciphertext in a private
+database schema.
 Cadence does not store Google event details in its hosted database. Browser and
 desktop clients receive normalized event snapshots, not the Google credential.
-Desktop may store the last complete normalized snapshot in the separate
-`calendar-cache.sqlite3` file. That file can contain the readable event details
-listed above. It contains no Google credential or raw Google response.
+For the Timeline connection, desktop may store the last complete normalized
+snapshot in the separate `calendar-cache.sqlite3` file. That file can contain
+the readable event details listed above. It contains no Google credential or raw
+Google response. Desktop keeps no event cache for Google Calendar for Daily
+Brief.
 
 **Exports and backups:** Calendar credentials and event snapshots are excluded
 from JSONL, CSV, App JSON, BehaviorLog, account synchronization, and user-created
@@ -95,13 +116,14 @@ the disposable Calendar cache. Supabase daily infrastructure backups can retain
 sealed credential ciphertext for the current seven-day backup window after live
 deletion. A user-created export cannot restore a Calendar connection.
 
-**Disconnect and deletion:** **Disconnect Google Calendar** marks the connection
-disconnected, clears selected calendar IDs, and deletes the live credential
-before Cadence attempts to revoke the Google grant. If Google cannot confirm
-revocation, Cadence tells you to remove the grant in Google Account permissions.
-Account deletion attempts the same revocation and then removes the Auth user and
-owner-scoped live Calendar records. If revocation fails, Google Account
-permissions may still show the grant. Provider or hosting backup remnants can
+**Disconnect and deletion:** Each connection has its own Disconnect. Disconnect
+marks that connection disconnected, clears its selected calendar IDs, and
+deletes its live credential before Cadence attempts to revoke its Google grant.
+The other connection stays connected. If Google cannot confirm revocation,
+Cadence tells you to remove the grant in Google Account permissions. Account
+deletion attempts revocation for each connection and then removes the Auth user
+and owner-scoped live Calendar records. If revocation fails, Google Account
+permissions may still show a grant. Provider or hosting backup remnants can
 outlast the live record under their retention policies. Other devices stop
 refreshing when they next observe the connection change.
 
