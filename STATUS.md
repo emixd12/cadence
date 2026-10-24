@@ -4,7 +4,8 @@
 
 The owner approved all three policy changes on October 24 (`docs/DECISIONS.md`,
 2026-10-24). This change covers documentation, one marketing link and its test. Nothing
-was notarized, uploaded, published or deployed, and no feed changed.
+was notarized, published or deployed, and no feed changed. The one authorized upload is
+recorded below.
 
 - `docs/DESKTOP_RELEASE.md` gains "Release acceptance" and "Publication". Every
   notarized release after 0.1.3 needs four checks: the 14 artifact checks,
@@ -31,12 +32,20 @@ marketing build before and after the change produced byte-identical `robots.txt`
 appears only in the header of 34 HTML pages. Every merge to `main` still rebuilds
 marketing and needs the Trust refresh in `docs/VERCEL_WORKFLOW.md`.
 
-**Merge gate:** `Cadence_aarch64.dmg` does not exist yet (the URL returns 404). The
-owner authorized uploading a copy of the published 0.1.3 DMG (SHA-256
-`aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`) under that name. A
-retained copy with that hash is prepared. The authoring session's permission check
-blocked the upload itself, so it has not happened. Merge only after the asset exists
-and the public URL serves that hash, and only on the owner's instruction.
+**Version-free asset uploaded October 24, 2026, at 01:44:18Z.** The release-process
+session uploaded it on the owner's authorization, from the retained 0.1.3 copy, which
+it hashed before the upload. Readback:
+- GitHub lists `Cadence_aarch64.dmg` at 8,063,145 bytes, with the same SHA-256 as
+  `Cadence_0.1.3_aarch64.dmg`:
+  `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`.
+- The public URL returns 200 after one redirect, and its download has that hash.
+- Gatekeeper accepts a quarantined copy of the download as Notarized Developer ID, both
+  the DMG and the app inside. Both staples validate, and `syspolicy_check distribution`
+  passes.
+- Every earlier asset and `latest.json` is unchanged. No feed changed.
+
+Merging waits for the owner's instruction. A merge deploys marketing to production, and
+then needs the Trust marketing-ID refresh in `docs/VERCEL_WORKFLOW.md`.
 
 Applied to 0.1.5 (PR #140; `dcefe7e` to `ed93fff`): schema 17 to 18 requires the
 real-updater upgrade from 0.1.3 during publication. `auth.ts` and `auth.rs` require the
