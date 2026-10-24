@@ -13596,7 +13596,7 @@ Platform impact:
 Status: revised October 22, 2026 from the owner's decisions below; implemented in
 source October 23 on branch `claude/ticket-216-place-labels-b20c33` (draft PR against
 Ticket 215's branch). Not deployed. Hosted migration
-`20261022160000_completion_place_labels.sql`, SQLite migration 0020, deployment and
+`20261024200000_completion_place_labels.sql`, SQLite migration 0020, deployment and
 live device acceptance remain owner-gated. Verification is in `STATUS.md`.
 Dependencies: 215. Ticket 219 owns label counts in model input.
 
@@ -13769,7 +13769,7 @@ Platform impact:
 ## Ticket 217: Learned travel habits
 
 Status: implemented in source October 22, 2026; not deployed. Draft PR against the
-Ticket 215 branch. Hosted migration `20261022170000_travel_habits.sql`, deployment,
+Ticket 215 branch. Hosted migration `20261024210000_travel_habits.sql`, deployment,
 a desktop preview with SQLite migration 0019 and production QA remain owner-gated.
 The hosted migration replays locally with every migration on the branch; it ships
 with the Ticket 215 coordinated rollout, after the 215 migration. Desktop builds that

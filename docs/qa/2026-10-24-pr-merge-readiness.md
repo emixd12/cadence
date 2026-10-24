@@ -179,12 +179,16 @@ types, owner RLS and account-sync contract before the coordinated rollout.
 
 | Order | Hosted migration | Release |
 | --- | --- | --- |
-| 1 | `20261022160000_completion_place_labels.sql` | #138 |
-| 2 | `20261022170000_travel_habits.sql` | #138 |
-| 3 | `20261022180000_separate_agent_calendar_grant.sql` | #135 |
+| 1 | `20261022180000_separate_agent_calendar_grant.sql` | Ticket 187, applied October 24, 2026 |
+| 2 | `20261024200000_completion_place_labels.sql` | #138 |
+| 3 | `20261024210000_travel_habits.sql` | #138 |
 
-The first two patch account-sync RPC definitions by anchor. Rehearse their
-composition, then the third migration's preference wrappers and connector fences.
+Ticket 187 shipped first, without the travel train. The travel migrations were
+renamed from `20261022160000` and `20261022170000` so they sort after that applied
+migration; a plain `db push` then applies them without `--include-all`. The two
+travel migrations patch account-sync RPC definitions by anchor and touch no object
+the Ticket 187 migration defines. Rehearse their composition on top of the applied
+preference wrappers and connector fences.
 Do not deploy application code that expects absent tables or RPC shapes. With the
 normal Git integration, merging to `main` deploys both application and marketing;
 there is no automatic hosted SQL migration or desktop publication. Apply the required

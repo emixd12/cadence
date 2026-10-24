@@ -1,5 +1,5 @@
 -- Ticket 216: completion place labels, device-recorded place markers and Where
--- suggestion dismissals. Mirrors hosted 20261022160000_completion_place_labels.sql.
+-- suggestion dismissals. Mirrors hosted 20261024200000_completion_place_labels.sql.
 -- Deletions on opt-out and on leaving Completed run in the store commands, not in
 -- triggers, so account sync can apply each deletion exactly once.
 CREATE TABLE place_label_settings (
