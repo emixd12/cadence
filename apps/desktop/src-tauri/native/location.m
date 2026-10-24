@@ -46,6 +46,19 @@
 }
 @end
 
+// Called on a Rust blocking worker. Reading authorization never requests a position
+// or presents a permission dialog, even while a foreground request is in flight.
+int cadence_location_permission(void) {
+    // The service query can contact locationd; keep it off the UI thread.
+    if (![CLLocationManager locationServicesEnabled]) return -1;
+    __block int status = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        CLLocationManager *manager = [CLLocationManager new];
+        status = (int)manager.authorizationStatus;
+    });
+    return status;
+}
+
 // Called on a Rust blocking worker. Core Location stays on the main run loop.
 char *cadence_location_request(bool requestPermission) {
     dispatch_semaphore_t done = dispatch_semaphore_create(0);

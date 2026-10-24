@@ -3,7 +3,7 @@ import type {
   DailyBriefResponse,
   DailyBriefSettings,
 } from "@cadence/core/types/daily-brief";
-import type { DailyBriefClient, DailyBriefPreferenceInput } from "@/lib/ui/daily-brief";
+import type { DailyBriefClient, DailyBriefPreferenceInput, DailyBriefRequestInput } from "@/lib/ui/daily-brief";
 import { DAILY_BRIEF_CLIENT_DEADLINES, DailyBriefRequestError, dailyBriefFetch } from "@/lib/ui/daily-brief";
 import { readDesktopCalendarBrokerOrigin } from "./calendar/google-calendar";
 
@@ -28,7 +28,7 @@ class DesktopDailyBriefClient implements DailyBriefClient {
     return this.request<DailyBriefSettings>("/api/advisor/preferences", { method: "PUT", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.preferencesMs, signal);
   }
 
-  requestBrief(input: Readonly<{ installationId: string; retry: boolean }>, signal?: AbortSignal) {
+  requestBrief(input: DailyBriefRequestInput, signal?: AbortSignal) {
     return this.request<DailyBriefResponse>("/api/advisor/brief", { method: "POST", body: JSON.stringify(input) }, DAILY_BRIEF_CLIENT_DEADLINES.briefMs, signal);
   }
 

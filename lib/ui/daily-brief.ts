@@ -20,10 +20,16 @@ export type DailyBriefClient = Readonly<{
     signal?: AbortSignal,
   ) => Promise<DailyBriefSettings>;
   requestBrief: (
-    input: Readonly<{ installationId: string; retry: boolean }>,
+    input: DailyBriefRequestInput,
     signal?: AbortSignal,
   ) => Promise<DailyBriefResponse>;
 }>;
+
+/**
+ * `travelConclusions` is the signed token from the latest travel view (Ticket 219
+ * Option A), passed back unchanged. Clients without one omit it.
+ */
+export type DailyBriefRequestInput = Readonly<{ installationId: string; retry: boolean; travelConclusions?: string }>;
 
 export type DailyBriefPreferenceInput = Readonly<{
   enabled: boolean;

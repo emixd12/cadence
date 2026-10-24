@@ -51,6 +51,21 @@ configuration edit that would contradict the stored Where value is refused.
    marketing deployments are ready. Keep any owner-gated provider enablement
    disabled until its own acceptance is complete.
 
+## Travel release train (October 23, 2026)
+
+The owner combined Tickets 165, 212 and 216–219 with this PR into one release. The
+train adds two hosted migrations after `20261019180000_add_behavior_where.sql`:
+`20261022160000_completion_place_labels.sql` (216), then
+`20261022170000_travel_habits.sql` (217). It adds SQLite 0019 (217 habits) and
+0020 (216 labels) after 0018, so the desktop schema version is 20. The desktop
+candidate must be 0.1.6 or later: 0.1.4 is the unpublished session hotfix, and 0.1.5
+is the signed build from main (schema 18) that restores Behavior sync after the
+October 23 production Where migration. Builds before the train fail closed on
+account synchronization.
+The train adds no step to the sequence above; it widens steps 2, 3 and 5 to the
+travel tickets' migrations and acceptance. See the release-train section in
+`STATUS.md`.
+
 ## Failure handling
 
 Preserve schema and local user data. Roll back the web deployment to the

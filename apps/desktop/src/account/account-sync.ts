@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ACCOUNT_SYNC_ENTITY_KINDS, ACCOUNT_SYNC_TIME_LIMIT_MS, accountSyncFingerprint, resolveAccountSync, resolveReviewedAccountSync, type AccountSyncConflictDecision, type AccountSyncEntity, type AccountSyncPlan, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
 import { sha256 } from "@cadence/core/hash";
+import { travelHabitSyncJson } from "@cadence/core/services/travel-habits";
 import type { Json } from "@cadence/core/types/json";
 import type { PortabilitySnapshot } from "@cadence/core/types/portability-rows";
 import type { NoteShortcutState } from "@cadence/core/types/note-shortcut";
@@ -179,6 +180,7 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
     routing_consent_at: travel.routingConsentAt,
     onboarding_completed_at: travel.onboardingCompletedAt,
     updated_at: travel.updatedAt,
+    ...travelHabitSyncJson(travel.habits),
   } }];
   add(entities, "category", snapshot.categories);
   for (const graph of snapshot.graphs) {
@@ -197,6 +199,10 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "imported_intervention", snapshot.importedInterventions);
   add(entities, "reminder_delivery", snapshot.reminderDeliveries ?? []);
   add(entities, "note_shortcut_state", snapshot.noteShortcutStates ?? []);
+  add(entities, "place_label_settings", snapshot.placeLabelSettings ?? []);
+  add(entities, "place_marker", snapshot.placeMarkers ?? []);
+  add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
+  add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
   return entities;
 }
 

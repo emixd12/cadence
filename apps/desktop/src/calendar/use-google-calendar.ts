@@ -6,7 +6,7 @@ import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { DesktopCalendarCache, type CalendarCacheRequest } from "./cache";
 import { DesktopCalendarCoordinator, type CalendarRefreshTrigger } from "./coordinator";
 import { CalendarBrokerError, createDesktopCalendarBroker, DesktopCalendarConnection,
-  DesktopGoogleCalendarPanelCoordinator, isDesktopCalendarCallback, type CalendarEventRange } from "./google-calendar";
+  DesktopAgentCalendarPanelCoordinator, DesktopGoogleCalendarPanelCoordinator, isDesktopCalendarCallback, type CalendarEventRange } from "./google-calendar";
 
 export type DesktopGoogleCalendarHookOptions = Readonly<{
   client: SupabaseClient | null;
@@ -19,8 +19,11 @@ export type DesktopGoogleCalendarHookOptions = Readonly<{
 
 export type DesktopGoogleCalendarHookResult = Readonly<{
   coordinator: DesktopGoogleCalendarPanelCoordinator | null;
+  agentCoordinator: DesktopAgentCalendarPanelCoordinator | null;
   panelVersion: number;
   wrongAccount: boolean;
+  agentWrongAccount: boolean;
+  agentCallbackMessage?: string;
   snapshot: ExternalEventSnapshotV1 | null;
   preferences: CalendarPreferences | null;
   stale: boolean;
@@ -33,17 +36,21 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
   const { client, accountId, timezone, range, enabled, screen } = options;
   const cache = useMemo(() => new DesktopCalendarCache(), []);
   const broker = useMemo(() => client ? createDesktopCalendarBroker(client) : null, [client]);
+  const agentBroker = useMemo(() => client ? createDesktopCalendarBroker(client, undefined, "agent") : null, [client]);
+  const agentConnection = useMemo(() => agentBroker ? new DesktopCalendarConnection(agentBroker) : null, [agentBroker]);
+  const agentCoordinator = useMemo(() => agentBroker && agentConnection ? new DesktopAgentCalendarPanelCoordinator(agentBroker, agentConnection) : null, [agentBroker, agentConnection]);
   const snapshots = useMemo(() => broker ? new DesktopCalendarCoordinator(broker, cache) : null, [broker, cache]);
   const connection = useMemo(() => broker ? new DesktopCalendarConnection(broker) : null, [broker]);
   const lease = useRef(0);
   const [panelVersion, setPanelVersion] = useState(0);
   const [wrongAccountOwner, setWrongAccountOwner] = useState<string | null>(null);
+  const [agentCallback, setAgentCallback] = useState<{ accountId: string; wrongAccount: boolean; message?: string } | null>(null);
   const scope = JSON.stringify([accountId, timezone, range.startLocalDate, range.endLocalDate]);
   const scopeRef = useRef(scope);
   const timezoneRef = useRef(timezone);
   timezoneRef.current = timezone;
   if (scopeRef.current !== scope) { scopeRef.current = scope; lease.current += 1; }
-  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "refresh" | "panelVersion" | "wrongAccount">>({
+  const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "agentCoordinator" | "refresh" | "panelVersion" | "wrongAccount" | "agentWrongAccount" | "agentCallbackMessage">>({
     snapshot: null, preferences: null, stale: true, label: broker ? "Calendar has not loaded." : "Calendar is unavailable in this build.", error: null,
   });
   const panelChanged = useCallback((view: Awaited<ReturnType<DesktopGoogleCalendarPanelCoordinator["getConnection"]>> | null, snapshot?: ExternalEventSnapshotV1) => {
@@ -136,12 +143,23 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
       for (const value of urls) {
         if (!active || seen.has(value) || !isDesktopCalendarCallback(value)) continue;
         seen.add(value);
-        try { const callback = await connection.complete(value, accountId); if (active) { setWrongAccountOwner(callback?.result === "same_account_required" ? accountId : null); setPanelVersion((version) => version + 1); await callbackRefresh.current("manual"); } }
+        const agent = new URL(value).searchParams.get("purpose") === "agent";
+        try {
+          const callback = await (agent ? agentConnection : connection)?.complete(value, accountId);
+          if (active && callback) {
+            if (agent) setAgentCallback({ accountId, wrongAccount: callback.result === "same_account_required",
+              message: callback.result === "connected" ? "Google Calendar for Daily Brief connected. Select calendars, then enable Calendar in Daily Brief settings." : "Calendar connection did not finish." });
+            else setWrongAccountOwner(callback.result === "same_account_required" ? accountId : null);
+            setPanelVersion((version) => version + 1);
+            if (!agent) await callbackRefresh.current("manual");
+          }
+        }
         catch (error) {
           if (active) {
-            setState((current) => ({ ...current, error: code(error) }));
+            if (agent) setAgentCallback({ accountId, wrongAccount: false, message: "Calendar connection did not finish. Try connecting again." });
+            else setState((current) => ({ ...current, error: code(error) }));
             setPanelVersion((version) => version + 1);
-            await callbackRefresh.current("manual");
+            if (!agent) await callbackRefresh.current("manual");
           }
         }
       }
@@ -152,7 +170,7 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
       if (!active) stop();
     })().catch((error) => { if (active) setState((current) => ({ ...current, error: code(error) })); });
     return () => { active = false; stop?.(); };
-  }, [accountId, connection, enabled]);
+  }, [accountId, connection, agentConnection, enabled]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -181,7 +199,8 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
     && state.snapshot.requestedRange.timezone === timezone
     && state.snapshot.requestedRange.startLocalDate === range.startLocalDate
     && state.snapshot.requestedRange.endLocalDate === range.endLocalDate;
-  return { coordinator: panel, panelVersion, wrongAccount: accountId !== null && wrongAccountOwner === accountId, ...state, snapshot: owned ? state.snapshot : null,
+  return { coordinator: panel, agentCoordinator, panelVersion, agentWrongAccount: agentCallback?.accountId === accountId && agentCallback?.wrongAccount === true,
+    agentCallbackMessage: agentCallback?.accountId === accountId ? agentCallback?.message : undefined, wrongAccount: accountId !== null && wrongAccountOwner === accountId, ...state, snapshot: owned ? state.snapshot : null,
     preferences: owned || !state.snapshot ? state.preferences : null, refresh };
 }
 

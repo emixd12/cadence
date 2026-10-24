@@ -22,7 +22,7 @@ import {
   type DailyBriefAttempt,
   type DailyBriefOutcome,
 } from "@/lib/ui/daily-brief-session";
-import { requestDailyBriefTravel } from "@/lib/ui/travel";
+import { requestDailyBriefTravel, travelConclusionsToken } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 
@@ -119,7 +119,13 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
       const attempt = startDailyBriefAttempt(briefClient, settings, {
         sourceKey: sourceKeyRef.current,
         retry,
-        run: async (signal) => briefClient.requestBrief({ installationId: await dailyBriefInstallationId(window.localStorage, signal), retry }, signal),
+        run: async (signal) => {
+          const installationId = await dailyBriefInstallationId(window.localStorage, signal);
+          // Ticket 219 Option A: the latest signed travel conclusions for this account and day, if any.
+          // Account-free desktop has no travel account, so it sends nothing.
+          const travelConclusions = travelConclusionsToken(travelAccountId, settings.localDate);
+          return briefClient.requestBrief({ installationId, retry, ...(travelConclusions ? { travelConclusions } : {}) }, signal);
+        },
       });
       // Clear this tab's cross-tab claim when the attempt settles, even if this launcher
       // unmounted. Another tab's newer claim stays in place.

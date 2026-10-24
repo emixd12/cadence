@@ -5,6 +5,15 @@ export type ForegroundLocation =
   | Readonly<{ state: "denied" | "unavailable"; reason?: string }>
   | Readonly<{ state: "prompt" | "revoked" | "stale" | "inaccurate" }>;
 
+export type LocationPermission = "granted" | "prompt" | "denied" | "unavailable";
+
+/** Reads permission only. It never requests permission or a device position. */
+export async function readBrowserLocationPermission(): Promise<LocationPermission> {
+  if (typeof navigator === "undefined" || typeof navigator.permissions?.query !== "function") return "unavailable";
+  try { return (await navigator.permissions.query({ name: "geolocation" })).state; }
+  catch { return "unavailable"; }
+}
+
 export function validateForegroundLocation(value: unknown, now: number): ForegroundLocation {
   if (!value || typeof value !== "object") return { state: "unavailable" };
   const row = value as Record<string, unknown>;

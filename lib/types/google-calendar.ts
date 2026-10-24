@@ -1,9 +1,10 @@
+export type CalendarPurpose = "standard" | "agent";
 export type CalendarPreferences = Readonly<{ selectedCalendarIds: string[]; hiddenCalendarIds: string[]; visible: boolean; showAllDay: boolean }>;
-export type CalendarConnection = Readonly<{ userId: string; googleSubject: string; generation: number; selectionRevision: number;
+export type CalendarConnection = Readonly<{ grantPurpose?: CalendarPurpose; oauthClientId?: string; userId: string; googleSubject: string; generation: number; selectionRevision: number;
   status: "connected" | "disconnected" | "reconnect_required"; preferences: CalendarPreferences }>;
 export type CalendarConnectionView = Readonly<{ accountId: string; status: CalendarConnection["status"] | "not_configured" | "unavailable";
   generation: number; selectionRevision: number; preferences: CalendarPreferences }>;
 export const DEFAULT_CALENDAR_PREFERENCES: CalendarPreferences = { selectedCalendarIds: [], hiddenCalendarIds: [], visible: true, showAllDay: true };
-export type CalendarOAuthAttempt = Readonly<{ userId: string; googleSubject: string; generation: number; stateHash: string;
+export type CalendarOAuthAttempt = Readonly<{ grantPurpose?: CalendarPurpose; oauthClientId?: string; userId: string; googleSubject: string; generation: number; stateHash: string;
   sealedVerifier: string; target: "web" | "desktop"; clientState: string; expiresAt: string }>;
 export type CalendarListEntry = Readonly<{ id: string; name: string; timezone: string; primary: boolean; selected: boolean; accessRole: "reader" | "writer" | "owner" }>;

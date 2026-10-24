@@ -207,7 +207,7 @@ async function inspectRange(input: BriefingHistoryInput, caller: CalendarCaller 
       source: caller && capture ? { mode: "account", accountRef: accountRef!, preferenceRevision: capture.preferences.revision }
         : { mode: "synthetic", fixtureId: input.fixtureId ?? "sparse", fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: input.analysisFixtureId ?? null, analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
       evidenceType: caller ? "retrospective" : "synthetic", history: selected.history, localDate: first.localDate, timezone, capturedAt: first.capturedAt, expiresAt: first.expiresAt,
-      capture: { historyDays, includeCalendar: caller ? calendarRequested : input.configs.some(config => config.scope.includeCalendar),
+      capture: { calendarGrantPurpose: "agent", historyDays, includeCalendar: caller ? calendarRequested : input.configs.some(config => config.scope.includeCalendar),
         calendarDisclosed: capture?.preferences.includeCalendar ?? true, includeRecordedElapsedDurations: input.configs.some(config => config.context.includeRecordedElapsedDurations),
         includeHistoricalCompletionTimes: input.configs.some(config => config.context.includeHistoricalCompletionTimes), analysis: input.configs.some(config => config.analysis.lanes.length > 0),
         includeReminders: false, remindersDisclosed: capture?.preferences.includeReminderHistory ?? false, includeNotes: false, notesDisclosed: capture?.preferences.includeNotes ?? false },

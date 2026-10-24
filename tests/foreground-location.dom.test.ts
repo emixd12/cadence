@@ -1,8 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { readBrowserForegroundLocation, validateForegroundLocation } from "@/lib/ui/foreground-location";
+import { readBrowserForegroundLocation, readBrowserLocationPermission, validateForegroundLocation } from "@/lib/ui/foreground-location";
 
 afterEach(() => { vi.restoreAllMocks(); });
+
+it("reads browser permission without asking for a position", async () => {
+  const getCurrentPosition = vi.fn();
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
+  Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => ({ state: "granted" }) } });
+  await expect(readBrowserLocationPermission()).resolves.toBe("granted");
+  expect(getCurrentPosition).not.toHaveBeenCalled();
+  Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => { throw new Error("not supported"); } } });
+  await expect(readBrowserLocationPermission()).resolves.toBe("unavailable");
+});
 
 function mockGeolocation(error: { code: number }) {
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });

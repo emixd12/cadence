@@ -188,6 +188,7 @@ Steps:
 2. Request browser notification permission.
 3. Import data when import exists.
 4. Point to Settings timezone confirmation when useful.
+5. Optionally save Home and usual travel where travel routing is configured.
 
 Onboarding should stay thin. It should reuse existing app controls and should
 not become a broad setup wizard. The Timeline may show a dismissible first-run
@@ -198,11 +199,19 @@ over the page instead of appearing before the feed. Its actions route to:
 - `/settings#notifications`
 - `/settings#timezone`
 - `/export#behaviorlog-import`
+- `/settings#travel`
 
 Import is optional and does not block setup completion.
-Planned under Ticket 212: an optional "Home and travel" item routes to
-`/settings#travel` for the home address and usual travel mode. It does not
-block setup completion and appears only where travel routing is configured.
+Home and travel (Ticket 212) is also optional and never blocks completion. It
+appears only after the deployment's `GET /api/travel/routes` report says routing
+is configured; that report calls no provider. The row opens the Travel settings
+section, where the user enters Home and chooses usual travel, then chooses Save
+travel settings. Saving sends nothing to Google, requests no device location and
+leaves the Travel estimates toggle unchanged. The row reads Saved once both
+values exist. The
+setup read carries only whether each value exists, never the Home text. On
+desktop the row needs a linked account to ask the deployment; local mode omits
+it, and Travel settings still saves both values offline.
 If browser notifications are denied or already blocked, that permission state
 counts as a completed onboarding decision because the app cannot unblock it from
 inside Cadence. The user can still use the tracker and may re-enable browser
@@ -910,6 +919,10 @@ Travel Settings supersedes steps 1–2 above with three inputs:
    records routing consent and asks for foreground device location. Denied or
    unavailable location leaves Home or the previous stop as the origin. Turning
    the toggle off withdraws consent and clears temporary estimates.
+   While travel is on and location is not allowed, not yet allowed or timed out,
+   Settings explains how to allow it (Ticket 165). On the Mac, macOS may not ask:
+   the user opens Location Services from Settings, turns on Cadence and chooses
+   Check again. Saved places and Calendar trips keep working meanwhile.
 3. In the Behavior form the user chooses Where: Not set (default), Anywhere, Home
    or A place. A place needs typed text. Not set and Anywhere request no route.
    Home routes home when the user is elsewhere and needs a saved Home. A place
@@ -919,8 +932,28 @@ Travel Settings supersedes steps 1–2 above with three inputs:
 
 Migration keeps every existing Behavior location as Where = A place with no
 provider call. Where joins Behavior configuration history and account sync. A
-Where suggestion (Ticket 216) never changes a Behavior on its own. Ticket 212
-reuses Home and usual travel in onboarding.
+Where suggestion (Ticket 216) never changes a Behavior on its own. First-run
+setup (Ticket 212) links to the same Home and usual travel controls at
+`/settings#travel`.
+
+### Completion places and Where suggestions (Ticket 216)
+
+1. In Settings, Travel, Completion places, the user selects Set up completion places,
+   chooses how long labels are kept (90 days by default) and selects Save where I
+   complete Behaviors. Labels stay off until then.
+2. At Home or a saved place the user selects I'm here: beside Home in Travel
+   Settings, below Where in the Behavior form, or in a Behavior's one-line marker
+   prompt. That tap may show the location prompt; Cadence stores the position as the
+   place's marker. Not now turns the prompts off on every device.
+3. The user marks an Occurrence Completed from Unresolved near its scheduled time on
+   its own day. If location is already allowed, Cadence reads one position, compares
+   it with the markers on the device, stores Home, a saved place or elsewhere, and
+   discards the position. It never prompts here. Changing the status away from
+   Completed deletes the label.
+4. After six labels in 60 days, a Behavior may show a Where suggestion. Review Where
+   fills the form; the user saves to apply it. Dismiss hides it until six more labels.
+5. Settings deletes labels or markers on request; Turn off deletes both and every
+   dismissal. A shorter retention asks first and deletes older labels.
 
 ## Connect and disconnect an AI client
 
@@ -942,3 +975,11 @@ A request ID alone cannot approve access. A changed signed-in account rejects an
 old consent form. Expired, consumed, or invalid requests require a new client
 connection. A failed Disconnect remains visible with a reload/retry instruction.
 No hosted actions or live Google-provider acceptance follow from local tests.
+
+## Connect Calendar for Daily Brief (Ticket 187)
+
+Open Settings → Google Calendar for Daily Brief → Connect Google Calendar.
+Approve read-only consent using the same Google account as Cadence. Select calendars and save.
+Enable Daily Brief, then enable its Calendar control. Calendar selection changes require renewed disclosure.
+Desktop completes consent in the system browser and receives a purpose-bound callback.
+Disconnect affects that purpose across the account's devices. Timeline consent and sign-in remain separate.

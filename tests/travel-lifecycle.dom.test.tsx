@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { requestDailyBriefTravel, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesView } from "@/lib/ui/travel";
+import { requestDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesView } from "@/lib/ui/travel";
 
 const settings = { enabled: true, mode: "walking" as const, baseLocationText: null, navigationPreference: "google_maps" as const,
   routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "revision" };
@@ -498,5 +498,23 @@ it("keeps the last same-day plan when changed inputs hit the budget limit", asyn
     expect(latest().view?.accountId).toBe("account-a");
     expect(latest().stale).toBe(true);
     expect(latest().resumesAt).not.toBeNull();
+  } finally { await unmount(); }
+});
+
+it("keeps the latest signed conclusions per account and day in page memory only (Ticket 219 Option A)", async () => {
+  const signed = { ...view("account-a"), conclusionsToken: "signed.token" };
+  const routes = vi.fn(async () => signed);
+  const { unmount } = await mount(routes);
+  try {
+    expect(travelConclusionsToken("account-a", "2026-09-21")).toBe("signed.token");
+    expect(travelConclusionsToken("account-b", "2026-09-21")).toBeNull();
+    expect(travelConclusionsToken("account-a", "2026-09-22")).toBeNull();
+    expect(travelConclusionsToken(null, "2026-09-21")).toBeNull();
+    // An expired view's token is never offered.
+    expect(travelConclusionsToken("account-a", "2026-09-21", Date.parse(signed.expiresAt!) + 1)).toBeNull();
+    expect(window.localStorage.length + window.sessionStorage.length).toBe(0);
+    // A travel settings or location change forgets it.
+    await act(() => window.dispatchEvent(new Event("cadence:travel-changed")));
+    expect(travelConclusionsToken("account-a", "2026-09-21")).toBeNull();
   } finally { await unmount(); }
 });

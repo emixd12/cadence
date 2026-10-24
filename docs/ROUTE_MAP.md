@@ -194,6 +194,9 @@ sign-in and the existing linked-desktop authenticated request path. The server
 derives the owner, local day and allowed fields, calls the bounded internal read
 service, then the model adapter. Return validated briefing text and provenance,
 not credentials or a raw export. POST starts generation, never a source mutation.
+The body holds `installationId`, `retry` and, optionally, the signed
+`travelConclusions` token from the latest one-day travel view (Ticket 219 Option A).
+The server alone verifies that token; it never widens what the caller may request.
 
 Require web origin/CSRF checks, exact desktop broker origins, RLS ownership,
 feature/disclosure checks, bounded attempts, output validation and `no-store`.
@@ -254,6 +257,24 @@ event revisions before and after provider work. It makes no tracking, Calendar, 
 Daily Brief mutation. A generated brief requests day scope once through the shared
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
+Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
+state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
+leg may carry its fixed weather margin. The server derives the weather area from the
+request's device sample only; the route accepts no area, forecast or provider URL.
+Ticket 219 Option A: with `TRAVEL_CONCLUSIONS_SIGNING_SECRET` set, a one-day response
+also carries `conclusionsToken`. It is Cadence's own conclusions for that view,
+HMAC-signed and bound to the user, local date, stored travel inputs and the view's
+expiry. Clients keep it in page memory only and return it unchanged as
+`travelConclusions` in `POST /api/advisor/brief`. The server verifies it there; any
+failure leaves trip and weather facts `not_supplied` and never fails the brief.
+
+`GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
+or the Behavior's own place text, keyed by place key. Calendar-only places get no
+name. `PUT /api/travel/habits` accepts exactly `{ expectedUpdatedAt, change }` with one
+of four changes (get-ready time, arrival buffer, place mode, leave-time answer). The
+server derives the owner, plans the change with the shared core rules and compares
+the habit revision only; a stale revision returns 409. Neither method calls a
+provider or accepts an owner ID, position or route result.
 
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 
@@ -331,3 +352,25 @@ request verifies a Cadence Bearer token before protocol handling. Cookie session
 never authorize MCP. Scope/rate admission calls the shared integration operation
 layer; user data remains RLS-scoped. Transport limits and verified protocol versions
 are recorded in `MCP_INTEGRATION.md` and `qa/mcp-server.md`.
+
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
+
+## Calendar purpose routing (Ticket 187)
+
+`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
+Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
+`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
+The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
+Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
+Desktop Keychain entries isolate pending standard and agent consent.

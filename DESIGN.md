@@ -712,3 +712,28 @@ have separate text. Controls preserve 44px targets and semantic live feedback.
 ## Developer documentation (Ticket 229)
 
 The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.
+
+## Agent Calendar settings — Ticket 187
+
+Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief grant.
+Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
+It omits Timeline display controls and explains the separate model-data disclosure.
+`CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.
+
+## Daily Brief recipe 1.1 bubble — Ticket 184
+
+Recipe 1.1 briefs keep the bubble's sections and tokens. Option lines read "Suggested time".
+Logging-lane tips use the "Logging tip" label. The evidence line sits under the tip with a
+1px `border-line` left border and 12px indent. `DailyBriefBubbleBench` shows this state.
+
+## Daily Brief recipe 1.2 bubble — Ticket 184
+
+Recipe 1.2 briefs (candidate 3) group suggestions by type. Each group sits above a
+`border-line` hairline with one muted label, such as "New suggested time", and a
+disc-bulleted list (`list-disc`, 20px indent). A move bullet is the Behavior name and
+"current → new" times, with no reason line. Suggestions without a time use the label
+"Suggestion", one bullet each. Behavior names that Cadence lists in `behaviorNames` render as
+compact chips (1px `border-line`, `bg-surface` fill, 4px side padding, Ink text) in the
+overview, move line and tip. Weight stays 400 under the no-bold rule. A Cadence-written
+"Setup tip" uses the same tip block and label style. An empty overview is omitted; an empty brief renders no bubble.
+`DailyBriefBubbleBench` shows the 1.2 state after the 1.1 state.
