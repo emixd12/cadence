@@ -15,8 +15,10 @@ asked agents to run installed and live checks themselves before asking.
 - `docs/DESKTOP_RELEASE.md`, new "Agent-run installed acceptance" after "Dev-signed
   builds": install and readback, read-only database queries, how desktop sync runs
   (launch, local edits, reconnect, Timeline reload, Sync now; no timer), the Where
-  round trip, the connector check, and reading the Mac window through its
-  accessibility tree. Written from the `0.1.6-dev.2` acceptance run (PR #140).
+  round trip, the connector check, reading the Mac window through its
+  accessibility tree, and location checks from the unified log. Written from the
+  `0.1.6-dev.2` acceptance run (PR #140). It also records that the install script's
+  rename swap needs no Launch Services refresh.
 - New project skill `.claude/skills/desktop-acceptance/SKILL.md`. `.gitignore` now
   ignores `.claude/*` except `.claude/skills/`; worktrees, launch configuration and
   codex-bridge state stay ignored.

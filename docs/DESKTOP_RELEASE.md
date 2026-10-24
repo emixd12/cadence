@@ -522,6 +522,12 @@ on the Mac; window automation can replace the last of these.
 3. Wait for the launch sync (about 30 seconds) with a bounded loop on the sync cursor
    below. Do not poll by hand.
 
+The rename swap needs no Launch Services refresh. After the `0.1.6-dev.2` install,
+Launch Services resolved `app.cadence.desktop` to `/Applications/Cadence.app`, and the
+running app was registered there. Stale records come from verification disk images and
+temporary copies. After QA, unregister those exact paths with `lsregister -u`, as
+"Local app discovery and archive retention" says.
+
 ### Read-only database queries
 
 ```bash
@@ -589,6 +595,23 @@ permission, and the Cadence window must be open. Use Computer Use, when this ses
 has it, for clicks such as **Sync now**. The location prompt itself stays with the
 owner: it answers a permission prompt, and turning Travel estimates on changes a
 synced setting.
+
+### Location checks
+
+- Read what happened from the unified log, not from the screen. Use `/usr/bin/log`,
+  because in zsh `log` is a builtin. Cadence's "cadence location result" lines are
+  info level, so start `/usr/bin/log stream --level info` before the test; `log show`
+  later will not have them. CoreLocationAgent logs "handle auth-prompt" when the
+  prompt appears and "AuthPrompt response" when it is answered. Never record
+  coordinates.
+- A read needs Cadence frontmost: `location.m` returns "inactive" when `NSApp.active`
+  is false. A background automation cannot make Cadence frontmost.
+- On desktop, the Travel panel's permission line is not a status-only check. It runs a
+  full location request, so a check right after a successful read can wait for a new
+  fix and log "timeout" after 12 seconds. That is the permission check, not the read
+  shown on screen (October 24, PR #140).
+- locationd's "not a plugin or an app" (`-10814`) lines and visit-monitoring
+  subscriptions are routine; they also appear for Apple's own apps.
 
 ## Release acceptance
 
