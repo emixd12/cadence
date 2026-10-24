@@ -1,5 +1,18 @@
 # Implementation Status
 
+## Ticket 216 merge review fixes — October 24, 2026
+
+Place-label collection readers now page through the full retained history using
+the existing repository helper. The opt-in trigger holds a share lock on the
+settings row so concurrent opt-out cannot leave newly inserted markers, labels
+or dismissals behind. Six repository regressions cover the 1,000-row boundary,
+recent suggestions after older history, and later-page failures.
+
+The original review passed the full web checks and a real PostgreSQL race
+regression. An unexpected scratch reset required reconstruction of the fixes;
+`docs/qa/2026-10-24-place-label-review.md` distinguishes the prior executed
+evidence from validation of the recovered commit. No hosted database was changed.
+
 ## Ticket 216: Completion place labels and Where suggestions — October 23, 2026
 
 Implemented in source on branch `claude/ticket-216-place-labels-b20c33` (draft PR

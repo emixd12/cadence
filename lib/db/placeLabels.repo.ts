@@ -6,6 +6,7 @@ import type {
   WhereSuggestionDismissalRecord,
 } from "@cadence/core/types/place-labels";
 import type { AppSupabaseClient } from "./behaviors.repo";
+import { readAllPostgrestRows } from "./paginated-read";
 
 export type PlaceLabelSettingsRow = PlaceLabelSettingsRecord;
 export type PlaceMarkerRow = PlaceMarkerRecord;
@@ -45,9 +46,11 @@ export async function savePlaceLabelSettingsRow(client: AppSupabaseClient, input
 }
 
 export async function readPlaceMarkerRows(client: AppSupabaseClient, userId: string): Promise<PlaceMarkerRow[]> {
-  const { data, error } = await client.from("place_markers").select(MARKERS).eq("user_id", userId).order("id");
-  if (error) throw error;
-  return (data ?? []) as PlaceMarkerRow[];
+  return readAllPostgrestRows<PlaceMarkerRow>({
+    label: "Place markers",
+    getRowKey: (row) => row.id,
+    createQuery: () => client.from("place_markers").select(MARKERS).eq("user_id", userId).order("id"),
+  });
 }
 
 export async function upsertPlaceMarkerRow(client: AppSupabaseClient, userId: string, row: PlaceMarkerRow): Promise<void> {
@@ -63,9 +66,12 @@ export async function deletePlaceMarkerRows(client: AppSupabaseClient, userId: s
 }
 
 export async function readCompletionPlaceLabelRows(client: AppSupabaseClient, userId: string): Promise<CompletionPlaceLabelRow[]> {
-  const { data, error } = await client.from("completion_place_labels").select(LABELS).eq("user_id", userId).order("local_date");
-  if (error) throw error;
-  return (data ?? []) as CompletionPlaceLabelRow[];
+  return readAllPostgrestRows<CompletionPlaceLabelRow>({
+    label: "Completion place labels",
+    getRowKey: (row) => row.id,
+    createQuery: () => client.from("completion_place_labels").select(LABELS).eq("user_id", userId)
+      .order("local_date").order("id"),
+  });
 }
 
 export async function insertCompletionPlaceLabelRow(client: AppSupabaseClient, userId: string, row: CompletionPlaceLabelRow): Promise<void> {
@@ -82,9 +88,12 @@ export async function deleteCompletionPlaceLabelRows(client: AppSupabaseClient, 
 }
 
 export async function readWhereSuggestionDismissalRows(client: AppSupabaseClient, userId: string): Promise<WhereSuggestionDismissalRow[]> {
-  const { data, error } = await client.from("where_suggestion_dismissals").select("id,suggestion,rule_version,dismissed_at").eq("user_id", userId);
-  if (error) throw error;
-  return (data ?? []) as WhereSuggestionDismissalRow[];
+  return readAllPostgrestRows<WhereSuggestionDismissalRow>({
+    label: "Where suggestion dismissals",
+    getRowKey: (row) => row.id,
+    createQuery: () => client.from("where_suggestion_dismissals").select("id,suggestion,rule_version,dismissed_at")
+      .eq("user_id", userId).order("id"),
+  });
 }
 
 export async function upsertWhereSuggestionDismissalRow(client: AppSupabaseClient, userId: string, row: WhereSuggestionDismissalRow): Promise<void> {
@@ -93,10 +102,12 @@ export async function upsertWhereSuggestionDismissalRow(client: AppSupabaseClien
 }
 
 export async function readPlaceLabelBehaviorRows(client: AppSupabaseClient, userId: string): Promise<PlaceLabelBehaviorRow[]> {
-  const { data, error } = await client.from("behaviors").select("id,active,where_kind,location_text")
-    .eq("user_id", userId).order("created_at").order("id");
-  if (error) throw error;
-  return (data ?? []) as PlaceLabelBehaviorRow[];
+  return readAllPostgrestRows<PlaceLabelBehaviorRow>({
+    label: "Place label Behaviors",
+    getRowKey: (row) => row.id,
+    createQuery: () => client.from("behaviors").select("id,active,where_kind,location_text")
+      .eq("user_id", userId).order("created_at").order("id"),
+  });
 }
 
 export async function readProfileTimezone(client: AppSupabaseClient, userId: string): Promise<string | null> {
