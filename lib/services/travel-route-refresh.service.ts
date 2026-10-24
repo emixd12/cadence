@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import { resolveBehaviorDurationEstimate } from "@cadence/core/resolvers/timeline-context.resolver";
+import { rememberedTravelMode, travelHabitBuffers, travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import {
   TRAVEL_LEG_OUTSIDE_WINDOW,
   normalizeTravelPlaceText,
@@ -23,8 +24,12 @@ import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReserv
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@/lib/services/google-calendar.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
+import { readTravelWeather } from "@/lib/services/weather-forecast.service";
+import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
+import { advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
+import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision } from "@/lib/services/travel-conclusions-token";
 
-const ZERO_BUFFERS = { arrivalSeconds: 0, exitSeconds: 0, settlingSeconds: 0 } as const;
 const PLACE_LOOKUP_CONCURRENCY = 4;
 
 type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">; placeText: string | null; endpointSource: TravelEndpoint["source"] }>;
@@ -33,12 +38,17 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 214 refresh: reuse stored place lookups, fence the sources once before the
  * first paid call and once before returning, and route only legs in the window.
  * Ticket 213: every provider call reserves its list price first.
+ * Ticket 218: weather comes from the device position only, through a shared hourly cache.
+ * Ticket 219 Option A: with a signing secret, a one-day view also carries a signed token
+ * of Cadence's own conclusions for the Daily Brief request to return.
  */
 export async function refreshTravelRoutes(
   caller: CalendarCaller,
   raw: unknown,
   config: TravelProviderConfig,
   now = Temporal.Now.instant(),
+  weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
+  conclusionsSecret: string | null = null,
 ): Promise<TravelRoutesResponse> {
   assertTravelProviderReady(config);
   const request = parseTravelRouteRefreshRequest(raw);
@@ -56,7 +66,7 @@ export async function refreshTravelRoutes(
     snapshot ? Promise.resolve(snapshot.requestedRange.timezone) : getProfileTimezone(caller.client, caller.user.id),
   ]);
   if (!timezone) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
-  const historyRange = durationHistoryRange(request.startLocalDate);
+  const historyRange = travelDurationHistoryRange(request.startLocalDate);
   const readDurationHistory = () => Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
     listTimeSessionHistory(caller.client, { userId: caller.user.id, startLocalDate: historyRange.startLocalDate, endLocalDate: historyRange.endLocalDate, includeArchived: false, throughStartedAt: now.toString() }),
@@ -64,31 +74,34 @@ export async function refreshTravelRoutes(
   const [historyOccurrences, historySessions] = await readDurationHistory();
   const durationEstimates = behaviorDurationEstimates(historyOccurrences, historySessions, behaviors, now, timezone);
   const occurrenceRevisions = occurrenceRouteRevision(behaviorOccurrences);
-  const durationRevision = historyRevision(historyOccurrences, historySessions);
+  const durationRevision = travelDurationRevision(historyOccurrences, historySessions);
   const deadline = AbortSignal.timeout(45_000);
   const changed = () => new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
   // Database inputs are fenced before spending and before delivery. Calendar has one initial read and one final check.
   const assertSourcesCurrent = async () => {
     if (deadline.aborted) throw changed();
-    const [current, currentCalendar, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions]] = await Promise.all([
+    const [current, currentCalendar, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions], currentTimezone] = await Promise.all([
       readTravelRouteSource(caller.client, caller.user.id),
       getCalendarConnection(caller),
       listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
       readDurationHistory(),
+      getProfileTimezone(caller.client, caller.user.id),
     ]);
-    if (current.settingsRevision !== source.settingsRevision || current.settings.enabled !== source.settings.enabled ||
+    if (current.settingsRevision !== source.settingsRevision || current.habitsRevision !== source.habitsRevision || current.settings.enabled !== source.settings.enabled ||
       current.settings.mode !== source.settings.mode || current.settings.routingConsentAt !== source.settings.routingConsentAt ||
+      current.settings.baseLocationText !== source.settings.baseLocationText || JSON.stringify(current.settings.habits) !== JSON.stringify(source.settings.habits) ||
+      currentTimezone !== timezone ||
       currentCalendar.status !== calendar.status || currentCalendar.generation !== calendar.generation || currentCalendar.selectionRevision !== calendar.selectionRevision ||
       !sameBehaviors(current.behaviors, source.behaviors) || !sameOccurrences(currentOccurrences, occurrenceRevisions) ||
-      historyRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
+      travelDurationRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
       throw changed();
     }
   };
   // Calendar event revisions are checked once more before returning.
   const assertAllCurrent = async () => {
-    await assertSourcesCurrent();
     const currentEvents = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
     if (snapshot && (!currentEvents || !sameCalendarRevisions(snapshot.events, currentEvents.events))) throw changed();
+    await assertSourcesCurrent();
     if (deadline.aborted) throw changed();
   };
   let fenced = false;
@@ -114,15 +127,20 @@ export async function refreshTravelRoutes(
     : drafts;
   const baseText = bounded.length ? source.settings.baseLocationText : null;
   const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve);
+  // Ticket 217: learned buffers and the remembered mode per place, falling back to usual travel.
+  const habits = source.settings.habits;
+  const buffers = travelHabitBuffers(habits);
   const commitments: TravelCommitment[] = bounded.map(({ commitment, placeText, endpointSource }) => {
     const point = placeText ? places.get(placeText) ?? null : null;
-    return { ...commitment, endpoint: point ? { ref: commitment.ref, point, source: endpointSource, sourceRevision: commitment.revision, observedAt: now.toString() } : null } as TravelCommitment;
+    const placeKey = travelHabitPlaceKey(placeText);
+    return { ...commitment, placeKey, mode: rememberedTravelMode(habits, placeKey),
+      endpoint: point ? { ref: commitment.ref, point, source: endpointSource, sourceRevision: commitment.revision, observedAt: now.toString() } : null } as TravelCommitment;
   });
   const basePoint = baseText ? places.get(baseText) ?? null : null;
   const base: TravelEndpoint | null = basePoint ? { ref: "base", point: basePoint, source: "saved_base", sourceRevision: source.settingsRevision, observedAt: now.toString() } : null;
   const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now);
   const device = request.device ? endpointForDevice(request.device, source.settingsRevision) : null;
-  const journeyRevision = revision(source.settingsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections);
+  const journeyRevision = revision(source.settingsRevision, source.habitsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections);
   const plan = resolveTravelPlan({
     journeyRef: `${request.startLocalDate}:${request.endLocalDate}`,
     journeyRevision,
@@ -134,8 +152,12 @@ export async function refreshTravelRoutes(
     predictedOrigin: null,
     corrections: [],
     commitments,
-    buffers: ZERO_BUFFERS,
+    buffers,
   });
+  // Weather never blocks routing; it runs beside the route calls and falls back to unavailable.
+  const weatherRequest = plan.legs.length
+    ? readTravelWeather({ device: request.device, config: weatherConfig, now }).catch(() => ({ state: "unavailable" as const }))
+    : Promise.resolve(null);
   const { due, later } = request.scope === "day"
     ? { due: plan.legs, later: [] }
     : partitionTravelLegsByWindow(plan.legs, now);
@@ -145,14 +167,24 @@ export async function refreshTravelRoutes(
     routed = await measurePerformanceSpan({ span: "travel.route_legs", counts: { routed_legs: due.length, later_legs: later.length } },
       () => routeTravelLegs({ routes: due.map((leg) => ({ id: leg.id, request: leg.request })), provider: config, reserve, now, signal: deadline }));
   }
+  const weather = await weatherRequest;
   await assertAllCurrent();
   const provenance = new Map(plan.legs.map((leg) => [leg.id, leg.provenance]));
   const results = [
     ...routed.map((result) => ({ legId: result.id, provenance: provenance.get(result.id)!, estimate: result.estimate, unavailableReason: result.failure?.code })),
     ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
   ];
-  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers: ZERO_BUFFERS, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: "disabled" });
-  return response(caller.user.id, source, { ...projectTravelRouteDisplay(evidence),
+  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate;
+  const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
+  const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
+    secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
+    events: snapshot?.events ?? [], occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    sourceKey: travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
+      enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
+      baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
+      calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
+  }) : null;
+  return response(caller.user.id, source, conclusionsToken, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
       const duration = durationEstimates.get(occurrence.behavior_id);
       return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
@@ -336,8 +368,8 @@ function eventRevision(event: { revision: { providerEtag: string | null; provide
   return createHash("sha256").update(JSON.stringify([event.id, event.startAt ?? null, event.endAt ?? null, event.location, event.conference, event.state])).digest("base64url");
 }
 
-function revision(settingsRevision: string, generation: number, selectionRevision: number, commitments: readonly TravelCommitment[], corrections: TravelRouteRefreshRequest["corrections"]): string {
-  return createHash("sha256").update(JSON.stringify({ settingsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, attendance, locationText }) => [eventId, correctionRevision, attendance, locationText]) })).digest("base64url");
+function revision(settingsRevision: string, habitsRevision: string | null, generation: number, selectionRevision: number, commitments: readonly TravelCommitment[], corrections: TravelRouteRefreshRequest["corrections"]): string {
+  return createHash("sha256").update(JSON.stringify({ settingsRevision, habitsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, attendance, locationText }) => [eventId, correctionRevision, attendance, locationText]) })).digest("base64url");
 }
 
 function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly TravelRouteBehavior[]): boolean {
@@ -346,7 +378,7 @@ function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly Tra
 
 function occurrenceRouteRevision(occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>): string {
   return JSON.stringify(occurrences.map(occurrence => [occurrence.id, occurrence.behavior_id, occurrence.scheduled_for,
-    occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time]));
+    occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time, occurrence.status]));
 }
 
 function sameOccurrences(current: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>, expected: string): boolean {
@@ -356,11 +388,6 @@ function sameOccurrences(current: Awaited<ReturnType<typeof listOccurrencesBetwe
 function sameCalendarRevisions(left: Awaited<ReturnType<typeof getCalendarEvents>>["events"], right: Awaited<ReturnType<typeof getCalendarEvents>>["events"]): boolean {
   const revisions = (events: typeof left) => events.map((event) => [event.id, eventRevision(event)]).sort((first, second) => first[0].localeCompare(second[0]));
   return JSON.stringify(revisions(left)) === JSON.stringify(revisions(right));
-}
-
-function durationHistoryRange(startLocalDate: string): { startLocalDate: string; endLocalDate: string } {
-  const start = Temporal.PlainDate.from(startLocalDate);
-  return { startLocalDate: start.subtract({ days: 90 }).toString(), endLocalDate: start.subtract({ days: 1 }).toString() };
 }
 
 function behaviorDurationEstimates(
@@ -390,16 +417,6 @@ function behaviorDurationEstimates(
   })]));
 }
 
-function historyRevision(
-  occurrences: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>,
-  sessions: Awaited<ReturnType<typeof listTimeSessionHistory>>,
-): string {
-  return createHash("sha256").update(JSON.stringify({
-    occurrences: occurrences.map((occurrence) => [occurrence.id, occurrence.updated_at]),
-    sessions: sessions.map((session) => [session.id, session.started_at, session.stopped_at]),
-  })).digest("base64url");
-}
-
 function afterNow(value: string, now: Temporal.Instant): boolean {
   try { return Temporal.Instant.compare(Temporal.Instant.from(value), now) > 0; }
   catch { return false; }
@@ -422,8 +439,40 @@ function collisionCandidates(commitments: readonly TravelCommitment[], occupancy
   return [...candidates, ...occupancy.filter((candidate) => !refs.has(candidate.ref))];
 }
 
-function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
+function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, conclusionsToken: ((expiresAt: string) => string | null) | null,
+  evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
   const expiresAt = evidence?.legs.reduce<string | null>((earliest, leg) => !leg.estimate ? earliest : !earliest || leg.estimate.expiresAt < earliest ? leg.estimate.expiresAt : earliest, null)
     ?? Temporal.Now.instant().add({ seconds: 300 }).toString();
-  return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision, expiresAt, evidence };
+  const token = conclusionsToken?.(expiresAt) ?? null;
+  return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision,
+    habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}) };
+}
+
+/**
+ * Signs Cadence's conclusions for this view (Ticket 219 Option A). Commitments are named
+ * by occurrence ID or Calendar event identity so the brief can map them to its own refs.
+ * Any commitment it cannot name withholds the whole token.
+ */
+function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
+  secret: string; userId: string; localDate: string; now: Temporal.Instant; expiresAt: string; sourceKey: string;
+  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"]; occurrenceIds: readonly string[];
+}>): string | null {
+  const conclusions = evidence.modelProjection;
+  if (!conclusions || Temporal.Instant.compare(Temporal.Instant.from(input.expiresAt), input.now) <= 0) return null;
+  const occurrences = new Set(input.occurrenceIds);
+  const events = new Map(input.events.map((event) => [event.id, event]));
+  const named = new Map(input.events.map((event) => [`event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision)]));
+  const rename = (ref: string) => {
+    const event = events.get(ref);
+    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? `event:${event.calendarId}\0${event.providerEventId}` : null;
+    if (!key) throw new Error("Unnamed travel commitment.");
+    return key;
+  };
+  try {
+    const facts = renameTravelConclusionRefs({ conclusions, weather: advisorWeatherOutlook(evidence) }, rename);
+    return issueTravelConclusionsToken({ sub: input.userId, date: input.localDate, src: input.sourceKey, iat: input.now.toString(),
+      exp: input.expiresAt, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named) }, input.secret);
+  } catch {
+    return null;
+  }
 }

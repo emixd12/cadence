@@ -1,5 +1,182 @@
 # Implementation Status
 
+## PR stack review: Calendar candidates with travel — October 24, 2026
+
+Integrated the reviewed release records, dependency upgrades and travel train before
+PR #135. Conflict resolution preserves both histories, the 0.1.5 release packet,
+status-only desktop location permission, agent Calendar controls, recipe 1.2
+presentation and Open-Meteo credit. The production recipe stays at 1.0.
+
+The combined review found a behavior neither branch tested alone: recipe 1.2
+restored every planner move the model omitted, including moves that travel rejected.
+A pure core policy now reads the final projected travel facts. Known `does_not_fit`
+options are withheld and rejected during output validation; unknown or scope-withheld
+conclusions cannot add an omitted move. The planner still receives no travel facts.
+Candidate instructions reflect the same rule, and the existing evidence limits hold:
+a suggested time is never proof that travel fits there.
+
+Five regression cases cover blocked and unknown fallbacks, rejected model output,
+permitted fallback, and scope projection. Four failed before the fix. Two combined
+bubble tests preserve weather attribution and calculated travel when recipe 1.2
+returns no model text. Design-system usage locations were refreshed against the
+merged JSX without dropping either branch's entries.
+
+Validation: the first full integrated run passed 3,802 tests with 179 configured
+skips. After final prompt wording alignment, 3,800 passed and two existing tests
+hit their 5-second DOM and 20-second portability limits while the web build ran.
+Both affected files then passed all 42 tests with unchanged timeouts after the build,
+establishing all 3,802 unique tests on the final runtime source. Agents, interactions,
+resolvers, lint, web/desktop typechecks, web/desktop frontend and marketing builds,
+marketing readability, public-source/artifact and Trust checks pass.
+A clean npm install resolves 716 packages. The design-system verifier is unavailable
+because the owner-local `design-system-bench` script is absent; this is not a pass.
+Native macOS compilation, installed acceptance and disposable full database rehearsal
+remain separate merge/release evidence. No hosted schema, provider settings, signing,
+release publication or recipe promotion changed.
+
+Platform impact: web and linked desktop share generation and presentation corrections;
+marketing has no product change, and future mobile is not implemented.
+
+## Combined travel PR review and merge plan — October 24, 2026
+
+The reviewed #138 tree combines the release records and dependency stack with the
+location-permission, weather and completion-label corrections. Signed travel
+conclusions now bind actual settings, duration history and the complete Calendar
+snapshot, and recheck stored inputs after outstanding provider reads. The brief
+falls back to stored facts when a conclusion token is stale or too large.
+
+Final local validation of `8ecbe338`: 3,729 tests passed, 179 configured skips;
+agents, interactions, resolvers, lint, both TypeScript checks, web and desktop
+renderer builds, marketing build/check and public-source audit passed. Fresh npm
+audits reported zero advisories in production-only and all-dependency scopes.
+The configured design-system verifier is an unavailable owner-local external
+script; it is not reported as passing. Fresh GitHub macOS native checks passed
+for the reviewed Tauri and location-permission branches. Installed acceptance and
+coordinated hosted SQL/desktop rollout remain separate release requirements.
+
+The all-PR assessment, resolved merge order, schema compatibility break, provider
+configuration, Calendar-grant cutover and rollback plan are recorded in
+`docs/qa/2026-10-24-pr-merge-readiness.md`. #135 is integrated after this train and
+records its own final combined checks. No main merge, hosted migration, production
+deployment, notarization, feed publication or recipe promotion was performed.
+
+## PR 124: paired Tauri dependency upgrade — October 24, 2026
+
+The API-only update selected JavaScript `@tauri-apps/api` 2.12.4 while the
+native `tauri` crate stayed at 2.11.5. Tauri requires matching core minor
+versions. Separate Vite and Cargo checks did not enforce that relationship.
+
+- Pin JavaScript API and CLI to 2.12.4, pair native `tauri` 2.12.4 with
+  `tauri-build` 2.7.3, and regenerate their lockfiles. Existing deep-link and
+  updater plugin pairs stay at 2.4.9 and 2.10.1.
+- `desktop:dependencies:check` rejects core minor drift and exact plugin
+  version drift across the npm and Cargo locks. `agents:check` and the desktop
+  frontend build run it. Six regression tests include the original mismatch.
+- Refresh this PR against main `ae17936` without rewriting its history.
+
+Verification on Node 24 and Rust 1.97.1: agents, interactions, resolvers, lint,
+both TypeScript checks, web/desktop frontend/marketing builds, marketing check,
+public-source and Trust checks pass. Full Vitest: 3,482 passed, 176 skipped.
+`cargo metadata --locked` resolves the new dependency graph. Local npm installs
+use `--ignore-scripts` because AgentMail's unrelated binary download cannot
+resolve GitHub from this environment.
+
+Native macOS compilation and installed acceptance are not verified here; this
+review environment is Linux. Require the updated PR's native macOS workflow,
+then a fresh desktop candidate and applicable release acceptance. Do not reuse
+the existing 0.1.5 binary as evidence for these new dependencies. If retaining
+that notarized candidate, finish its acceptance and release before merging
+dependency upgrades.
+
+Platform impact: desktop native runtime/tooling only. Web and marketing keep
+their runtime dependency versions; future mobile is not implemented. No schema,
+hosted setting, signing, publication or feed change.
+
+## Agent-run installed acceptance — October 24, 2026
+
+Documentation and agent guidance only; no runtime, schema or hosted change. The owner
+asked agents to run installed and live checks themselves before asking.
+
+- `AGENTS.md`, new "Installed and live acceptance" section, in this order: read state
+  without the UI (read-only SQLite, app APIs as the user, logs); the web app in the
+  in-app browser; the Mac app window through Computer Use or the apple-automation
+  skill; the owner last. Owner-only steps: quitting Cadence, sign-ins and credentials,
+  consent or permission prompts, provider revocation, settings that change synced data
+  or send data to a provider, and creating macOS users. Asks go out as one numbered
+  list; a missing tool is named so the owner can enable it.
+- `docs/DESKTOP_RELEASE.md`, new "Agent-run installed acceptance" after "Dev-signed
+  builds": install and readback, read-only database queries, how desktop sync runs
+  (launch, local edits, reconnect, Timeline reload, Sync now; no timer), the Where
+  round trip, the connector check, reading the Mac window through its
+  accessibility tree, and location checks from the unified log. Written from the
+  `0.1.6-dev.2` acceptance run (PR #140). It also records that the install script's
+  rename swap needs no Launch Services refresh.
+- New project skill `.claude/skills/desktop-acceptance/SKILL.md`. `.gitignore` now
+  ignores `.claude/*` except `.claude/skills/`; worktrees, launch configuration and
+  codex-bridge state stay ignored.
+- No test hook was added to the app.
+
+Platform impact: agent process for desktop acceptance; web, marketing and future
+mobile have no change.
+
+## PR review: preserve unknown weather evidence — October 24, 2026
+
+PR #133 now requires complete hourly coverage and every rule measurement before
+reporting clear weather. A missing rain or showers component remains unknown;
+observed adverse conditions still contribute their margin. The adapter validates
+Unix time units, range, hourly alignment and increasing timestamps.
+
+Three new regression tests fail against the original implementation and pass with
+the correction. Required repository checks, lint, web and desktop typechecks,
+the full suite (3,525 passed; 167 configured skips), web build and desktop renderer
+build pass on the updated Ticket 215 base. No provider, hosted configuration or
+production deployment changed. These fixes also belong in the combined #138 release.
+## Ticket 216 merge review fixes — October 24, 2026
+
+Place-label collection readers now page through the full retained history using
+the existing repository helper. The opt-in trigger holds a share lock on the
+settings row so concurrent opt-out cannot leave newly inserted markers, labels
+or dismissals behind. Six repository regressions cover the 1,000-row boundary,
+recent suggestions after older history, and later-page failures.
+
+The original review passed the full web checks and a real PostgreSQL race
+regression. An unexpected scratch reset required reconstruction of the fixes;
+`docs/qa/2026-10-24-place-label-review.md` distinguishes the prior executed
+evidence from validation of the recovered commit. No hosted database was changed.
+
+## Ticket 165 review: status-only device location permission — October 24, 2026
+
+The owner's dev.2 evidence in PR #140 exposed a separate permission-refresh bug:
+Travel Settings called the foreground-position command to read the OS grant. Its
+save and position-completion refreshes could compete with the active request or
+time out on a second position read, clearing the permission line after success.
+
+The desktop now uses `location_permission`, a read of Core Location authorization
+and Location Services state that requests no coordinates or permission prompt.
+Travel Settings accepts a separate permission reader; browser permission queries
+keep their existing behavior. Toggle and Check again still request one position,
+and Timeline's `readLocation(false)` still reads coordinates without asking for a
+new grant. Synthetic bench adapters supply their own permission states.
+
+Regression coverage separates an allowed grant from both an available position and
+a timed-out position, checks the native bridge contract and preserves Timeline
+reads. Native Rust tests cover denied, restricted, unknown and granted status
+mapping. The native macOS CI and an installed dev-build check remain required;
+this Linux review cannot establish the real permission or Core Location behavior.
+The notarized 0.1.5 candidate and its evidence remain unchanged.
+
+Validation: agents, interactions, resolvers, lint, web and desktop typechecks,
+the full Vitest suite (324 files, 3,498 tests; 15 files/176 tests skipped), web and
+desktop renderer builds, public-source audit and diff check pass. The exact pure
+Rust mapping and its source unit test also pass in an isolated Rust 1.97.1 harness.
+The design-system check cannot run here because its external
+`design-system-bench` verifier is absent; the existing bench and manifest are updated.
+
+Platform impact: desktop fixes permission readback through a native adapter;
+web retains its Permissions API behavior through the shared Settings contract;
+marketing and future mobile have no implementation change. No migration, provider
+configuration, signing or release action.
+
 ## PR #135 review corrections — October 24, 2026
 
 Recipe 1.2 Setup tips now use the same projected facts and selected duration
@@ -76,6 +253,45 @@ macOS user or the second Mac. Native reminder and updater files did not change.
 
 Platform impact: desktop release process and the marketing download link. Web and
 future mobile are not affected. No schema, migration or hosted configuration change.
+
+## Connector and Where hosted migrations applied — October 23, 2026
+
+PR #111 (connectors) merged at 13:21 UTC and PR #112 (Ticket 215 Where) at
+15:58 UTC. Both deployed before their hosted migrations, against the rollout
+order in `docs/qa/2026-10-21-behavior-where-rollout.md`. A read-only Data API
+probe of the linked project `qjodzutjxtmtzczbloxa` showed `behaviors.where_kind`
+missing (42703), and `connector_connections` and `connector_preferences` absent
+(PGRST205). Travel settings, route refresh and the connector Settings panels
+were exposed until the push. Production logs for the prior three hours held 50
+entries, one error and no schema-related failures.
+
+The owner authorized the forward fix and accepted that signed Cadence for Mac
+0.1.3 stops synchronizing Behaviors until a Where-compatible 0.1.5 ships.
+
+- `migration list --linked` matched every hosted version through
+  `20261019025157`, with no hosted-only entries. Exactly three local migrations
+  were pending, and the dry run listed the same three.
+- `db push` applied, in order, `20261019040000_connector_lifecycle.sql`,
+  `20261019041000_daily_brief_connector_disclosure.sql` and
+  `20261019180000_add_behavior_where.sql`. The readback lists all three as
+  applied.
+- Probes after the push: `behaviors.where_kind` returns 200. Both connector
+  tables exist and refuse anonymous reads (42501).
+- The project-local CLI 2.105.0 binary was killed at startup (exit 137) in the
+  operator shell, so the hosted commands used Homebrew CLI 2.109.1.
+- PR #134 (location entitlement) merged at 16:06 UTC as `f922685`. Vercel built
+  no web deployment for it.
+- Trust: the app's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+  marketing `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` (the PR #112 build), and the
+  readback matched. The app was redeployed as `dpl_A5td86nYSP5Gboe4peeeGif95v3u`
+  on app.cadence-me.com. Provenance shows Stale until the next scheduled
+  collection.
+
+Not verified: an authenticated save of a Behavior's Where and an authenticated
+Travel Settings or connector Settings view on production. The Where backfill
+count was not read. Mac 0.1.3 Behavior sync now fails closed with "Update
+Cadence". The release-train PR #138 still needs Tickets 216 and 217 hosted
+migrations and a signed 0.1.5 before release.
 
 ## PR #135 brought up to date with main — October 23, 2026
 
@@ -176,6 +392,443 @@ persisting across two dev builds. The 0.1.5 candidate's prepared upgrade check
 
 Platform impact: desktop release tooling only. Web, marketing and future mobile are not
 affected. No schema, migration, hosted configuration or interaction change.
+
+## Connector production secrets and redeploy — October 23, 2026
+
+The owner approved release steps 1–5 at 16:19 UTC. Steps 1–3 (preflight, dry
+run and the hosted push of the three connector and Where migrations) were
+already done by another session; see PR #139. This session did not run
+`supabase link`, `db push` or the hosted RLS smoke. `npm run smoke:rls` was
+skipped because it creates hosted auth users, which was not approved.
+
+- Vercel project `cadence`, Production only. The session added
+  `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (new random 32-byte key, sensitive),
+  `CONNECTOR_CREDENTIAL_KEY_ID`, `OUTLOOK_CALENDAR_CLIENT_ID`,
+  `OUTLOOK_CALENDAR_CALLBACK_URL` and `OUTLOOK_CALENDAR_CLIENT_SECRET`
+  (sensitive). `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS` stays unset. No values
+  were printed, logged or written to disk. `vercel env ls production` lists all
+  five names.
+- Outlook secret: the first `cadence-production` client secret on the Entra app
+  was created, but `vercel env add` did not store it. With coordinator approval
+  the session deleted that unused credential and created a new
+  `cadence-production` secret (expires 2027-10-23), which Vercel stored. The
+  app now holds `cadence-production` and the local test secret
+  `cadence-live-local`.
+- The app redeployed from `dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2` (commit `f922685`)
+  as `dpl_5UTt75NNMvovbABshuusrGkyXNAH`. The live marketing deployment was
+  `dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv` (the `f922685` build), so
+  `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` changed from
+  `dpl_FNa5C9gWfpNJtMntmUjFPFMsYCHE` to that ID; the readback matched. The app
+  was redeployed again as `dpl_4dgT9AH9ZtzPwi2ggfr7ZBxXeqmd`, Ready on
+  app.cadence-me.com at commit `f922685`.
+- An unauthenticated `GET /api/outlook-calendar/connection` returns 401
+  `unauthenticated`. Production logs from 16:24 to 18:50 UTC show no 5xx
+  responses or error-level entries. The coordinator separately observed the
+  expected disabled `/mcp` 503, and `GET` 200 on the Outlook, Hevy and iCloud
+  connection routes at 17:52 UTC.
+
+Still pending: step 6 (production smoke on the owner's accounts, then revoking
+test credentials) and step 7 (public disclosure copy, owner approves the
+wording). Desktop connectors arrive with the next signed release.
+
+## Cadence for Mac 0.1.5 candidate — October 23, 2026
+
+The hosted Where migration (PR #112) went live October 23. Published 0.1.3 does not
+send `where_kind`, so its Behavior sync now fails closed with "Update Cadence".
+Version 0.1.5, built from main, restores sync. It carries SQLite schema 18 (Where),
+the 0.1.4 session fix (never built or published) and the Ticket 165 location
+entitlement. The owner approved signing and notarizing the candidate; publication
+needs a separate instruction. Nothing was published.
+
+Built from `41e4549` (PR #140). Apple accepted the app and the DMG; both staples,
+Gatekeeper (including a quarantined copy), strict verification and all 14 release
+checks pass. The signed entitlements include the location entitlement with Hardened
+Runtime. The binary embeds schema 18 and only the stable feed. The updater archive
+and signature verify but were not uploaded. DMG SHA-256
+`9518085a0c27e950e709523925144d07a2f697a823bc83f8a5c719ca1c6bc686`.
+Native library tests (115) and repository checks pass. Main since then (`ed93fff`)
+changed only release tooling and documents, so the 0.1.5 artifacts still match main's
+application source.
+
+Installed acceptance on the owner's Mac moved to the dev-signed `0.1.6-dev.2` (built
+from `ed93fff`, executable SHA-256 `94dbaf1d…a991`), because that Mac already ran
+`0.1.6-dev.1`. October 24: the install script replaced dev.1 at 00:59Z (schema 18, all
+30 tables kept their rows), and the app synced 30 s after launch. Where sync passes
+both ways: four test Behaviors created on the web with Not set, Anywhere, Home and A
+place reached the Mac, and the owner's four Mac edits reached the web. The test
+Behaviors are archived. Read through the macOS accessibility tree, the Mac shows
+connect controls for Outlook, iCloud and Hevy, and "Device location: not yet allowed."
+with Travel estimates on. Ticket 165 on this Mac: the signed entitlement produced the
+first macOS location prompt (02:42 BST), the owner allowed it, and with Cadence
+frontmost a current position was available. A follow-up defect: the desktop
+permission check runs a full location request, which times out right after a read and
+clears the "Device location" line. Open: the denied state, the 0.1.5 upgrade from
+0.1.3 on the test Mac, the prompt on a never-authorized user, and publication.
+
+Connector gating: when the candidate was built, production had no
+`CONNECTOR_CREDENTIAL_*` or `OUTLOOK_CALENDAR_*` settings, and the three connectors
+showed "not configured". Those secrets were set later on October 23 (PR #141). Hevy,
+iCloud Calendar and Outlook Calendar now report `disconnected` for the owner's account,
+so a linked desktop offers connect controls for all three. Connector release steps
+6–7 are still pending; the owner decides whether they must finish before publication.
+
+The travel release train (PR #138) moves from 0.1.5 to 0.1.6. Evidence, hashes,
+owner steps and rollback: `docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`.
+
+October 24 review: the packet now follows the merged release policy. The 0.1.3
+test Mac must upgrade through the real stable-feed updater during authorized
+publication, before the version-free DMG and preview feed move. Callback, session,
+new-user and public-download checks remain explicitly open. Source and notarized
+artifacts are unchanged; no publication or hosted action occurred. The evidence
+matrix preserves the owner's recorded dev.2 location prompt and foreground-position
+passes, while the denied state and never-authorized user checks remain open.
+
+Platform impact: desktop version and release records only. Web, marketing and
+future mobile have no change. No schema, migration or hosted configuration changed.
+
+## Travel release train: Tickets 165, 212 and 216–219 on Ticket 215 — October 23, 2026
+
+**Owner decision (October 23):** combine the travel ticket branches into one
+release with one hosted migration window and one signed desktop release newer
+than every published version. Branch `claude/travel-release-train-15ebed`, one
+draft PR #138 against `main`, incorporating the merged Ticket 215 base. Not deployed,
+signed or published. The per-ticket sections below keep their own detail.
+
+Included, merged in this order with `--no-ff`: PR #131 (165, location permission
+guidance and entitlement), PR #130 (212, Home and travel in first-run setup),
+PR #136 (217, learned travel habits), PR #133 (218, Open-Meteo weather margin),
+PR #137 (216, completion place labels and Where suggestions) and PR #132 (219
+stage 1). The moved 215 branch was merged again on October 23; the later 216 and
+217 heads only carried that 215 state.
+
+Integration:
+- Hosted migrations, all after `20261019180000_add_behavior_where.sql`:
+  `20261022160000_completion_place_labels.sql` (216), then
+  `20261022170000_travel_habits.sql` (217). Both patch the account-sync RPCs by
+  anchor and compose. 91 tracked migrations in total. As of October 23,
+  production has `20261019040000`, `20261019041000` and `20261019180000`
+  (Ticket 215 and PR #111, merged to main as PR #112); the train's two are pending.
+- SQLite: `0018_behavior_where` (215), `0019_travel_habits` (217),
+  `0020_completion_place_labels` (216, renumbered from 0019). Desktop schema
+  version 20. The desktop release must be 0.1.6 or later. 0.1.3 is published,
+  0.1.4 is the unpublished session hotfix, and a separate session is building
+  signed 0.1.5 from main (schema 18) to restore Behavior sync. The source still
+  says 0.1.4; set the version when the owner prepares the release.
+- Departure timing: get-ready time (217) ends at the weather-adjusted departure
+  (218), so it precedes the weather margin. The refresh service passes learned
+  buffers and weather together. Combined resolver tests cover the spans, the fit
+  overlap and unchanged route requests.
+- Travel Settings is one panel: setup with Ticket 212's `travel` anchor, Home with
+  its "I'm here" line, usual travel, the storage notes and Ticket 165's device
+  location guidance, then How you travel (217) and Completion places (216) as
+  ruled subsections. `CompletionPlacesPanel` became `CompletionPlacesSection`.
+  Checked at 390 px and desktop width in the design-system bench.
+- Account sync: the planner and the native apply path take Ticket 217 profile
+  habits beside Ticket 216 place-label rows in one plan. Builds before these
+  tickets fail closed on synchronization.
+
+Ticket 219 stage 2: the Daily Brief context now carries learned habits (get-ready
+minutes and the remembered mode per Behavior place), place label counts and the
+weather outlook with rule conclusions. A brief that used weather facts shows the
+Open-Meteo credit. Stage 1's yes/no conclusions are unchanged. Open point: the owner
+waits for Google's reply on support case 76805292 before deciding whether to restrict
+conclusions to day-level facts.
+
+Owner decisions (October 23), implemented:
+- Option A: one-day travel views carry an HMAC-signed token of Cadence's own
+  conclusions, bound to the user, local date, stored travel inputs and expiry.
+  - The Daily Brief request returns the token; the server verifies it before
+    filling route and weather conclusions.
+  - Any failure, or no `TRAVEL_CONCLUSIONS_SIGNING_SECRET`, leaves them
+    `not_supplied` without failing the brief.
+  - Account-free desktop sends nothing.
+- Label counts cover the last 60 days and all retained history (90 days, 1 year or
+  until deleted). Each set is labelled with its window. The retention copy says what
+  the Daily Brief sees.
+
+Verification (local, October 23; Vitest and ESLint exclude `.claude/**`):
+- Repository and catalog checks pass: agents, interactions, resolvers, core,
+  load-manifest and design-system.
+- Lint, web and desktop typechecks, and the public-source and public-trust checks
+  pass.
+- The full Vitest suite ran 3,731 passed and 99 skipped. Three 5-second timeouts in
+  `tests/desktop-release-acceptance.test.ts` came from load; that file passes 46/46
+  alone.
+- The web, desktop and marketing builds and the marketing check pass.
+- Native: `cargo test --lib` passes 122 tests, and `desktop:contract:test` passes 22
+  with 1 skipped.
+- On the isolated project `cadence-train` (ports 55820–55829, loopback only,
+  stopped afterwards):
+  - all 91 migrations replayed in tracked order;
+  - all 24 SQL fixtures passed;
+  - the RLS smoke (92 checks), the account-sync smoke, the Where, place-label and
+    habit integration tests and the authenticated BehaviorStore contract passed;
+  - generated types matched the checked-in file.
+- Option A and full-history counts, a later commit: lint, typechecks, checks and both
+  builds pass. The suite ran 3,750 passed; three load timeouts in unchanged desktop
+  release tests pass alone (71/71). GitHub CI passed on the previous head.
+
+Remaining release work: provisioning
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` in Vercel, the version bump, the hosted
+migration window, web deployment, desktop signing and publication, installed and
+live acceptance, and operator weather clearance. Privacy and disclosure changes are
+logged in `docs/PRIVACY_CHANGES.md` and do not block development under current policy.
+Platform impact: web and desktop
+as in each ticket section; marketing not applicable until privacy claims are
+reviewed; future mobile inherits the shared model and hosted facts.
+
+## Ticket 165: macOS location permission path and directions plan — October 22, 2026
+
+Ticket 165 stays in progress. Source only, on the Ticket 215 base; not deployed or
+signed. Owner decisions (October 22): accept the manual macOS permission path,
+investigate the missing first prompt, and test directions after Ticket 215.
+
+- Travel Settings now explains how to allow device location while travel is on and
+  location is not allowed, not yet allowed or timed out. Desktop adds Open Location
+  Services (`INT-TRAVEL-007`, fixed-URL native command `open_location_settings`);
+  both platforms add Check again (`INT-TRAVEL-006`). The panel states that saved
+  places and Calendar trips keep working without device location.
+- Investigation: signed builds enable Hardened Runtime but lacked the Hardened
+  Runtime location entitlement `com.apple.security.personal-information.location`.
+  Apple lists it under Hardened Runtime resource access; Chrome, which works on the
+  same Mac, signs it. Production `Entitlements.plist` now includes it, and
+  `verify-entitlements.py` accepts it without provisioning-profile authorization.
+  The native Core Location adapter showed no defect. Whether the entitlement restores
+  the prompt is not yet verified.
+- Device location no longer waits for Developer ID signing: 0.1.3 is published, and
+  signed rc.2 and rc.3 already failed to prompt.
+- The entitlement and verifier change also ships alone from main in PR #134, so the
+  prompt test can run on a main-based build (recommended: the 0.1.4 candidate)
+  without the held Where rollout.
+- Open: owner prompt test on that main-based build, installed check of Open
+  Location Services and Check again after the hosted Where migration, and the
+  directions handoff matrix after Ticket 215 deploys. Steps and plan:
+  `docs/qa/travel-release.md`, October 22, and
+  `docs/qa/2026-10-22-desktop-location-entitlement.md` (PR #134).
+
+Platform impact: web shares the panel guidance and Check again; desktop adds the
+settings command and the signing entitlement; marketing is not applicable (no public
+travel copy changed); future mobile inherits the shared guidance pattern.
+
+## Ticket 212: Home and travel in first-run setup — October 22, 2026
+
+Implemented in source on the Ticket 215 branch; not deployed. First-run setup gains
+an optional **Home and travel** row. It opens Travel settings at the new
+`/settings#travel` anchor and reuses Ticket 215's Home and usual travel controls.
+It never blocks setup completion and reads Saved once both values exist.
+
+- The row appears only when `GET /api/travel/routes` reports routing configured.
+  That report calls no provider. The pop-up asks only while it will show; a failed
+  or 5-second answer hides the row.
+- The Timeline bundle reads two presence flags through
+  `readTravelSetupPresence`. The Home text never enters onboarding state. A failed
+  read hides the row instead of failing Timeline.
+- Saving from the row's destination sends nothing to Google, requests no device
+  location and leaves the Travel estimates toggle unchanged.
+- Desktop shares the model and reads presence from local SQLite. Only a linked
+  account can ask the deployment, so local mode omits the row (owner decision,
+  October 23). Travel settings still saves both values offline.
+- Optional rows now take their one-line description from the shared model.
+
+No migration, hosted change, provider call or new data storage. Local checks pass:
+agents, interactions, resolvers and design-system checks, lint, web and desktop
+typecheck, the full Vitest suite and both builds. The `/design-system` preview
+shows the row at desktop width and 390 px without calling `/api/travel/routes`.
+Not exercised: the authenticated Timeline against a real routing report, and the
+installed desktop guide. Both remain open and ship with Ticket 215's rollout.
+Platform impact: web and desktop as above; marketing not applicable; future mobile
+carries the row into the proposed Ticket 196.
+
+## Ticket 217: learned travel habits in source — October 22, 2026
+
+**Owner decision (October 22):** the starting values are confirmed: get-ready
+time 10 minutes, arrival buffer 5 minutes, each "too late" or "too early" answer
+moves the buffer by 5 minutes within 0–30, at most one question a day, dismissing
+records nothing, and exit and settling buffers stay zero. They live in the
+versioned constant `TRAVEL_HABIT_RULES` (`travel-habit-defaults@1`) in
+`packages/core/src/services/travel-habits.ts`.
+
+Implemented on a draft PR against the Ticket 215 branch; not deployed:
+- Resolver: optional `TravelBuffers.preparationSeconds` adds a
+  `preparation_buffer` segment before each outbound departure. It never moves the
+  departure or the route request. Production `ZERO_BUFFERS` is replaced by the
+  learned values.
+- Mode per place: Travel by in Calendar event details and expanded located
+  Behaviors. Cadence remembers it under the Ticket 216 place key and falls back to
+  usual travel.
+- Leave-time question on the Timeline after a journey with a routed outbound leg,
+  once a day. Not now stores nothing.
+- Travel Settings, How you travel: the learned values as plain sentences with
+  inline selects. No buffer fields.
+- Storage: hosted migration `20261022170000_travel_habits.sql` (habit columns on
+  `travel_settings`, owner RLS unchanged, a separate habit revision), generated
+  types, SQLite migration 0019, the `commitTravelHabits` native command and the
+  singleton profile sync entity, now 13 keys. `PUT /api/travel/habits` writes one
+  change; `GET` names remembered places.
+- Registry: `INT-TRAVEL-008` to `INT-TRAVEL-010`. Design-system manifest, usage,
+  surfaces and bench entries for the three new components.
+
+Assumptions, not owner-confirmed: get-ready time editable 0–60 minutes in
+5-minute steps; the newest 30 answers kept; at most 100 remembered places.
+
+Rollout: ship with the Ticket 215 coordinated rollout, after its migration.
+Desktop builds that predate Ticket 217 fail closed on every synchronization
+("Update Cadence before synchronizing account data.") once the hosted migration
+runs, as with Ticket 215. No hosted migration, deployment, signing or Google
+Maps call was made.
+
+Local verification on an isolated `cadence-t217` stack (loopback ports
+55420–55429, stopped afterwards): clean replay of all 90 migrations, all 23 SQL
+rollback fixtures including the new `ticket-217-travel-habits-smoke.sql`, RLS
+smoke (92 ownership checks), account-sync RPC smoke with a learned-habit round
+trip and old-client rejection, the authenticated BehaviorStore contract and the
+new opt-in `tests/travel-habits.local-integration.test.ts`. Results of the
+repository checks are in the PR.
+
+Platform impact: web and desktop implemented; marketing not applicable; future
+mobile inherits the stored habits, the mode choice and the question. Exports do
+not include learned habits yet, as for Home and usual travel.
+
+## Ticket 218: weather travel margin in source — October 22, 2026
+
+Implemented in source on the Ticket 215 branch; not deployed. Weather stays off until
+the operator sets `CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`.
+
+Owner decisions (October 22): the free Open-Meteo API for development and testing,
+the paid API Standard plan before commercial use (`docs/LEGAL.md` L-008), a versioned
+fixed margin table with orchestrator-set starting values, and privacy items logged
+instead of blocking.
+
+- Core: `weather-margin@1` in `packages/core/src/resolvers/weather-margin.resolver.ts`.
+  The largest single margin applies, margins never stack, and each records the table
+  version. The departure window comes from planned timing, so margins never depend on
+  route duration. `resolveTravelEvidence` takes weather beside the buffers, adds a
+  `weather_margin` segment and shifts the shown leave or return time.
+- Area: the request's device sample rounded to 0.1°; never Google coordinates
+  (L-002). Without a position the status line says "No weather margin: device
+  location is unavailable."
+- Provider: server-only Open-Meteo adapter with a configurable Open-Meteo base URL and
+  optional key. One 48-hour forecast per area per UTC hour is shared across users in
+  server memory, per instance. Failures never block routing.
+- UI: shared travel timing, status line and Daily Brief travel block show the margin,
+  the suggestion and the CC BY 4.0 credit (`INT-WEATHER-001`,
+  `composite.travel-weather-credit`).
+- Ticket 219 input: `projectWeatherOutlook` (`weather-outlook@1`) carries no times,
+  durations, area or coordinates; nothing sends it to a model.
+
+Evidence: fixture tests for every table row and boundary, the adapter, cache, refresh
+service, outlook projection and UI. A live check through the adapter read the free API
+for two public-landmark areas (Willis Tower, Big Ben): 48 validated hours each, and a
+nearby point reused the cached forecast. Bench scenarios for thunderstorms and no
+device location were checked in the browser at desktop and 375 px.
+
+Open: privacy content naming Open-Meteo and its 90-day logs (L-011); the paid plan;
+deployment clearance; deployed-web and installed-desktop acceptance; merging with
+Ticket 217's `preparationSeconds`. Platform impact: web and linked desktop share the
+hosted adapter and components; marketing makes no claim; future mobile inherits it.
+
+## Ticket 216: Completion place labels and Where suggestions — October 23, 2026
+
+Implemented in source on branch `claude/ticket-216-place-labels-b20c33` (draft PR
+against Ticket 215's branch); not deployed. Built from the owner's October 22
+decisions: device-recorded "I'm here" markers instead of Google coordinates
+(resolves `docs/LEGAL.md` L-003 by design), versioned rule sets, user-chosen
+retention, and export out of scope. The revised ticket in `docs/TICKETS.md` records
+the design, the storage decision and the privacy surface entries.
+
+- Core: `packages/core/src/resolvers/place-label.resolver.ts` holds frozen
+  `place-label-rules@1` and `where-suggestion-rules@1` with pinned tests, plus a
+  counts-only `projectPlaceLabelCounts` that nothing feeds to the model yet.
+- Storage: account-level, with RLS. Hosted migration
+  `20261022160000_completion_place_labels.sql` adds four owner-scoped tables,
+  opt-in and Completed-only triggers, deletion on opt-out and status change, a
+  settings save that purges by retention, a service-role daily purge (called by the
+  occurrence-sync cron) and four account-sync entity kinds. SQLite migration 0020
+  mirrors the tables. Sync conflicts on these kinds resolve without review.
+- Web and desktop: shared `components/travel/PlaceLabels.tsx` (Completion places
+  panel, I'm here beside Home and below Where, one sparse Behavior line for a
+  suggestion or a marker prompt, silent completion capture), the
+  `/api/travel/place-labels` route and a local SQLite client. Registry
+  `INT-PLACE-001` to `010`; bench previews for the three components.
+
+Verification: required checks pass (agents, interactions, resolvers, core,
+design-system, lint, web and desktop typecheck, web and desktop builds). The full
+Vitest run passed 3,562 tests (96 skipped); two desktop release-acceptance cases
+timed out under build load and pass when rerun alone (46/46). 118 native tests,
+22 real-SQLite contract tests, all 23 SQL smokes, the RLS smoke (92 checks), the
+account-sync RPC smoke and a new opt-in hosted round trip
+(`tests/place-labels.local-integration.test.ts`: TypeScript and SQL fingerprints
+match for the new kinds; uploads and opt-out apply) pass against the isolated
+loopback stack `cadence-t216`, which replayed all 90 migrations. Generated types
+match. Browser QA on port 4333 covered opt-in, Home marker (blocked and stubbed
+granted position), completion label, deletion on Not Completed, suggestion with its
+rule version, Review Where, Dismiss, marker prompt, Not now, Turn off and a 375 px
+layout. QA found and fixed a stale suggestion draft after save; the contract test
+found and fixed a desktop settings-save timestamp mismatch.
+
+Open: hosted migration after `20261019180000_add_behavior_where.sql`, then web, then
+a desktop release with schema 20 in the combined train (older desktops fail closed on sync); iPhone
+Safari re-prompt check (needs the owner's simulator or device approval); installed
+signed-desktop CoreLocation acceptance; approved privacy text and marketing privacy
+review for the listed conflicts.
+
+## Ticket 219 stage 1: travel facts in Daily Brief model input — October 22, 2026
+
+Stage 1 is implemented in source in draft
+[PR #132](https://github.com/emixd12/cadence/pull/132), based on the Ticket 215
+branch (PR #112). Nothing is deployed. Stage 2 follows Tickets 216, 217 and 218.
+
+- `TravelTimingModelProjection` 2.0 carries only Cadence's own conclusions: travel
+  day, trips by destination with mode and a current/unknown estimate, and a
+  fits/does_not_fit/unknown conclusion per unresolved Behavior. Version 1.0 carried
+  route timing and was never enabled. Unknown or non-current legs make overlapping
+  fits unknown, never free.
+- The day context gains an optional `travel` block: Behavior Where (`not_set` is
+  "location not set"), routing on/off, usual travel and the route conclusions.
+  The strict validator rejects any instant, duration, extra field or free text.
+  Typed slots wait for Ticket 217 habits, Ticket 218 weather and Ticket 216 label
+  counts.
+- `projectBriefingContext` sends the block to the model only for facts it already
+  receives. Conclusions shaped by a Calendar event need the Calendar source. The
+  planner never sees travel.
+- The live brief now sends Where and usual travel, read without place text and
+  fenced before and after generation. It sends no route conclusions: estimates
+  stay on the client and are never stored, so the server has none. Stage 2 must
+  choose a transport; `docs/TICKETS.md` Ticket 219 records the options.
+- The private workbench adds synthetic `travel_day` and `travel_unknown` fixtures
+  built from invented places and estimates through the real travel resolver.
+- Model instructions gain a travel block only when travel facts are present. The
+  prompt revision changes; the policy version stays 3.0, as in Ticket 239.
+
+Tests prove that no route duration, rounded trip length, departure, arrival,
+leave-by time, place or derived time pair reaches the full model payload.
+Exact leave-by times stay in the calculated line beside the brief. Travel changes
+still never regenerate a brief or reset its dismissal.
+
+Privacy surface entries (owner decision October 22: logged, not blocking; the
+existing Daily Brief model-data toggle stays the only gate):
+1. `components/briefing/DailyBriefSettingsPanel.tsx:141` lists what the brief sends
+   to OpenAI. It must add Behavior Where (Home, a saved place without its address,
+   Anywhere or not set) and usual travel when travel is on.
+2. `components/settings/TravelSettingsPanel.tsx:107` says travel places and route
+   results are not sent to the Daily Brief model. Places and route results remain
+   unsent in stage 1, but usual travel is now sent.
+3. `docs/user-guide/travel.md` says deterministic travel facts stay separate from
+   the briefing. Where and usual travel now reach it; route conclusions follow in
+   stage 2.
+4. When live route conclusions ship, every disclosure above must cover Cadence's
+   conclusions from Google routes and state that no times, durations, addresses or
+   coordinates are sent. Review the privacy policy and the marketing AI claims,
+   including the Ticket 187 no-AI conflict.
+5. Residual inference: a yes/no fit bounds when a trip starts, though it never
+   reveals a duration. This is the regime the owner accepted under L-001; include
+   it in the written question to Google.
+6. Stage 2 adds learned habits, weather (Open-Meteo attribution, L-011) and
+   completion-label counts to the same disclosure.
+
+Platform impact: web briefing pipeline and private workbench; a linked desktop
+shares hosted generation, and account-free desktop sends nothing. Marketing and
+future mobile have no implementation change.
 
 ## Tickets 187, 184 candidate 2 and 188 recovered for review — October 22, 2026
 
@@ -1073,6 +1726,7 @@ signed-native travel evidence. Briefing and Calendar-agent work on that branch i
 excluded. The final `0.1.1` candidate is built from main after this change merges.
 No build, notarization, publication or hosted change ran. Ticket 178 session
 renewal and replay/expiry checks and Ticket 181 publication remain open.
+
 ## Behavior end-date lifecycle SQL smoke fix — October 19, 2026
 
 `tests/sql/behavior-end-date-lifecycle-smoke.sql:138` failed with

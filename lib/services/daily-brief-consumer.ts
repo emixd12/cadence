@@ -12,6 +12,7 @@ import { isLaneRecipe, isPlainRecipe } from "@cadence/core/types/briefing-config
 import { briefingBehaviorNames } from "@cadence/core/services/daily-brief-presentation";
 import { briefingSetupTip } from "@cadence/core/services/briefing-setup-tip";
 import { briefingMoveOverview, briefingMoveReason } from "@cadence/core/services/briefing-move-overview";
+import { briefingTravelOptionPolicy, briefingUsesWeather } from "@cadence/core/services/briefing-travel";
 
 export const DAILY_BRIEF_INSTRUCTIONS = `Write a concise, forward-looking Daily Brief for Cadence's horse speech bubble within the supplied combined word budget.
 Purpose: a morning overview of practical day constraints and supported opportunities, adding interpretation beyond the visible ledger.
@@ -57,14 +58,14 @@ Estimated lengths: a duration with source description_estimate was estimated fro
 /** Appended after the 1.1 rules for recipe 1.2 (Ticket 184 owner review, October 23), so it overrides them. */
 export const DAILY_BRIEF_V1_2_INSTRUCTIONS = `Recipe 1.2 rules. Where they conflict with anything above, these rules win.
 Advice blocks: Cadence shows each kind of advice in its own labeled block. The main text names today's problems. Each suggestion with an optionId appears under "New suggested time", where Cadence already shows the Behavior with its current and new times. The tip appears under its own label, with its evidence below it.
-Main text: state each problem once. For every overlap you raise, give its length as a number of minutes from overlapMinutes, and say where it falls from participants[].part: "all" means the whole item, "start" its first minutes, "end" its last minutes, "middle" a span inside it. Examples: "All of Walk (12:30–12:50 PM) falls during your 12:00–1:00 PM meeting." "The last 10 minutes of Walk run into your 1:00 PM meeting." "Read covers your whole 15-minute call." When two things nearly touch, say how many minutes are left between them from minutesBetween. Never mention a different time, free time or a move in the main text. Never describe a Behavior that has no problem. When no option is supplied and nothing needs attention today, return text as an empty string. When any option is supplied, text is never empty.
-Suggestion text: for a suggestion with an optionId, return text as an empty string; the block's times say everything. A suggestion without an optionId is one short sentence. Each supplied option is for a different Behavior; return a suggestion for each one. Cadence shows every option even if you skip it.
+Main text: state each problem once. For every overlap you raise, give its length as a number of minutes from overlapMinutes, and say where it falls from participants[].part: "all" means the whole item, "start" its first minutes, "end" its last minutes, "middle" a span inside it. Examples: "All of Walk (12:30–12:50 PM) falls during your 12:00–1:00 PM meeting." "The last 10 minutes of Walk run into your 1:00 PM meeting." "Read covers your whole 15-minute call." When two things nearly touch, say how many minutes are left between them from minutesBetween. Never mention a different time, free time or a move in the main text. Never describe a Behavior that has no problem. When no option is supplied and nothing needs attention today, return text as an empty string. When you recommend an option, text is never empty.
+Suggestion text: for a suggestion with an optionId, return text as an empty string; the block's times say everything. A suggestion without an optionId is one short sentence. Each supplied option is for a different Behavior. Apply the travel policy before selecting options; unknown travel never proves a move fits. Cadence may fill omitted options, but will not do so for unknown or withheld travel conclusions.
 Every move needs its reason stated once in the main text, from option.why: "overlap" (the overlap, with its minutes), "too_close" (how many minutes are left between them) or "time_passed" (its time has passed today and it is still undecided).
 Combine moves that share a reason into one sentence instead of repeating a pattern, such as "Daily Injections, Physical Therapy in Red Light and Clean Invisalign are still open from this morning." Vary sentence openings, and write the overview as two or three connected sentences a friend would say, not a list of reports.
 Effort: judge from each Behavior's title and length how much its timing matters. A quick, low-effort Behavior, such as taking a pill, putting on a device or charging something, does not need time before or after other things. Do not raise a tight fit for one, and do not suggest moving one only to add time in between. Before raising an overlap, decide whether the Behavior can happen alongside the other item, such as wearing a device, taking a pill or listening during a long event. If it can, do not raise that overlap and do not use its option.
 Lengths: state recorded or configured lengths exactly. Only a description_estimate length may be called approximate. Never write buffer, reserved, approximate or approximately for any other length.
 Tips: tip.text is one sentence of advice for today. Do not describe the pattern, its counts or its times; Cadence shows that evidence under the tip. When analysis.tip.category is "logging", the advice is always to record the decision right after doing the Behavior. Never suggest a recording time, never mention when it is usually marked, and never suggest doing the Behavior at a different time.
-Quiet days (no option supplied): when nothing needs attention and analysis.tip is supplied, return empty text and give only the tip. When nothing needs attention and no tip is supplied, return empty text, no suggestions and tip null; Cadence then shows no brief.
+Quiet days (no option recommended): when nothing needs attention and analysis.tip is supplied, return empty text and give only the tip. When nothing needs attention and no tip is supplied, return empty text, no suggestions and tip null; Cadence then shows no brief.
 Names: every mention of a Behavior uses its full title exactly as supplied, never a shortened form, so Cadence can highlight it.`;
 
 /** Ticket 188 estimate step. Its output is only validated numbers; text never reaches the brief. */
@@ -84,8 +85,20 @@ context.connectorSources holds sources the user disclosed separately. calendars 
 recordedActivity lists past workouts that already happened, recorded in Hevy. Use them only as context about earlier activity today. A recorded workout never reserves future time, never proves free or busy time, never completes or proves a Behavior, never changes a duration estimate and never measures adherence. Do not describe exercises, intensity, location or performance; none are supplied.
 A missing, partial, stale or unavailable source proves nothing: it never establishes free time, the absence of a meeting or the absence of a workout.`;
 
+/** Appended only when the facts carry travel (Ticket 219). The facts hold Cadence's conclusions, never route timing. */
+export const DAILY_BRIEF_TRAVEL_INSTRUCTIONS = `Travel policy:
+context.travel holds slow-changing travel facts and Cadence's own travel conclusions. It supplies no travel times. Never state or estimate how long a trip takes, when to leave, or when the user arrives or gets back; exact leave-by times appear in a separate calculated line beside the brief.
+behaviors[].where says where a Behavior happens: home, place (a saved place whose address is never supplied), anywhere (it fits wherever the user is) or not_set (location not set: the user has not said where). Never treat not_set as anywhere or as home. You may say that setting Where helps travel advice when it bears on today.
+usualMode is how the user usually travels. routing off means travel estimates are off; then say nothing about trips.
+When route.state is available: travelDay yes means the rest of today includes a planned trip. trips lists them by destination reference, an occurrence or event already in the facts, or null for the trip home; estimate unknown means Cadence has no current estimate. fits gives Cadence's conclusion for unresolved Behavior occurrences at their scheduled time: fits means travel leaves room for it; does_not_fit means travel crowds it (travel_overlap) or the trip there arrives late (late_arrival); unknown means Cadence cannot tell. trip and position say which trip a conclusion concerns and whether the occurrence comes before or after it.
+Never turn unknown into fits and never assume unknown travel takes no time. Mention travel uncertainty only when it changes a recommendation. When route.state is unavailable, the facts prove nothing about travel.
+Planner options and day evidence do not account for travel. Never claim a planner option avoids travel, and do not recommend an option for an occurrence whose travel conclusion is does_not_fit.
+habits, weather and placeLabels appear only when supplied. habits.getReadyMinutes is the time the user needs to get ready before leaving Home or their current position (getReadySource default means Cadence's starting value, learned means the user's own); habits.placeModes give the travel mode the user chose for a Behavior's place, and usualMode applies elsewhere.
+weather.state applied means Cadence read a forecast; each weather trip, named like route trips, is clear, margin or unknown. unknown is not clear weather. marginMinutes is a fixed allowance for the listed conditions from Cadence's table, never a share of the trip: you may suggest allowing that many extra minutes, or a suggestion alternative instead of suggestion.instead, but never a departure time. Any other weather.state means there are no weather facts today; then say nothing about the weather.
+placeLabels count where the user was when marking each Behavior Completed: home, wherePlace (the Behavior's own saved place), otherSavedPlace and elsewhere, out of total. behaviors covers the last periodDays days; retained.behaviors covers all history the user kept (retained.retention: 90_days, 1_year or until_deleted, meaning everything kept until the user deletes it). Name the window with each count, for example "logged at Home 9 of 10 times in the last 60 days" or "41 of 52 times in the kept year". Never infer a place beyond these counts.`;
+
 /** Identifies the exact instruction text, so workbench runs can show prompt changes between candidates. */
-export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}\0${DAILY_BRIEF_V1_1_INSTRUCTIONS}\0${DAILY_BRIEF_V1_2_INSTRUCTIONS}\0${DURATION_ESTIMATE_INSTRUCTIONS}\0${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}`).digest("hex").slice(0, 16);
+export const DAILY_BRIEF_PROMPT_REVISION = createHash("sha256").update(`${DAILY_BRIEF_INSTRUCTIONS}\0${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}\0${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}\0${DAILY_BRIEF_V1_1_INSTRUCTIONS}\0${DAILY_BRIEF_V1_2_INSTRUCTIONS}\0${DURATION_ESTIMATE_INSTRUCTIONS}\0${DURATION_ESTIMATE_V1_2_INSTRUCTIONS}\0${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}`).digest("hex").slice(0, 16);
 
 export type DailyBriefGenerator = (input: Readonly<{
   instructions: string;
@@ -132,14 +145,15 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
   const { facts, contextControls, references, plan, configurationRevision, pipelineVersion, analysis } = prepared;
   const v11 = isPlainRecipe(config.recipe);
   const v12 = isLaneRecipe(config.recipe);
-  const instructions = `${DAILY_BRIEF_INSTRUCTIONS}${analysis ? `\n${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}` : ""}${"connectorSources" in facts ? `\n${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}` : ""}${v11 ? `\n${DAILY_BRIEF_V1_1_INSTRUCTIONS}` : ""}${v12 ? `\n${DAILY_BRIEF_V1_2_INSTRUCTIONS}` : ""}\nPresentation: ${JSON.stringify({ tone: config.tone, directness: config.directness, encouragement: config.encouragement, maxWords: config.length.maxWords, priorities: config.priorities })}. Hard limit: at most ${config.length.maxWords} words across ${analysis ? "text, all suggestion text and tip.text" : "text and all suggestion text"} combined, not per field. Aim below this limit; summarize selectively instead of listing every Behavior. Maximum ${config.alternatives} suggestions. Route: ${plan.route}.`;
+  const offeredOptions = plan.options.filter(({ occurrenceRef }) => briefingTravelOptionPolicy(facts.travel, occurrenceRef).offer);
+  const instructions = `${DAILY_BRIEF_INSTRUCTIONS}${analysis ? `\n${DAILY_BRIEF_ANALYSIS_INSTRUCTIONS}` : ""}${"connectorSources" in facts ? `\n${DAILY_BRIEF_CONNECTOR_INSTRUCTIONS}` : ""}${v11 ? `\n${DAILY_BRIEF_V1_1_INSTRUCTIONS}` : ""}${v12 ? `\n${DAILY_BRIEF_V1_2_INSTRUCTIONS}` : ""}${facts.travel ? `\n${DAILY_BRIEF_TRAVEL_INSTRUCTIONS}` : ""}\nPresentation: ${JSON.stringify({ tone: config.tone, directness: config.directness, encouragement: config.encouragement, maxWords: config.length.maxWords, priorities: config.priorities })}. Hard limit: at most ${config.length.maxWords} words across ${analysis ? "text, all suggestion text and tip.text" : "text and all suggestion text"} combined, not per field. Aim below this limit; summarize selectively instead of listing every Behavior. Maximum ${config.alternatives} suggestions. Route: ${plan.route}.`;
   const alongsideRefs = new Set(planned.cadence.occurrences.filter((item) => alongside.has(item.behaviorRef)).map((item) => item.ref));
   // Keep detailed rejection diagnostics in the inspector, not the prose inputs.
   const modelPlan = {
     version: plan.version, route: plan.route, outcome: plan.outcome,
     generatedAt: plan.generatedAt, expiresAt: plan.expiresAt, revisions: plan.revisions,
     // Recipe 1.2: each option says why it exists, so the overview can explain every move.
-    options: v12 ? plan.options.map((option) => ({ ...option, why: briefingMoveReason(option, plan, planningNow) })) : plan.options,
+    options: v12 ? offeredOptions.map((option) => ({ ...option, why: briefingMoveReason(option, plan, planningNow) })) : offeredOptions,
     dayEvidence: {
       ...plan.dayEvidence,
       findings: plan.dayEvidence.findings.filter((finding) => finding.kind !== "unknown_feasibility" &&
@@ -148,7 +162,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
         // Recipe 1.2: a Behavior that can happen alongside other things is never one side of a conflict.
         !(v12 && (finding.kind === "known_overlap" || finding.kind === "tight_transition") && finding.refs.occurrenceRefs.some((ref) => alongsideRefs.has(ref))) &&
         // Recipe 1.1 mentions a different time only through an option, so a move-only opening without one is noise.
-        !(v11 && finding.kind === "feasible_opportunity" && finding.hypotheticalMoveRequired && !plan.options.some((option) => option.occurrenceRef === finding.occurrenceRef)))
+        !(v11 && finding.kind === "feasible_opportunity" && finding.hypotheticalMoveRequired && !offeredOptions.some((option) => option.occurrenceRef === finding.occurrenceRef)))
         .map((finding) => v12 ? withMinutes(finding) : withoutParticipants(finding)),
     },
   };
@@ -184,7 +198,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     if (Object.keys(suggestion).sort().join() !== "occurrenceRefs,optionId,referenceIds,text" || typeof suggestion.text !== "string" || (!(v12 && suggestion.optionId !== null) && !suggestion.text.trim()) || suggestion.text.length > 1000 ||
         !validRefs(suggestion.occurrenceRefs, refs, 200) || !validRefs(suggestion.referenceIds, sources, 4) ||
         (plan.route !== "priority_suggestions" && plan.route !== "scheduling_options")) throw new DailyBriefError("advisor_unavailable");
-    const option = plan.options.find((option) => option.id === suggestion.optionId);
+    const option = offeredOptions.find((option) => option.id === suggestion.optionId);
     if (plan.route === "scheduling_options" ? !option || !suggestion.occurrenceRefs.includes(option.occurrenceRef) : suggestion.optionId !== null) throw new DailyBriefError("advisor_unavailable");
     if (option) {
       if (selectedOptionIds.has(option.id)) throw new DailyBriefError("advisor_unavailable");
@@ -194,15 +208,15 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     const behavior = v12 && option ? context.cadence.occurrences.find((occurrence) => occurrence.ref === option.occurrenceRef)?.title : undefined;
     return { text: v12 && option ? "" : suggestion.text.trim(), occurrenceRefs: suggestion.occurrenceRefs, referenceIds: suggestion.referenceIds, optionId: option?.id ?? null, ...(option ? { option } : {}), ...(behavior ? { behavior } : {}) };
   });
-  // Recipe 1.2 shows every option the planner offered, in its order, even if the model skipped one.
+  // Recipe 1.2 fills omitted options only when projected travel permits a fallback.
   if (v12 && plan.route === "scheduling_options") {
     const used = new Set(suggestions.map((item) => item.optionId));
-    for (const option of plan.options) {
-      if (used.has(option.id)) continue;
+    for (const option of offeredOptions) {
+      if (used.has(option.id) || !briefingTravelOptionPolicy(facts.travel, option.occurrenceRef).fallback) continue;
       const behavior = context.cadence.occurrences.find((occurrence) => occurrence.ref === option.occurrenceRef)?.title;
       suggestions.push({ text: "", occurrenceRefs: [option.occurrenceRef], referenceIds: [], optionId: option.id, option, ...(behavior ? { behavior } : {}) });
     }
-    const order = new Map(plan.options.map((option, index) => [option.id, index]));
+    const order = new Map(offeredOptions.map((option, index) => [option.id, index]));
     suggestions.sort((left, right) => (order.get(left.optionId ?? "") ?? 99) - (order.get(right.optionId ?? "") ?? 99));
   }
   // Recipe 1.2: moves never appear without their reasons; Cadence writes them if the model did not.
@@ -237,6 +251,7 @@ export async function generateDailyBrief(context: AdvisorDayContext, input: Read
     text, localDate: context.localDate, timezone: context.timezone,
     generatedAt: now.toString(), expiresAt: context.expiresAt, coverage: facts.status,
     warnings: ["Suggestions only. No changes were applied."],
+    ...(briefingUsesWeather(facts.travel) ? { attributions: ["open_meteo"] as const } : {}),
   };
 }
 

@@ -25,6 +25,7 @@ import {
 } from "@/lib/navigation";
 import { readCurrentBrowserPushEndpoint } from "@/lib/push/browser";
 import { WebRuntimeProvider } from "@/components/layout/WebRuntimeProvider";
+import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
 
 const navIcons: Record<AppNavHref, LucideIcon> = {
   "/timeline": CalendarDays,
@@ -789,7 +790,7 @@ export function AppShell({
             isDesktopSidebarOpen ? "lg:pl-64" : "lg:pl-16",
           ].join(" ")}
         >
-          <WebRuntimeProvider>{children}</WebRuntimeProvider>
+          <WebRuntimeProvider><PlaceLabelProvider>{children}</PlaceLabelProvider></WebRuntimeProvider>
         </main>
       </div>
     </div>

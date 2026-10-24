@@ -372,6 +372,13 @@ assert(coreCheck.status === 0, `Core portability validation failed:\n${(
   coreCheck.stderr || coreCheck.stdout || "Unknown error"
 ).trim()}`);
 
+const desktopDependencies = spawnSync(process.execPath, [filePath("scripts/check-desktop-dependencies.mjs")], {
+  cwd: root, encoding: "utf8",
+});
+assert(desktopDependencies.status === 0, `Desktop dependency validation failed:\n${(
+  desktopDependencies.stderr || desktopDependencies.stdout || "Unknown error"
+).trim()}`);
+
 const loadInteractionCheck = spawnSync(
   process.execPath,
   [filePath("scripts/check-load-test-interactions.mjs")],

@@ -223,6 +223,8 @@ Public launch includes a minimal first-run setup prompt after first login:
 - request browser notification permission
 - import data when import exists
 - point to Settings timezone confirmation when useful
+- optionally save Home and usual travel where travel routing is configured
+  (Ticket 212); saving them enables no routing
 
 The setup prompt is optional, appears as a non-modal pop-up, can be dismissed
 locally, and routes into the existing Behaviors, Settings, and Export controls
@@ -448,7 +450,7 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - JSONL/CSV/full JSON/BehaviorLog export
 - Account deletion with export reminder and typed confirmation
 - Public Terms, Privacy, and Trust routes
-- Simple onboarding for first behavior, notification permission, import, and timezone
+- Simple onboarding for first behavior, notification permission, import, timezone, and optional Home and usual travel
 - Privacy-safe monitoring/error reporting
 - Repeatable many-user RLS smoke QA
 - Public Astro marketing site when explicitly ticketed
@@ -663,6 +665,84 @@ The repository implements deterministic travel behind a disabled deployment gate
 Provider review, credentials, live acceptance and model projection remain unapproved.
 See `qa/travel-release.md`. Route expiry clears evidence; the next meaningful
 foreground change can refresh within quota. It never polls or regenerates Daily Brief.
+
+Completion place labels (Ticket 216) are a separate opt-in, off by default. The user
+records each place's reference position on their own device ("I'm here"); Cadence
+never fetches, stores or compares Google coordinates for labels. A qualifying
+completion stores one label (Home, a saved place or elsewhere) and discards the
+position. Fixed, versioned rules (`place-label-rules@1`, `where-suggestion-rules@1`)
+turn labels into Where suggestions that the user must apply. The user chooses label
+retention (90 days, 1 year or until deleted). Labels sync with the account and stay
+out of exports. Ticket 219 stage 2 sends per-Behavior label counts for both the
+`where-suggestion-rules@1` 60-day window and all retained history to Daily Brief model
+input. Each count names its window; keys, positions and place text stay out.
+
+### Weather travel margin (Ticket 218)
+
+Weather adjusts departure timing with a fixed margin and may suggest another mode.
+The owner selected Open-Meteo on October 18, 2026. On October 22 the owner chose the
+free API for development and testing; the paid API Standard plan is required before
+commercial use (`docs/LEGAL.md` L-008). Weather stays off until the operator sets
+`CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`. The base URL and optional key are
+server-only, so the paid endpoint needs no code change.
+
+Rules live in the versioned table `weather-margin@1` in
+`packages/core/src/resolvers/weather-margin.resolver.ts`. The owner may tune the
+starting values; a changed value needs a new version.
+
+| Condition in the departure window | Margin | Mode suggestion |
+|---|---|---|
+| Thunderstorm (WMO 95–99) | +15 min | Transit or driving instead of walking or cycling |
+| Snow (snowfall > 0, or WMO 71–77, 85–86) | +15 min | Transit or driving instead of cycling |
+| Freezing rain or drizzle (WMO 56–57, 66–67) | +15 min | Transit or driving instead of cycling |
+| Heavy rain (rain plus showers ≥ 4 mm/h, or WMO 65, 82) | +15 min | Transit instead of walking or cycling |
+| Rain (rain plus showers ≥ 0.5 mm/h, or probability ≥ 60%) | +10 min | Transit instead of cycling |
+| Extreme heat (apparent temperature ≥ 35 °C) | +5 min | Transit instead of cycling |
+| Strong wind (gusts ≥ 60 km/h) | +5 min | Transit instead of cycling |
+
+- The single largest matching margin applies; margins never stack. A margin applies
+  to every mode; a suggestion appears only for the modes its row names. The first
+  matching row that names the leg's mode supplies the suggestion.
+- The departure window is the two hours before an arrival target, or the two hours
+  after a fixed return departure. It comes from planned timing, never from a route
+  estimate, so a margin never depends on route duration and weather facts reveal
+  none (`docs/LEGAL.md` L-001). Forecast hours that overlap the window count.
+  Missing values never match. A clear result requires complete hourly coverage of
+  the window and every rule measurement; gaps or missing measurements stay unknown.
+  A reported adverse condition still contributes its margin when other data is
+  missing. Rain plus showers stays unknown if either component is missing.
+- The margin is its own resolver input beside the travel buffers. It sits
+  immediately before an arrive-by departure, or after a fixed-departure arrival, as
+  a `weather_margin` occupancy segment. It moves the shown leave time or return time
+  and final availability; the Google estimate itself is unchanged. Ticket 217's
+  get-ready time precedes the weather-adjusted departure when both exist.
+- Every computed margin records `weather-margin@1`.
+- The weather area comes from the device position only, rounded to a 0.1° grid.
+  Google coordinates never become an area (`docs/LEGAL.md` L-002). Legs that start
+  at another stop use the current area as a proxy; weather at each stop waits on
+  L-002. With no usable
+  position there is no weather, and the travel status line says "No weather margin:
+  device location is unavailable." A provider failure says the forecast is
+  unavailable; travel estimates continue in both cases.
+- One forecast per area per clock hour is shared across users in server memory and
+  expires with its hour. It is never stored per user, synced, exported or backed up.
+  Each server instance keeps its own copy.
+- Travel timing and the Daily Brief travel block show the adjusted time, the margin
+  and any suggestion. Open-Meteo's CC BY 4.0 credit, with site and licence links and
+  a note that Cadence derived the margins, sits beside those lines (`docs/LEGAL.md`
+  L-011).
+- `projectWeatherOutlook` in `packages/core/src/services/weather-outlook.ts`
+  (`weather-outlook@1`) is the model-safe projection for Ticket 219: commitment
+  references, mode, conditions, margin minutes, suggestion and table version. It
+  carries no area, coordinates, times or durations. Ticket 219 stage 2 maps it to
+  the Daily Brief weather facts (`advisorWeatherOutlook`) only with supplied travel
+  evidence. The live brief returns the server-signed conclusions token from its
+  one-day route view. Invalid, stale, missing or oversized evidence leaves route and
+  weather facts `not_supplied`; stored facts still support the brief.
+
+Platform impact: web uses the hosted adapter in `lib/services`; a linked desktop
+receives weather through the same travel route and makes no provider call; marketing
+makes no weather claim; future mobile inherits the hosted adapter.
 
 `docs/plans/first-external-consumer.md` retains its filename but now defines this
 in-app contract, daily presentation default, first-party route, limits and data use.

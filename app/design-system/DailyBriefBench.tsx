@@ -21,6 +21,8 @@ async function fetchAccount(signal: AbortSignal): Promise<Account> {
 
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
+import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { BriefingWorkbenchGuide } from "./BriefingWorkbenchGuide";
 import { EMPTY_FEEDBACK, FeedbackForm, FeedbackList, ProposalPanel, ReadingColumn, RunDifferences, SavedReviews, type EstimateReviewInput, type FeedbackDraft, type ViewRun } from "./BriefingReview";
@@ -35,6 +37,20 @@ const client: DailyBriefClient = {
   updatePreferences: async (input) => ({ accountRef: "bench-account", available: true, revision: 2, localDate: "2026-09-20", timezone: "America/New_York", ...input }),
   requestBrief: async () => ({ state: "already_attempted" }),
 };
+
+// Ticket 218 synthetic guidance: a thunderstorm margin with its credit, and no device location.
+const briefTravel = (weather: "applied" | "no_position"): BriefTravelGuidance => ({
+  localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
+  items: [
+    { kind: "departure", at: weather === "applied" ? "2026-09-20T18:05:00Z" : "2026-09-20T18:20:00Z", label: "Dentist", mode: "cycling",
+      weather: weather === "applied" ? { marginMinutes: 15, conditions: ["thunderstorm", "heavy_rain", "rain"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } : null },
+    { kind: "return", at: "2026-09-20T21:10:00Z" },
+  ],
+  conflictingOptionIds: [], occupiedSpans: [],
+  weather: weather === "applied" ? { state: "applied", attribution: OPEN_METEO_ATTRIBUTION } : { state: "no_position", attribution: null },
+});
+const travelBriefing: DailyBriefing = { text: "Dentist anchors the afternoon.", localDate: "2026-09-20", timezone: "America/New_York",
+  generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] };
 
 /** Static recipe 1.1 state: plain suggested time and a Logging tip with nested evidence. Not model output. */
 const RECIPE_V11_BENCH_BRIEFING: DailyBriefing = {
@@ -66,7 +82,7 @@ export function DailyBriefBubbleBench() {
   return <div className="bg-background"><div className="aspect-[1423/367] w-full overflow-hidden bg-background sm:aspect-[2041/239]"><picture className="block h-full w-full"><source media="(max-width: 639px)" srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png" /><img src="/brand/cadence-timeline-horse-lines-dots-clear-background.png" width={2041} height={239} alt="" aria-hidden="true" className="block h-full w-full object-fill" /></picture></div><div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={{
     text: `Your midday walk overlaps a fixed commitment. ${"schedule".repeat(260)}`, localDate: "2026-09-20", timezone: "America/New_York",
     generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
-  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V12_BENCH_BRIEFING} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
+  }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V12_BENCH_BRIEFING} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("applied")} onDismiss={() => undefined} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("no_position")} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
 }
 
 export function DailyBriefSettingsBench() {

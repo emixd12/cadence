@@ -40,7 +40,7 @@ describe("advisor day-context contract", () => {
 
   it("rejects rich fields, inconsistent bounds, duplicate refs, and incomplete empty-calendar claims", async () => {
     const fixture = JSON.parse(await readFile(contextFixture, "utf8"));
-    expect(() => validateAdvisorDayContext({ ...fixture, rawAccountId: "owner" })).toThrow("exactly");
+    expect(() => validateAdvisorDayContext({ ...fixture, rawAccountId: "owner" })).toThrow("documented fields");
     expect(() => validateAdvisorDayContext({ ...fixture, dayEndAt: "2026-11-02T04:00:00Z" })).toThrow("day bounds");
     expect(() => validateAdvisorDayContext({
       ...fixture,

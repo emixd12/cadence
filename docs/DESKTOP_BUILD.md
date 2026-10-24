@@ -40,6 +40,14 @@ configuration as data without sending.
 
 ## Native dependency CI
 
+`npm run desktop:dependencies:check` verifies the versions selected by both
+lockfiles. The Tauri JavaScript API and native runtime must share a major/minor
+version; JavaScript/native plugins must match exactly, including the patch.
+Both `agents:check` and the desktop frontend build run this guard. Update the
+JavaScript API, CLI, native `tauri` and matching `tauri-build` together, and
+regenerate both lockfiles. Keep the API and CLI pinned alongside the native
+runtime. See [Tauri's dependency guidance](https://v2.tauri.app/develop/updating-dependencies/).
+
 `.github/workflows/desktop-native.yml` checks changes to native sources,
 Cargo manifests and locks, npm manifests and locks, the bundled icon, and the
 workflow itself. It runs on GitHub's Apple Silicon `macos-15` runner with Node
@@ -520,6 +528,17 @@ or another untested macOS version from the compiled minimum.
 Ticket 115 is now in progress under the owner-authorized
 [September 27 plan](plans/2026-09-27-apple-developer-unblocked-work.md).
 Public production publication remains an explicit owner-authorized action.
+
+## Completion place labels (Ticket 216)
+
+Place markers, labels, the opt-in and suggestion dismissals synchronize as
+`place_label_settings`, `place_marker`, `completion_place_label` and
+`where_suggestion_dismissal` entities. Their conflicts resolve without review: a
+deletion wins, otherwise the later record wins. "I'm here" and completion labels
+use the existing `foreground_location` command; a completion read passes
+`requestPermission = false`, so it never shows the macOS prompt. Local-only desktop
+keeps the rows in SQLite until an account is linked; first link treats them as
+private data like Home and Where.
 
 ## Note shortcuts (Tickets 126–128)
 

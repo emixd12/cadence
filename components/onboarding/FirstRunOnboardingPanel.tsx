@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
+  House,
   ListChecks,
   Upload,
   X,
@@ -20,6 +21,7 @@ import {
   type BrowserPushSupport,
 } from "@/lib/push/browser";
 import { resolveFirstRunOnboardingModel } from "@/lib/services/onboarding-model";
+import { readTravelRoutingReport, webTravelClient } from "@/lib/ui/travel";
 import type {
   FirstRunOnboardingClientSnapshot,
   FirstRunOnboardingItemKey,
@@ -33,19 +35,26 @@ const itemIcons: Record<FirstRunOnboardingItemKey, LucideIcon> = {
   notifications: Bell,
   timezone: Clock3,
   import: Upload,
+  travel: House,
 };
 
 type FirstRunOnboardingPanelProps = Readonly<{
   onboarding: FirstRunOnboardingState;
   storageKey?: string;
+  /** Asks the deployment whether travel routing is configured. No provider call. */
+  readTravelRoutingConfigured?: (signal: AbortSignal) => Promise<boolean>;
 }>;
 
 export function FirstRunOnboardingPanel({
   onboarding,
   storageKey = STORAGE_KEY,
+  readTravelRoutingConfigured = webTravelClient.configured,
 }: FirstRunOnboardingPanelProps) {
   const [clientSnapshot, setClientSnapshot] =
     useState<FirstRunOnboardingClientSnapshot | null>(null);
+  const [travelRouting, setTravelRouting] = useState<{
+    configured: boolean | null;
+  } | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -85,6 +94,7 @@ export function FirstRunOnboardingPanel({
         notificationSupported: support.supported,
         notificationSubscriptionStatus,
         browserTimezone,
+        travelRoutingConfigured: null,
       });
     }
 
@@ -94,11 +104,40 @@ export function FirstRunOnboardingPanel({
     };
   }, [onboarding.vapidPublicKey, storageKey]);
 
-  if (!clientSnapshot) {
+  // Ask the deployment about routing only while the pop-up will show.
+  const checkTravelRouting = Boolean(
+    clientSnapshot &&
+      onboarding.travel &&
+      resolveFirstRunOnboardingModel(onboarding, clientSnapshot).shouldRender,
+  );
+
+  useEffect(() => {
+    if (!checkTravelRouting) {
+      return;
+    }
+
+    const controller = new AbortController();
+    void readTravelRoutingReport(
+      readTravelRoutingConfigured,
+      controller.signal,
+    ).then((configured) => {
+      if (!controller.signal.aborted) {
+        setTravelRouting({ configured });
+      }
+    });
+
+    return () => controller.abort();
+  }, [checkTravelRouting, readTravelRoutingConfigured]);
+
+  // Wait for the routing answer so the travel row does not shift the pop-up.
+  if (!clientSnapshot || (checkTravelRouting && !travelRouting)) {
     return null;
   }
 
-  const model = resolveFirstRunOnboardingModel(onboarding, clientSnapshot);
+  const model = resolveFirstRunOnboardingModel(onboarding, {
+    ...clientSnapshot,
+    travelRoutingConfigured: travelRouting?.configured ?? null,
+  });
 
   if (!model.shouldRender) {
     return null;
@@ -175,9 +214,9 @@ export function FirstRunOnboardingPanel({
                       {item.statusLabel}
                     </span>
                   </div>
-                  {item.optional ? (
+                  {item.description ? (
                     <p className="mt-1 text-sm leading-6 text-muted-readable">
-                      Use this only if you already have a BehaviorLog bundle.
+                      {item.description}
                     </p>
                   ) : null}
                 </div>
