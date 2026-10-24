@@ -40,6 +40,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
       const behavior: Behavior = { ...input.behavior, archive_notes: input.behavior.archive_notes ?? [], id: behaviorId,
         default_duration_minutes: input.behavior.default_duration_minutes ?? null,
         end_date: input.behavior.end_date ?? null, auto_archived_at: input.behavior.auto_archived_at ?? null,
+        where_kind: input.behavior.where_kind ?? null, location_text: input.behavior.location_text ?? null,
         current_configuration_event_id: configurationEvent.id,
         scheduled_time: canonicalTime(input.behavior.scheduled_time),
         created_at: input.definitionEventPlan.recordedAt, updated_at: timestamp };
@@ -67,6 +68,7 @@ export function createLocalBehaviorStore(profileId: string, now: Temporal.Instan
         end_date: input.behavior.end_date === undefined ? previous.behavior.end_date ?? null : input.behavior.end_date,
         auto_archived_at: input.behavior.auto_archived_at === undefined
           ? previous.behavior.auto_archived_at ?? null : input.behavior.auto_archived_at,
+        where_kind: input.behavior.where_kind === undefined ? previous.behavior.where_kind ?? null : input.behavior.where_kind,
         scheduled_time: canonicalTime(input.behavior.scheduled_time),
         current_configuration_event_id: configurationEvent?.id ?? previous.behavior.current_configuration_event_id,
         updated_at: timestamp };

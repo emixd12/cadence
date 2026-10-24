@@ -1,11 +1,11 @@
 import { DAILY_BRIEF_POLICY_VERSION } from "@cadence/core/types/daily-brief";
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
-import { parseBriefingConfig, DEFAULT_BRIEFING_CONFIG, scopeBriefingContext, projectBriefingContext } from "@cadence/core/services/briefing-config";
+import { parseBriefingConfig, DEFAULT_BRIEFING_CONFIG, scopeBriefingContext, projectBriefingContext, projectBriefingConnectorSources, splitBriefingContext } from "@cadence/core/services/briefing-config";
 import { selectBriefingReferences } from "@cadence/core/services/briefing-references";
 import { BRIEFING_PLAN_VERSION } from "@cadence/core/types/briefing-plan";
 import { planBriefing } from "@cadence/core/resolvers/briefing-plan.resolver";
-import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
 import { BRIEFING_ANALYSIS_VERSION, type BriefingAnalysisResult, type BriefingAnalysisSource, type BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import { resolveBriefingAnalysis, selectBriefingTip, type BriefingTipSelection } from "@cadence/core/resolvers/briefing-analysis.resolver";
@@ -40,10 +40,21 @@ export function briefingConfigurationRevision(value: unknown = activeBriefingCon
   return createHash("sha256").update(JSON.stringify({ config, references: selectBriefingReferences(config.referenceIds), pipeline: BRIEFING_PIPELINE_VERSION, policy: DAILY_BRIEF_POLICY_VERSION, planner: BRIEFING_PLAN_VERSION })).digest("hex");
 }
 
-export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, now: string, analysisInput?: BriefingAnalysisInput) {
+export function prepareBriefing(sourceContext: AdvisorDayContext, value: unknown, now: string, analysisInput?: BriefingAnalysisInput) {
   const config = parseBriefingConfig(value);
+  // Ticket 239: existing projections see the Google-only `1.0` view; disclosed sources travel separately.
+  const { context, sources } = splitBriefingContext(sourceContext, config);
   const plannerContext = scopeBriefingContext(context, config);
-  const { facts, contextControls } = projectBriefingContext(context, config);
+  const projected = projectBriefingContext(context, config);
+  const contextControls = projected.contextControls;
+  const connectorSources = projectBriefingConnectorSources(sources);
+  const sourcesComplete = sources.calendars.every((item) => item.complete) && (sources.recordedActivity?.complete ?? true);
+  const facts = connectorSources ? {
+    ...projected.facts,
+    version: sourceContext.version,
+    status: projected.facts.status === "complete" && sourcesComplete ? "complete" as const : "partial" as const,
+    connectorSources,
+  } : projected.facts;
   const references = selectBriefingReferences(config.referenceIds);
   const configurationRevision = briefingConfigurationRevision(config);
   const atMinute = (minute: number) => {
@@ -61,6 +72,7 @@ export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, no
   });
   // A narrowed Behavior view omits fixed commitments and cannot establish availability.
   const plan = planBriefing({ context: plannerContext, now, configurationRevision,
+    ...(sources.calendars.length ? { additionalCalendars: sources.calendars } : {}),
     permittedWindows: windows,
     fixedCommitmentsComplete: (analysisInput?.cadenceComplete ?? true) && plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
     alternatives: config.alternatives, allowedSuggestionTypes: config.allowedSuggestionTypes,

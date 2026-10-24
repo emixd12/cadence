@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
-vi.mock("@/lib/ui/google-calendar", () => ({ reloadWebTimelineConnectors: mocks.connectors }));
+vi.mock("@/lib/ui/timeline-connector-reloads", () => ({ reloadWebTimelineConnectors: mocks.connectors }));
 
 let container: HTMLDivElement;
 let root: Root;

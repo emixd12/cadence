@@ -563,7 +563,7 @@ describe("resolveAccountSync", () => {
     const revised: AccountSyncEntity = { kind: "behavior", id: "a", value: { id: "a", revision: 3, user_id: "local", metadata: { user_id: "provenance-owner" } } };
     expect(plan(empty, snapshot([revised]), empty).hostedWrites[0].value).toEqual({
       archive_notes: [], default_duration_minutes: null, end_date: null, auto_archived_at: null, location_text: null,
-      id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
+      where_kind: null, id: "a", revision: 3, metadata: { user_id: "provenance-owner" },
     });
   });
 

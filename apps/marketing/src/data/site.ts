@@ -16,9 +16,9 @@ export const siteConfig = {
   standardUrl: "https://github.com/emixd12/BehaviorLog-Bundle",
   githubUrl: "https://github.com/emixd12/cadence",
   desktopDownloadUrl:
-    "https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_0.1.3_aarch64.dmg",
+    "https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg",
   exampleBundlePath: "/examples/cadence-demo.behaviorlog.zip",
-  lastModified: "2026-09-17",
+  lastModified: "2026-10-18",
   trustUrl: `${env.PUBLIC_CADENCE_APP_URL ?? "https://cadence-blush-three.vercel.app"}/trust`,
   trustEvidenceUrl: `${env.PUBLIC_CADENCE_APP_URL ?? "https://cadence-blush-three.vercel.app"}/api/public/trust-evidence`,
 } as const;

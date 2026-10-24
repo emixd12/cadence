@@ -237,6 +237,9 @@ export async function clearDesktopCalendarClientState(
   await Promise.all([
     call("auth_secret_remove", { name: "pending-calendar-state" }),
     call("calendar_cache_clear"),
+    // Ticket 238: connector source caches and any pending Outlook attempt.
+    call("auth_secret_remove", { name: "pending-outlook-calendar-attempt" }),
+    call("connector_cache_clear", { provider: null }),
   ]);
 }
 

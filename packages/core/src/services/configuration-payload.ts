@@ -28,6 +28,7 @@ export function toBehaviorConfigurationSnapshotPayload(
   return {
     category_id: snapshot.categoryId,
     location_text: snapshot.locationText ?? null,
+    where_kind: snapshot.whereKind === undefined ? (snapshot.locationText ? "place" : null) : snapshot.whereKind,
     schedule_graph: snapshot.scheduleGraph.map((schedule) => ({
       recurrence_rule: schedule.recurrenceRule,
       sort_order: schedule.sortOrder,

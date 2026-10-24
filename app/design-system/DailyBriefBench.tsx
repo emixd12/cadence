@@ -27,7 +27,10 @@ import { BriefingDays } from "./BriefingDays";
 import type { BenchCaseDetail, BenchCaseSummary, BenchProposal } from "@/lib/services/briefing-bench-store";
 
 const client: DailyBriefClient = {
-  preferences: async () => ({ accountRef: "bench-account", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York" }),
+  // Ticket 239 states: Outlook allowed but reselected since (Allow again), Hevy disclosed while disconnected, iCloud not offered.
+  preferences: async () => ({ accountRef: "bench-account", available: true, enabled: true, includeCalendar: false, revision: 1, localDate: "2026-09-20", timezone: "America/New_York",
+    includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true, connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: false },
+    connectorAttention: { outlookCalendar: "changed", icloudCalendar: null, hevy: "unavailable" } }),
   updatePreferences: async (input) => ({ accountRef: "bench-account", available: true, revision: 2, localDate: "2026-09-20", timezone: "America/New_York", ...input }),
   requestBrief: async () => ({ state: "already_attempted" }),
 };

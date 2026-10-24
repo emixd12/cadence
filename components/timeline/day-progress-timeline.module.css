@@ -32,3 +32,8 @@
 .drawerEvents { display: grid; flex: 1; min-width: 0; min-height: 0; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 1rem 2rem; overflow-y: auto; }
 .currentTime { transition: none; }
 @media (max-width: 575px) { .timeline { --timeline-gutter: 4.5rem; --timeline-gap: 16px; --calendar-node-x: -50px; --timeline-axis-x: -16px; } .timeline :global(.timeline-occurrence-summary) { padding-left: 0.5rem; } .timeline :global(.timeline-occurrence-main) { grid-template-columns: max-content minmax(0, 1fr); gap: 0.375rem; } .timeline :global(.timeline-occurrence-time) { font-size: var(--text-xs); } .timeline :global(.timeline-occurrence-title) { font-size: var(--text-base); } .timeline :global(.timeline-occurrence-status) { margin-right: 0.75rem; } }
+/* Ticket 238: recorded activity is a plain list under the day title, never an axis marker or overlap cue. */
+.activity { margin-top: 0.75rem; font-size: var(--text-xs); line-height: 1.25rem; color: var(--muted-readable); }
+.activity ul { display: grid; gap: 0.25rem; margin-top: 0.25rem; }
+.activity li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; color: var(--foreground); overflow-wrap: anywhere; }
+.activity li svg { flex: none; color: var(--muted-readable); }

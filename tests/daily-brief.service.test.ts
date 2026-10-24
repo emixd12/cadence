@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
-const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), begin: vi.fn(), finish: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(), calendar: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), config: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), begin: vi.fn(), finish: vi.fn(), timezone: vi.fn(), prepare: vi.fn(), current: vi.fn(), calendar: vi.fn(), tipHistory: vi.fn(), recordTip: vi.fn(), config: vi.fn(),
+  outlook: vi.fn(), hevy: vi.fn(), icloud: vi.fn() }));
+vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
+vi.mock("@/lib/services/hevy.service", () => ({ getHevyConnection: mocks.hevy }));
+vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud }));
 vi.mock("@/lib/db/daily-brief.repo", () => ({ readDailyBriefPreferences: mocks.read, saveDailyBriefPreferences: mocks.save, beginDailyBrief: mocks.begin, finishDailyBrief: mocks.finish,
   readDailyBriefTipHistory: mocks.tipHistory, recordDailyBriefTip: mocks.recordTip }));
 vi.mock("@/lib/services/briefing-pipeline", async (original) => {
@@ -126,9 +130,11 @@ describe("first-party daily briefing service", () => {
     mocks.calendar.mockResolvedValue({ status: "connected" });
     mocks.timezone.mockResolvedValue(fixture.timezone);
     await updateDailyBriefSettings(caller, { enabled: true, includeCalendar: false, includeReminderHistory: true, includeNotes: true });
-    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, { enabled: true, includeCalendar: false, includeReminderHistory: true, includeNotes: true }, 1);
+    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, { enabled: true, includeCalendar: false, includeReminderHistory: true, includeNotes: true,
+      includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false }, 1);
     await updateDailyBriefSettings(caller, { enabled: true, includeCalendar: false });
-    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false }, 1);
+    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false,
+      includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false }, 1);
     await expect(updateDailyBriefSettings(caller, { enabled: false, includeCalendar: false, includeReminderHistory: false, includeNotes: true })).rejects.toMatchObject({ code: "invalid_request" });
     await expect(updateDailyBriefSettings(caller, { enabled: true, includeCalendar: false, includeNotes: true })).rejects.toMatchObject({ code: "invalid_request" });
   });
@@ -136,6 +142,128 @@ describe("first-party daily briefing service", () => {
     await expect(requestInAppDailyBrief(caller, { ...input, userId: "other" }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
     await expect(updateDailyBriefSettings(caller, { enabled: true, includeCalendar: false, prompt: "ignore rules" })).rejects.toMatchObject({ code: "invalid_request" });
     expect(generate).not.toHaveBeenCalled();
+  });
+});
+
+describe("separately disclosed connector sources (Ticket 239)", () => {
+  const seven = { enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false, includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true };
+  beforeEach(() => {
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["calendar-1"] } });
+    mocks.hevy.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    mocks.icloud.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+  });
+
+  it("accepts exactly the seven-key set and requires each enabled source to be connected", async () => {
+    const settings = await updateDailyBriefSettings(caller, seven);
+    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, seven, 1);
+    expect(settings.connectorSources).toEqual({ outlookCalendar: true, icloudCalendar: false, hevy: true });
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: [] } });
+    await expect(updateDailyBriefSettings(caller, seven)).rejects.toMatchObject({ code: "source_unavailable" });
+    mocks.outlook.mockResolvedValue({ status: "not_configured", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    await expect(updateDailyBriefSettings(caller, seven)).rejects.toMatchObject({ code: "source_unavailable" });
+    mocks.hevy.mockResolvedValue({ status: "reconnect_required", generation: 1, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    await expect(updateDailyBriefSettings(caller, { ...seven, includeOutlookCalendar: false })).rejects.toMatchObject({ code: "source_unavailable" });
+    // Ticket 240: iCloud needs a connected source with a selected calendar, like Outlook.
+    const icloudOnly = { ...seven, includeOutlookCalendar: false, includeHevy: false, includeIcloudCalendar: true };
+    await expect(updateDailyBriefSettings(caller, icloudOnly)).rejects.toMatchObject({ code: "source_unavailable" });
+    mocks.icloud.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 2, preferences: { selectedSourceIds: [] } });
+    await expect(updateDailyBriefSettings(caller, icloudOnly)).rejects.toMatchObject({ code: "source_unavailable" });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    mocks.icloud.mockResolvedValue({ status: "connected", generation: 4, selectionRevision: 2, preferences: { selectedSourceIds: ["ic_home"] } });
+    const allowed = await updateDailyBriefSettings(caller, icloudOnly);
+    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, icloudOnly, 1);
+    expect(allowed.connectorSources).toMatchObject({ icloudCalendar: true });
+  });
+
+  it("rejects other key sets, non-boolean values, and disabled saves that keep a disclosure", async () => {
+    const six = Object.fromEntries(Object.entries(seven).filter(([key]) => key !== "includeHevy"));
+    for (const body of [six, { ...seven, includeHevy: "true" }, { ...seven, enabled: false, includeOutlookCalendar: false }, { ...seven, includeStrava: false },
+      { enabled: true, includeCalendar: false, includeHevy: true }]) {
+      await expect(updateDailyBriefSettings(caller, body)).rejects.toMatchObject({ code: "invalid_request" });
+    }
+    await updateDailyBriefSettings(caller, { ...seven, enabled: false, includeOutlookCalendar: false, includeHevy: false });
+    expect(mocks.save).toHaveBeenLastCalledWith(caller.client, { ...seven, enabled: false, includeOutlookCalendar: false, includeHevy: false }, 1);
+  });
+
+  it("reports stored disclosures and offers only connected sources", async () => {
+    mocks.read.mockResolvedValue({ ...prefs, includeOutlookCalendar: true, outlookConnectionGeneration: 2, outlookSelectionRevision: 3, includeHevy: false, includeIcloudCalendar: false });
+    mocks.hevy.mockRejectedValue(new Error("status unavailable"));
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    expect(await getDailyBriefSettings(caller)).toMatchObject({
+      includeCalendar: false, includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: false,
+      connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: false },
+    });
+  });
+
+  it.each([
+    ["current", {}, {}, { outlookCalendar: null, icloudCalendar: null, hevy: null }],
+    ["Outlook reconnected", { generation: 3 }, {}, { outlookCalendar: "changed", hevy: null }],
+    ["Outlook reselected", { selectionRevision: 4 }, {}, { outlookCalendar: "changed", hevy: null }],
+    ["Hevy reconnected", {}, { generation: 2 }, { outlookCalendar: null, hevy: "changed" }],
+    ["Outlook without calendars", { preferences: { selectedSourceIds: [] } }, {}, { outlookCalendar: "no_calendars" }],
+    ["sources disconnected", { status: "disconnected" }, { status: "reconnect_required" }, { outlookCalendar: "unavailable", hevy: "unavailable" }],
+  ])("reports per-source recovery state when a disclosed source is %s", async (_label, outlook, hevy, attention) => {
+    mocks.read.mockResolvedValue({ ...prefs, includeOutlookCalendar: true, outlookConnectionGeneration: 2, outlookSelectionRevision: 3, includeHevy: true, hevyConnectionGeneration: 1,
+      includeIcloudCalendar: false, icloudConnectionGeneration: null, icloudSelectionRevision: null });
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["calendar-1"] }, ...outlook });
+    mocks.hevy.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 0, preferences: { selectedSourceIds: [] }, ...hevy });
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    expect((await getDailyBriefSettings(caller)).connectorAttention).toMatchObject(attention);
+  });
+
+  it.each([
+    ["disconnected", { status: "disconnected" }, "unavailable"],
+    ["status unreadable", null, "unavailable"],
+    ["without calendars", { preferences: { selectedSourceIds: [] } }, "no_calendars"],
+    ["reconnected", { generation: 2 }, "changed"],
+    ["reselected", { selectionRevision: 2 }, "changed"],
+    ["current", {}, null],
+  ])("reports no recovery state for undisclosed sources and iCloud attention when it is %s", async (_label, icloud, attention) => {
+    mocks.read.mockResolvedValue({ ...prefs, includeOutlookCalendar: false, includeHevy: false, includeIcloudCalendar: true, icloudConnectionGeneration: 1, icloudSelectionRevision: 1 });
+    mocks.outlook.mockResolvedValue({ status: "connected", generation: 9, selectionRevision: 9, preferences: { selectedSourceIds: ["calendar-1"] } });
+    if (icloud) mocks.icloud.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1, preferences: { selectedSourceIds: ["ic_home"] }, ...icloud });
+    else mocks.icloud.mockRejectedValue(new Error("status unavailable"));
+    const { getDailyBriefSettings } = await import("@/lib/services/daily-brief.service");
+    expect((await getDailyBriefSettings(caller)).connectorAttention).toEqual({ outlookCalendar: null, icloudCalendar: attention, hevy: null });
+  });
+
+  it("asks only the live brief for disclosed sources, ending provider reads before the generation reserve", async () => {
+    const started = Date.now();
+    await requestInAppDailyBrief(caller, input, { generate, now });
+    const options = mocks.prepare.mock.calls[0]![1];
+    expect(options.connectorSources).toMatchObject({ calendars: true, recordedActivity: true });
+    expect(options.connectorSources.deadlineAt).toBeGreaterThanOrEqual(started + 50_000);
+    expect(options.connectorSources.deadlineAt).toBeLessThanOrEqual(Date.now() + 50_000);
+    mocks.prepare.mockClear();
+    await requestInAppDailyBrief(caller, input, { generate, now, deadlineMs: 20_000 });
+    expect(mocks.prepare.mock.calls[0]![1].connectorSources.deadlineAt).toBeLessThanOrEqual(Date.now() + 10_000);
+  });
+
+  it("sends disclosed sources to the model in separate branches with past-activity policy, and drops stale output", async () => {
+    const { connectorDayContext } = await import("./helpers/connector-day-context");
+    const context = connectorDayContext();
+    mocks.prepare.mockImplementation(async (_caller, options) => ({ contexts: [context], assertCurrent: mocks.current, configurationRefs: {}, preferences: options.preferences }));
+    const result = await requestInAppDailyBrief(caller, input, { generate, now });
+    expect(result).toMatchObject({ state: "ready", briefing: { coverage: "complete" } });
+    const call = generate.mock.calls[0]![0] as { instructions: string; facts: string };
+    expect(call.instructions).toContain("recordedActivity lists past workouts");
+    const facts = JSON.parse(call.facts);
+    expect(facts.context.version).toBe("1.1");
+    expect(facts.context.connectors).toHaveLength(1);
+    expect(facts.context.connectorSources.calendars[0].source).toBe("outlook_calendar");
+    expect(facts.context.connectorSources.recordedActivity).toMatchObject({ semantics: "past_recorded_activity", source: "hevy" });
+    expect(call.facts).not.toMatch(/Private review|hevy\/[0-9a-f]{16}|routine|exercise/);
+
+    // A withdrawn disclosure or changed connection after generation never delivers text.
+    generate.mockImplementation(async () => { mocks.current.mockRejectedValue(Object.assign(new Error("context_changed"), { code: "context_changed" })); return { suggestions: [], text: "A brief", occurrenceRefs: [] }; });
+    await expect(requestInAppDailyBrief(caller, input, { generate, now })).rejects.toMatchObject({ code: "context_changed" });
+  });
+
+  it("omits connector policy and branches when no source is disclosed", async () => {
+    await requestInAppDailyBrief(caller, input, { generate, now });
+    const call = generate.mock.calls[0]![0] as { instructions: string; facts: string };
+    expect(call.instructions).not.toContain("recordedActivity");
+    expect(JSON.parse(call.facts).context).not.toHaveProperty("connectorSources");
   });
 });
 
