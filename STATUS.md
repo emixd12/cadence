@@ -69,13 +69,26 @@ checks pass. The signed entitlements include the location entitlement with Harde
 Runtime. The binary embeds schema 18 and only the stable feed. The updater archive
 and signature verify but were not uploaded. DMG SHA-256
 `9518085a0c27e950e709523925144d07a2f697a823bc83f8a5c719ca1c6bc686`.
-Native library tests (115) and repository checks pass. Open: owner install over
-the installed app (this Mac runs 0.1.2, the test Mac 0.1.3), Where sync both ways,
-the location prompt on a never-authorized user, and publication.
+Native library tests (115) and repository checks pass. Main since then (`ed93fff`)
+changed only release tooling and documents, so the 0.1.5 artifacts still match main's
+application source.
 
-Connector gating: production has no `CONNECTOR_CREDENTIAL_*` or
-`OUTLOOK_CALENDAR_*` settings, so Outlook, iCloud and Hevy each show "not configured
-for this Cadence deployment" with no controls. None is usable or broken.
+Installed acceptance on the owner's Mac moved to the dev-signed `0.1.6-dev.2` (built
+from `ed93fff`, executable SHA-256 `94dbaf1d…a991`), because that Mac already ran
+`0.1.6-dev.1`. October 24: the install script replaced dev.1 at 00:59Z (schema 18, all
+30 tables kept their rows), and the app synced 30 s after launch. Where sync passes
+both ways: four test Behaviors created on the web with Not set, Anywhere, Home and A
+place reached the Mac, and the owner's four Mac edits reached the web. The test
+Behaviors are archived. Open: the Travel location line and Connectors panels on this
+Mac, the 0.1.5 upgrade from 0.1.3 on the test Mac, the location prompt on a
+never-authorized user, and publication.
+
+Connector gating: when the candidate was built, production had no
+`CONNECTOR_CREDENTIAL_*` or `OUTLOOK_CALENDAR_*` settings, and the three connectors
+showed "not configured". Those secrets were set later on October 23 (PR #141). Hevy,
+iCloud Calendar and Outlook Calendar now report `disconnected` for the owner's account,
+so a linked desktop offers connect controls for all three. Connector release steps
+6–7 are still pending; the owner decides whether they must finish before publication.
 
 The travel release train (PR #138) moves from 0.1.5 to 0.1.6. Evidence, hashes,
 owner steps and rollback: `docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`.
