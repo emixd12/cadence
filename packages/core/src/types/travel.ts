@@ -1,3 +1,5 @@
+import type { TravelLegWeather, TravelWeatherInput, TravelWeatherSummary } from "./weather";
+
 export const TRAVEL_EVIDENCE_VERSION = "1.0" as const;
 
 export type TravelMode = "walking" | "cycling" | "transit" | "driving";
@@ -17,6 +19,39 @@ export type TravelSettings = Readonly<{
   routingConsentAt: string | null;
   onboardingCompletedAt: string | null;
   updatedAt: string;
+  /** Ticket 217. Absent means nothing learned yet: the travel-habit defaults apply. */
+  habits?: TravelHabits;
+}>;
+
+export type TravelLeaveAnswer = "too_early" | "about_right" | "too_late";
+
+/** A remembered travel mode. The key is a digest of the place text; no text or position. */
+export type TravelPlaceMode = Readonly<{
+  placeKey: string;
+  mode: TravelMode;
+  chosenAt: string;
+}>;
+
+/** One leave-time answer. The event reference is a digest; no title, time or location. */
+export type TravelLeaveFeedback = Readonly<{
+  eventRef: string;
+  localDate: string;
+  answer: TravelLeaveAnswer;
+  answeredAt: string;
+  rulesVersion: string;
+}>;
+
+/**
+ * Ticket 217: learned only from what the user tells Cadence. Null minutes follow
+ * the versioned defaults. `updatedAt` is null until the first habit change and is
+ * the revision for habit writes, separate from the settings revision.
+ */
+export type TravelHabits = Readonly<{
+  preparationMinutes: number | null;
+  arrivalBufferMinutes: number | null;
+  placeModes: readonly TravelPlaceMode[];
+  leaveFeedback: readonly TravelLeaveFeedback[];
+  updatedAt: string | null;
 }>;
 
 export type TravelPoint =
@@ -85,6 +120,8 @@ export type TravelCommitment = Readonly<{
   endpoint: TravelEndpoint | null;
   mode: TravelMode | null;
   excluded?: boolean;
+  /** Ticket 217: digest of the destination text, used to remember a mode for this place. */
+  placeKey?: string | null;
 }>;
 
 export type TravelJourneyCorrection = Readonly<{
@@ -98,6 +135,12 @@ export type TravelBuffers = Readonly<{
   arrivalSeconds: number;
   exitSeconds: number;
   settlingSeconds: number;
+  /**
+   * Ticket 217 get-ready time before a leg that starts at Home or the current
+   * position. It occupies time before departure; it never moves the departure
+   * or the route request. Absent means zero.
+   */
+  preparationSeconds?: number;
 }>;
 
 export type TravelPlanningInput = Readonly<{
@@ -136,6 +179,8 @@ export type TravelPlannedLeg = Readonly<{
   journeyRef: string;
   originCommitmentRef: string | null;
   destinationCommitmentRef: string | null;
+  /** Ticket 217: the destination's place digest; null for the return home. */
+  destinationPlaceKey?: string | null;
   mode: TravelMode;
   readyAt: string;
   request: TravelRouteRequest;
@@ -183,6 +228,8 @@ export type TravelEvidenceInput = Readonly<{
   results: TravelLegResult[];
   collisionCandidates: TravelCollisionCandidate[];
   buffers: TravelBuffers;
+  /** Ticket 218 weather margin, kept apart from the buffers. Absent means weather is off. */
+  weather?: TravelWeatherInput | null;
   now: string;
   expectedJourneyRevision: string;
   expectedGrantRevision: string;
@@ -191,7 +238,7 @@ export type TravelEvidenceInput = Readonly<{
 
 export type TravelOccupiedSegment = Readonly<{
   id: string;
-  kind: "commitment" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer";
+  kind: "commitment" | "preparation_buffer" | "arrival_buffer" | "exit_buffer" | "route" | "settling_buffer" | "weather_margin";
   startAt: string;
   endAt: string;
   sourceRefs: string[];
@@ -217,6 +264,8 @@ export type TravelEvidenceLeg = Readonly<{
   journeyRef: string;
   originCommitmentRef: string | null;
   destinationCommitmentRef: string | null;
+  /** Ticket 217: lets the journey's mode choice name its place without any place text. */
+  destinationPlaceKey?: string | null;
   mode: TravelMode;
   readyAt: string;
   provenance: TravelLegProvenance;
@@ -227,26 +276,56 @@ export type TravelResolvedLegEvidence = Readonly<{
   state: "current" | "unavailable" | "stale" | "rejected_revision";
   estimate: TravelRouteEstimate | null;
   reason: string | null;
+  /** Ticket 218: present when weather is on and the leg's revision is current. */
+  weather?: TravelLegWeather;
 }>;
 
+/**
+ * Ticket 219: version of Cadence's own travel conclusions for model input.
+ * Version 1.0 carried route timing and was never enabled.
+ */
+export const TRAVEL_MODEL_PROJECTION_VERSION = "2.0" as const;
+
+/** A trip the plan knows about. Its destination's own time is already in the facts. */
+export type TravelModelTrip = Readonly<{
+  /** Destination commitment ref; `null` for the trip back to Home. */
+  destinationRef: string | null;
+  role: TravelLegRole;
+  /** `null` when Cadence could not plan the trip. */
+  mode: TravelMode | null;
+  /** `unknown` never means zero travel. */
+  estimate: "current" | "unknown";
+}>;
+
+export type TravelFitConclusion = "fits" | "does_not_fit" | "unknown";
+
+/**
+ * Whether travel leaves room for one unresolved Behavior occurrence at its
+ * scheduled time. A yes/no/unknown conclusion carries no time or duration.
+ */
+export type TravelModelFit = Readonly<{
+  ref: string;
+  conclusion: TravelFitConclusion;
+  basis: "travel_known" | "travel_overlap" | "late_arrival" | "travel_unknown" | "duration_unknown";
+  /** The trip the conclusion is about, by destination; `null` when today has none. */
+  trip: Readonly<{ destinationRef: string | null; role: TravelLegRole }> | null;
+  /** Order relative to that trip's destination, which the facts already show. */
+  position: "before" | "after" | null;
+}>;
+
+/**
+ * Cadence's own deterministic travel conclusions (Ticket 219, `docs/LEGAL.md`
+ * L-001). It never carries route durations, departure or arrival times,
+ * occupied intervals, leave-by times, provider text, places or coordinates.
+ */
 export type TravelTimingModelProjection = Readonly<{
-  version: typeof TRAVEL_EVIDENCE_VERSION;
-  journeyRef: string;
-  legs: ReadonlyArray<Readonly<{
-    ref: string;
-    role: TravelLegRole;
-    mode: TravelMode;
-    departureAt: string;
-    arrivalAt: string;
-    durationSeconds: number;
-    fallback: boolean;
-    observedAt: string;
-    expiresAt: string;
-  }>>;
-  occupiedSpans: TravelOccupiedSpan[];
-  collisions: TravelCollisionEvidence[];
-  completeTrip: boolean;
-  finalAvailabilityAt: string | null;
+  version: typeof TRAVEL_MODEL_PROJECTION_VERSION;
+  /** `yes` when the rest of today includes a planned trip. */
+  travelDay: "yes" | "no" | "unknown";
+  /** Whether a Calendar event shaped these conclusions; they then need the Calendar source. */
+  calendarEvents: boolean;
+  trips: readonly TravelModelTrip[];
+  fits: readonly TravelModelFit[];
 }>;
 
 export type TravelEvidenceResult = Readonly<{
@@ -258,6 +337,8 @@ export type TravelEvidenceResult = Readonly<{
   collisions: TravelCollisionEvidence[];
   completeTrip: boolean;
   finalAvailabilityAt: string | null;
+  /** Ticket 218: weather state and attribution; absent when weather is off. */
+  weather?: TravelWeatherSummary;
   modelProjection: TravelTimingModelProjection | null;
   /** Snapshot of future Behaviors, including resolved stops omitted from this plan. */
   behaviorSources?: readonly Readonly<{

@@ -8,6 +8,9 @@ import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 
+const travelToken = vi.hoisted(() => vi.fn<(accountId: string | null, localDate: string) => string | null>(() => null));
+vi.mock("@/lib/ui/travel", async (load) => ({ ...(await load<typeof import("@/lib/ui/travel")>()), travelConclusionsToken: travelToken }));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -45,6 +48,25 @@ function client(overrides: Partial<DailyBriefClient> = {}): DailyBriefClient {
 }
 
 describe("Daily Brief UI", () => {
+  it("returns the latest signed travel conclusions with the request, and nothing without a travel account (Ticket 219)", async () => {
+    travelToken.mockImplementation((accountId) => accountId === "owner" ? "signed.token" : null);
+    const linked = client();
+    await act(() => root.render(<DailyBriefLauncher client={linked} travelAccountId="owner" sessionKey="owner" />));
+    await vi.waitFor(() => expect(linked.requestBrief).toHaveBeenCalledOnce());
+    expect(travelToken).toHaveBeenCalledWith("owner", settings.localDate);
+    expect(linked.requestBrief).toHaveBeenCalledWith(expect.objectContaining({ travelConclusions: "signed.token" }), expect.any(AbortSignal));
+    await act(() => root.unmount());
+    root = createRoot(container);
+    localStorage.clear();
+    // Account-free desktop and signed-out views have no travel account, so the request carries no token.
+    const local = client();
+    await act(() => root.render(<DailyBriefLauncher client={local} sessionKey="local" />));
+    await vi.waitFor(() => expect(local.requestBrief).toHaveBeenCalledOnce());
+    expect(vi.mocked(local.requestBrief).mock.calls[0]![0]).not.toHaveProperty("travelConclusions");
+    travelToken.mockReset();
+    travelToken.mockReturnValue(null);
+  });
+
   it("starts once, announces ready text politely, and keeps the dismiss control reachable", async () => {
     const adapter = client();
     await act(() => root.render(<DailyBriefLauncher client={adapter} />));
@@ -238,8 +260,8 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
     travel={{ localDate: settings.localDate, observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit" }, { kind: "return_unknown" }],
-      conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
+      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit", weather: null }, { kind: "return_unknown" }],
+      weather: null, conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
     briefing={{
       text: "Dentist anchors the afternoon.", localDate: settings.localDate, timezone: settings.timezone,
       generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [],
@@ -261,7 +283,7 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
 it("omits travel from another day", async () => {
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
-    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
+    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, weather: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
     briefing={{ text: "Quiet day.", localDate: settings.localDate, timezone: settings.timezone, generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] }} />));
   expect(container.textContent).not.toContain("Travel");
 });

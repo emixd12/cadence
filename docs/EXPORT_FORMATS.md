@@ -110,7 +110,9 @@ Ticket 215) on each Behavior and in prior and next configuration snapshots.
 Snapshots recorded before Where read as `place` when they have location text.
 JSONL, CSV, Markdown, and BehaviorLog omit saved location text and Where. The
 BehaviorLog raw Cadence configuration view removes `location_text`, `where_kind`
-and their changed-field markers before writing. Travel settings and the saved base are preserved by
+and their changed-field markers before writing. No export format includes Ticket 216
+completion place labels, place markers, their settings or suggestion dismissals;
+inclusion is a backlog decision. Travel settings and the saved base are preserved by
 the native SQLite backup. They are not part of the hosted App JSON artifact,
 which has no JSON restore input.
 

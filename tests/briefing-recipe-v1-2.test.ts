@@ -185,6 +185,17 @@ describe("recipe 1.2 alongside Behaviors and moves", () => {
     expect(briefing.text).toBe("Walk overlaps your 12:00 PM–1:00 PM calendar event by 20 minutes.");
     expect(briefing.behaviorNames).toEqual(["Walk"]);
   });
+
+  it("counts the written overview against the combined word limit", async () => {
+    // The 11-word overview plus a tip must fit maxWords, even though the model's own text was empty.
+    const config = parseBriefingConfig({ ...debtConfig(), length: { maxWords: 40 } });
+    const words = (count: number) => Array.from({ length: count }, () => "decide").join(" ");
+    const reply = (tip: string) => vi.fn().mockResolvedValue({ text: "", occurrenceRefs: [], suggestions: [], tip: { findingId: "tip", text: tip, noteRefs: [] } });
+    const fits = await generateDailyBrief(context, { generate: reply(words(25)), now, signal: signal(), config, analysis: { source } });
+    expect(fits.text).toBe("Walk overlaps your 12:00 PM–1:00 PM calendar event by 20 minutes.");
+    await expect(generateDailyBrief(context, { generate: reply(words(35)), now, signal: signal(), config, analysis: { source } }))
+      .rejects.toThrow("advisor_unavailable");
+  });
 });
 
 describe("recipe 1.2 fallback overview", () => {

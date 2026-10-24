@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BriefingReference } from "@cadence/core/services/briefing-references";
 import type { BriefingPlanOption } from "@cadence/core/types/briefing-plan";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
+import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { writeBriefingReview, writeReviewPacket } from "@/lib/services/briefing-review.service";
 import { createBriefingBenchStore, type BenchCase } from "@/lib/services/briefing-bench-store";
@@ -24,6 +26,14 @@ const briefing: DailyBriefing = {
   expiresAt: "2026-11-01T19:04:00Z", coverage: "complete", warnings: ["Suggestions only. No changes were applied."],
   suggestions: [{ text: "Try the earlier slot.", occurrenceRefs: [], referenceIds: [source.id, "source-two"], optionId: "option-one", option }],
   references: [source, { ...source, id: "source-two", title: "Second Source" }], tip: { text: "Keep the stretch brief.", laneId: "realistic-timing", basis: "Based on six marks.", limitation: "Marks show when you logged a decision." },
+};
+
+const weatherTravel: BriefTravelGuidance = {
+  localDate: briefing.localDate, observedAt: "2026-11-01T16:00:00Z", expiresAt: "2026-11-01T19:04:00Z",
+  attribution: "Google Maps", conflictingOptionIds: [], occupiedSpans: [option.intervals.proposed],
+  items: [{ kind: "departure", at: "2026-11-01T17:00:00Z", label: "Dentist", mode: "walking",
+    weather: { marginMinutes: 15, conditions: ["rain"], suggestion: null } }],
+  weather: { state: "applied", attribution: OPEN_METEO_ATTRIBUTION },
 };
 
 let root: string;
@@ -131,5 +141,35 @@ describe("Daily Brief visible text and quote validation", () => {
     tipOnly.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={{ ...laned, text: "", suggestions: [] }} onDismiss={() => undefined} />);
     expect(tipOnly.querySelector('[role="status"]')).toBeNull();
     expect(tipOnly.textContent).toContain("Logging tip");
+  });
+
+  it("keeps recipe 1.2 moves, travel overlap warnings and one weather attribution together", () => {
+    const laned: DailyBriefing = { ...briefing, text: "Walk overlaps planned travel.", behaviorNames: ["Walk"],
+      versions: { configuration: "c", references: "r", planner: "p", pipeline: "x", recipe: "daily_brief@1.2" },
+      attributions: ["open_meteo"],
+      suggestions: [{ text: "", occurrenceRefs: [], referenceIds: [], optionId: "option-one", behavior: "Walk",
+        option: { intervals: { current: { startAt: "2026-11-01T17:30:00Z", endAt: "2026-11-01T17:50:00Z" }, proposed: option.intervals.proposed } } as BriefingPlanOption }],
+    };
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={laned} travel={weatherTravel} onDismiss={() => undefined} />);
+    const moves = container.querySelector('[aria-label="Suggestions only"]')!;
+    expect(moves.textContent).toContain("New suggested time");
+    expect(moves.querySelector("strong")?.textContent).toBe("Walk");
+    expect(moves.textContent).toContain("overlaps planned travel.");
+    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist (walking). Includes 15 min for rain.");
+    expect(container.querySelectorAll("[data-weather-credit]")).toHaveLength(1);
+    expect(container.querySelector("[data-brief-weather-credit]")).toBeNull();
+    expect(container.querySelector(`a[href="${OPEN_METEO_ATTRIBUTION.url}"]`)).not.toBeNull();
+  });
+
+  it("keeps deterministic travel visible for an otherwise empty recipe 1.2 brief", () => {
+    const empty: DailyBriefing = { ...briefing, text: "", suggestions: [], tip: undefined,
+      versions: { configuration: "c", references: "r", planner: "p", pipeline: "x", recipe: "daily_brief@1.2" } };
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<DailyBriefBubble state="ready" briefing={empty} travel={weatherTravel} onDismiss={() => undefined} />);
+    expect(container.querySelector('[aria-label="Cadence Daily Brief"]')).not.toBeNull();
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist");
+    expect(container.querySelectorAll("[data-weather-credit]")).toHaveLength(1);
   });
 });

@@ -69,6 +69,11 @@ export type BriefingComparisonOptions = Readonly<{
   estimate?: DailyBriefGenerator;
 }>;
 
+/** Ticket 188: descriptions leave the server only for configurations that estimate durations, each with one extra call. */
+export function estimatesDurations(config: BriefingConfig): boolean {
+  return isPlainRecipe(config.recipe) && config.context.duration.includeDescriptionEstimate === true;
+}
+
 export type ReviewCandidateInput = Readonly<{ id: string; label: string; role: "baseline" | "candidate"; parentCandidateId: string | null; proposalId: string | null; rationale: string }>;
 type ReviewInput = Readonly<{ caseId: string; candidates: readonly ReviewCandidateInput[] }>;
 
@@ -98,8 +103,7 @@ export async function runBriefingComparison(request: Request, generate?: DailyBr
         !Array.isArray(value.configs) || (savedMode ? value.configs.length < 1 || value.configs.length > 2 : value.configs.length !== 2) ||
         (savedMode && value.review === undefined)) throw new DailyBriefError("invalid_request");
     const configs = value.configs.map(parseBriefingConfig) as BriefingConfig[];
-    // Ticket 188: descriptions leave the server only for configurations that estimate durations.
-    const estimating = configs.map((config) => isPlainRecipe(config.recipe) && config.context.duration.includeDescriptionEstimate === true);
+    const estimating = configs.map(estimatesDurations);
     const descriptionsConfirmed = accountMode && value.descriptionsConfirmed === true && estimating.some(Boolean);
     const review = value.review === undefined ? null : parseReview(value.review, configs.length);
     if (!generate && !process.env.OPENAI_API_KEY) return json({ error: "not_configured" }, 503);

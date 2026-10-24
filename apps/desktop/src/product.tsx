@@ -9,8 +9,10 @@ import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSetting
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
-import { createLocalTravelSettingsClient } from "./local-travel-settings.service";
-import { readMacForegroundLocation } from "./foreground-location";
+import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
+import { createLocalPlaceLabelClient } from "./local-place-labels.service";
+import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
+import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPermission } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
@@ -303,13 +305,20 @@ export function Product() {
   const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient) : null, [calendarClient, accountUserId]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
-    return { load: local.load, save: async (value: Parameters<typeof local.save>[0]) => {
+    return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
       const saved = await local.save(value);
+      setSyncRequest((previous) => previous + 1);
+      return saved;
+    }, saveHabits: async (value: Parameters<typeof local.saveHabits>[0]) => {
+      // Learned habits reach the hosted route through account synchronization (Ticket 217).
+      const saved = await local.saveHabits(value);
       setSyncRequest((previous) => previous + 1);
       return saved;
     } };
   }, []);
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 216: place labels live in SQLite; each change asks account sync to run.
+  const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
   const calendarRange = {
     startLocalDate: bundle?.timeline.timeline.todayLocalDate ?? "1970-01-01",
     endLocalDate: bundle?.timeline.timeline.daySections.at(-1)?.localDate ?? "1970-01-01",
@@ -346,6 +355,7 @@ export function Product() {
     travelStatus: travel,
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
+    travelSettingsClient,
     // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
     events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
     ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),
@@ -497,6 +507,7 @@ export function Product() {
     {account.status === "linked" || syncReady || disconnectResult ? <AccountDisconnectPanel busy={accountBusy} result={disconnectResult} error={disconnectError} onDisconnect={disconnect} /> : null}</>;
 
   return <DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0}>
+    <PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
     <DesktopUpdateNotice required={syncStatus.state === "update_required"} {...restartActions} />
@@ -506,7 +517,8 @@ export function Product() {
     {bundle && occurrenceActions && behaviorActions ? <>
       {activeScreen === "timeline" ? <DesktopOnboardingGuide key={guideRequest} forceOpen={guideRequest > 0} onDismiss={() => setGuideRequest(0)}
         hasAnyBehavior={bundle.timeline.behaviors.length > 0} hasImportRuns={bundle.hasImportRuns} currentTimezone={bundle.timeline.profile.timezone}
-        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} /> : null}
+        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS}
+        loadTravelSetup={readLocalTravelSetupPresence} readTravelRoutingConfigured={travelClient?.configured ?? null} /> : null}
       {activeScreen === "timeline" ? <TimelineScreen timeline={bundle.timeline.timeline} {...occurrenceActions}
         shortcutsByBehavior={bundle.shortcuts.accepted} dayProgress={calendarContext}
         notificationTarget={notificationTarget}
@@ -537,7 +549,7 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
-        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />}
+        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}
@@ -545,6 +557,7 @@ export function Product() {
         onReconcile={() => refreshReminders()} onShowOnboarding={() => { setGuideRequest((value) => value + 1); navigate("timeline"); }} /> : null}
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
     </> : null}
+    </PlaceLabelProvider>
   </DesktopApp>;
 }
 

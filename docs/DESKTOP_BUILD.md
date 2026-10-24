@@ -529,6 +529,17 @@ Ticket 115 is now in progress under the owner-authorized
 [September 27 plan](plans/2026-09-27-apple-developer-unblocked-work.md).
 Public production publication remains an explicit owner-authorized action.
 
+## Completion place labels (Ticket 216)
+
+Place markers, labels, the opt-in and suggestion dismissals synchronize as
+`place_label_settings`, `place_marker`, `completion_place_label` and
+`where_suggestion_dismissal` entities. Their conflicts resolve without review: a
+deletion wins, otherwise the later record wins. "I'm here" and completion labels
+use the existing `foreground_location` command; a completion read passes
+`requestPermission = false`, so it never shows the macOS prompt. Local-only desktop
+keeps the rows in SQLite until an account is linked; first link treats them as
+private data like Home and Where.
+
 ## Note shortcuts (Tickets 126–128)
 
 The local deterministic fallback uses current owned SQLite Occurrence Notes and

@@ -8,6 +8,7 @@ import type {
   AdvisorDuration,
 } from "./advisor-day-context";
 import type { BriefingAnalysisLaneId } from "./briefing-analysis";
+import type { BriefingModelTravelFacts, BriefingTravelControl } from "./briefing-travel";
 
 export const BRIEFING_CONFIG_VERSION = "1.3" as const;
 export const LEGACY_BRIEFING_CONFIG_VERSION = "1.0" as const;
@@ -164,6 +165,8 @@ export type BriefingModelFacts = Readonly<{
   connectors?: Array<AdvisorCalendarConnector | AdvisorCalendarNotRequested>;
   /** Separately disclosed sources (Ticket 239). Absent unless at least one is included. */
   connectorSources?: BriefingModelConnectorSources;
+  /** Ticket 219 travel facts and conclusions. Never route timing; absent without a travel block. */
+  travel?: BriefingModelTravelFacts;
 }>;
 
 export type BriefingContextControlState = Readonly<{
@@ -178,6 +181,8 @@ export type BriefingContextControls = Readonly<{
   completionHistory: BriefingContextControlState;
   historicalCompletionTimes: BriefingContextControlState;
   recordedElapsedDurations: BriefingContextControlState;
+  /** Ticket 219. Present only when the context carries travel facts. */
+  travel?: BriefingTravelControl;
   duration: Readonly<{
     preference: BriefingDurationSource;
     fallback: "other_enabled_source" | "none";

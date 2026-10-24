@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Temporal } from "@js-temporal/polyfill";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
-import { DEFAULT_BRIEFING_CONFIG } from "@cadence/core/services/briefing-config";
+import { BRIEFING_PRESETS, DEFAULT_BRIEFING_CONFIG } from "@cadence/core/services/briefing-config";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import { createBriefingBenchStore, type BriefingBenchStore, type BenchCase } from "@/lib/services/briefing-bench-store";
 import { historicalFixture } from "@/lib/services/briefing-history.service";
 import { briefingAnalysisFixture, BRIEFING_ANALYSIS_FIXTURE_VERSION } from "@/lib/services/briefing-analysis-fixtures";
 import { BRIEFING_FIXTURE_VERSION } from "@/lib/services/briefing-fixtures";
-import type { DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
+import { DURATION_ESTIMATE_INSTRUCTIONS, type DailyBriefGenerator } from "@/lib/services/daily-brief-consumer";
 import type { BriefingSequenceStatus } from "@/lib/services/briefing-sequence.service";
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), preferences: vi.fn(), behaviors: vi.fn() }));
@@ -33,16 +33,18 @@ beforeEach(async () => {
   mocks.auth.mockResolvedValue({ user: { id: "owner" }, client: {} }); mocks.preferences.mockResolvedValue({ enabled: true, revision: 1 }); mocks.behaviors.mockResolvedValue(["owned"]);
 });
 afterEach(async () => { vi.unstubAllEnvs(); vi.restoreAllMocks(); await rm(root, { recursive: true, force: true }); });
-async function save(id: string, date: string, account = false, evidenceType?: BenchCase["evidenceType"]) {
+async function save(id: string, date: string, account = false, evidenceType?: BenchCase["evidenceType"],
+  extra: Readonly<{ fixtureId?: "sparse" | "missing_duration"; descriptions?: Record<string, string> }> = {}) {
   const day = Temporal.PlainDate.from(date), logical = day.toZonedDateTime({ timeZone: "America/New_York", plainTime: "07:00" }).toInstant();
-  const context = historicalFixture("sparse", config(), day, "America/New_York", logical);
+  const context = historicalFixture(extra.fixtureId ?? "sparse", config(), day, "America/New_York", logical);
   const saved: BenchCase = { schemaVersion: 1, kind: "case", id, createdAt: new Date().toISOString(),
     source: account ? { mode: "account", accountRef: "account_reference_owner", preferenceRevision: 1 }
       : { mode: "synthetic", fixtureId: "sparse", fixtureVersion: BRIEFING_FIXTURE_VERSION, analysisFixtureId: "marking_offset", analysisFixtureVersion: BRIEFING_ANALYSIS_FIXTURE_VERSION },
     evidenceType: evidenceType ?? (account ? "captured" : "synthetic"), localDate: date, timezone: context.timezone, capturedAt: context.capturedAt, expiresAt: context.expiresAt,
     capture: { historyDays: [90], includeCalendar: false, calendarDisclosed: false, includeRecordedElapsedDurations: false, includeHistoricalCompletionTimes: false,
       analysis: true, includeReminders: false, remindersDisclosed: false, includeNotes: false, notesDisclosed: false },
-    inputs: { contexts: [context], analysisSource: briefingAnalysisFixture("marking_offset", context), configurationRefs: account ? { behavior_fixture: "behavior_fixture" } : {} }, behaviorTitles: [{ ref: "behavior_fixture", title: "Walk" }] };
+    inputs: { contexts: [context], analysisSource: briefingAnalysisFixture("marking_offset", context), configurationRefs: account ? { behavior_fixture: "behavior_fixture" } : {},
+      ...(extra.descriptions ? { descriptions: extra.descriptions } : {}) }, behaviorTitles: [{ ref: "behavior_fixture", title: "Walk" }] };
   await store.createCase(account ? "account-account_reference_owner" : "synthetic", saved);
 }
 const input = (caseIds = ["case-sequence-0001", "case-sequence-0002"], extra = {}) => ({ action: "simulate", accountRef: null, caseIds,
@@ -88,6 +90,23 @@ it("generation history records only retained successful tips independently for A
   const runs = (await store.readCase("synthetic", "case-sequence-0002")).runs;
   expect(runs[0].evaluation).toMatchObject({ sequenceId: job.id, mode: "daily" });
   expect(runs[0].attemptId).not.toBe((await store.readCase("synthetic", "case-sequence-0001")).runs[0].attemptId);
+});
+
+it("plans and reserves a description estimate call alongside each estimating task's brief", async () => {
+  // missing_duration: Walk has no recorded length, so recipe 1.1 estimates it from the saved description.
+  await save("case-sequence-0001", "2026-11-02", false, undefined, { fixtureId: "missing_duration", descriptions: { behavior_fixture: "A 25 minute loop around the park." } });
+  const { startBriefingSequence } = await import("@/lib/services/briefing-sequence.service");
+  const estimating = BRIEFING_PRESETS.find(item => item.id === "advisor-analysis-2")!.config;
+  const generate = vi.fn<DailyBriefGenerator>(async ({ instructions }) => instructions.startsWith(DURATION_ESTIMATE_INSTRUCTIONS)
+    ? { estimates: [{ behaviorRef: "behavior_fixture", minutes: 25, basis: "stated" }] } : output);
+  const body = (action: string) => input(["case-sequence-0001"], { action, configs: [estimating, estimating] });
+  expect((await (await startBriefingSequence(request(body("simulate")), generate, store)).json()).plannedCalls).toBe(4);
+  const response = await startBriefingSequence(request(body("start")), generate, store);
+  expect(response.status).toBe(202);
+  const job = await waitJob((await response.json()).id);
+  expect(job.results.map(result => result.state)).toEqual(["ready", "ready"]);
+  expect(generate.mock.calls.filter(([call]) => call.instructions.startsWith(DURATION_ESTIMATE_INSTRUCTIONS))).toHaveLength(2);
+  expect(job.dispatchedCalls).toBe(4); expect(job.budget.reserved).toBe(0);
 });
 
 it("derives eligible diagnostic lanes, labels its bypass, and keeps all normal output validation", async () => {

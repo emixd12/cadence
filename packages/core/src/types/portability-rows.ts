@@ -162,6 +162,11 @@ export type PortabilitySnapshot = {
   importedInterventions: PortabilityInterventionRow[];
   reminderDeliveries?: import("./json").Json[];
   travelSettings?: import("./travel").TravelSettings;
+  /** Ticket 216 rows, with the local owner column. Older snapshots omit them. */
+  placeLabelSettings?: (import("./place-labels").PlaceLabelSettingsRecord & { id: string; user_id: string })[];
+  placeMarkers?: (import("./place-labels").PlaceMarkerRecord & { user_id: string })[];
+  completionPlaceLabels?: (import("./place-labels").CompletionPlaceLabelRecord & { user_id: string })[];
+  whereSuggestionDismissals?: (import("./place-labels").WhereSuggestionDismissalRecord & { user_id: string })[];
 };
 export type PortabilityRowWrite<T> = { expected: T | null; next: T };
 export type LocalImportWritePlan = {

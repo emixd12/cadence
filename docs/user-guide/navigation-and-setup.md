@@ -104,6 +104,8 @@ are incomplete, and this browser has not dismissed the setup pop-up.
    - **Browser notifications**: choose **Open settings**.
    - **Timezone**: choose **Review timezone**.
    - **Import existing records**: optionally choose **Open import**.
+   - **Home and travel**: optionally choose **Open travel** to save Home and
+     usual travel. This row appears only where travel routing is configured.
 2. Complete each task on its owning screen. The setup row only navigates; it
    never performs the underlying action automatically.
 3. To hide the pop-up without completing the remaining tasks, use the icon
@@ -111,10 +113,12 @@ are incomplete, and this browser has not dismissed the setup pop-up.
 
 **Result and persistence:** Task links navigate to
 `/behaviors#create-behavior`, `/settings#notifications`,
-`/settings#timezone`, or `/export#behaviorlog-import`. Dismissing the pop-up
+`/settings#timezone`, `/export#behaviorlog-import`, or `/settings#travel`.
+Saving Home and usual travel sends nothing to Google, asks for no location and
+does not turn on travel estimates. Dismissing the pop-up
 stores a local `cadence-first-run-dismissed` preference when browser storage is
 available. Completing required tasks causes the pop-up to stop appearing based
-on current account and device state. Import is optional.
+on current account and device state. Import and Home and travel are optional.
 
 **Recovery or undo:** A dismissed pop-up has no in-app restore control. You can
 still open every task directly from **Behaviors**, **Settings**, or

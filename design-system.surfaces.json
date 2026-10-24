@@ -445,12 +445,14 @@
       "id": "flow.first-run-setup",
       "name": "First-run setup",
       "tier": "flow",
-      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, and import controls.",
+      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, import, and travel controls.",
       "sharedContract": [
         "Never requests notification permission on page load",
         "Uses factual status labels without progress or reward language",
         "Links into existing app controls rather than creating a separate wizard",
-        "Import stays optional and does not block setup completion"
+        "Import stays optional and does not block setup completion",
+        "Home and travel stays optional, appears only when the deployment reports travel routing as configured, and reads presence flags rather than the Home text",
+        "Optional rows show one description line from the shared model"
       ],
       "surfaceImplementations": [
         {
@@ -484,7 +486,7 @@
             "docs/DESKTOP_BUILD.md"
           ],
           "implementationIds": [],
-          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress."
+          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress. Ticket 212: Home and travel reads presence from local SQLite and appears only when a linked account's hosted routing report says configured; local mode omits it."
         },
         {
           "surfaceId": "mobile",
@@ -530,10 +532,13 @@
             "tests/occurrence-note-shortcuts-ui.test.tsx",
             "components/timeline/DayProgressTimeline.tsx",
             "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/TravelLeaveQuestion.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
             "public/brand/google-calendar.svg",
-            "components/timeline/RecordedActivityList.tsx"
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "module.timeline",
@@ -544,10 +549,13 @@
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
+            "composite.travel-mode-choice",
+            "composite.travel-leave-question",
             "composite.external-event-preview",
-            "composite.recorded-activity-list"
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "marketing",
@@ -574,19 +582,25 @@
             "tests/occurrence-note-shortcuts-ui.test.tsx",
             "components/timeline/DayProgressTimeline.tsx",
             "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/TravelLeaveQuestion.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
             "public/brand/google-calendar.svg",
-            "components/timeline/RecordedActivityList.tsx"
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
+            "composite.travel-mode-choice",
+            "composite.travel-leave-question",
             "composite.external-event-preview",
-            "composite.recorded-activity-list"
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "mobile",
@@ -832,6 +846,7 @@
             "components/note-shortcuts/NoteShortcutControls.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
             "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/TravelHabitsSection.tsx",
             "components/settings/ConnectorLibrary.tsx",
             "components/settings/OutlookCalendarPanel.tsx",
             "components/settings/HevyPanel.tsx",
@@ -846,6 +861,7 @@
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
             "module.travel-settings-panel",
+            "module.travel-habits-section",
             "module.connector-library",
             "module.outlook-calendar-panel",
             "module.hevy-panel",
@@ -880,6 +896,7 @@
             "tests/desktop-update-panel.test.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
             "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/TravelHabitsSection.tsx",
             "components/settings/ConnectorLibrary.tsx",
             "components/settings/OutlookCalendarPanel.tsx",
             "components/settings/HevyPanel.tsx",
@@ -892,6 +909,7 @@
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
             "module.travel-settings-panel",
+            "module.travel-habits-section",
             "module.connector-library",
             "module.outlook-calendar-panel",
             "module.hevy-panel",

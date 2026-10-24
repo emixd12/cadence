@@ -27,6 +27,8 @@ export type DailyBriefing = Readonly<{
    */
   behaviorNames?: readonly string[];
   versions?: Readonly<{ configuration: string; references: string; planner: string; pipeline: string; recipe?: string; policy?: string }>;
+  /** Credits owed for facts the model used (Ticket 219): Open-Meteo weather is CC BY 4.0. */
+  attributions?: readonly "open_meteo"[];
 }>;
 
 export type DailyBriefSourceAttention = "changed" | "no_calendars" | "unavailable";
