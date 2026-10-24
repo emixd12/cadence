@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Ticket 187 release without the travel train — October 24, 2026
+
+The owner chose, on October 24, 2026, to ship Ticket 187 for Google's demo recording
+without the travel train. PR #135 had absorbed PR #138 (Tickets 165, 212, 216–219)
+at `6cf3c047`. Shipping that would push two more hosted migrations. It would also stop
+sync on the published Mac 0.1.5, which predates Ticket 217. And its signed trip
+conclusions, which name Timeline Calendar events, could reach Daily Brief input.
+
+- Branch `claude/agent-calendar-187-release`: `36aa5bce`, the last PR #135 head before
+  the travel train (Tickets 187, 184 candidates 2–3, 188), merged with main `6f2e770b`,
+  plus the PR #148 disclosure line and verification record.
+- One hosted migration: `20261022180000_separate_agent_calendar_grant.sql`. The travel
+  migrations `20261022160000` and `20261022170000` stay unapplied. They then sort
+  before an applied migration; when the travel train ships, give them later
+  timestamps (or push with `--include-all` after review).
+- Recipe 1.0 stays the production default. Tickets 184 and 188 stay gated.
+- Cutover follows `docs/OPERATIONS.md`, "Agent Calendar grant (Ticket 187)": pause
+  `/api/advisor/*` and `/api/dev/briefing-*`, push the migration, deploy, refresh
+  Trust, then lift the pause.
+- P-005 is resolved: PR #147's text is live.
+
+Not verified: the published Mac 0.1.5 against the 187 server, and installed desktop
+consent for the Daily Brief connection.
+
+Platform impact: web gets the separate Daily Brief Calendar connection and its Settings
+and disclosure. Desktop source changes ship in a later desktop release; the installed
+0.1.5 keeps the Timeline connection. Marketing: no change. Future mobile: not
+applicable.
+
 ## Ticket 187: Google verification preparation — October 24, 2026
 
 Prepared Google's sensitive-scope verification for the Daily Brief Calendar client in

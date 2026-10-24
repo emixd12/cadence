@@ -53,7 +53,7 @@ Status values:
 | [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, Travel Settings, user guide |
 | [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, Settings, marketing, user guide, interface |
 | [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Daily Brief and Travel Settings, user guide |
-| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | drafted | 187 | Trust page, test |
+| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | resolved | 187 | Trust page, test |
 | [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | logged | 219, 165, 187 | Marketing |
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
 | [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
@@ -304,7 +304,10 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Update needed:** rewrite the sentence so that it agrees with the Daily Brief and MCP
   disclosures, and update the test. The rewrite must also cover Ticket 219's travel
   facts in model input (P-004).
-- **Status:** drafted. On October 24, 2026, for Google's verification of the Daily
+- **Status:** resolved. The text below went live on October 24, 2026 at 18:16 UTC
+  (PR #147, main `6f2e770b`, app deployment `dpl_GGNbBrLyA7knWGzghH6gWKp7vq5X`, then
+  `dpl_9SvrL4ekjjQg5utxsH7hpvnnvrR6` for the Trust refresh). Earlier record: on
+  October 24, 2026, for Google's verification of the Daily
   Brief Calendar client (Ticket 187), the Trust sentence was rewritten: exports go only
   where the user sends them; Daily Brief sends the context the Privacy Policy describes,
   Calendar timing only after a separate choice; MCP clients receive records only after
@@ -312,8 +315,7 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   change describes both Google Calendar connections in Privacy, "Optional Google
   Calendar", and adds the AI training limit there and in
   `docs/user-guide/privacy-and-account.md`. The owner approved the text on October 24,
-  2026. Set this entry to resolved when it is live, with the deployment and date.
-  Travel facts stay with P-004.
+  2026. Travel facts stay with P-004.
 
 ## P-006: Marketing review of AI and travel claims
 
@@ -409,9 +411,9 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
   selection, credential and Disconnect, and the one-time renewed choice.
 - **Status:** drafted. PR #147 (October 24, 2026, to `main`) describes both connections
   in Privacy, "Optional Google Calendar", and in `docs/user-guide/privacy-and-account.md`,
-  for Google's verification of the Daily Brief Calendar client. It does not yet mention
-  the one-time renewed choice. Daily Brief Settings now has its own Calendar disclosure
-  line. Set this entry to resolved when the text is live.
+  for Google's verification of the Daily Brief Calendar client. That text is live
+  since October 24, 2026 (see P-005). It does not yet mention the one-time renewed
+  choice. Daily Brief Settings now has its own Calendar disclosure line.
 
 ## P-011: Behavior descriptions sent for duration estimates
 
