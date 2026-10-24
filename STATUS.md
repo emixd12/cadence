@@ -81,7 +81,11 @@ both ways: four test Behaviors created on the web with Not set, Anywhere, Home a
 place reached the Mac, and the owner's four Mac edits reached the web. The test
 Behaviors are archived. Read through the macOS accessibility tree, the Mac shows
 connect controls for Outlook, iCloud and Hevy, and "Device location: not yet allowed."
-with Travel estimates on. Open: the location prompt (owner), the 0.1.5 upgrade from
+with Travel estimates on. Ticket 165 on this Mac: the signed entitlement produced the
+first macOS location prompt (02:42 BST), the owner allowed it, and with Cadence
+frontmost a current position was available. A follow-up defect: the desktop
+permission check runs a full location request, which times out right after a read and
+clears the "Device location" line. Open: the denied state, the 0.1.5 upgrade from
 0.1.3 on the test Mac, the prompt on a never-authorized user, and publication.
 
 Connector gating: when the candidate was built, production had no
