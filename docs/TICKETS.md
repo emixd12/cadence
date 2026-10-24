@@ -13246,6 +13246,7 @@ Execution evidence: `docs/qa/cadence-project-rename.md`.
 Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
 October 22, 2026: recovered from a local backup for owner review; the migration is now
 `20261022180000_separate_agent_calendar_grant.sql` (see `STATUS.md`).
+Privacy log: P-005, P-006 and P-010 in `docs/PRIVACY_CHANGES.md`.
 Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
 Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
 
@@ -13279,6 +13280,7 @@ This ticket supersedes the single Calendar-grant assumption in the Daily Brief p
 
 Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
 October 22, 2026: recovered from a local backup for owner review (see `STATUS.md`).
+Privacy log: P-011 in `docs/PRIVACY_CHANGES.md`.
 The unmerged iOS plan also uses the label "Ticket 188" for its activation step; renumber that
 step if the plan lands.
 Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate

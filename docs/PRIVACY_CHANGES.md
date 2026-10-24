@@ -27,7 +27,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-010` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-012` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -58,6 +58,8 @@ Status values:
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
 | [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
 | [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
+| [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | logged | 187 | Privacy, Settings |
+| [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -292,8 +294,8 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Change:** none new. Daily Brief already sends Behavior schedule and completion
   history to OpenAI, and connected AI clients read tracking records through MCP. A
   public statement suggests the opposite.
-- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187, but
-  `docs/TICKETS.md` has no Ticket 187 section yet. Files:
+- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187; its
+  section in `docs/TICKETS.md` names the public no-AI disclosure as a release gate. Files:
   `components/settings/LegalContent.tsx` (Trust, "Data boundaries"),
   `tests/legal-content.test.tsx`.
 - **Conflicting current text:** Trust, "Data boundaries": "Cadence does not send
@@ -377,4 +379,43 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     in native database backups".
   - `docs/user-guide/desktop-local.md`: "Import preserves the saved base".
 - **Update needed:** use Home, Where and usual travel, the words the interface shows.
+- **Status:** logged.
+
+## P-010: Separate Google Calendar grant for Daily Brief
+
+- **Change:** Ticket 187 (PR #135) gives Daily Brief its own Google Calendar connection.
+  It uses a separate Google Cloud project and client, separate consent, calendar selection,
+  encrypted credential and Disconnect. The Timeline Calendar connection never reaches the
+  model. The migration withdraws existing Daily Brief Calendar choices, so users must
+  connect again and allow Calendar again.
+- **Affected:** Ticket 187. Files: `components/settings/LegalContent.tsx` (Privacy,
+  "Optional Google Calendar" and "Optional Daily Brief").
+- **Conflicting current text:**
+  - Privacy, "Optional Google Calendar": "The Google Calendar connector is optional",
+    "encrypted Google refresh credential" and "Disconnect Google Calendar marks the
+    account connection disconnected" describe one connection.
+  - Privacy, "Optional Daily Brief": "Connecting a source or displaying it on Timeline
+    does not grant model access." Daily Brief now also needs its own Google connection.
+- **Update needed:** describe both Google Calendar connections, their separate consent,
+  selection, credential and Disconnect, and the one-time renewed choice.
+- **Status:** logged.
+
+## P-011: Behavior descriptions sent for duration estimates
+
+- **Change:** Ticket 188 (PR #135) sends Behavior titles and descriptions to OpenAI in
+  one bounded call that estimates session lengths. It applies only to recipes 1.1 and
+  1.2 (Ticket 184 candidates), when a Behavior has no default duration and too few
+  tracked sessions. Today only the private workbench uses it, after a page-session owner
+  confirmation. Production use needs a promoted recipe, a Daily Brief Settings choice
+  and a migration for that disclosure.
+- **Affected:** Tickets 188 and 184. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Optional Daily Brief" and the processor table's OpenAI row).
+- **Conflicting current text:**
+  - Privacy, "Optional Daily Brief": "Cadence sends today's Behavior schedule and
+    completion history, including findings calculated from it, to OpenAI."
+  - Processor table, OpenAI: "Behavior schedule, completion history and calculated
+    findings; separately enabled Calendar timing, reminder counts, and selected note
+    excerpts". Neither names Behavior titles or descriptions.
+- **Update needed:** when a recipe with estimates is promoted, name Behavior titles and
+  descriptions as a separate Daily Brief choice and add them to the OpenAI row.
 - **Status:** logged.
