@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Ticket ledger reconciled with production — October 27, 2026
+
+Documentation only; no runtime, schema or hosted change. `docs/TICKETS.md` now matches
+production as of October 24, 2026, and the evidence in `STATUS.md` and git history.
+
+- Live: Ticket 215 since October 23 (PR #112). Ticket 187 since October 24 (PR #150),
+  then the travel train the same day (Tickets 165, 212 and 216–219; PRs #135 and #138).
+  Evidence: PR #152. Each status names what stays open: Google verification for the
+  Daily Brief client, weather clearance, desktop 0.1.6 or PR #153's sync contracts,
+  and installed acceptance.
+- Complete: Ticket 129 (repair acceptance, September 9) and Ticket 131 (Ticket 180 on
+  September 29, and the 0.1.5 stable-feed update on October 24).
+- Still open, each with a dated note and its evidence: 091, 104, 105, 128, 133–137, 141,
+  147, 148, 150, 155, 161 and 174.
+- Unchanged: Ticket 130. This file calls it complete on September 9, "in progress" on
+  September 10, and keeps "the broader Ticket 130" open on September 15. The owner
+  decides its state.
+- Number collision: the October 22 entry "Ticket 232: Astro and Vitest dependency
+  integration" is not `docs/TICKETS.md` Ticket 232 (MCP production deployment and live
+  client acceptance). Nothing is renumbered; the PR proposes a fix.
+
+Read-only checks on October 27: `app.cadence-me.com` serves
+`dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T`; Vercel Production lists
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` and no `CADENCE_WEATHER_PROVIDER_CLEARANCE`; npm
+`latest` for web-push is 3.6.7.
+
+Platform impact: ledger text only. Web, desktop and marketing have no change; future
+mobile is not applicable.
+
 ## PR #150 review follow-ups — October 24, 2026
 
 Fixes the two chatgpt-codex P2 findings that PR #150 resolved as follow-ups. Both
