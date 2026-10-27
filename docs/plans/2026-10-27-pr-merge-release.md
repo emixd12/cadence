@@ -38,13 +38,14 @@ another author's work. Preserve original PR history with merge commits.
    test-device tooling: `.github/workflows/desktop-native.yml` now includes the
    **Test-device Swift helpers** job on macOS 15. Resolve review threads only after
    the fix is present.
-3. Require #153's disposable Supabase rehearsal on its revised head. The initial
-   run `40537377626` failed during image pull rate limiting, before any migration
-   test ran; it is not SQL validation evidence. The later run `40556180279`
-   failed at the same pull stage. The reviewed repair gives the workflow read-only
-   package permission and authenticates GHCR pulls with the workflow token through
-   an immutable official Docker login action. It changes no proxy or rehearsal
-   gate. A successful run on the final head must still prove this repair.
+3. Require #153's disposable Supabase rehearsal on its revised head. Runs
+   `40537377626`, `40556180279` and `40558572739` failed before SQL validation.
+   Registry authentication did not clear the gate. The later isolated standard
+   Docker pull in `40561396997` confirmed GHCR throttling. The current repair
+   uses the already-approved official ECR image pins with bounded, classified
+   pull retries; it removes the unused GHCR login and package permission. All
+   proxy restrictions and rehearsal checks remain. A successful run on the
+   final head must still establish migration and RPC validation.
 4. Exercise contract 1 reads/writes, hidden-field preservation, receipt replay,
    contract transitions, unsupported/null contracts and cross-account isolation.
 5. Distinguish plain PostgreSQL regression evidence from Supabase/PostgREST and
@@ -132,15 +133,32 @@ Review checkpoint, October 27, 2026: six PRs are merged; **only #153 remains ope
 Integrated PR #153 head `aae56162c95864719b2696d934357905c09e7476` passed ordinary
 CI (`40558572628`) and both native jobs (`40558572652`), including the Swift
 helpers. Supabase rehearsal `40558572739` still failed during startup after GHCR
-login succeeded. No SQL test executed in that run. Its actual failure cause awaits
-sanitized diagnostics; registry authentication alone has not cleared the gate.
+login succeeded. No SQL test executed in that run; the earlier broad classifier
+cannot establish its exact failure cause.
 
-The next rehearsal pulls the same seven approved image pins sequentially through
-the unchanged Docker proxy, sharing the first startup's eight-minute budget.
-Failed pulls or starts report fixed, allowlisted signals from at most the final
-64 KiB of private output; raw logs and credentials stay suppressed. This separates
-registry failures from startup and improves diagnosis. It does not yet establish
-that startup, migration replay or RPC checks succeed.
+The next published head, `21babac38de7a945e92e7a4a15fd424a88d9cb79`, added
+isolated sequential pulls and bounded diagnostics. Rehearsal `40561396997`
+(job `122391069851`) failed the standard Docker pre-pull of
+`ghcr.io/supabase/postgres:17.6.1.132` with only the fixed
+`registry_rate_limit` signal and no retained HTTP code. No migration check ran.
+Read-only manifest probes on October 27 at 18:37–18:38 UTC independently found
+429/`TOOMANYREQUESTS` for six GHCR pins and ECR's Storage pin; the other six ECR
+manifests and GHCR's PostgREST manifest returned 200. No throttled response supplied
+`Retry-After`, and no missing-manifest response was observed. Only PostgREST's
+cross-registry indexes could be compared and were byte-identical; the other six
+identities were not reverified.
+
+The current repair selects `public.ecr.aws`, the pinned CLI's official default
+and an existing proxy allowlist entry. It pulls all seven unchanged pins
+sequentially, with at most four attempts per image and 10-/20-/40-second backoff
+only for explicit throttling or specified network interruptions. Unknown,
+authentication, manifest, proxy, disk/certificate and incomplete-diagnostic
+failures do not retry. All pulls and delays share the first startup's eight-minute
+budget. The second clean startup, migration reset and full SQL/RPC checks remain.
+Raw logs and credentials stay suppressed; diagnostics emit only bounded,
+allowlisted fields. ECR also throttled during the probes, so this repair does not
+establish availability or a successful rehearsal. Final-head validation remains
+required.
 
 No hosted migration has been applied during this review. The ledger remains at
 92 migrations through `20261024210000`. Successful final-head SQL/RPC rehearsal,
@@ -148,10 +166,16 @@ reviewed migration deployment and any provider-generated timestamp reconciliatio
 remain pending. The migration contents must remain traceable to the reviewed SQL.
 
 Local CLI authentication is absent for Vercel 65.4.0 and GitHub CLI 2.103.3. The
-Vercel connector's environment-list request returned 403. This does not establish
-whether the exact Production Trust environment upsert will succeed: its write
-capability remains untested until the final marketing deployment ID is available.
-Final application/marketing deployment verification and Trust pairing remain open.
+Vercel connector's environment-list request and the actual Production upsert of
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` both returned 403. The attempted value was
+`dpl_6naaoSjaTVGUUrwtx9VK9djrYHpR`; no environment write was made. This is a
+confirmed write-permission blocker, with no authenticated local CLI fallback.
+
+At merged main `f8a7740035529a81f8037cdfea3af0aabea73a64`, application deployment
+`dpl_CzL5eMtoVCzCP4YBJfTrAhSGnjk4` and marketing deployment
+`dpl_6naaoSjaTVGUUrwtx9VK9djrYHpR` are both Ready. These establish deployment of
+the current merged main only. Final PR #153 deployment verification and the
+required Trust provenance pairing remain open.
 
 Native 0.1.6 is prepared in source; the published feeds still serve 0.1.5. No Mac
 inventory is configured in this environment. Installed acceptance, signing,

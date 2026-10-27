@@ -122,13 +122,14 @@ while IFS= read -r volume; do
 done <<< "$volume_names"
 
 export SUPABASE_TELEMETRY_DISABLED=1 SUPABASE_ACCESS_TOKEN="" SUPABASE_DB_PASSWORD=""
-# Anonymous public.ecr.aws pulls hit "toomanyrequests" on some shared runner
-# addresses (October 22-23, 2026), failing both start attempts. GHCR serves the
-# same pinned manifests; the Docker proxy accepts exactly those images.
-export SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io
+# Use the pinned CLI's official default registry, already accepted by the proxy.
+# Authenticated GHCR pulls were throttled on October 27; ECR can also throttle,
+# so confirmed transient pull failures receive bounded backoff below.
+SUPABASE_INTERNAL_IMAGE_REGISTRY="$(node scripts/supabase-rehearsal-diagnostics.mjs registry)"
+export SUPABASE_INTERNAL_IMAGE_REGISTRY
 export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-linux-x64/bin/supabase-go"
 test "$(npm run --silent supabase -- --version)" = 2.105.0
-printf 'Supabase CLI 2.105.0 image registry: ghcr.io (pinned service images).\n'
+printf 'Supabase CLI 2.105.0 image registry: %s (pinned service images).\n' "$SUPABASE_INTERNAL_IMAGE_REGISTRY"
 
 begin_phase 'preparing the unlinked workdir'
 CADENCE_DOCKER_PROXY_DIR="$(mktemp -d "$RUNNER_TEMP/cadence-sql.XXXXXX")"
@@ -170,22 +171,32 @@ pinned_image_output="$(node scripts/supabase-rehearsal-diagnostics.mjs images)"
 mapfile -t pinned_images <<< "$pinned_image_output"
 test "${#pinned_images[@]}" = 7
 for image in "${pinned_images[@]}"; do
-  output="$CADENCE_DOCKER_PROXY_DIR/pull.out"
-  remaining=$((first_start_deadline - SECONDS))
-  status=0
-  if ((remaining <= 0)); then
-    : > "$output"
-    status=124
-  else
-    timeout --kill-after=5s "${remaining}s" docker pull --quiet "$image" > "$output" 2>&1 || status=$?
-  fi
-  if ((status != 0)); then
-    diagnostics="$(node scripts/supabase-rehearsal-diagnostics.mjs inspect "$output" "$status" pull)"
-    printf '::error::Pinned image pull %s failed with exit %s; diagnostics=%s\n' "$image" "$status" "$diagnostics"
+  for attempt in {1..4}; do
+    output="$CADENCE_DOCKER_PROXY_DIR/pull.out"
+    remaining=$((first_start_deadline - SECONDS))
+    status=0
+    if ((remaining <= 0)); then
+      : > "$output"
+      status=124
+    else
+      timeout --kill-after=5s "${remaining}s" docker pull --quiet "$image" > "$output" 2>&1 || status=$?
+    fi
+    if ((status == 0)); then
+      rm -f "$output"
+      break
+    fi
+    remaining=$((first_start_deadline - SECONDS))
+    diagnostics="$(node scripts/supabase-rehearsal-diagnostics.mjs inspect-pull "$output" "$status" "$attempt" "$remaining")"
     rm -f "$output"
-    exit "$status"
-  fi
-  rm -f "$output"
+    delay="$(jq -r '.retry_delay_seconds // 0' <<< "$diagnostics")"
+    if ((delay == 0)); then
+      printf '::error::Pinned image pull %s attempt %s failed with exit %s; diagnostics=%s\n' "$image" "$attempt" "$status" "$diagnostics"
+      exit "$status"
+    fi
+    printf '::warning::Pinned image pull %s attempt %s failed with exit %s; diagnostics=%s\n' "$image" "$attempt" "$status" "$diagnostics"
+    printf 'Retrying the same pinned image after %s seconds within the existing startup budget.\n' "$delay"
+    sleep "$delay"
+  done
   printf 'Pinned image cached: %s\n' "$image"
 done
 

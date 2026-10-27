@@ -116,15 +116,15 @@ environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
 runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
 
 The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
-project-scoped Docker proxy. It pulls the pinned images from `ghcr.io/supabase`
-(`SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io`): anonymous `public.ecr.aws` pulls
-were throttled (`toomanyrequests`) on some shared runner addresses. GHCR serves
-the same manifest digests. The workflow logs Docker into GHCR using its temporary
-`GITHUB_TOKEN` with `packages: read`; the login action removes that login on exit.
+project-scoped Docker proxy. It pulls the seven existing pinned images from
+`public.ecr.aws/supabase`, the pinned CLI's official default registry and an
+existing proxy allowlist entry. The registry and pull inventory come from the
+rehearsal helper and the proxy's immutable image list; image pins are not copied.
 The rehearsal first pulls the seven approved pins sequentially with standard
 Docker through the same proxy. This isolates registry access, reduces concurrent
 pull pressure and caches the images before CLI startup. There is no registry or
-image fallback. It copies only config, the empty seed and tracked
+image fallback, registry login step, or package permission. It copies only
+config, the empty seed and tracked
 migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
 checks service health before and after `db reset --local`. The tracked migration
 version list must exactly match the applied list; its count is derived from the
@@ -137,17 +137,40 @@ npm run smoke:account-sync:local
 CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
 ```
 
+Registry evidence, October 27, 2026: authenticated GHCR
+[run 40561396997](https://github.com/emixd12/cadence/actions/runs/40561396997)
+failed the isolated `postgres:17.6.1.132` pull with the fixed
+`registry_rate_limit` signal, before any migration check. Read-only manifest
+probes at 18:37–18:38 UTC returned 429/`TOOMANYREQUESTS` for six GHCR pins and
+ECR's `storage-api:v1.60.4`; the other manifests returned 200. No missing-manifest
+response or `Retry-After` header was observed. Only PostgREST could be compared
+across both registries and its indexes were byte-identical. The other six
+cross-registry identities were not reverified. ECR availability is not guaranteed.
+
+Each image pull permits at most four attempts, with 10-, 20-, and 40-second
+backoff only for explicit throttling or specific network interruptions
+(`unexpected EOF`, connection reset, I/O timeout, or TLS handshake timeout).
+Authentication, missing manifests, proxy rejection, disk/certificate errors,
+unknown failures, truncated diagnostics, and process time limits stop retries.
+The delay must fit inside the remaining startup budget. This follows the
+[ECR throttling/backoff guidance](https://docs.aws.amazon.com/AmazonECR/latest/userguide/common-errors.html)
+and the documented retry treatment of
+[closed connections and read timeouts](https://docs.aws.amazon.com/boto3/latest/guide/retries.html).
+Docker also has its own layer retries within the same command deadline;
+[Docker 28.0.4](https://github.com/moby/moby/blob/v28.0.4/distribution/errors.go)
+does not retry `TOOMANYREQUESTS` internally.
+
 Local API credentials stay inside the existing config reader. Startup/reset
 output is suppressed; failures identify the phase and show only container names,
 health, ports and networks. Failed pulls and starts also report their exit code
 and bounded diagnostics from at most the final 64 KiB of private output: fixed
 failure categories/signals, approved registry and image names, allowlisted HTTP
-status codes, and whether earlier output was omitted. No raw message, URL, query,
+status codes, the fixed retry delay, and whether earlier output was omitted. No raw message, URL, query,
 header, key or credential is emitted. Signals are observations; they do not prove
 which failure caused the exit. Plain "rate limit" text does not establish registry
 throttling. The proxy logs any rejected request as method and path only. Sequential
 pulls share the first start's 8-minute budget; the second start gets 8 minutes
-from a stopped stack with this project's two volumes removed. A failed image
+from a stopped stack with this project's two volumes removed. An unrecovered image
 pull stops the rehearsal before startup. The 30-minute job
 stops only its Cadence containers before ending the proxy. Docker cleanup is
 limited to the CLI's prunes filtered by this project's label; the shared network

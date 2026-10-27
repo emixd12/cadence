@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const modulePath = "../scripts/supabase-docker-proxy.mjs";
-const { createDockerProxy, rewriteCreate, PINNED_GHCR_IMAGES } = await import(modulePath);
+const { createDockerProxy, rewriteCreate, PINNED_IMAGES } = await import(modulePath);
 const PROJECT = "habit-tracking-app";
 const DB = `supabase_db_${PROJECT}`;
 const labels = { "com.supabase.cli.project": PROJECT, "com.docker.compose.project": PROJECT };
@@ -210,12 +210,13 @@ describe("Docker HTTP forwarding against a fake Unix-socket daemon", () => {
     expect(received.filter((request) => request.path.startsWith("/images/create"))).toHaveLength(2);
   });
 
-  it("accepts all seven sequential-pull pins and forwards registry authentication without logging it", async () => {
+  it("accepts all seven ECR sequential-pull pins and forwards registry authentication without logging it", async () => {
     const rejections: string[] = [];
     const { send, received } = await setup(rejections);
     const auth = Buffer.from(JSON.stringify({ username: "synthetic-user", password: "synthetic-password" })).toString("base64url");
-    expect(PINNED_GHCR_IMAGES).toHaveLength(7);
-    for (const image of PINNED_GHCR_IMAGES as string[]) {
+    const images = (PINNED_IMAGES as string[]).filter((image) => image.startsWith("public.ecr.aws/"));
+    expect(images).toHaveLength(7);
+    for (const image of images) {
       const [name, tag] = image.split(":");
       const result = await send("POST", `/images/create?fromImage=${encodeURIComponent(name)}&tag=${tag}`, undefined, false, { "x-registry-auth": auth });
       expect(result.status, image).toBe(201);
