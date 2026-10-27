@@ -1,10 +1,14 @@
 # Implementation Status
 
-## Cadence for Mac 0.1.6 release preparation — October 27, 2026
+## Cadence for Mac 0.1.6 release — October 27, 2026
 
-Release source `8be778a` (version 0.1.6, account-sync contract 2, SQLite schema 20)
-passed dev-signed installed acceptance after the hosted contract migration. It is not
-built, notarized or published; those steps wait for the owner. Packet:
+**Published October 27, 2026** on the owner's instruction. Release source `8be778a`
+(version 0.1.6, account-sync contract 2, SQLite schema 20) was built, notarized (app
+`156960f0…`, DMG `3a2f6806…`) and published to `desktop-stable`. The stable feed has
+offered 0.1.6 since 22:33:43Z and the preview feed since 22:47:28Z. The test Mac upgraded from
+0.1.5 through the real updater: schema 18 → 20, no lost rows, contract-2 convergence. The
+public readback and the quarantined download of the version-free DMG pass. Open: reconnecting
+the test Mac after the revoked-session check (owner sign-in) and the never-run macOS user. Packet:
 `docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
 `docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
 
