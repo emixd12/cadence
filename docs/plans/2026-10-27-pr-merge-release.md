@@ -35,14 +35,29 @@ another author's work. Preserve original PR history with merge commits.
 1. Run agents, interactions, resolvers, lint, typecheck, Vitest and web build checks.
    Run desktop renderer and marketing checks for the integrated tree.
 2. Require GitHub CI on each revised PR. Require native Swift validation for the
-   test-device tooling. Resolve review threads only after the fix is present.
+   test-device tooling: `.github/workflows/desktop-native.yml` now includes the
+   **Test-device Swift helpers** job on macOS 15. Resolve review threads only after
+   the fix is present.
 3. Require #153's disposable Supabase rehearsal on its revised head. The initial
    run `40537377626` failed during image pull rate limiting, before any migration
-   test ran; it is not SQL validation evidence.
+   test ran; it is not SQL validation evidence. The later run `40556180279`
+   failed at the same pull stage. The reviewed repair gives the workflow read-only
+   package permission and authenticates GHCR pulls with the workflow token through
+   an immutable official Docker login action. It changes no proxy or rehearsal
+   gate. A successful run on the final head must still prove this repair.
 4. Exercise contract 1 reads/writes, hidden-field preservation, receipt replay,
    contract transitions, unsupported/null contracts and cross-account isolation.
 5. Distinguish plain PostgreSQL regression evidence from Supabase/PostgREST and
    installed desktop acceptance. Never substitute one for another in release records.
+
+The combined source joins reviewed PR #153 head `f80f758` (tree
+`75bd407014dfdf8ca3945aefc0cb0800bc6b4ecb`) and PR #149 head `b97492b` (tree
+`7b2764b5a506f0820676650b0665a1d11feebd3f`). Both remote trees matched the reviewed
+local trees before integration. This integration changes no migration SQL and
+does not establish a hosted deployment.
+
+Ordinary CI passed on `f80f758` in run `40556180460`. That run precedes the combined
+test-device changes and registry repair; final-head CI remains required.
 
 ## Hosted release sequence
 
@@ -80,6 +95,13 @@ A new signed desktop must use 0.1.6 or later and the final reviewed source. Foll
 quarantined download, database preservation, the 0.1.5-to-candidate updater run and
 changed-area checks remain mandatory. Publishing server compatibility does not
 publish the newer desktop features.
+
+Installed acceptance must also exercise the revised test-device helpers. Verify
+the configured process, expected downloaded version, named restart and resulting
+PID on the test Mac. If accessibility fails after bundle replacement, the helper
+must report installation without restart and send no stale-coordinate click.
+Synthetic SSH tests and the macOS Swift typecheck do not establish that installed
+flow or database preservation.
 
 The current execution environment is Linux. No private test-device inventory,
 Tailscale connection, Apple signing identity or retained Mac artifact has been

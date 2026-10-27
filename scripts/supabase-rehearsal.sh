@@ -128,6 +128,7 @@ export SUPABASE_TELEMETRY_DISABLED=1 SUPABASE_ACCESS_TOKEN="" SUPABASE_DB_PASSWO
 export SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io
 export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-linux-x64/bin/supabase-go"
 test "$(npm run --silent supabase -- --version)" = 2.105.0
+printf 'Supabase CLI 2.105.0 image registry: ghcr.io (pinned service images).\n'
 
 begin_phase 'preparing the unlinked workdir'
 CADENCE_DOCKER_PROXY_DIR="$(mktemp -d "$RUNNER_TEMP/cadence-sql.XXXXXX")"

@@ -9,6 +9,9 @@ on:
       - package.json
       - package-lock.json
       - public/icons/cadence-notification-icon.png
+      - scripts/test-device.mjs
+      - scripts/test-device-ax/**
+      - tests/test-device.test.ts
   push:
     branches:
       - main
@@ -19,6 +22,9 @@ on:
       - package.json
       - package-lock.json
       - public/icons/cadence-notification-icon.png
+      - scripts/test-device.mjs
+      - scripts/test-device-ax/**
+      - tests/test-device.test.ts
   workflow_dispatch:
 
 permissions:
@@ -29,6 +35,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-device-helpers:
+    name: Test-device Swift helpers
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Typecheck accessibility helpers
+        run: |
+          swiftc -typecheck scripts/test-device-ax/axelement.swift
+          swiftc -typecheck scripts/test-device-ax/click.swift
+
   native:
     name: Native macOS check and tests
     runs-on: macos-15

@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: supabase-rehearsal-${{ github.event.pull_request.number || github.ref }}
@@ -73,5 +74,11 @@ jobs:
       - run: npm ci
       - name: Verify the existing Docker proxy
         run: npx vitest run tests/supabase-docker-proxy.test.ts
+      - name: Authenticate pulls from the Supabase image registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Replay migrations and run local contracts
         run: bash scripts/supabase-rehearsal.sh

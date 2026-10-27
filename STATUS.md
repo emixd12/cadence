@@ -256,6 +256,25 @@ Platform impact: web public legal pages and user guide. Desktop shares the hoste
 legal pages; no runtime change. Marketing claims stay accurate in both states and
 are not changed (P-006). Future mobile: not applicable.
 
+## Test device pathway — October 24, 2026
+
+The owner kept the test Mac's SSH accessibility grant from the 0.1.5 release and
+asked for a standing, multi-device pathway.
+
+- `docs/TEST_DEVICES.md`: setup per device (Tailscale, Remote Login, labelled SSH
+  key, Accessibility for `sshd-keygen-wrapper`, the System Events prompt), commands,
+  rules and known behavior.
+- `scripts/test-device.mjs` with `list`, `check`, `exec` and `ax`; JXA helpers in
+  `scripts/test-device-ax/`. The inventory lives outside the public repository in
+  `~/Library/Application Support/Cadence Release/test-devices.json`; the format is
+  `docs/examples/test-devices.example.json`.
+- `AGENTS.md` and `docs/DESKTOP_RELEASE.md` point to it.
+- Verified against the test Mac: `check` reported macOS 27.0.1, Cadence 0.1.5 running
+  and working accessibility; `exec` and `ax find` returned results.
+
+Platform impact: desktop acceptance tooling only. Web, marketing and future mobile
+have no change; a future mobile device would need its own driver.
+
 ## Cadence for Mac 0.1.5 published — October 24, 2026
 
 The owner instructed the merge and release of the retained 0.1.5 candidate (source
