@@ -2,9 +2,15 @@
 
 ## Account sync contracts — October 27, 2026
 
-Approved by the owner on October 27. Adding a synced field no longer forces a
-desktop update. Plan and decisions: `docs/plans/2026-10-27-sync-compatibility.md`.
-Source only: nothing is pushed to hosted, merged or released.
+Approved by the owner on October 27. The contract implementation lets additive
+synced fields preserve supported older desktop shapes. Plan and decisions:
+`docs/plans/2026-10-27-sync-compatibility.md`.
+The compatibility code and complete disposable Supabase rehearsal are verified.
+Hosted deployment remains blocked: two migration-connector requests returned
+`Invalid or expired requestState`. Readback on October 27 at 19:18 UTC confirmed
+the original 92 migrations, no contract registry or integer reader, and no
+in-flight contract migration. The server rescue is not live. Native 0.1.6 is
+prepared in source and remains unpublished.
 
 - Migration `20261027120000_account_sync_contracts.sql` adds a contract
   registry. Each client gets a snapshot and fingerprint projected to the
@@ -32,6 +38,17 @@ Source only: nothing is pushed to hosted, merged or released.
   matrix and a forward-correction procedure.
 - Part C (a separate dev Supabase target) is dropped by owner decision. Dev builds keep
   using production.
+- Full-stack evidence: all 93 migrations, all 27 SQL fixtures, both authenticated
+  smokes (including 92 RLS ownership checks), and the authenticated BehaviorStore
+  contract passed on exact PR source in an isolated disposable environment.
+  Every service binding remained on loopback, synthetic users were removed, and
+  the services and proxy stopped. GitHub's separate rehearsal attempts were
+  throttled at the first image pull before any SQL ran. Evidence and limitations:
+  `docs/qa/2026-10-27-sync-contract-rehearsal.md`.
+- Source merging is safe while hosted deployment is blocked: only the desktop
+  adapter calls the versioned account-sync RPCs; the web deployment does not.
+  Do not publish a contract-2 desktop until the reviewed migration is applied
+  and its ledger, functions, permissions and public RPC types are verified.
 
 Platform impact: hosted sync and linked desktop. Web screens and marketing have
 no change. Future mobile would declare its own contract.

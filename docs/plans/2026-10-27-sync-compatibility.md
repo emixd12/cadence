@@ -1,8 +1,11 @@
 # Account sync compatibility: stop forced updates on additive changes
 
 Status: Parts A and B (including A.7) approved and implemented in source October 27,
-2026, on branch `claude/sync-contract-projection`. The owner dropped Part C on
-October 27; development builds keep using production. No hosted change has been made.
+2026, in PR #153. The owner dropped Part C on October 27; development builds keep
+using production. No hosted change has been made: two migration-connector requests
+failed with `Invalid or expired requestState`, and readback at 19:18 UTC confirmed
+the unchanged 92-entry ledger and absent contract objects. Native 0.1.6 remains
+unpublished until the server migration and installed acceptance are complete.
 
 Implementation differs from the proposal in three places:
 
@@ -31,8 +34,17 @@ SQL smoke files pass on fresh disposable PostgreSQL 16.15 with synthetic auth
 tables and roles. The new fixture fails against the original null-contract and
 delete-preservation implementations. Targeted Vitest passes 96 tests; core and
 desktop typechecks, changed-file lint, agents, interactions and resolvers checks
-pass. This standalone database does not establish Supabase Auth/PostgREST or
-installed Mac acceptance; the disposable Supabase rehearsal remains required.
+pass. This standalone database evidence is separate from Supabase Auth/PostgREST
+and installed Mac acceptance.
+
+The complete disposable Supabase rehearsal subsequently passed on exact source
+`ab7483d50a0fd4728320c03513fcb3768ff1c244`: all 93 migrations, all 27 SQL fixtures,
+both authenticated smokes, and the authenticated BehaviorStore contract, with
+loopback bindings, service health and synthetic-account cleanup verified. The
+manual isolated run retained all seven pinned services and every database-rehearsal gate;
+GitHub's two attempts failed at registry pulls before SQL. Details and environment
+differences: `docs/qa/2026-10-27-sync-contract-rehearsal.md`. Installed Mac and hosted
+rollout acceptance remain open.
 
 ## Problem
 
@@ -255,5 +267,6 @@ or deleting pending writes.
 - The currently installed Mac build, and installed 0.1.5, recorded dev.2 or
   contract-2 desktop acceptance against the deployed migration.
 - Vercel Preview's Supabase target.
-- PostgREST overload dispatch is covered by the authenticated RPC smoke when the
-  disposable Supabase rehearsal runs; a standalone SQL run alone does not verify it.
+- Hosted deployment, function/permission readback and generated public RPC types.
+  PostgREST overload dispatch passed in the disposable authenticated RPC smoke;
+  this does not establish that the hosted migration has been applied.

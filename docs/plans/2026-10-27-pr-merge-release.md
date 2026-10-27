@@ -44,8 +44,13 @@ another author's work. Preserve original PR history with merge commits.
    Docker pull in `40561396997` confirmed GHCR throttling. The current repair
    uses the already-approved official ECR image pins with bounded, classified
    pull retries; it removes the unused GHCR login and package permission. All
-   proxy restrictions and rehearsal checks remain. A successful run on the
-   final head must still establish migration and RPC validation.
+   proxy restrictions and rehearsal checks remain. The complete manual rehearsal
+   subsequently passed on exact source `ab7483d`, using all seven pins and every
+   migration, SQL, authenticated-RPC, isolation and cleanup check. See
+   `docs/qa/2026-10-27-sync-contract-rehearsal.md` for its source identity and
+   environment differences. It does not change the failed GitHub result. Repeat
+   the rehearsal if runtime, SQL or harness code changes; final documentation-only
+   updates retain that evidence. Required CI still runs on the final PR head.
 4. Exercise contract 1 reads/writes, hidden-field preservation, receipt replay,
    contract transitions, unsupported/null contracts and cross-account isolation.
 5. Distinguish plain PostgreSQL regression evidence from Supabase/PostgREST and
@@ -69,8 +74,12 @@ results are recorded below.
    sends contract 2. Confirm that no-argument reads still mean contract 1 and that
    unknown contracts fail closed. Verify the published 0.1.5 shape with synthetic
    fixtures before claiming installed 0.1.5 acceptance.
-3. Merge the final source only after required CI succeeds. Both Vercel projects
-   rebuild on every main merge; verify each final production deployment's commit.
+3. Merge the final source only after required CI and the complete disposable
+   rehearsal succeed. Source may merge while the hosted connector is blocked:
+   only the desktop adapter calls the new RPC, and no new desktop is published.
+   Keep contract-2 native publication blocked until steps 1–2 complete. Both
+   Vercel projects rebuild on every main merge; verify each final production
+   deployment's commit.
 4. Set the application's Production `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` to the
    final Ready marketing deployment. Redeploy the application and read back its
    production aliases, source commit and provenance pairing.
@@ -119,7 +128,9 @@ Mac connection. Do not label native publication complete without its evidence.
 
 ## Completion record
 
-Review checkpoint, October 27, 2026: six PRs are merged; **only #153 remains open**.
+Review checkpoint before the final merge, October 27, 2026: six PRs are merged;
+**#153 is the final source PR**. Merging this corrected and verified PR closes
+the original seven-PR queue. Its final CI and merge commit are recorded on the PR.
 
 | PR | Merge result |
 | --- | --- |
@@ -129,6 +140,7 @@ Review checkpoint, October 27, 2026: six PRs are merged; **only #153 remains ope
 | #156 | Merged to main at `fefeeb0`. |
 | #151 | Merged into #149 at `feb9ea4`. |
 | #149 | Merged to main at `f8a7740035529a81f8037cdfea3af0aabea73a64`. |
+| #153 | Final source PR; full disposable validation passed, with hosted/native release blockers recorded below. |
 
 Integrated PR #153 head `aae56162c95864719b2696d934357905c09e7476` passed ordinary
 CI (`40558572628`) and both native jobs (`40558572652`), including the Swift
@@ -157,13 +169,40 @@ failures do not retry. All pulls and delays share the first startup's eight-minu
 budget. The second clean startup, migration reset and full SQL/RPC checks remain.
 Raw logs and credentials stay suppressed; diagnostics emit only bounded,
 allowlisted fields. ECR also throttled during the probes, so this repair does not
-establish availability or a successful rehearsal. Final-head validation remains
-required.
+establish availability or a successful rehearsal by itself.
 
-No hosted migration has been applied during this review. The ledger remains at
-92 migrations through `20261024210000`. Successful final-head SQL/RPC rehearsal,
-reviewed migration deployment and any provider-generated timestamp reconciliation
-remain pending. The migration contents must remain traceable to the reviewed SQL.
+Head `ab7483d50a0fd4728320c03513fcb3768ff1c244` passed CI `40563809987`, both
+native jobs in `40563810101`, and both Vercel previews. Local validation passed
+3,866 tests with 179 configured skips and every required build/check. Supabase
+rehearsal `40563810090` failed twice on separate GitHub runners at the first ECR
+Postgres image, with the same explicit throttle and bounded four-attempt stop.
+
+The independent full rehearsal then passed in a fresh Vercel Sandbox on the exact
+same source/tree. All seven image pulls succeeded; all 93 migrations and 27 SQL
+fixtures passed; the RLS smoke passed 92 ownership checks; account-sync RPC and
+authenticated BehaviorStore checks passed. Startup/reset/final binding and health
+checks, zero remaining synthetic users, unchanged source, and stopped services/
+proxy were verified. The QA record preserves the manual procedure's differences
+without claiming the GitHub job passed. Final source changes only record this
+evidence and release state; runtime, SQL and rehearsal code stay unchanged.
+
+No hosted migration has been applied during this review. Two exact-SQL migration
+requests returned `Invalid or expired requestState`. After each, readback verified
+the original 92 migrations through `20261024210000`, no contract registry or
+integer reader, and no in-flight contract migration; the last readback was
+October 27 at 19:18 UTC. The old no-argument reader remains present. The pending
+file remains `20261027120000_account_sync_contracts.sql`, SHA-256
+`a21ab54b6b9049b2a65d905229eefbfaea38f607de5d5aef0f0da65ac4f3c4a6`.
+There is no generated hosted version to reconcile and no source file was renamed.
+
+Resume through the project-local migration workflow when authenticated migration
+tooling is operational. Recheck history and absence of partial application, apply
+the exact reviewed migration once, and verify the complete ledger, registry,
+function definitions, privileges and generated public RPC types. If the managed
+migration API supplies a different version, reconcile only this still-unapplied
+source version with the observed ledger while preserving the SQL bytes. Keep all
+92 applied migrations unchanged. The contract-1 rescue is not live, and native
+0.1.6 must not be published before this step succeeds.
 
 Local CLI authentication is absent for Vercel 65.4.0 and GitHub CLI 2.103.3. The
 Vercel connector's environment-list request and the actual Production upsert of
@@ -176,6 +215,18 @@ At merged main `f8a7740035529a81f8037cdfea3af0aabea73a64`, application deploymen
 `dpl_6naaoSjaTVGUUrwtx9VK9djrYHpR` are both Ready. These establish deployment of
 the current merged main only. Final PR #153 deployment verification and the
 required Trust provenance pairing remain open.
+
+Public checks on that merged source returned 200 for marketing, the application's
+login destination, `/trust` and `/api/public/trust-evidence`. Unauthenticated GETs
+to `/api/reminders/process` and `/api/occurrences/sync` returned 401. The Trust API
+correctly marked evidence from the earlier `f10e068` deployment as stale. The
+bounded runtime query reported one Node `DEP0169` deprecation-warning group and
+no other error group; this does not establish signed-in workflow acceptance.
+
+The public Trust evidence workflow has a manual trigger and a 07:17 UTC schedule.
+The connector exposes no dispatch operation and the local GitHub CLI has no
+authenticated session. A fresh successful collection remains separate from the
+Vercel environment/deployment pairing; neither is currently complete.
 
 Native 0.1.6 is prepared in source; the published feeds still serve 0.1.5. No Mac
 inventory is configured in this environment. Installed acceptance, signing,
