@@ -616,6 +616,13 @@ synced setting.
   shown on screen (October 24, PR #140).
 - locationd's "not a plugin or an app" (`-10814`) lines and visit-monitoring
   subscriptions are routine; they also appear for Apple's own apps.
+- WebKit treats an occluded window as hidden. A window on another Space, behind other
+  windows, or under Computer Use's full-screen control overlay logs
+  `isViewVisible(): … window occluded 1`. `document.hidden` then blocks location reads
+  before the native call, and account sync slows (one **Sync now** took 3 min 23 s on
+  October 27). For location checks, release full-screen control, run
+  `osascript -e 'tell application id "app.cadence.desktop" to activate'`, and press
+  controls through the accessibility tree.
 
 ## Release acceptance
 

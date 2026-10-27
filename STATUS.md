@@ -1,5 +1,33 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.6 release preparation — October 27, 2026
+
+Release source `8be778a` (version 0.1.6, account-sync contract 2, SQLite schema 20)
+passed dev-signed installed acceptance after the hosted contract migration. It is not
+built, notarized or published; those steps wait for the owner. Packet:
+`docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
+`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
+
+- Rollout step 3 passed on installed clients. Published 0.1.5 on the test Mac and the
+  recorded `0.1.6-dev.2` on the owner's Mac synced again under contract 1, sent their
+  pending writes and converged on the hosted contract-1 fingerprint. After the test
+  account gained travel habits and a place-label settings row, 0.1.5 writes left them
+  byte-identical.
+- `0.1.7-dev.1` (the dev-signed build of `8be778a`) upgraded the owner's Mac from schema
+  18 to 20 with no lost rows; the release acceptance comparison passed. Travel habits and
+  place-label settings synced web → Mac, and a Home marker synced Mac → hosted under
+  contract 2.
+- Sign-in and Calendar callback replays passed. Ticket 165: allowed state and the
+  status-only permission read pass; the denied state stays with the owner.
+- Not established: a completion place label on an installed Mac (CoreLocation returned
+  no fix), installed receipt replay, and a contract-1 profile write that lands.
+- Known issue, not a regression: a timezone change on a linked Mac with an archived
+  Behavior stalls sync, because the server requires every Behavior and both clients
+  update only active ones.
+
+Platform impact: desktop release only; web, marketing and future mobile have no change.
+Messaging impact: none; the packet holds draft release notes for the owner.
+
 ## Account sync contracts — October 27, 2026
 
 Approved by the owner on October 27. The contract implementation lets additive
