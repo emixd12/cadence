@@ -1,21 +1,42 @@
-# Privacy change log
+# Messaging change log
 
-**Rule (owner decision, October 22, 2026):** until the pre-launch privacy pass,
-privacy, disclosure and marketing-language conflicts are logged here and never block
-development. In-progress work proceeds as if no privacy policy constrains it.
+**Rule (owner decision, October 27, 2026; replaces the October 22 privacy-only
+rule):** development work records here every change it makes to what Cadence says
+about itself, then proceeds. Messaging conflicts never block development, merges or
+deployments. The messaging track (Tickets 245 and 246) resolves them in its own
+tickets. `docs/DECISIONS.md` (2026-10-27) records the rule.
 
-This file lists every decided or implemented change that makes Cadence's current
-privacy text, disclosures, user guide or marketing language inaccurate or incomplete.
-The pre-launch privacy pass works through the open entries and updates the text in
-one review. That pass is not yet ticketed. `docs/DECISIONS.md` (2026-10-22) records
-the rule.
+This file lists every decided or implemented change that makes any of these surfaces
+inaccurate or incomplete:
+
+- **Privacy and Terms**: the Privacy and Terms pages.
+- **Trust**: the public Trust page and its claims.
+- **In-app copy**: disclosures, consent text, Settings and setup wording.
+- **User guide**: `docs/user-guide/*`.
+- **Marketing**: cadence-me.com, the FAQ, the README and listing copy.
+- **Provider submissions**: Google OAuth verification, OpenAI and Claude directory
+  listings, Apple and other reviewer-facing text and videos.
+
+The file name was `docs/PRIVACY_CHANGES.md` until October 27, 2026. Existing `P-`
+IDs keep their numbers; new entries continue the same `P-` sequence.
 
 Provider terms, data licences and the owner's legal risk decisions stay in
 `docs/LEGAL.md`. An entry here links the related `L-` entry when one exists.
 
+## When the track gates
+
+Only outward actions wait on this log. Before a provider submission, public launch
+or public listing, the owner resolves (or explicitly accepts) every open entry whose
+surfaces that action shows to a reviewer or the public. A source merge, hosted
+migration or deployment never waits on an entry.
+
+Development tickets do not edit Privacy, Terms, Trust, marketing or submission text,
+or tests that assert that text (`tests/legal-content.test.tsx`), unless the ticket
+says so. They log an entry instead.
+
 ## Current text the entries cite
 
-- `components/settings/LegalContent.tsx`: the Privacy page (dated October 21, 2026),
+- `components/settings/LegalContent.tsx`: the Privacy page (dated October 24, 2026),
   the Terms page (dated October 18, 2026) and the Trust page (dated August 27, 2026).
   `tests/legal-content.test.tsx` asserts parts of that text.
 - `docs/user-guide/*`: factual user guidance.
@@ -27,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-010` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-013` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -35,8 +56,8 @@ numbers move.
 5. When updated text ships, record the file, the deployment and the date, then set
    the status.
 
-Fields: change; affected tickets and files; conflicting current text; update needed;
-status.
+Fields: change; affected tickets and files; surfaces (from the list above);
+conflicting current text; update needed; status.
 
 Status values:
 
@@ -53,13 +74,20 @@ Status values:
 | [P-002](#p-002-leave-time-feedback-taps-and-learned-travel-habits) | Leave-time feedback taps and learned travel habits | logged | 217, 219 | Privacy, Travel Settings, user guide |
 | [P-003](#p-003-open-meteo-recipient-log-retention-and-attribution) | Open-Meteo recipient, log retention and attribution | logged | 218, 219 | Privacy, Settings, marketing, user guide, interface |
 | [P-004](#p-004-daily-brief-model-data-disclosure-and-re-consent) | Daily Brief model-data disclosure and re-consent | logged | 219, 216, 217, 218 | Privacy, Daily Brief and Travel Settings, user guide |
-| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | logged | 187 | Trust page, test |
+| [P-005](#p-005-public-statement-that-cadence-sends-no-behavior-data-to-an-ai-provider) | Public statement that Cadence sends no behavior data to an AI provider | resolved | 187 | Trust page, test |
 | [P-006](#p-006-marketing-review-of-ai-and-travel-claims) | Marketing review of AI and travel claims | logged | 219, 165, 187 | Marketing |
 | [P-007](#p-007-first-run-setup-invites-a-home-address) | First-run setup invites a Home address | logged | 212 | Privacy, user guide |
 | [P-008](#p-008-setup-purpose-line-does-not-name-google-maps) | Setup purpose line does not name Google Maps | logged | 212 | Setup copy, Privacy |
 | [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
+| [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | drafted | 187 | Privacy, Settings |
+| [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
+| [P-012](#p-012-daily-brief-trip-conclusions-come-from-the-timeline-calendar-connection) | Daily Brief trip conclusions come from the Timeline Calendar connection | logged | 219, 187 | Privacy |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
+
+Since October 24, 2026, 22:13 UTC (PRs #135 and #138 merged and deployed, owner
+decision), P-001 to P-004 and P-012 describe live production behavior. The text they
+cite has not changed.
 
 ## P-001: "I'm here" place positions and completion place labels
 
@@ -292,8 +320,8 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Change:** none new. Daily Brief already sends Behavior schedule and completion
   history to OpenAI, and connected AI clients read tracking records through MCP. A
   public statement suggests the opposite.
-- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187, but
-  `docs/TICKETS.md` has no Ticket 187 section yet. Files:
+- **Affected:** Ticket 187. `docs/LEGAL.md` L-012 and Ticket 219 cite Ticket 187; its
+  section in `docs/TICKETS.md` names the public no-AI disclosure as a release gate. Files:
   `components/settings/LegalContent.tsx` (Trust, "Data boundaries"),
   `tests/legal-content.test.tsx`.
 - **Conflicting current text:** Trust, "Data boundaries": "Cadence does not send
@@ -302,7 +330,18 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
 - **Update needed:** rewrite the sentence so that it agrees with the Daily Brief and MCP
   disclosures, and update the test. The rewrite must also cover Ticket 219's travel
   facts in model input (P-004).
-- **Status:** logged.
+- **Status:** resolved. The text below went live on October 24, 2026 at 18:16 UTC
+  (PR #147, main `6f2e770b`, app deployment `dpl_GGNbBrLyA7knWGzghH6gWKp7vq5X`, then
+  `dpl_9SvrL4ekjjQg5utxsH7hpvnnvrR6` for the Trust refresh). Earlier record: on
+  October 24, 2026, for Google's verification of the Daily
+  Brief Calendar client (Ticket 187), the Trust sentence was rewritten: exports go only
+  where the user sends them; Daily Brief sends the context the Privacy Policy describes,
+  Calendar timing only after a separate choice; MCP clients receive records only after
+  authorization; Cadence does not use Google user data to train AI models. The same
+  change describes both Google Calendar connections in Privacy, "Optional Google
+  Calendar", and adds the AI training limit there and in
+  `docs/user-guide/privacy-and-account.md`. The owner approved the text on October 24,
+  2026. Travel facts stay with P-004.
 
 ## P-006: Marketing review of AI and travel claims
 
@@ -377,4 +416,75 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     in native database backups".
   - `docs/user-guide/desktop-local.md`: "Import preserves the saved base".
 - **Update needed:** use Home, Where and usual travel, the words the interface shows.
+- **Status:** logged.
+
+## P-010: Separate Google Calendar grant for Daily Brief
+
+- **Change:** Ticket 187 (PR #135) gives Daily Brief its own Google Calendar connection.
+  It uses a separate Google Cloud project and client, separate consent, calendar selection,
+  encrypted credential and Disconnect. The Timeline Calendar connection never reaches the
+  model. The migration withdraws existing Daily Brief Calendar choices, so users must
+  connect again and allow Calendar again.
+- **Affected:** Ticket 187. Files: `components/settings/LegalContent.tsx` (Privacy,
+  "Optional Google Calendar" and "Optional Daily Brief").
+- **Conflicting current text:**
+  - Privacy, "Optional Google Calendar": "The Google Calendar connector is optional",
+    "encrypted Google refresh credential" and "Disconnect Google Calendar marks the
+    account connection disconnected" describe one connection.
+  - Privacy, "Optional Daily Brief": "Connecting a source or displaying it on Timeline
+    does not grant model access." Daily Brief now also needs its own Google connection.
+- **Update needed:** describe both Google Calendar connections, their separate consent,
+  selection, credential and Disconnect, and the one-time renewed choice.
+- **Status:** drafted. PR #147 (October 24, 2026, to `main`) describes both connections
+  in Privacy, "Optional Google Calendar", and in `docs/user-guide/privacy-and-account.md`,
+  for Google's verification of the Daily Brief Calendar client. That text is live
+  since October 24, 2026 (see P-005). It does not yet mention the one-time renewed
+  choice. Daily Brief Settings now has its own Calendar disclosure line.
+
+## P-011: Behavior descriptions sent for duration estimates
+
+- **Change:** Ticket 188 (PR #135) sends Behavior titles and descriptions to OpenAI in
+  one bounded call that estimates session lengths. It applies only to recipes 1.1 and
+  1.2 (Ticket 184 candidates), when a Behavior has no default duration and too few
+  tracked sessions. Today only the private workbench uses it, after a page-session owner
+  confirmation. Production use needs a promoted recipe, a Daily Brief Settings choice
+  and a migration for that disclosure.
+- **Affected:** Tickets 188 and 184. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Optional Daily Brief" and the processor table's OpenAI row).
+- **Conflicting current text:**
+  - Privacy, "Optional Daily Brief": "Cadence sends today's Behavior schedule and
+    completion history, including findings calculated from it, to OpenAI."
+  - Processor table, OpenAI: "Behavior schedule, completion history and calculated
+    findings; separately enabled Calendar timing, reminder counts, and selected note
+    excerpts". Neither names Behavior titles or descriptions.
+- **Update needed:** when a recipe with estimates is promoted, name Behavior titles and
+  descriptions as a separate Daily Brief choice and add them to the OpenAI row.
+- **Status:** logged.
+
+## P-012: Daily Brief trip conclusions come from the Timeline Calendar connection
+
+- **Change:** Ticket 219's signed travel conclusions token is built from the Timeline
+  travel view, which reads Calendar event locations through the Timeline (standard)
+  connection. When the Daily Brief connection's snapshot holds exactly the same events
+  and revisions, the brief maps the token's event commitments to its own opaque refs
+  and sends the conclusions to OpenAI: trips, yes/no fits, unknowns and weather rule
+  conclusions, never durations, times or places. If the event sets differ, or Daily
+  Brief Calendar is not allowed, the brief drops the whole token. Code:
+  `withSuppliedConclusions` and `readCurrentTravelSource` in
+  `lib/services/briefing-account-context.service.ts`. `TRAVEL_CONCLUSIONS_SIGNING_SECRET`
+  is set in production. The owner chose on October 24, 2026 to ship this as it is.
+- **Affected:** Tickets 219 and 187. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Optional Google Calendar" and "Optional Daily Brief"),
+  `docs/user-guide/privacy-and-account.md` ("AI use").
+- **Conflicting current text:**
+  - Privacy, "Optional Google Calendar": "Where Google Calendar for Daily Brief is
+    available, Daily Brief reads Calendar only through that connection, never through
+    the Timeline connection". The trip conclusions are derived from Timeline
+    connection reads.
+  - `docs/user-guide/privacy-and-account.md`, "AI use": lists only event timing,
+    timezone, availability and response state as Calendar input to the model.
+- **Update needed:** either fence event-based trip conclusions out of Daily Brief, or
+  say that trip conclusions about events present in both connections come from the
+  Timeline connection's event locations and Google Maps (with P-004). Google's
+  sensitive-scope review of `cadence-calendar-agent-prod` reads this Privacy text.
 - **Status:** logged.

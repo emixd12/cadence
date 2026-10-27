@@ -2,6 +2,8 @@ import rawPresets from "../data/briefing-presets.json";
 import {
   BRIEFING_CONFIG_VERSION,
   DAILY_BRIEF_RECIPE,
+  DAILY_BRIEF_RECIPE_V1_1,
+  DAILY_BRIEF_RECIPE_V1_2,
   LEGACY_BRIEFING_CONFIG_VERSION,
   type BriefingConfig,
   type BriefingContextConfig,
@@ -21,6 +23,7 @@ import { BRIEFING_ANALYSIS_LANE_IDS, type BriefingAnalysisLaneId } from "../type
 import type { BriefingAnalysisConfig } from "../types/briefing-config";
 import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
 import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "./advisor-day-context";
+import { projectBriefingTravelFacts } from "./briefing-travel";
 
 const TONES: readonly BriefingTone[] = ["calm", "warm", "matter_of_fact"];
 const DIRECTNESS: readonly BriefingDirectness[] = ["gentle", "balanced", "direct"];
@@ -67,7 +70,11 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
   if (config.version !== BRIEFING_CONFIG_VERSION) fail("configuration.version is unsupported.");
   const recipe = record(config.recipe, "configuration.recipe");
   exactKeys(recipe, ["id", "version"], "configuration.recipe");
-  if (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version) {
+  // Recipes 1.1 and 1.2 need the 1.3 fields; older configurations keep recipe 1.0.
+  const candidateRecipe = current && recipe.id === DAILY_BRIEF_RECIPE.id
+    ? [DAILY_BRIEF_RECIPE_V1_1, DAILY_BRIEF_RECIPE_V1_2].find((item) => item.version === recipe.version) ?? null
+    : null;
+  if (!candidateRecipe && (recipe.id !== DAILY_BRIEF_RECIPE.id || recipe.version !== DAILY_BRIEF_RECIPE.version)) {
     fail("configuration.recipe is incompatible with this configuration.");
   }
   const tone = oneOf(config.tone, TONES, "configuration.tone");
@@ -92,7 +99,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
   const historyDays = integer(scope.historyDays, "configuration.scope.historyDays", 1, 90);
   if (typeof scope.includeCalendar !== "boolean") fail("configuration.scope.includeCalendar must be a boolean.");
 
-  const context = parseContext(config.context);
+  const context = parseContext(config.context, candidateRecipe !== null);
 
   const referenceIds = uniqueIds(config.referenceIds, "configuration.referenceIds", 4);
   const planner = record(config.planner, "configuration.planner");
@@ -107,7 +114,7 @@ export function parseBriefingConfig(value: unknown): BriefingConfig {
 
   return {
     version: BRIEFING_CONFIG_VERSION,
-    recipe: DAILY_BRIEF_RECIPE,
+    recipe: candidateRecipe ?? DAILY_BRIEF_RECIPE,
     tone,
     directness,
     encouragement,
@@ -139,7 +146,8 @@ export function serializeBriefingConfig(value: unknown): string {
 }
 
 export function scopeBriefingContext(contextValue: unknown, configValue: unknown): AdvisorDayContextV1 {
-  const context = validateAdvisorDayContext(contextValue);
+  // The planner never sees travel (Ticket 219): its intervals would reveal travel timing.
+  const context = Object.fromEntries(Object.entries(validateAdvisorDayContext(contextValue)).filter(([key]) => key !== "travel")) as AdvisorDayContextV1;
   const config = parseBriefingConfig(configValue);
   if (context.cadence.history.lookbackDays !== config.scope.historyDays) {
     fail("Briefing context history does not match configuration.scope.historyDays.");
@@ -262,6 +270,13 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
   const recorded = (sourceContext.cadence.recordedElapsedDurations ?? []).filter(({ behaviorRef, localDate }) =>
     selectedBehaviors.has(behaviorRef) && localDate >= context.cadence.history.startLocalDate && localDate < context.cadence.history.endLocalDateExclusive);
   const recordedIncluded = config.context.includeRecordedElapsedDurations && recorded.length > 0;
+  const calendarInFacts = config.scope.includeCalendar && calendarIncluded;
+  const travel = sourceContext.travel ? projectBriefingTravelFacts(sourceContext.travel, {
+    occurrenceRefs: new Set(occurrences.map(({ ref }) => ref)),
+    behaviorRefs: new Set(occurrences.map(({ behaviorRef }) => behaviorRef)),
+    eventRefs: new Set(calendarInFacts && calendar && "events" in calendar ? calendar.events.map(({ ref }) => ref) : []),
+    calendarIncluded: calendarInFacts,
+  }) : null;
   const facts = {
     version: context.version,
     snapshotId: context.snapshotId,
@@ -286,11 +301,13 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
         recordedElapsedDurations: recorded,
       } : {}),
     },
-    ...(config.scope.includeCalendar && calendarIncluded ? { connectors: context.connectors } : {}),
+    ...(calendarInFacts ? { connectors: context.connectors } : {}),
+    ...(travel ? { travel: travel.facts } : {}),
   };
   return {
     facts,
     contextControls: {
+      ...(travel ? { travel: travel.control } : {}),
       calendar: control(config.scope.includeCalendar, config.scope.includeCalendar && calendarIncluded, calendarAvailable ? "available" : "unavailable"),
       completionHistory: control(config.context.includeCompletionHistory, config.context.includeCompletionHistory, context.cadence.history.completeness === "complete" ? "available" : "unavailable"),
       historicalCompletionTimes: control(config.context.includeHistoricalCompletionTimes,
@@ -308,14 +325,15 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
   };
 }
 
-function parseContext(value: unknown): BriefingContextConfig {
+function parseContext(value: unknown, plainRecipe = false): BriefingContextConfig {
   const context = record(value, "configuration.context");
   exactKeys(context, ["includeCompletionHistory", "includeHistoricalCompletionTimes", "includeRecordedElapsedDurations", "duration"], "configuration.context");
   for (const key of ["includeCompletionHistory", "includeHistoricalCompletionTimes", "includeRecordedElapsedDurations"] as const) {
     if (typeof context[key] !== "boolean") fail(`configuration.context.${key} must be a boolean.`);
   }
   const duration = record(context.duration, "configuration.context.duration");
-  exactKeys(duration, ["includeHistoricalAverage", "includeConfiguredDefault", "preference", "fallback"], "configuration.context.duration");
+  exactKeys(duration, ["includeHistoricalAverage", "includeConfiguredDefault", "preference", "fallback", ...(plainRecipe ? ["includeDescriptionEstimate"] : [])], "configuration.context.duration");
+  if (plainRecipe && typeof duration.includeDescriptionEstimate !== "boolean") fail("configuration.context.duration.includeDescriptionEstimate must be a boolean.");
   if (typeof duration.includeHistoricalAverage !== "boolean" || typeof duration.includeConfiguredDefault !== "boolean") {
     fail("configuration.context.duration source controls must be booleans.");
   }
@@ -334,6 +352,7 @@ function parseContext(value: unknown): BriefingContextConfig {
       includeConfiguredDefault: duration.includeConfiguredDefault,
       preference: duration.preference,
       fallback: duration.fallback,
+      ...(plainRecipe ? { includeDescriptionEstimate: duration.includeDescriptionEstimate as boolean } : {}),
     },
   };
 }
@@ -354,7 +373,7 @@ function legacyContext(): BriefingContextConfig {
 
 function selectDuration(occurrence: AdvisorOccurrence, config: BriefingConfig): Readonly<{
   duration: AdvisorDuration;
-  source: "configured_default" | "historical_average" | null;
+  source: "configured_default" | "historical_average" | "description_estimate" | null;
   reason: "disabled" | "insufficient_samples" | "history_limit_exceeded" | "unavailable" | null;
 }> {
   const candidates = occurrence.durationCandidates ?? {
@@ -377,6 +396,10 @@ function selectDuration(occurrence: AdvisorOccurrence, config: BriefingConfig): 
     if (!enabled[source]) continue;
     const value = candidate(source);
     if (value?.kind === "known") return { duration: value, source, reason: null };
+  }
+  // A description estimate only fills a gap the recorded sources leave (Ticket 188).
+  if (config.context.duration.includeDescriptionEstimate && occurrence.durationCandidates?.descriptionEstimate) {
+    return { duration: occurrence.durationCandidates.descriptionEstimate, source: "description_estimate", reason: null };
   }
   const requested = sources.find((source) => enabled[source] && candidate(source)) ?? sources.find((source) => enabled[source]);
   const unavailable = requested ? candidate(requested) : null;

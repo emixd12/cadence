@@ -10,8 +10,14 @@ import type { BriefingTipDecision } from "../resolvers/briefing-analysis.resolve
  * warn; they never reject or rewrite production output.
  */
 
-/** Proposed working range for a roughly 45-second read. Not a validated reading-speed formula. */
-export const BRIEFING_READING_TARGET = Object.freeze({ minWords: 80, maxWords: 120 });
+/**
+ * Default ceiling when no configuration cap is supplied. The September 30 owner
+ * criteria set a general one-minute read with no minimum; word count alone does not
+ * establish reading time.
+ */
+export const BRIEFING_READING_TARGET = Object.freeze({ minWords: 0, maxWords: 120 });
+
+export type BriefingReadingTarget = Readonly<{ minWords: number; maxWords: number }>;
 
 /** Shared-phrase length that counts as repetition between two visible parts. */
 export const BRIEFING_REPETITION_WORDS = 5;
@@ -21,7 +27,8 @@ export const BRIEFING_MECHANICS_TERMS = Object.freeze([
   "planner", "move option", "option id", "planner route", "analysis lane", "inspector", "fingerprint",
   "baseline", "materiality", "cooldown", "occurrence ref", "day evidence", "evidence band",
   "sample size", "typical marked time", "reserved range", "dayevidence", "typicalmarkedtime",
-  "experiment", "association",
+  "experiment", "association", "planning window", "load-heavy", "transition room", "handoff",
+  "feasible", "coverage", "buffer",
 ]);
 
 export const BRIEFING_LANE_LABELS: Readonly<Record<BriefingAnalysisLaneId, string>> = Object.freeze({
@@ -67,7 +74,7 @@ export type BriefingReadingSegment = Readonly<{ label: string; text: string }>;
 export type BriefingReadingReview = Readonly<{
   /** Every word the reader sees in the bubble body, including evidence, option and travel lines. */
   visibleWords: number;
-  target: typeof BRIEFING_READING_TARGET;
+  target: BriefingReadingTarget;
   position: "below" | "within" | "above";
   repeated: readonly Readonly<{ between: readonly [string, string]; phrase: string }>[];
   mechanicsTerms: readonly string[];
@@ -86,18 +93,22 @@ export function reviewBriefingReading(input: Readonly<{
   visibleText: string;
   segments: readonly BriefingReadingSegment[];
   behaviorTitles?: readonly string[];
+  /** The run's configured word cap; the review target follows the configuration. */
+  maxWords?: number;
 }>): BriefingReadingReview {
   const visibleWords = countBriefingWords(input.visibleText);
-  const target = BRIEFING_READING_TARGET;
+  const target: BriefingReadingTarget = input.maxWords ? { minWords: 0, maxWords: input.maxWords } : BRIEFING_READING_TARGET;
   const repeated: { between: readonly [string, string]; phrase: string }[] = [];
   const segments = input.segments.filter((segment) => segment.text.trim());
+  const titleTokens = (input.behaviorTitles ?? []).map(tokens).filter((title) => title.length).sort((a, b) => b.length - a.length);
+  // A Behavior's name in two places is not repeated advice, so phrases inside one title never count.
+  const insideTitle = (phrase: readonly string[]) => titleTokens.some((title) => containsRun(title, phrase));
   for (let left = 0; left < segments.length; left += 1) {
     for (let right = left + 1; right < segments.length; right += 1) {
-      const phrase = sharedPhrase(segments[left]!.text, segments[right]!.text, BRIEFING_REPETITION_WORDS);
+      const phrase = sharedPhrase(segments[left]!.text, segments[right]!.text, BRIEFING_REPETITION_WORDS, insideTitle);
       if (phrase) repeated.push({ between: [segments[left]!.label, segments[right]!.label], phrase });
     }
   }
-  const titleTokens = (input.behaviorTitles ?? []).map(tokens).filter((title) => title.length).sort((a, b) => b.length - a.length);
   const proseTokens = tokens(segments.map((segment) => segment.text).join(" "));
   const prose = removeTitleMatches(proseTokens, titleTokens).join(" ");
   const mechanicsTerms = BRIEFING_MECHANICS_TERMS.filter((term) =>
@@ -143,14 +154,23 @@ function removeTitleMatches(prose: readonly string[], titles: readonly (readonly
   return result;
 }
 
-function sharedPhrase(left: string, right: string, words: number): string | null {
+function sharedPhrase(left: string, right: string, words: number, ignore: (phrase: readonly string[]) => boolean = () => false): string | null {
   const haystack = ` ${tokens(right).join(" ")} `;
   const needle = tokens(left);
   for (let index = 0; index + words <= needle.length; index += 1) {
-    const phrase = needle.slice(index, index + words).join(" ");
-    if (haystack.includes(` ${phrase} `)) return phrase;
+    const run = needle.slice(index, index + words);
+    const phrase = run.join(" ");
+    if (haystack.includes(` ${phrase} `) && !ignore(run)) return phrase;
   }
   return null;
+}
+
+/** Whether `run` appears as consecutive tokens within `title`. */
+function containsRun(title: readonly string[], run: readonly string[]): boolean {
+  for (let start = 0; start + run.length <= title.length; start += 1) {
+    if (run.every((token, offset) => title[start + offset] === token)) return true;
+  }
+  return false;
 }
 
 function escape(value: string): string {

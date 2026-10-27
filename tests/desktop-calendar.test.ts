@@ -139,6 +139,7 @@ describe("desktop Calendar transport", () => {
     await clearDesktopCalendarClientState(async (command, args) => { calls.push([command, args]); });
     expect(calls).toEqual(expect.arrayContaining([
       ["auth_secret_remove", { name: "pending-calendar-state" }],
+      ["auth_secret_remove", { name: "pending-calendar-agent-state" }],
       ["calendar_cache_clear", undefined],
     ]));
   });
@@ -147,7 +148,7 @@ describe("desktop Calendar transport", () => {
     [{ accountId: "account-a", state: "opaque" }, "state=opaque&result=connected"],
     [{ accountId: "account-a", state: null, createdAt: 1_000 }, "result=connected"],
   ])("rejects malformed persisted Calendar state before reading the broker", async (pending, query) => {
-    const broker = { connection: vi.fn() };
+    const broker = { grantPurpose: "standard", connection: vi.fn() };
     const io = { get: vi.fn(async () => JSON.stringify(pending)), set: vi.fn(), remove: vi.fn(async () => undefined), open: vi.fn() };
     const flow = new DesktopCalendarConnection(broker as unknown as DesktopCalendarBroker, io);
     await expect(flow.complete(`cadence://calendar/callback?${query}`, "account-a", 2_000)).rejects.toThrow("invalid");
@@ -159,7 +160,7 @@ describe("desktop Calendar transport", () => {
     const secrets = new Map<string, string>();
     const connection = { accountId: "account-a", status: "connected", generation: 2, selectionRevision: 4,
       preferences: { selectedCalendarIds: ["primary"], hiddenCalendarIds: [], visible: true, showAllDay: true } } as const;
-    const broker = { connect: vi.fn(async (state: string) => ({ url: `https://accounts.example/connect?state=${state}` })), connection: vi.fn(async () => connection) };
+    const broker = { grantPurpose: "standard", connect: vi.fn(async (state: string) => ({ url: `https://accounts.example/connect?state=${state}` })), connection: vi.fn(async () => connection) };
     const io = { get: vi.fn(async (name: string) => secrets.get(name) ?? null), set: vi.fn(async (name: string, value: string) => { secrets.set(name, value); }),
       remove: vi.fn(async (name: string) => { secrets.delete(name); }), open: vi.fn(async () => undefined) };
     const flow = new DesktopCalendarConnection(broker as unknown as DesktopCalendarBroker, io);
@@ -181,6 +182,28 @@ describe("desktop Calendar transport", () => {
     expect(secrets.has("pending-calendar-state")).toBe(false);
     expect(broker.connection).toHaveBeenCalledOnce();
   });
+});
+
+
+it("isolates concurrent standard and agent callback state and cancellation", async () => {
+  const secrets = new Map<string, string>();
+  const io = { get: async (name: string) => secrets.get(name) ?? null,
+    set: async (name: string, value: string) => { secrets.set(name, value); },
+    remove: async (name: string) => { secrets.delete(name); }, open: async () => undefined };
+  const fetcher = vi.fn(async (url: string | URL | Request) => Response.json(String(url).includes("connection") ? { url: "https://accounts.example/consent", status: "connected" } : {}));
+  const standard = new DesktopCalendarConnection(new DesktopCalendarBroker("https://calendar.example", async () => "jwt", fetcher), io);
+  const agent = new DesktopCalendarConnection(new DesktopCalendarBroker("https://calendar.example", async () => "jwt", fetcher, "agent"), io);
+  await standard.begin("owner"); await agent.begin("owner");
+  const pending = JSON.parse(secrets.get("pending-calendar-agent-state")!);
+  const callback = `cadence://calendar/callback?purpose=agent&state=${pending.state}&result=connected`;
+  expect(await standard.complete(callback, "owner")).toBeNull();
+  expect(secrets.size).toBe(2);
+  expect(await agent.complete(callback, "owner")).toMatchObject({ result: "connected" });
+  expect(secrets.has("pending-calendar-state")).toBe(true);
+  expect(fetcher).toHaveBeenLastCalledWith("https://calendar.example/api/google-calendar/connection?purpose=agent", expect.anything());
+  await agent.begin("owner"); await agent.cancel();
+  expect(secrets.has("pending-calendar-state")).toBe(true);
+  await expect(agent.complete(callback, "owner")).rejects.toThrow("already used or cancelled");
 });
 
 // Ticket 238 desktop connector sources.

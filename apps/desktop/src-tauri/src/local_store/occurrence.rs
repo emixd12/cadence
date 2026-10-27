@@ -399,6 +399,10 @@ pub fn status(db: &Connection, request: &Request) -> Result<Value> {
     current.status_marked_at = status_marked_at.clone();
     current.updated_at = now.clone();
     db::update(db, profile_id, occurrence_id, &current)?;
+    if status != "completed" {
+        // Ticket 216: leaving Completed deletes the occurrence's place label.
+        super::place_labels::delete_label(db, profile_id, occurrence_id)?;
+    }
     if *cancel_pending_reminders {
         db.execute("UPDATE reminder_deliveries SET status='cancelled',error=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status='pending'",params![profile_id,occurrence_id,now]).map_err(error)?;
         db.execute("UPDATE native_reminder_state SET status='cancelled',error=NULL,verified_at=NULL,updated_at=?3 WHERE user_id=?1 AND occurrence_id=?2 AND status IN ('planned','scheduled')",params![profile_id,occurrence_id,now]).map_err(error)?;

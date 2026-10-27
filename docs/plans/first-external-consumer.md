@@ -69,8 +69,10 @@ with separately scoped operations, permissions, preview, approval, and conflict 
 
 Reuse Cadence sign-in and authenticated account ownership. Web requests use the
 existing server-verified session; linked desktop uses its existing authenticated
-account path and Keychain custody. No external advisor account, delegated OAuth
-client, PKCE flow, consumer token, or public MCP/API surface is required.
+account path and Keychain custody. No external advisor account, consumer token,
+or public MCP/API surface is required. Ticket 187 adds separate Google Calendar
+agent consent with PKCE. It does not change Cadence sign-in. Agent Calendar reads
+require that grant and independent model-data disclosure; Timeline consent cannot authorize them.
 The September 19 delegated-token isolation finding is historical evidence about
 that abandoned architecture, not a blocker for first-party briefing generation.
 

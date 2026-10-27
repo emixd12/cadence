@@ -69,7 +69,8 @@ describe("briefing workbench boundary", () => {
         recipe: "daily_brief@1.0", policy: result.inspector.policyVersion,
       });
       expect(result.inspector.plan.options).toEqual([]);
-      expect(JSON.stringify(payloads[index])).not.toMatch(/travel|departure|durationCandidates/);
+      // Only the synthetic travel fixtures carry travel facts (Ticket 219), never route timing.
+      expect(JSON.stringify(payloads[index])).not.toMatch(fixtureId.startsWith("travel_") ? /departure|arrivalAt|durationSeconds|durationCandidates/ : /travel|departure|durationCandidates/);
     }
     expect(body.results[0].inspector.configurationRevision).not.toBe(body.results[1].inspector.configurationRevision);
   });

@@ -272,7 +272,12 @@
         "INT-BEHAVIOR-028",
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
-        "INT-TRAVEL-005"
+        "INT-TRAVEL-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
       ]
     },
     {
@@ -297,6 +302,11 @@
         "INT-TRAVEL-002",
         "INT-TRAVEL-003",
         "INT-TRAVEL-004",
+        "INT-TRAVEL-008",
+        "INT-TRAVEL-009",
+        "INT-TRAVEL-010",
+        "INT-TRAVEL-006",
+        "INT-TRAVEL-007",
         "INT-CALENDAR-008",
         "INT-CALENDAR-009",
         "INT-CALENDAR-010",
@@ -307,7 +317,14 @@
         "INT-CALENDAR-012",
         "INT-CALENDAR-013",
         "INT-CALENDAR-014",
-        "INT-CALENDAR-015"
+        "INT-CALENDAR-015",
+        "INT-PLACE-001",
+        "INT-PLACE-002",
+        "INT-PLACE-003",
+        "INT-PLACE-004",
+        "INT-PLACE-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007"
       ]
     },
     {
@@ -333,7 +350,8 @@
         "INT-BRIEF-001",
         "INT-BRIEF-002",
         "INT-BRIEF-003",
-        "INT-BRIEF-005"
+        "INT-BRIEF-005",
+        "INT-WEATHER-001"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
     },
@@ -464,7 +482,7 @@
     {
       "path": "components/behaviors/BehaviorForm.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 44,
+      "interaction_marker_count": 45,
       "interaction_ids": [
         "INT-BEHAVIOR-007",
         "INT-BEHAVIOR-008",
@@ -480,7 +498,8 @@
         "INT-BEHAVIOR-021",
         "INT-BEHAVIOR-030",
         "INT-BEHAVIOR-031",
-        "INT-TRAVEL-005"
+        "INT-TRAVEL-005",
+        "INT-PLACE-006"
       ]
     },
     {
@@ -503,7 +522,11 @@
         "INT-BEHAVIOR-025",
         "INT-BEHAVIOR-026",
         "INT-BEHAVIOR-027",
-        "INT-BEHAVIOR-028"
+        "INT-BEHAVIOR-028",
+        "INT-PLACE-006",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
       ]
     },
     {
@@ -781,7 +804,8 @@
         "INT-TIMELINE-001",
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
-        "INT-TRAVEL-004"
+        "INT-TRAVEL-004",
+        "INT-TRAVEL-008"
       ]
     },
     {
@@ -792,29 +816,31 @@
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
         "INT-CALENDAR-007",
-        "INT-TRAVEL-003"
+        "INT-TRAVEL-003",
+        "INT-WEATHER-001",
+        "INT-TRAVEL-009"
       ]
     },
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 4,
+      "interaction_marker_count": 8,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
     {
       "path": "app/design-system/DailyBriefBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 97,
+      "interaction_marker_count": 102,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls."
+      "reason": "Development-only Daily Brief recipe workbench: Ticket 161 adds overlap, tight-transition, supported-gap, missing-duration, completed-work and uneventful synthetic selections to the existing explicit-run control; recipe/version-bound drafts, independent input exclusions, opt-in historical completion marking times with the shared history window and inspector exclusions, duration source preference/fallback, Synthetic and authenticated My account sources, consent-gated explicit comparison, private Behavior selection, access refresh, cancellation, inspectors and memory-only results. Delivered results survive window focus changes and snapshot expiry with an inspection-only notice; account/consent changes clear private output; retained reviews survive hidden tabs. Save/export stays synthetic-only. Account captures reuse briefing and optional Calendar disclosure without daily admission. Tickets 173\u2013174 add synthetic analysis scenarios, per-configuration lane selection, a one-tip ceiling and cooldown, and a lane/tip-selection summary; comparisons never read or record tip history. Tickets 175\u2013177 replace memory-only results with a Compare-first review workspace: Compare and Saved reviews views, Run new comparison and Rerun candidate on this case (baseline pinned, frozen captured clock), cancellation that keeps completed runs, configuration edits that keep results and mark changed drafts, candidate name and rationale, and locally saved cases, runs, feedback and proposals under .local/briefing-bench/ for Synthetic and My account (account cases save captured inputs for exact reruns after current consent checks). Review fixes keep drafts with their exact case/run pair, preserve unsaved rerun output, ignore stale account/source reads, collapse configuration initially, and validate quotations against rendered option, source, warning and timestamp text. Excluded from product interaction counts. Tickets 182\u2013183 add Days navigation and A/B generation on one saved day; historical selectors and sequence controls live in BriefingDays.tsx. Production tip history stays untouched; sequence evaluation history is isolated. Ticket 213 adds owner-month reserved travel spend to the existing account-access readback without provider calls. Ticket 219 adds travel_day and travel_unknown synthetic selections whose travel facts come from invented places and routes, never Maps content. Tickets 184 and 188 add the advisor-analysis-2 recipe 1.1 preset, a per-configuration description-estimate toggle, a page-session owner confirmation that sends Behavior descriptions for estimates in My account mode, and a duration estimate review that saves the owner's typical minutes to the local case."
     },
     {
       "path": "app/design-system/BriefingReview.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 36,
+      "interaction_marker_count": 43,
       "interaction_ids": [],
-      "reason": "Development-only Daily Brief review components for Tickets 175\u2013177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Excluded from product interaction counts."
+      "reason": "Development-only Daily Brief review components for Tickets 175\u2013177: reading columns with a run selector, plain-language evidence and tip-selection labels, reading-burden review, prose feedback with optional judgment, in-output quotation and replacement wording, review-packet writing, proposal loading and accept/needs-correction/reject decisions, and the Saved reviews list with open and confirmed delete. Ticket 188 adds a duration estimate review per run: typical minutes, an optional comment and Save. Excluded from product interaction counts."
     },
     {
       "path": "components/briefing/DailyBriefBubble.tsx",
@@ -823,7 +849,8 @@
       "interaction_ids": [
         "INT-BRIEF-002",
         "INT-BRIEF-003",
-        "INT-BRIEF-005"
+        "INT-BRIEF-005",
+        "INT-WEATHER-001"
       ]
     },
     {
@@ -844,10 +871,54 @@
     {
       "path": "components/settings/TravelSettingsPanel.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 12,
       "interaction_ids": [
         "INT-TRAVEL-001",
-        "INT-TRAVEL-002"
+        "INT-TRAVEL-002",
+        "INT-PLACE-006",
+        "INT-TRAVEL-006",
+        "INT-TRAVEL-007"
+      ]
+    },
+    {
+      "path": "components/travel/PlaceLabels.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 32,
+      "interaction_ids": [
+        "INT-PLACE-001",
+        "INT-PLACE-002",
+        "INT-PLACE-003",
+        "INT-PLACE-004",
+        "INT-PLACE-005",
+        "INT-PLACE-006",
+        "INT-PLACE-007",
+        "INT-PLACE-008",
+        "INT-PLACE-009",
+        "INT-PLACE-010"
+      ]
+    },
+    {
+      "path": "components/settings/TravelHabitsSection.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 6,
+      "interaction_ids": [
+        "INT-TRAVEL-010"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelLeaveQuestion.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-TRAVEL-008"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelModeChoice.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-TRAVEL-009"
       ]
     },
     {
@@ -931,6 +1002,14 @@
         "INT-CALENDAR-013",
         "INT-CALENDAR-014",
         "INT-CALENDAR-015"
+      ]
+    },
+    {
+      "path": "components/timeline/TravelWeather.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 4,
+      "interaction_ids": [
+        "INT-WEATHER-001"
       ]
     }
   ],
@@ -3426,11 +3505,12 @@
         }
       ],
       "availability": "Dismiss controls appear while the setup guide is visible. Desktop Settings can reopen the guide.",
-      "success_result": "Dismissal hides the guide and records localStorage when available. Show setup guide opens it for the current session.",
+      "success_result": "Dismissal hides the guide and records localStorage when available. Show setup guide opens it for the current session. While the guide shows, it reads the deployment's travel routing report (GET /api/travel/routes, no provider call) to decide whether the optional Home and travel row appears (Ticket 212).",
       "failure_result": "The pop-up still hides for the current render if localStorage is unavailable.",
       "effects": [
         "ui_state",
-        "local_preference"
+        "local_preference",
+        "network_request"
       ],
       "risk": "low",
       "confirmation": "none",
@@ -3505,7 +3585,8 @@
         "/behaviors#create-behavior",
         "/settings#notifications",
         "/settings#timezone",
-        "/export#behaviorlog-import"
+        "/export#behaviorlog-import",
+        "/settings#travel"
       ],
       "journeys": [
         "J04",
@@ -3518,7 +3599,7 @@
       "triggers": [
         {
           "kind": "activate",
-          "control": "Create behavior, Enable notifications, Confirm timezone, or Import data setup row"
+          "control": "Create behavior, Enable notifications, Confirm timezone, Import data, or Home and travel setup row"
         }
       ],
       "variants": [
@@ -3541,9 +3622,14 @@
           "id": "import",
           "label": "Import data",
           "result": "Navigate to /export#behaviorlog-import."
+        },
+        {
+          "id": "travel",
+          "label": "Home and travel",
+          "result": "Navigate to /settings#travel (desktop: Settings, travel anchor). Optional; complete when Home and usual travel both exist. Shown only when the deployment reports travel routing as configured."
         }
       ],
-      "availability": "A row is actionable while its corresponding setup task is available for review.",
+      "availability": "A row is actionable while its corresponding setup task is available for review. Ticket 212: Home and travel appears only after GET /api/travel/routes reports routing configured (no provider call); desktop asks only with a linked account, so local mode omits it.",
       "success_result": "Navigates to the existing owning screen and fragment without performing the task automatically.",
       "failure_result": "Normal navigation failure behavior applies.",
       "effects": [
@@ -3555,7 +3641,9 @@
         "components/onboarding/FirstRunOnboardingPanel.tsx",
         "apps/desktop/src/onboarding-guide.tsx",
         "apps/desktop/src/product.tsx#Product",
-        "apps/desktop/src/desktop-navigation.ts"
+        "apps/desktop/src/desktop-navigation.ts",
+        "lib/services/onboarding-model.ts",
+        "lib/ui/travel.ts#readTravelRoutingReport"
       ],
       "test_coverage": {
         "level": "indirect",
@@ -3563,9 +3651,10 @@
           "tests/onboarding.service.test.ts",
           "tests/ux-ticket-049-052-ui.test.tsx",
           "tests/desktop-settings-ui.test.tsx",
-          "tests/desktop-navigation.test.ts"
+          "tests/desktop-navigation.test.ts",
+          "tests/onboarding-travel.dom.test.tsx"
         ],
-        "notes": "Task resolution and client-state handling are automated, but activating the client-only setup links remains browser QA."
+        "notes": "Task resolution and client-state handling are automated. Ticket 212 DOM tests cover the Home and travel row, its routing gate and the desktop travel destination; activating the client-only setup links remains browser QA."
       },
       "platforms": {
         "web": {
@@ -3576,7 +3665,8 @@
           ],
           "evidence": [
             "tests/onboarding.service.test.ts",
-            "tests/ux-ticket-049-052-ui.test.tsx"
+            "tests/ux-ticket-049-052-ui.test.tsx",
+            "tests/onboarding-travel.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -3590,9 +3680,10 @@
             "tests/ux-ticket-049-052-ui.test.tsx",
             "tests/desktop-settings-ui.test.tsx",
             "tests/desktop-navigation.test.ts",
+            "tests/onboarding-travel.dom.test.tsx",
             "docs/qa/2026-08-30-desktop-native-boundary.md"
           ],
-          "reason": "Shared setup model and local navigation contracts pass. Native Open import reached the loaded import controls. Dismissal lifecycle is tracked separately."
+          "reason": "Shared setup model and local navigation contracts pass. Native Open import reached the loaded import controls. Dismissal lifecycle is tracked separately. Ticket 212 Home and travel needs a linked account for the routing report; native activation has not had installed QA."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -3979,13 +4070,14 @@
         }
       ],
       "availability": "Available on unresolved rows and inside expanded correction controls; behavior date review also exposes it.",
-      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, refreshes the view, and attempts the completion chime at most once for a new Completed transition.",
+      "success_result": "Atomically updates the occurrence snapshot, appends the status event when the choice changes, cancels pending reminders as planned, refreshes the view, and attempts the completion chime at most once for a new Completed transition. With completion places on and location already allowed, a first resolution on the occurrence's day and hours reads one foreground position, stores only a place label and discards the position (Ticket 216).",
       "failure_result": "Refreshes server truth after a stale-status conflict, rolls back optimistic presentation, and shows a factual error; no partial status write is retained.",
       "effects": [
         "database_write",
         "reminder_cancellation",
         "ui_state",
-        "optional_audio"
+        "optional_audio",
+        "optional_device_location_read"
       ],
       "risk": "moderate",
       "confirmation": "none",
@@ -3994,13 +4086,15 @@
         "app/(app)/timeline/actions.ts#markOccurrenceStatusAction",
         "app/(app)/behaviors/actions.ts#markBehaviorReviewOccurrenceStatusAction",
         "apps/desktop/src/local-actions.ts",
-        "apps/desktop/src/timeline-screen.tsx"
+        "apps/desktop/src/timeline-screen.tsx",
+        "components/travel/PlaceLabels.tsx#PlaceLabelProvider"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/timeline-interactions-ui.test.tsx",
-          "tests/status-buttons-completion-chime.test.ts"
+          "tests/status-buttons-completion-chime.test.ts",
+          "tests/place-labels.dom.test.tsx"
         ],
         "notes": "Timeline UI coverage renders the Completed control. The mobile activation harness preserves one submission, one guarded preparation, one media playback attempt, and one playback-start event; transition and persistence behavior are covered separately."
       },
@@ -11491,7 +11585,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11511,7 +11606,7 @@
           "control": "Connect Google Calendar"
         }
       ],
-      "availability": "Explicit action is available after Cadence sign-in and provider configuration.",
+      "availability": "Explicit action is available after Cadence sign-in and provider configuration. Each purpose requires its own configured client and same-account grant.",
       "success_result": "Opens provider consent; same-account verification installs sealed server credentials.",
       "failure_result": "Consent denial, wrong-account selection, and expired state leave Cadence data unchanged. Wrong-account recovery links to Google Account connections and discloses project-wide revocation; Cadence never revokes automatically.",
       "effects": [
@@ -11527,9 +11622,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11554,7 +11650,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11566,7 +11662,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-002",
@@ -11574,7 +11682,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11594,8 +11703,8 @@
           "control": "Save Calendar settings"
         }
       ],
-      "availability": "A configured connected account can edit its Calendar preferences.",
-      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts.",
+      "availability": "A configured connected account can edit its Calendar preferences. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Saves owner-scoped selections and visibility; invalidates old range receipts. Agent mode saves a separate selection and omits Timeline visibility controls.",
       "failure_result": "Invalid or unavailable selections keep a visible error.",
       "effects": [
         "database_write",
@@ -11609,9 +11718,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11636,7 +11746,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11648,7 +11758,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-003",
@@ -11656,7 +11778,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11676,8 +11799,8 @@
           "control": "Refresh Calendar"
         }
       ],
-      "availability": "Connected accounts can refresh calendar discovery, including without selected calendars.",
-      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state.",
+      "availability": "Connected accounts can refresh calendar discovery, including without selected calendars. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Replaces complete matching snapshots atomically and shows last refreshed state. Agent mode refreshes calendar discovery only; event reads remain behind Daily Brief authorization.",
       "failure_result": "A failed or incomplete read preserves the last complete stale snapshot.",
       "effects": [
         "network_request",
@@ -11691,9 +11814,11 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-client.test.tsx"
+          "tests/google-calendar-client.test.tsx",
+          "tests/google-calendar-agent.test.ts",
+          "tests/google-calendar-panel.dom.test.tsx"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11718,7 +11843,7 @@
             "tests/google-calendar-client.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11730,7 +11855,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-004",
@@ -11738,7 +11875,8 @@
       "user_guidance": {
         "audience": "user",
         "references": [
-          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context"
+          "docs/user-guide/timeline.md#day-progress-and-optional-calendar-context",
+          "docs/user-guide/timeline.md#calendar-for-daily-brief"
         ]
       },
       "status": "implemented",
@@ -11751,15 +11889,15 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Remove the account-wide grant and clear external context.",
+      "intent": "Remove the selected Calendar grant across devices for this account.",
       "triggers": [
         {
           "kind": "activate",
-          "control": "Disconnect Google Calendar everywhere"
+          "control": "Disconnect Google Calendar"
         }
       ],
-      "availability": "Available for an existing connection; the UI explains other-device effects.",
-      "success_result": "Fences reads, deletes credentials, attempts provider revocation, and clears local cache.",
+      "availability": "Available for an existing connection; the UI explains other-device effects. Each purpose requires its own configured client and same-account grant.",
+      "success_result": "Fences reads for the selected purpose, deletes its credentials, and attempts provider revocation. Standard disconnect clears the Timeline cache; agent disconnect invalidates agent reads only.",
       "failure_result": "A revocation outage requires grant removal in Google settings; deleted local credentials stay deleted.",
       "effects": [
         "database_delete",
@@ -11773,9 +11911,10 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/google-calendar-panel.dom.test.tsx"
+          "tests/google-calendar-panel.dom.test.tsx",
+          "tests/google-calendar-agent.test.ts"
         ],
-        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
+        "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137. Ticket 187 covers agent isolation; provider and installed-desktop acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -11800,7 +11939,7 @@
             "tests/google-calendar-panel.dom.test.tsx",
             "tests/desktop-calendar.test.ts"
           ],
-          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
+          "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137. Agent callback and Keychain isolation are source-tested; Ticket 187 owns installed acceptance."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -11812,7 +11951,19 @@
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
         }
-      }
+      },
+      "variants": [
+        {
+          "id": "standard",
+          "label": "Google Calendar",
+          "result": "Uses the standard grant for Timeline context."
+        },
+        {
+          "id": "agent",
+          "label": "Google Calendar for Daily Brief",
+          "result": "Uses separate agent consent and selections. Model disclosure remains a separate Daily Brief control; no Timeline cache access."
+        }
+      ]
     },
     {
       "id": "INT-CALENDAR-005",
@@ -12842,7 +12993,7 @@
         }
       ],
       "availability": "Available only when the first-party feature is enabled and the hosted service is available; linked desktop also needs connectivity.",
-      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result. With travel consent and provider clearance, each generated brief requests whole-day travel once, within the eight-leg bound, for the calculated display only (Ticket 214).",
+      "success_result": "Shows validated model text in the existing horse bubble without changing tracking or Calendar records. Returning focus preserves the bubble when account, date, timezone, and settings remain current. Navigating away and back reattaches to the same in-flight attempt or fresh result. With travel consent and provider clearance, each generated brief requests whole-day travel once, within the eight-leg bound, for the calculated display only (Ticket 214). The request returns the latest unexpired signed travel conclusions for the account and day unchanged, when the client holds one; the server verifies them before any trip or weather conclusion reaches model input (Ticket 219 Option A).",
       "failure_result": "Keeps Timeline usable. Bounded client deadlines end stalled reads. Timeout, offline, sign-in, changed-context, rate-limit, pending and interrupted outcomes show distinct nonblocking notices with an explicit retry where one can help. A Timeline change or expiry withdraws delivered text and offers a refresh.",
       "effects": [
         "network_request",
@@ -13108,7 +13259,7 @@
       "triggers": [
         {
           "kind": "change",
-          "control": "Enable Daily Brief or Include selected Google Calendar timing"
+          "control": "Enable Daily Brief or Include calendars selected in Google Calendar for Daily Brief"
         },
         {
           "kind": "change",
@@ -13127,8 +13278,8 @@
           "control": "Allow Outlook Calendar again, Allow iCloud Calendar again, or Allow Hevy again"
         }
       ],
-      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 240 adds its adapter.",
-      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one.",
+      "availability": "Available in Settings when the server reports the first-party feature is configured; desktop also needs a linked online account. The reminder and Note controls appear only when the server's reviewed recipe uses those sources, or in development. Each connector control appears only while that source is connected (Outlook also needs a selected calendar), or while its disclosure is still on so it can be turned off. iCloud Calendar offers no control until Ticket 240 adds its adapter. Google Calendar disclosure requires a separate agent Calendar connection; Timeline consent alone is insufficient.",
+      "success_result": "Saves the declared preference fields and withdraws any current Daily Brief presentation. Turning Daily Brief off revokes every optional source and deletes tip repetition metadata; older two-field clients revoke optional sources, and older two- or four-field clients revoke the Outlook, iCloud, and Hevy disclosures. Each connector disclosure binds the connection generation (and calendar selection) it was granted for; reconnecting, disconnecting, or changing the selection fences pending briefs. Settings then explains the change for that source and offers Allow <source> again, which re-sends the seven fields with only that source renewed. Saving any other choice sends off every disclosed source that changed, has no selected calendar, or is not connected, so an unrelated save never renews a changed source and never fails because of one. Google Calendar disclosure binds the agent grant generation and selection revision.",
       "failure_result": "Shows an unavailable or save error state and keeps tracking available.",
       "effects": [
         "network_request",
@@ -13277,7 +13428,8 @@
         "settings"
       ],
       "routes": [
-        "/settings"
+        "/settings",
+        "/settings#travel"
       ],
       "journeys": [
         "J14"
@@ -13289,7 +13441,7 @@
           "control": "Save travel settings"
         }
       ],
-      "availability": "Existing Settings; enabled after Home or usual travel changes. Route estimates remain deployment-gated.",
+      "availability": "Existing Settings; enabled after Home or usual travel changes. The first-run Home and travel row opens the same section at /settings#travel (Ticket 212). Saving sends nothing to Google, requests no device location and does not enable routing. Route estimates remain deployment-gated.",
       "success_result": "Saves Home and usual travel and announces the change so travel estimates refresh.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
@@ -13306,7 +13458,8 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-settings.dom.test.tsx"
+          "tests/travel-settings.dom.test.tsx",
+          "tests/onboarding-travel.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
       },
@@ -13365,7 +13518,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Turning the travel toggle on records routing consent beside the Google Maps disclosure and requests one foreground device position in the same click. Turning it off withdraws consent.",
+      "intent": "Turning the travel toggle on records routing consent beside the Google Maps disclosure and requests one foreground device position in the same click. Turning it off withdraws consent. Permission status refreshes read the OS grant without requesting another position.",
       "triggers": [
         {
           "kind": "change",
@@ -13678,6 +13831,545 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-WEATHER-001",
+      "name": "Open the weather data credit",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#weather-margin"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J07"
+      ],
+      "intent": "Open Open-Meteo or the CC BY 4.0 licence from the credit beside weather-margin lines in travel timing and the Daily Brief travel block.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Weather data by Open-Meteo.com"
+        },
+        {
+          "kind": "activate",
+          "control": "CC BY 4.0"
+        }
+      ],
+      "availability": "The deployment enables weather, the device position gave a forecast area and a travel leg carries a weather margin, or a Daily Brief whose model facts held weather trips (Ticket 219 stage 2).",
+      "success_result": "Opens the Open-Meteo site or the licence in a new tab, or in the system browser on desktop. No account, location or route data is sent.",
+      "failure_result": "Without a weather margin no credit renders; travel timing is unchanged.",
+      "effects": [
+        "navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelWeather.tsx#TravelWeatherCredit",
+        "components/timeline/ExternalEventDetails.tsx#renderTravelTiming",
+        "components/briefing/DailyBriefBubble.tsx#DailyBriefBubble"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-weather-ui.dom.test.tsx"
+        ],
+        "notes": "Synthetic forecasts only. Live Open-Meteo and installed desktop acceptance remain open."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelWeather.tsx#TravelWeatherCredit"
+          ],
+          "evidence": [
+            "tests/travel-weather-ui.dom.test.tsx"
+          ],
+          "reason": "Shared travel timing and Daily Brief travel block."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelWeather.tsx#TravelWeatherCredit",
+            "apps/desktop/src/timeline-screen.tsx#TimelineScreen"
+          ],
+          "evidence": [
+            "tests/travel-weather-ui.dom.test.tsx"
+          ],
+          "reason": "Shared components; a linked desktop receives weather from the hosted travel route. Timeline links open through the system browser. Installed acceptance remains pending."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing shows no account travel."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-008",
+      "name": "Answer the leave-time question",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#answer-the-leave-time-question"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "After a journey with a routed outbound leg ends, say once that day whether the leave time was too early, about right or too late, or choose Not now. Too late adds 5 minutes to the arrival buffer and too early removes 5, within 0\u201330 minutes (travel-habit-defaults@1).",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Too early"
+        },
+        {
+          "kind": "activate",
+          "control": "About right"
+        },
+        {
+          "kind": "activate",
+          "control": "Too late"
+        },
+        {
+          "kind": "activate",
+          "control": "Not now"
+        }
+      ],
+      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this page session. Hidden after an answer that day or after Not now in this session.",
+      "success_result": "Stores the answer with an event digest, local date, time and rules version, updates the arrival buffer, names the new buffer and refreshes estimates when the buffer changed. Not now records nothing.",
+      "failure_result": "Keeps the question and says the answer could not save. Tracking data and estimates are unchanged.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelLeaveQuestion.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "lib/ui/travel-habits.ts",
+        "packages/core/src/services/travel-habits.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-habits.test.ts"
+        ],
+        "notes": "Provider-free tests. No position, route duration or event title is stored."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelLeaveQuestion.tsx",
+            "components/timeline/DayProgressTimeline.tsx",
+            "app/api/travel/habits/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; hosted route and travel_settings store the answer."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelLeaveQuestion.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; SQLite stores the answer and account synchronization carries it."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-009",
+      "name": "Choose travel for a place",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#choose-travel-for-a-place"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Choose walking, cycling, transit or driving for the journey to a located Calendar event or Behavior. Cadence remembers the choice for that place; Usual travel forgets it.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Travel by"
+        }
+      ],
+      "availability": "Calendar event details and expanded located Behavior rows while a planned leg reaches that place. The trip home follows the last stop and offers no choice.",
+      "success_result": "Stores the mode with the place key and time, then refreshes estimates once with the remembered mode.",
+      "failure_result": "Keeps the previous mode and says the choice could not save.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelModeChoice.tsx",
+        "components/timeline/ExternalEventDetails.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "lib/services/travel-route-refresh.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-habits.test.ts",
+          "tests/travel-route-refresh.service.test.ts"
+        ],
+        "notes": "Provider-free tests. The place key is a digest; no place text is stored for Calendar places."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/ExternalEventDetails.tsx"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; the hosted refresh routes with the remembered mode."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelModeChoice.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-habits.test.ts"
+          ],
+          "reason": "Shared Timeline control; SQLite stores the mode and account synchronization carries it to the hosted refresh."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-010",
+      "name": "Edit learned travel habits",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#learned-travel-habits"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Edit the learned get-ready time, arrival buffer and travel mode per place, shown as plain sentences in Travel Settings. Choosing a default follows it; Use usual travel forgets a place.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Get-ready time"
+        },
+        {
+          "kind": "change",
+          "control": "Arrival buffer"
+        },
+        {
+          "kind": "change",
+          "control": "Travel to {place}"
+        }
+      ],
+      "availability": "Settings, Travel, How you travel. Each change saves at once with the habit revision; there are no separate buffer fields.",
+      "success_result": "Saves the habit, says Travel habits saved, and refreshes estimates once.",
+      "failure_result": "Keeps the stored habits and asks the user to reload Settings when another device changed them.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "local_preference",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelHabitsSection.tsx",
+        "components/settings/TravelSettingsPanel.tsx",
+        "app/api/travel/habits/route.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-habits.dom.test.tsx",
+          "tests/travel-settings.service.test.ts"
+        ],
+        "notes": "Provider-free tests."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelHabitsSection.tsx",
+            "app/api/travel/habits/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-settings.service.test.ts"
+          ],
+          "reason": "Shared Settings section; hosted habit writes compare the habit revision."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelHabitsSection.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/local-travel-settings.service.ts"
+          ],
+          "evidence": [
+            "tests/travel-habits.dom.test.tsx",
+            "tests/travel-settings.service.test.ts"
+          ],
+          "reason": "Shared Settings section; SQLite habit writes compare the habit revision and synchronize."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated travel habits."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; it inherits the stored habits and this question."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-006",
+      "name": "Check device location again",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#allow-device-location"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "After allowing location in the browser or System Settings, ask for one foreground device position again without changing travel settings.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Check again"
+        }
+      ],
+      "availability": "Settings, Travel while travel estimates are on and device location is not allowed, not yet allowed or timed out. Disabled while a request is running.",
+      "success_result": "Shows the new device location state. An available position is not saved or sent from this request; the guidance disappears.",
+      "failure_result": "Keeps the guidance and shows the location state with any diagnostic reason. Saved places and Calendar trips keep working.",
+      "effects": [
+        "ui_state",
+        "permission_request"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelSettingsPanel.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx"
+        ],
+        "notes": "Provider-free DOM tests with simulated location results. Installed macOS permission acceptance remains open under Ticket 165."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelSettingsPanel.tsx"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; the browser decides whether to show its prompt."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/TravelSettingsPanel.tsx",
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/foreground-location.ts"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; installed signed-app permission acceptance remains open under Ticket 165."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-007",
+      "name": "Open macOS Location Services",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#allow-device-location"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Open System Settings at Privacy & Security, Location Services so the user can turn on Cadence by hand when macOS does not ask.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Open Location Services"
+        }
+      ],
+      "availability": "Installed macOS app, Settings, Travel while travel estimates are on and device location is not allowed, not yet allowed or timed out.",
+      "success_result": "System Settings opens at Location Services. Cadence changes no setting; the user returns and chooses Check again.",
+      "failure_result": "Shows that System Settings could not open and how to open it from the Apple menu.",
+      "effects": [
+        "native_navigation"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/TravelSettingsPanel.tsx",
+        "apps/desktop/src/foreground-location.ts",
+        "apps/desktop/src-tauri/src/location.rs"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx"
+        ],
+        "notes": "DOM tests cover the control and its failure message with a simulated opener; a native unit test pins the fixed settings URL. Installed launch of the pane is not yet verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Browsers cannot open macOS System Settings; the web panel names the browser setting instead."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/foreground-location.ts",
+            "apps/desktop/src-tauri/src/location.rs"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx"
+          ],
+          "reason": "The native command opens one fixed System Settings URL and accepts no input. Installed acceptance remains open under Ticket 165."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot configure authenticated account data use."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "macOS System Settings is desktop-specific; native mobile is deferred."
         }
       }
     },
@@ -14550,6 +15242,957 @@
           "applicability": "deferred",
           "status": "deferred",
           "reason": "Future mobile implementation and parity remain unscheduled."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-001",
+      "name": "Turn on completion places",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#save-where-you-complete-behaviors"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Opt in to saving where Behaviors are completed, choosing how long labels are kept.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Set up completion places"
+        },
+        {
+          "kind": "change",
+          "control": "Keep labels for"
+        },
+        {
+          "kind": "activate",
+          "control": "Save where I complete Behaviors"
+        }
+      ],
+      "availability": "Settings, Travel, Completion places, while labels are off. Off by default; 90 days is preselected.",
+      "success_result": "Saves the opt-in time and retention, shows label and marker counts, and reveals I'm here controls.",
+      "failure_result": "Keeps labels off and shows a reload message after a stale or failed save.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover the retention step and default; service tests and the SQL smoke cover the opt-in and compare-and-set."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-002",
+      "name": "Change label retention",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#save-where-you-complete-behaviors"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Keep labels for 90 days, 1 year or until deleted.",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Keep labels for"
+        },
+        {
+          "kind": "activate",
+          "control": "Switch and delete"
+        }
+      ],
+      "availability": "Settings, Travel, Completion places, while labels are on.",
+      "success_result": "A longer choice saves at once; a shorter choice asks first and deletes older labels in the same save.",
+      "failure_result": "Keeps the prior retention and labels after a stale or failed save.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover the confirmation; the SQL smoke and native tests cover deletion in the same save."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-003",
+      "name": "Delete completion place labels",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Delete every saved completion place label.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Delete labels"
+        }
+      ],
+      "availability": "Settings, Travel, Completion places, while at least one label exists.",
+      "success_result": "Deletes all labels after confirmation; suggestions restart from new completions.",
+      "failure_result": "Keeps labels and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover deletion; DOM tests cover the panel."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-004",
+      "name": "Delete place markers",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Delete every recorded place marker.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Delete place markers"
+        }
+      ],
+      "availability": "Settings, Travel, Completion places, while at least one marker exists.",
+      "success_result": "Deletes all markers after confirmation; new labels wait for new markers.",
+      "failure_result": "Keeps markers and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover deletion; DOM tests cover the panel."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel and core planners. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-005",
+      "name": "Turn off completion places",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#delete-labels-and-markers"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Stop saving completion places and delete everything location-derived.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Turn off"
+        },
+        {
+          "kind": "activate",
+          "control": "Turn off and delete"
+        }
+      ],
+      "availability": "Settings, Travel, Completion places, while labels are on.",
+      "success_result": "Turns labels off and deletes every label, marker and suggestion dismissal on hosted and local stores.",
+      "failure_result": "Keeps labels on and shows a reload message.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "destructive",
+      "confirmation": "acknowledgement",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+        "app/(app)/settings/page.tsx",
+        "lib/services/place-labels.service.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "The SQL smoke, native tests and the sync planner cover deletion on every writer."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "app/(app)/settings/page.tsx",
+            "lib/services/place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared panel; a hosted trigger and the native command delete the rows."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "components/travel/PlaceLabels.tsx#CompletionPlacesSection",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared panel; a hosted trigger and the native command delete the rows. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-006",
+      "name": "Record a place marker",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "behaviors"
+      ],
+      "routes": [
+        "/settings",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06",
+        "J14"
+      ],
+      "intent": "Record the device's current position as the marker for Home or a saved place.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "I'm here"
+        },
+        {
+          "kind": "activate",
+          "control": "Update marker"
+        }
+      ],
+      "availability": "While labels are on: beside a saved Home in Travel Settings, below Where for Home or A place, and in a Behavior's missing-marker prompt.",
+      "success_result": "Reads one foreground position after the tap, checks age and accuracy, and stores it as the place's marker in microdegrees.",
+      "failure_result": "Explains a blocked, unavailable, old or inaccurate position and stores nothing.",
+      "effects": [
+        "device_location_read",
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+        "components/settings/TravelSettingsPanel.tsx",
+        "components/behaviors/BehaviorForm.tsx",
+        "components/behaviors/BehaviorList.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests prove the tap requests location and sends microdegrees; service tests cover sample limits."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "lib/ui/place-labels.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared control; browser or CoreLocation read."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared control; browser or CoreLocation read. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-007",
+      "name": "Remove a place marker",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings",
+        "behaviors"
+      ],
+      "routes": [
+        "/settings",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06",
+        "J14"
+      ],
+      "intent": "Remove the marker for one place.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Remove"
+        }
+      ],
+      "availability": "Beside a recorded marker while labels are on.",
+      "success_result": "Deletes that marker; labels for the place stop until it is recorded again.",
+      "failure_result": "Keeps the marker as loaded.",
+      "effects": [
+        "database_write",
+        "database_delete",
+        "ui_state"
+      ],
+      "risk": "moderate",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#PlaceMarkerControl"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "Service and native tests cover single-marker deletion."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared control."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#PlaceMarkerControl",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared control. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-008",
+      "name": "Review a Where suggestion",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#where-suggestions"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Open the Behavior's settings with the suggested Where filled in.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Review Where"
+        }
+      ],
+      "availability": "On an active Behavior with a suggestion from where-suggestion-rules@1.",
+      "success_result": "Opens Details and Settings with Where filled in and a note to save; the Behavior changes only when the user saves.",
+      "failure_result": "No change is stored.",
+      "effects": [
+        "form_draft",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+        "components/behaviors/BehaviorList.tsx",
+        "components/behaviors/BehaviorForm.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests prove the suggestion is not applied by itself and carries its rule version."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "components/behaviors/BehaviorList.tsx"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-009",
+      "name": "Dismiss a Where suggestion",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#where-suggestions"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Hide a Where suggestion for a Behavior.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Dismiss"
+        }
+      ],
+      "availability": "On an active Behavior with a suggestion.",
+      "success_result": "Stores the dismissal with its rule version; it returns only after six more labels if the rule still applies.",
+      "failure_result": "Keeps the suggestion visible.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM, resolver and service tests cover the dismissal and its return rule."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
+        }
+      }
+    },
+    {
+      "id": "INT-PLACE-010",
+      "name": "Turn off marker prompts",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#record-a-place-marker"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "behaviors"
+      ],
+      "routes": [
+        "/behaviors"
+      ],
+      "journeys": [
+        "J06"
+      ],
+      "intent": "Stop the one-line prompts that ask for missing place markers.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Not now"
+        }
+      ],
+      "availability": "On the first active Behavior per place with no current marker, while prompts are on.",
+      "success_result": "Records the dismissal in settings; prompts stay off on every device while Settings and Where keep I'm here.",
+      "failure_result": "Keeps the prompt visible.",
+      "effects": [
+        "database_write",
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/place-labels.dom.test.tsx",
+          "tests/place-labels.service.test.ts",
+          "tests/place-label.resolver.test.ts"
+        ],
+        "notes": "DOM tests cover Not now; the resolver test covers prompt suppression."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "apps/desktop/src/behaviors-screen.tsx",
+            "components/travel/PlaceLabels.tsx#BehaviorPlaceAssist",
+            "apps/desktop/src/local-place-labels.service.ts"
+          ],
+          "evidence": [
+            "tests/place-labels.dom.test.tsx",
+            "tests/place-labels.service.test.ts",
+            "tests/place-label.resolver.test.ts",
+            "tests/account-sync.resolver.test.ts"
+          ],
+          "reason": "Shared Behavior list. Native SQLite tests cover the store; installed signed-desktop location acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated account data or read device location."
+        },
+        "mobile": {
+          "applicability": "deferred",
+          "status": "deferred",
+          "reason": "Native mobile implementation is deferred; it inherits the design with a native foreground location read."
         }
       }
     }

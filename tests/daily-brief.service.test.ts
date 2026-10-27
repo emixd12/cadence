@@ -57,6 +57,20 @@ describe("first-party daily briefing service", () => {
       signal: expect.any(AbortSignal),
     }));
   });
+  it("passes an optional travel token and the server's signing secrets only to the live snapshot (Ticket 219 Option A)", async () => {
+    vi.stubEnv("TRAVEL_CONCLUSIONS_SIGNING_SECRET", "test-only-conclusions-secret-0123456789");
+    try {
+      await expect(requestInAppDailyBrief(caller, { ...input, travelConclusions: "signed.token" }, { generate, now })).resolves.toMatchObject({ state: "ready" });
+      expect(mocks.prepare).toHaveBeenLastCalledWith(caller, expect.objectContaining({
+        travelConclusions: { token: "signed.token", secrets: { current: "test-only-conclusions-secret-0123456789", previous: null } } }));
+      // A malformed token is passed on for verification to reject; it never fails the request.
+      await expect(requestInAppDailyBrief(caller, { ...input, travelConclusions: 42 }, { generate, now })).resolves.toMatchObject({ state: "ready" });
+      await requestInAppDailyBrief(caller, input, { generate, now });
+      expect(mocks.prepare).toHaveBeenLastCalledWith(caller, expect.objectContaining({ travelConclusions: expect.objectContaining({ token: null }) }));
+      await expect(requestInAppDailyBrief(caller, { ...input, travelConclusions: "x", conclusions: "y" }, { generate, now })).rejects.toMatchObject({ code: "invalid_request" });
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("uses authenticated repositories, rechecks fences and completes one lease", async () => {
     const result = await requestInAppDailyBrief(caller, input, { generate, now });
     expect(result.state).toBe("ready");

@@ -472,7 +472,7 @@ describe("advisor day-context service", () => {
     calendar.getCalendarEventsForAdvisor.mockResolvedValue({
       result: { ok: true, snapshot: calendarSnapshot }, connection: { selectionRevision: 2 },
     });
-    calendar.getCalendarConnection.mockResolvedValue({ generation: calendarSnapshot.connectionGeneration, selectionRevision: 2 });
+    calendar.getCalendarConnection.mockResolvedValue({ status: "connected", generation: calendarSnapshot.connectionGeneration, selectionRevision: 2 });
 
     const contexts = await readAdvisorDayContexts({
       caller: { client, user }, authorization: calendarAuthorization,
@@ -485,6 +485,14 @@ describe("advisor day-context service", () => {
 
     expect(calendar.getCalendarEventsForAdvisor).toHaveBeenCalledOnce();
     expect(contexts[0]?.connectors).toEqual(contexts[1]?.connectors);
+    expect(calendar.getCalendarConnection).toHaveBeenCalledWith({ client, user }, "agent");
+    calendar.getCalendarConnection.mockResolvedValue({ status: "reconnect_required", generation: calendarSnapshot.connectionGeneration, selectionRevision: 2 });
+    await expect(readAdvisorDayContexts({
+      caller: { client, user }, authorization: calendarAuthorization,
+      revalidateAuthorization: async () => calendarAuthorization,
+      includeGoogleCalendar: true, historyDays: [90, 30], opaqueRefKey: "k".repeat(32),
+      now: Temporal.Instant.from("2026-09-19T12:00:02Z"),
+    })).rejects.toThrow("context_changed");
   });
 
   it("rejects 501 Calendar events instead of disclosing partial context", async () => {

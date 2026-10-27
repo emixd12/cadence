@@ -73,3 +73,16 @@ describe("Calendar and Daily Brief request authentication", () => {
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 });
+
+
+it("rejects agent and invalid purposes at the Timeline event endpoint", async () => {
+  const { GET } = await import("@/app/api/google-calendar/events/route");
+  const { calendarRequestPurpose } = await import("@/lib/services/google-calendar-request");
+  expect(calendarRequestPurpose(new Request("https://cadence.example/api/google-calendar/connection"))).toBe("standard");
+  expect(calendarRequestPurpose(new Request("https://cadence.example/api/google-calendar/connection?purpose=agent"))).toBe("agent");
+  for (const purpose of ["agent", "unknown"]) {
+    const response = await GET(new Request(`https://cadence.example/api/google-calendar/events?purpose=${purpose}`));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_request" });
+  }
+});

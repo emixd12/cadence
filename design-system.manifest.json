@@ -71,7 +71,7 @@
       "benchAnchor": "design-system#ds-flow-first-run-onboarding-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Timeline-only setup pop-up that routes into existing Behaviors, Settings, and Export controls."
+      "notes": "Timeline-only setup pop-up that routes into existing Behaviors, Settings, and Export controls. Ticket 212 adds the optional Home and travel row; the bench supplies a synthetic routing report and never calls the travel routes endpoint."
     },
     {
       "id": "flow.account-deletion-panel",
@@ -464,7 +464,7 @@
       "benchAnchor": "design-system#ds-module-day-progress-timeline",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Shared web/desktop Timeline with source-labeled Google and Outlook Calendar markers, a separate recorded-activity list, thin facet overlap borders and duration lines, and synthetic provider-free preview."
+      "notes": "Shared web/desktop Timeline with source-labeled Google and Outlook Calendar markers, a separate recorded-activity list, thin facet overlap borders and duration lines, and synthetic provider-free preview. Ticket 218 shows weather-adjusted leave times, fixed weather margins, mode suggestions and the plain no-weather status in the travel status line; bench fixtures cover thunderstorms and no device location."
     },
     {
       "id": "module.daily-brief-bubble",
@@ -478,7 +478,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-bubble",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Configuration comparison: /design-system?preview=briefing-workbench."
+      "notes": "Read-only Timeline horse bubble with forward-looking Daily Brief policy, validated suggestions, trusted source links, 44px dismiss control and bounded scrolling. Recovery notices use a labeled retry (Try again, Refresh brief, Get a fresh brief) that stays disabled until a server wait passes. Source diagnostics remain in the private workbench inspector. Recipe 1.1 (Ticket 184 candidate) shows plain Suggested time lines and a Logging or Pattern tip label with evidence indented under the tip. Recipe 1.2 (candidate 3) lists every move as a bullet under one New suggested time heading with current → new times, Behavior names as compact chips, and hides an empty brief. Configuration comparison: /design-system?preview=briefing-workbench. Ticket 218 adds weather-adjusted departures with fixed margins, the Open-Meteo credit and the plain no-weather line to the calculated travel block."
     },
     {
       "id": "module.daily-brief-settings-panel",
@@ -492,7 +492,7 @@
       "benchAnchor": "design-system#ds-module-daily-brief-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Settings enablement and optional Calendar-context disclosure; the bench uses a fixture client only."
+      "notes": "Settings enablement and optional Calendar-context disclosure from the separate agent grant; the bench uses a fixture client only."
     },
     {
       "id": "module.google-calendar-panel",
@@ -506,7 +506,7 @@
       "benchAnchor": "design-system#ds-module-google-calendar-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Tickets 133\u2013137; synthetic bench never contacts a provider."
+      "notes": "Tickets 133\u2013137 and 187; shared standard/agent consent panel. Agent mode has its own selection and omits Timeline display controls. Synthetic bench covers connected, disconnected, reconnect and unconfigured states without provider calls."
     },
     {
       "id": "module.connector-library",
@@ -607,6 +607,20 @@
       "notes": "Persistent bottom preview with title-aligned close control and reserved rendered height."
     },
     {
+      "id": "composite.travel-weather-credit",
+      "name": "TravelWeatherCredit",
+      "kind": "composite",
+      "source": "components/timeline/TravelWeather.tsx",
+      "exportName": "TravelWeatherCredit",
+      "usageNames": [
+        "TravelWeatherCredit"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-weather-credit",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 218: Open-Meteo CC BY 4.0 credit with site and licence links and the change note. It sits beside weather-margin lines in travel timing and the Daily Brief travel block; desktop opens links through onOpenExternal. Synthetic bench; no weather provider call."
+    },
+    {
       "id": "module.travel-settings-panel",
       "name": "TravelSettingsPanel",
       "kind": "module",
@@ -618,7 +632,91 @@
       "benchAnchor": "design-system#ds-module-travel-settings-panel",
       "trackUsages": "required",
       "status": "active",
-      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Synthetic bench never reads location or contacts a provider."
+      "notes": "Ticket 215: three inputs (Travel estimates toggle with the Google Maps disclosure, optional Home, usual travel). The toggle records consent and asks for foreground location in the same click. Ticket 165: while travel is on and device location is not allowed, not yet allowed or timed out, platform guidance, Check again and (desktop) Open Location Services appear; saved places and Calendar trips keep working. Ticket 212 adds the `travel` anchor. The panel is one sparse sequence: setup and device-location guidance, then How you travel (Ticket 217) and Completion places (Ticket 216) as ruled subsections; I'm here sits below Home while labels are on. Permission status uses a separate read that never requests coordinates. Synthetic bench shows both states and never reads location, opens System Settings or contacts a provider."
+    },
+    {
+      "id": "module.travel-habits-section",
+      "name": "TravelHabitsSection",
+      "kind": "module",
+      "source": "components/settings/TravelHabitsSection.tsx",
+      "exportName": "TravelHabitsSection",
+      "usageNames": [
+        "TravelHabitsSection"
+      ],
+      "benchAnchor": "design-system#ds-module-travel-habits-section",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 217: learned get-ready time, arrival buffer and travel per place as plain sentences with inline selects; each change saves at once with the habit revision. Bench saves stay in page memory."
+    },
+    {
+      "id": "composite.travel-mode-choice",
+      "name": "TravelModeChoice",
+      "kind": "composite",
+      "source": "components/timeline/TravelModeChoice.tsx",
+      "exportName": "TravelModeChoice",
+      "usageNames": [
+        "TravelModeChoice"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-mode-choice",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 217: Travel by select in Calendar event details and expanded located Behaviors; remembers the mode for the place key. Synthetic bench evidence; no provider call."
+    },
+    {
+      "id": "composite.travel-leave-question",
+      "name": "TravelLeaveQuestion",
+      "kind": "composite",
+      "source": "components/timeline/TravelLeaveQuestion.tsx",
+      "exportName": "TravelLeaveQuestion",
+      "usageNames": [
+        "TravelLeaveQuestion"
+      ],
+      "benchAnchor": "design-system#ds-composite-travel-leave-question",
+      "trackUsages": "optional",
+      "status": "active",
+      "notes": "Ticket 217: once-a-day Too early / About right / Too late question with Not now, shown in the Timeline status area. Not now records nothing."
+    },
+    {
+      "id": "module.completion-places-section",
+      "name": "CompletionPlacesSection",
+      "kind": "module",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "CompletionPlacesSection",
+      "usageNames": [
+        "CompletionPlacesSection"
+      ],
+      "benchAnchor": "design-system#ds-module-completion-places-section",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: Completion places subsection of the Travel panel, after How you travel: separate opt-in for completion place labels with a retention choice (90 days default, 1 year, until deleted), label and marker counts, and confirmed delete and turn-off controls. Synthetic bench state; no position read or request."
+    },
+    {
+      "id": "composite.place-marker-control",
+      "name": "PlaceMarkerControl",
+      "kind": "composite",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "PlaceMarkerControl",
+      "usageNames": [
+        "PlaceMarkerControl"
+      ],
+      "benchAnchor": "design-system#ds-composite-place-marker-control",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: I'm here beside Home in Travel Settings and below the Behavior Where field. Records one device position as the place's marker after an explicit tap; hidden while labels are off."
+    },
+    {
+      "id": "composite.behavior-place-assist",
+      "name": "BehaviorPlaceAssist",
+      "kind": "composite",
+      "source": "components/travel/PlaceLabels.tsx",
+      "exportName": "BehaviorPlaceAssist",
+      "usageNames": [
+        "BehaviorPlaceAssist"
+      ],
+      "benchAnchor": "design-system#ds-composite-behavior-place-assist",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 216: one sparse line on a Behavior record, either a Where suggestion (Review Where, Dismiss; carries its rule version) or the first missing-marker prompt (I'm here, Not now). A suggestion only fills the form."
     },
     {
       "id": "flow.consent-form",

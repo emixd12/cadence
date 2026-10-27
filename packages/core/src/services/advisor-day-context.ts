@@ -23,7 +23,19 @@ import {
   type AdvisorOccurrence,
   type AdvisorSourceFailureCode,
 } from "../types/advisor-day-context";
+import {
+  ADVISOR_BEHAVIOR_WHERE,
+  ADVISOR_TRAVEL_CONTEXT_VERSION,
+  ADVISOR_TRAVEL_ROUTE_UNAVAILABLE_REASONS,
+  ADVISOR_WEATHER_STATES,
+} from "../types/briefing-travel";
 import type { OccurrenceStatus } from "../types/database";
+import { TRAVEL_MODEL_PROJECTION_VERSION, type TravelLegRole, type TravelMode, type TravelModelFit } from "../types/travel";
+import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
+import { CURRENT_WHERE_SUGGESTION_RULES } from "../resolvers/place-label.resolver";
+import { PLACE_LABEL_RETENTIONS } from "../types/place-labels";
+import { WEATHER_MARGIN_TABLE } from "../resolvers/weather-margin.resolver";
+import { TRAVEL_HABIT_RULES } from "./travel-habits";
 import type {
   ExternalEventFailure,
   ExternalEventSnapshotV1,
@@ -454,7 +466,7 @@ export function validateVersionedAdvisorDayContext(value: unknown): AdvisorDayCo
 
 function validateContext(value: unknown, mode: "1.0_only" | "versioned"): AdvisorDayContext {
   const root = record(value, "context");
-  exactKeys(root, ["version", "snapshotId", "accountRef", "localDate", "timezone", "dayStartAt", "dayEndAt", "capturedAt", "expiresAt", "status", "authority", "grantGeneration", "cadence", "connectors"], "context");
+  exactOptionalKeys(root, ["version", "snapshotId", "accountRef", "localDate", "timezone", "dayStartAt", "dayEndAt", "capturedAt", "expiresAt", "status", "authority", "grantGeneration", "cadence", "connectors"], ["travel"], "context");
   const version = root.version;
   if (version !== ADVISOR_DAY_CONTEXT_VERSION && (mode === "1.0_only" || version !== ADVISOR_DAY_CONTEXT_VERSION_1_1)) {
     fail("context.version is unsupported.");
@@ -537,8 +549,184 @@ function validateContext(value: unknown, mode: "1.0_only" | "versioned"): Adviso
   })) {
     fail("Complete context cannot contain an incomplete connector.");
   }
+  if ("travel" in root) validateTravel(root.travel, { occurrenceRefs, behaviorRefs: new Set([...behaviorRefs, ...historyBehaviorRefs]), eventRefs });
   return value as AdvisorDayContext;
 }
+
+const TRAVEL_MODES: readonly TravelMode[] = ["walking", "cycling", "transit", "driving"];
+const TRAVEL_LEG_ROLES: readonly TravelLegRole[] = ["outbound", "onward", "return"];
+const TRAVEL_FIT_BASES: readonly TravelModelFit["basis"][] = ["travel_known", "travel_overlap", "late_arrival", "travel_unknown", "duration_unknown"];
+
+/**
+ * Ticket 219. Every field may reach model input, so the shape is closed: enums,
+ * refs already present in the context and bounded whole numbers in the later-stage
+ * slots. No instant, duration or free text is accepted.
+ */
+function validateTravel(value: unknown, refs: Readonly<{ occurrenceRefs: Set<string>; behaviorRefs: Set<string>; eventRefs: Set<string> }>): void {
+  const travel = record(value, "context.travel");
+  exactOptionalKeys(travel, ["version", "routing", "usualMode", "behaviors", "route"], ["habits", "weather", "placeLabels"], "context.travel");
+  if (travel.version !== ADVISOR_TRAVEL_CONTEXT_VERSION) fail("context.travel.version is unsupported.");
+  if (travel.routing !== "on" && travel.routing !== "off") fail("context.travel.routing is invalid.");
+  if (travel.usualMode !== null && !TRAVEL_MODES.includes(travel.usualMode as TravelMode)) fail("context.travel.usualMode is invalid.");
+  if (travel.routing === "off" && travel.usualMode !== null) fail("context.travel.usualMode requires routing.");
+  const behaviorRef = (item: unknown, label: string) => {
+    const ref = nonempty(item, label);
+    if (!refs.behaviorRefs.has(ref)) fail(`${label} has no Behavior in this context.`);
+    return ref;
+  };
+  const destinationRef = (item: unknown, label: string) => {
+    if (item === null) return;
+    const ref = nonempty(item, label);
+    if (!refs.occurrenceRefs.has(ref) && !refs.eventRefs.has(ref)) fail(`${label} has no occurrence or event in this context.`);
+  };
+  const unique = (items: string[], label: string) => { if (new Set(items).size !== items.length) fail(`${label} must be unique.`); };
+  const mode = (item: unknown, label: string, nullable: boolean) => {
+    if (!(nullable && item === null) && !TRAVEL_MODES.includes(item as TravelMode)) fail(`${label} is invalid.`);
+  };
+  const whole = (item: unknown, label: string, max: number) => {
+    if (!Number.isInteger(item) || (item as number) < 0 || (item as number) > max) fail(`${label} is invalid.`);
+  };
+
+  unique(array(travel.behaviors, "context.travel.behaviors", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+    const row = record(item, `travel.behavior[${index}]`);
+    exactKeys(row, ["behaviorRef", "where"], `travel.behavior[${index}]`);
+    if (!(ADVISOR_BEHAVIOR_WHERE as readonly unknown[]).includes(row.where)) fail("travel.behavior.where is invalid.");
+    return behaviorRef(row.behaviorRef, "travel.behavior.behaviorRef");
+  }), "context.travel.behaviors");
+
+  const route = record(travel.route, "context.travel.route");
+  if (route.state === "unavailable") {
+    exactKeys(route, ["state", "reason"], "context.travel.route");
+    if (!(ADVISOR_TRAVEL_ROUTE_UNAVAILABLE_REASONS as readonly unknown[]).includes(route.reason)) fail("context.travel.route.reason is invalid.");
+  } else if (route.state === "available") {
+    if (travel.routing !== "on") fail("context.travel.route requires routing.");
+    exactKeys(route, ["state", "conclusions"], "context.travel.route");
+    const conclusions = record(route.conclusions, "travel.route.conclusions");
+    exactKeys(conclusions, ["version", "travelDay", "calendarEvents", "trips", "fits"], "travel.route.conclusions");
+    if (conclusions.version !== TRAVEL_MODEL_PROJECTION_VERSION) fail("travel.route.conclusions.version is unsupported.");
+    if (conclusions.travelDay !== "yes" && conclusions.travelDay !== "no" && conclusions.travelDay !== "unknown") fail("travel.route.conclusions.travelDay is invalid.");
+    if (typeof conclusions.calendarEvents !== "boolean") fail("travel.route.conclusions.calendarEvents is invalid.");
+    array(conclusions.trips, "travel.route.conclusions.trips", ADVISOR_DAY_CONTEXT_LIMITS.occurrences).forEach((item, index) => {
+      const trip = record(item, `travel.trip[${index}]`);
+      exactKeys(trip, ["destinationRef", "role", "mode", "estimate"], `travel.trip[${index}]`);
+      destinationRef(trip.destinationRef, "travel.trip.destinationRef");
+      if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.trip.role is invalid.");
+      mode(trip.mode, "travel.trip.mode", true);
+      if (trip.estimate !== "current" && trip.estimate !== "unknown") fail("travel.trip.estimate is invalid.");
+    });
+    unique(array(conclusions.fits, "travel.route.conclusions.fits", ADVISOR_DAY_CONTEXT_LIMITS.occurrences).map((item, index) => {
+      const fit = record(item, `travel.fit[${index}]`);
+      exactKeys(fit, ["ref", "conclusion", "basis", "trip", "position"], `travel.fit[${index}]`);
+      const ref = nonempty(fit.ref, "travel.fit.ref");
+      if (!refs.occurrenceRefs.has(ref)) fail("travel.fit.ref has no occurrence in this context.");
+      if (fit.conclusion !== "fits" && fit.conclusion !== "does_not_fit" && fit.conclusion !== "unknown") fail("travel.fit.conclusion is invalid.");
+      if (!TRAVEL_FIT_BASES.includes(fit.basis as TravelModelFit["basis"])) fail("travel.fit.basis is invalid.");
+      if (fit.trip !== null) {
+        const trip = record(fit.trip, "travel.fit.trip");
+        exactKeys(trip, ["destinationRef", "role"], "travel.fit.trip");
+        destinationRef(trip.destinationRef, "travel.fit.trip.destinationRef");
+        if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.fit.trip.role is invalid.");
+      }
+      if (fit.position !== null && fit.position !== "before" && fit.position !== "after") fail("travel.fit.position is invalid.");
+      return ref;
+    }), "travel.route.conclusions.fits");
+  } else {
+    fail("context.travel.route.state is invalid.");
+  }
+
+  if ("habits" in travel) {
+    if (travel.routing !== "on") fail("context.travel.habits requires routing.");
+    const habits = record(travel.habits, "context.travel.habits");
+    exactKeys(habits, ["rulesVersion", "getReadyMinutes", "getReadySource", "placeModes"], "context.travel.habits");
+    if (habits.rulesVersion !== TRAVEL_HABIT_RULES.version) fail("travel.habits.rulesVersion is unsupported.");
+    const preparation = TRAVEL_HABIT_RULES.preparation;
+    whole(habits.getReadyMinutes, "travel.habits.getReadyMinutes", preparation.maxMinutes);
+    if ((habits.getReadyMinutes as number) % preparation.stepMinutes !== 0) fail("travel.habits.getReadyMinutes is invalid.");
+    if (habits.getReadySource !== "default" && habits.getReadySource !== "learned") fail("travel.habits.getReadySource is invalid.");
+    if (habits.getReadySource === "default" && habits.getReadyMinutes !== preparation.defaultMinutes) fail("travel.habits.getReadyMinutes does not match its source.");
+    unique(array(habits.placeModes, "travel.habits.placeModes", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+      const row = record(item, `travel.placeMode[${index}]`);
+      exactKeys(row, ["behaviorRef", "mode"], `travel.placeMode[${index}]`);
+      mode(row.mode, "travel.placeMode.mode", false);
+      return behaviorRef(row.behaviorRef, "travel.placeMode.behaviorRef");
+    }), "travel.habits.placeModes");
+  }
+  if ("weather" in travel) {
+    if (travel.routing !== "on") fail("context.travel.weather requires routing.");
+    const weather = record(travel.weather, "context.travel.weather");
+    exactKeys(weather, ["source", "tableVersion", "state", "calendarEvents", "trips"], "context.travel.weather");
+    if (weather.source !== "open_meteo") fail("travel.weather.source is invalid.");
+    if (weather.tableVersion !== WEATHER_MARGIN_TABLE_VERSION) fail("travel.weather.tableVersion is unsupported.");
+    if (!(ADVISOR_WEATHER_STATES as readonly unknown[]).includes(weather.state)) fail("travel.weather.state is invalid.");
+    if (typeof weather.calendarEvents !== "boolean") fail("travel.weather.calendarEvents is invalid.");
+    const trips = array(weather.trips, "travel.weather.trips", ADVISOR_DAY_CONTEXT_LIMITS.occurrences);
+    if (weather.state !== "applied" && trips.length) fail("travel.weather.trips require a forecast.");
+    unique(trips.map((item, index) => {
+      const trip = record(item, `travel.weather.trip[${index}]`);
+      exactKeys(trip, ["destinationRef", "role", "mode", "state", "conditions", "marginMinutes", "suggestion"], `travel.weather.trip[${index}]`);
+      destinationRef(trip.destinationRef, "travel.weather.trip.destinationRef");
+      if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.weather.trip.role is invalid.");
+      // As in route trips, only the trip home has no destination.
+      if ((trip.role === "return") !== (trip.destinationRef === null)) fail("travel.weather.trip.destinationRef is invalid.");
+      mode(trip.mode, "travel.weather.trip.mode", false);
+      if (trip.state !== "clear" && trip.state !== "margin" && trip.state !== "unknown") fail("travel.weather.trip.state is invalid.");
+      const conditions = array(trip.conditions, "travel.weather.trip.conditions", WEATHER_MARGIN_TABLE.length);
+      unique(conditions.map((condition) => {
+        if (!WEATHER_MARGIN_TABLE.some((rule) => rule.id === condition)) fail("travel.weather.trip.condition is invalid.");
+        return condition as string;
+      }), "travel.weather.trip.conditions");
+      // The margin is the largest fixed table value among the conditions, never a share of trip time.
+      const margin = WEATHER_MARGIN_TABLE.filter((rule) => conditions.includes(rule.id)).reduce((largest, rule) => Math.max(largest, rule.marginMinutes), 0);
+      if (trip.marginMinutes !== margin || (trip.state === "margin") !== (margin > 0)) fail("travel.weather.trip.marginMinutes is invalid.");
+      if (trip.suggestion !== null) {
+        const suggestion = record(trip.suggestion, "travel.weather.trip.suggestion");
+        exactKeys(suggestion, ["instead", "alternatives"], "travel.weather.trip.suggestion");
+        if (trip.state !== "margin" || suggestion.instead !== trip.mode) fail("travel.weather.trip.suggestion is invalid.");
+        const alternatives = array(suggestion.alternatives, "travel.weather.trip.suggestion.alternatives", TRAVEL_MODES.length - 1);
+        if (!alternatives.length) fail("travel.weather.trip.suggestion.alternatives is invalid.");
+        unique(alternatives.map((alternative) => {
+          mode(alternative, "travel.weather.trip.suggestion.alternative", false);
+          if (alternative === trip.mode) fail("travel.weather.trip.suggestion.alternative is invalid.");
+          return alternative as string;
+        }), "travel.weather.trip.suggestion.alternatives");
+      }
+      return `${trip.role}:${trip.destinationRef ?? ""}`;
+    }), "travel.weather.trips");
+  }
+  if ("placeLabels" in travel) {
+    const labels = record(travel.placeLabels, "context.travel.placeLabels");
+    exactKeys(labels, ["rulesVersion", "periodDays", "behaviors", "retained"], "context.travel.placeLabels");
+    if (labels.rulesVersion !== CURRENT_WHERE_SUGGESTION_RULES.version || labels.periodDays !== CURRENT_WHERE_SUGGESTION_RULES.periodDays) {
+      fail("travel.placeLabels.rulesVersion is unsupported.");
+    }
+    const counts = (value: unknown, label: string) => {
+      const rows = new Map<string, Record<string, unknown>>();
+      unique(array(value, label, ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+        const row = record(item, `travel.placeLabel[${index}]`);
+        exactKeys(row, ["behaviorRef", "total", "home", "wherePlace", "otherSavedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
+        for (const key of PLACE_LABEL_COUNT_KEYS) whole(row[key], `travel.placeLabel.${key}`, 10_000);
+        const parts = (row.home as number) + (row.wherePlace as number) + (row.otherSavedPlace as number) + (row.elsewhere as number);
+        if (row.total === 0 || row.total !== parts) fail("travel.placeLabel.total is invalid.");
+        const ref = behaviorRef(row.behaviorRef, "travel.placeLabel.behaviorRef");
+        rows.set(ref, row);
+        return ref;
+      }), label);
+      return rows;
+    };
+    const period = counts(labels.behaviors, "travel.placeLabels.behaviors");
+    const retained = record(labels.retained, "travel.placeLabels.retained");
+    exactKeys(retained, ["retention", "behaviors"], "travel.placeLabels.retained");
+    if (!(PLACE_LABEL_RETENTIONS as readonly unknown[]).includes(retained.retention)) fail("travel.placeLabels.retained.retention is invalid.");
+    const kept = counts(retained.behaviors, "travel.placeLabels.retained.behaviors");
+    // Every retention keeps at least the 60-day window, so kept history never counts fewer labels.
+    for (const [ref, row] of period) {
+      const whole = kept.get(ref);
+      if (!whole || PLACE_LABEL_COUNT_KEYS.some((key) => (whole[key] as number) < (row[key] as number))) fail("travel.placeLabels.retained is invalid.");
+    }
+  }
+}
+
+const PLACE_LABEL_COUNT_KEYS = ["total", "home", "wherePlace", "otherSavedPlace", "elsewhere"] as const;
 
 function validateHistoricalCompletionTimes(value: unknown, historyValue: unknown, zone: string, refs: Set<string>): void {
   const timing = record(value, "historicalCompletionTimes");
@@ -657,7 +845,7 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
 
 function validateDurationCandidates(value: unknown): void {
   const candidates = record(value, "occurrence.durationCandidates");
-  exactKeys(candidates, ["configuredDefault", "historicalAverage"], "occurrence.durationCandidates");
+  exactOptionalKeys(candidates, ["configuredDefault", "historicalAverage"], ["descriptionEstimate"], "occurrence.durationCandidates");
   if (candidates.configuredDefault !== null) {
     validateDuration(candidates.configuredDefault);
     const configured = record(candidates.configuredDefault, "occurrence.durationCandidates.configuredDefault");
@@ -666,6 +854,11 @@ function validateDurationCandidates(value: unknown): void {
   validateDuration(candidates.historicalAverage);
   const historical = record(candidates.historicalAverage, "occurrence.durationCandidates.historicalAverage");
   if (historical.kind === "known" && historical.source !== "completed_stopped_occurrence_mean") fail("Historical average duration candidate is invalid.");
+  if (candidates.descriptionEstimate !== undefined && candidates.descriptionEstimate !== null) {
+    validateDuration(candidates.descriptionEstimate);
+    const estimate = record(candidates.descriptionEstimate, "occurrence.durationCandidates.descriptionEstimate");
+    if (estimate.kind !== "known" || estimate.source !== "description_estimate") fail("Description estimate duration candidate is invalid.");
+  }
 }
 
 function validateDuration(value: unknown): void {
@@ -673,7 +866,7 @@ function validateDuration(value: unknown): void {
   if (duration.kind === "known") {
     exactKeys(duration, ["kind", "seconds", "source", "sampleCount", "lookbackDays"], "duration");
     positive(duration.seconds, "duration.seconds");
-    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean") fail("duration.source is invalid.");
+    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean" && duration.source !== "description_estimate") fail("duration.source is invalid.");
   } else if (duration.kind === "unknown") {
     exactKeys(duration, ["kind", "reason", "sampleCount", "lookbackDays"], "duration");
     if (duration.reason !== "insufficient_samples" && duration.reason !== "history_limit_exceeded") fail("duration.reason is invalid.");

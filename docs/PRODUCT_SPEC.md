@@ -223,6 +223,8 @@ Public launch includes a minimal first-run setup prompt after first login:
 - request browser notification permission
 - import data when import exists
 - point to Settings timezone confirmation when useful
+- optionally save Home and usual travel where travel routing is configured
+  (Ticket 212); saving them enables no routing
 
 The setup prompt is optional, appears as a non-modal pop-up, can be dismissed
 locally, and routes into the existing Behaviors, Settings, and Export controls
@@ -448,7 +450,7 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - JSONL/CSV/full JSON/BehaviorLog export
 - Account deletion with export reminder and typed confirmation
 - Public Terms, Privacy, and Trust routes
-- Simple onboarding for first behavior, notification permission, import, and timezone
+- Simple onboarding for first behavior, notification permission, import, timezone, and optional Home and usual travel
 - Privacy-safe monitoring/error reporting
 - Repeatable many-user RLS smoke QA
 - Public Astro marketing site when explicitly ticketed
@@ -664,6 +666,84 @@ Provider review, credentials, live acceptance and model projection remain unappr
 See `qa/travel-release.md`. Route expiry clears evidence; the next meaningful
 foreground change can refresh within quota. It never polls or regenerates Daily Brief.
 
+Completion place labels (Ticket 216) are a separate opt-in, off by default. The user
+records each place's reference position on their own device ("I'm here"); Cadence
+never fetches, stores or compares Google coordinates for labels. A qualifying
+completion stores one label (Home, a saved place or elsewhere) and discards the
+position. Fixed, versioned rules (`place-label-rules@1`, `where-suggestion-rules@1`)
+turn labels into Where suggestions that the user must apply. The user chooses label
+retention (90 days, 1 year or until deleted). Labels sync with the account and stay
+out of exports. Ticket 219 stage 2 sends per-Behavior label counts for both the
+`where-suggestion-rules@1` 60-day window and all retained history to Daily Brief model
+input. Each count names its window; keys, positions and place text stay out.
+
+### Weather travel margin (Ticket 218)
+
+Weather adjusts departure timing with a fixed margin and may suggest another mode.
+The owner selected Open-Meteo on October 18, 2026. On October 22 the owner chose the
+free API for development and testing; the paid API Standard plan is required before
+commercial use (`docs/LEGAL.md` L-008). Weather stays off until the operator sets
+`CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`. The base URL and optional key are
+server-only, so the paid endpoint needs no code change.
+
+Rules live in the versioned table `weather-margin@1` in
+`packages/core/src/resolvers/weather-margin.resolver.ts`. The owner may tune the
+starting values; a changed value needs a new version.
+
+| Condition in the departure window | Margin | Mode suggestion |
+|---|---|---|
+| Thunderstorm (WMO 95–99) | +15 min | Transit or driving instead of walking or cycling |
+| Snow (snowfall > 0, or WMO 71–77, 85–86) | +15 min | Transit or driving instead of cycling |
+| Freezing rain or drizzle (WMO 56–57, 66–67) | +15 min | Transit or driving instead of cycling |
+| Heavy rain (rain plus showers ≥ 4 mm/h, or WMO 65, 82) | +15 min | Transit instead of walking or cycling |
+| Rain (rain plus showers ≥ 0.5 mm/h, or probability ≥ 60%) | +10 min | Transit instead of cycling |
+| Extreme heat (apparent temperature ≥ 35 °C) | +5 min | Transit instead of cycling |
+| Strong wind (gusts ≥ 60 km/h) | +5 min | Transit instead of cycling |
+
+- The single largest matching margin applies; margins never stack. A margin applies
+  to every mode; a suggestion appears only for the modes its row names. The first
+  matching row that names the leg's mode supplies the suggestion.
+- The departure window is the two hours before an arrival target, or the two hours
+  after a fixed return departure. It comes from planned timing, never from a route
+  estimate, so a margin never depends on route duration and weather facts reveal
+  none (`docs/LEGAL.md` L-001). Forecast hours that overlap the window count.
+  Missing values never match. A clear result requires complete hourly coverage of
+  the window and every rule measurement; gaps or missing measurements stay unknown.
+  A reported adverse condition still contributes its margin when other data is
+  missing. Rain plus showers stays unknown if either component is missing.
+- The margin is its own resolver input beside the travel buffers. It sits
+  immediately before an arrive-by departure, or after a fixed-departure arrival, as
+  a `weather_margin` occupancy segment. It moves the shown leave time or return time
+  and final availability; the Google estimate itself is unchanged. Ticket 217's
+  get-ready time precedes the weather-adjusted departure when both exist.
+- Every computed margin records `weather-margin@1`.
+- The weather area comes from the device position only, rounded to a 0.1° grid.
+  Google coordinates never become an area (`docs/LEGAL.md` L-002). Legs that start
+  at another stop use the current area as a proxy; weather at each stop waits on
+  L-002. With no usable
+  position there is no weather, and the travel status line says "No weather margin:
+  device location is unavailable." A provider failure says the forecast is
+  unavailable; travel estimates continue in both cases.
+- One forecast per area per clock hour is shared across users in server memory and
+  expires with its hour. It is never stored per user, synced, exported or backed up.
+  Each server instance keeps its own copy.
+- Travel timing and the Daily Brief travel block show the adjusted time, the margin
+  and any suggestion. Open-Meteo's CC BY 4.0 credit, with site and licence links and
+  a note that Cadence derived the margins, sits beside those lines (`docs/LEGAL.md`
+  L-011).
+- `projectWeatherOutlook` in `packages/core/src/services/weather-outlook.ts`
+  (`weather-outlook@1`) is the model-safe projection for Ticket 219: commitment
+  references, mode, conditions, margin minutes, suggestion and table version. It
+  carries no area, coordinates, times or durations. Ticket 219 stage 2 maps it to
+  the Daily Brief weather facts (`advisorWeatherOutlook`) only with supplied travel
+  evidence. The live brief returns the server-signed conclusions token from its
+  one-day route view. Invalid, stale, missing or oversized evidence leaves route and
+  weather facts `not_supplied`; stored facts still support the brief.
+
+Platform impact: web uses the hosted adapter in `lib/services`; a linked desktop
+receives weather through the same travel route and makes no provider call; marketing
+makes no weather claim; future mobile inherits the hosted adapter.
+
 `docs/plans/first-external-consumer.md` retains its filename but now defines this
 in-app contract, daily presentation default, first-party route, limits and data use.
 Ticket 146 is reopened for completion-history projection and first-party fences.
@@ -752,6 +832,40 @@ Source references, assumptions and freshness accompany the evidence. The model
 explains ranked findings; it never calculates intervals. Detailed rejections remain
 in the inspector. A fit observation does not grant permission to move an exact
 schedule; hypothetical move options still require explicit movability.
+Recipe 1.1 (Ticket 184 candidate, owner decision October 16, 2026) makes every
+Behavior still Unresolved at generation movable by default, within that day, for
+suggestions only. No movability setting is added. The Behavior's schedule is unchanged.
+The brief mentions a different time only as a suggestion backed by a planner option.
+Recipe 1.0, used by the production default, keeps explicit movability.
+Recipe 1.2 (Ticket 184 candidate 3, owner review October 23, 2026) keeps the 1.1 rules.
+The overview names problems once, with overlap and gap lengths in minutes and where
+each overlap falls (all of a Behavior, its start, its end or its middle), and
+never mentions a move, free time or a Behavior without a problem. Moves appear only as
+"New suggested time" blocks, at most three, one per Behavior. Behaviors that overlap a
+commitment come first, and chosen times keep the buffer from each other. Logging tips advise only on recording decisions. A quiet
+day shows only a history-based tip, or no brief. Recipe 1.2 drops next-day tip
+spacing: a different tip may follow the next day. One tip per day and the per-tip
+cooldown remain. Recipe 1.0 and 1.1 keep next-day spacing.
+Recipe 1.2 planning treats range-scheduled Behaviors as flexible: they never count as
+overlaps and are never moved. A range Behavior with a known or estimated length holds
+only that length, packed at the earliest free time in its span, so the rest of the span
+can take moves, including Behaviors whose time has passed today. A Behavior with no known or estimated length gets no
+suggestion and blocks nothing; Behaviors without a description are estimated from the
+title. When the model gives no tip, a deterministic "Setup tip" asks the user to add a
+typical length for the first such Behavior today. The recipe 1.2 estimate step covers
+every unresolved Behavior today and also returns `alongside`: whether the activity can
+usually happen during other activities. Such Behaviors get no moves and are never one
+side of a raised conflict; a recorded length still beats the estimate. Every planner
+move is shown, and the overview states each move's reason (overlap, too close, or its
+time has passed and it is still undecided). When the model returns no overview while
+moves are shown, Cadence writes one plain sentence per move from those reasons.
+Ticket 188 adds a third duration source for recipe 1.1 configurations that opt in. When
+neither the default duration nor tracked sessions are known, one separate model call
+estimates whole minutes (1–480) from the Behavior's title and description. Cadence
+validates the reply, labels the result `description_estimate`, and lets the deterministic
+planner use it. A failed estimate leaves the duration unknown. Descriptions reach the model
+only after disclosure: production Settings disclosure is pending; the private workbench
+uses a page-session owner confirmation. Recorded sources always take precedence.
 No travel-time inference enters the briefing before travel release acceptance.
 The model explains valid options; voice controls
 cannot override scheduling constraints, data disclosure or read-only boundaries.
@@ -879,3 +993,11 @@ model. Selected summaries and exclusions appear in the inspector. Completion
 recaps and routine diagnostic prose remain prohibited. A marking pattern cannot
 prove availability or override Calendar evidence, duration or planner constraints.
 Consent, explicit comparison runs, read-only authority and duration controls remain.
+
+## Separate Calendar consent for Daily Brief (Ticket 187)
+
+Timeline Calendar and Daily Brief Calendar use independent read-only Google grants and selections.
+Settings exposes **Google Calendar for Daily Brief** before the Daily Brief disclosure controls.
+Connecting this grant does not enable model sharing. The user must enable Calendar separately in Daily Brief settings.
+Missing agent configuration or denied agent consent cannot authorize use of the Timeline grant.
+Web and linked desktop share this contract. Marketing has no authenticated consent control; native mobile remains deferred.
