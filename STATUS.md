@@ -1,5 +1,21 @@
 # Implementation Status
 
+## Messaging track — October 27, 2026
+
+Owner decision: messaging and compliance work is a separate track and never blocks
+development. `docs/PRIVACY_CHANGES.md` is now `docs/MESSAGING_CHANGES.md` and covers
+every public and reviewer-facing surface. `AGENTS.md` ("Messaging changes") and
+`docs/DECISIONS.md` (2026-10-27) record the rule.
+
+Open messaging tickets:
+- Ticket 245: Google verification for the Daily Brief Calendar client. Gated on
+  P-010 and P-012. PR #152 can merge without its evidence.
+- Ticket 246: pre-launch messaging pass over all open entries.
+
+Documentation only; no runtime, schema or hosted change. Messaging impact: none.
+Platform impact: process only for web, desktop and marketing; future mobile not
+applicable.
+
 ## PR #150 review follow-ups — October 24, 2026
 
 Fixes the two chatgpt-codex P2 findings that PR #150 resolved as follow-ups. Both
@@ -740,7 +756,7 @@ Remaining release work: provisioning
 `TRAVEL_CONCLUSIONS_SIGNING_SECRET` in Vercel, the version bump, the hosted
 migration window, web deployment, desktop signing and publication, installed and
 live acceptance, and operator weather clearance. Privacy and disclosure changes are
-logged in `docs/PRIVACY_CHANGES.md` and do not block development under current policy.
+logged in `docs/MESSAGING_CHANGES.md` and do not block development under current policy.
 Platform impact: web and desktop
 as in each ticket section; marketing not applicable until privacy claims are
 reviewed; future mobile inherits the shared model and hosted facts.
@@ -1060,7 +1076,7 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   budget posture and the privacy rule are recorded in `docs/DECISIONS.md`
   (2026-10-22). The budget posture: US$5 per user per calendar month, in the user's
   timezone, Google Maps calls only.
-- `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
+- `docs/MESSAGING_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
   privacy pass, privacy, disclosure and marketing-language conflicts are logged there
   and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
   219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
