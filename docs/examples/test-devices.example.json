@@ -1,0 +1,14 @@
+{
+  "devices": [
+    {
+      "name": "test-mac",
+      "description": "Mac that stays on the last published release for updater tests",
+      "platform": "macos",
+      "host": "tailnet-host-name",
+      "user": "admin-account",
+      "app": "/Applications/Cadence.app",
+      "process": "cadence-desktop-spike",
+      "node": "/opt/homebrew/bin/node"
+    }
+  ]
+}
