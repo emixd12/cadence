@@ -17,8 +17,10 @@ built, notarized or published; those steps wait for the owner. Packet:
   18 to 20 with no lost rows; the release acceptance comparison passed. Travel habits and
   place-label settings synced web → Mac, and a Home marker synced Mac → hosted under
   contract 2.
-- Sign-in and Calendar callback replays passed. Ticket 165: allowed state and the
-  status-only permission read pass; the denied state stays with the owner.
+- Sign-in and Calendar callback replays and session renewal passed. Ticket 165: allowed
+  state and the status-only permission read pass; the denied state stays with the owner.
+  Ticket 187 installed desktop consent stays open: the connect flow reached Google's
+  unverified-app warning and was not completed.
 - Not established: a completion place label on an installed Mac (CoreLocation returned
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
