@@ -8,7 +8,8 @@
 offered 0.1.6 since 22:33:43Z and the preview feed since 22:47:28Z. The test Mac upgraded from
 0.1.5 through the real updater: schema 18 → 20, no lost rows, contract-2 convergence. The
 public readback and the quarantined download of the version-free DMG pass. Open: reconnecting
-the test Mac after the revoked-session check (owner sign-in) and the never-run macOS user. Packet:
+the test Mac after the revoked-session check (owner sign-in). The never-run macOS user check:
+Not required: removed by owner decision, October 27, 2026. Packet:
 `docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
 `docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
 
@@ -23,8 +24,8 @@ the test Mac after the revoked-session check (owner sign-in) and the never-run m
   contract 2.
 - Sign-in and Calendar callback replays and session renewal passed. Ticket 165: allowed
   state and the status-only permission read pass; the denied state stays with the owner.
-  Ticket 187 installed desktop consent stays open: the connect flow reached Google's
-  unverified-app warning and was not completed.
+  Ticket 187 installed desktop consent passes: the Daily Brief Calendar grant connected
+  with one calendar, the Timeline grant unchanged, calendar sharing with OpenAI off.
 - Not established: a completion place label on an installed Mac (CoreLocation returned
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
