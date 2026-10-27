@@ -1,5 +1,41 @@
 # Implementation Status
 
+## Account sync contract migration applied — October 27, 2026
+
+The owner authorized the push on October 27. Migration
+`20261027120000_account_sync_contracts.sql` was applied to hosted project
+`qjodzutjxtmtzczbloxa` at 20:31:10 UTC. Its SQL SHA-256 is `a21ab54b…c4a6`, the
+file the disposable rehearsal tested. The hosted half of PR #153 is live.
+
+- Before: `migration list --linked` matched 92 entries through `20261024210000`,
+  with no hosted-only entries. The dry run listed only this migration.
+- The push used the Homebrew Supabase CLI 2.109.1. The project-local CLI binary
+  still fails at startup. The earlier Supabase MCP attempts played no part.
+- Ledger readback: 93 matched entries, ending at `20261027120000`. Nothing is
+  local-only or hosted-only.
+- Functions: the six `cadence_private` functions and both
+  `public.read_account_sync_snapshot` signatures exist. Each hosted body matches
+  the migration text verbatim. Only `authenticated` can execute them; `anon` and
+  `service_role` cannot. Every function has an empty `search_path`, and
+  `apply_account_sync_plan` stays security definer.
+- Registry: nine contract-2 rows, as the migration inserts. `authenticated` has
+  select only; `anon` and `service_role` have no access. The current contract is
+  2, and the minimum writer contract is 1.
+- Types: hosted `public` types from `gen types --linked` match
+  `lib/db/database.types.ts`. The only differences are generator boilerplate: the
+  `graphql_public` block, the `PostgrestVersion` marker and parentheses.
+- Data API: anonymous calls to both signatures return 42501. An unknown function
+  returns PGRST202, so the API serves the new overload.
+
+Not verified: an authenticated sync under either contract, the published 0.1.5
+synchronizing again on an installed Mac, and preservation of travel habits and
+place labels through a contract-1 write. Those checks are rollout step 3 in
+`docs/plans/2026-10-27-sync-compatibility.md`. 0.1.6 (contract 2) stays
+unpublished until its own acceptance.
+
+Platform impact: hosted sync for linked desktop. Web screens and marketing have
+no change. Future mobile is not affected.
+
 ## Account sync contracts — October 27, 2026
 
 Approved by the owner on October 27. The contract implementation lets additive

@@ -2,10 +2,10 @@
 
 Status: Parts A and B (including A.7) approved and implemented in source October 27,
 2026, in PR #153. The owner dropped Part C on October 27; development builds keep
-using production. No hosted change has been made: two migration-connector requests
-failed with `Invalid or expired requestState`, and readback at 19:18 UTC confirmed
-the unchanged 92-entry ledger and absent contract objects. Native 0.1.6 remains
-unpublished until the server migration and installed acceptance are complete.
+using production. Two Supabase MCP requests failed with `Invalid or expired
+requestState`. The owner then authorized a CLI push, and the migration was applied
+to hosted at 20:31:10 UTC on October 27; readback is in `STATUS.md`. Native 0.1.6
+remains unpublished until installed acceptance is complete.
 
 Implementation differs from the proposal in three places:
 
