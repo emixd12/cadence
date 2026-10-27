@@ -19,7 +19,8 @@ The inventory names hosts and accounts, so it stays out of this public repositor
 
 That folder is Spotlight-excluded and owner-only. `CADENCE_TEST_DEVICES` can point
 at another file. The format is in `docs/examples/test-devices.example.json`. Each
-entry needs a `name`, the Tailscale `host` and an SSH `user`. Optional fields give
+entry needs a unique `name`, the Tailscale `host` and an SSH `user`. These values
+start with a letter or digit. The app path must be absolute. Optional fields give
 the app path, the process name System Events reports, and an absolute Node path
 (non-interactive SSH does not load the shell profile).
 
@@ -34,7 +35,7 @@ node scripts/test-device.mjs ax <device> find '<regex>'
 node scripts/test-device.mjs ax <device> press AXButton 'Sync now'
 node scripts/test-device.mjs ax <device> locate AXButton 'Sync now'
 node scripts/test-device.mjs click <device> <x> <y>
-node scripts/test-device.mjs update-install <device>
+node scripts/test-device.mjs update-install <device> <expected-version>
 ```
 
 - `check` prints the macOS version and build, architecture, model, installed
@@ -49,12 +50,14 @@ node scripts/test-device.mjs update-install <device>
 
 - `locate` prints an element's screen frame and center as JSON, read directly from
   Cadence's process (no System Events). `click` posts one mouse click at screen
-  coordinates (top-left origin, as `locate` prints). Both are small Swift helpers in
+  coordinates after a fresh visual inspection (top-left origin, as `locate` prints).
+  It refuses unless Cadence is frontmost and owns the target point. Both are small Swift helpers in
   `scripts/test-device-ax/`; the script compiles them on the device with `swiftc` and
   rebuilds only when their source changes.
-- `update-install` installs a downloaded update and restarts Cadence. Open Settings ›
-  App updates first, with "Cadence X is ready to install." showing. See "Restart after
-  an update" below.
+- `update-install` verifies the expected downloaded version, installs it, and attempts
+  a named **Restart Cadence** accessibility action. Open Settings › App updates first,
+  with "Cadence X is ready to install." showing. A failed restart is an error, even if
+  installation succeeded. See "Restart after an update" below.
 
 Copy files with `scp` to the same `user@host`. Recheck hashes on the device.
 
@@ -115,21 +118,34 @@ keep working. On the 0.1.5 release, a read at 16:22:28Z still worked right after
 install and failed from 16:22:42Z, so do not rely on that window. A synthetic mouse
 click posted over SSH still reaches the process.
 
+The button position does **not** remain stable across installation. The updater drops
+release notes in the installed state, removing the block above the buttons. Status
+text can also wrap differently. A saved **Check for updates** position cannot safely
+identify **Restart Cadence**.
+
 `update-install` therefore:
 
-1. Scrolls **Check for updates** into view and records its frame. In
-   `apps/desktop/src/desktop-update-panel.tsx`, the installed state hides Check for
-   updates (`canCheck`), so **Restart Cadence** becomes the only button, in that
-   slot. The script refuses if the slot is off-screen.
-2. Presses **Install update** and waits for the version on disk to change.
-3. Clicks near the left edge of the recorded slot (the two labels differ in width)
-   and confirms the restart by a new Cadence PID. It retries the click twice.
+1. Finds the exact "Cadence X is ready to install." label for the requested version,
+   then presses **Install update**.
+2. Waits up to two minutes for that exact version on disk. An unexpected version or
+   process change stops the command before any restart.
+3. Makes a fresh **Restart Cadence** accessibility action. If macOS refuses it, the
+   command exits with "installed but was not restarted" and sends no mouse click.
+4. When the action succeeds, confirms a new Cadence PID at the configured app's exact
+   executable path and rechecks the installed version. A second running copy fails
+   the check. This confirms restart, not database migration or release acceptance.
 
-If the PID does not change, the click missed, or Cadence refused the restart for
-pending writes or unsaved drafts. The owner then checks the window. The slot
-assumption depends on the status line and release notes keeping their height; if
-the panel layout changes, re-verify it. Never relaunch Cadence from the shell while
+When accessibility is unavailable, inspect the **current** window with Computer Use
+and click the visible Restart button. A fresh screenshot can supply coordinates to
+`click`; never reuse coordinates from before installation. The click helper checks
+process ownership and the frontmost window, but cannot identify the button for you.
+It posts only one click. Reinspect the window if restart does not occur; pending
+writes or unsaved drafts may block it. Never relaunch Cadence from the shell while
 the old process runs.
+
+The command's orchestration has synthetic SSH regression tests. The revised native
+helpers and updater flow still need a run on the test Mac for the next candidate;
+synthetic tests do not establish installed acceptance.
 
 ## Removing access
 
