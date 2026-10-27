@@ -17,9 +17,12 @@ production as of October 24, 2026, and the evidence in `STATUS.md` and git histo
 - Unchanged: Ticket 130. This file calls it complete on September 9, "in progress" on
   September 10, and keeps "the broader Ticket 130" open on September 15. The owner
   decides its state.
-- Number collision: the October 22 entry "Ticket 232: Astro and Vitest dependency
-  integration" is not `docs/TICKETS.md` Ticket 232 (MCP production deployment and live
-  client acceptance). Nothing is renumbered; the PR proposes a fix.
+- Number collision resolved: the October 22 Astro and Vitest dependency entry now
+  names PRs #125 and #126. Ticket 232 remains MCP production deployment and live
+  client acceptance; its status now records the disabled October 18 release and
+  keeps activation, scheduled maintenance and live-client acceptance open.
+- Ticket 187 points to Ticket 245 for Google's verification submission and P-012;
+  installed acceptance stays with Ticket 187.
 
 Read-only checks on October 27: `app.cadence-me.com` serves
 `dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T`; Vercel Production lists
@@ -28,6 +31,46 @@ Read-only checks on October 27: `app.cadence-me.com` serves
 
 Platform impact: ledger text only. Web, desktop and marketing have no change; future
 mobile is not applicable.
+
+## Messaging track — October 27, 2026
+
+Owner decision: messaging and compliance work is a separate track and never blocks
+development. `docs/PRIVACY_CHANGES.md` is now `docs/MESSAGING_CHANGES.md` and covers
+every public and reviewer-facing surface. `AGENTS.md` ("Messaging changes") and
+`docs/DECISIONS.md` (2026-10-27) record the rule.
+
+Open messaging tickets:
+- Ticket 245: Google verification for the Daily Brief Calendar client. Gated on
+  P-010 and P-012. PR #152 can merge without its evidence.
+- Ticket 246: pre-launch messaging pass over all open entries.
+
+Documentation only; no runtime, schema or hosted change. Messaging impact: none.
+Platform impact: process only for web, desktop and marketing; future mobile not
+applicable.
+
+## Ticket 187 and the travel train live in production — October 24, 2026
+
+Records only; no code change. Evidence: `docs/qa/2026-10-12-agentic-calendar.md`,
+"Production cutover and Google branding, October 24, 2026".
+
+- Ticket 187 went live first through PR #150: a short `/api/advisor` pause, hosted
+  migration `20261022180000`, deploy (main `42270ed9`) and Trust refresh.
+- Branding for `cadence-calendar-agent-prod` is verified and published.
+- The owner then had PRs #135 and #138 merged as they are. Hosted migrations
+  `20261024200000` and `20261024210000` were applied at 22:13 UTC, before main
+  `f10e068c` deployed (`dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T` after the Trust refresh).
+- Desktop builds older than 0.1.6, including the published Mac 0.1.5, now fail closed
+  on account synchronization until 0.1.6 is published.
+- New privacy entry P-012: Daily Brief trip conclusions come from Timeline connection
+  event locations, which contradicts the Privacy text Google's reviewer reads. P-001
+  to P-004 now describe live behavior; their text is unchanged.
+
+Google verification is still pending: the demo video, the Data Access justification
+and the Verification Center submission.
+
+Platform impact: web production now runs Tickets 187, 184 (gated), 188 (gated) and the
+travel train. Desktop needs 0.1.6 to synchronize. Marketing: no change. Future mobile:
+not applicable.
 
 ## PR #150 review follow-ups — October 24, 2026
 
@@ -769,7 +812,7 @@ Remaining release work: provisioning
 `TRAVEL_CONCLUSIONS_SIGNING_SECRET` in Vercel, the version bump, the hosted
 migration window, web deployment, desktop signing and publication, installed and
 live acceptance, and operator weather clearance. Privacy and disclosure changes are
-logged in `docs/PRIVACY_CHANGES.md` and do not block development under current policy.
+logged in `docs/MESSAGING_CHANGES.md` and do not block development under current policy.
 Platform impact: web and desktop
 as in each ticket section; marketing not applicable until privacy claims are
 reviewed; future mobile inherits the shared model and hosted facts.
@@ -1089,7 +1132,7 @@ Documentation only; no runtime, schema, hosted text or deployment change.
   budget posture and the privacy rule are recorded in `docs/DECISIONS.md`
   (2026-10-22). The budget posture: US$5 per user per calendar month, in the user's
   timezone, Google Maps calls only.
-- `docs/PRIVACY_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
+- `docs/MESSAGING_CHANGES.md` is new and listed in `AGENTS.md`. Until the pre-launch
   privacy pass, privacy, disclosure and marketing-language conflicts are logged there
   and never block development. Entries P-001 to P-006 cover Tickets 216, 217, 218,
   219 and 187 and a marketing review. P-007 to P-009 cover Ticket 212's setup item
@@ -1129,7 +1172,7 @@ repository has no Markdown linter, and no source file changed.
 Platform impact: documentation for web, desktop and marketing; no implementation.
 Future mobile is not applicable.
 
-## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
+## PRs #125 and #126: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
 browser test and two retained QA scripts import esbuild directly. Declare it as
@@ -1150,8 +1193,9 @@ waive the open alert. The combined audit removes both Vitest findings; five
 high package entries remain in the development-only braces/ESLint chain. The
 production-only audit reports zero, but the all-scope audit still fails. No
 suppression, downgrade or security waiver is included. No production, Trust
-publication, signing-key or activation change occurred. Ticket 232 remains
-incomplete.
+publication, signing-key or activation change occurred. The disputed
+http-cache-semantics alert and the five high development-only audit entries remain
+open; neither is tracked under MCP Ticket 232.
 
 Platform impact: marketing's existing Astro upgrade and test tooling only;
 web and desktop runtime behavior is unchanged. Future mobile is not implemented.

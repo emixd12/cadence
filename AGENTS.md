@@ -11,7 +11,7 @@ The app lets a user create recurring behaviors, view scheduled occurrences in a 
 
 Cadence may support many independent accounts, but each account remains
 single-player. This is not a general productivity app, not a social habit
-tracker, not a medical dosing app, not a collaboration product, and not an
+tracker, not a collaboration product, and not an
 admin-heavy SaaS product.
 
 Cadence also serves as a practical reference implementation and promotion
@@ -75,8 +75,9 @@ Installed desktop testing uses dev-signed builds under the owner's standing appr
 Every new or materially changed product/design ticket must state its impact on
 web, desktop, marketing, and future mobile. Each platform entry needs an
 implementation reference, a follow-up ticket, or an explicit not-applicable
-reason. Use the existing interaction registry and design-system catalog for
-cross-platform evidence; do not create a parallel decision inventory.
+reason. Each such ticket also states its messaging impact: "none" or the
+`docs/MESSAGING_CHANGES.md` entry IDs it logged. Use the existing interaction
+registry and design-system catalog for cross-platform evidence; do not create a parallel decision inventory.
 
 ## Installed and live acceptance
 
@@ -126,15 +127,23 @@ Product and implementation docs:
 24. `/docs/INTEGRATION_PLAYBOOK.md`
 25. `/docs/MCP_INTEGRATION.md`
 26. `/docs/MCP_CONTRACT.md` (Ticket 221)
-27. `/docs/PRIVACY_CHANGES.md`
+27. `/docs/MESSAGING_CHANGES.md`
 28. `/docs/COSTS.md` — update it in the same change as any new paid provider call
 
-## Privacy changes
+## Messaging changes
 
-Until the pre-launch privacy pass, log privacy, disclosure and marketing-language
-conflicts in `docs/PRIVACY_CHANGES.md`. These conflicts never block development.
-In-progress work proceeds as if no privacy policy constrains it. Provider-terms and
-licence questions stay in `docs/LEGAL.md`.
+Messaging and compliance is a separate track from development. When a feature
+changes what Privacy, Terms, Trust, in-app disclosures, the user guide, marketing or
+a provider submission should say, log an entry in `docs/MESSAGING_CHANGES.md` and
+continue. These entries never block development, merges or deployments.
+
+- Do not edit that text, or tests that assert it, unless the ticket says so.
+- Messaging work runs in its own tickets (Tickets 245 and 246), not inside
+  development tickets.
+- Only outward actions wait on open entries: provider submissions, public launch
+  and public listings.
+
+Provider-terms and licence questions stay in `docs/LEGAL.md`.
 
 ## Product constraints
 
@@ -173,7 +182,6 @@ Out of scope for v1:
 - Native mobile apps
 - Apple Health / Google Fit integration
 - Structured measurement templates
-- Medication dose tracking
 - Supply/refill inventory
 - General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
   the in-app read-only daily briefing in the horse bubble. Outside AI clients may

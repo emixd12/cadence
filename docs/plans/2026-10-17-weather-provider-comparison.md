@@ -268,7 +268,7 @@ Economic Area. An EEA address would bring different Maps terms.
   privacy and attribution content (L-011). Update, October 22, 2026: the owner chose
   the free plan for development and testing and requires API Standard before
   commercial use (L-008 stays open until Cadence subscribes). L-011 moved to
-  `docs/PRIVACY_CHANGES.md` P-003 and does not block development.
+  `docs/MESSAGING_CHANGES.md` P-003 and does not block development.
 - Ticket 218 keeps the boundaries above: a hosted adapter in `lib/services`, weather
   rules in `packages/core`, one shared forecast per area per hour, no per-user
   forecast storage.
