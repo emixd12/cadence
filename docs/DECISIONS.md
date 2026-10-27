@@ -1044,7 +1044,7 @@ by the orchestrating agent session.
 ## 2026-10-22: Privacy conflicts never block development before launch
 
 Until the pre-launch privacy pass, privacy, disclosure and marketing-language
-conflicts are logged in `docs/PRIVACY_CHANGES.md` and never block development.
+conflicts are logged in `docs/MESSAGING_CHANGES.md` and never block development.
 In-progress work proceeds as if no privacy policy constrains it. The pass is not yet
 ticketed. Provider-terms and licence questions stay in `docs/LEGAL.md`; `docs/LEGAL.md`
 L-011 moved to P-003. `AGENTS.md` ("Privacy changes") states the rule. This decision
@@ -1081,7 +1081,7 @@ L-003.
   90-day proposal.
 - Full JSON export of labels and markers moves to backlog Ticket 244. It does not
   block Ticket 216.
-- Privacy-text changes are logged as `docs/PRIVACY_CHANGES.md` P-001.
+- Privacy-text changes are logged as `docs/MESSAGING_CHANGES.md` P-001.
 
 Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
 session.
@@ -1091,7 +1091,7 @@ session.
 The owner confirmed Ticket 217's proposed defaults and step sizes as starting values:
 a 10-minute get-ready time, a 5-minute arrival buffer, 5-minute feedback steps within
 0–30 minutes, and at most one leave-time question a day. Privacy-text changes for
-stored habits and feedback taps are logged as `docs/PRIVACY_CHANGES.md` P-002.
+stored habits and feedback taps are logged as `docs/MESSAGING_CHANGES.md` P-002.
 Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
 session.
 
@@ -1102,7 +1102,7 @@ session.
   subscribes.
 - The weather margin is a versioned, fixed table: minutes per weather condition, never
   a share of trip time.
-- Privacy and attribution items are logged as `docs/PRIVACY_CHANGES.md` P-003.
+- Privacy and attribution items are logged as `docs/MESSAGING_CHANGES.md` P-003.
 
 This supersedes the open plan choice in "2026-10-18: Weather provider is Open-Meteo".
 Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
@@ -1111,7 +1111,7 @@ session.
 ## 2026-10-22: Ticket 219 disclosures logged, not blocking
 
 The Daily Brief model-data disclosure, the re-consent for travel, habit and weather
-facts, and the marketing language are logged as `docs/PRIVACY_CHANGES.md` P-004 to
+facts, and the marketing language are logged as `docs/MESSAGING_CHANGES.md` P-004 to
 P-006. They do not block development. This supersedes, for development, the
 disclosure gate in "2026-10-17: Travel redesign budget, Behavior Where and model
 input" and "2026-10-18: Google route data in model input; legal register". The
@@ -1132,7 +1132,7 @@ Option B, routing the day again during brief generation, was rejected: it adds p
 calls and breaks Ticket 170's rule against extra paid routing merely to generate
 prose. The `docs/LEGAL.md` L-001 regime still applies, including its open point on
 yes/no conclusions that bound a route duration from one side. Privacy text: P-004 in
-`docs/PRIVACY_CHANGES.md`.
+`docs/MESSAGING_CHANGES.md`.
 
 Ticket 219 implements the token on the travel release train (PR #138). Platform
 impact: web hosts the token and its verification; linked desktop uses the same hosted
@@ -1146,7 +1146,7 @@ Daily Brief model input carries per-Behavior place-label counts for two periods,
 labeled separately: the 60-day suggestion window and the user's full retained label
 history. This keeps the retention copy's promise that longer retention lets the
 advisor learn more. Counts carry no place keys, positions or text. Privacy text:
-P-001 and P-004 in `docs/PRIVACY_CHANGES.md`. Recorded from the owner's October 23
+P-001 and P-004 in `docs/MESSAGING_CHANGES.md`. Recorded from the owner's October 23
 decisions, relayed by the orchestrating agent session.
 
 ## 2026-10-23: Dev-signed desktop builds; the owner gates notarization and publication
@@ -1189,7 +1189,7 @@ Brief moves for medication Behaviors), and it is not meaningful during
 development. "Medication dose tracking" is also removed from the out-of-scope
 list; no dose-tracking feature is planned or ticketed by this change. Public
 README and marketing wording is unchanged; review it in the pre-launch privacy
-and marketing pass (`docs/PRIVACY_CHANGES.md`).
+and marketing pass (`docs/MESSAGING_CHANGES.md`).
 
 This supersedes the line in "2026-10-18: Cadence MCP server and AI plugins"
 that says the phrase "stays true."
@@ -1261,3 +1261,24 @@ The owner's words: "I want us to skip Cloud Checks."
 Platform impact: development tooling only. Web, desktop, marketing and future
 mobile behavior is unchanged; the Dagger checks build web, desktop frontend and
 marketing exactly as `CI` does.
+
+## 2026-10-27: Messaging and compliance is a separate track
+
+The owner separated messaging and compliance work from development. It replaces the
+2026-10-22 rule that covered privacy text only.
+
+- `docs/PRIVACY_CHANGES.md` is renamed `docs/MESSAGING_CHANGES.md`. It now covers
+  Privacy and Terms, Trust, in-app copy, the user guide, marketing (including the
+  README) and provider submissions such as Google OAuth verification. `P-` IDs keep
+  their numbers.
+- Development tickets log the change and continue. They do not edit that text or
+  the tests that assert it unless the ticket says so. Each ticket states its
+  messaging impact beside its platform impact.
+- Messaging work runs in its own tickets: Ticket 245 (Google verification for the
+  Daily Brief Calendar client) and Ticket 246 (pre-launch messaging pass).
+- Only outward actions wait on open entries: provider submissions, public launch and
+  public listings. Merges, hosted migrations and deployments never do.
+- Consequence: PR #152 no longer waits for the Google submission evidence. Ticket 245
+  records that evidence. P-012 gates the Google submission, not development.
+- `docs/LEGAL.md` keeps provider terms, licences and legal risk decisions.
+- No `agents:check` enforcement for now.

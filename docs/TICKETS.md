@@ -12280,7 +12280,7 @@ projection of travel remains disabled pending provider-use clearance and revised
 disclosure; native and live gates stay with Tickets 165 and 174. Filed September 26, 2026.
 October 22, 2026: Ticket 219 owns travel model projection. Google terms are an accepted
 risk (`docs/LEGAL.md` L-001); the disclosure update is logged as
-`docs/PRIVACY_CHANGES.md` P-004 and does not block development.
+`docs/MESSAGING_CHANGES.md` P-004 and does not block development.
 Dependencies: 169 and existing 159, 162–167 implementation. Coordinate with 165 and 174.
 
 Goal: explain departure, onward travel and return constraints alongside feasible
@@ -13257,7 +13257,7 @@ Execution evidence: `docs/qa/cadence-project-rename.md`.
 Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
 October 22, 2026: recovered from a local backup for owner review; the migration is now
 `20261022180000_separate_agent_calendar_grant.sql` (see `STATUS.md`).
-Privacy log: P-005, P-006 and P-010 in `docs/PRIVACY_CHANGES.md`.
+Privacy log: P-005, P-006 and P-010 in `docs/MESSAGING_CHANGES.md`.
 Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
 Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
 
@@ -13291,7 +13291,7 @@ This ticket supersedes the single Calendar-grant assumption in the Daily Brief p
 
 Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
 October 22, 2026: recovered from a local backup for owner review (see `STATUS.md`).
-Privacy log: P-011 in `docs/PRIVACY_CHANGES.md`.
+Privacy log: P-011 in `docs/MESSAGING_CHANGES.md`.
 The unmerged iOS plan also uses the label "Ticket 188" for its activation step; renumber that
 step if the plan lands.
 Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate
@@ -13406,7 +13406,7 @@ only. Hosting, the Daily Brief model and weather are tracked separately in
 
 On October 22 the owner also decided the next steps for Tickets 165 and 216–219
 (`docs/DECISIONS.md`, 2026-10-22). Until the pre-launch privacy pass, privacy,
-disclosure and marketing-language conflicts are logged in `docs/PRIVACY_CHANGES.md`
+disclosure and marketing-language conflicts are logged in `docs/MESSAGING_CHANGES.md`
 and never block development. Backlog Tickets 243 and 244 follow Ticket 219.
 
 End state: each located Calendar event and each Behavior with a Where gets a travel
@@ -13438,7 +13438,7 @@ reused (`docs/COSTS.md`, caching terms).
 | 216 | Completion place labels and Where suggestions | 215 |
 | 217 | Learned travel habits: mode per place, get-ready time, arrival buffer | 215 |
 | 218 | Weather provider selection and travel margin | Open-Meteo selected, free plan for development and testing (`docs/LEGAL.md` L-008); 217 for margin |
-| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/PRIVACY_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/MESSAGING_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
 | 243 | Backlog, low priority: six-leg refresh speed and before/after comparison | 214 |
 | 244 | Backlog: place labels and "I'm here" markers in Full JSON | 216 |
 
@@ -14160,7 +14160,7 @@ Scope and acceptance:
 - CSV, JSONL and BehaviorLog keep their current place-text omissions unless the owner
   decides otherwise.
 - Update `docs/EXPORT_FORMATS.md`, `docs/user-guide/data-portability.md`, export
-  resolver tests and the privacy entry `docs/PRIVACY_CHANGES.md` P-001.
+  resolver tests and the privacy entry `docs/MESSAGING_CHANGES.md` P-001.
 
 Platform impact:
 - Web: `packages/core/src/resolvers/export.resolver.ts` (re-exported by
@@ -15103,3 +15103,39 @@ Platform impact:
 | Desktop | Same hosted broker and shared contracts; no desktop-specific scope handling. Installed acceptance stays with Ticket 238/115. |
 | Marketing | FAQ and Privacy wording for the broader Microsoft permission. |
 | Future mobile | Not applicable: no mobile surface. |
+
+## Ticket 245: Google verification submission for the Daily Brief Calendar client
+
+Status: filed October 27, 2026; messaging track. Not a development ticket.
+Dependencies: Ticket 187 (live October 24, 2026).
+
+Submit Google's sensitive-scope verification for `cadence-calendar-agent-prod`.
+
+- Before submission, resolve or explicitly accept every open
+  `docs/MESSAGING_CHANGES.md` entry Google's reviewer sees. At filing: P-010 and
+  P-012. P-012 (logged in PR #152) says Daily Brief trip conclusions use Timeline
+  connection event locations, while the live Privacy page says Daily Brief reads
+  Calendar only through its own connection. The owner chooses the text change or a
+  code change; a code change is filed as a separate development ticket.
+- Record and upload the demo video, enter the Data Access justification and submit
+  in the Verification Center. Owner steps: `docs/qa/2026-10-12-agentic-calendar.md`.
+- Record the video link, submission time and Verification Center state in that QA
+  file and `STATUS.md`. Then follow Google's review to a decision.
+
+Messaging impact: resolves P-010 and P-012. Platform impact: web Privacy and Settings
+text only if the owner chooses text changes; desktop shares the hosted pages;
+marketing and future mobile not applicable.
+
+## Ticket 246: Pre-launch messaging pass
+
+Status: filed October 27, 2026; messaging track. Not a development ticket.
+Dependencies: none. Required before public launch.
+
+Work through every open `docs/MESSAGING_CHANGES.md` entry and update Privacy, Terms,
+Trust, in-app copy, the user guide, marketing and the README in one review. Update
+tests that assert changed text. Include the README and marketing wording left by the
+2026-10-23 removal of "not a medical dosing app" from `AGENTS.md`. Mark each entry
+resolved with file, deployment and date.
+
+Messaging impact: resolves all open entries. Platform impact: web legal and copy,
+desktop in-app copy, marketing site; future mobile not applicable.
