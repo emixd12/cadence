@@ -16,6 +16,30 @@ Documentation only; no runtime, schema or hosted change. Messaging impact: none.
 Platform impact: process only for web, desktop and marketing; future mobile not
 applicable.
 
+## Ticket 187 and the travel train live in production — October 24, 2026
+
+Records only; no code change. Evidence: `docs/qa/2026-10-12-agentic-calendar.md`,
+"Production cutover and Google branding, October 24, 2026".
+
+- Ticket 187 went live first through PR #150: a short `/api/advisor` pause, hosted
+  migration `20261022180000`, deploy (main `42270ed9`) and Trust refresh.
+- Branding for `cadence-calendar-agent-prod` is verified and published.
+- The owner then had PRs #135 and #138 merged as they are. Hosted migrations
+  `20261024200000` and `20261024210000` were applied at 22:13 UTC, before main
+  `f10e068c` deployed (`dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T` after the Trust refresh).
+- Desktop builds older than 0.1.6, including the published Mac 0.1.5, now fail closed
+  on account synchronization until 0.1.6 is published.
+- New privacy entry P-012: Daily Brief trip conclusions come from Timeline connection
+  event locations, which contradicts the Privacy text Google's reviewer reads. P-001
+  to P-004 now describe live behavior; their text is unchanged.
+
+Google verification is still pending: the demo video, the Data Access justification
+and the Verification Center submission.
+
+Platform impact: web production now runs Tickets 187, 184 (gated), 188 (gated) and the
+travel train. Desktop needs 0.1.6 to synchronize. Marketing: no change. Future mobile:
+not applicable.
+
 ## PR #150 review follow-ups — October 24, 2026
 
 Fixes the two chatgpt-codex P2 findings that PR #150 resolved as follow-ups. Both

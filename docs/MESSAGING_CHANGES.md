@@ -36,7 +36,7 @@ says so. They log an entry instead.
 
 ## Current text the entries cite
 
-- `components/settings/LegalContent.tsx`: the Privacy page (dated October 21, 2026),
+- `components/settings/LegalContent.tsx`: the Privacy page (dated October 24, 2026),
   the Terms page (dated October 18, 2026) and the Trust page (dated August 27, 2026).
   `tests/legal-content.test.tsx` asserts parts of that text.
 - `docs/user-guide/*`: factual user guidance.
@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-012` is next; open PR #152 claims it). Never reuse an ID.
+1. Give a new entry the next ID (`P-013` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -81,8 +81,13 @@ Status values:
 | [P-009](#p-009-privacy-text-says-saved-base-where-the-interface-says-home) | Privacy text says "saved base" where the interface says "Home" | logged | 215, 212 | Privacy, user guide |
 | [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | drafted | 187 | Privacy, Settings |
 | [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
+| [P-012](#p-012-daily-brief-trip-conclusions-come-from-the-timeline-calendar-connection) | Daily Brief trip conclusions come from the Timeline Calendar connection | logged | 219, 187 | Privacy |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
+
+Since October 24, 2026, 22:13 UTC (PRs #135 and #138 merged and deployed, owner
+decision), P-001 to P-004 and P-012 describe live production behavior. The text they
+cite has not changed.
 
 ## P-001: "I'm here" place positions and completion place labels
 
@@ -454,4 +459,32 @@ P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026
     excerpts". Neither names Behavior titles or descriptions.
 - **Update needed:** when a recipe with estimates is promoted, name Behavior titles and
   descriptions as a separate Daily Brief choice and add them to the OpenAI row.
+- **Status:** logged.
+
+## P-012: Daily Brief trip conclusions come from the Timeline Calendar connection
+
+- **Change:** Ticket 219's signed travel conclusions token is built from the Timeline
+  travel view, which reads Calendar event locations through the Timeline (standard)
+  connection. When the Daily Brief connection's snapshot holds exactly the same events
+  and revisions, the brief maps the token's event commitments to its own opaque refs
+  and sends the conclusions to OpenAI: trips, yes/no fits, unknowns and weather rule
+  conclusions, never durations, times or places. If the event sets differ, or Daily
+  Brief Calendar is not allowed, the brief drops the whole token. Code:
+  `withSuppliedConclusions` and `readCurrentTravelSource` in
+  `lib/services/briefing-account-context.service.ts`. `TRAVEL_CONCLUSIONS_SIGNING_SECRET`
+  is set in production. The owner chose on October 24, 2026 to ship this as it is.
+- **Affected:** Tickets 219 and 187. Files: `components/settings/LegalContent.tsx`
+  (Privacy, "Optional Google Calendar" and "Optional Daily Brief"),
+  `docs/user-guide/privacy-and-account.md` ("AI use").
+- **Conflicting current text:**
+  - Privacy, "Optional Google Calendar": "Where Google Calendar for Daily Brief is
+    available, Daily Brief reads Calendar only through that connection, never through
+    the Timeline connection". The trip conclusions are derived from Timeline
+    connection reads.
+  - `docs/user-guide/privacy-and-account.md`, "AI use": lists only event timing,
+    timezone, availability and response state as Calendar input to the model.
+- **Update needed:** either fence event-based trip conclusions out of Daily Brief, or
+  say that trip conclusions about events present in both connections come from the
+  Timeline connection's event locations and Google Maps (with P-004). Google's
+  sensitive-scope review of `cadence-calendar-agent-prod` reads this Privacy text.
 - **Status:** logged.
