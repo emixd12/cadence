@@ -18,7 +18,8 @@ Source only: nothing is pushed to hosted, merged or released.
 - Guard: `tests/sql/account-sync-contract-smoke.sql` freezes the synced columns,
   and `tests/account-sync-contract.test.ts` ties the client constant to the
   registry.
-- Part C (dev builds against the local stack) is not implemented. See the plan.
+- Part C (a separate dev Supabase target) is dropped by owner decision. Dev builds keep
+  using production.
 
 Platform impact: hosted sync and linked desktop. Web screens and marketing have
 no change. Future mobile would declare its own contract.

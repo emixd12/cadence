@@ -130,6 +130,13 @@ within their contract.
 
 ### Part C: keep development off the owner's account
 
+**Owner decision, October 27, 2026: Part C is dropped.** Neither a staging
+project nor the local stack will serve dev builds. The setup work (a separate
+dev identity, a dev-only sign-in and a local web app) outweighs the benefit once
+Part A stops additive changes from breaking sync. Dev builds keep using
+production. Breaking changes still need the coordinated release in
+`docs/DESKTOP_DATA_MODEL.md`. The analysis below is kept for reference.
+
 The desktop already takes `VITE_SUPABASE_URL` at build time
 (`apps/desktop/scripts/release-config.mjs:120`), so this needs configuration,
 not code.
@@ -193,7 +200,7 @@ With Part C, unfinished schema never reaches the real account at all.
 1. Approve Part A as described?
 2. Include A.7 (rescue 0.1.5 without a release)? Recommended. It also tests the
    mechanism on a real old client.
-3. Part C: decided (local stack, US$0).
+3. Part C: dropped (October 27).
 4. Should 0.1.6 wait for Part A? Recommended: yes. Then 0.1.6 is the last
    forced update caused by additive changes.
 
