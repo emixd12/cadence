@@ -1,5 +1,28 @@
 # Implementation Status
 
+## Account sync contracts — October 27, 2026
+
+Approved by the owner on October 27. Adding a synced field no longer forces a
+desktop update. Plan and decisions: `docs/plans/2026-10-27-sync-compatibility.md`.
+Source only: nothing is pushed to hosted, merged or released.
+
+- Migration `20261027120000_account_sync_contracts.sql` adds a contract
+  registry. Each client gets a snapshot and fingerprint projected to the
+  contract it understands. An older client's write keeps the hosted fields it
+  cannot see.
+- Contract 1 is the desktop 0.1.5 shape. Requests without a contract, which is
+  how 0.1.5 sends them, get contract 1. After this migration is pushed, the
+  published 0.1.5 should synchronize again without travel habits or place labels
+  and cannot erase them. That is not yet verified on an installed 0.1.5.
+- Desktop sends `ACCOUNT_SYNC_CONTRACT` (2). The native reader stays strict.
+- Guard: `tests/sql/account-sync-contract-smoke.sql` freezes the synced columns,
+  and `tests/account-sync-contract.test.ts` ties the client constant to the
+  registry.
+- Part C (dev builds against the local stack) is not implemented. See the plan.
+
+Platform impact: hosted sync and linked desktop. Web screens and marketing have
+no change. Future mobile would declare its own contract.
+
 ## PR #150 review follow-ups — October 24, 2026
 
 Fixes the two chatgpt-codex P2 findings that PR #150 resolved as follow-ups. Both

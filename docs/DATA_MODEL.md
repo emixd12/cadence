@@ -1698,6 +1698,39 @@ anonymous, and service-role execution remain revoked; only `authenticated` may
 execute it. This narrow `SECURITY DEFINER` boundary avoids granting direct
 authenticated writes to protected history and graph tables.
 
+### Account sync contracts (October 27, 2026)
+
+Migration `20261027120000_account_sync_contracts.sql` adds contract
+versioning. A contract is the snapshot shape one client build understands.
+Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
+
+- `cadence_private.account_sync_contract_additions(contract, kind, field,
+  default_value)` lists what each contract after 1 adds. A row with no `field`
+  adds a whole entity kind. Each added field has a `default_value`, which is used
+  when no stored value exists. Contract 1 is the desktop 0.1.5 shape (SQLite
+  schema 18). Contract 2 adds five Ticket 217 travel-habit profile keys and the
+  four Ticket 216 place-label kinds.
+- `cadence_private.account_sync_snapshot()` is the full snapshot that the public
+  reader used to return.
+- `cadence_private.project_account_sync_snapshot(snapshot, contract)` removes
+  later kinds and fields and recomputes the fingerprint over the result.
+- `public.read_account_sync_snapshot(contract integer)` returns that
+  projection. The no-argument form returns contract 1 for builds that predate
+  contracts.
+- `apply_account_sync_plan` accepts an optional numeric `contract` payload field.
+  A missing field means contract 1. It projects the hosted, merged and receipt
+  fingerprints to that contract. For an older contract, it rejects writes to later
+  kinds or fields. It then fills each upsert's `value` and `expected` with the
+  stored value of every hidden field, or that field's default. A client therefore
+  cannot erase data it cannot see. A contract above
+  `account_sync_current_contract()` is refused. A contract below
+  `account_sync_min_writer_contract()` (now 1) gets "Update Cadence".
+
+`tests/sql/account-sync-contract-smoke.sql` freezes the contract 2 columns of
+every synced table. It fails when a column is added without a registry entry and
+default. `tests/account-sync-contract.test.ts` keeps `ACCOUNT_SYNC_CONTRACT` equal
+to the newest registered contract.
+
 The apply boundary serializes plans per account and locks each written entity
 identity before its ownership check. Immutable receipts retain fingerprints,
 not duplicated account snapshots. A replay reconstructs its response only

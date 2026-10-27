@@ -70,7 +70,7 @@ localDescribe("Learned travel habits against local Supabase", () => {
       .eq("user_id", users[0]!.id).select("user_id");
     expect(foreign.data).toEqual([]);
 
-    const { data, error } = await users[0]!.client.rpc("read_account_sync_snapshot");
+    const { data, error } = await users[0]!.client.rpc("read_account_sync_snapshot", { contract: 2 });
     expect(error).toBeNull();
     const profile = (data as { entities: { kind: string; value: Record<string, unknown> }[] }).entities.find((entity) => entity.kind === "profile")!;
     expect(Object.keys(profile.value)).toHaveLength(13);

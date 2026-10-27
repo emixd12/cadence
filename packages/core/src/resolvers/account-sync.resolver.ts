@@ -6,6 +6,12 @@ import { Temporal } from "@js-temporal/polyfill";
 import type { Json } from "../types/json";
 
 export const ACCOUNT_SYNC_ENTITY_KINDS = ["profile", "category", "behavior", "schedule", "schedule_slot", "definition_event", "configuration_event", "occurrence", "status_event", "time_session", "import_run", "mapping", "imported_note", "imported_intervention", "reminder_delivery", "note_shortcut_state", "place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"] as const;
+/**
+ * Hosted sync shape this build understands. The server projects snapshots to it and
+ * preserves fields added in later contracts. Raise it with every hosted
+ * `cadence_private.account_sync_contract_additions` entry; see docs/DESKTOP_DATA_MODEL.md.
+ */
+export const ACCOUNT_SYNC_CONTRACT = 2;
 export const ACCOUNT_SYNC_ROW_LIMIT = 100_000;
 export const ACCOUNT_SYNC_BYTE_LIMIT = 64 * 1024 * 1024;
 export const ACCOUNT_SYNC_TIME_LIMIT_MS = 30_000;

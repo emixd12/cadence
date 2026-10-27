@@ -543,6 +543,25 @@ The backup remains until the user acknowledges and deletes that exact recovery c
 Schema 0013 remains in chronological order as a compatibility prerequisite. The
 repair release includes its table migration without activating Note shortcut UI.
 
+## Sync contract
+
+Desktop sends `ACCOUNT_SYNC_CONTRACT` from
+`packages/core/src/resolvers/account-sync.resolver.ts` with every hosted read and
+apply. The server returns only that contract's kinds and fields, and it keeps
+hosted fields that this build cannot see. The native reader stays strict. Any
+unexpected field therefore signals a server projection fault, not a newer
+schema.
+
+Rules for a schema change:
+
+- **Additive** (a new optional field or kind): give the column a default and
+  register it in `cadence_private.account_sync_contract_additions` under the next
+  contract. Raise `ACCOUNT_SYNC_CONTRACT` and add matching SQLite fields.
+  Published builds keep synchronizing without the new data.
+- **Breaking** (a rename, a removal, a change in meaning or allowed values, or a
+  cross-row invariant that old builds could violate): also raise
+  `account_sync_min_writer_contract()`. Builds below it show "Update Cadence".
+
 ## Dependency-safe synchronization (Ticket 130)
 
 An accepted Occurrence deletion removes attached reminder deliveries in both

@@ -2221,7 +2221,9 @@ export type Database = {
         Returns: Json
       }
       purge_expired_completion_place_labels: { Args: never; Returns: number }
-      read_account_sync_snapshot: { Args: never; Returns: Json }
+      read_account_sync_snapshot:
+        | { Args: never; Returns: Json }
+        | { Args: { contract: number }; Returns: Json }
       read_advisor_analysis_snapshot: {
         Args: {
           history_start_local_date: string
