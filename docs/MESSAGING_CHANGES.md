@@ -1,21 +1,42 @@
-# Privacy change log
+# Messaging change log
 
-**Rule (owner decision, October 22, 2026):** until the pre-launch privacy pass,
-privacy, disclosure and marketing-language conflicts are logged here and never block
-development. In-progress work proceeds as if no privacy policy constrains it.
+**Rule (owner decision, October 27, 2026; replaces the October 22 privacy-only
+rule):** development work records here every change it makes to what Cadence says
+about itself, then proceeds. Messaging conflicts never block development, merges or
+deployments. The messaging track (Tickets 245 and 246) resolves them in its own
+tickets. `docs/DECISIONS.md` (2026-10-27) records the rule.
 
-This file lists every decided or implemented change that makes Cadence's current
-privacy text, disclosures, user guide or marketing language inaccurate or incomplete.
-The pre-launch privacy pass works through the open entries and updates the text in
-one review. That pass is not yet ticketed. `docs/DECISIONS.md` (2026-10-22) records
-the rule.
+This file lists every decided or implemented change that makes any of these surfaces
+inaccurate or incomplete:
+
+- **Privacy and Terms**: the Privacy and Terms pages.
+- **Trust**: the public Trust page and its claims.
+- **In-app copy**: disclosures, consent text, Settings and setup wording.
+- **User guide**: `docs/user-guide/*`.
+- **Marketing**: cadence-me.com, the FAQ, the README and listing copy.
+- **Provider submissions**: Google OAuth verification, OpenAI and Claude directory
+  listings, Apple and other reviewer-facing text and videos.
+
+The file name was `docs/PRIVACY_CHANGES.md` until October 27, 2026. Existing `P-`
+IDs keep their numbers; new entries continue the same `P-` sequence.
 
 Provider terms, data licences and the owner's legal risk decisions stay in
 `docs/LEGAL.md`. An entry here links the related `L-` entry when one exists.
 
+## When the track gates
+
+Only outward actions wait on this log. Before a provider submission, public launch
+or public listing, the owner resolves (or explicitly accepts) every open entry whose
+surfaces that action shows to a reviewer or the public. A source merge, hosted
+migration or deployment never waits on an entry.
+
+Development tickets do not edit Privacy, Terms, Trust, marketing or submission text,
+or tests that assert that text (`tests/legal-content.test.tsx`), unless the ticket
+says so. They log an entry instead.
+
 ## Current text the entries cite
 
-- `components/settings/LegalContent.tsx`: the Privacy page (dated October 21, 2026),
+- `components/settings/LegalContent.tsx`: the Privacy page (dated October 24, 2026),
   the Terms page (dated October 18, 2026) and the Trust page (dated August 27, 2026).
   `tests/legal-content.test.tsx` asserts parts of that text.
 - `docs/user-guide/*`: factual user guidance.
@@ -35,8 +56,8 @@ numbers move.
 5. When updated text ships, record the file, the deployment and the date, then set
    the status.
 
-Fields: change; affected tickets and files; conflicting current text; update needed;
-status.
+Fields: change; affected tickets and files; surfaces (from the list above);
+conflicting current text; update needed; status.
 
 Status values:
 

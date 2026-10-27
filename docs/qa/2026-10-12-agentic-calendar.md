@@ -235,7 +235,7 @@ Consequences the owner accepted with the travel merge:
   on account synchronization until 0.1.6 is published.
 - Daily Brief can send trip conclusions derived from Timeline connection event
   locations when the Daily Brief connection holds the same events. This conflicts
-  with the Privacy line quoted in `docs/PRIVACY_CHANGES.md` P-012, which Google's
+  with the Privacy line quoted in `docs/MESSAGING_CHANGES.md` P-012, which Google's
   reviewer reads.
 
 Still open: the demo recording and upload, the Data Access justification entry and the

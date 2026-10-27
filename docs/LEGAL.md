@@ -10,7 +10,7 @@ until someone moves them here.
 
 ## How to add or update an entry
 
-Privacy-text, disclosure and marketing-language items go to `docs/PRIVACY_CHANGES.md`,
+Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHANGES.md`,
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
@@ -31,7 +31,7 @@ Status values:
   still be asked.
 - **resolved**: answered, or moot because the matter no longer applies. The entry says
   which.
-- **moved**: the entry now lives in `docs/PRIVACY_CHANGES.md`. The stub names the `P-`
+- **moved**: the entry now lives in `docs/MESSAGING_CHANGES.md`. The stub names the `P-`
   entry.
 
 Risk levels:
@@ -191,7 +191,7 @@ part of L-002.
 - **Status:** resolved (design change). Reopen if Ticket 216 or a later ticket fetches
   Google coordinates or compares a position with them.
 - **Next action:** none. Storing marker positions and labels is a privacy-text change,
-  logged as `docs/PRIVACY_CHANGES.md` P-001.
+  logged as `docs/MESSAGING_CHANGES.md` P-001.
 
 ## L-004: Google Weather API facts in model input
 
@@ -313,7 +313,7 @@ part of L-002.
 
 ## L-011: Weather privacy disclosure and attribution
 
-- **Status:** moved to `docs/PRIVACY_CHANGES.md` P-003 on October 22, 2026. P-003 keeps
+- **Status:** moved to `docs/MESSAGING_CHANGES.md` P-003 on October 22, 2026. P-003 keeps
   the question, sources, reading and next action. Under the owner's October 22 rule it
   does not block development before the pre-launch privacy pass.
 
@@ -356,4 +356,4 @@ part of L-002.
   `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` serves the approved notices; live readback passed.
 - **Next action:** retain the verified notices with future releases; this entry is resolved. The Privacy statement that Cadence does not send behavior data
   to an AI provider is a separate conflict under Ticket 187, logged as
-  `docs/PRIVACY_CHANGES.md` P-005.
+  `docs/MESSAGING_CHANGES.md` P-005.
