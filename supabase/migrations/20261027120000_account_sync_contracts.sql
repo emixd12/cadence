@@ -141,10 +141,7 @@ begin
   snapshot := jsonb_build_object(
     'schemaVersion', 1,
     'userId', current_user_id,
-    'fingerprint', encode(extensions.digest(convert_to(cadence_private.canonical_account_sync_json(coalesce((
-      select jsonb_agg(jsonb_set(entity, '{value}', (entity -> 'value') - 'updated_at') order by entity ->> 'kind' collate "C", entity ->> 'id' collate "C")
-      from jsonb_array_elements(entities) entity
-    ), '[]'::jsonb)), 'UTF8'), 'sha256'), 'hex'),
+    'fingerprint', cadence_private.account_sync_fingerprint(entities),
     'entities', entities
   );
 
@@ -167,7 +164,7 @@ as $$
 declare
   projected jsonb;
 begin
-  if target_contract < 1 or target_contract > cadence_private.account_sync_current_contract() then
+  if target_contract is null or target_contract < 1 or target_contract > cadence_private.account_sync_current_contract() then
     raise exception 'The account synchronization contract is not supported.' using errcode = '22023';
   end if;
   if target_contract = cadence_private.account_sync_current_contract() then
@@ -371,9 +368,11 @@ begin
     full_snapshot := cadence_private.account_sync_snapshot();
     sync_payload := jsonb_set(sync_payload, '{plan,writes}', coalesce((
       select jsonb_agg(case
-        when hidden.restore is null or item.w ->> 'operation' <> 'upsert' then item.w
+        when hidden.restore is null then item.w
         else item.w
-          || jsonb_build_object('value', hidden.restore || (item.w -> 'value'))
+          || case when item.w ->> 'operation' = 'upsert'
+            then jsonb_build_object('value', hidden.restore || (item.w -> 'value'))
+            else '{}'::jsonb end
           || case when jsonb_typeof(item.w -> 'expected') = 'object'
             then jsonb_build_object('expected', hidden.restore || (item.w -> 'expected'))
             else '{}'::jsonb end
@@ -792,12 +791,7 @@ begin
         accuracy_meters = excluded.accuracy_meters, rule_version = excluded.rule_version, recorded_at = excluded.recorded_at;
       continue;
     elsif write_kind = 'note_shortcut_state' then
-      if write_kind = 'behavior' and not ((write -> 'value') ?& array[
-      'default_duration_minutes', 'end_date', 'auto_archived_at', 'location_text', 'where_kind'
-    ]) then
-      raise exception 'Update Cadence before synchronizing Behavior changes.' using errcode = '22023';
-    end if;
-    write_value := (write -> 'value') || jsonb_build_object('user_id', current_user_id);
+      write_value := (write -> 'value') || jsonb_build_object('user_id', current_user_id);
       insert into public.note_shortcut_states as state
       select (jsonb_populate_record(null::public.note_shortcut_states, write_value)).*
       on conflict (user_id, id) do update set

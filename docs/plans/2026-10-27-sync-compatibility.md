@@ -1,8 +1,8 @@
 # Account sync compatibility: stop forced updates on additive changes
 
 Status: Parts A and B (including A.7) approved and implemented in source October 27,
-2026, on branch `claude/sync-contract-projection`. Part C is decided (local stack)
-and its dev-build change is tracked below. No hosted change has been made.
+2026, on branch `claude/sync-contract-projection`. The owner dropped Part C on
+October 27; development builds keep using production. No hosted change has been made.
 
 Implementation differs from the proposal in three places:
 
@@ -18,6 +18,21 @@ Implementation differs from the proposal in three places:
   `tests/account-sync-contract.test.ts` ties `ACCOUNT_SYNC_CONTRACT` to the
   registry. Neither is an `agents:check` rule, because only a migrated database
   shows the real columns.
+
+Review corrections also reject null read contracts, preserve hidden compare-and-set
+fields for deletes, and namespace client idempotency keys by contract. The rollback
+fixture `tests/sql/account-sync-contract-write-smoke.sql` covers profile preservation,
+receipt replay after hidden-only changes, owner isolation and a synthetic later
+Category column. It tests old inserts, updates and deletes, and keeps the existing
+concurrent-revision rejection before a retry.
+
+Review verification: all 93 migrations and the five sync/place-label/travel-habit
+SQL smoke files pass on fresh disposable PostgreSQL 16.15 with synthetic auth
+tables and roles. The new fixture fails against the original null-contract and
+delete-preservation implementations. Targeted Vitest passes 96 tests; core and
+desktop typechecks, changed-file lint, agents, interactions and resolvers checks
+pass. This standalone database does not establish Supabase Auth/PostgREST or
+installed Mac acceptance; the disposable Supabase rehearsal remains required.
 
 ## Problem
 
@@ -182,32 +197,47 @@ turned up three blockers that need owner decisions first:**
    also run locally. Not verified: App Transport Security for plain HTTP to a
    Tailscale `100.x` address.
 
-With Part A alone, the owner's 0.1.x Mac keeps syncing through additive changes.
-With Part C, unfinished schema never reaches the real account at all.
+Part A preserves registered additive shapes for supported contracts. It does not
+make every historical desktop shape compatible. Part C is dropped.
 
 ## Rollout
 
 1. Implement Part A and Part B in one PR: SQL migration, core contract, desktop
    reader, planner, tests. Rehearse it on a local `db reset`.
-2. Push the migration. If A.7 is included, published 0.1.5 resumes syncing
-   immediately. Verify on the test Mac.
-3. Ship 0.1.6 with the contract-2 reader. From then on, additive features need
-   no forced update.
-4. Part C can proceed in parallel; it has no code dependency.
+2. Prepare a 0.1.6 build from contract-2 source before the hosted cutover. Older
+   0.1.6 development builds require the expanded profile but send no contract.
+   After the migration they receive contract 1 and fail closed until rebuilt.
+3. Push the migration after the disposable Supabase rehearsal passes. Verify
+   published 0.1.5 on the test Mac, including pending local writes, convergence,
+   receipt retry, and preservation of hosted travel habits and place labels.
+4. Publish the verified 0.1.6 build through the existing desktop acceptance and
+   release procedure. Its contract-2 RPC requires this migration first.
 
-## Decisions for the owner
+| Client | Result after migration |
+|---|---|
+| Published 0.1.5 | Receives contract 1; source-level SQL/RPC checks cover preservation. Installed acceptance remains required. |
+| Published 0.1.3 or earlier | Not rescued; its Behavior shape predates Where. It still needs a desktop update. |
+| Pre-contract 0.1.6 development build | Receives contract 1 but expects the expanded profile; rebuild from contract-2 source. |
+| Contract-2 desktop | Receives the complete current shape, including travel habits and place labels. |
 
-1. Approve Part A as described?
-2. Include A.7 (rescue 0.1.5 without a release)? Recommended. It also tests the
-   mechanism on a real old client.
+Fix forward if the migration needs correction. Once a contract-2 build is in use,
+removing the new overload breaks its reads. Reverting only desktop source does not
+revert the hosted RPCs. Keep both read signatures, registry, and old-client
+projection while correcting any apply defect in a new migration. Preserve account
+data and receipt history. This release does not authorize replacing local profiles
+or deleting pending writes.
+
+## Recorded decisions
+
+1. Parts A and B are approved, including the contract-1 rescue for published 0.1.5.
+2. Installed 0.1.5 acceptance verifies the rescue on a real old client.
 3. Part C: dropped (October 27).
-4. Should 0.1.6 wait for Part A? Recommended: yes. Then 0.1.6 is the last
-   forced update caused by additive changes.
+4. The next 0.1.6 build uses contract 2 and requires this migration before it can
+   synchronize. Registered additive fields can then retain older supported shapes.
 
 ## Not verified
 
-- The exact Behavior and schedule column lists per historical contract. The
-  fixtures in Part B will establish them.
+- Installed 0.1.5 and contract-2 desktop acceptance against the deployed migration.
 - Vercel Preview's Supabase target.
-- Whether any planner conflict rule compares fields that a contract-1 client
-  cannot see. Check during implementation in `account-sync.resolver.ts`.
+- PostgREST overload dispatch is covered by the authenticated RPC smoke when the
+  disposable Supabase rehearsal runs; a standalone SQL run alone does not verify it.

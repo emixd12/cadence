@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ACCOUNT_SYNC_CONTRACT } from "@cadence/core/resolvers/account-sync.resolver";
+import { ACCOUNT_SYNC_CONTRACT, resolveAccountSync, resolveFirstLinkReplacement, resolveReviewedAccountSync, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
+import { sha256 } from "@cadence/core/hash";
 
 const migrations = join(process.cwd(), "supabase/migrations");
 
@@ -27,5 +28,20 @@ describe("account sync contract", () => {
     const adapter = readFileSync(join(process.cwd(), "apps/desktop/src/account/account-sync.ts"), "utf8");
     expect(adapter).toContain('client.rpc("read_account_sync_snapshot", { contract: ACCOUNT_SYNC_CONTRACT })');
     expect(adapter).toContain("schemaVersion: 1, contract: ACCOUNT_SYNC_CONTRACT,");
+  });
+
+  it("does not reuse another contract's receipt when the projected data is identical", () => {
+    const snapshot: AccountSyncSnapshot = { entities: [{ kind: "profile", id: "profile", value: { timezone: "UTC" } }] };
+    const input = { accountLinkId: "contract-upgrade", baseline: snapshot, local: snapshot, hosted: snapshot };
+    const standard = resolveAccountSync(input);
+    const reviewed = resolveReviewedAccountSync({ ...input, reviewedFingerprints: standard.fingerprints, decisions: [] });
+    const replacement = resolveFirstLinkReplacement(input);
+    for (const [plan, suffix] of [[standard, ""], [reviewed, ""], [replacement, ":first-link-replacement"]] as const) {
+      const { baseline, local, hosted, merged } = plan.fingerprints;
+      const legacyKeyMaterial = `${input.accountLinkId}:${baseline}:${local}:${hosted}:${merged}${suffix}`;
+      expect(plan.idempotencyKey).not.toBe(sha256(legacyKeyMaterial));
+      expect(plan.idempotencyKey).not.toBe(sha256(`contract:${ACCOUNT_SYNC_CONTRACT - 1}:${legacyKeyMaterial}`));
+      expect(plan.idempotencyKey).toBe(sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${legacyKeyMaterial}`));
+    }
   });
 });

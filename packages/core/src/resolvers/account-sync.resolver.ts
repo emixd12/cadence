@@ -41,7 +41,7 @@ export function resolveFirstLinkReplacement(input: Readonly<{ accountLinkId: str
   const fingerprints = { baseline: fingerprint(baseline.values()), local: fingerprint(local.values()), hosted: fingerprint(hosted.values()) };
   const mergedEntities = [...hosted.values()].sort(compareEntity), merged = fingerprint(mergedEntities);
   return { localWrites: writesBetween(local, hosted), hostedWrites: [], conflicts: [], mergedEntities,
-    fingerprints: { ...fingerprints, merged }, idempotencyKey: sha256(`${input.accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${merged}:first-link-replacement`) };
+    fingerprints: { ...fingerprints, merged }, idempotencyKey: sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${input.accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${merged}:first-link-replacement`) };
 }
 
 export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; baseline: AccountSyncSnapshot; local: AccountSyncSnapshot; hosted: AccountSyncSnapshot; firstLink?: boolean; firstHostedHydration?: boolean; noteShortcutExclusionPolicy?: NoteShortcutExclusionPolicy }>): AccountSyncPlan {
@@ -84,7 +84,7 @@ export function resolveAccountSync(input: Readonly<{ accountLinkId?: string; bas
   ));
   const merged = prepare({ entities: retained }), mergedRows = [...merged.values()].sort(compareEntity), mergedFingerprint = fingerprint(mergedRows);
   validateInputGraphs(false, merged);
-  return { localWrites: writesBetween(local, merged), hostedWrites: writesBetween(hosted, merged), conflicts: [], mergedEntities: mergedRows, fingerprints: { ...fingerprints, merged: mergedFingerprint }, idempotencyKey: sha256(`${accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${mergedFingerprint}`) };
+  return { localWrites: writesBetween(local, merged), hostedWrites: writesBetween(hosted, merged), conflicts: [], mergedEntities: mergedRows, fingerprints: { ...fingerprints, merged: mergedFingerprint }, idempotencyKey: sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${accountLinkId}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${mergedFingerprint}`) };
 }
 
 export function canKeepBothAccountSyncConflict(_conflict: AccountSyncConflict): boolean {
@@ -135,7 +135,7 @@ export function resolveReviewedAccountSync(input: Readonly<{
   validateInputGraphs(false, merged);
   const fingerprints = { baseline: initial.fingerprints.baseline, local: initial.fingerprints.local, hosted: initial.fingerprints.hosted, merged: fingerprint(merged.values()) };
   return { ...resolved, mergedEntities, localWrites: writesBetween(actualLocal, merged), hostedWrites: writesBetween(actualHosted, merged), fingerprints,
-    idempotencyKey: sha256(`${input.accountLinkId ?? "account-link"}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${fingerprints.merged}`) };
+    idempotencyKey: sha256(`contract:${ACCOUNT_SYNC_CONTRACT}:${input.accountLinkId ?? "account-link"}:${fingerprints.baseline}:${fingerprints.local}:${fingerprints.hosted}:${fingerprints.merged}`) };
 }
 
 /** Independently generated, untouched local Occurrences reuse the hosted schedule identity. */

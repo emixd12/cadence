@@ -552,6 +552,15 @@ hosted fields that this build cannot see. The native reader stays strict. Any
 unexpected field therefore signals a server projection fault, not a newer
 schema.
 
+The contract also namespaces client idempotency keys. A build with a new contract
+must not reuse an older contract's receipt, even when their projected data is
+identical. Native schema upgrades still require a new desktop build.
+
+Contract 1 matches the published 0.1.5 build, not every pre-contract build.
+Existing 0.1.6 development builds that require the expanded profile but send no
+contract must be rebuilt from contract-2 source when this migration ships.
+Published 0.1.3 still needs an update because it predates the Where fields.
+
 Rules for a schema change:
 
 - **Additive** (a new optional field or kind): give the column a default and

@@ -18,6 +18,14 @@ Source only: nothing is pushed to hosted, merged or released.
 - Guard: `tests/sql/account-sync-contract-smoke.sql` freezes the synced columns,
   and `tests/account-sync-contract.test.ts` ties the client constant to the
   registry.
+- Review corrections reject null read contracts, retain hidden fields in delete
+  preconditions, and namespace client receipt keys by contract. The new SQL write
+  smoke verifies legacy profile writes, receipt replay, owner isolation and old
+  inserts/updates/deletes against a rolled-back later Category column. Concurrent
+  row revisions still reject stale writes before a preserving retry.
+- Rollout caveat: pre-contract 0.1.6 development builds need a rebuild, because
+  their expanded profile is not contract 1. Published 0.1.3 remains unsupported.
+  The plan records the client matrix and a forward-correction procedure.
 - Part C (a separate dev Supabase target) is dropped by owner decision. Dev builds keep
   using production.
 

@@ -84,6 +84,7 @@ try {
   assert(legacy.fingerprint === entityDigest(legacy.entities), "contract 1 fingerprint covers its projection");
   assert((await readSnapshot(clients[0], 1)).fingerprint === legacy.fingerprint, "contract 1 by argument matches the legacy read");
   await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 3 }), "unknown read contract");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
   const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
   const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
   const c1Request = (writes, key) => { const value = payload(legacy, writes, entityDigest(c1Merged), key); delete value.contract; return value; };

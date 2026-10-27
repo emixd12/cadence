@@ -1720,9 +1720,12 @@ Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
 - `apply_account_sync_plan` accepts an optional numeric `contract` payload field.
   A missing field means contract 1. It projects the hosted, merged and receipt
   fingerprints to that contract. For an older contract, it rejects writes to later
-  kinds or fields. It then fills each upsert's `value` and `expected` with the
-  stored value of every hidden field, or that field's default. A client therefore
-  cannot erase data it cannot see. A contract above
+  kinds or fields. It fills each upsert's `value` and each write's object `expected`
+  with the stored value of every hidden field, or that field's default. This
+  includes compare-and-set checks for permitted deletes. Old inserts receive
+  registered defaults; old updates retain hidden values. Existing protected-row
+  and append-only-history rules still apply. A null or out-of-range read contract
+  is refused. A write contract above
   `account_sync_current_contract()` is refused. A contract below
   `account_sync_min_writer_contract()` (now 1) gets "Update Cadence".
 
@@ -1730,6 +1733,22 @@ Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
 every synced table. It fails when a column is added without a registry entry and
 default. `tests/account-sync-contract.test.ts` keeps `ACCOUNT_SYNC_CONTRACT` equal
 to the newest registered contract.
+
+The client includes its contract in the idempotency key. Identical projected
+snapshots under two contracts therefore cannot collide with receipts whose request
+fingerprints include different contract fields. Existing contract-1 receipt keys
+remain valid for the published 0.1.5 client.
+
+`tests/sql/account-sync-contract-write-smoke.sql` exercises the no-argument 0.1.5
+profile, later-field/kind rejection, hidden-habit preservation, projected receipt
+replay, populated hidden settings/markers and account isolation. A rolled-back contract-3 Category column verifies
+old inserts, updates and deletes, plus rejection and replanning after a concurrent
+row revision. Neither fixture changes the deployed registry.
+
+Projection does not disable product lifecycle rules. For example, an older client
+changing a Completed Occurrence to another status still removes its completion
+place label through the existing trigger. The compatibility guarantee preserves
+unknown data during unrelated writes; it does not retain labels that became invalid.
 
 The apply boundary serializes plans per account and locks each written entity
 identity before its ownership check. Immutable receipts retain fingerprints,
