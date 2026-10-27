@@ -543,6 +543,39 @@ The backup remains until the user acknowledges and deletes that exact recovery c
 Schema 0013 remains in chronological order as a compatibility prerequisite. The
 repair release includes its table migration without activating Note shortcut UI.
 
+## Sync contract
+
+Desktop sends `ACCOUNT_SYNC_CONTRACT` from
+`packages/core/src/resolvers/account-sync.resolver.ts` with every hosted read and
+apply. The server returns only that contract's kinds and fields, and it keeps
+hosted fields that this build cannot see. The native reader stays strict. Any
+unexpected field therefore signals a server projection fault, not a newer
+schema.
+
+The contract also namespaces client idempotency keys. A build with a new contract
+must not reuse an older contract's receipt, even when their projected data is
+identical. Native schema upgrades still require a new desktop build.
+
+Contract 1 matches published 0.1.5 and the recorded 0.1.6-dev.2 from `ed93fff`
+(SQLite schema 18), whose sync source is unchanged from 0.1.5's `41e4549`.
+Compatibility follows source and sync shape, not a version label. Only
+unversioned development builds from later source that requires the expanded
+profile need coordinated replacement from contract-2 source when this migration
+ships. No later installed development build is recorded, and the current Mac
+build is unverified. Published 0.1.3 still needs an update because it predates the
+Where fields. The complete matrix is in
+`docs/plans/2026-10-27-sync-compatibility.md`.
+
+Rules for a schema change:
+
+- **Additive** (a new optional field or kind): give the column a default and
+  register it in `cadence_private.account_sync_contract_additions` under the next
+  contract. Raise `ACCOUNT_SYNC_CONTRACT` and add matching SQLite fields.
+  Published builds keep synchronizing without the new data.
+- **Breaking** (a rename, a removal, a change in meaning or allowed values, or a
+  cross-row invariant that old builds could violate): also raise
+  `account_sync_min_writer_contract()`. Builds below it show "Update Cadence".
+
 ## Dependency-safe synchronization (Ticket 130)
 
 An accepted Occurrence deletion removes attached reminder deliveries in both

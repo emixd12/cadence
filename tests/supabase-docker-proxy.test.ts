@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const modulePath = "../scripts/supabase-docker-proxy.mjs";
-const { createDockerProxy, rewriteCreate } = await import(modulePath);
+const { createDockerProxy, rewriteCreate, PINNED_IMAGES } = await import(modulePath);
 const PROJECT = "habit-tracking-app";
 const DB = `supabase_db_${PROJECT}`;
 const labels = { "com.supabase.cli.project": PROJECT, "com.docker.compose.project": PROJECT };
@@ -119,9 +119,9 @@ async function setup(rejections: string[] = []) {
   const proxy = createDockerProxy(daemonSocket, (line: string) => rejections.push(line));
   await new Promise<void>((ok, fail) => { proxy.once("error", fail); proxy.listen(proxySocket, ok); });
   cleanups.push(() => new Promise<void>((ok) => proxy.close(() => ok())));
-  const send = (method: string, path: string, body?: string | object, chunked = false) => new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>((ok, fail) => {
+  const send = (method: string, path: string, body?: string | object, chunked = false, extraHeaders: IncomingHttpHeaders = {}) => new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>((ok, fail) => {
     const bytes = body == null ? "" : typeof body === "string" ? body : JSON.stringify(body);
-    const headers = { "content-type": "application/json", "x-request-test": "preserved", ...(chunked ? {} : { "content-length": String(Buffer.byteLength(bytes)) }) };
+    const headers = { ...extraHeaders, "content-type": "application/json", "x-request-test": "preserved", ...(chunked ? {} : { "content-length": String(Buffer.byteLength(bytes)) }) };
     const request = http.request({ socketPath: proxySocket, path, method, headers }, async (response) => {
       const chunks = [];
       for await (const chunk of response) chunks.push(chunk);
@@ -208,6 +208,26 @@ describe("Docker HTTP forwarding against a fake Unix-socket daemon", () => {
       expect((await send("POST", `/images/create?${query}`)).status, query).toBe(403);
     }
     expect(received.filter((request) => request.path.startsWith("/images/create"))).toHaveLength(2);
+  });
+
+  it("accepts all seven ECR sequential-pull pins and forwards registry authentication without logging it", async () => {
+    const rejections: string[] = [];
+    const { send, received } = await setup(rejections);
+    const auth = Buffer.from(JSON.stringify({ username: "synthetic-user", password: "synthetic-password" })).toString("base64url");
+    const images = (PINNED_IMAGES as string[]).filter((image) => image.startsWith("public.ecr.aws/"));
+    expect(images).toHaveLength(7);
+    for (const image of images) {
+      const [name, tag] = image.split(":");
+      const result = await send("POST", `/images/create?fromImage=${encodeURIComponent(name)}&tag=${tag}`, undefined, false, { "x-registry-auth": auth });
+      expect(result.status, image).toBe(201);
+    }
+    expect(received).toHaveLength(7);
+    expect(received.every((request) => request.headers["x-registry-auth"] === auth)).toBe(true);
+    expect(rejections).toEqual([]);
+    expect((await send("POST", "/images/create?fromImage=ghcr.io%2Fsupabase%2Fpostgres&tag=latest", undefined, false, { "x-registry-auth": auth })).status).toBe(403);
+    expect(rejections).toEqual(["POST /images/create (policy)"]);
+    expect(rejections.join("\n")).not.toContain(auth);
+    expect(rejections.join("\n")).not.toContain("synthetic-password");
   });
 
   it("logs rejected methods and paths without query strings, bodies or private values", async () => {

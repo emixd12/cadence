@@ -95,11 +95,11 @@ begin
   end;
 
   -- The synchronized profile carries the habits as five additional keys.
-  if (select count(*) from jsonb_object_keys((select entity -> 'value' from jsonb_array_elements(public.read_account_sync_snapshot() -> 'entities') entity
+  if (select count(*) from jsonb_object_keys((select entity -> 'value' from jsonb_array_elements(public.read_account_sync_snapshot(2) -> 'entities') entity
       where entity ->> 'kind' = 'profile'))) <> 13 then
     raise exception 'The synchronized profile does not have 13 keys';
   end if;
-  if (select entity #> '{value,travel_place_modes,0,mode}' from jsonb_array_elements(public.read_account_sync_snapshot() -> 'entities') entity
+  if (select entity #> '{value,travel_place_modes,0,mode}' from jsonb_array_elements(public.read_account_sync_snapshot(2) -> 'entities') entity
       where entity ->> 'kind' = 'profile') <> '"transit"'::jsonb then
     raise exception 'The synchronized profile lost the remembered mode';
   end if;

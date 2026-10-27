@@ -24,7 +24,7 @@ try {
   await rejects(anonymous.rpc("read_account_sync_snapshot"), "unauthenticated snapshot");
   await rejects(anonymous.rpc("apply_account_sync_plan", { sync_payload: {} }), "unauthenticated apply");
 
-  const [snapshotA, snapshotB] = await Promise.all(clients.map(readSnapshot));
+  const [snapshotA, snapshotB] = await Promise.all(clients.map((client) => readSnapshot(client)));
   assert(snapshotA.userId === users[0].id && snapshotB.userId === users[1].id, "snapshot owner isolation");
   assert(snapshotA.entities.every((row) => !contains(row.value, users[1].id)), "account A row isolation");
   assert(snapshotB.entities.every((row) => !contains(row.value, users[0].id)), "account B row isolation");
@@ -73,12 +73,45 @@ try {
   assert(otherProfile.value.travel_habits_updated_at === null, "learned habits stay with their owner");
   first.snapshot = habitResult.snapshot;
   first.fingerprint = habitResult.fingerprint;
+  // Contract 1 is the pre-contract shape of desktop 0.1.5: no contract argument or field.
+  const current = await readSnapshot(clients[0]);
+  const legacy = await readSnapshot(clients[0], null);
+  const c1Profile = legacy.entities.find((row) => row.kind === "profile");
+  const c2Profile = current.entities.find((row) => row.kind === "profile");
+  assert(c2Profile.value.travel_preparation_minutes !== null, "contract 2 shows learned habits");
+  assert(Object.keys(c1Profile.value).length === 8 && !("travel_place_modes" in c1Profile.value), "contract 1 profile omits learned habits");
+  assert(!legacy.entities.some((row) => ["place_label_settings", "place_marker", "completion_place_label", "where_suggestion_dismissal"].includes(row.kind)), "contract 1 omits place-label kinds");
+  assert(legacy.fingerprint === entityDigest(legacy.entities), "contract 1 fingerprint covers its projection");
+  assert((await readSnapshot(clients[0], 1)).fingerprint === legacy.fingerprint, "contract 1 by argument matches the legacy read");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: 3 }), "unknown read contract");
+  await rejects(clients[0].rpc("read_account_sync_snapshot", { contract: null }), "null read contract");
+  const c1Value = { ...c1Profile.value, base_location_text: "Legacy client base", updated_at: "2026-09-01T06:10:00.000Z" };
+  const c1Merged = legacy.entities.map((row) => row.kind === "profile" ? { ...row, value: c1Value } : row);
+  const c1Request = (writes, key) => { const value = payload(legacy, writes, entityDigest(c1Merged), key); delete value.contract; return value; };
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: { ...c1Value, travel_place_modes: [] } }], "c1a1".repeat(16)) }),
+    "contract 1 cannot write a later field");
+  await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...payload(legacy, [], legacy.fingerprint, "c3c3".repeat(16)), contract: 3 } }), "unknown apply contract");
+  const c1Result = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
+  assert(c1Result.fingerprint === entityDigest(c1Merged) && c1Result.snapshot.entities.length === legacy.entities.length, "contract 1 apply returns its projection");
+  const preserved = (await readSnapshot(clients[0])).entities.find((row) => row.kind === "profile").value;
+  assert(preserved.base_location_text === "Legacy client base", "contract 1 profile change applies");
+  for (const key of ["travel_preparation_minutes", "travel_arrival_buffer_minutes", "travel_place_modes", "travel_leave_feedback", "travel_habits_updated_at"]) {
+    assert(JSON.stringify(preserved[key]) === JSON.stringify(c2Profile.value[key]), `contract 1 write preserves ${key}`);
+  }
+  const c1Replay = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: c1Request(
+    [{ kind: "profile", id: "profile", operation: "upsert", expected: c1Profile.value, value: c1Value }], "c1c1".repeat(16)) }));
+  assert(c1Replay.fingerprint === c1Result.fingerprint, "contract 1 receipt replay");
+  const afterContracts = await readSnapshot(clients[0]);
+  first.snapshot = afterContracts;
+  first.fingerprint = afterContracts.fingerprint;
   const category = first.snapshot.entities.find((row) => row.kind === "category");
   assert(category, "timestamp roundtrip category");
   const timestampValue = { ...category.value, name: "Timestamp roundtrip", description: "Synced category context", updated_at: "2026-09-01T06:00:00.123457Z" };
   const timestampMerged = first.snapshot.entities.map((row) => row.kind === "category" && row.id === category.id ? { ...row, value: timestampValue } : row);
   const timestampPlan = { writes: [{ kind: "category", id: category.id, operation: "upsert", expected: category.value, value: timestampValue }], mergedFingerprint: entityDigest(timestampMerged), conflicts: [] };
-  const timestampRequest = { schemaVersion: 1, idempotencyKey: "4".repeat(64), baselineFingerprint: first.fingerprint, localFingerprint: first.fingerprint,
+  const timestampRequest = { schemaVersion: 1, contract: 2, idempotencyKey: "4".repeat(64), baselineFingerprint: first.fingerprint, localFingerprint: first.fingerprint,
     hostedFingerprint: first.fingerprint, planFingerprint: digest(timestampPlan), plan: timestampPlan, attemptedAt: "2026-09-01T06:00:01.000Z" };
   const timestampResult = await applied(clients[0].rpc("apply_account_sync_plan", { sync_payload: timestampRequest }));
   assert(timestampResult.fingerprint === timestampPlan.mergedFingerprint, "timestamp precision roundtrip");
@@ -224,7 +257,7 @@ try {
   const sameAccountRace = await Promise.all(sameAccountRequests.map((syncPayload) => clients[1].rpc("apply_account_sync_plan", { sync_payload: syncPayload })));
   assert(sameAccountRace.filter(({ error }) => Boolean(error)).length === 1, "same-account stale plans serialize");
 
-  const [crossAccountA, crossAccountB] = await Promise.all(clients.map(readSnapshot));
+  const [crossAccountA, crossAccountB] = await Promise.all(clients.map((client) => readSnapshot(client)));
   const sharedId = randomUUID();
   const crossAccountRequests = [crossAccountA, crossAccountB].map((snapshot, index) => {
     const value = { id: sharedId, description: null, name: `Cross-account race ${index}`, sort_order: 99, created_at: "2026-09-02T14:00:00.000000Z", updated_at: "2026-09-02T14:00:00.000000Z" };
@@ -237,19 +270,21 @@ try {
   assert(crossAccountRows[0] + crossAccountRows[1] === 1, "cross-account insert identity has one owner");
 
   await rejects(clients[0].rpc("apply_account_sync_plan", { sync_payload: { ...request, localFingerprint: "e".repeat(64) } }), "idempotency-key substitution");
-  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
+  console.log("Account sync RPC smoke passed: unauthenticated rejection, two-account isolation, stale and cross-account rejection, bounded receipt replay, serialized same-account plans and cross-account identities, timestamp precision, learned travel habits, contract 1 projection and preserving writes, compare-and-set rejection, dependency-safe all-status reminder deletion, occurrence history, and idempotency substitution rejection.");
 } finally {
   await cleanupTemporaryUsers(admin, users);
 }
 
-async function readSnapshot(client) {
-  const { data, error } = await client.rpc("read_account_sync_snapshot");
+async function readSnapshot(client, contract = 2) {
+  const { data, error } = contract === null
+    ? await client.rpc("read_account_sync_snapshot")
+    : await client.rpc("read_account_sync_snapshot", { contract });
   if (error) throw error;
   return data;
 }
 function payload(snapshot, writes, mergedFingerprint, idempotencyKey) {
   const plan = { writes, mergedFingerprint, conflicts: [] };
-  return { schemaVersion: 1, idempotencyKey, baselineFingerprint: snapshot.fingerprint, localFingerprint: snapshot.fingerprint,
+  return { schemaVersion: 1, contract: 2, idempotencyKey, baselineFingerprint: snapshot.fingerprint, localFingerprint: snapshot.fingerprint,
     hostedFingerprint: snapshot.fingerprint, planFingerprint: digest(plan), plan, attemptedAt: "2026-09-01T06:00:00.000Z" };
 }
 async function rejects(operation, label) { const { error } = await operation; assert(error, label); }

@@ -1698,6 +1698,58 @@ anonymous, and service-role execution remain revoked; only `authenticated` may
 execute it. This narrow `SECURITY DEFINER` boundary avoids granting direct
 authenticated writes to protected history and graph tables.
 
+### Account sync contracts (October 27, 2026)
+
+Migration `20261027120000_account_sync_contracts.sql` adds contract
+versioning. A contract is the snapshot shape one client build understands.
+Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
+
+- `cadence_private.account_sync_contract_additions(contract, kind, field,
+  default_value)` lists what each contract after 1 adds. A row with no `field`
+  adds a whole entity kind. Each added field has a `default_value`, which is used
+  when no stored value exists. Contract 1 is the desktop 0.1.5 shape (SQLite
+  schema 18). Contract 2 adds five Ticket 217 travel-habit profile keys and the
+  four Ticket 216 place-label kinds.
+- `cadence_private.account_sync_snapshot()` is the full snapshot that the public
+  reader used to return.
+- `cadence_private.project_account_sync_snapshot(snapshot, contract)` removes
+  later kinds and fields and recomputes the fingerprint over the result.
+- `public.read_account_sync_snapshot(contract integer)` returns that
+  projection. The no-argument form returns contract 1 for builds that predate
+  contracts.
+- `apply_account_sync_plan` accepts an optional numeric `contract` payload field.
+  A missing field means contract 1. It projects the hosted, merged and receipt
+  fingerprints to that contract. For an older contract, it rejects writes to later
+  kinds or fields. It fills each upsert's `value` and each write's object `expected`
+  with the stored value of every hidden field, or that field's default. This
+  includes compare-and-set checks for permitted deletes. Old inserts receive
+  registered defaults; old updates retain hidden values. Existing protected-row
+  and append-only-history rules still apply. A null or out-of-range read contract
+  is refused. A write contract above
+  `account_sync_current_contract()` is refused. A contract below
+  `account_sync_min_writer_contract()` (now 1) gets "Update Cadence".
+
+`tests/sql/account-sync-contract-smoke.sql` freezes the contract 2 columns of
+every synced table. It fails when a column is added without a registry entry and
+default. `tests/account-sync-contract.test.ts` keeps `ACCOUNT_SYNC_CONTRACT` equal
+to the newest registered contract.
+
+The client includes its contract in the idempotency key. Identical projected
+snapshots under two contracts therefore cannot collide with receipts whose request
+fingerprints include different contract fields. Existing contract-1 receipt keys
+remain valid for the published 0.1.5 client.
+
+`tests/sql/account-sync-contract-write-smoke.sql` exercises the no-argument 0.1.5
+profile, later-field/kind rejection, hidden-habit preservation, projected receipt
+replay, populated hidden settings/markers and account isolation. A rolled-back contract-3 Category column verifies
+old inserts, updates and deletes, plus rejection and replanning after a concurrent
+row revision. Neither fixture changes the deployed registry.
+
+Projection does not disable product lifecycle rules. For example, an older client
+changing a Completed Occurrence to another status still removes its completion
+place label through the existing trigger. The compatibility guarantee preserves
+unknown data during unrelated writes; it does not retain labels that became invalid.
+
 The apply boundary serializes plans per account and locks each written entity
 identity before its ownership check. Immutable receipts retain fingerprints,
 not duplicated account snapshots. A replay reconstructs its response only

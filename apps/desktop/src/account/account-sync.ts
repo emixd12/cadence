@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNT_SYNC_ENTITY_KINDS, ACCOUNT_SYNC_TIME_LIMIT_MS, accountSyncFingerprint, resolveAccountSync, resolveReviewedAccountSync, type AccountSyncConflictDecision, type AccountSyncEntity, type AccountSyncPlan, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
+import { ACCOUNT_SYNC_CONTRACT, ACCOUNT_SYNC_ENTITY_KINDS, ACCOUNT_SYNC_TIME_LIMIT_MS, accountSyncFingerprint, resolveAccountSync, resolveReviewedAccountSync, type AccountSyncConflictDecision, type AccountSyncEntity, type AccountSyncPlan, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
 import { sha256 } from "@cadence/core/hash";
 import { travelHabitSyncJson } from "@cadence/core/services/travel-habits";
 import type { Json } from "@cadence/core/types/json";
@@ -73,7 +73,7 @@ export async function readHostedAccountSyncEnvelope(client: SupabaseClient, sign
     const controller = new AbortController();
     return deadline(readHostedAccountSyncEnvelope(client, controller.signal), controller);
   }
-  let request = client.rpc("read_account_sync_snapshot");
+  let request = client.rpc("read_account_sync_snapshot", { contract: ACCOUNT_SYNC_CONTRACT });
   request = request.abortSignal(signal);
   const { data, error, status } = await request;
   if (error) throw withSessionStatus(error, status);
@@ -96,7 +96,7 @@ export async function applyHostedAccountSync(client: SupabaseClient, inputs: Acc
   if (plan.conflicts.length || !plan.idempotencyKey || !plan.fingerprints.merged) throw new Error("Account synchronization conflicts must be resolved before apply.");
   if (plan.fingerprints.baseline !== accountSyncFingerprint(inputs.baseline) || plan.fingerprints.local !== accountSyncFingerprint(inputs.local) || plan.fingerprints.hosted !== inputs.hostedFingerprint) throw new Error("The account synchronization plan is stale.");
   const rpcPlan = { writes: plan.hostedWrites, mergedFingerprint: plan.fingerprints.merged, conflicts: [] };
-  const syncPayload = { schemaVersion: 1, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
+  const syncPayload = { schemaVersion: 1, contract: ACCOUNT_SYNC_CONTRACT, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
       localFingerprint: plan.fingerprints.local, hostedFingerprint: plan.fingerprints.hosted, planFingerprint: sha256(canonicalJson(rpcPlan)), plan: rpcPlan, attemptedAt };
   const applied = await client.rpc("apply_account_sync_plan", { sync_payload: syncPayload });
   if (applied.error) throw withSessionStatus(applied.error, applied.status);

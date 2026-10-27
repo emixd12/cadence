@@ -61,7 +61,7 @@ localDescribe("Completion place labels against local Supabase", () => {
   });
 
   async function snapshot(): Promise<Envelope> {
-    const { data, error } = await client.rpc("read_account_sync_snapshot");
+    const { data, error } = await client.rpc("read_account_sync_snapshot", { contract: 2 });
     if (error) throw error;
     return data as unknown as Envelope;
   }
@@ -71,7 +71,7 @@ localDescribe("Completion place labels against local Supabase", () => {
     expect(plan.conflicts).toEqual([]);
     const rpcPlan = { writes: plan.hostedWrites, mergedFingerprint: plan.fingerprints.merged, conflicts: [] };
     const { data, error } = await client.rpc("apply_account_sync_plan", { sync_payload: {
-      schemaVersion: 1, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
+      schemaVersion: 1, contract: 2, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
       localFingerprint: plan.fingerprints.local, hostedFingerprint: plan.fingerprints.hosted,
       planFingerprint: sha256(canonicalJson(rpcPlan)), plan: rpcPlan, attemptedAt: new Date().toISOString(),
     } as never });

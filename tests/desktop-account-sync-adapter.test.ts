@@ -53,7 +53,7 @@ describe("desktop account sync adapter", () => {
     const rpc = vi.fn(() => ({ abortSignal }));
     const client = { rpc } as unknown as SupabaseClient;
     await expect(readHostedAccountSyncEnvelope(client)).resolves.toEqual(hosted);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot");
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 2 });
     expect(abortSignal).toHaveBeenCalledOnce();
     expect(native.invoke).toHaveBeenCalledWith("local_store", { request: { operation: "validateAccountSyncSnapshot", entities: hosted.entities } });
 
@@ -91,7 +91,7 @@ describe("desktop account sync adapter", () => {
     });
     const rpc = vi.fn(() => ({ abortSignal: vi.fn(async () => ({ data: hosted, error: null })) }));
     await expect(synchronizeAccount("local", { rpc } as unknown as SupabaseClient)).resolves.toEqual({ state: "update_required", message: "Update required to synchronize" });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot");
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 2 });
     expect(native.invoke.mock.calls.some(([name, args]) => name === "auth_complete_account_sync" || args?.request.operation === "applyAccountSync")).toBe(false);
   });
 

@@ -1,5 +1,58 @@
 # Implementation Status
 
+## Account sync contracts — October 27, 2026
+
+Approved by the owner on October 27. The contract implementation lets additive
+synced fields preserve supported older desktop shapes. Plan and decisions:
+`docs/plans/2026-10-27-sync-compatibility.md`.
+The compatibility code and complete disposable Supabase rehearsal are verified.
+Hosted deployment remains blocked: two migration-connector requests returned
+`Invalid or expired requestState`. Readback on October 27 at 19:18 UTC confirmed
+the original 92 migrations, no contract registry or integer reader, and no
+in-flight contract migration. The server rescue is not live. Native 0.1.6 is
+prepared in source and remains unpublished.
+
+- Migration `20261027120000_account_sync_contracts.sql` adds a contract
+  registry. Each client gets a snapshot and fingerprint projected to the
+  contract it understands. An older client's write keeps the hosted fields it
+  cannot see.
+- Contract 1 is the desktop 0.1.5 shape. Requests without a contract, which is
+  how 0.1.5 sends them, get contract 1. After this migration is pushed, the
+  published 0.1.5 should synchronize again without travel habits or place labels
+  and cannot erase them. That is not yet verified on an installed 0.1.5.
+- Desktop sends `ACCOUNT_SYNC_CONTRACT` (2). The native reader stays strict.
+- Guard: `tests/sql/account-sync-contract-smoke.sql` freezes the synced columns,
+  and `tests/account-sync-contract.test.ts` ties the client constant to the
+  registry.
+- Review corrections reject null read contracts, retain hidden fields in delete
+  preconditions, and namespace client receipt keys by contract. The new SQL write
+  smoke verifies legacy profile writes, receipt replay, owner isolation and old
+  inserts/updates/deletes against a rolled-back later Category column. Concurrent
+  row revisions still reject stale writes before a preserving retry.
+- Rollout follows source and sync shape, not a version label. Recorded
+  0.1.6-dev.2 (`ed93fff`, SQLite schema 18) has the same contract-1 sync source as
+  published 0.1.5 (`41e4549`). Only unversioned development builds from later
+  expanded-profile source need coordinated replacement from contract-2 source.
+  No later installed development build is recorded; the current Mac build is
+  unverified. Published 0.1.3 remains unsupported. The plan records the client
+  matrix and a forward-correction procedure.
+- Part C (a separate dev Supabase target) is dropped by owner decision. Dev builds keep
+  using production.
+- Full-stack evidence: all 93 migrations, all 27 SQL fixtures, both authenticated
+  smokes (including 92 RLS ownership checks), and the authenticated BehaviorStore
+  contract passed on exact PR source in an isolated disposable environment.
+  Every service binding remained on loopback, synthetic users were removed, and
+  the services and proxy stopped. GitHub's separate rehearsal attempts were
+  throttled at the first image pull before any SQL ran. Evidence and limitations:
+  `docs/qa/2026-10-27-sync-contract-rehearsal.md`.
+- Source merging is safe while hosted deployment is blocked: only the desktop
+  adapter calls the versioned account-sync RPCs; the web deployment does not.
+  Do not publish a contract-2 desktop until the reviewed migration is applied
+  and its ledger, functions, permissions and public RPC types are verified.
+
+Platform impact: hosted sync and linked desktop. Web screens and marketing have
+no change. Future mobile would declare its own contract.
+
 ## Ticket ledger reconciled with production — October 27, 2026
 
 Documentation only; no runtime, schema or hosted change. `docs/TICKETS.md` now matches
@@ -71,6 +124,14 @@ and the Verification Center submission.
 Platform impact: web production now runs Tickets 187, 184 (gated), 188 (gated) and the
 travel train. Desktop needs 0.1.6 to synchronize. Marketing: no change. Future mobile:
 not applicable.
+
+Review clarification, October 27: the version-based statements above record the
+October 24 release assessment. Compatibility actually follows source and sync
+shape. Recorded 0.1.6-dev.2 has the same eight-key profile and no-argument RPC as
+published 0.1.5, so both belong to PR #153's contract-1 rescue cohort. Only later
+unversioned builds with the expanded profile need coordinated replacement; their
+presence on the current Mac is unverified. See the current contract rollout entry
+and `docs/plans/2026-10-27-sync-compatibility.md`.
 
 ## PR #150 review follow-ups — October 24, 2026
 

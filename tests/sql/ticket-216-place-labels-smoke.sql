@@ -161,11 +161,11 @@ begin
   end;
 
   -- The account snapshot carries every new kind and no foreign rows.
-  if (select count(*) from jsonb_array_elements(public.read_account_sync_snapshot() -> 'entities') entity
+  if (select count(*) from jsonb_array_elements(public.read_account_sync_snapshot(2) -> 'entities') entity
       where entity ->> 'kind' in ('place_label_settings', 'place_marker', 'completion_place_label', 'where_suggestion_dismissal')) <> 5 then
     raise exception 'The account snapshot did not include the place label rows.';
   end if;
-  if exists (select 1 from jsonb_array_elements(public.read_account_sync_snapshot() -> 'entities') entity
+  if exists (select 1 from jsonb_array_elements(public.read_account_sync_snapshot(2) -> 'entities') entity
       where entity ->> 'kind' = 'place_marker' and entity -> 'value' ->> 'latitude_e6' <> '41878100') then
     raise exception 'The snapshot did not keep integer marker coordinates.';
   end if;
