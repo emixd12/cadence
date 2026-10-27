@@ -582,3 +582,45 @@ that the check did not save or send the position. Coordinates were not collected
 proactive travel stayed off. This passes manual grant/retry and foreground location
 acquisition. It does not establish automatic first-prompt behavior or resolve the
 first Mac's timeout. The exact rc.3 candidate was unchanged.
+
+## Native location code investigation — October 8, 2026
+
+Code-only investigation; no live location request, permission change or build ran.
+
+**Missing first prompt (both Macs).** Every Cadence build signs with Hardened Runtime
+but without `com.apple.security.personal-information.location`. Read-only `codesign`
+readback confirms it: installed preview.45 has no entitlements; retained rc.3, rc.4 and
+signed preview.47 carry only the Keychain entitlements. Google Chrome, which Core
+Location serves on the first Mac, has Hardened Runtime and that entitlement. Apple lists
+the entitlement under Hardened Runtime resource access: it controls whether the app may
+access Location Services. Apple does not document prompt behavior without it. Both Macs
+show the same pattern: Cadence listed under Location Services, switch off, no prompt,
+and a manual grant works. This is the leading cause. It is not live-verified.
+
+**First-Mac timeout.** The adapter called `requestWhenInUseAuthorization` and waited
+12 seconds for an authorization change. With no prompt the status stays
+`notDetermined`, so the deadline always fired as `timeout`. The second Mac's first
+check takes the same path. The timeout is a consequence of the missing prompt, not a
+separate first-Mac fault. The first Mac also carries Location Services entries from
+earlier ad hoc and self-signed builds; a switch granted to one signing identity does
+not authorize the next, which explains the September 23 `notDetermined` readback with
+the switch on.
+
+Changes:
+
+- `Entitlements.plist` adds the location entitlement. Previews now sign with
+  `Entitlements.preview.plist`, which contains only that key, so ad hoc builds stay free
+  of restricted Keychain entitlements.
+- `release.mjs verify` rejects an app whose signature lacks the entitlement. Every
+  existing Cadence artifact would fail this check; Chrome passes.
+- `native/location.m` waits up to 30 seconds for a permission answer, then reports
+  `no_permission_response`. After authorization, the position request keeps its own
+  12-second `timeout`. An authorized start no longer issues a duplicate request.
+- Desktop Settings shows, for `not yet allowed`: “If macOS does not ask, turn on
+  Cadence in System Settings › Privacy & Security › Location Services, then check again.”
+
+Queued live checks: build a preview and a signed candidate with the entitlement; on the
+second Mac, remove Cadence from Location Services and confirm the prompt appears; on the
+first Mac, confirm the prompt or the `no_permission_response` diagnostic. If the prompt
+returns, also check whether a grant arrives while Cadence is inactive and reports
+`inactive`. That behavior is unchanged and unverified.

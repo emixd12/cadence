@@ -1,8 +1,11 @@
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
+#import <os/log.h>
+#import <Security/Security.h>
 #import <UserNotifications/UserNotifications.h>
 
 static void (*eventCallback)(void);
+static SecRequirementRef launchRequirement;
 
 static BOOL ownedIdentifier(NSString *identifier) {
     if ([identifier hasPrefix:@"cadence-spike."]) return YES;
@@ -90,6 +93,12 @@ void cadence_native_initialize(void (*callback)(void)) {
         // UserNotifications requires an application bundle. Raw `cargo run` remains useful for SQLite.
         if (NSBundle.mainBundle.bundleIdentifier.length) {
             UNUserNotificationCenter.currentNotificationCenter.delegate = adapter;
+            // Capture this build's identity before an update can replace the bundle on disk.
+            SecStaticCodeRef code = NULL;
+            if (SecStaticCodeCreateWithPath((__bridge CFURLRef)NSBundle.mainBundle.bundleURL, kSecCSDefaultFlags, &code) == errSecSuccess) {
+                if (SecCodeCopyDesignatedRequirement(code, kSecCSDefaultFlags, &launchRequirement) != errSecSuccess) launchRequirement = NULL;
+                CFRelease(code);
+            }
         }
         id wake = [NSWorkspace.sharedWorkspace.notificationCenter
             addObserverForName:NSWorkspaceDidWakeNotification object:nil queue:nil
@@ -287,6 +296,49 @@ static NSDictionary *execute(NSDictionary *input) {
         if (failure) [failures addObject:@{ @"id": request.identifier, @"error": failure.localizedDescription }];
     }
     return pendingResult(center, ids, failures);
+}
+
+static NSArray<NSString *> *ownedPendingIdentifiers(NSArray<UNNotificationRequest *> *requests) {
+    NSMutableArray *ids = [NSMutableArray new];
+    for (UNNotificationRequest *request in requests) if (ownedIdentifier(request.identifier)) [ids addObject:request.identifier];
+    return ids;
+}
+
+// Observed on macOS 26 and 27: pending requests stay with the signing identity (designated
+// requirement) that scheduled them, while capacity is shared by the app. Each ad hoc or locally
+// signed build is a new identity, so after an update the old identity's requests keep occupying
+// capacity and the next build can neither read nor cancel them.
+// At Restart the update is already on disk, so compare it with the requirement captured at launch.
+// Withdraw only when the identity changes; the next build reschedules nearest-first on launch.
+// Consecutive Developer ID builds satisfy the requirement and keep their requests in place.
+char *cadence_native_withdraw_pending_before_update(void) {
+    @autoreleasepool {
+        if (!NSBundle.mainBundle.bundleIdentifier.length || !launchRequirement) {
+            return encode(@{ @"identity": @"unknown", @"withdrawn": @0, @"remaining": @0 });
+        }
+        SecStaticCodeRef next = NULL;
+        OSStatus check = SecStaticCodeCreateWithPath((__bridge CFURLRef)NSBundle.mainBundle.bundleURL, kSecCSDefaultFlags, &next);
+        if (check == errSecSuccess) check = SecStaticCodeCheckValidity(next, kSecCSDefaultFlags, launchRequirement);
+        if (next) CFRelease(next);
+        if (check != errSecCSReqFailed) {
+            return encode(@{ @"identity": check == errSecSuccess ? @"unchanged" : @"unknown", @"withdrawn": @0, @"remaining": @0 });
+        }
+        UNUserNotificationCenter *center = UNUserNotificationCenter.currentNotificationCenter;
+        NSArray *requests = pending(center);
+        if (!requests) return encode(@{ @"error": @"macOS did not return pending notifications within 10 seconds." });
+        NSArray<NSString *> *ids = ownedPendingIdentifiers(requests);
+        if (ids.count) [center removePendingNotificationRequestsWithIdentifiers:ids];
+        // Removal reaches macOS asynchronously; confirm it before this process exits.
+        NSUInteger remaining = ids.count;
+        for (int attempt = 0; attempt < 20 && remaining; attempt++) {
+            if (attempt) [NSThread sleepForTimeInterval:0.1];
+            NSArray *after = pending(center);
+            if (after) remaining = ownedPendingIdentifiers(after).count;
+        }
+        os_log_info(OS_LOG_DEFAULT, "cadence update changes signing identity; withdrew %lu pending reminders, %lu remaining",
+            (unsigned long)(ids.count - remaining), (unsigned long)remaining);
+        return encode(@{ @"identity": @"changed", @"withdrawn": @(ids.count - remaining), @"remaining": @(remaining) });
+    }
 }
 
 char *cadence_native_request(const char *input) {

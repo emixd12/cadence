@@ -99,6 +99,21 @@ it("maps desktop states from readLocation(false)", async () => {
   } finally { await unmount(); }
 });
 
+it("tells desktop users where to allow location when macOS gives no decision", async () => {
+  mockPermissions(null);
+  const readLocation = vi.fn(async (requestPermission: boolean) => requestPermission
+    ? { state: "unavailable" as const, reason: "no_permission_response" } : { state: "prompt" as const });
+  const { container, unmount } = await renderPanel({ readLocation, desktop: true });
+  try {
+    expect(container.textContent).toContain("Device location: not yet allowed. If macOS does not ask, turn on Cadence in System Settings › Privacy & Security › Location Services, then check again.");
+    const check = [...container.querySelectorAll("button")].find((button) => button.textContent === "Check device location permission")!;
+    await act(async () => check.click());
+    expect(readLocation).toHaveBeenCalledWith(true);
+    expect(container.textContent).toContain("Diagnostic: no_permission_response.");
+    expect(container.textContent).toContain("Device location: not yet allowed. If macOS does not ask");
+  } finally { await unmount(); }
+});
+
 it("requests permission inside the consent save click without showing Saving…", async () => {
   mockPermissions("prompt");
   let finishLocate!: () => void;

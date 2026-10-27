@@ -378,6 +378,13 @@ repair. It counts occupied desired identifiers separately from exact content
 matches and preserves matching nearest requests. Unstable readback remains
 limited; it never establishes a universal OS capacity. Archival, resolution,
 and deletion also cancel and verify delivered-only Notification Center entries.
+
+macOS was observed to keep pending requests with the signing identity that scheduled
+them while the app shares one capacity. Before Restart after an installed update, the
+running build checks the on-disk update against its launch designated requirement. On
+a confirmed mismatch it withdraws its own pending requests so the next build can
+reschedule nearest-first. Delivered entries stay. Consecutive Developer ID builds keep
+one identity and withdraw nothing.
 Already delivered entries for unresolved active Occurrences remain available.
 
 Verify permission denial, scheduled delivery, cancellation, replacement,

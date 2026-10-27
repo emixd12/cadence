@@ -6,6 +6,8 @@
   <string>HK26VT477G.app.cadence.desktop</string>
   <key>com.apple.developer.team-identifier</key>
   <string>HK26VT477G</string>
+  <key>com.apple.security.personal-information.location</key>
+  <true/>
   <key>keychain-access-groups</key>
   <array>
     <string>HK26VT477G.app.cadence.desktop</string>

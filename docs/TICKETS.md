@@ -11879,7 +11879,10 @@ preservation and a hosted route request on preview.45. Open: native device locat
 (first-Mac rc.2/rc.3 timeout and absent first permission prompt remain unresolved).
 September 29: clean second-Mac rc.3 acquired a current position after the owner
 manually enabled Cadence in Location Services. Initial prompt did not appear.
-Manual grant/retry and foreground acquisition pass; automatic prompting does not. Signed rc.3
+Manual grant/retry and foreground acquisition pass; automatic prompting does not.
+October 8 code investigation: all builds lacked the Hardened Runtime location entitlement;
+signing now adds it and the adapter reports `no_permission_response` instead of a generic
+timeout. Live prompt checks on both Macs are queued. Signed rc.3
 Google Maps search handoff passed September 28: the timed test Calendar event
 opened Central Park in Chrome. Search has no transport mode; directions remain
 unverified. Evidence: `docs/qa/travel-release.md`. Billing and restricted local credentials are configured.

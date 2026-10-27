@@ -1245,3 +1245,38 @@ Both rc.4 and signed preview.47 app/DMG notarization and all 12 artifact checks 
 The installed acceptance host is arm64 macOS 27.0, build 26A428. macOS 14 compatibility
 remains owner-deferred. Ticket 181 must verify its exact final published artifact;
 this acceptance does not authorize replacing that gate with a different build.
+
+### Reminder gap code investigation — October 8, 2026
+
+Code-only investigation; no reminder, notification permission or build changed.
+
+The 2/434 versus 30/30 difference is explained by recorded evidence plus signing
+readback. It is not a reconciliation defect. Reconciliation schedules nearest-first and
+performs one repair bounded by observed occupancy. The first Mac has 434 eligible
+reminders against an observed shared capacity of about 100 pending requests for the app.
+Its preview.45 identity held 97–99 of them, leaving rc.3 two to five slots. The clean
+second Mac had one identity and 30 eligible reminders, under that capacity.
+
+Signing readback narrows the identity rule. Installed preview.45 is not ad hoc; it is
+re-signed with the local "Hermes Local Code Signing" certificate, and its designated
+requirement pins that certificate. `SecStaticCodeCheckValidity` against each build's
+designated requirement reproduces every observed source result: rc.3→rc.4 and
+preview.47→rc.4 satisfy it (same source, 7/7 retained), while preview.45 or preview.46
+to any other build fail it (new source). Each ad hoc or locally signed preview update
+therefore repeats the gap until the old requests fire, for up to 31 days. Old
+requests sharing an identifier with new ones can also deliver twice.
+
+Change: at Restart after an installed update, the running build compares the on-disk
+update with the designated requirement captured at launch. Only on a confirmed mismatch
+(`errSecCSReqFailed`) does it withdraw its own pending requests, confirm the withdrawal
+through readback, and log the counts. Delivered notifications stay. Matching or
+unknown identity withdraws nothing. The next build reschedules nearest-first at launch.
+
+Limits: the fix ships only in builds that contain it, so the installed preview.45 still
+needs the documented operator withdrawal before moving to a signed build. Quitting
+after Install instead of choosing Restart skips the withdrawal. A reconciliation that
+runs between withdrawal and restart could re-add requests under the old identity.
+The steady-state first-Mac horizon stays OS-limited at about 100 of 434 and is
+disclosed as limited coverage. Queued live check: update a preview with this change to
+a signed candidate and confirm the new build retains about 100 requests and the old
+identity holds none.

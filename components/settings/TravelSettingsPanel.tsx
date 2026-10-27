@@ -121,7 +121,10 @@ function isIosSafari(): boolean {
 }
 
 function deviceLocationHint(permission: DeviceLocationPermission, desktop: boolean): string | null {
-  if (permission === "not yet allowed") return !desktop && isIosSafari() ? "To stop Safari asking, tap AA, then Website Settings, then Location, then Allow." : null;
+  if (permission === "not yet allowed") {
+    if (desktop) return "If macOS does not ask, turn on Cadence in System Settings › Privacy & Security › Location Services, then check again.";
+    return isIosSafari() ? "To stop Safari asking, tap AA, then Website Settings, then Location, then Allow." : null;
+  }
   if (permission !== "blocked") return null;
   if (desktop) return "Allow it in System Settings › Privacy & Security › Location Services › Cadence.";
   if (isIosSafari()) return "Allow it in Settings › Privacy & Security › Location Services › Safari Websites.";

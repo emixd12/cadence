@@ -22,9 +22,11 @@ export type ReleaseOverlay = {
 };
 export function createReleaseOverlay(base: { app: { windows: Record<string, unknown>[] } }, env: Record<string, string | undefined>): ReleaseOverlay;
 export type PreviewOverlay = ReleaseOverlay & { version: string; bundle: ReleaseOverlay["bundle"] & {
-  macOS: { signingIdentity: string; minimumSystemVersion: string; hardenedRuntime: boolean };
+  macOS: { signingIdentity: string; minimumSystemVersion: string; hardenedRuntime: boolean; entitlements: string };
 } };
 export function createPreviewOverlay(base: { app: { windows: Record<string, unknown>[] } }, env: Record<string, string | undefined>, version: string): PreviewOverlay;
+export const LOCATION_ENTITLEMENT: "com.apple.security.personal-information.location";
+export function hasLocationEntitlement(entitlementsXml: string | undefined): boolean;
 export function validatePreviewConfiguration(base: unknown, overlay: unknown): string[];
 export function validatePreviewBuildEnvironment(env: Record<string, string | undefined>): string[];
 export function validateDesktopPublicServiceEnvironment(env: Record<string, string | undefined>, base?: unknown): string[];

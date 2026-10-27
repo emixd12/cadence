@@ -5,8 +5,10 @@
 
 @interface CadenceLocation : NSObject <CLLocationManagerDelegate>
 @property CLLocationManager *manager;
+@property BOOL awaitingAuthorization;
 @property(copy) void (^complete)(NSDictionary *);
 - (void)finish:(NSDictionary *)value;
+- (void)locate;
 @end
 
 @implementation CadenceLocation
@@ -19,9 +21,19 @@
     [self.manager stopUpdatingLocation];
     callback(value);
 }
+- (void)locate {
+    self.awaitingAuthorization = NO;
+    [self.manager requestLocation];
+    // This block retains the one-shot adapter until completion or deadline.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 12 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        [self finish:@{@"state": @"unavailable", @"reason": @"timeout"}];
+    });
+}
 - (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager {
+    // Only a pending permission request acts here; an authorized start already called locate.
+    if (!self.awaitingAuthorization) return;
     if (manager.authorizationStatus == kCLAuthorizationStatusAuthorizedAlways) {
-        if (NSApp.active) [manager requestLocation];
+        if (NSApp.active) [self locate];
         else [self finish:@{@"state": @"unavailable", @"reason": @"inactive"}];
     } else if (manager.authorizationStatus != kCLAuthorizationStatusNotDetermined) {
         [self finish:@{@"state": @"denied", @"reason": [NSString stringWithFormat:@"status_%d", (int)manager.authorizationStatus]}];
@@ -73,11 +85,13 @@ char *cadence_location_request(bool requestPermission) {
             [adapter finish:@{@"state": @"prompt"}]; return;
         }
         adapter.manager.delegate = adapter;
-        if (status == kCLAuthorizationStatusNotDetermined) [adapter.manager requestWhenInUseAuthorization];
-        else [adapter.manager requestLocation];
-        // This block retains the one-shot adapter until completion or deadline.
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 12 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            [adapter finish:@{@"state": @"unavailable", @"reason": @"timeout"}];
+        if (status != kCLAuthorizationStatusNotDetermined) { [adapter locate]; return; }
+        adapter.awaitingAuthorization = YES;
+        [adapter.manager requestWhenInUseAuthorization];
+        // macOS can withhold the prompt and leave the status undetermined. Give a shown prompt time
+        // for an answer, then report that no decision arrived instead of a generic position timeout.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (adapter.awaitingAuthorization) [adapter finish:@{@"state": @"unavailable", @"reason": @"no_permission_response"}];
         });
     });
     dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);

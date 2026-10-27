@@ -86,7 +86,7 @@ pub fn native_events() -> Result<Value, String> {
     platform::events()
 }
 
-pub use platform::{attach, initialize};
+pub use platform::{attach, initialize, withdraw_pending_before_update};
 
 #[cfg(target_os = "macos")]
 mod platform {
@@ -101,6 +101,7 @@ mod platform {
         fn cadence_native_initialize(callback: extern "C" fn());
         fn cadence_native_request(input: *const c_char) -> *mut c_char;
         fn cadence_native_events() -> *mut c_char;
+        fn cadence_native_withdraw_pending_before_update() -> *mut c_char;
         fn cadence_native_free(value: *mut c_char);
     }
 
@@ -140,6 +141,10 @@ mod platform {
     pub fn events() -> Result<Value, String> {
         decode(unsafe { cadence_native_events() })
     }
+
+    pub fn withdraw_pending_before_update() -> Result<Value, String> {
+        decode(unsafe { cadence_native_withdraw_pending_before_update() })
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -152,6 +157,9 @@ mod platform {
     }
     pub fn events() -> Result<Value, String> {
         Ok(serde_json::json!([]))
+    }
+    pub fn withdraw_pending_before_update() -> Result<Value, String> {
+        Ok(serde_json::json!({ "identity": "unknown", "withdrawn": 0, "remaining": 0 }))
     }
 }
 
@@ -191,6 +199,14 @@ mod tests {
             r#"{"operation":"cancelPending","ids":[],"reminders":[]}"#,
         )
         .is_err());
+    }
+
+    #[test]
+    fn update_withdrawal_keeps_requests_when_the_signing_identity_is_unknown() {
+        // Test processes have no bundle or captured launch identity, so nothing may be withdrawn.
+        let result = withdraw_pending_before_update().unwrap();
+        assert_eq!(result["identity"], "unknown");
+        assert_eq!(result["withdrawn"], 0);
     }
 
     #[test]

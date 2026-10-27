@@ -42,7 +42,8 @@ if(tool==='xcrun') {
  if(args[0]==='stapler'&&args[1]==='staple'&&process.env.TEST_STAPLE_FAILURE==='1') process.exit(3);
 }
 if(tool==='lipo') process.stdout.write('arm64\\n');
-if(tool==='codesign'&&args.includes('--display')) process.stderr.write((process.env.TEST_PRODUCTION_SIGNING==='1'?'Authority=Developer ID Application: Test (ABCDEFGHIJ)':'Signature=adhoc')+'\\nflags=0x10002(adhoc,runtime)\\nInfo.plist entries=14\\nSealed Resources version=2 rules=13 files=1\\n');
+if(tool==='codesign'&&args.includes('--entitlements')) process.stdout.write(process.env.TEST_MISSING_LOCATION_ENTITLEMENT==='1'?'<plist><dict></dict></plist>':'<plist><dict><key>com.apple.security.personal-information.location</key><true/></dict></plist>');
+else if(tool==='codesign'&&args.includes('--display')) process.stderr.write((process.env.TEST_PRODUCTION_SIGNING==='1'?'Authority=Developer ID Application: Test (ABCDEFGHIJ)':'Signature=adhoc')+'\\nflags=0x10002(adhoc,runtime)\\nInfo.plist entries=14\\nSealed Resources version=2 rules=13 files=1\\n');
 if(tool==='minisign'&&args.includes('-V')&&process.env.TEST_SIGNATURE_FAILURE==='1') process.exit(3);
 if(tool==='npm') {
  if(args[0]==='run'&&args[1]==='build') {
@@ -296,6 +297,14 @@ if(tool==='npm') {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("signature verification failed");
     expect(existsSync(path.join(previewPath(), "bundle"))).toBe(false);
+    expect(existsSync(path.join(previewPath(), "artifact-verification.json"))).toBe(false);
+  });
+
+  it("never stages a preview whose signature lacks the location entitlement", () => {
+    const result = run(["preview-build", "0.1.1-preview.1"], { ...environment, TAURI_SIGNING_PRIVATE_KEY: "synthetic-key", TEST_MISSING_LOCATION_ENTITLEMENT: "1",
+      VITE_SUPABASE_URL: "https://project.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test" });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("location entitlement");
     expect(existsSync(path.join(previewPath(), "artifact-verification.json"))).toBe(false);
   });
 

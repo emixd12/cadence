@@ -32,7 +32,14 @@ export function createReleaseOverlay(base, env) {
 export function createPreviewOverlay(base, env, version) {
   const overlay = createReleaseOverlay(base, env);
   return { ...overlay, version, bundle: { ...overlay.bundle,
-    macOS: { signingIdentity: "-", minimumSystemVersion: "14.0", hardenedRuntime: true } } };
+    macOS: { signingIdentity: "-", minimumSystemVersion: "14.0", hardenedRuntime: true, entitlements: "Entitlements.preview.plist" } } };
+}
+
+// Hardened Runtime builds without this entitlement were listed under Location Services but never prompted.
+export const LOCATION_ENTITLEMENT = "com.apple.security.personal-information.location";
+
+export function hasLocationEntitlement(entitlementsXml) {
+  return (entitlementsXml ?? "").replace(/\s+/g, "").includes(`<key>${LOCATION_ENTITLEMENT}</key><true/>`);
 }
 
 export function validatePreviewConfiguration(base, overlay) {

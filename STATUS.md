@@ -1,5 +1,19 @@
 # Implementation Status
 
+## Ticket 165 location and reminder gap code fixes — October 8, 2026
+
+Code-only; no build, live permission request or reminder change ran. Every Cadence
+build had Hardened Runtime without the location entitlement; Chrome has both. That is
+the leading cause of the missing first prompt on both Macs. The first-Mac timeout is the
+adapter waiting for a decision that never came. Production and preview signing now carry
+the entitlement, release verification requires it, the adapter reports
+`no_permission_response` after 30 seconds, and desktop Settings names the Location
+Services switch. The 2/434 versus 30/30 gap is old signing-identity occupancy of shared
+notification capacity, not a reconciliation defect. Restart after an update now
+withdraws this build's pending reminders only when the installed update fails the
+running build's designated requirement. Live checks on both Macs are queued. Evidence:
+`docs/qa/travel-release.md` and `docs/qa/2026-09-27-apple-distribution.md`.
+
 ## Ticket 186: Cadence project and repository rename — October 7, 2026
 
 Execution remains in progress. The owner renamed the Codex display name to

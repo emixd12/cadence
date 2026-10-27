@@ -353,8 +353,11 @@ CI certificate or creating an Apple credential is a separate operation.
 Production overlays use `src-tauri/Entitlements.plist` for Cadence's registered
 App ID prefix `HK26VT477G` and private Keychain access group. The Apple portal
 confirmed this prefix when `app.cadence.desktop` was registered on September 27.
-Provisioning must authorize those entitlements. Preview overlays omit both the
-entitlements and provisioning profile. Production child processes strip the
+Provisioning must authorize those entitlements. The file also grants the Hardened
+Runtime location entitlement; without it macOS listed Cadence under Location Services
+but never prompted. Preview overlays use `src-tauri/Entitlements.preview.plist`, which
+contains only that location entitlement, and omit the provisioning profile.
+`verify` rejects an app whose signature lacks the location entitlement. Production child processes strip the
 legacy-Keychain build flag, and production artifact verification rejects its
 compiled marker. Installed Data Protection Keychain acceptance remains required.
 

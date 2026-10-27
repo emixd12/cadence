@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReleaseBuildEnvironment, createReleaseOverlay, validateReleaseConfiguration, validateSigningEnvironment,
   createPreviewBuildEnvironment, createPreviewOverlay, validatePreviewConfiguration, validatePreviewBuildEnvironment,
-  RELEASE_IDENTIFIER, RELEASE_NAME, RELEASE_TARGET } from "./release-config.mjs";
+  RELEASE_IDENTIFIER, RELEASE_NAME, RELEASE_TARGET, hasLocationEntitlement } from "./release-config.mjs";
 import { verifyUpdaterSignature } from "./verify-updater-signature.mjs";
 
 const desktop = fileURLToPath(new URL("../", import.meta.url));
@@ -91,6 +91,10 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
     : !signing.stderr.split("\n").includes(`Authority=${process.env.APPLE_SIGNING_IDENTITY}`)) {
     throw new Error(preview ? "The preview app must use ad hoc signing." : "The app does not use the expected Developer ID authority.");
   }
+  const entitlements = spawnSync("codesign", ["--display", "--entitlements", "-", "--xml", app], { env: verificationEnvironment, encoding: "utf8" });
+  if (entitlements.status !== 0 || !hasLocationEntitlement(entitlements.stdout)) {
+    throw new Error("The app signature must carry the Hardened Runtime location entitlement, or macOS withholds the location prompt.");
+  }
   if (capture("lipo", ["-archs", executable]).trim() !== "arm64") throw new Error("The initial release must contain only the arm64 executable.");
   if (!/minos\s+14\.0(?:\s|$)/.test(capture("xcrun", ["vtool", "-show-build", executable]))) throw new Error("The executable does not declare macOS 14.0 minimum.");
   run("codesign", ["--verify", "--deep", "--strict", app]);
@@ -107,7 +111,7 @@ function verify(bundleDirectory, frontendPublicConfiguration) {
   run("python3", [path.join(desktop, "scripts", "verify-updater-archive.py"), archive, app]);
   return { milestone: preview ? "unnotarized preview" : "production candidate", identifier: RELEASE_IDENTIFIER, version, target: RELEASE_TARGET, checkedAt: new Date().toISOString(),
     frontendPublicConfiguration: frontendPublicConfiguration ?? "not verified by this command",
-    checks: ["strict codesign", "hardened runtime", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "read-only DMG contents match app", "updater signature", "updater archive contents match app",
+    checks: ["strict codesign", "hardened runtime", "location entitlement", "bound Info.plist", "sealed resources", "arm64", "compiled macOS 14 minimum", "read-only DMG contents match app", "updater signature", "updater archive contents match app",
       ...(preview ? ["ad hoc app signature", "legacy macOS login Keychain"] : ["Developer ID authority", "Gatekeeper", "stapled notarization"])],
     artifacts: [dmg, archive, signatureFile].map((file) => ({ file, sha256: createHash("sha256").update(fs.readFileSync(file)).digest("hex") })),
     binarySha256: createHash("sha256").update(fs.readFileSync(executable)).digest("hex"),

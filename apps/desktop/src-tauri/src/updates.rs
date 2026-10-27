@@ -76,6 +76,8 @@ pub fn restart_after_update(
         return Err("Signed updates are not configured for this build.".into());
     }
     let _restart_guard = lock_for_restart(&local)?;
+    // A failed withdrawal must not block the update; the next build still reports truthful coverage.
+    let _ = crate::notifications::withdraw_pending_before_update();
     app.restart()
 }
 

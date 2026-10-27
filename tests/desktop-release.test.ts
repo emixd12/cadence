@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createReleaseBuildEnvironment, createReleaseOverlay, validateReleaseConfiguration, validateSigningEnvironment, decodeUpdaterPublicKey,
   createPreviewBuildEnvironment, createPreviewOverlay, validatePreviewConfiguration, validatePreviewBuildEnvironment,
-  validateDesktopPublicServiceEnvironment, PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT } from "../apps/desktop/scripts/release-config.mjs";
+  validateDesktopPublicServiceEnvironment, PREVIEW_ENDPOINT, UPDATER_QA_ENDPOINT, LOCATION_ENTITLEMENT, hasLocationEntitlement } from "../apps/desktop/scripts/release-config.mjs";
 
 const publicKey = Buffer.from("untrusted comment: test public key\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\n").toString("base64");
 const env = { CADENCE_UPDATER_PUBLIC_KEY: publicKey, CADENCE_UPDATER_ENDPOINT: "https://updates.cadence-test.org/latest.json" };
@@ -15,8 +15,18 @@ describe("desktop release preparation", () => {
       entitlements: "Entitlements.plist", files: { "embedded.provisionprofile": signing.CADENCE_APPLE_PROVISIONING_PROFILE },
     });
     const preview = createPreviewOverlay(base, { ...signing, CADENCE_UPDATER_ENDPOINT: PREVIEW_ENDPOINT }, "0.1.1-preview.46");
-    expect(preview.bundle.macOS).not.toHaveProperty("entitlements");
+    expect(preview.bundle.macOS.entitlements).toBe("Entitlements.preview.plist");
     expect(preview.bundle.macOS).not.toHaveProperty("files");
+  });
+  it("signs every build with the Hardened Runtime location entitlement and keeps restricted entitlements out of previews", () => {
+    const production = readFileSync("apps/desktop/src-tauri/Entitlements.plist", "utf8");
+    const preview = readFileSync("apps/desktop/src-tauri/Entitlements.preview.plist", "utf8");
+    expect(hasLocationEntitlement(production)).toBe(true);
+    expect(hasLocationEntitlement(preview)).toBe(true);
+    expect([...preview.matchAll(/<key>([^<]+)<\/key>/g)].map(([, key]) => key)).toEqual([LOCATION_ENTITLEMENT]);
+    expect(hasLocationEntitlement("<dict><key>com.apple.security.personal-information.location</key><false/></dict>")).toBe(false);
+    expect(hasLocationEntitlement("<dict><key>keychain-access-groups</key><array/></dict>")).toBe(false);
+    expect(hasLocationEntitlement(undefined)).toBe(false);
   });
   it("embeds a normalized key envelope and rejects base64 accepted by permissive Node decoding but rejected by the updater", () => {
     const overlay = createReleaseOverlay(base, { ...env, CADENCE_UPDATER_PUBLIC_KEY: `  ${publicKey}\n` });

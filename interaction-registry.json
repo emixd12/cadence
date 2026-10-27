@@ -972,12 +972,13 @@
         }
       ],
       "availability": "Configured desktop builds check at startup and every 24 hours while open. Settings and the nonmodal notice expose explicit installation and restart.",
-      "success_result": "Automatically downloads signed updates by default. Later snoozes one version for 24 hours. Installation and restart require separate actions. Restart waits for writes and saved or explicitly discarded drafts.",
+      "success_result": "Automatically downloads signed updates by default. Later snoozes one version for 24 hours. Installation and restart require separate actions. Restart waits for writes and saved or explicitly discarded drafts. When the installed update has a different signing identity, Restart first withdraws this build's pending native reminders so the next build can reschedule them; delivered notifications stay.",
       "failure_result": "Shows configuration, network, signature, installation, or restart errors without claiming success. Unconfigured builds do not contact an update feed.",
       "effects": [
         "network_request",
         "application_update",
         "application_restart",
+        "reminder_cancellation",
         "ui_state"
       ],
       "risk": "high",
