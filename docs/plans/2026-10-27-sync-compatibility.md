@@ -204,21 +204,36 @@ make every historical desktop shape compatible. Part C is dropped.
 
 1. Implement Part A and Part B in one PR: SQL migration, core contract, desktop
    reader, planner, tests. Rehearse it on a local `db reset`.
-2. Prepare a 0.1.6 build from contract-2 source before the hosted cutover. Older
-   0.1.6 development builds require the expanded profile but send no contract.
-   After the migration they receive contract 1 and fail closed until rebuilt.
-3. Push the migration after the disposable Supabase rehearsal passes. Verify
-   published 0.1.5 on the test Mac, including pending local writes, convergence,
-   receipt retry, and preservation of hosted travel habits and place labels.
+2. Classify development clients by their source and sync shape, not their version
+   label. The recorded 0.1.6-dev.2 has the contract-1 shape. Only an unversioned
+   development build from later source that requires the expanded profile needs
+   a coordinated replacement from contract-2 source: after the migration its
+   no-argument read receives contract 1 and fails its stricter shape check.
+3. Push the migration after the required SQL, authenticated RPC and CI checks,
+   including the disposable Supabase rehearsal, pass. Rescuing contract-1 clients
+   does not require a new desktop release first. Verify published 0.1.5 or the
+   recorded compatible dev.2 on a test Mac, including pending local writes,
+   convergence, receipt retry, and preservation of hosted travel habits and place
+   labels. Record which client is actually installed before claiming acceptance.
 4. Publish the verified 0.1.6 build through the existing desktop acceptance and
    release procedure. Its contract-2 RPC requires this migration first.
 
 | Client | Result after migration |
 |---|---|
 | Published 0.1.5 | Receives contract 1; source-level SQL/RPC checks cover preservation. Installed acceptance remains required. |
+| Recorded 0.1.6-dev.2 from `ed93fff`, SQLite schema 18 | Receives contract 1; its sync source matches published 0.1.5. The current Mac installation and post-migration acceptance remain unverified. |
 | Published 0.1.3 or earlier | Not rescued; its Behavior shape predates Where. It still needs a desktop update. |
-| Pre-contract 0.1.6 development build | Receives contract 1 but expects the expanded profile; rebuild from contract-2 source. |
+| Unversioned development build from expanded-profile source | Receives contract 1 but expects the later shape; coordinate replacement from contract-2 source if such a build is installed. The version label alone cannot identify this cohort. |
 | Contract-2 desktop | Receives the complete current shape, including travel habits and place labels. |
+
+The recorded 0.1.6-dev.2 was installed on October 24 from `ed93fff`, with SQLite
+schema 18 (`STATUS.md`, PR #140 acceptance). That source expects eight profile
+keys and calls the no-argument read RPC. Its desktop application/native source,
+core, web application, library and migrations match the published 0.1.5 source
+`41e4549`; the intervening changes concern release tooling, configuration and
+documents. No later installed development build is recorded. This source evidence
+places dev.2 in the contract-1 rescue cohort but does not establish what is on the
+Mac now.
 
 Fix forward if the migration needs correction. Once a contract-2 build is in use,
 removing the new overload breaks its reads. Reverting only desktop source does not
@@ -237,7 +252,8 @@ or deleting pending writes.
 
 ## Not verified
 
-- Installed 0.1.5 and contract-2 desktop acceptance against the deployed migration.
+- The currently installed Mac build, and installed 0.1.5, recorded dev.2 or
+  contract-2 desktop acceptance against the deployed migration.
 - Vercel Preview's Supabase target.
 - PostgREST overload dispatch is covered by the authenticated RPC smoke when the
   disposable Supabase rehearsal runs; a standalone SQL run alone does not verify it.

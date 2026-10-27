@@ -159,38 +159,63 @@ for attempt in {1..100}; do
 done
 test -S "$CADENCE_DOCKER_PROXY_DIR/docker.sock"
 
-# Startup/status output contains local API keys. Never print or upload it. A
-# failed attempt reports only a fixed category from its private output file.
-start_stack() {
-  local output="$CADENCE_DOCKER_PROXY_DIR/start-$1.out" status=0
-  timeout --kill-after=5s 8m npm run --silent supabase -- start \
-    --workdir "$SUPABASE_WORKDIR" --network-id cadence-local \
-    --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
-    > "$output" 2>&1 || status=$?
+# Pull sequentially through the same restricted proxy, with Docker's normal
+# registry credentials. This isolates registry access and avoids concurrent
+# pulls in CLI startup. Only the seven existing pins are accepted by the proxy;
+# no platform override, registry fallback or additional image is permitted.
+# Pulls share the first start's budget, preserving the 30-minute job ceiling.
+first_start_deadline=$((SECONDS + 8 * 60))
+begin_phase 'pulling pinned service images (shared first-start 8-minute limit)'
+pinned_image_output="$(node scripts/supabase-rehearsal-diagnostics.mjs images)"
+mapfile -t pinned_images <<< "$pinned_image_output"
+test "${#pinned_images[@]}" = 7
+for image in "${pinned_images[@]}"; do
+  output="$CADENCE_DOCKER_PROXY_DIR/pull.out"
+  remaining=$((first_start_deadline - SECONDS))
+  status=0
+  if ((remaining <= 0)); then
+    : > "$output"
+    status=124
+  else
+    timeout --kill-after=5s "${remaining}s" docker pull --quiet "$image" > "$output" 2>&1 || status=$?
+  fi
   if ((status != 0)); then
-    # Most specific cause first: CLI cleanup after any failure also reaches the
-    # proxy, so a rejection alone does not explain the start failure. The proxy
-    # logs each rejected method and path itself.
-    local category='an unclassified error'
-    if ((status == 124)); then category='the 8-minute limit'
-    elif grep -qiE 'toomanyrequests|rate limit' "$output"; then category='an image registry rate limit'
-    elif grep -qiE 'failed to pull|manifest unknown' "$output"; then category='an image pull'
-    elif grep -qiE 'is not ready|unhealthy' "$output"; then category='a service health check'
-    elif grep -qiE 'SQLSTATE|failed to apply migration|seed' "$output"; then category='a migration or seed error'
-    elif grep -qiE 'deadline exceeded|timed out|timeout' "$output"; then category='a timeout'
-    elif grep -q 'Cadence Docker request rejected' "$output"; then category='a Docker proxy rejection'
-    fi
-    printf '::warning::Local stack start attempt %s failed with exit %s after %s.\n' "$1" "$status" "$category"
+    diagnostics="$(node scripts/supabase-rehearsal-diagnostics.mjs inspect "$output" "$status" pull)"
+    printf '::error::Pinned image pull %s failed with exit %s; diagnostics=%s\n' "$image" "$status" "$diagnostics"
+    rm -f "$output"
+    exit "$status"
+  fi
+  rm -f "$output"
+  printf 'Pinned image cached: %s\n' "$image"
+done
+
+# Startup/status output contains local API keys. Never print or upload it. A
+# failed attempt reports only bounded, allowlisted diagnostic fields.
+start_stack() {
+  local output="$CADENCE_DOCKER_PROXY_DIR/start-$1.out" status=0 duration=480 diagnostics
+  if (($# == 2)); then duration=$(($2 - SECONDS)); fi
+  if ((duration <= 0)); then
+    : > "$output"
+    status=124
+  else
+    timeout --kill-after=5s "${duration}s" npm run --silent supabase -- start \
+      --workdir "$SUPABASE_WORKDIR" --network-id cadence-local \
+      --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
+      > "$output" 2>&1 || status=$?
+  fi
+  if ((status != 0)); then
+    diagnostics="$(node scripts/supabase-rehearsal-diagnostics.mjs inspect "$output" "$status" start)"
+    printf '::warning::Local stack start attempt %s failed with exit %s; diagnostics=%s\n' "$1" "$status" "$diagnostics"
   fi
   rm -f "$output"
   return "$status"
 }
 
-begin_phase 'starting the local stack (2 attempts, 8-minute limit each)'
+begin_phase 'starting the local stack (first budget includes image pulls; retry limit 8 minutes)'
 # Some runners failed both starts after about three minutes with no container
 # left behind, and passed on another runner (October 21-23, 2026). Retry once
 # from a clean stack; the proxy now permits the CLI's project-scoped cleanup.
-if ! start_stack 1; then
+if ! start_stack 1 "$first_start_deadline"; then
   timeout --kill-after=5s 2m npm run --silent supabase -- stop --no-backup \
     --workdir "$SUPABASE_WORKDIR" >/dev/null 2>&1 || true
   # The retry must start from empty volumes, exactly like the first attempt.

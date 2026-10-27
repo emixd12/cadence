@@ -19,6 +19,8 @@ const REGISTRIES = ["public.ecr.aws", "ghcr.io"];
 const imagesFor = (service) => REGISTRIES.map((registry) => `${registry}/supabase/${IMAGES[service]}`);
 const NAMES = new Map(Object.keys(IMAGES).map((service) => [`supabase_${service}_${PROJECT}`, imagesFor(service)]));
 const ALLOWED_IMAGES = new Set([...NAMES.values()].flat());
+// Consumers may inspect the existing pins, but cannot mutate the proxy policy.
+export const PINNED_GHCR_IMAGES = Object.freeze([...ALLOWED_IMAGES].filter((image) => image.startsWith("ghcr.io/")));
 const VOLUMES = new Map([[DB, "/var/lib/postgresql/data"], [`supabase_storage_${PROJECT}`, "/mnt"]]);
 const JOBS = new Map([
   ...imagesFor("auth").map((image) => [image, ["gotrue", "migrate"]]),

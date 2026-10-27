@@ -6,12 +6,14 @@ on:
       - .github/workflows/supabase-rehearsal.yml
       - supabase/**
       - scripts/supabase-rehearsal.sh
+      - scripts/supabase-rehearsal-diagnostics.mjs
       - scripts/supabase-docker-proxy.mjs
       - scripts/supabase-rls-smoke.mjs
       - scripts/account-sync-rpc-smoke.mjs
       - tests/sql/**
       - tests/behavior-store-supabase.contract.test.ts
       - tests/supabase-docker-proxy.test.ts
+      - tests/supabase-rehearsal-diagnostics.test.ts
       - tests/helpers/**
       - tests/fixtures/**
       - lib/db/**
@@ -72,8 +74,8 @@ jobs:
           node-version: 24.x
           cache: npm
       - run: npm ci
-      - name: Verify the existing Docker proxy
-        run: npx vitest run tests/supabase-docker-proxy.test.ts
+      - name: Verify Docker isolation and private-log diagnostics
+        run: npx vitest run tests/supabase-docker-proxy.test.ts tests/supabase-rehearsal-diagnostics.test.ts
       - name: Authenticate pulls from the Supabase image registry
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:

@@ -56,8 +56,8 @@ The combined source joins reviewed PR #153 head `f80f758` (tree
 local trees before integration. This integration changes no migration SQL and
 does not establish a hosted deployment.
 
-Ordinary CI passed on `f80f758` in run `40556180460`. That run precedes the combined
-test-device changes and registry repair; final-head CI remains required.
+Final-head CI remains required after further repairs. The latest integrated-head
+results are recorded below.
 
 ## Hosted release sequence
 
@@ -76,11 +76,19 @@ test-device changes and registry repair; final-head CI remains required.
 5. Check public routes, unauthenticated protected endpoints and bounded runtime
    errors. Record what was actually tested, including any unverified signed-in flow.
 
-Compatibility covers the published **0.1.5** shape. It does not cover every
-unversioned build. Pre-contract 0.1.6 development builds expect the expanded profile
-but send no contract; after this migration they fail closed until rebuilt from
-contract-2 source. Published 0.1.3 remains unsupported because it predates Where.
-Coordinate the development-build replacement with the hosted cutover. The full
+Compatibility covers the published **0.1.5** shape and the recorded
+**0.1.6-dev.2** from `ed93fff` (SQLite schema 18). Dev.2's sync source matches
+0.1.5's `41e4549`: it expects eight profile keys and calls the no-argument read
+RPC. No later installed development build is recorded; the current Mac build
+remains unverified.
+
+Only unversioned development builds from later source that requires the expanded
+profile need coordinated replacement from contract-2 source at cutover. They
+receive contract 1 and fail their stricter shape check. Classify that cohort by
+source, not a 0.1.6 version label. Published 0.1.3 remains unsupported because it
+predates Where. After SQL, authenticated RPC and required CI checks pass, the
+server rescue may proceed without waiting for a new native release. Native
+publication keeps its installed acceptance and signing gates below. The full
 client matrix is in `docs/plans/2026-10-27-sync-compatibility.md`.
 
 The server migration is additive and retains the 0.1.5 interface. Application
@@ -110,6 +118,44 @@ Mac connection. Do not label native publication complete without its evidence.
 
 ## Completion record
 
-Update this plan and `STATUS.md` with correction commits, CI runs, migration readback,
-deployment IDs, open-PR count and desktop publication evidence or the exact remaining
-access blocker. Keep private device inventory and credentials outside this repository.
+Review checkpoint, October 27, 2026: six PRs are merged; **only #153 remains open**.
+
+| PR | Merge result |
+| --- | --- |
+| #152 | Merged to main at `a0dfd2f`. |
+| #154 | Merged to main at `28ef9fd`. |
+| #155 | Merged to main at `ecba2be`. |
+| #156 | Merged to main at `fefeeb0`. |
+| #151 | Merged into #149 at `feb9ea4`. |
+| #149 | Merged to main at `f8a7740035529a81f8037cdfea3af0aabea73a64`. |
+
+Integrated PR #153 head `aae56162c95864719b2696d934357905c09e7476` passed ordinary
+CI (`40558572628`) and both native jobs (`40558572652`), including the Swift
+helpers. Supabase rehearsal `40558572739` still failed during startup after GHCR
+login succeeded. No SQL test executed in that run. Its actual failure cause awaits
+sanitized diagnostics; registry authentication alone has not cleared the gate.
+
+The next rehearsal pulls the same seven approved image pins sequentially through
+the unchanged Docker proxy, sharing the first startup's eight-minute budget.
+Failed pulls or starts report fixed, allowlisted signals from at most the final
+64 KiB of private output; raw logs and credentials stay suppressed. This separates
+registry failures from startup and improves diagnosis. It does not yet establish
+that startup, migration replay or RPC checks succeed.
+
+No hosted migration has been applied during this review. The ledger remains at
+92 migrations through `20261024210000`. Successful final-head SQL/RPC rehearsal,
+reviewed migration deployment and any provider-generated timestamp reconciliation
+remain pending. The migration contents must remain traceable to the reviewed SQL.
+
+Local CLI authentication is absent for Vercel 65.4.0 and GitHub CLI 2.103.3. The
+Vercel connector's environment-list request returned 403. This does not establish
+whether the exact Production Trust environment upsert will succeed: its write
+capability remains untested until the final marketing deployment ID is available.
+Final application/marketing deployment verification and Trust pairing remain open.
+
+Native 0.1.6 is prepared in source; the published feeds still serve 0.1.5. No Mac
+inventory is configured in this environment. Installed acceptance, signing,
+notarization and native publication remain open; the passing native CI jobs do not
+replace those checks. Preserve historical STATUS evidence and append actual release
+results when available. Keep private device inventory and credentials outside this
+repository.

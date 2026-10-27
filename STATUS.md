@@ -23,9 +23,13 @@ Source only: nothing is pushed to hosted, merged or released.
   smoke verifies legacy profile writes, receipt replay, owner isolation and old
   inserts/updates/deletes against a rolled-back later Category column. Concurrent
   row revisions still reject stale writes before a preserving retry.
-- Rollout caveat: pre-contract 0.1.6 development builds need a rebuild, because
-  their expanded profile is not contract 1. Published 0.1.3 remains unsupported.
-  The plan records the client matrix and a forward-correction procedure.
+- Rollout follows source and sync shape, not a version label. Recorded
+  0.1.6-dev.2 (`ed93fff`, SQLite schema 18) has the same contract-1 sync source as
+  published 0.1.5 (`41e4549`). Only unversioned development builds from later
+  expanded-profile source need coordinated replacement from contract-2 source.
+  No later installed development build is recorded; the current Mac build is
+  unverified. Published 0.1.3 remains unsupported. The plan records the client
+  matrix and a forward-correction procedure.
 - Part C (a separate dev Supabase target) is dropped by owner decision. Dev builds keep
   using production.
 
@@ -103,6 +107,14 @@ and the Verification Center submission.
 Platform impact: web production now runs Tickets 187, 184 (gated), 188 (gated) and the
 travel train. Desktop needs 0.1.6 to synchronize. Marketing: no change. Future mobile:
 not applicable.
+
+Review clarification, October 27: the version-based statements above record the
+October 24 release assessment. Compatibility actually follows source and sync
+shape. Recorded 0.1.6-dev.2 has the same eight-key profile and no-argument RPC as
+published 0.1.5, so both belong to PR #153's contract-1 rescue cohort. Only later
+unversioned builds with the expanded profile need coordinated replacement; their
+presence on the current Mac is unverified. See the current contract rollout entry
+and `docs/plans/2026-10-27-sync-compatibility.md`.
 
 ## PR #150 review follow-ups — October 24, 2026
 
