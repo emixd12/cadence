@@ -6536,10 +6536,14 @@ Suggested files:
 
 ## Ticket 091: Reminder delivery cadence and export cost guardrails
 
-Status: in_progress (2026-09-04).
+Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open.
 
-Local implementation and checks pass. Hosted migration, Preview inspection,
-and five-minute delivery acceptance remain pending.
+Local implementation and checks pass. Hosted migration `20260905020741` and the
+five-minute reminder cron reached production in the September 12 rollout
+(`STATUS.md`, "Current repository state", "Production rollout (2026-09-12)");
+`vercel.json` still schedules `*/5 * * * *`. That entry leaves "Ticket 091's
+separately authorized reminder-delivery check" open, and no later record closes it
+or the Preview inspection of Export reads.
 Evidence: `docs/qa/2026-09-04-tickets-088-091-104-105.md`.
 
 Platform impact:
@@ -7893,7 +7897,9 @@ Out of scope:
 
 ## Ticket 104: Security inbox deliverability hardening
 
-Status: blocked (2026-09-04).
+Status: blocked (2026-09-04). Reconciled October 27, 2026: still blocked. No operator
+diagnostics or authorized route test is recorded after September 4 in `STATUS.md`,
+`docs/OPERATIONS.md` ("Ticket 104 security inbox follow-up") or git history.
 
 Read-only review and monitoring guidance are recorded. Operator diagnostics
 and one separately authorized synthetic send remain required.
@@ -7969,7 +7975,9 @@ Out of scope:
 
 ## Ticket 105: Browser-push dependency compatibility cleanup
 
-Status: in_progress (2026-09-04).
+Status: in_progress (2026-09-04). Reconciled October 27, 2026: still open. npm still
+lists web-push 3.6.7 as `latest` (read October 27), so the recheck trigger in
+`docs/OPERATIONS.md` has not fired. No Preview inspection is recorded since.
 
 The published dependency has no newer release containing the upstream fix.
 The documented exception and fake-transport checks pass. Preview inspection remains pending.
@@ -9399,6 +9407,8 @@ Schema and evidence checks passed 80/80. Estimated API cost was $0.0088825; p95 
 The measured gate failed. Retain the deterministic fallback; do not integrate this provider candidate.
 See `docs/qa/2026-09-07-note-suggestion-provider-evaluation.md`.
 Ticket 127's persisted proposal lifecycle and native acceptance are complete.
+Reconciled October 27, 2026: still blocked. `STATUS.md` (September 7–8) says a revised
+candidate needs a new measured gate; no revised candidate or new gate is recorded since.
 
 Identify repeated meaning within one Behavior's Notes and offer proposed text
 shortcuts for explicit review. Keep the non-AI fallback available.
@@ -9479,7 +9489,12 @@ The shared verification and rollout requirements below apply to all three ticket
 
 ## Ticket 129: Bounded reminder bookkeeping and storage recovery
 
-Status: in_progress (2026-09-08).
+Status: complete (2026-09-09; reconciled October 27, 2026). `STATUS.md`, "Desktop
+repair acceptance — 2026-09-09": installed preview.21 reduced the live database from
+6.21 GB to 6.53 MB with records preserved, converged with the hosted account, and
+repeated native reminder reconciliation kept one receipt per operation with zero
+measured file growth. Evidence: `docs/qa/2026-09-08-desktop-repair-implementation.md`.
+Earlier status: in_progress (2026-09-08).
 
 **Stop the growth at its source.**
 
@@ -9678,7 +9693,15 @@ Platform impact:
 
 ## Ticket 131: Automatic downloads with user-controlled installation
 
-Status: in_progress (2026-09-08); excluded from the Tickets 129–130 repair release.
+Status: complete (reconciled October 27, 2026). On September 9 `STATUS.md` ("Handoff
+notes") kept it open only "until a newer signed release verifies the corrected
+download/install lifecycle". Ticket 180 (complete September 29) verified it on signed
+builds: discovery, Install and separate Restart, partial-download failure and Retry,
+and safe failure for wrong signatures, tampered archives and unavailable downloads.
+The 0.1.5 publication repeated it through the stable feed on October 24: published
+0.1.3 showed Review update, Install update and Restart Cadence and produced 0.1.5
+(`docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`).
+Earlier status: in_progress (2026-09-08); excluded from the Tickets 129–130 repair release.
 
 Extend the existing signed Tauri updater. No new updater service or dependency is needed.
 
@@ -9976,6 +9999,8 @@ code also requires the standard coding checks. Provider access is unnecessary.
 ## Ticket 133: Continuous day-progress timeline on web and desktop
 
 Status: in_progress (deployed web and installed evidence recorded; remaining combined native acceptance is open). Dependency: Ticket 132.
+Reconciled October 27, 2026: still open. Its combined acceptance stays with Ticket 137,
+which is still open (see Ticket 137's reconciliation note).
 
 Goal: ship the time line and moving current-time dot using Cadence data alone.
 
@@ -10043,6 +10068,8 @@ WKWebView QA, and idle/minimized performance evidence. Run applicable shared che
 
 Status: in_progress (hosted rollout and same/wrong-account live checks pass; remaining native/provider acceptance is open).
 Dependency: Ticket 132 (complete). Next priority: infrastructure.
+Reconciled October 27, 2026: still open. Its combined acceptance stays with Ticket 137,
+which is still open (see Ticket 137's reconciliation note).
 
 Goal: provide rich read-only events from the same Google identity used to sign
 into Cadence, with a bounded local desktop cache and honest freshness states.
@@ -10146,6 +10173,8 @@ claiming integration completion. Provider setup and release remain explicit gate
 ## Ticket 135: External event lanes, previews, and details
 
 Status: in_progress (shared production presentation; combined acceptance pending). Dependencies: Tickets 133 and 134.
+Reconciled October 27, 2026: still open. Its combined acceptance stays with Ticket 137,
+which is still open (see Ticket 137's reconciliation note).
 
 Goal: integrate the accepted Calendar interface beside the ledger, using the
 Ticket 134 normalized contract. Preserve the seventh-revision interaction baseline:
@@ -10215,6 +10244,8 @@ applicable shared checks.
 ## Ticket 136: Estimated Behavior durations and advisory overlap cues
 
 Status: in_progress (bounded history and shared presentation wiring). Dependencies: Tickets 132 and 135.
+Reconciled October 27, 2026: still open. Its combined acceptance stays with Ticket 137,
+which is still open (see Ticket 137's reconciliation note).
 
 Goal: distinguish estimated scheduling overlap from actual running timers
 without changing Behavior schedules or manual statuses. Consume Ticket 134's
@@ -10274,6 +10305,11 @@ schedule, reminder, or provider writes occur. Run applicable shared checks.
 ## Ticket 137: Combined timeline acceptance and release documentation
 
 Status: in_progress (source, deployed web, live, and installed evidence recorded; remaining native/provider cases and public approval are open). Dependencies: Tickets 133–136.
+Reconciled October 27, 2026: still open. The latest Calendar record
+(`docs/qa/google-calendar-capabilities.md`, "Production Calendar pending-state audit —
+September 27, 2026") leaves the post-approval web/native consent smoke checks and
+Ticket 137's controlled provider-failure/Workspace and installed fixture cases open.
+No later record in `STATUS.md` or git history closes them.
 
 Goal: verify the complete experience on both platforms before publishing claims
 or distributing the feature.
@@ -10524,6 +10560,11 @@ video requirements before recording. Filing this ticket uploads nothing.
 Status: in_progress. Dependencies: Tickets 138–140 and relevant technical evidence
 from 134/137. Full Ticket 137 closure is not a prerequisite; this ticket supplies
 its public-verification evidence.
+Reconciled October 27, 2026: still open. Google verified data access on September 20;
+the one-time post-approval web/native consent smoke checks are still recorded as
+outstanding (`docs/qa/google-calendar-capabilities.md`, September 27 audit), and no
+later record closes them. This ticket covers the Timeline client
+(`cadence-calendar-498717`), not Ticket 187's Daily Brief client.
 
 September 20 follow-up: Google Verification Center reports data access verified.
 Data Access marks `calendar.events.readonly` verified. The unchanged production
@@ -10871,6 +10912,12 @@ and clean SQL replay where changed. Update resolver ownership for actual changes
 Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
+Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
+reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+2026"), and the web app deployed on September 26 ("Daily Brief web production
+deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
+and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
+still open.
 Filed September 18, 2026. Dependencies: revised Ticket 146 and September 20 decision.
 
 The old disabled endpoint is implemented, but it is not the target interface.
@@ -10934,6 +10981,12 @@ Live provider access and deployment require their own recorded evidence.
 Status: in_progress for release acceptance. Source implementation, required
 checks and fresh independent review (`ship`) completed September 20, 2026.
 Hosted/live-data/installed-desktop gates remain in `docs/qa/in-app-daily-brief.md`.
+Reconciled October 27, 2026: still open. Hosted migrations and the OpenAI server key
+reached production on September 20 (`STATUS.md`, "Consolidated release — September 20,
+2026"), and the web app deployed on September 26 ("Daily Brief web production
+deployment — September 26, 2026"). Installed desktop acceptance with linked, unsynced
+and offline accounts is not recorded. Ticket 174 carries the remaining gates and is
+still open.
 Filed September 18, 2026. Dependencies: revised Tickets 146–147.
 
 The earlier synthetic external consumer is not acceptance of this flow. The owner
@@ -11023,7 +11076,11 @@ No schema, new connector, or provider permission change.
 ## Ticket 150: Calendar display names and compact selection
 
 Status: in_progress (September 20, 2026). Implementation and focused/browser QA
-passed; repository acceptance awaits concurrent Daily Brief test/build repairs.
+passed. Reconciled October 27, 2026: still open. The September 20 consolidated release
+superseded the concurrent test/build failures (`STATUS.md`, "Consolidated release —
+September 20, 2026"); commit `b127df2` is in the September 26 production deployment.
+Still open: the live check that a calendar with a custom name (Northwestern Work)
+shows that name in production and can be selected and saved. No later record closes it.
 Evidence: `docs/qa/calendar-selection.md`.
 
 - Request and prefer Google's per-user `summaryOverride`, falling back to `summary`.
@@ -11289,6 +11346,9 @@ quality, hosted and installed desktop acceptance gates.
 Status: in_progress. Source implementation and independent review are complete;
 live synthetic, hosted and installed desktop acceptance remain open. See
 `docs/qa/briefing-workbench.md`.
+Reconciled October 27, 2026: still open. No later record closes its live synthetic,
+hosted or installed desktop acceptance. Ticket 174 carries these gates ("Carry forward
+open evidence from 147–148, 155 and 161") and is still open.
 Filed September 20, 2026. Dependencies: Tickets 151–154. Hosted/live-data/native
 activation also depends on remaining release acceptance for Tickets 147–148.
 
@@ -11636,6 +11696,10 @@ Status: in_progress. Provider-free evaluation implementation and required checks
 pass; fresh independent review returned ship with no findings. Model wording review,
 owner-run comparisons, promotion, hosted and installed desktop acceptance remain
 open. Evidence and rollback: `docs/qa/briefing-workbench.md#ticket-161-evaluation-and-rollout`.
+Reconciled October 27, 2026: still open. Recipe 1.0 is still the production default
+(`STATUS.md`, October 24, 2026 entries), so no reviewed promotion has happened. Owner
+comparisons continued under Ticket 184 (`docs/qa/briefing-workbench.md`, October 16
+and 23). Ticket 174 carries the hosted and installed desktop gates.
 Filed September 21, 2026. Dependencies: Tickets 156–159; coordinate with Ticket 155
 and remaining Tickets 147–148 release gates. Ticket 160 is not a rollout dependency.
 
@@ -11877,7 +11941,20 @@ preserved, and unchanged status/schedule/dismissal flows.
 
 ## Ticket 165: Travel provider and cross-platform release acceptance
 
-Status: in progress. Repository, local database, public-landmark, deployed-web and
+Status: in progress. Web: the Travel Settings location guidance and Check again
+(`INT-TRAVEL-006`) are live since October 24, 2026, in the travel train (main
+`f10e068c`; evidence: PR #152, `docs/qa/2026-10-12-agentic-calendar.md`, "Production
+cutover and Google branding, October 24, 2026"). Desktop: the published Mac 0.1.5
+(October 24) carries the Hardened Runtime location entitlement. On dev-signed
+`0.1.6-dev.2`, with the same location code and entitlement, the first macOS prompt
+appeared and a foreground position was available (`docs/qa/travel-release.md`,
+October 24). Open Location Services (`INT-TRAVEL-007`) and the status-only permission
+read ship in desktop 0.1.6 or later. Still open: the denied state, a never-authorized
+macOS user on a notarized build, the installed check of Open Location Services and
+Check again, the installed regression of the status-only permission read, and the
+directions handoff matrix now that Ticket 215 is deployed.
+
+September evidence: repository, local database, public-landmark, deployed-web and
 private-account acceptance pass (PRs #58–#65, September 22–23). Installed macOS passed
 cold start, account sync, restart preservation and a hosted route request on
 preview.45. September 29: clean second-Mac rc.3 acquired a current position after the
@@ -12280,7 +12357,7 @@ projection of travel remains disabled pending provider-use clearance and revised
 disclosure; native and live gates stay with Tickets 165 and 174. Filed September 26, 2026.
 October 22, 2026: Ticket 219 owns travel model projection. Google terms are an accepted
 risk (`docs/LEGAL.md` L-001); the disclosure update is logged as
-`docs/PRIVACY_CHANGES.md` P-004 and does not block development.
+`docs/MESSAGING_CHANGES.md` P-004 and does not block development.
 Dependencies: 169 and existing 159, 162–167 implementation. Coordinate with 165 and 174.
 
 Goal: explain departure, onward travel and return constraints alongside feasible
@@ -12502,6 +12579,12 @@ Human wording review remains required under 174. Apply shared checks.
 Status: in progress September 26, 2026. Deterministic fixtures, workbench controls
 and synthetic evidence are recorded; owner-clicked comparisons, hosted, deployed-web
 and installed-desktop acceptance remain open. Filed September 26, 2026.
+Reconciled October 27, 2026: still open. Hosted migrations `20260926150000` and
+`20260926170000` and the web deployment landed September 26 (`STATUS.md`). Owner-clicked
+account comparisons ran under Ticket 184 on October 16 and 23
+(`docs/qa/briefing-workbench.md`). Deployed-web and installed-desktop acceptance of
+recovery, tips and travel lines stay listed as remaining gates there, with no later
+record closing them.
 Dependencies: review begins alongside 168–173; release acceptance follows delivered slices.
 Carry forward open evidence from 147–148, 155 and 161; coordinate travel gates with 165.
 
@@ -13254,10 +13337,21 @@ Execution evidence: `docs/qa/cadence-project-rename.md`.
 
 ## Ticket 187: Isolate agentic Calendar access
 
-Status: source implemented and locally verified October 12, 2026; independent review and rollout acceptance remain open.
+Status: live in production since October 24, 2026. PR #150 (main `42270ed9`) shipped it
+without the travel train: a short `/api/advisor` pause, hosted migration
+`20261022180000`, deployment and Trust refresh. Branding for `cadence-calendar-agent-prod`
+is verified and published. Still open: Google's sensitive-scope verification (demo
+video, Data Access justification, Verification Center submission), the published Mac
+0.1.5 against the 187 server, installed desktop consent for the Daily Brief connection,
+and privacy entry P-012. Evidence: PR #152, `docs/qa/2026-10-12-agentic-calendar.md`,
+"Production cutover and Google branding, October 24, 2026".
+Earlier status: source implemented and locally verified October 12, 2026.
+October 27 follow-up: Ticket 245 owns Google's verification submission and the
+related messaging entries, including P-012. Installed desktop acceptance stays
+with this ticket; a deployed release does not establish that acceptance.
 October 22, 2026: recovered from a local backup for owner review; the migration is now
 `20261022180000_separate_agent_calendar_grant.sql` (see `STATUS.md`).
-Privacy log: P-005, P-006 and P-010 in `docs/PRIVACY_CHANGES.md`.
+Privacy log: P-005, P-006 and P-010 in `docs/MESSAGING_CHANGES.md`.
 Evidence: `docs/qa/2026-10-12-agentic-calendar.md`.
 Cloud rollout plan: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
 
@@ -13291,7 +13385,7 @@ This ticket supersedes the single Calendar-grant assumption in the Daily Brief p
 
 Status: filed October 16, 2026 from Ticket 184 owner feedback; implementation started.
 October 22, 2026: recovered from a local backup for owner review (see `STATUS.md`).
-Privacy log: P-011 in `docs/PRIVACY_CHANGES.md`.
+Privacy log: P-011 in `docs/MESSAGING_CHANGES.md`.
 The unmerged iOS plan also uses the label "Ticket 188" for its activation step; renumber that
 step if the plan lands.
 Owner decisions (October 16): include in Ticket 184 candidate 2; use a separate
@@ -13328,9 +13422,13 @@ Platform impact:
 
 ## Ticket 212: Home address and usual travel in first-run onboarding
 
-Status: implemented in source October 22, 2026 on the Ticket 215 branch; not deployed.
-It ships with Ticket 215's rollout and needs no migration. Browser and installed desktop
-QA of the setup row remain open. Filed October 17, 2026 from owner direction during the
+Status: live on web since October 24, 2026, in the travel train (PRs #138 and #135,
+main `f10e068c`); no migration. Desktop gets it in 0.1.6 or later; the published 0.1.5
+predates it. Still open: authenticated browser QA of the setup row against a real
+routing report, and installed desktop QA. Evidence: PR #152,
+`docs/qa/2026-10-12-agentic-calendar.md`, "Production cutover and Google branding,
+October 24, 2026". Earlier status: implemented in source October 22, 2026 on the
+Ticket 215 branch. Filed October 17, 2026 from owner direction during the
 travel review. Numbered after the iOS plan's proposed 189–211 range to avoid collisions.
 Owner direction (October 17): onboarding scope includes the user's home address and how
 they usually travel. These are two of the three inputs the simplified travel design keeps
@@ -13406,7 +13504,7 @@ only. Hosting, the Daily Brief model and weather are tracked separately in
 
 On October 22 the owner also decided the next steps for Tickets 165 and 216–219
 (`docs/DECISIONS.md`, 2026-10-22). Until the pre-launch privacy pass, privacy,
-disclosure and marketing-language conflicts are logged in `docs/PRIVACY_CHANGES.md`
+disclosure and marketing-language conflicts are logged in `docs/MESSAGING_CHANGES.md`
 and never block development. Backlog Tickets 243 and 244 follow Ticket 219.
 
 End state: each located Calendar event and each Behavior with a Where gets a travel
@@ -13438,7 +13536,7 @@ reused (`docs/COSTS.md`, caching terms).
 | 216 | Completion place labels and Where suggestions | 215 |
 | 217 | Learned travel habits: mode per place, get-ready time, arrival buffer | 215 |
 | 218 | Weather provider selection and travel margin | Open-Meteo selected, free plan for development and testing (`docs/LEGAL.md` L-008); 217 for margin |
-| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/PRIVACY_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
+| 219 | Travel, habit and weather facts in Daily Brief model input | 215 and 217; 216 and 218 for their facts; disclosure logged as `docs/MESSAGING_CHANGES.md` P-004, not blocking (Google terms: accepted risk, `docs/LEGAL.md` L-001) |
 | 243 | Backlog, low priority: six-leg refresh speed and before/after comparison | 214 |
 | 244 | Backlog: place labels and "I'm here" markers in Full JSON | 216 |
 
@@ -13548,13 +13646,17 @@ Platform impact:
 
 ## Ticket 215: Three-input travel Settings and optional Behavior Where
 
-Status: implemented in source October 19, 2026; not deployed. Hosted migration
-`20261019180000_add_behavior_where.sql`, deployment, a desktop preview with SQLite
-migration 0018 and production QA remain owner-gated. Deploy the hosted migration,
-then the web app, then the desktop preview. The migration accepts the previous web
-build's payloads in between; an older desktop build fails closed on Behavior
-synchronization until it is updated. Model input for Not set ("location
-not set") waits for Ticket 219; travel stays out of model input.
+Status: live. PR #112 merged and deployed October 23, 2026, and hosted migration
+`20261019180000_add_behavior_where.sql` was applied the same day (`STATUS.md`,
+"Connector and Where hosted migrations applied — October 23, 2026"). Cadence for Mac
+0.1.5, published October 24, carries SQLite migration 0018. Where passed both ways
+between app.cadence-me.com and a Mac build with 0.1.5's application source
+(`docs/qa/2026-10-23-desktop-0.1.5-release-packet.md`). Since the travel train went live
+on October 24, 0.1.5 fails closed on account synchronization until 0.1.6 ships or PR
+#153's sync contracts are pushed. Still open: an authenticated Travel Settings view on
+production, listed as not verified on October 23 and not recorded since. Ticket 219
+owns Where in model input; it went live with the travel train.
+Earlier status: implemented in source October 19, 2026.
 Dependencies: 214. Ticket 212 reuses these controls in onboarding.
 
 Goal: make travel setup short and let each Behavior say where it happens.
@@ -13593,11 +13695,14 @@ Platform impact:
 
 ## Ticket 216: Completion place labels and Where suggestions
 
-Status: revised October 22, 2026 from the owner's decisions below; implemented in
-source October 23 on branch `claude/ticket-216-place-labels-b20c33` (draft PR against
-Ticket 215's branch). Not deployed. Hosted migration
-`20261024200000_completion_place_labels.sql`, SQLite migration 0020, deployment and
-live device acceptance remain owner-gated. Verification is in `STATUS.md`.
+Status: live on web since October 24, 2026, in the travel train (main `f10e068c`).
+Hosted migration `20261024200000_completion_place_labels.sql` was applied at 22:13 UTC,
+before the deployment. SQLite migration 0020 ships in desktop 0.1.6 or later. Still
+open: the iPhone Safari re-prompt check, installed signed-desktop CoreLocation
+acceptance, and privacy entry P-001, which now describes live behavior. Evidence: PR
+#152, `docs/qa/2026-10-12-agentic-calendar.md`, "Production cutover and Google branding,
+October 24, 2026". Earlier status: revised October 22, 2026 from the owner's decisions
+below; implemented in source October 23 (PR #137). Verification is in `STATUS.md`.
 Dependencies: 215. Ticket 219 owns label counts in model input.
 
 Owner decisions, October 22, 2026:
@@ -13768,13 +13873,15 @@ Platform impact:
 
 ## Ticket 217: Learned travel habits
 
-Status: implemented in source October 22, 2026; not deployed. Draft PR against the
-Ticket 215 branch. Hosted migration `20261024210000_travel_habits.sql`, deployment,
-a desktop preview with SQLite migration 0019 and production QA remain owner-gated.
-The hosted migration replays locally with every migration on the branch; it ships
-with the Ticket 215 coordinated rollout, after the 215 migration. Desktop builds that
-predate Ticket 217 fail closed on every synchronization ("Update Cadence before
-synchronizing account data.") until updated, as with Ticket 215.
+Status: live on web since October 24, 2026, in the travel train (main `f10e068c`).
+Hosted migration `20261024210000_travel_habits.sql` was applied at 22:13 UTC, before
+the deployment. Desktop builds that predate Ticket 217, including the published 0.1.5,
+now fail closed on every synchronization ("Update Cadence before synchronizing account
+data.") until 0.1.6 ships with SQLite migration 0019, or PR #153's sync contracts are
+pushed. Still open: production QA, installed desktop acceptance, and privacy entry
+P-002, which now describes live behavior. Evidence: PR #152,
+`docs/qa/2026-10-12-agentic-calendar.md`, "Production cutover and Google branding,
+October 24, 2026". Earlier status: implemented in source October 22, 2026 (PR #136).
 Owner decision (October 22, 2026): the starting values below are confirmed.
 Dependencies: 215.
 
@@ -13861,8 +13968,14 @@ Platform impact:
 
 ## Ticket 218: Weather provider selection and travel margin
 
-Status: implemented in source October 22, 2026; not deployed. Weather stays off until
-the operator sets `CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`. The owner selected
+Status: code live on web since October 24, 2026, in the travel train (main `f10e068c`).
+Weather itself stays off until the operator sets
+`CADENCE_WEATHER_PROVIDER_CLEARANCE=approved`; the production environment had no such
+variable when its names were read on October 27, 2026. Still open: operator clearance,
+the paid plan, deployed-web and installed-desktop acceptance, and privacy entry P-003.
+Evidence: PR #152, `docs/qa/2026-10-12-agentic-calendar.md`, "Production cutover and
+Google branding, October 24, 2026". Earlier status: implemented in source October 22,
+2026 (PR #133). The owner selected
 Open-Meteo on October 18, 2026 (`docs/DECISIONS.md`). On October 22 the owner chose the
 free API for development and testing, a versioned fixed margin table with starting
 values set by the orchestrator, and logging the privacy items instead of blocking.
@@ -13948,17 +14061,25 @@ Privacy surface entries (logged, not blocking; owner decision October 22):
 
 Remaining gates: privacy disclosure and Open-Meteo recipient text; the paid plan before
 commercial use; operator clearance per deployment; live Open-Meteo, deployed-web and
-installed-desktop acceptance; merging with Ticket 217's `preparationSeconds`.
+installed-desktop acceptance. The merge with Ticket 217's `preparationSeconds` is done
+on the travel release train (`STATUS.md`, October 23, 2026).
 
 ## Ticket 219: Travel, habit and weather facts in Daily Brief model input
 
-Status: stage 1 implemented in source October 22, 2026 in draft PR #132, based on
-the Ticket 215 branch; stage 2 implemented in source October 23, 2026 on the travel
-release train (Tickets 165, 212 and 216–219 combined on 215); not deployed. Open point:
-the owner is waiting for Google's reply to support case 76805292 (whether sending yes/no
-route conclusions to the model complies with Maps Platform Terms 3.2.3(c)) before
-deciding whether to restrict conclusions to day-level facts. Stage 2 leaves the stage 1
-conclusions unchanged until that decision. Owner decisions (October 23, 2026): live
+Status: stages 1 and 2 live on web since October 24, 2026, in the travel train (main
+`f10e068c`). `TRAVEL_CONCLUSIONS_SIGNING_SECRET` is set in production. Weather facts
+depend on Ticket 218's clearance, which is not set. The owner chose on October 24 to
+ship as it is: trip conclusions come from Timeline connection event locations when
+the Daily Brief connection holds the same events, which conflicts with the live
+Privacy text (privacy entry P-012). Still open: Google's reply to support case
+76805292 (whether sending yes/no route conclusions to the model complies with Maps
+Platform Terms 3.2.3(c)) and the decision whether to restrict conclusions to
+day-level facts; privacy entries P-004 and P-012; installed desktop acceptance.
+Stage 2 leaves the stage 1 conclusions unchanged until that decision. Evidence: PR
+#152, `docs/qa/2026-10-12-agentic-calendar.md`, "Production cutover and Google
+branding, October 24, 2026". Earlier status: stage 1 implemented in source October
+22, 2026 (PR #132); stage 2 October 23, 2026 on the travel release train.
+Owner decisions (October 23, 2026): live
 route and weather conclusions use Option A, a server-signed conclusions token, and label
 counts also cover all retained history. Both are implemented on the release train.
 Owner decision (October 22,
@@ -14160,7 +14281,7 @@ Scope and acceptance:
 - CSV, JSONL and BehaviorLog keep their current place-text omissions unless the owner
   decides otherwise.
 - Update `docs/EXPORT_FORMATS.md`, `docs/user-guide/data-portability.md`, export
-  resolver tests and the privacy entry `docs/PRIVACY_CHANGES.md` P-001.
+  resolver tests and the privacy entry `docs/MESSAGING_CHANGES.md` P-001.
 
 Platform impact:
 - Web: `packages/core/src/resolvers/export.resolver.ts` (re-exported by
@@ -14592,15 +14713,23 @@ Scope and acceptance:
 
 ## Ticket 232: Production deployment and live client acceptance
 
-Status: filed October 18, 2026; production preparation only (wave 5); awaiting owner approval.
+Status: in progress. The disabled release deployed October 18, 2026 through PR #108
+(main `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`). Six approved migrations reached
+hosted production, both Node 24 sites were Ready, and the final app deployment
+bound the matching marketing deployment. MCP/OAuth/discovery remained disabled
+(503); the unconfigured challenge returned 404. Scheduled maintenance observation,
+public activation and live-client acceptance remain open. Evidence:
+`docs/qa/mcp-server.md`, "Disabled production release — October 18, 2026", and
+`STATUS.md`, "Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026".
+Reconciled October 27, 2026. Earlier status: production preparation only (wave 5).
 Dependencies: 226–231 and explicit owner authorization for every provider step.
 
 Goal: prove the deployed server works in real Claude and ChatGPT clients.
 
-The owner selected existing production for planning on October 18, 2026.
-Preparation permits bounded read-only metadata checks, not hosted changes or
-live account operations. No staging project will be provisioned. The review
-packet lives in the Ticket 232 workspace note and shared PR Context.
+The owner selected existing production on October 18, 2026 and subsequently
+authorized the disabled release recorded above. That authorization did not activate
+MCP or authorize live account operations. No staging project will be provisioned.
+The review packet lives in the Ticket 232 workspace note and shared PR Context.
 
 Scope and acceptance:
 
@@ -15103,3 +15232,39 @@ Platform impact:
 | Desktop | Same hosted broker and shared contracts; no desktop-specific scope handling. Installed acceptance stays with Ticket 238/115. |
 | Marketing | FAQ and Privacy wording for the broader Microsoft permission. |
 | Future mobile | Not applicable: no mobile surface. |
+
+## Ticket 245: Google verification submission for the Daily Brief Calendar client
+
+Status: filed October 27, 2026; messaging track. Not a development ticket.
+Dependencies: Ticket 187 (live October 24, 2026).
+
+Submit Google's sensitive-scope verification for `cadence-calendar-agent-prod`.
+
+- Before submission, resolve or explicitly accept every open
+  `docs/MESSAGING_CHANGES.md` entry Google's reviewer sees. At filing: P-010 and
+  P-012. P-012 (logged in PR #152) says Daily Brief trip conclusions use Timeline
+  connection event locations, while the live Privacy page says Daily Brief reads
+  Calendar only through its own connection. The owner chooses the text change or a
+  code change; a code change is filed as a separate development ticket.
+- Record and upload the demo video, enter the Data Access justification and submit
+  in the Verification Center. Owner steps: `docs/qa/2026-10-12-agentic-calendar.md`.
+- Record the video link, submission time and Verification Center state in that QA
+  file and `STATUS.md`. Then follow Google's review to a decision.
+
+Messaging impact: resolves P-010 and P-012. Platform impact: web Privacy and Settings
+text only if the owner chooses text changes; desktop shares the hosted pages;
+marketing and future mobile not applicable.
+
+## Ticket 246: Pre-launch messaging pass
+
+Status: filed October 27, 2026; messaging track. Not a development ticket.
+Dependencies: none. Required before public launch.
+
+Work through every open `docs/MESSAGING_CHANGES.md` entry and update Privacy, Terms,
+Trust, in-app copy, the user guide, marketing and the README in one review. Update
+tests that assert changed text. Include the README and marketing wording left by the
+2026-10-23 removal of "not a medical dosing app" from `AGENTS.md`. Mark each entry
+resolved with file, deployment and date.
+
+Messaging impact: resolves all open entries. Platform impact: web legal and copy,
+desktop in-app copy, marketing site; future mobile not applicable.

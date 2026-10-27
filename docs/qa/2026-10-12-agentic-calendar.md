@@ -208,3 +208,36 @@ playback while signed out.
    link and additional information, answer the questionnaire, and submit.
 6. Record the submission time, Verification Center state and video link here and in
    `STATUS.md`.
+
+## Production cutover and Google branding, October 24, 2026
+
+Owner decisions in chat, October 24, 2026: approve and publish the PR #147 text; record
+the demo on production with the test account (option 1 above); ship Ticket 187 first
+without the travel train; authorize one real Daily Brief call for the test account;
+approve the scope justification; later the same day, merge PRs #135 and #138 as they
+are. All times UTC.
+
+| Step | Evidence |
+|---|---|
+| Disclosures live | PR #147 merged 18:16:00 (main `6f2e770b`). App `dpl_GGNbBrLyA7knWGzghH6gWKp7vq5X`, marketing `dpl_AdDKVeCjcYJc5fwwxT2JsfJkYhsU`, Trust redeploy `dpl_9SvrL4ekjjQg5utxsH7hpvnnvrR6`. Live `/privacy` and `/trust` show the new text, dated October 24, 2026 |
+| OpenAI data controls | Read in Chrome Browser 1, organization "Cadence": feedback sharing, evaluation and fine-tuning sharing, and inputs and outputs sharing all Disabled |
+| Release branch | PR #150: `36aa5bce` (last PR #135 head before the travel train) + main `6f2e770b` + PR #148's commit. All GitHub checks pass, including `rehearse` (clean `db reset` and every `tests/sql` contract) and `verify` |
+| Cutover pause | Vercel firewall rule "Ticket 187 cutover pause" (deny path prefix `/api/advisor/` or `/api/dev/briefing`) live 18:42:30; those routes returned 403 while `/privacy` returned 200. Removed and published 18:55:01; no custom rules remain |
+| Migration | Dry run listed only `20261022180000_separate_agent_calendar_grant.sql`; applied 18:43:17; hosted ledger read back ending at it. Homebrew Supabase CLI 2.109.1 ran the push: the npm-pinned 2.105.0 binary is killed at launch on this Mac (exit 137) |
+| Review threads | Two chatgpt-codex P2 threads on PR #150 (dev-only workbench reservation, recipe 1.2 word count) were answered and resolved with the owner's approval; fixes followed on PRs #135 and #138 |
+| 187 deploy | PR #150 merged 18:51:30 (main `42270ed9`). App `dpl_7wZeNEqUZGoFbDXqUwonCKqQNwNn`, marketing `dpl_AVrKBYzQYqho9TLwDE1Bau7iXf9a`, Trust redeploy `dpl_8K6r6gbgmWL9MjhWgZP6zWL8Qf3o`. Unauthenticated `/api/google-calendar/*`, with and without `purpose=agent`, return 401; the callback without state redirects to `/settings?calendar=error` |
+| Branding | Verify branding passed ("Your branding has been verified"), then published: "Your branding has been verified and is being shown to users." A dry run of the Daily Brief consent showed the app name Cadence after Google's unverified-app warning; nothing was granted |
+| Travel train | Dry run listed only `20261024200000_completion_place_labels.sql` and `20261024210000_travel_habits.sql`; applied 22:13:16–22:13:20. PR #135 merged 22:13:31 (main `f10e068c`); GitHub marked PR #138 merged at 22:13:34 (its head is in `f10e068c`). App `dpl_6Tsxfppfb2brdJQDzfZ1A14XcPrb`, marketing `dpl_Gid3Tau9W5fKx2sLfau9avJ36jYQ`, Trust redeploy `dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T` on `app.cadence-me.com` |
+
+Consequences the owner accepted with the travel merge:
+
+- Desktop builds older than 0.1.6, including the published Mac 0.1.5, now fail closed
+  on account synchronization until 0.1.6 is published.
+- Daily Brief can send trip conclusions derived from Timeline connection event
+  locations when the Daily Brief connection holds the same events. This conflicts
+  with the Privacy line quoted in `docs/MESSAGING_CHANGES.md` P-012, which Google's
+  reviewer reads.
+
+Still open: the demo recording and upload, the Data Access justification entry and the
+Verification Center submission; the published Mac 0.1.5 against the 187 server; installed
+desktop consent for the Daily Brief connection.
