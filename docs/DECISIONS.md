@@ -1181,6 +1181,19 @@ Platform impact: desktop release tooling only. Web, marketing and future mobile 
 not affected. Recorded from the owner's October 23 instruction in the release-process
 session.
 
+## 2026-10-23: Remove the "not a medical dosing app" agent directive
+
+The owner removed "not a medical dosing app" from the `AGENTS.md` product
+description. Agents kept raising it against advisor work (for example, Daily
+Brief moves for medication Behaviors), and it is not meaningful during
+development. "Medication dose tracking" is also removed from the out-of-scope
+list; no dose-tracking feature is planned or ticketed by this change. Public
+README and marketing wording is unchanged; review it in the pre-launch privacy
+and marketing pass (`docs/PRIVACY_CHANGES.md`).
+
+This supersedes the line in "2026-10-18: Cadence MCP server and AI plugins"
+that says the phrase "stays true."
+
 ## 2026-10-24: Right-sized desktop release acceptance and a version-free download link
 
 Cadence for Mac 0.1.3 shipped on October 22 after three notarized candidates. Each one

@@ -11,7 +11,7 @@ The app lets a user create recurring behaviors, view scheduled occurrences in a 
 
 Cadence may support many independent accounts, but each account remains
 single-player. This is not a general productivity app, not a social habit
-tracker, not a medical dosing app, not a collaboration product, and not an
+tracker, not a collaboration product, and not an
 admin-heavy SaaS product.
 
 Cadence also serves as a practical reference implementation and promotion
@@ -173,7 +173,6 @@ Out of scope for v1:
 - Native mobile apps
 - Apple Health / Google Fit integration
 - Structured measurement templates
-- Medication dose tracking
 - Supply/refill inventory
 - General AI coaching/chat and autonomous execution; Tickets 146–148 implement only
   the in-app read-only daily briefing in the horse bubble. Outside AI clients may
