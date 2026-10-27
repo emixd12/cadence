@@ -1,5 +1,37 @@
 # Implementation Status
 
+## Ticket ledger reconciled with production — October 27, 2026
+
+Documentation only; no runtime, schema or hosted change. `docs/TICKETS.md` now matches
+production as of October 24, 2026, and the evidence in `STATUS.md` and git history.
+
+- Live: Ticket 215 since October 23 (PR #112). Ticket 187 since October 24 (PR #150),
+  then the travel train the same day (Tickets 165, 212 and 216–219; PRs #135 and #138).
+  Evidence: PR #152. Each status names what stays open: Google verification for the
+  Daily Brief client, weather clearance, desktop 0.1.6 or PR #153's sync contracts,
+  and installed acceptance.
+- Complete: Ticket 129 (repair acceptance, September 9) and Ticket 131 (Ticket 180 on
+  September 29, and the 0.1.5 stable-feed update on October 24).
+- Still open, each with a dated note and its evidence: 091, 104, 105, 128, 133–137, 141,
+  147, 148, 150, 155, 161 and 174.
+- Unchanged: Ticket 130. This file calls it complete on September 9, "in progress" on
+  September 10, and keeps "the broader Ticket 130" open on September 15. The owner
+  decides its state.
+- Number collision resolved: the October 22 Astro and Vitest dependency entry now
+  names PRs #125 and #126. Ticket 232 remains MCP production deployment and live
+  client acceptance; its status now records the disabled October 18 release and
+  keeps activation, scheduled maintenance and live-client acceptance open.
+- Ticket 187 points to Ticket 245 for Google's verification submission and P-012;
+  installed acceptance stays with Ticket 187.
+
+Read-only checks on October 27: `app.cadence-me.com` serves
+`dpl_8Yhhr9bQPKT7iRNX1Dn2sJfJuq3T`; Vercel Production lists
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` and no `CADENCE_WEATHER_PROVIDER_CLEARANCE`; npm
+`latest` for web-push is 3.6.7.
+
+Platform impact: ledger text only. Web, desktop and marketing have no change; future
+mobile is not applicable.
+
 ## Messaging track — October 27, 2026
 
 Owner decision: messaging and compliance work is a separate track and never blocks
@@ -1140,7 +1172,7 @@ repository has no Markdown linter, and no source file changed.
 Platform impact: documentation for web, desktop and marketing; no implementation.
 Future mobile is not applicable.
 
-## Ticket 232: Astro and Vitest dependency integration — October 22, 2026
+## PRs #125 and #126: Astro and Vitest dependency integration — October 22, 2026
 
 PR #125 removes Astro's transitive esbuild installation. The portable SHA-256
 browser test and two retained QA scripts import esbuild directly. Declare it as
@@ -1161,8 +1193,9 @@ waive the open alert. The combined audit removes both Vitest findings; five
 high package entries remain in the development-only braces/ESLint chain. The
 production-only audit reports zero, but the all-scope audit still fails. No
 suppression, downgrade or security waiver is included. No production, Trust
-publication, signing-key or activation change occurred. Ticket 232 remains
-incomplete.
+publication, signing-key or activation change occurred. The disputed
+http-cache-semantics alert and the five high development-only audit entries remain
+open; neither is tracked under MCP Ticket 232.
 
 Platform impact: marketing's existing Astro upgrade and test tooling only;
 web and desktop runtime behavior is unchanged. Future mobile is not implemented.
