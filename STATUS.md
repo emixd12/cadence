@@ -25,7 +25,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
 - Sign-in and Calendar callback replays and session renewal passed. Ticket 165: allowed
   state and the status-only permission read pass; the denied state stays with the owner.
   Ticket 187 installed desktop consent passes: the Daily Brief Calendar grant connected
-  with one calendar, the Timeline grant unchanged, calendar sharing with OpenAI off.
+  with one calendar and the Timeline grant unchanged. The owner then turned on Calendar
+  timing for Daily Brief (`includeCalendar: true`, read back at 00:20Z on October 28).
 - Not established: a completion place label on an installed Mac (CoreLocation returned
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
