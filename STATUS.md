@@ -1,5 +1,48 @@
 # Implementation Status
 
+## Account sync timezone rule for archived Behaviors — October 27, 2026
+
+Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
+source. The hosted push is not done and needs the owner's explicit authorization.
+
+- Bug: a profile timezone change on a linked Mac failed every sync when the account
+  had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
+  every Behavior (rule from `20260901054332`, kept in `20261027120000`). Desktop
+  `update_timezone` and the web Settings RPC move only active Behaviors, as
+  `docs/DATA_MODEL.md` and `docs/DATETIME_STRATEGY.md` specify. The docs agree:
+  archived Behaviors keep their historical timezone. Reproduced on published 0.1.5;
+  the same rule is on `main`.
+- Fix forward: `20261027221625_account_sync_active_behavior_timezones.sql` replaces
+  only that rule in `cadence_private.apply_account_sync_plan`. Every Behavior active
+  before and after the plan must end in the new timezone: its upsert carries the
+  timezone, or it has no upsert and already uses it. An upsert that archives a
+  Behavior also satisfies the rule. Read signatures, contract registry, old-client
+  projection and grants are unchanged.
+- A plain `active` filter was not enough. It still rejected a plan that archives a
+  Behavior and changes the timezone in one offline session, and a plan that leaves
+  an active Behavior already in the target timezone unwritten.
+- Fixture `tests/sql/account-sync-active-behavior-timezone-smoke.sql` builds each
+  plan as the hosted diff of the web Settings RPC and applies it through the real RPC
+  as contract 1 (no contract field, no-argument reader) and contract 2. Four plans
+  must apply; two plans that omit an active Behavior must still be rejected.
+- Local rehearsal on October 27 in the separate project `cadence-f1-timezone`,
+  through the reviewed Docker proxy with only its project identity changed: start and
+  `db reset --local` passed with all 94 migrations (ledger equal), and all seven
+  services stayed on `cadence-local` with loopback-only bindings. All 28 SQL
+  fixtures, the RLS smoke (92 ownership checks), the account-sync smoke and the
+  authenticated BehaviorStore contract passed. Auth users ended at zero. The new
+  fixture fails on the `20261027120000` rule with the F1 message, and a plain
+  `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
+  named volumes are kept. `habit-tracking-app` was not touched. Type generation was
+  refused by the proxy; no function signature changed.
+- Not verified: hosted push and readback, and a timezone change synced from an
+  installed Mac after the push.
+
+Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
+timezone change after the push, with no desktop code change. Web: no change; its
+Settings RPC already moves only active Behaviors. Marketing: not applicable. Future
+mobile: a mobile client would sync under the same server rule. Messaging impact: none.
+
 ## Cadence for Mac 0.1.6 release — October 27, 2026
 
 **Published October 27, 2026** on the owner's instruction. Release source `8be778a`
@@ -31,7 +74,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
   Behavior stalls sync, because the server requires every Behavior and both clients
-  update only active ones.
+  update only active ones. Fixed in source by migration
+  `20261027221625` (entry above); the hosted push needs the owner's authorization.
 
 Platform impact: desktop release only; web, marketing and future mobile have no change.
 Messaging impact: none; the packet holds draft release notes for the owner.
