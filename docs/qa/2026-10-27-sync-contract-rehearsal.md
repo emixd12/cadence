@@ -151,6 +151,26 @@ was performed. Hosted registry/function/grant readback and generated public
 RPC types for the new contract remain deployment follow-ups. The local pass
 does not imply that the hosted contract is available.
 
+## Hosted deployment — applied October 27, 20:31 UTC
+
+The owner authorized a CLI push after the blocked attempts above. Before the push,
+`migration list --linked` matched 92 entries through `20261024210000`, and the dry
+run listed only `20261027120000_account_sync_contracts.sql`. Its SQL SHA-256 still
+matched the pending hash in this record. `db push` with the Homebrew Supabase CLI
+2.109.1 applied it at 20:31:10 UTC.
+
+| Readback | Result |
+| --- | --- |
+| Ledger | 93 matched entries ending at `20261027120000`; no local-only or hosted-only entries |
+| Functions | Six `cadence_private` functions and both `public.read_account_sync_snapshot` signatures; each hosted body equals the migration text |
+| Grants | Execute and registry select for `authenticated` only; none for `anon` or `service_role`; empty `search_path` on every function |
+| Registry | Nine contract-2 rows; current contract 2, minimum writer contract 1 |
+| Public RPC types | `gen types --linked` matches `lib/db/database.types.ts` apart from generator boilerplate |
+| Data API | Anonymous calls to both signatures return 42501; an unknown function returns PGRST202 |
+
+These checks cover the hosted schema only. An authenticated sync, installed 0.1.5
+and contract-2 acceptance remain open.
+
 ## Final source and environment disposition
 
 No renamed-source replay was needed: the hosted migration did not execute, no

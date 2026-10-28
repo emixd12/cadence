@@ -330,7 +330,9 @@ The profile update, active-Behavior updates, configuration events, and one
 `timezone_changed` stale-state write share one owner-scoped database
 transaction. A failed Behavior precondition rolls back the profile update.
 Occurrence generation stays outside that transaction and can be retried while
-the committed sync state remains stale.
+the committed sync state remains stale. Desktop applies the same rule, and
+account sync accepts it: a synced timezone change never needs a write for an
+archived Behavior (see `public.apply_account_sync_plan(jsonb)` below).
 
 ### Completion place labels (Ticket 216)
 
@@ -1693,7 +1695,17 @@ conflicts, row preconditions, and idempotency before applying any write. It
 uses the existing owner-validating BehaviorLog restore boundary for graph,
 history, provenance, and protected-Occurrence changes. It applies profile
 timezone and reminder-delivery supplemental writes with compare-and-swap
-checks. The product writes and immutable receipt share one transaction. Public,
+checks. A profile timezone change must leave every Behavior that is active
+before and after the plan in the new timezone. Its upsert carries that timezone,
+or it has no upsert and already uses it. An upsert that archives a Behavior also
+satisfies the rule, and archived Behaviors need no write: they keep their
+historical timezone. Migration
+`20261027221625_account_sync_active_behavior_timezones.sql` set this rule. The
+earlier rule required a timezone upsert for every Behavior, archived ones
+included, so each sync of a timezone change failed on an account with an
+archived Behavior (0.1.6 release finding F1).
+`tests/sql/account-sync-active-behavior-timezone-smoke.sql` covers contracts 1
+and 2. The product writes and immutable receipt share one transaction. Public,
 anonymous, and service-role execution remain revoked; only `authenticated` may
 execute it. This narrow `SECURITY DEFINER` boundary avoids granting direct
 authenticated writes to protected history and graph tables.
@@ -1702,7 +1714,8 @@ authenticated writes to protected history and graph tables.
 
 Migration `20261027120000_account_sync_contracts.sql` adds contract
 versioning. A contract is the snapshot shape one client build understands.
-Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
+Plan: `docs/plans/2026-10-27-sync-compatibility.md`. Applied to hosted on October 27,
+2026.
 
 - `cadence_private.account_sync_contract_additions(contract, kind, field,
   default_value)` lists what each contract after 1 adds. A row with no `field`
