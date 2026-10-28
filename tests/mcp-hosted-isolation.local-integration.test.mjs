@@ -16,14 +16,14 @@ it.skipIf(!enabled)("exercises the hosted procedure with real grants in the isol
   expect(origin).toBe("http://127.0.0.1:56121");
   const publishableKey = process.env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY;
   const options = { auth: { persistSession: false, autoRefreshToken: false } };
-  const admin = createClient(origin, process.env.CADENCE_LOCAL_SUPABASE_SERVICE_KEY, options);
+  const adminAuth = createClient(origin, process.env.CADENCE_LOCAL_SUPABASE_SERVICE_KEY, options).auth.admin;
   const users = [], fixtures = {}, clients = [], preservedIds = [];
   const now = new Date();
   const date = Temporal.Now.plainDateISO("America/New_York").subtract({ days: 1 }).toString();
   try {
     for (const slot of ["a", "b"]) {
       const email = `mcp-isolation-${randomUUID()}@example.invalid`, password = `Qa-${randomUUID()}-aA1!`;
-      const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+      const created = await adminAuth.createUser({ email, password, email_confirm: true });
       expect(created.error).toBeNull();
       const user = created.data.user.id;
       users.push(user);
@@ -97,13 +97,21 @@ it.skipIf(!enabled)("exercises the hosted procedure with real grants in the isol
     // Reuse this exact migrated disposable stack; no hosted SQL connection exists here.
     const allBehaviorIds = Object.values(fixtures).flatMap(row => [row.walk, row.reading, row.stretch]);
     const categoryIds = Object.values(fixtures).map(row => row.category);
+    const readOwned = async (table, fields, column, ids) => {
+      const rows = [];
+      for (const [index, client] of clients.entries()) {
+        const result = await client.from(table).select(fields).eq("user_id", users[index]).in(column, ids).order("id");
+        expect(result.error).toBeNull();
+        rows.push(...result.data);
+      }
+      return rows.sort((a, b) => a.id.localeCompare(b.id));
+    };
     const runId = randomUUID(), rows = [];
     for (const table of TABLES) {
-      const query = admin.from(table).select("id,user_id,created_at");
-      const found = await query.in(table === "categories" || table === "behaviors" ? "id" : "behavior_id",
+      const found = await readOwned(table, "id,user_id,created_at",
+        table === "categories" || table === "behaviors" ? "id" : "behavior_id",
         table === "categories" ? categoryIds : allBehaviorIds);
-      expect(found.error).toBeNull();
-      rows.push(...found.data.map(row => ({ ...row, table, run_id: runId })));
+      rows.push(...found.map(row => ({ ...row, table, run_id: runId })));
     }
     const manifest = { version: 1, project: PROJECT, users, runId,
       startedAt: now.toISOString(), capturedAt: new Date().toISOString(), rows,
@@ -117,8 +125,7 @@ it.skipIf(!enabled)("exercises the hosted procedure with real grants in the isol
       return result.status === 0;
     };
     const initial = await snapshots();
-    const preservedBefore = await admin.from("behaviors").select("*").in("id", preservedIds).order("id");
-    expect(preservedBefore.error).toBeNull();
+    const preservedBefore = await readOwned("behaviors", "*", "id", preservedIds);
     for (const corrupt of [
       m => { m.rows.find(row => row.table === "behaviors").id = randomUUID(); },
       m => { const row = m.rows.find(row => row.table === "behaviors" && row.user_id === users[0]); row.user_id = users[1]; },
@@ -143,17 +150,15 @@ it.skipIf(!enabled)("exercises the hosted procedure with real grants in the isol
     for (const table of TABLES) {
       const ids = rows.filter(row => row.table === table).map(row => row.id);
       if (!ids.length) continue;
-      const retained = await admin.from(table).select("id").in("id", ids);
-      expect(retained.error).toBeNull(); expect(retained.data).toHaveLength(ids.length);
+      const retained = await readOwned(table, "id", "id", ids);
+      expect(retained).toHaveLength(ids.length);
     }
-    const events = await admin.from("behavior_configuration_events").select("id").in("behavior_id", allBehaviorIds);
-    expect(events.error).toBeNull();
-    expect(events.data.length).toBe(manifest.counts.behavior_configuration_events + 4);
-    const preservedAfter = await admin.from("behaviors").select("*").in("id", preservedIds).order("id");
-    expect(preservedAfter.error).toBeNull();
-    expect(JSON.stringify(preservedAfter.data) === JSON.stringify(preservedBefore.data)).toBe(true);
+    const events = await readOwned("behavior_configuration_events", "id", "behavior_id", allBehaviorIds);
+    expect(events.length).toBe(manifest.counts.behavior_configuration_events + 4);
+    const preservedAfter = await readOwned("behaviors", "*", "id", preservedIds);
+    expect(JSON.stringify(preservedAfter) === JSON.stringify(preservedBefore)).toBe(true);
 
   } finally {
-    for (const id of users) expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();
+    for (const id of users) expect((await adminAuth.deleteUser(id)).error).toBeNull();
   }
 }, 60_000);

@@ -187,6 +187,13 @@ response-body printing, and discard error context. No database credentials belon
 in command arguments. No all-account cron, purge, reset, seed or account deletion
 is part of cleanup.
 
+The reviewed cleanup connection must execute as **postgres**, not service_role.
+The DO block validates and locks rows as postgres; its existing SECURITY DEFINER
+Behavior RPC executes as its existing database owner, with the exact validated
+A/B auth.uid claim set transaction-locally. This explicitly authorized synthetic
+admin cleanup is not an RLS proof. Verify that connection role and the reviewed
+schema before execution; do not substitute a service-role Data API request.
+
 The transaction takes the existing account advisory locks in sorted order and
 locks every captured row. It checks exact table counts and full captured graph
 membership before the first archive. A missing ID, foreign owner, changed creation
@@ -266,8 +273,13 @@ through a private process environment. Use only the assigned cadence-mcp-232
 private workdir/project and ports56120–56129, with the project-scoped Docker
 proxy and loopback readback. Never run against the default local project.
 
-The harness uses admin credentials for its two disposable local users, captured
-fixture metadata and the bounded cleanup transaction. It signs them in normally and seeds through existing core/web services.
+The harness uses the Auth admin API only for two disposable local users. All
+fixture metadata and preservation reads use ordinary A/B authenticated sessions
+with explicit user and ID filters. It holds no service-role table-read assumption.
+The bounded local cleanup SQL runs as postgres through the exact isolated
+container. CLI2.109.1 defaults can revoke service_role table SELECT; do not add
+grants to make the harness pass. It signs users in normally and seeds through
+existing core/web services.
 It confirms direct own-Behavior PATCH is403, then runs the entire corrected
 procedure: three own RPC successes and three foreign null responses, invalid
 JWT denial, all other own/foreign table operations and note restoration.
