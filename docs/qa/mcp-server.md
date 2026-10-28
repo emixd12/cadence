@@ -82,10 +82,14 @@ authority. Do not substitute an owner account or another project to make it pass
 ### Exact operations, evidence and cleanup
 
 The script reuses `lib/supabase/integration-token.ts` for five-minute ES256 tokens.
-It makes only ID-filtered GET/PATCH requests to profiles, categories, behaviors
-and occurrences at the exact project's Data API. Each result is limited to one
-row; the request asks for at most two to detect malformed/unexpected results.
-There are no RPCs, account creation, list-all queries, inserts, deletes, cron,
+It makes ID-filtered reads of profiles, categories, Behaviors and Occurrences,
+and column-permitted PATCHes of profiles, categories and Occurrences. Behavior
+writes use the existing `update_behavior_with_schedule_graph` RPC, exactly as
+the web repository does. Its same-value payload preserves the complete synthetic
+Behavior and ordered schedule graph, with the exact expected update timestamp.
+The embedded schedule/slot read stays under that one Behavior and the16KiB cap.
+Each table result is limited to one row; requests ask for two to detect surprises.
+There are no account creations, list-all queries, inserts, deletes, cron,
 purge, reminders, or provider operations. It follows no redirects, retries no
 request, allows at most60 requests, bounds each request to4seconds and16KiB,
 and reserves30seconds for cleanup after a90second test budget.
@@ -94,12 +98,13 @@ and reserves30seconds for cleanup after a90second test budget.
    minted token. The script checks expiry and invalid-signature rejection (401)
    before mutations. The untrusted key is generated only in memory, with the
    trusted public kid and a different private key; it is never imported.
-2. A's GET of each B row must return an empty200 result. A's same-value PATCH
-   of each B row must return empty200 or403. Any returned row fails isolation.
+2. A's GET of each B row must return an empty200 result. A uses the same write
+   path for B that succeeds for A: column PATCHes or the Behavior RPC. Denial
+   must return an empty200/null RPC result or403. Any returned row fails isolation.
    Same-value writes limit harm if RLS is broken, but triggers may still record
    metadata; these are strictly approved synthetic rows.
-3. A's matching same-value profile/category/Behavior PATCHes must return its
-   exact row. A changes only its selected Occurrence note to **Review confirmed**
+3. A's matching same-value profile/category PATCHes and Behavior RPCs must
+   return its exact row. A changes only its selected Occurrence note to **Review confirmed**
    with a compare-and-swap filter, then reads it back.
 4. In `finally`, read that Occurrence once. Restore the original approved note
    only if it still equals the probe value, with another compare-and-swap.
@@ -113,6 +118,8 @@ cleanup **unverified**. Keep MCP disabled, inspect only the named A/B fixture ID
 through their owner sessions, and reconcile the approved note before another run.
 Do not delete users/grants/client registrations as an automatic cleanup fallback.
 This script restores note content, not timestamps or synthetic audit effects.
+Same-value Behavior transactions also mark the account occurrence-sync state stale;
+normal user synchronization resolves that state. They do not schedule reminders.
 Owner-approved end-of-acceptance cleanup remains separately ID-bound.
 
 Offline guard/fault tests:
@@ -122,6 +129,55 @@ node node_modules/vitest/vitest.mjs run tests/mcp-hosted-isolation.test.mjs
 ```
 
 These mocks prove the guards and assertion behavior; they do not prove hosted RLS.
+
+### Grant basis and real local verification
+
+| Call | Permission and ownership basis |
+|---|---|
+| Profile GET / timezone PATCH | Initial SELECT and owner policies (`20260607204951`); `20260825061411` revokes broad writes and explicitly grants only UPDATE(timezone). |
+| Category GET / name PATCH | Initial SELECT/UPDATE and owner policies; `20260815015023` revokes DELETE, not name UPDATE. |
+| Behavior GET | Initial SELECT and owner policy, retained after `20260815015023` removes direct writes. |
+| Embedded schedule/slot GET | SELECT and owner policies in `20260626140000` / `20260609202707`; direct write revocations retain SELECT. |
+| Behavior RPC POST | Explicit authenticated EXECUTE in `20260815015023`; latest replacement `20260827071000` and later field-preservation patches. This existing SECURITY DEFINER function checks auth.uid(), looks up the target with user_id=auth.uid(), and returns null for a foreign target. It also validates exact expected graph/timestamp. This is ownership enforcement inside the supported RPC, not a new RLS bypass. |
+| Occurrence GET / note PATCH and restoration | Initial SELECT/owner policies; `20260815023424` regrants UPDATE(note,status,completed_at,status_marked_at) after broad UPDATE revocation. Exact ID and expected-note filters bound both mutation and restoration. |
+| Expired/wrong-key profile GET | The same SELECT path; Auth/PostgREST JWT rejection must occur before the query. |
+
+The surrounding execution runbook uses the ordinary web services for fixture
+creation: `manage_categories` (authenticated EXECUTE, auth.uid()-bound checks in
+`20260905035835`), `create_behavior_with_schedule_graph` (authenticated EXECUTE,
+owner-derived inserts in `20260815015023`), and
+`apply_occurrence_status_transition` (authenticated EXECUTE, owner-scoped target
+in `20260709203117`). Plain note edits use the permitted note PATCH above;
+shortcut edits use `update_occurrence_note_with_shortcut` with authenticated
+EXECUTE and owner checks in `20260908003245`. Synthetic time-session start/stop
+uses the INSERT/UPDATE grants and owner RLS in `20260802000000`. Consent and
+revocation use authenticated `oauth_approve_consent` / `oauth_revoke_grant`,
+which bind to auth.uid() in `20261018160000`; token endpoints remain service-only.
+No fixture setup requires granting raw Behavior writes. Management API metadata,
+signing-key operations and Vercel configuration use separately authorized
+provider access; they are not user RLS tests. Any later physical fixture cleanup
+still needs its exact ID-bound transaction and dependency review before execution.
+
+`tests/mcp-hosted-isolation.local-integration.test.mjs` imports the **same**
+runHostedIsolation function. Its separate, opt-in transport accepts only
+http://127.0.0.1:56121 and forwards the pinned hosted requests to that isolated
+stack. It never relaxes the CLI hosted-project guard or existing local-suite
+guards. Set CADENCE_MCP_HOSTED_ISOLATION_LOCAL=1 plus the existing
+CADENCE_LOCAL_SUPABASE_URL, CADENCE_LOCAL_SUPABASE_SERVICE_KEY,
+CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY and CADENCE_LOCAL_INTEGRATION_SIGNING_KEY
+through a private process environment. Use only the assigned cadence-mcp-232
+private workdir/project and ports56120–56129, with the project-scoped Docker
+proxy and loopback readback. Never run against the default local project.
+
+The harness uses admin credentials only to create/delete its two disposable local
+users. It signs them in normally and seeds through existing core/web services.
+It confirms direct own-Behavior PATCH is403, then runs the entire corrected
+procedure: three own RPC successes and three foreign null responses, invalid
+JWT denial, all other own/foreign table operations and note restoration.
+It compares complete Behavior/schedule graphs (allowing own updated_at changes)
+and requires B's graph to remain byte-equivalent. This is local SQL evidence,
+not proof of hosted acceptance. No hosted call occurs in this harness.
+
 
 ### Timeout evidence: metadata only
 

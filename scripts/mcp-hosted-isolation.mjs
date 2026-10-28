@@ -11,6 +11,8 @@ const ORIGIN = `https://${PROJECT}.supabase.co`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NOTE = "Review sample note";
 const PROBE_NOTE = "Review confirmed";
+// Read the exact synthetic graph so the existing atomic writer preserves all fields.
+const BEHAVIOR_SELECT = "*,schedules:behavior_schedules!behavior_schedules_behavior_owner_fkey(id,recurrence_rule,sort_order,time_entries:behavior_schedule_slots!behavior_schedule_slots_schedule_owner_fkey(id,kind,preset,start_time,end_time,sort_order))";
 const FIELDS = ["category", "walk", "reading", "stretch", "occurrence"];
 
 function requireCheck(ok, code) {
@@ -63,8 +65,10 @@ export async function runHostedIsolation(args, env, fixtures, fetcher = fetch, n
     requireCheck(++requests <= 60 && Date.now() - start < (restoring ? 120_000 : 90_000), "request-budget");
     const query = new URLSearchParams({ id: `eq.${id}`, select, limit: "2" });
     if (noteFilter !== undefined) query.set("note", noteFilter === null ? "is.null" : `eq.${noteFilter}`);
-    const response = await fetcher(`${ORIGIN}/rest/v1/${table}?${query}`, {
-      method: patch ? "PATCH" : "GET", redirect: "error", signal: AbortSignal.timeout(4000),
+    const behaviorWrite = table === "behaviors" && patch;
+    const endpoint = behaviorWrite ? "rpc/update_behavior_with_schedule_graph" : `${table}?${query}`;
+    const response = await fetcher(`${ORIGIN}/rest/v1/${endpoint}`, {
+      method: behaviorWrite ? "POST" : patch ? "PATCH" : "GET", redirect: "error", signal: AbortSignal.timeout(4000),
       headers: { apikey: config.publishableKey, Authorization: `Bearer ${auth}`,
         "Content-Type": "application/json", Prefer: "return=representation" },
       ...(patch ? { body: JSON.stringify(patch) } : {}),
@@ -84,7 +88,9 @@ export async function runHostedIsolation(args, env, fixtures, fetcher = fetch, n
         chunks.push(value);
       }
     } finally { await reader.cancel(); }
-    const rows = JSON.parse(Buffer.concat(chunks).toString());
+    const value = JSON.parse(Buffer.concat(chunks).toString());
+    // The product RPC returns a row or null for a target the caller does not own.
+    const rows = behaviorWrite ? (value === null ? [] : [value]) : value;
     requireCheck(Array.isArray(rows) && rows.length <= 1, "unexpected-row-count");
     return { status: response.status, rows };
   }
@@ -105,11 +111,26 @@ export async function runHostedIsolation(args, env, fixtures, fetcher = fetch, n
     requireCheck(category.user_id === user && category.name === "Review examples", "fixture-category");
     records.push({ table: "categories", id: fixture.category, patch: { name: category.name } });
     for (const [field, title] of [["walk", "Review walk"], ["reading", "Review reading"], ["stretch", "Review stretch"]]) {
-      const behavior = own(await request(auth, "behaviors", fixture[field], "id,user_id,title,category_id,browser_reminder_enabled,email_reminder_enabled,active,archived_at"), fixture[field]);
+      const behavior = own(await request(auth, "behaviors", fixture[field], BEHAVIOR_SELECT), fixture[field]);
       requireCheck(behavior.user_id === user && behavior.title === title && behavior.category_id === fixture.category
         && behavior.browser_reminder_enabled === false && behavior.email_reminder_enabled === false
         && behavior.active === (field !== "stretch") && (field === "stretch" ? Boolean(behavior.archived_at) : behavior.archived_at === null), "fixture-behavior");
-      records.push({ table: "behaviors", id: fixture[field], patch: { title } });
+      requireCheck(Array.isArray(behavior.schedules) && behavior.schedules.length > 0
+        && typeof behavior.updated_at === "string", "fixture-behavior-graph");
+      const graph = behavior.schedules.map((schedule) => ({ ...schedule,
+        time_entries: [...schedule.time_entries].sort((a, b) => a.sort_order - b.sort_order
+          || a.start_time.localeCompare(b.start_time) || a.id.localeCompare(b.id)),
+      })).sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+      const payload = { ...behavior };
+      delete payload.schedules;
+      // Same-value transaction, with the same optimistic-concurrency input as the web writer.
+      records.push({ table: "behaviors", id: fixture[field], patch: {
+        target_behavior_id: fixture[field], behavior_payload: payload,
+        expected_definition: { stored_title: title, stored_description: behavior.description,
+          normalized_title: title, normalized_description: behavior.description },
+        expected_schedule_graph: graph, expected_updated_at: behavior.updated_at,
+        definition_event_plan: null, configuration_event_plan: null, schedule_graph: graph,
+      } });
     }
     const occurrence = own(await request(auth, "occurrences", fixture.occurrence, "id,user_id,behavior_id,local_date,note"), fixture.occurrence);
     requireCheck(occurrence.user_id === user && occurrence.behavior_id === fixture.walk

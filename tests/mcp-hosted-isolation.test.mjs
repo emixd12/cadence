@@ -5,7 +5,7 @@ import { PROJECT, main, readConfig, runHostedIsolation } from "../scripts/mcp-ho
 const now = new Date("2026-10-28T01:00:00Z");
 const note = "Review sample note";
 
-function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, timeoutAfterWrite = false, cleanupConflict = false } = {}) {
+function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, timeoutAfterWrite = false, cleanupConflict = false, leakBehaviorWrite = false } = {}) {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const users = [randomUUID(), randomUUID()];
   const fixtures = Object.fromEntries(["a", "b"].map((slot) => [slot,
@@ -21,7 +21,10 @@ function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, ti
     for (const [field, title] of [["walk", "Review walk"], ["reading", "Review reading"], ["stretch", "Review stretch"]]) {
       rows.set(f[field], { id: f[field], user_id: user, title, category_id: f.category,
         browser_reminder_enabled: false, email_reminder_enabled: false,
-        active: field !== "stretch", archived_at: field === "stretch" ? now.toISOString() : null });
+        active: field !== "stretch", archived_at: field === "stretch" ? now.toISOString() : null,
+        description: null, updated_at: now.toISOString(), schedules: [{ id: randomUUID(),
+          recurrence_rule: { frequency: "daily", interval: 1 }, sort_order: 0,
+          time_entries: [{ id: randomUUID(), kind: "exact", preset: null, start_time: "09:00:00", end_time: null, sort_order: 0 }] }] });
     }
     rows.set(f.occurrence, { id: f.occurrence, user_id: user, behavior_id: f.walk, local_date: "2026-10-27", note });
   }
@@ -29,11 +32,13 @@ function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, ti
   const fetcher = vi.fn(async (url, init) => {
     const parsed = new URL(url);
     expect(parsed.origin).toBe(`https://${PROJECT}.supabase.co`);
-    expect(parsed.pathname).toMatch(/^\/rest\/v1\/(profiles|categories|behaviors|occurrences)$/);
+    const rpc = parsed.pathname === "/rest/v1/rpc/update_behavior_with_schedule_graph";
+    expect(parsed.pathname).toMatch(/^\/rest\/v1\/(profiles|categories|behaviors|occurrences|rpc\/update_behavior_with_schedule_graph)$/);
     expect(init.redirect).toBe("error");
     expect(init.signal).toBeInstanceOf(AbortSignal);
-    expect(parsed.searchParams.get("limit")).toBe("2");
-    const id = parsed.searchParams.get("id").slice(3);
+    if (!rpc) expect(parsed.searchParams.get("limit")).toBe("2");
+    const body = init.body && JSON.parse(init.body);
+    const id = rpc ? body.target_behavior_id : parsed.searchParams.get("id").slice(3);
     const jwt = init.headers.Authorization.slice(7);
     const [header, payload, signature] = jwt.split(".");
     const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
@@ -47,8 +52,17 @@ function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, ti
       response.json = () => { throw new Error("error body consumed"); };
       return response;
     }
+    if (parsed.pathname.endsWith("/behaviors") && init.method === "PATCH") return new Response(null, { status: 403 });
     const row = rows.get(id);
     const allowed = (row.user_id ?? row.id) === claims.sub;
+    if (rpc) {
+      expect(init.method).toBe("POST");
+      expect(body.behavior_payload.id).toBe(id);
+      expect(body.expected_updated_at).toBe(row.updated_at);
+      expect(body.expected_schedule_graph).toEqual(body.schedule_graph);
+      if (!allowed && !leakBehaviorWrite) return Response.json(null);
+      return Response.json(row);
+    }
     if (!allowed && !(init.method === "PATCH" ? leakWrite : leakRead)) return Response.json([]);
     if (init.method === "PATCH") {
       const filter = parsed.searchParams.get("note");
@@ -58,7 +72,8 @@ function setup({ leakRead = false, leakWrite = false, acceptBadToken = false, ti
     } else if (row.note === "Review confirmed" && cleanupConflict) {
       row.note = "concurrent synthetic edit";
     }
-    return Response.json([Object.fromEntries(parsed.searchParams.get("select").split(",").map((key) => [key, row[key]]))]);
+    return Response.json([parsed.pathname.endsWith("/behaviors") && parsed.searchParams.get("select").includes("schedules:")
+      ? structuredClone(row) : Object.fromEntries(parsed.searchParams.get("select").split(",").map((key) => [key, row[key]]))]);
   });
   return { args, env, fixtures, users, rows, calls, fetcher };
 }
@@ -110,7 +125,7 @@ it.each(["reminders", "title", "ownership", "old-date", "private-note"])("refuse
   expect(t.calls.every((c) => c.method === "GET")).toBe(true);
 });
 
-it.each(["leakRead", "leakWrite", "acceptBadToken"])("detects broken isolation %s without returning Passed", async (fault) => {
+it.each(["leakRead", "leakWrite", "leakBehaviorWrite", "acceptBadToken"])("detects broken isolation %s without returning Passed", async (fault) => {
   const t = setup({ [fault]: true });
   await expect(runHostedIsolation(t.args, t.env, t.fixtures, t.fetcher, now)).rejects.toThrow();
   expect(t.rows.get(t.fixtures.a.occurrence).note).toBe(note);
@@ -160,4 +175,16 @@ it("validates the explicit manifest without requiring network access", () => {
   const t = setup();
   expect(readConfig(t.args, t.env, t.fixtures).users).toEqual(t.users);
   expect(() => readConfig(t.args, {}, t.fixtures)).toThrow("publishable-key-required");
+});
+
+it("uses the same supported Behavior RPC for own success and cross-account denial", async () => {
+  const t = setup();
+  await runHostedIsolation(t.args, t.env, t.fixtures, t.fetcher, now);
+  const writes = t.calls.filter((call) => call.patch?.target_behavior_id);
+  expect(writes).toHaveLength(6);
+  expect(writes.every((call) => call.method === "POST")).toBe(true);
+  expect(new Set(writes.map((call) => call.id))).toEqual(new Set([
+    t.fixtures.a.walk, t.fixtures.a.reading, t.fixtures.a.stretch,
+    t.fixtures.b.walk, t.fixtures.b.reading, t.fixtures.b.stretch,
+  ]));
 });
