@@ -11949,10 +11949,12 @@ cutover and Google branding, October 24, 2026"). Desktop: the published Mac 0.1.
 `0.1.6-dev.2`, with the same location code and entitlement, the first macOS prompt
 appeared and a foreground position was available (`docs/qa/travel-release.md`,
 October 24). Open Location Services (`INT-TRAVEL-007`) and the status-only permission
-read ship in desktop 0.1.6 or later. Still open: the denied state, a never-authorized
-macOS user on a notarized build, the installed check of Open Location Services and
-Check again, the installed regression of the status-only permission read, and the
-directions handoff matrix now that Ticket 215 is deployed.
+read ship in desktop 0.1.6 or later. Still open: the denied state, the installed check
+of Open Location Services and Check again, the installed regression of the status-only
+permission read, and the directions handoff matrix now that Ticket 215 is deployed.
+October 27, 2026: the never-authorized macOS user check is no longer a ticket or release
+gate (`docs/DECISIONS.md`, 2026-10-27); the idea is logged in `docs/FUTURE_UPDATES.md`,
+"Never-run Mac or macOS user test workflow".
 
 September evidence: repository, local database, public-landmark, deployed-web and
 private-account acceptance pass (PRs #58–#65, September 22–23). Installed macOS passed
