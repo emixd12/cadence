@@ -7,8 +7,11 @@
 `156960f0…`, DMG `3a2f6806…`) and published to `desktop-stable`. The stable feed has
 offered 0.1.6 since 22:33:43Z and the preview feed since 22:47:28Z. The test Mac upgraded from
 0.1.5 through the real updater: schema 18 → 20, no lost rows, contract-2 convergence. The
-public readback and the quarantined download of the version-free DMG pass. Open: reconnecting
-the test Mac after the revoked-session check (owner sign-in). The never-run macOS user check:
+public readback and the quarantined download of the version-free DMG pass. The revoked-session
+check passed, including the test Mac's reconnect (re-linked 22:51:27Z; synced again on October 28
+at 00:38:06Z with 0 pending). PR #158 merged on October 28 as `02ad42b`. The Trust marketing-ID
+refresh followed: the variable now names marketing deployment `dpl_Hnpbc6Q8…`, and the
+app was redeployed as `dpl_3ZeAo1qe…` (ready 00:39:28Z). The never-run macOS user check:
 Not required: removed by owner decision, October 27, 2026. Packet:
 `docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
 `docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
