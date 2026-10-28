@@ -3,25 +3,28 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
+import { partialGraph } from "./helpers/mcp-fixture-partial.mjs";
 import { buildFixtureBundle, FIXTURE_SOURCE } from "../scripts/build-mcp-hosted-fixtures.mjs";
 
 const USERS = ["caefd1b8-ea46-485f-8869-119a715fb092", "c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b"];
 const CATEGORY = { id: "a29dd2d0-5425-4180-a29a-01a026ebb8c0", user_id: USERS[0], created_at: "2026-10-28T02:17:19.262435+00:00" };
 const RUN = { runId: "4db9fe6e-a966-4cca-938b-aee5a1b955b7", startedAt: "2026-10-28T02:17:18.882Z", D: "2026-10-27", users: USERS, source: FIXTURE_SOURCE };
-let runFixtures, buildRoot, receipt;
+let runFixtures, buildRoot, receipt, bundle;
 beforeAll(async () => {
   expect(process.versions.node.split(".")[0]).toBe("24");
   mkdirSync(".intent/artifacts", { recursive: true });
   buildRoot = mkdtempSync(".intent/artifacts/fixture-bundle-test-");
   const output = join(buildRoot, "fixtures.mjs");
   receipt = buildFixtureBundle(output);
-  ({ runFixtures } = await import(pathToFileURL(join(process.cwd(), output)).href));
+  bundle = await import(pathToFileURL(join(process.cwd(), output)).href);
+  ({ runFixtures } = bundle);
 });
 afterAll(() => rmSync(buildRoot, { recursive: true, force: true }));
 
-async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, stopAtOccurrences = false, now = "2026-10-28T14:25:00Z" } = {}) {
+async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, changeGraph, now = "2026-10-28T14:25:00Z" } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "fixture-resume-test-"));
-  const files = { "execution": RUN, "fixture-ids": { a: { category: CATEGORY.id } }, "creation-receipts": [{ path: "/rest/v1/categories", ...CATEGORY }] };
+  const files = { "execution": RUN, "fixture-ids": { a: { category: CATEGORY.id } }, "creation-receipts": [{ path: "/rest/v1/categories", ...CATEGORY }], "resume-started": bundle.PRIOR_RESUME, "resume-fixture-ids": bundle.PARTIAL_IDS };
+  const graph = partialGraph(bundle); changeGraph?.(graph);
   const category = { ...CATEGORY, name: "Review examples", updated_at: CATEGORY.created_at };
   changeCategory?.(category);
   const input = { mode, allowHostedProject: "qjodzutjxtmtzczbloxa", publishableKey: "sb_publishable_OFFLINE",
@@ -32,27 +35,20 @@ async function attempt({ mode = "resume", changeCategory, changeFiles, changeInp
   for (const [name, value] of Object.entries(copied)) writeFileSync(join(directory, `${name}.json`), JSON.stringify(value));
   const originalBytes = Object.fromEntries(Object.keys(files).map(name => [name, readFileSync(join(directory, `${name}.json`), "utf8")]));
   const calls = [];
-  let createdBehavior;
   const fetcher = async (url, options) => {
     const parsed = new URL(url), method = options.method ?? "GET";
     const auth = new Headers(options.headers).get("authorization");
     const user = JSON.parse(Buffer.from(auth.split(".")[1], "base64url").toString()).sub;
     calls.push({ path: parsed.pathname, method, ...(options.body ? { payload: JSON.parse(options.body) } : {}) });
     const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
-    if (method === "POST" && parsed.pathname === "/rest/v1/rpc/create_behavior_with_schedule_graph") {
-      if (stopAtOccurrences) {
-        createdBehavior = { ...JSON.parse(options.body).behavior_payload, id: "11111111-1111-4111-8111-111111111111",
-          created_at: now, updated_at: now, schedule_slots: [], schedules: [] };
-        return json(createdBehavior);
-      }
-      return json({ message: "SECRET_PROVIDER_ERROR_WITH_NOTE_TEXT" }, 400);
-    }
-    if (method === "POST" && parsed.pathname === "/rest/v1/occurrences") return json({}, 400);
+    if (method === "POST") return json({ message: "SECRET_PROVIDER_ERROR_WITH_NOTE_TEXT" }, 400);
     expect(method).toBe("GET");
     if (parsed.pathname === "/auth/v1/user") return json({ id: user });
     if (parsed.pathname === "/rest/v1/profiles") return json({ id: user, timezone: "America/New_York" });
-    if (parsed.pathname === "/rest/v1/categories") return json(user === USERS[0] || bCategory ? [category] : []);
-    if (parsed.pathname === "/rest/v1/behaviors") return json(parsed.searchParams.has("id") ? createdBehavior : behavior ? [{ id: "existing" }] : []);
+    if (parsed.pathname === "/rest/v1/categories" && !parsed.searchParams.has("id")) return json(user === USERS[0] || bCategory ? [category] : []);
+    if (parsed.pathname === "/rest/v1/behaviors" && !parsed.searchParams.has("id")) return json(behavior ? [{ id: "existing" }] : user === USERS[0] ? [{ id: bundle.PARTIAL_IDS.a.walk }] : []);
+    const table = parsed.pathname.split("/").at(-1);
+    if (graph[table]) return json(graph[table]);
     throw new Error("Unexpected offline request");
   };
   try {
@@ -60,7 +56,7 @@ async function attempt({ mode = "resume", changeCategory, changeFiles, changeInp
     const writes = calls.filter(c => c.method !== "GET");
     const persisted = Object.fromEntries(Object.keys(files).map(name => [name, JSON.parse(readFileSync(join(directory, `${name}.json`)))]));
     const bytesUnchanged = Object.keys(files).every(name => readFileSync(join(directory, `${name}.json`), "utf8") === originalBytes[name]);
-    const resumeReceipt = existsSync(join(directory, "resume-started.json")) ? JSON.parse(readFileSync(join(directory, "resume-started.json"))) : null;
+    const resumeReceipt = existsSync(join(directory, "completion-started.json")) ? JSON.parse(readFileSync(join(directory, "completion-started.json"))) : null;
     const second = mode === "resume" && writes.length ? await runFixtures(input, { directory, fetcher, now: new Date("2026-10-28T14:25:01Z") }) : null;
     return { result, calls, writes, persisted, second, bytesUnchanged, resumeReceipt };
   } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -72,20 +68,22 @@ it("builds only frozen product inputs and checks installed runtime dependency ve
   expect(receipt.inputs.every(i => /^(lib|packages\/core)\//.test(i.path))).toBe(true);
   expect(receipt.dependencies["@supabase/supabase-js"]).toBe("2.107.0");
 });
-it("reuses A's exact category and sends a coherent frozen RPC payload without recreating it", async () => {
+it("reuses the exact partial graph and submits only the remaining status through the frozen planner", async () => {
   const { result, writes, persisted, second, bytesUnchanged, resumeReceipt } = await attempt();
   expect(writes).toHaveLength(1);
-  expect(writes[0].path).toBe("/rest/v1/rpc/create_behavior_with_schedule_graph");
-  const plan = writes[0].payload.configuration_event_plan;
-  expect(plan.changed_fields).toContain("where_kind");
-  expect(plan.next_configuration).toHaveProperty("where_kind", null);
-  expect(writes[0].payload.behavior_payload.category_id).toBe(CATEGORY.id);
+  expect(writes[0].path).toBe("/rest/v1/rpc/apply_occurrence_status_transition");
+  const p = writes[0].payload;
+  expect(p.target_occurrence_id).toBe("8b4d5d5e-d13b-4ab3-bbe4-66b86f337e7d");
+  expect(p.planned_status).toBe("not_completed");
+  expect(p.planned_completed_at).toBeNull();
+  expect(p.planned_event_effective_at).toBeTruthy();
+  expect(p.planned_event_effective_at).toBe(p.planned_status_marked_at);
+  expect(p.planned_event_recorded_at).toBe(p.planned_status_marked_at);
   expect(result).toMatchObject({ result: "stopped", stage: "a-walk", lastRequest: { status: 400 } });
   expect(JSON.stringify(result)).not.toContain("SECRET_PROVIDER_ERROR");
   expect(persisted.execution).toEqual(RUN);
-  expect(persisted["creation-receipts"]).toEqual([{ path: "/rest/v1/categories", ...CATEGORY }]);
   expect(bytesUnchanged).toBe(true);
-  expect(resumeReceipt).toEqual({ initialD: "2026-10-27", D: "2026-10-28", resumedAt: "2026-10-28T14:25:00.000Z", runId: RUN.runId, source: FIXTURE_SOURCE });
+  expect(resumeReceipt).toEqual({ initialD: "2026-10-27", D: "2026-10-28", resumedAt: "2026-10-28T14:25:00.000Z", runId: RUN.runId, source: FIXTURE_SOURCE, priorResume: bundle.PRIOR_RESUME.resumedAt });
   expect(second).toMatchObject({ result: "stopped", stage: "input", requests: 0 });
 });
 it("preflight has no writes", async () => {
@@ -97,12 +95,21 @@ it.each(["2026-10-28T03:59:59Z", "2026-10-29T04:00:00Z"])("refuses October27 and
   expect(result).toMatchObject({ result: "stopped", stage: "input", requests: 0 });
   expect(calls).toHaveLength(0);
 });
-it("bounds resumed walk Occurrences to October21–28 and preserves all original receipt bytes", async () => {
-  const { writes, bytesUnchanged } = await attempt({ stopAtOccurrences: true });
-  const insert = writes.find(call => call.path === "/rest/v1/occurrences");
-  expect(insert).toBeDefined();
-  expect(insert.payload.map(row => row.local_date)).toEqual(Array.from({ length: 8 }, (_, i) => `2026-10-${21 + i}`));
-  expect(bytesUnchanged).toBe(true);
+it.each([
+  g => { g.occurrences.pop(); },
+  g => { g.occurrences[0].created_at = "2026-10-28T18:11:35+00:00"; },
+  g => { g.occurrences[0].status = "completed"; },
+  g => { g.occurrences[0].note = "Changed"; },
+  g => { g.occurrence_status_events[0].effective_at = "2026-10-25T14:00:00Z"; },
+  g => { g.behaviors[0].user_id = USERS[1]; },
+  g => { g.behavior_schedule_slots[0].start_time = "10:00:00"; },
+  g => { g.behavior_definition_events[0].next_title = "Changed"; },
+  g => { g.behavior_configuration_events[0].next_configuration.email_reminder_enabled = true; },
+  g => { g.occurrence_time_sessions.push({ id: USERS[0] }); },
+])("refuses a partial graph mismatch before any write", async changeGraph => {
+  const { result, writes } = await attempt({ changeGraph });
+  expect(result).toMatchObject({ result: "stopped", stage: "session-and-fixture-preflight" });
+  expect(writes).toHaveLength(0);
 });
 it.each([
   c => { c.id = USERS[1]; }, c => { c.user_id = USERS[1]; }, c => { c.name = "Changed"; },
@@ -116,6 +123,8 @@ it.each([
 it.each([
   f => { f.execution.runId = USERS[0]; }, f => { f.execution.source = "another-source"; },
   f => { f["fixture-ids"].a.walk = USERS[0]; }, f => { f["creation-receipts"] = []; },
+  f => { f["resume-fixture-ids"].a.walk = USERS[1]; },
+  f => { f["resume-started"].D = "2026-10-27"; },
   f => { f["creation-receipts"][0].created_at = "2026-10-28T01:00:00Z"; },
 ])("refuses changed or incomplete retained receipts before any request", async changeFiles => {
   const { result, calls } = await attempt({ changeFiles });

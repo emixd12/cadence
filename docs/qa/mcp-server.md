@@ -262,30 +262,50 @@ the publishable key and ordinary A/B sessions through stdin/process memory.
 Never save session input or invoke the unbundled entry. `import.meta.fixtureSource`
 is absent outside the verified bundle, so the entry refuses direct execution.
 
-This is a one-run recovery, not a general seed command. It reuses only category
-`a29dd2d0-5425-4180-a29a-01a026ebb8c0` owned by A. Its name must remain
-`Review examples`; `created_at` must equal the retained creation receipt and
-`updated_at` must still equal that timestamp (the initial INSERT defaults both
-timestamps to the same transaction time). A different ID, owner, name, either
-timestamp, changed receipt, existing fixture Behavior, or B category aborts
-before writes. It never inserts an A category. The original run ID, start time
-and initial D=`2026-10-27` stay fixed. The explicit October 28 amendment sets
-`RESUME_D=2026-10-28` and compares it against the actual Temporal New York date.
-October 27 and October 29 refuse before any request; never inject an old clock.
-The resumed Occurrences cover October 21–28. `resume-started.json` records
-`initialD`, amended `D`, actual `resumedAt`, original run ID and frozen source.
-The original `execution.json`, `fixture-ids.json` and `creation-receipts.json`
-remain byte-unchanged. New IDs and receipts use `resume-fixture-ids.json` and
-`resume-creation-receipts.json`; pass the former to the isolation script.
-Cleanup retains the original start, so the captured A category remains inside
-the run window. The existing 48-hour maximum still stops cleanup after
-October 30 at 02:17:18.882 UTC; a later capture requires reconciliation.
+This is a one-run recovery, not a general seed command. It reuses only A's
+captured category `a29dd2d0-5425-4180-a29a-01a026ebb8c0` and Review walk
+`b2c5b6b1-457a-4e58-a14f-e4270c3d341e`. The October 28 18:11 UTC attempt
+created that Behavior's schedule/slot, eight October 21–28 Occurrences and one
+Completed event before the Not Completed RPC returned HTTP 400. The runner had
+supplied a null effective timestamp. Frozen SQL requires the Not Completed
+effective, recorded and marked timestamps to match. The isolated rehearsal
+reproduces SQLSTATE 22023; the hosted response SQLSTATE was not captured.
 
-An exclusive `resume-started.json` marker prevents blind replay after any partial
-resume. Creation receipts contain IDs, owners and creation times only. Ordinary
-authenticated sessions create Behaviors through the frozen shared-core service
-and existing RPC, then insert only the approved D−7..D Occurrences. Reminder
-settings stay off. No admin, schema or grant change is part of this runner.
+The repaired entry uses the frozen shared status resolver and one clock instant.
+It checks the retained `resume-started.json` and `resume-fixture-ids.json`, every
+captured row ID/owner/creation timestamp, schedule, status, note and history
+configuration before writes. The category name and both timestamps must still
+match. Any missing/extra row, changed content, other fixture Behavior or B
+category refuses. It never recreates A's category, walk, Occurrences or Completed
+event. It finishes A's Not Completed transition/time session, reading and archived
+stretch, then all of B through the same supported paths. Reminder settings stay
+off. No admin, schema or grant change is part of the hosted runner.
+
+The original run ID, start time and initial D=`2026-10-27` stay fixed. The explicit
+amendment `RESUME_D=2026-10-28` still checks the actual Temporal New York date.
+October 27 and October 29 refuse before any request; never inject an old clock.
+The Occurrences cover October 21–28. The original three receipts and prior resume
+receipts remain byte-unchanged. The exclusive `completion-started.json` records
+both dates, actual completion-attempt start, original run/source and prior resume.
+It prevents blind replay after any further partial success.
+
+New IDs and creation receipts use `completion-fixture-ids.json` and
+`completion-creation-receipts.json`; pass the former to the isolation script.
+Creation receipts contain IDs, owners and creation times only. Cleanup retains
+the original start and its 48-hour limit: October 30 at 02:17:18.882 UTC. A later
+capture requires reconciliation. The repair never substitutes a new run clock.
+
+`tests/mcp-hosted-fixtures.local-integration.test.mjs` is a separate opt-in local
+harness. It requires Homebrew Supabase 2.109.1, loopback port 56121, the isolated
+`cadence-mcp-232` database and all 94 frozen migrations. It runs the old frozen
+builder to reproduce the failure, then seeds a synthetic replica with the captured
+IDs/timestamps and tests the entire remaining A/B operation at the real current
+time. Only this harness redirects the injected transport. Hosted guards remain
+unchanged. Local-only privileged seeding never runs through the hosted entry.
+It also proves changed-partial refusal, no duplicate/replayed writes, preserved
+prior Completed history, notes, time sessions and all original receipt bytes.
+Rehearsal success does not authorize a hosted retry without independent review
+and fresh session/target preflight.
 
 Before archive cleanup, refresh the manifest through ordinary A/B sessions.
 Include every row derived from the captured original Behaviors and client-created
