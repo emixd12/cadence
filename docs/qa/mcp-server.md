@@ -234,6 +234,74 @@ rotate-while-disabled → session checks → isolation/timeout metadata → enab
 order remains. Activation changes the web deployment ID and requires the
 coordinated final-pair Trust refresh with full immutable-history preservation.
 
+### Frozen-source fixture resume and tool audit (October 28)
+
+The first fixture attempt created only A's `Review examples` category, then its
+Behavior RPC returned HTTP400. Both accounts had zero fixture Behaviors on the
+bounded readback. The provider error body was discarded; its SQLSTATE is unknown.
+Offline reproduction found mixed sources: the eb5afa5 planner included
+`where_kind`, but the workspace's older serializer omitted it. That payload
+violates the frozen SQL configuration validator. This is a demonstrated runner
+defect, not evidence that hosted grants need changing.
+
+`scripts/build-mcp-hosted-fixtures.mjs` builds the execution entry from exact
+`eb5afa5be5c49b43bbad3ffd5a25d6eddff30079` Git objects. It explicitly binds
+`@cadence/core` and `@/` to that archive, rejects other product-source inputs,
+checks each input against its Git blob, and checks the external runtime
+dependency versions against that source's lockfile. It writes a private bundle
+and hash receipt. It does not connect to a provider. Under Node24:
+
+```bash
+node scripts/build-mcp-hosted-fixtures.mjs /private/path/in/workspace/resume.mjs
+```
+
+The output must live under this workspace so Node resolves the checked runtime
+dependencies. Import its `runFixtures` export in a private Node24 child; pass
+`allowHostedProject: "qjodzutjxtmtzczbloxa"`, `mode: "preflight"` or `"resume"`,
+the publishable key and ordinary A/B sessions through stdin/process memory.
+Never save session input or invoke the unbundled entry. `import.meta.fixtureSource`
+is absent outside the verified bundle, so the entry refuses direct execution.
+
+This is a one-run recovery, not a general seed command. It reuses only category
+`a29dd2d0-5425-4180-a29a-01a026ebb8c0` owned by A. Its name must remain
+`Review examples`; `created_at` must equal the retained creation receipt and
+`updated_at` must still equal that timestamp (the initial INSERT defaults both
+timestamps to the same transaction time). A different ID, owner, name, either
+timestamp, changed receipt, existing fixture Behavior, or B category aborts
+before writes. It never inserts an A category. The original run ID, start time
+and D=`2026-10-27` stay fixed. A local-day rollover requires reconciliation;
+do not inject an old clock to bypass that guard.
+
+An exclusive `resume-started.json` marker prevents blind replay after any partial
+resume. Creation receipts contain IDs, owners and creation times only. Ordinary
+authenticated sessions create Behaviors through the frozen shared-core service
+and existing RPC, then insert only the approved D−7..D Occurrences. Reminder
+settings stay off. No admin, schema or grant change is part of this runner.
+
+Before archive cleanup, refresh the manifest through ordinary A/B sessions.
+Include every row derived from the captured original Behaviors and client-created
+`Review practice` IDs. Retain the original creation receipts and record the
+refresh separately. Never adopt a pre-existing Behavior or an unattributable
+row; refuse on missing lineage or an exhausted row bound. The archive transaction
+still enforces exact closure and preserves categories, Occurrences and history.
+
+| Step/tool | Source and import audit | Execution rule |
+|---|---|---|
+| Fixture creation, archive-stretch and status helper | Verified bundle above: all product imports are eb5afa5; external Supabase/Temporal dependency closure matches its lockfile. | Use only the new bundle and captured receipt; the original mixed bundle is retired. |
+| Category, Occurrence and time-session payloads | Fixed execution entry; no workspace-package imports. Category INSERT retains initial authenticated grant; Occurrence columns are explicitly granted in `20260815023424`; time-session INSERT is granted in `20260802000000`. | Exact A/B users and captured Behavior IDs; stop on denial, never switch roles. |
+| Session identity/continuity | Supabase JS `auth.getUser` and exact profile-ID reads; browser session capture is origin/account-bound and stays in memory. No product-package imports. | Owner's Cadence tabs only; renew the pre-rotation baseline if old tokens expire. |
+| Key generation/custody/import and environment operations | Node crypto, op, bounded Management API and Vercel CLI; no workspace-package imports. These are planned operations, not completed key proof. | Fixed project/vault/name, secret stdin or memory, metadata/public-key readbacks; no diagnostic helper reuse. |
+| Hosted isolation | Reviewed `scripts/mcp-hosted-isolation.mjs` imports Node builtins, Temporal and `lib/supabase/integration-token.ts`. The signer is byte-identical to eb5afa5 and imports only Node crypto. No `packages` import. | Keep the reviewed script; same-value Behavior RPC uses the actual read graph with null configuration plan. No raw Behavior PATCH. |
+| Timeout/privilege metadata | Fixed catalog-only SELECTs; no product imports. General-query postgres preflight returned HTTP201 with required booleans true at02:01:50UTC. | Preserve the proven cleanup transport; metadata is not cancellation proof. |
+| Trust workflow/collection | Workspace workflow, prepare helper and collector differ from eb5afa5. They must not drive release evidence. | Dispatch the normal remote workflow only after verifying main still equals frozen source; it checks out that source. Use frozen-source history/validation scripts and lockfile, not workspace npm aliases. |
+| Client consent and grant revocation | Actual frozen deployed UI/RPC and client OAuth flows; `oauth.repo.ts` is byte-identical and has type-only imports. | Owner handles consent; no local smoke/admin-consent substitution. Revoke only captured grant IDs as the owning user. |
+| Test Mac helper | `scripts/test-device.mjs` is absent from this old workspace; eb5afa5 has it and its AX helpers. Node builtins only. | Extract the exact frozen helper set; preserve test-Mac account/data and do not install or relink. |
+| Cleanup generator/transaction | Reviewed `mcp-fixture-cleanup.mjs` imports only Node builtins and reads the reviewed SQL template. SQL calls current database functions; no workspace serializer. Verified against eb5afa5's94 migrations. | Hash-bound refreshed manifest, confirmed postgres transport, archive only. No grant changes. |
+
+This repair changes QA tooling only. Web, marketing and desktop product code are
+unchanged; future mobile has no implementation impact. No hosted retry, key
+operation or activation is authorized by a successful offline test alone.
+
 ### Grant basis and real local verification
 
 | Call | Permission and ownership basis |
