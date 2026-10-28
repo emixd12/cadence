@@ -1,5 +1,176 @@
 # MCP server local acceptance — Ticket 228
 
+## Bounded hosted isolation preparation — Ticket 232 (October 28)
+
+This procedure is prepared, not executed. It is a separate hosted opt-in;
+the loopback guards in the existing local integration suites remain unchanged.
+It checks the internal-token Data API boundary, not OAuth consent, MCP scopes,
+all RPCs, or installed-client acceptance. Those need their separate tests.
+Web server security is the affected surface. Desktop acceptance uses a separate
+QA-only profile; marketing and future mobile gain no implementation from this script.
+
+### Required identities and fixtures
+
+The owner must name two dedicated Google QA accounts and their actual Auth UUIDs,
+approve this exact operation on project `qjodzutjxtmtzczbloxa`, and confirm neither
+is their real tracking account. Names alone do not prove an account is synthetic.
+Never create or delete accounts through this script. Never supply a service-role
+key. Use a publishable key and the approved integration signing key in process
+environment only, from its approved custody destination. Do not export the current
+provider private key or copy tokens, note text, or private keys into evidence.
+
+Prepare the existing **Review examples**, **Review walk**, **Review reading** and
+archived **Review stretch** fixtures described in
+`mcp-directory-submission.md#reviewer-account-plan`. Both accounts use
+America/New_York. Walk is daily09:00; reading is Mon/Wed/Fri19:00. Disable browser
+and email reminders; no push subscription, Calendar, travel or Daily Brief.
+Use only the previous week through today. The stopped time session and resolved
+status examples remain untouched by this script. Pause client/desktop editing
+for these fixtures during the check.
+
+Record the exact existing IDs in a private JSON file, without credentials:
+
+```json
+{
+  "a": { "category": "UUID", "walk": "UUID", "reading": "UUID", "stretch": "UUID", "occurrence": "UUID" },
+  "b": { "category": "UUID", "walk": "UUID", "reading": "UUID", "stretch": "UUID", "occurrence": "UUID" }
+}
+```
+
+Each Occurrence must belong to that account's Review walk, within the previous
+seven days or today, with a null note or exactly **Review sample note**.
+The script validates both complete sets, ownership, titles, category, archive
+state, timezone and reminders before any write. IDs must all be distinct UUIDs.
+Schedule semantics and the absence of other provider connections require the
+fixture-preparation checklist; the script does not inspect customer/provider data.
+
+After explicit approval, run with an actual Node24 runtime and these environment
+variable **names** injected privately: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+`CADENCE_INTEGRATION_JWT_SIGNING_KEY`. The script never loads `.env` files.
+
+```sh
+node --experimental-strip-types scripts/mcp-hosted-isolation.mjs \
+  --allow-hosted-project qjodzutjxtmtzczbloxa \
+  --qa-a ACTUAL_QA_A_AUTH_UUID --qa-b ACTUAL_QA_B_AUTH_UUID \
+  --fixtures /private/path/to/approved-fixture-ids.json
+```
+
+The placeholders deliberately fail validation. This command is not execution
+authority. Do not substitute an owner account or another project to make it pass.
+
+### Exact operations, evidence and cleanup
+
+The script reuses `lib/supabase/integration-token.ts` for five-minute ES256 tokens.
+It makes only ID-filtered GET/PATCH requests to profiles, categories, behaviors
+and occurrences at the exact project's Data API. Each result is limited to one
+row; the request asks for at most two to detect malformed/unexpected results.
+There are no RPCs, account creation, list-all queries, inserts, deletes, cron,
+purge, reminders, or provider operations. It follows no redirects, retries no
+request, allows at most60 requests, bounds each request to4seconds and16KiB,
+and reserves30seconds for cleanup after a90second test budget.
+
+1. A and B each read their exact profile and five fixture rows through their own
+   minted token. The script checks expiry and invalid-signature rejection (401)
+   before mutations. The untrusted key is generated only in memory, with the
+   trusted public kid and a different private key; it is never imported.
+2. A's GET of each B row must return an empty200 result. A's same-value PATCH
+   of each B row must return empty200 or403. Any returned row fails isolation.
+   Same-value writes limit harm if RLS is broken, but triggers may still record
+   metadata; these are strictly approved synthetic rows.
+3. A's matching same-value profile/category/Behavior PATCHes must return its
+   exact row. A changes only its selected Occurrence note to **Review confirmed**
+   with a compare-and-swap filter, then reads it back.
+4. In `finally`, read that Occurrence once. Restore the original approved note
+   only if it still equals the probe value, with another compare-and-swap.
+   Verify restoration, then verify B's note stayed unchanged through B's token.
+   An ambiguous timeout is never retried blindly. A conflicting edit stops cleanup.
+
+Output is fixed check labels and request count only. Errors produce a fixed
+failure message; provider bodies, tokens and note text are never printed.
+A failure, process termination, expired token or exhausted cleanup budget leaves
+cleanup **unverified**. Keep MCP disabled, inspect only the named A/B fixture IDs
+through their owner sessions, and reconcile the approved note before another run.
+Do not delete users/grants/client registrations as an automatic cleanup fallback.
+This script restores note content, not timestamps or synthetic audit effects.
+Owner-approved end-of-acceptance cleanup remains separately ID-bound.
+
+Offline guard/fault tests:
+
+```sh
+node node_modules/vitest/vitest.mjs run tests/mcp-hosted-isolation.test.mjs
+```
+
+These mocks prove the guards and assertion behavior; they do not prove hosted RLS.
+
+### Timeout evidence: metadata only
+
+Use the established CLI credential in memory and the Management API's dedicated
+`/v1/projects/qjodzutjxtmtzczbloxa/database/query/read-only` endpoint. Do not use
+the mutation query endpoint, assume a Management session is PostgREST, or print
+credentials. Run these SELECTs only; record the result with observation time:
+
+```sql
+select n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as arguments,
+       pg_get_userbyid(p.proowner) as owner, p.prosecdef as security_definer,
+       p.proconfig, p.proacl::text as acl
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname in
+  ('oauth_purge_expired', 'oauth_verify_access_token',
+   'oauth_rotate_refresh_token', 'integration_apply_write')
+order by p.proname;
+
+select r.rolname, r.rolcanlogin, r.rolbypassrls, coalesce(r.rolconfig, '{}') as settings
+from pg_roles r where rolname in ('authenticator', 'authenticated', 'service_role')
+order by r.rolname;
+
+select coalesce(r.rolname, 'all') as role, coalesce(d.datname, 'all') as database,
+       x.setting
+from pg_db_role_setting s
+left join pg_roles r on r.oid = s.setrole
+left join pg_database d on d.oid = s.setdatabase
+cross join lateral unnest(s.setconfig) x(setting)
+where (s.setrole = 0 or r.rolname in ('authenticator', 'authenticated', 'service_role'))
+  and x.setting ~ '^(statement_timeout|lock_timeout)='
+order by 1, 2, 3;
+```
+
+Compare function owner, SECURITY DEFINER, search_path, timeout overrides and ACL
+to the reviewed migration, including any database-specific role overrides.
+These records describe configuration. They do not prove a live PostgREST session
+loaded it, a cancelled HTTP call terminated SQL, or a nonzero purge completed.
+Do not call `oauth_purge_expired`, all-account scheduler routes, `pg_sleep`, locks,
+or customer-record queries to manufacture that evidence. No production timeout
+probe is included: it would require a separately reviewed isolated, no-customer-
+impact design and explicit approval. Retain this gap in activation readiness.
+
+### Activation order and release coordination
+
+Keep MCP disabled. After exact key-operation approval, generate one ES256 key in
+approved private custody, import standby, verify its public kid and set only the
+matching server secret. Rotate it to current **while MCP remains disabled**.
+Then verify fresh and pre-rotation synthetic sessions, run the approved bounded
+isolation check and review timeout evidence/gaps. Enable only after those gates
+pass and the owner grants all-user activation authority. Preserve all existing
+keys and session overlap; do not revoke them. Refresh jwt_exp/cache requirements
+before selecting the overlap (3600s plus15minutes was the recorded baseline).
+
+The activation redeploy changes the web deployment ID. Coordinate one final
+Trust refresh for that resulting web ID and current marketing ID with the other
+release owner. This workspace must not compete with its binding/deploy/migration
+work. Final client/desktop acceptance and cleanup follow; directory submission
+is excluded. No key or hosted operation is authorized by this local preparation.
+
+Owner inputs to fill before execution:
+
+- QA A and QA B Google identities, actual Auth UUIDs, fixture IDs and authorization.
+- Available Claude, Claude Code, ChatGPT and Inspector accounts/client versions.
+- Dedicated desktop/macOS QA target and isolated profile linked only to QA A.
+- Durable private-key custody destination and approved import/rotation operator.
+- Exact final production source/pair, all-user key/session/activation authority,
+  acceptance of any remaining timeout-proof gap or a separately approved probe.
+
+## Historical local acceptance — October 18
+
 Date: 2026-10-18. Starting foundation: `1cb5314d42d1e22e577d3b3685586a4ba924bd61`.
 Branch: `mcp-create`. Implementation commit `1bbdca5`; Inspector tested with
 Ticket 227 UI at `7019a80`. No hosted actions or deployment. Inspector OAuth and
