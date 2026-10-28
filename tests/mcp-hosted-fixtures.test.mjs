@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
@@ -19,7 +19,7 @@ beforeAll(async () => {
 });
 afterAll(() => rmSync(buildRoot, { recursive: true, force: true }));
 
-async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, now = "2026-10-28T02:25:00Z" } = {}) {
+async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, stopAtOccurrences = false, now = "2026-10-28T14:25:00Z" } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "fixture-resume-test-"));
   const files = { "execution": RUN, "fixture-ids": { a: { category: CATEGORY.id } }, "creation-receipts": [{ path: "/rest/v1/categories", ...CATEGORY }] };
   const category = { ...CATEGORY, name: "Review examples", updated_at: CATEGORY.created_at };
@@ -30,7 +30,9 @@ async function attempt({ mode = "resume", changeCategory, changeFiles, changeInp
   const copied = structuredClone(files);
   changeFiles?.(copied);
   for (const [name, value] of Object.entries(copied)) writeFileSync(join(directory, `${name}.json`), JSON.stringify(value));
+  const originalBytes = Object.fromEntries(Object.keys(files).map(name => [name, readFileSync(join(directory, `${name}.json`), "utf8")]));
   const calls = [];
+  let createdBehavior;
   const fetcher = async (url, options) => {
     const parsed = new URL(url), method = options.method ?? "GET";
     const auth = new Headers(options.headers).get("authorization");
@@ -38,21 +40,29 @@ async function attempt({ mode = "resume", changeCategory, changeFiles, changeInp
     calls.push({ path: parsed.pathname, method, ...(options.body ? { payload: JSON.parse(options.body) } : {}) });
     const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
     if (method === "POST" && parsed.pathname === "/rest/v1/rpc/create_behavior_with_schedule_graph") {
+      if (stopAtOccurrences) {
+        createdBehavior = { ...JSON.parse(options.body).behavior_payload, id: "11111111-1111-4111-8111-111111111111",
+          created_at: now, updated_at: now, schedule_slots: [], schedules: [] };
+        return json(createdBehavior);
+      }
       return json({ message: "SECRET_PROVIDER_ERROR_WITH_NOTE_TEXT" }, 400);
     }
+    if (method === "POST" && parsed.pathname === "/rest/v1/occurrences") return json({}, 400);
     expect(method).toBe("GET");
     if (parsed.pathname === "/auth/v1/user") return json({ id: user });
     if (parsed.pathname === "/rest/v1/profiles") return json({ id: user, timezone: "America/New_York" });
     if (parsed.pathname === "/rest/v1/categories") return json(user === USERS[0] || bCategory ? [category] : []);
-    if (parsed.pathname === "/rest/v1/behaviors") return json(behavior ? [{ id: "existing" }] : []);
+    if (parsed.pathname === "/rest/v1/behaviors") return json(parsed.searchParams.has("id") ? createdBehavior : behavior ? [{ id: "existing" }] : []);
     throw new Error("Unexpected offline request");
   };
   try {
     const result = await runFixtures(input, { directory, fetcher, now: new Date(now) });
     const writes = calls.filter(c => c.method !== "GET");
     const persisted = Object.fromEntries(Object.keys(files).map(name => [name, JSON.parse(readFileSync(join(directory, `${name}.json`)))]));
-    const second = mode === "resume" && writes.length ? await runFixtures(input, { directory, fetcher, now: new Date("2026-10-28T02:25:01Z") }) : null;
-    return { result, calls, writes, persisted, second };
+    const bytesUnchanged = Object.keys(files).every(name => readFileSync(join(directory, `${name}.json`), "utf8") === originalBytes[name]);
+    const resumeReceipt = existsSync(join(directory, "resume-started.json")) ? JSON.parse(readFileSync(join(directory, "resume-started.json"))) : null;
+    const second = mode === "resume" && writes.length ? await runFixtures(input, { directory, fetcher, now: new Date("2026-10-28T14:25:01Z") }) : null;
+    return { result, calls, writes, persisted, second, bytesUnchanged, resumeReceipt };
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
@@ -63,7 +73,7 @@ it("builds only frozen product inputs and checks installed runtime dependency ve
   expect(receipt.dependencies["@supabase/supabase-js"]).toBe("2.107.0");
 });
 it("reuses A's exact category and sends a coherent frozen RPC payload without recreating it", async () => {
-  const { result, writes, persisted, second } = await attempt();
+  const { result, writes, persisted, second, bytesUnchanged, resumeReceipt } = await attempt();
   expect(writes).toHaveLength(1);
   expect(writes[0].path).toBe("/rest/v1/rpc/create_behavior_with_schedule_graph");
   const plan = writes[0].payload.configuration_event_plan;
@@ -74,16 +84,25 @@ it("reuses A's exact category and sends a coherent frozen RPC payload without re
   expect(JSON.stringify(result)).not.toContain("SECRET_PROVIDER_ERROR");
   expect(persisted.execution).toEqual(RUN);
   expect(persisted["creation-receipts"]).toEqual([{ path: "/rest/v1/categories", ...CATEGORY }]);
+  expect(bytesUnchanged).toBe(true);
+  expect(resumeReceipt).toEqual({ initialD: "2026-10-27", D: "2026-10-28", resumedAt: "2026-10-28T14:25:00.000Z", runId: RUN.runId, source: FIXTURE_SOURCE });
   expect(second).toMatchObject({ result: "stopped", stage: "input", requests: 0 });
 });
 it("preflight has no writes", async () => {
   const { result, writes } = await attempt({ mode: "preflight" });
   expect(result.result).toBe("preflight-passed"); expect(writes).toHaveLength(0);
 });
-it("refuses a local-day rollover without rebasing the recorded run", async () => {
-  const { result, calls } = await attempt({ now: "2026-10-28T04:00:00Z" });
+it.each(["2026-10-28T03:59:59Z", "2026-10-29T04:00:00Z"])("refuses October27 and October29 in New York before any request: %s", async now => {
+  const { result, calls } = await attempt({ now });
   expect(result).toMatchObject({ result: "stopped", stage: "input", requests: 0 });
   expect(calls).toHaveLength(0);
+});
+it("bounds resumed walk Occurrences to October21–28 and preserves all original receipt bytes", async () => {
+  const { writes, bytesUnchanged } = await attempt({ stopAtOccurrences: true });
+  const insert = writes.find(call => call.path === "/rest/v1/occurrences");
+  expect(insert).toBeDefined();
+  expect(insert.payload.map(row => row.local_date)).toEqual(Array.from({ length: 8 }, (_, i) => `2026-10-${21 + i}`));
+  expect(bytesUnchanged).toBe(true);
 });
 it.each([
   c => { c.id = USERS[1]; }, c => { c.user_id = USERS[1]; }, c => { c.name = "Changed"; },

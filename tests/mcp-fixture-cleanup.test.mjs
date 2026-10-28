@@ -23,6 +23,13 @@ it("prepares a bounded atomic archive through the supported RPC, without deletes
   expect(sql).not.toMatch(/\bDELETE\b|\bTRUNCATE\b|\bUPDATE public\.behaviors/i);
   expect(sql).not.toContain("MANIFEST_HEX");
 });
+it("keeps the original run window bounded to 48 hours", () => {
+  const manifest = fixture();
+  manifest.capturedAt = "2026-10-30T01:00:00Z";
+  expect(() => buildCleanupSql(manifest)).not.toThrow();
+  manifest.capturedAt = "2026-10-30T01:00:00.001Z";
+  expect(() => buildCleanupSql(manifest)).toThrowError("cleanup-manifest-refused");
+});
 it.each([
   m => { m.users = [randomUUID(), QA_USERS[1]]; },
   m => { m.rows[0].user_id = randomUUID(); },

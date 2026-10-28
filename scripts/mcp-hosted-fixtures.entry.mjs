@@ -12,6 +12,7 @@ const ORIGIN = 'https://qjodzutjxtmtzczbloxa.supabase.co';
 const SOURCE = 'eb5afa5be5c49b43bbad3ffd5a25d6eddff30079';
 const CATEGORY = { id: 'a29dd2d0-5425-4180-a29a-01a026ebb8c0', user_id: USERS[0], created_at: '2026-10-28T02:17:19.262435+00:00' };
 const RUN = { runId: '4db9fe6e-a966-4cca-938b-aee5a1b955b7', startedAt: '2026-10-28T02:17:18.882Z', D: '2026-10-27', users: USERS, source: SOURCE };
+const RESUME_D = '2026-10-28';
 export async function runFixtures(input, { directory = '.intent/artifacts/trust232/activation-execution', fetcher = fetch, now = new Date() } = {}) {
     const DIR = directory;
     const take = (r) => { if (r.error)
@@ -30,7 +31,7 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
         assert.deepEqual(JSON.parse(readFileSync(`${DIR}/creation-receipts.json`)), [{ path: '/rest/v1/categories', ...CATEGORY }]);
         assert(!existsSync(`${DIR}/resume-started.json`));
         const today = Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO('America/New_York').toPlainDate();
-        assert.equal(today.toString(), RUN.D);
+        assert.equal(today.toString(), RESUME_D);
         assert(/^sb_publishable_[A-Za-z0-9_-]+$/.test(input.publishableKey));
         const clients = input.sessions.map((session, index) => {
             assert.equal(session.userId, USERS[index]);
@@ -52,7 +53,7 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
                         if (options?.method === 'POST' && ['/rest/v1/categories', '/rest/v1/occurrences', '/rest/v1/occurrence_time_sessions', '/rest/v1/rpc/create_behavior_with_schedule_graph'].includes(u.pathname)) {
                             const body = await response.clone().json();
                             const rows = Array.isArray(body) ? body : [body];
-                            save('creation-receipts', [...(existsSync(`${DIR}/creation-receipts.json`) ? JSON.parse(readFileSync(`${DIR}/creation-receipts.json`)) : []), ...rows.filter(r => r?.id).map(r => ({ path: u.pathname, id: r.id, user_id: r.user_id, created_at: r.created_at }))]);
+                            save('resume-creation-receipts', [...(existsSync(`${DIR}/resume-creation-receipts.json`) ? JSON.parse(readFileSync(`${DIR}/resume-creation-receipts.json`)) : []), ...rows.filter(r => r?.id).map(r => ({ path: u.pathname, id: r.id, user_id: r.user_id, created_at: r.created_at }))]);
                         }
                         return response;
                     } } });
@@ -79,13 +80,13 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
         const start = RUN.startedAt, runId = RUN.runId;
         const fixtures = { a: { category: CATEGORY.id } }, rows = [];
         // Never replay a partially successful resume without a new reviewed manifest.
-        writeFileSync(`${DIR}/resume-started.json`, JSON.stringify({ startedAt: now.toISOString(), runId, source: SOURCE }) + '\n', { mode: 0o600, flag: 'wx' });
+        writeFileSync(`${DIR}/resume-started.json`, JSON.stringify({ initialD: RUN.D, D: RESUME_D, resumedAt: now.toISOString(), runId, source: SOURCE }) + '\n', { mode: 0o600, flag: 'wx' });
         for (const [i, c] of clients.entries()) {
             const user = USERS[i], slot = i ? 'b' : 'a';
             stage = `${slot}-category`;
             const category = i === 0 ? CATEGORY : take(await c.from('categories').insert({ user_id: user, name: 'Review examples', sort_order: 8 }).select('id,user_id,created_at').single());
             const f = fixtures[slot] = { category: category.id };
-            save('fixture-ids', fixtures);
+            save('resume-fixture-ids', fixtures);
             const store = createBehaviorStore(c, user);
             for (const [field, title] of [['walk', 'Review walk'], ['reading', 'Review reading'], ['stretch', 'Review stretch']]) {
                 stage = `${slot}-${field}`;
@@ -93,7 +94,7 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
                 const time = field === 'reading' ? '19:00' : '09:00';
                 const b = await createBehavior(store, { userId: user, timezone: 'America/New_York', recordedAt: new Date().toISOString(), values: { title, description: null, categoryId: category.id, recurrenceRule: rule, scheduledTime: time, browserReminderEnabled: false, emailReminderEnabled: false, reminderOffsetMinutes: 0, active: true, schedules: [{ id: null, recurrenceRule: rule, sortOrder: 0, timeEntries: [{ id: null, kind: 'exact', preset: null, startTime: time, endTime: null, sortOrder: 0 }] }] } });
                 f[field] = b.id;
-                save('fixture-ids', fixtures);
+                save('resume-fixture-ids', fixtures);
                 if (field === 'stretch') {
                     await setBehaviorActive(store, { behaviorId: b.id, active: false, recordedAt: new Date().toISOString(), newArchiveNoteId: randomUUID(), archiveNote: 'Old demo schedule' });
                     continue;
@@ -109,7 +110,7 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
                 const created = take(await c.from('occurrences').insert(occurrences).select('id,user_id,created_at,local_date,scheduled_for'));
                 if (field === 'walk') {
                     f.occurrence = created.find(o => o.local_date === today.subtract({ days: 1 }).toString()).id;
-                    save('fixture-ids', fixtures);
+                    save('resume-fixture-ids', fixtures);
                     for (const [days, status] of [[3, 'completed'], [2, 'not_completed']]) {
                         const o = created.find(o => o.local_date === today.subtract({ days }).toString());
                         await applyOccurrenceStatusTransitionRpc(c, { occurrenceId: o.id, expectedStatus: 'unresolved', expectedLatestEventId: null, status, completedAt: status === 'completed' ? o.scheduled_for : null, statusMarkedAt: new Date().toISOString(), cancelPendingReminders: true, event: { statusSemantics: 'explicit_user_mark', recordedAt: new Date().toISOString(), effectiveAt: status === 'completed' ? o.scheduled_for : null, sourceCaptureMethod: 'manual_tap', sourceConfidence: 'high' } });

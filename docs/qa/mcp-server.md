@@ -269,8 +269,17 @@ This is a one-run recovery, not a general seed command. It reuses only category
 timestamps to the same transaction time). A different ID, owner, name, either
 timestamp, changed receipt, existing fixture Behavior, or B category aborts
 before writes. It never inserts an A category. The original run ID, start time
-and D=`2026-10-27` stay fixed. A local-day rollover requires reconciliation;
-do not inject an old clock to bypass that guard.
+and initial D=`2026-10-27` stay fixed. The explicit October 28 amendment sets
+`RESUME_D=2026-10-28` and compares it against the actual Temporal New York date.
+October 27 and October 29 refuse before any request; never inject an old clock.
+The resumed Occurrences cover October 21–28. `resume-started.json` records
+`initialD`, amended `D`, actual `resumedAt`, original run ID and frozen source.
+The original `execution.json`, `fixture-ids.json` and `creation-receipts.json`
+remain byte-unchanged. New IDs and receipts use `resume-fixture-ids.json` and
+`resume-creation-receipts.json`; pass the former to the isolation script.
+Cleanup retains the original start, so the captured A category remains inside
+the run window. The existing 48-hour maximum still stops cleanup after
+October 30 at 02:17:18.882 UTC; a later capture requires reconciliation.
 
 An exclusive `resume-started.json` marker prevents blind replay after any partial
 resume. Creation receipts contain IDs, owners and creation times only. Ordinary
