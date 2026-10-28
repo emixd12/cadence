@@ -616,6 +616,13 @@ synced setting.
   shown on screen (October 24, PR #140).
 - locationd's "not a plugin or an app" (`-10814`) lines and visit-monitoring
   subscriptions are routine; they also appear for Apple's own apps.
+- WebKit treats an occluded window as hidden. A window on another Space, behind other
+  windows, or under Computer Use's full-screen control overlay logs
+  `isViewVisible(): … window occluded 1`. `document.hidden` then blocks location reads
+  before the native call, and account sync slows (one **Sync now** took 3 min 23 s on
+  October 27). For location checks, release full-screen control, run
+  `osascript -e 'tell application id "app.cadence.desktop" to activate'`, and press
+  controls through the accessibility tree.
 
 ## Release acceptance
 
@@ -672,7 +679,6 @@ acceptance stays with the ticket; the packet links it.
 | Session renewal and revoked session | The sign-in files; `apps/desktop/src/account/account-sync.ts`; `apps/desktop/src/sync-engine.ts`; the resolved `@supabase/supabase-js` version in `package-lock.json` | Sync is still current after more than an hour signed in. On the test account, with the owner's authorization, delete its hosted session. After the access token expires, Settings shows the revoked state with Reconnect account. Reconnecting syncs, and no table loses rows. |
 | Calendar callback replay | `apps/desktop/src/calendar/google-calendar.ts`, `use-google-calendar.ts`, `outlook-calendar.ts` and `use-connectors.ts` | A replayed Calendar callback leaves the connection unchanged. |
 | Native reminders | `apps/desktop/src/local-reminder.service.ts` and `notification-activation.ts`; `apps/desktop/src-tauri/src/notifications.rs`; `apps/desktop/src-tauri/native/notifications.m`; `native-reminder.resolver.ts` in `packages/core` or `lib` | Settings shows verified coverage, and a reminder arrives while Cadence is quit. |
-| Second Mac or new macOS user | `apps/desktop/src-tauri/Entitlements.plist` and `Info.plist`; `apps/desktop/src-tauri/src/location.rs`; `apps/desktop/src-tauri/native/location.m`; `apps/desktop/src/foreground-location.ts`; the reminder files above; `apps/desktop/src/account/first-link.ts`; `packages/core/src/services/first-account-link.ts` | On a Mac or macOS user where Cadence never ran, install Cadence, from the DMG for a candidate. Each first permission prompt appears, Allow works, and turning Cadence off in System Settings shows the blocked state. A first account link succeeds. |
 
 0.1.3, the first production release, also passed the Ticket 115 list in
 "Apple-trusted distribution". Later releases do not repeat it.

@@ -5,7 +5,8 @@ Status: Parts A and B (including A.7) approved and implemented in source October
 using production. Two Supabase MCP requests failed with `Invalid or expired
 requestState`. The owner then authorized a CLI push, and the migration was applied
 to hosted at 20:31:10 UTC on October 27; readback is in `STATUS.md`. Native 0.1.6
-remains unpublished until installed acceptance is complete.
+passed installed acceptance, including rollout step 3, and was published on October
+27; see `docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`.
 
 Implementation differs from the proposal in three places:
 

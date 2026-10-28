@@ -1,5 +1,41 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.6 release — October 27, 2026
+
+**Published October 27, 2026** on the owner's instruction. Release source `8be778a`
+(version 0.1.6, account-sync contract 2, SQLite schema 20) was built, notarized (app
+`156960f0…`, DMG `3a2f6806…`) and published to `desktop-stable`. The stable feed has
+offered 0.1.6 since 22:33:43Z and the preview feed since 22:47:28Z. The test Mac upgraded from
+0.1.5 through the real updater: schema 18 → 20, no lost rows, contract-2 convergence. The
+public readback and the quarantined download of the version-free DMG pass. Open: reconnecting
+the test Mac after the revoked-session check (owner sign-in). The never-run macOS user check:
+Not required: removed by owner decision, October 27, 2026. Packet:
+`docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
+`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
+
+- Rollout step 3 passed on installed clients. Published 0.1.5 on the test Mac and the
+  recorded `0.1.6-dev.2` on the owner's Mac synced again under contract 1, sent their
+  pending writes and converged on the hosted contract-1 fingerprint. After the test
+  account gained travel habits and a place-label settings row, 0.1.5 writes left them
+  byte-identical.
+- `0.1.7-dev.1` (the dev-signed build of `8be778a`) upgraded the owner's Mac from schema
+  18 to 20 with no lost rows; the release acceptance comparison passed. Travel habits and
+  place-label settings synced web → Mac, and a Home marker synced Mac → hosted under
+  contract 2.
+- Sign-in and Calendar callback replays and session renewal passed. Ticket 165: allowed
+  state and the status-only permission read pass; the denied state stays with the owner.
+  Ticket 187 installed desktop consent passes: the Daily Brief Calendar grant connected
+  with one calendar and the Timeline grant unchanged. The owner then turned on Calendar
+  timing for Daily Brief (`includeCalendar: true`, read back at 00:20Z on October 28).
+- Not established: a completion place label on an installed Mac (CoreLocation returned
+  no fix), installed receipt replay, and a contract-1 profile write that lands.
+- Known issue, not a regression: a timezone change on a linked Mac with an archived
+  Behavior stalls sync, because the server requires every Behavior and both clients
+  update only active ones.
+
+Platform impact: desktop release only; web, marketing and future mobile have no change.
+Messaging impact: none; the packet holds draft release notes for the owner.
+
 ## Account sync contract migration applied — October 27, 2026
 
 The owner authorized the push on October 27. Migration
@@ -27,11 +63,9 @@ file the disposable rehearsal tested. The hosted half of PR #153 is live.
 - Data API: anonymous calls to both signatures return 42501. An unknown function
   returns PGRST202, so the API serves the new overload.
 
-Not verified: an authenticated sync under either contract, the published 0.1.5
-synchronizing again on an installed Mac, and preservation of travel habits and
-place labels through a contract-1 write. Those checks are rollout step 3 in
-`docs/plans/2026-10-27-sync-compatibility.md`. 0.1.6 (contract 2) stays
-unpublished until its own acceptance.
+Rollout step 3 in `docs/plans/2026-10-27-sync-compatibility.md` ran after this
+readback; the 0.1.6 release entry above records it. Installed Macs synced under
+contracts 1 and 2, and 0.1.5 writes left travel habits and place labels unchanged.
 
 Platform impact: hosted sync for linked desktop. Web screens and marketing have
 no change. Future mobile is not affected.
