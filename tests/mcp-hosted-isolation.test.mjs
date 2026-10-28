@@ -77,6 +77,9 @@ it.each(["missing-opt-in", "wrong-project", "missing-a", "missing-b", "same-user
   if (fault === "service-key") t.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_secret_forbidden";
   if (fault === "duplicate-id") t.fixtures.b.walk = t.fixtures.a.walk;
   if (fault === "extra-fixture") t.fixtures.a.customer = randomUUID();
+  if (["missing-a", "missing-b", "invalid-uuid"].includes(fault)) {
+    expect(() => readConfig(t.args, t.env, t.fixtures)).toThrow(/^qa-identities-required$/);
+  }
   await expect(runHostedIsolation(t.args, t.env, t.fixtures, t.fetcher, now)).rejects.toThrow();
   expect(t.fetcher).not.toHaveBeenCalled();
 });
@@ -95,14 +98,15 @@ it("proves positive writes, cross-account denial and signature/expiry rejection,
 });
 
 it.each(["reminders", "title", "ownership", "old-date", "private-note"])("refuses unsafe fixture %s before writes", async (fault) => {
-  const t = setup();
+  const t = setup({ leakRead: fault === "ownership" });
   const walk = t.rows.get(t.fixtures.b.walk), occurrence = t.rows.get(t.fixtures.a.occurrence);
   if (fault === "reminders") walk.browser_reminder_enabled = true;
   if (fault === "title") walk.title = "unapproved fixture";
   if (fault === "ownership") walk.user_id = t.users[0];
   if (fault === "old-date") occurrence.local_date = "2020-01-01";
   if (fault === "private-note") occurrence.note = "private customer note";
-  await expect(runHostedIsolation(t.args, t.env, t.fixtures, t.fetcher, now)).rejects.toThrow();
+  await expect(runHostedIsolation(t.args, t.env, t.fixtures, t.fetcher, now)).rejects.toThrow(
+    fault === "old-date" || fault === "private-note" ? /^fixture-occurrence$/ : /^fixture-behavior$/);
   expect(t.calls.every((c) => c.method === "GET")).toBe(true);
 });
 
