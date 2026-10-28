@@ -130,6 +130,103 @@ node node_modules/vitest/vitest.mjs run tests/mcp-hosted-isolation.test.mjs
 
 These mocks prove the guards and assertion behavior; they do not prove hosted RLS.
 
+### Captured-ID archive cleanup (Ticket232)
+
+`scripts/mcp-fixture-cleanup.mjs` prepares a private SQL transaction. It never
+connects to a database. Its CLI pins the approved project and both QA user IDs:
+A `caefd1b8-ea46-485f-8869-119a715fb092`, B
+`c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b`. The separate local harness supplies its
+own two disposable IDs to the pure generator; this does not relax any hosted
+transport guard. Execution remains subject to independent review and the
+coordinator's activation window.
+
+This uses the authorized **archive** option. It does not physically remove
+categories, Occurrences, notes, schedules, time sessions or history. It retains
+them under archived Behaviors. This is not proof of erasure or completed physical
+cleanup. The transaction calls the existing atomic Behavior RPC, preserving
+archive notes and creating the normal configuration history. It marks occurrence
+sync stale through that RPC. Already archived Behaviors remain unchanged.
+Do not substitute raw Behavior UPDATE or cascade DELETE.
+
+Capture creation receipts as operations succeed, including generated child IDs.
+Do not reconstruct provenance from titles or a later account-wide query. The
+final private manifest contains only metadata:
+
+- `version: 1`, `project: qjodzutjxtmtzczbloxa`, a UUID `runId`, and `users: [A, B]`.
+- `startedAt` before fixture creation and `capturedAt` after final receipt capture,
+  at most48hours apart. Database `created_at` values must fall within that window.
+- `rows`: exact `{table,id,user_id,created_at,run_id}` creation receipts. Each
+  `run_id` equals `runId`. Include all fixture categories, Behaviors, schedules,
+  slots, Occurrences, status events, definition events, configuration events and
+  time sessions. The allowlist excludes accounts, imported records and settings.
+- `counts`: an explicit count for each of the nine allowlisted tables, including
+  zeroes. At most500 rows. Stop for a larger run; do not silently increase the cap.
+
+Record the manifest's SHA256 separately in the execution receipt before cleanup.
+The command requires that digest and refuses changed files, foreign IDs, duplicate
+rows, missing counts or timestamps outside the run. The database independently
+checks existence, ownership and exact creation timestamps. **Provenance comes
+from the retained creation receipts, not a database run-ID column.** A timestamp
+inside the window alone cannot prove who created a row. Never invent or widen
+receipts to make cleanup pass. If creation evidence is missing, stop.
+
+```sh
+node scripts/mcp-fixture-cleanup.mjs \
+  --allow-hosted-project qjodzutjxtmtzczbloxa \
+  --manifest /private/path/to/captured-cleanup-manifest.json \
+  --manifest-sha256 EXACT_PREVIOUSLY_RECORDED_SHA256 \
+  --output /private/path/to/reviewed-cleanup.sql
+```
+
+Output is a digest and a prepared-not-executed label. The SQL file is created
+exclusively with0600 permissions. The generator prints no IDs, note text or
+provider errors. Review the SQL hash, schema and manifest against the frozen
+release before supplying it to the already authorized synthetic-account SQL
+path. That path must use one connection, ON_ERROR_STOP, no query logging or
+response-body printing, and discard error context. No database credentials belong
+in command arguments. No all-account cron, purge, reset, seed or account deletion
+is part of cleanup.
+
+The transaction takes the existing account advisory locks in sorted order and
+locks every captured row. It checks exact table counts and full captured graph
+membership before the first archive. A missing ID, foreign owner, changed creation
+receipt, omitted graph row, extra Behavior using a fixture category, enabled
+reminder, running time session or reminder-delivery row aborts it. It uses an
+8second statement timeout and2second lock timeout, with no retry. Every archive
+must return its exact ID, and the final archive count must match. Any error rolls
+back all archive and history changes. An interrupted connection needs a fresh
+readback; a client timeout alone is not proof of rollback. A second execution
+needs fresh reviewed receipts because normal archive history changed the graph.
+
+Before this transaction, revoke only newly captured grant IDs through the
+ordinary A/B `oauth_revoke_grant` path. Match each grant's owner and creation
+receipt first; preserve pre-existing grants and shared client registrations.
+Verify the captured grant is revoked and its old token fails. No client deletion
+or OAuth purge substitutes for revocation. These grant calls are separate from
+the archive transaction and require their own receipts.
+
+Read back all captured Behaviors as archived, retained-row counts, new archive
+history, unchanged nonfixture baselines, and the test Mac's ordinary synchronization.
+Do not report physical removal, timestamp restoration or automatic disappearance
+of past Occurrences. Capture the new history IDs, remove local token/fixture
+material after retaining sanitized evidence, and preserve the accounts and keys.
+Web acceptance tooling only changes here; desktop gets a later sync check.
+Marketing and future mobile have no implementation change.
+
+October28 prerequisites: the owner confirmed vault **Cadence**
+(`fgyupy5i26isvkdqofojc5o66u`) and working app-integrated `op vault list`.
+Do not gate on `op whoami`, which still reports no signed-in CLI account.
+At the approved key step, verify the exact vault metadata, create the document
+through stdin, then verify item/document metadata and the public key identity.
+No plaintext file or sign-in command is required. The other release finished
+PR157/159/160; freeze canonical READY sites at
+`eb5afa5be5c49b43bbad3ffd5a25d6eddff30079` and stop on drift. The owner holds
+PR161 until activation and cleanup; do not merge it. Independent approval of
+isolation and archive cleanup must precede any hosted execution. The existing
+rotate-while-disabled → session checks → isolation/timeout metadata → enable
+order remains. Activation changes the web deployment ID and requires the
+coordinated final-pair Trust refresh with full immutable-history preservation.
+
 ### Grant basis and real local verification
 
 | Call | Permission and ownership basis |
@@ -155,8 +252,8 @@ revocation use authenticated `oauth_approve_consent` / `oauth_revoke_grant`,
 which bind to auth.uid() in `20261018160000`; token endpoints remain service-only.
 No fixture setup requires granting raw Behavior writes. Management API metadata,
 signing-key operations and Vercel configuration use separately authorized
-provider access; they are not user RLS tests. Any later physical fixture cleanup
-still needs its exact ID-bound transaction and dependency review before execution.
+provider access; they are not user RLS tests. Physical deletion remains outside this archive procedure and requires a separate
+exact ID-bound transaction and dependency review.
 
 `tests/mcp-hosted-isolation.local-integration.test.mjs` imports the **same**
 runHostedIsolation function. Its separate, opt-in transport accepts only
@@ -169,8 +266,8 @@ through a private process environment. Use only the assigned cadence-mcp-232
 private workdir/project and ports56120–56129, with the project-scoped Docker
 proxy and loopback readback. Never run against the default local project.
 
-The harness uses admin credentials only to create/delete its two disposable local
-users. It signs them in normally and seeds through existing core/web services.
+The harness uses admin credentials for its two disposable local users, captured
+fixture metadata and the bounded cleanup transaction. It signs them in normally and seeds through existing core/web services.
 It confirms direct own-Behavior PATCH is403, then runs the entire corrected
 procedure: three own RPC successes and three foreign null responses, invalid
 JWT denial, all other own/foreign table operations and note restoration.
