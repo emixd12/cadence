@@ -19,6 +19,27 @@ key. Use a publishable key and the approved integration signing key in process
 environment only, from its approved custody destination. Do not export the current
 provider private key or copy tokens, note text, or private keys into evidence.
 
+Owner selection on October28: A is the existing dedicated test-Mac account.
+Its normalized-email SHA-256 prefix matches the supplied test-Mac prefix; retain
+only that match result. A's final cleanup removes only approved MCP fixtures and
+grants, never the account or its other data. B must be the September Calendar
+wrong-account identity from Emi Chrome, not the owner's real tracking account.
+Local QA records do not name B; Chrome Local State access was denied by macOS.
+Do not infer B from deployment-author metadata. Once B is named, use one read-only
+exact-email lookup returning only existence and Auth UUID for A and B. Do not
+scan auth.users or other accounts. No such lookup has run yet.
+
+If B cannot be reused, the owner must supply another Google identity; create
+nothing automatically. An AgentMail inbox alone is not a Google account. Google
+[sometimes requires phone verification](https://support.google.com/accounts/answer/114129)
+during signup. Check the actual sign-in client's audience and requested scopes.
+Later Calendar QA records say In production, superseding the earlier Testing
+checkpoint, but that separate project's state does not prove the sign-in state.
+Google's [audience rules](https://support.google.com/cloud/answer/15549945) exempt
+openid/email/profile-only sign-in from Testing's test-user requirement; additional
+scopes in Testing require an eligible listed test user. Current console state
+and the new identity's eligibility remain unverified. Do not add Calendar scopes.
+
 Prepare the existing **Review examples**, **Review walk**, **Review reading** and
 archived **Review stretch** fixtures described in
 `mcp-directory-submission.md#reviewer-account-plan`. Both accounts use
@@ -162,10 +183,21 @@ is excluded. No key or hosted operation is authorized by this local preparation.
 
 Owner inputs to fill before execution:
 
-- QA A and QA B Google identities, actual Auth UUIDs, fixture IDs and authorization.
-- Available Claude, Claude Code, ChatGPT and Inspector accounts/client versions.
-- Dedicated desktop/macOS QA target and isolated profile linked only to QA A.
-- Durable private-key custody destination and approved import/rotation operator.
+- A is selected and its test-Mac prefix matches. B's address, both actual Auth
+  UUIDs, fixture IDs and exact synthetic-operation authority remain to fill.
+- Owner reports Claude web, Claude Code, ChatGPT developer mode and Inspector
+  available. Record versions and verify access during acceptance.
+- Desktop target is the test Mac. Follow the current desktop-acceptance skill,
+  DESKTOP_RELEASE agent-run acceptance and TEST_DEVICES pathway; retain its assigned
+  published release. Do not use the owner's primary Mac/data as fixtures.
+- Key custody is 1Password. The owner must enable CLI integration and name the
+  destination vault/operator; the reported installed CLI has no signed-in account.
+  Do not sign in for the owner or expand the existing read-only service account.
+  After approval, generate one ES256 JWK in memory and pipe directly to
+  `op document create - --vault APPROVED_VAULT --title APPROVED_TITLE --file-name integration-jwk.json`.
+  Capture only the item reference and safe status, never plaintext output, argv,
+  clipboard or temporary files. Verify custody before import; on an ambiguous
+  create, inspect metadata before retrying. No key has been generated or stored.
 - Exact final production source/pair, all-user key/session/activation authority,
   acceptance of any remaining timeout-proof gap or a separately approved probe.
 
