@@ -1714,7 +1714,8 @@ authenticated writes to protected history and graph tables.
 
 Migration `20261027120000_account_sync_contracts.sql` adds contract
 versioning. A contract is the snapshot shape one client build understands.
-Plan: `docs/plans/2026-10-27-sync-compatibility.md`.
+Plan: `docs/plans/2026-10-27-sync-compatibility.md`. Applied to hosted on October 27,
+2026.
 
 - `cadence_private.account_sync_contract_additions(contract, kind, field,
   default_value)` lists what each contract after 1 adds. A row with no `field`
