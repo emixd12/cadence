@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { runKeyCustody, publicFingerprint, CUSTODY } from '../scripts/mcp-signing-key-custody.mjs';
+import { EventEmitter } from 'node:events';
+import { runKeyCustody, publicFingerprint, createRunner, CUSTODY } from '../scripts/mcp-signing-key-custody.mjs';
 
 const OLD = [
   { id: '78be1780-9785-44e5-947a-c839fc20a991', algorithm: 'HS256', status: 'previously_used' },
@@ -103,6 +104,14 @@ describe('Ticket 232 signing-key custody', () => {
     ['an existing standby key', { keysBefore: [{ ...OLD[0], status: 'standby' }, OLD[1]] }, 'signing-keys-drift'],
     ['an existing signer variable', { signerPresent: true }, 'signer-variable-exists'],
     ['unparseable custody item list', { itemsRaw: 'not json' }, 'op-item-list-unreadable'],
+    ['a custody item without a title', { itemsRaw: '[{}]' }, 'op-item-list-unreadable'],
+    ['a custody item with a null title', { itemsRaw: '[{"title":null}]' }, 'op-item-list-unreadable'],
+    ['a custody item with a numeric title', { itemsRaw: '[{"title":5}]' }, 'op-item-list-unreadable'],
+    ['a vault row without a name', { vaults: [{ id: CUSTODY.vault }] }, 'op-vault-list-unreadable'],
+    ['an env row without a key', { envPreflightRaw: '{"envs":[{}]}' }, 'vercel-env-preflight-unreadable'],
+    ['an env row with an empty key', { envPreflightRaw: '{"envs":[{"key":""}]}' }, 'vercel-env-preflight-unreadable'],
+    ['an env row with a null key', { envPreflightRaw: '{"envs":[{"key":null}]}' }, 'vercel-env-preflight-unreadable'],
+    ['a signing-key row without an algorithm', { keysBefore: [{ id: OLD[0].id, status: OLD[0].status }, OLD[1]] }, 'keys-preflight-unreadable'],
     ['an empty Vercel env response', { envPreflightRaw: '{}' }, 'vercel-env-preflight-unreadable'],
     ['a replaced historical key ID', { keysBefore: [{ ...OLD[0], id: '00000000-0000-4000-8000-000000000000' }, OLD[1]] }, 'signing-keys-drift'],
     ['a changed current-key algorithm', { keysBefore: [OLD[0], { ...OLD[1], algorithm: 'RS256' }] }, 'signing-keys-drift'],
@@ -170,5 +179,43 @@ describe('Ticket 232 signing-key custody', () => {
     expect(result.reason).toMatch(/-internal-error$/);
     expect(JSON.stringify([result, w.calls.saves, w.calls.logs])).not.toContain('secret-material');
     expect(w.calls.op.some((c) => c.args[1] === 'create')).toBe(false);
+  });
+});
+
+describe('Ticket 232 custody subprocess runner', () => {
+  const harness = (mode) => {
+    const kills = [];
+    const spawn = () => {
+      if (mode === 'spawn-throw') throw new Error('synthetic-detail');
+      const c = new EventEmitter();
+      c.stdout = new EventEmitter(); c.stderr = new EventEmitter(); c.stdin = new EventEmitter();
+      c.kill = (signal) => kills.push(signal);
+      c.stdin.end = () => {
+        if (mode === 'stdin-throw') throw new Error('synthetic-detail');
+        queueMicrotask(() => {
+          if (mode === 'timeout') return;
+          if (mode === 'child-error') { c.emit('error', new Error('synthetic-detail')); return; }
+          if (mode === 'stdin-error') c.stdin.emit('error', Object.assign(new Error('synthetic-EPIPE'), { code: 'EPIPE' }));
+          c.stderr.emit('data', 'synthetic-stderr');
+          c.stdout.emit('data', '{"ok":true}');
+          c.emit('close', mode === 'exit-nonzero' ? 2 : 0);
+        });
+      };
+      return c;
+    };
+    return { run: createRunner(spawn, 20), kills };
+  };
+  for (const mode of ['spawn-throw', 'child-error', 'stdin-error', 'stdin-throw', 'exit-nonzero', 'timeout']) {
+    it(`settles ${mode} as status 1 with empty stdout`, async () => {
+      const h = harness(mode);
+      const result = await h.run('fake', [], 'synthetic-input');
+      expect(result).toEqual({ status: 1, stdout: '' });
+      if (mode !== 'spawn-throw') expect(h.kills).toEqual(['SIGTERM']);
+    });
+  }
+  it('returns stdout only on a clean exit', async () => {
+    const h = harness('success');
+    expect(await h.run('fake', [], 'x')).toEqual({ status: 0, stdout: '{"ok":true}' });
+    expect(h.kills).toEqual([]);
   });
 });

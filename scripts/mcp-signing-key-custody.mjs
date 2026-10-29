@@ -40,6 +40,38 @@ export const KEY_BASELINE = Object.freeze([
 ]);
 const tuple = (k) => `${k.id}|${k.algorithm}|${k.status}`;
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const text = (v) => typeof v === 'string' && v.length > 0;
+// Row shapes: every field a check reads must be present with the right type.
+const vaultRow = (v) => isObject(v) && text(v.id) && text(v.name);
+const itemRow = (v) => isObject(v) && typeof v.title === 'string';
+const envRow = (v) => isObject(v) && text(v.key);
+const keyRow = (v) => isObject(v) && text(v.id) && text(v.algorithm) && text(v.status) && (v.public_jwk === undefined || v.public_jwk === null || isObject(v.public_jwk));
+
+/**
+ * Subprocess runner for op and the Vercel CLI. Any spawn, child, stdin or
+ * timeout failure settles once with status 1 and empty stdout, stops the child,
+ * and discards stderr and error text. A later exit 0 cannot override it.
+ */
+export function createRunner(spawn, timeoutMs = 180_000) {
+  return (cmd, args, input) => new Promise((resolve) => {
+    let settled = false, stdout = '', child = null, timer = null;
+    const finish = (status) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (status !== 0 && child) { try { child.kill('SIGTERM'); } catch { /* already gone */ } }
+      resolve(status === 0 ? { status: 0, stdout } : { status: 1, stdout: '' });
+    };
+    try { child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] }); } catch { finish(1); return; }
+    timer = setTimeout(() => finish(1), timeoutMs);
+    child.on('error', () => finish(1));
+    child.stdin.on('error', () => finish(1));
+    child.stdout.on('data', (c) => { stdout += c; });
+    child.stderr.on('data', () => {});
+    child.on('close', (status) => finish(status === 0 ? 0 : 1));
+    try { child.stdin.end(input ?? ''); } catch { finish(1); }
+  });
+}
 
 class Stop extends Error {
   constructor(reason) { super(reason); this.reason = reason; }
@@ -74,19 +106,19 @@ export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, rec
   const keysRead = async (name) => {
     const r = await call(name, () => supabase('/config/auth/signing-keys'));
     const list = r?.status === 200 ? (Array.isArray(r.body) ? r.body : isObject(r.body) && Array.isArray(r.body.keys) ? r.body.keys : null) : null;
-    if (!list || !list.every(isObject)) throw new Stop(`${name}-unreadable`);
+    if (!list || !list.every(keyRow)) throw new Stop(`${name}-unreadable`);
     return list;
   };
-  const envsRead = (name) => cli(name, () => vercel(['api', `/v10/projects/${config.web}/env`]), (v) => isObject(v) && Array.isArray(v.envs) && v.envs.every(isObject)).then((v) => v.envs);
+  const envsRead = (name) => cli(name, () => vercel(['api', `/v10/projects/${config.web}/env`]), (v) => isObject(v) && Array.isArray(v.envs) && v.envs.every(envRow)).then((v) => v.envs);
   let jwk = null;
   try {
     if (receiptExists()) return { result: 'stopped', reason: 'receipt-exists-reconcile-first' };
     if (await call('mcp-check', mcpStatus) !== 503) throw new Stop('mcp-not-disabled');
 
-    const vaults = await cli('op-vault-list', () => op(['vault', 'list', '--format=json']), (v) => Array.isArray(v) && v.every(isObject));
+    const vaults = await cli('op-vault-list', () => op(['vault', 'list', '--format=json']), (v) => Array.isArray(v) && v.every(vaultRow));
     const cadence = vaults.filter((v) => v.name === 'Cadence');
     if (cadence.length !== 1 || cadence[0].id !== config.vault) throw new Stop('vault-mismatch');
-    const items = await cli('op-item-list', () => op(['item', 'list', '--vault', config.vault, '--categories', 'Document', '--format=json']), (v) => Array.isArray(v) && v.every(isObject));
+    const items = await cli('op-item-list', () => op(['item', 'list', '--vault', config.vault, '--categories', 'Document', '--format=json']), (v) => Array.isArray(v) && v.every(itemRow));
     if (items.some((i) => i.title === config.title)) throw new Stop('custody-title-exists-reconcile');
     step('vault-bound', { vault: config.vault });
 
@@ -149,20 +181,7 @@ async function main() {
   const out = '.intent/artifacts/trust232/extension-execution/step2-custody.json';
   const node = '/Users/emi/.npm/_npx/387698761821791d/node_modules/node/bin/node';
   const vc = '/Users/emi/.npm/_npx/67eb4586ca667318/node_modules/vercel/dist/index.js';
-  // Subprocess failures resolve to a nonzero status; stderr and error text are discarded.
-  const run = (cmd, args, input) => new Promise((resolve) => {
-    let settled = false, stdout = '', timedOut = false;
-    const finish = (status) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ status: timedOut ? 1 : status, stdout: timedOut ? '' : stdout }); } };
-    let child;
-    try { child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] }); } catch { resolve({ status: 1, stdout: '' }); return; }
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); finish(1); }, 180_000);
-    child.on('error', () => finish(1));
-    child.stdin.on('error', () => {});
-    child.stdout.on('data', (c) => { stdout += c; });
-    child.stderr.on('data', () => {});
-    child.on('close', (status) => finish(status ?? 1));
-    child.stdin.end(input ?? '');
-  });
+  const run = createRunner(spawn);
   let token = execFileSync('security', ['find-generic-password', '-s', 'Supabase CLI', '-a', 'supabase', '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   if (token.startsWith('go-keyring-base64:')) token = Buffer.from(token.slice(18), 'base64').toString('utf8').trim();
   const result = await runKeyCustody({

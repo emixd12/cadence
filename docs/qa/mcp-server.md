@@ -494,8 +494,10 @@ named Cadence has ID `fgyupy5i26isvkdqofojc5o66u`, and no custody document has
 the fixed title. The signing keys must be exactly the frozen pair: `78be1780…`
 HS256 previously_used and `cb295840…` ES256 in_use. The Production signer
 variable must be absent. Every CLI and API read needs a success status and the
-expected array or object shape. A failed, unparseable or missing response stops
-the run and is never treated as empty. It then generates one ES256 JWK in
+expected array or object shape. Every row field a check reads must also be
+present with the right type: vault ID and name, item title, env key and
+signing-key ID, algorithm and status. A failed, unparseable or missing response
+or field stops the run and is never treated as empty. It then generates one ES256 JWK in
 memory. That JWK is piped over stdin to `op document create`, and the item
 metadata and stored document are read back and compared. Next it imports the key
 to Supabase as standby only and requires the same kid and public fingerprint,
@@ -504,13 +506,17 @@ add --environment production --sensitive` and reads back a Production-only
 sensitive record, then rechecks `/mcp` 503. After the import, both frozen tuples
 must be unchanged and the only addition must be the expected standby kid. The
 private key never appears in argv, files, logs or the 0600 receipt
-`step2-custody.json`. Adapter, subprocess (spawn, stdin, timeout) and internal
-errors become fixed phase codes, with no raw message, body or cause. A top-level
+`step2-custody.json`. Adapter, subprocess and internal errors become fixed phase
+codes, with no raw message, body or cause. The exported `createRunner` handles
+spawn, child, stdin (for example EPIPE) and timeout failures, and any nonzero
+exit. Each settles once with status 1 and empty stdout and stops the child, and
+a later exit 0 cannot override it. A top-level
 catch covers `main`. There are no retries. The receipt records the phase and
 whether a write was attempted, plus a `custody-created` step with the document
 ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
-this script. Evidence: 19 offline cases, including direct regressions for the
-b12e0bc findings, and 21/21 mutation kills (`key-custody-mutations.json`).
+this script. Evidence: 34 offline cases, including direct regressions for the
+b12e0bc and 34821fd findings and a direct EventEmitter runner harness, and 30/30
+mutation kills (`key-custody-mutations.json`).
 
 ##### Emi's steps
 
