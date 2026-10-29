@@ -208,6 +208,55 @@ needs fresh reviewed receipts because normal archive history changed the graph.
 Before this transaction, revoke only newly captured grant IDs through the
 ordinary A/B `oauth_revoke_grant` path. Match each grant's owner and creation
 receipt first; preserve pre-existing grants and shared client registrations.
+
+#### October28 interrupted run: archive-only closure
+
+The October28 resume date has expired. Do not run the fixture creator again.
+The optional `emptyUsers: [B]` manifest field closes only run
+`4db9fe6e-a966-4cca-938b-aee5a1b955b7`, started
+`2026-10-28T02:17:18.882Z`. Both approved identities remain in `users`.
+The generator requires no B rows, exactly category
+`a29dd2d0-5425-4180-a29a-01a026ebb8c0` and Behavior
+`b2c5b6b1-457a-4e58-a14f-e4270c3d341e`, all owned by A.
+Other partial runs remain refused. The original 48-hour span and every SQL
+ownership, creation-receipt, graph-closure and count guard remain unchanged.
+
+Refresh metadata only for that captured category and Behavior, and children
+whose `behavior_id` equals that captured ID. Include app-generated Occurrences:
+October29 readback found38, including30 created after the owner's sign-in.
+Their actual writer was not verified. Never adopt A's pre-existing Behaviors
+or their Occurrences. An unrecognized or unattributable row stops cleanup.
+The category and all rows retain their existing Review test labels; archive
+only the captured walk through the supported RPC, retaining its history.
+
+`occurrence_sync_state` is account-scoped, keyed by `user_id`, with no Behavior
+ID. It cannot enter the fixture manifest. Preserve the row; the archive RPC's
+normal stale-state update is expected. Read it separately to verify retention.
+No grant was created: the October29 bounded read found zero grants for A and B.
+Signing-key IDs and states were unchanged. Recheck both facts before execution.
+
+The reviewed postgres Management API connection can capture metadata, archive
+and read back without browser sessions. Its read-only mode can report a
+different role; that does not establish the execution role. Confirm postgres
+on the exact general-query transport before the authorized transaction. If
+ordinary-session capture is selected instead, only A needs a fresh sign-in;
+B has no fixture or grant operation. No session is needed solely to revoke
+zero grants. Stop if a grant unexpectedly appears.
+
+Hosted execution still needs the coordinator's archive-only approval. Finish
+and read back well before October30 02:17:18.882UTC; target October29 20:00UTC.
+Retain all38 Occurrences, category, schedules and original history. Verify one
+new archive configuration event, the captured walk inactive, and no mutation
+of pre-existing data. The isolated rehearsal covers three preserved Behaviors
+and96 Occurrences, explicit/implicit empty-B cases, omitted-child and changed
+receipt refusals, and transaction rollback.
+
+For a future run (planning only): model app-generated rows after sign-in/sync
+as bounded descendants of captured Behaviors, refresh the manifest before
+cleanup, and reject unrelated rows. Sessions expire hourly; coordinate one
+continuous owner window for sign-in, key prompts and client consent. Rehearse
+all five steps end-to-end locally, including interrupted resumes, generation,
+session expiry and archive closure, before any new hosted fixture write.
 Verify the captured grant is revoked and its old token fails. No client deletion
 or OAuth purge substitutes for revocation. These grant calls are separate from
 the archive transaction and require their own receipts.

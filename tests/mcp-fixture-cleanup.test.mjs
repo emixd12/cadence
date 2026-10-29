@@ -30,6 +30,34 @@ it("keeps the original run window bounded to 48 hours", () => {
   manifest.capturedAt = "2026-10-30T01:00:00.001Z";
   expect(() => buildCleanupSql(manifest)).toThrowError("cleanup-manifest-refused");
 });
+function partialRun() {
+  const m = fixture();
+  m.runId = "4db9fe6e-a966-4cca-938b-aee5a1b955b7";
+  m.startedAt = "2026-10-28T02:17:18.882Z";
+  m.capturedAt = "2026-10-29T13:00:00Z";
+  m.emptyUsers = [QA_USERS[1]];
+  m.rows = m.rows.filter(r => r.user_id === QA_USERS[0]).map(r => ({ ...r,
+    id: r.table === "categories" ? "a29dd2d0-5425-4180-a29a-01a026ebb8c0" : "b2c5b6b1-457a-4e58-a14f-e4270c3d341e",
+    run_id: m.runId, created_at: "2026-10-28T18:11:34Z" }));
+  m.counts = Object.fromEntries(TABLES.map(t => [t, m.rows.filter(r => r.table === t).length]));
+  return m;
+}
+it("accepts explicitly empty B only for the captured partial A run", () => {
+  expect(() => buildCleanupSql(partialRun())).not.toThrow();
+});
+it.each([
+  m => { delete m.emptyUsers; },
+  m => { m.emptyUsers = [QA_USERS[0]]; },
+  m => { m.emptyUsers = QA_USERS; },
+  m => { m.runId = randomUUID(); m.rows.forEach(r => { r.run_id = m.runId; }); },
+  m => { m.startedAt = "2026-10-28T02:17:18Z"; },
+  m => { m.rows.find(r => r.table === "behaviors").id = randomUUID(); },
+  m => { m.rows.find(r => r.table === "categories").id = randomUUID(); },
+  m => { m.rows.push({ ...m.rows[0], table: "occurrences", id: randomUUID(), user_id: QA_USERS[1] }); m.counts.occurrences++; },
+])("refuses an implicit, foreign or widened empty-account declaration", change => {
+  const m = partialRun(); change(m);
+  expect(() => buildCleanupSql(m)).toThrowError("cleanup-manifest-refused");
+});
 it.each([
   m => { m.users = [randomUUID(), QA_USERS[1]]; },
   m => { m.rows[0].user_id = randomUUID(); },

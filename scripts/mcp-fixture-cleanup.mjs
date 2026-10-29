@@ -11,7 +11,10 @@ const check = (ok) => { if (!ok) throw new Error("cleanup-manifest-refused"); };
 
 // Only produces a reviewable transaction. It has no database or provider transport.
 export function buildCleanupSql(manifest, expectedUsers = QA_USERS) {
-  check(manifest && Object.keys(manifest).sort().join() === "capturedAt,counts,project,rows,runId,startedAt,users,version");
+  const partial = Object.hasOwn(manifest ?? {}, "emptyUsers");
+  check(manifest && Object.keys(manifest).sort().join() === (partial
+    ? "capturedAt,counts,emptyUsers,project,rows,runId,startedAt,users,version"
+    : "capturedAt,counts,project,rows,runId,startedAt,users,version"));
   check(manifest?.version === 1 && UUID.test(manifest.runId) && manifest.project === "qjodzutjxtmtzczbloxa");
   check(JSON.stringify(manifest.users) === JSON.stringify(expectedUsers)
     && expectedUsers.length === 2 && expectedUsers.every((id) => UUID.test(id)) && expectedUsers[0] !== expectedUsers[1]);
@@ -28,7 +31,20 @@ export function buildCleanupSql(manifest, expectedUsers = QA_USERS) {
   }
   check(Object.keys(manifest.counts ?? {}).sort().join() === [...TABLES].sort().join());
   for (const table of TABLES) check(manifest.counts[table] === manifest.rows.filter((row) => row.table === table).length);
+  if (partial) {
+    // This exception closes only the interrupted October28 run; it is not a general partial-run option.
+    check(JSON.stringify(expectedUsers) === JSON.stringify(QA_USERS)
+      && JSON.stringify(manifest.emptyUsers) === JSON.stringify([QA_USERS[1]])
+      && manifest.runId === "4db9fe6e-a966-4cca-938b-aee5a1b955b7"
+      && manifest.startedAt === "2026-10-28T02:17:18.882Z"
+      && manifest.rows.every(row => row.user_id === QA_USERS[0]));
+    for (const [table, id] of [["categories", "a29dd2d0-5425-4180-a29a-01a026ebb8c0"],
+      ["behaviors", "b2c5b6b1-457a-4e58-a14f-e4270c3d341e"]]) {
+      check(manifest.counts[table] === 1 && manifest.rows.some(row => row.table === table && row.id === id));
+    }
+  }
   for (const user of expectedUsers) {
+    if (partial && manifest.emptyUsers.includes(user)) continue;
     check(manifest.rows.some((row) => row.table === "categories" && row.user_id === user));
     check(manifest.rows.some((row) => row.table === "behaviors" && row.user_id === user));
   }
