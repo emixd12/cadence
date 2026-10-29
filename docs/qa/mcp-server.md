@@ -408,6 +408,92 @@ refresh helper cannot add Behaviors, schedules or history implicitly.
 
 #### Session continuity and the owner window
 
+**Superseded October 29, 17:50 UTC (owner decision): the A/B sessions now come
+from the local sign-in broker below, not from the owner's Cadence tabs.** This
+agent session has no browser channel to those Chrome profiles. The tab-cookie
+plan in the next paragraphs is retained as history only.
+
+##### Local sign-in broker (`scripts/mcp-session-broker.mjs`)
+
+- Transport: Cadence's ordinary hosted Supabase Google OAuth with PKCE and the
+  publishable key only. No service role, admin link or provider credential. The
+  start step adds only `prompt=select_account` so Emi picks the dedicated account.
+- Redirect: the exact allowlisted `http://127.0.0.1:<port>/auth/callback`. Ports
+  4327–4330, then 4326–4324, in that order; 4321–4323 are avoided. Startup reads
+  back `uri_allow_list`, the Site URL and Google enablement through the read-only
+  Management API. It requires the exact callback entry and does not change auth
+  configuration. The 17:53 UTC readback found all 20 `127.0.0.1` entries for
+  4321–4330, Site URL `https://app.cadence-me.com`, Google enabled, `jwt_exp`
+  3600 and refresh-token rotation with a 10-second reuse interval
+  (`auth-allowlist-readback.json`).
+- Binding: HTTP on 127.0.0.1 only; exact `Host` check; GET only; no-store,
+  no-referrer, `default-src 'none'` CSP and frame denial; header/request timeouts
+  of 5 and 10 seconds; 15-second provider-call timeout; at most four pending
+  attempts.
+- State: each attempt has its own in-memory PKCE verifier and a 256-bit HttpOnly
+  SameSite=Lax cookie scoped to the callback path. Attempts expire after five
+  minutes and are deleted on their first callback. The code is exchanged once in
+  the broker process, and the browser is sent on to a fixed result page.
+- Identity: `auth.getUser` must return exactly A
+  `caefd1b8-ea46-485f-8869-119a715fb092` for slot A, or B
+  `c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b` for slot B. Anything else, including the
+  other test account, is signed out with local scope and dropped. The page shows
+  only `signed in as A/B: match`, `wrong account: discarded` or a retry notice.
+- Custody: sessions stay in broker memory. Runner processes receive access tokens
+  through the Unix socket `~/.cadence-qa232/broker.sock`. The socket is 0600 and
+  its directory 0700, owned by the operator; anything else is refused. Tokens are
+  never written to disk, notes, chat, logs or artifacts. Log lines are fixed
+  event names. `session-broker.jsonl` (0600) records only slot, subject, expiry,
+  kid and state.
+- Refresh: every 30 seconds the broker refreshes any session within 15 minutes of
+  expiry. A handoff requires at least 10 minutes of remaining validity. These are
+  separate sessions from the owner's browser tabs, so no refresh-token race with
+  the tabs occurs.
+- Teardown: SIGINT, SIGTERM, the `teardown` command or a five-hour lifetime limit
+  signs out both sessions and any pending attempt with local scope. It then
+  clears memory, closes both servers and removes the socket. Run it when the run
+  ends or aborts.
+
+##### Key rotation with broker sessions
+
+1. Immediately before rotation, send `pin`. The broker force-refreshes A and B on
+   the current kid `cb295840-0eb2-4b4a-a1ba-c28c5b975361`. It then copies both
+   access tokens as the pre-rotation baseline, requiring at least 30 minutes of
+   validity (normally about 60). The baseline is never refreshed. A new sign-in
+   for a slot clears that slot's pin, which means re-pinning before rotation.
+2. Rotate while MCP stays disabled, then allow the documented propagation time.
+3. Send `refresh`. The live sessions must now carry the new kid; this is the
+   fresh new-kid session. Verify both live and pinned tokens with `auth.getUser`
+   and an exact own-profile read. The pinned old-kid token must still pass.
+4. Emi does not sign in again after rotation. One sign-in checkpoint per account
+   is needed only if a refresh fails (state `refresh-failed`). If the verifier
+   wants a fresh-login proof as well as a refresh, that is one extra A sign-in on
+   the same page, taking about a minute.
+
+##### Emi's steps
+
+1. The operator starts the broker and relays the exact URL, `http://127.0.0.1:<port>/`.
+2. In Chrome profile **Identity Scaffolding**, open that URL and choose **Sign in
+   test account A**. In Google's chooser pick dedicated account A, and wait for
+   `signed in as A: match`.
+3. Then, in **Emi Chrome**, open the same URL and choose **Sign in test account
+   B**. Pick account B and wait for `signed in as B: match`.
+4. On `wrong account: discarded` or a retry notice, repeat that profile's step
+   within five minutes. The existing Cadence tabs are not touched.
+
+Evidence: offline `tests/mcp-session-broker.test.mjs` (14 cases) uses a fake
+GoTrue behind real supabase-js, so the actual PKCE storage path runs. Fourteen guard
+mutations all fail it (`session-broker-mutations.json`). The opt-in
+`tests/mcp-session-broker.local-integration.test.mjs`
+(`CADENCE_QA_BROKER_LOCAL=1`) ran against a disposable auth-only CLI 2.109.1
+stack `cadence-qa232-broker` on ports 56120–56127, which was stopped and removed
+afterward. Local Google is unavailable, so its injected starter uses a PKCE magic
+link. Real code exchange, replay refusal, wrong-account and other-test-account
+discard with zero remaining server sessions, pin/refresh continuity and teardown
+to zero sessions all passed (`session-broker-local.log`). Live Google sign-in,
+production rotation and new-kid issuance remain unverified until execution.
+
+
 The frozen app's Settings page has no browser-client refresh loop. Merely leaving
 it open is insufficient. The frozen server proxy calls `auth.getClaims()` and
 passes refreshed cookies to the browser through `setAll`. The installed frozen
