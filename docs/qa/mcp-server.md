@@ -508,8 +508,9 @@ uses `redirect: 'error'` and a 30-second timeout, and discards the response body
 unread. The bearer token is the existing Vercel CLI credential, read into memory
 from the CLI's `auth.json` at write time and never logged. Preflight requires it
 to stay valid for at least 30 more minutes. Success requires a 2xx whose body
-holds exactly one created record with the same key, type sensitive and target
-production, and no failures. A 4xx is `rejected`. A throw, reset, timeout, 5xx,
+holds exactly one created record with an `id`, the same key, type sensitive and
+target production, and no failures. The returned value field is never kept. The
+later readback must find that same record `id`. A 4xx is `rejected`. A throw, reset, timeout, 5xx,
 other status, or a 2xx body that doesn't prove the create is `ambiguous`. Either
 way the script never re-POSTs. It records a read-only reconciliation of whether
 the record exists and stops. Every CLI read pins
@@ -549,8 +550,22 @@ ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
 this script. Evidence: 34 offline cases, including direct regressions for the
 b12e0bc and 34821fd findings, the stdin-path forms, a direct EventEmitter runner
 harness, direct one-attempt writer cases (reset, timeout, 5xx, 3xx, 4xx and nine
-2xx body shapes) and ambiguous/rejected reconciliation, and 47/47 mutation kills
+2xx body shapes) and ambiguous/rejected reconciliation, and 49/49 mutation kills
 (`key-custody-mutations.json`).
+
+##### Activation signer gate (step 3)
+
+The Vercel-stored JWK can't be read back, so its integrity is unproven until the
+deployed server uses it. Immediately after the activation redeploy reaches
+READY, the FIRST check is one minimal authenticated MCP call as A: one read
+tool, through the Inspector or a scripted OAuth client against the deployed
+`/mcp`. That call makes the server mint an integration token with the stored
+key and pass it to Supabase under RLS. Success means the call returns A's own
+data and nothing else. If the call fails for any signing, token or 401/403
+reason, roll back at once: set `CADENCE_MCP_ENABLED` false, then a same-source
+redeploy, keeping every key. Do not start client acceptance, Trust or any other
+step until that call has passed. Record the deployment ID, the grant ID, the
+tool name and the result status only.
 
 ##### Emi's steps
 

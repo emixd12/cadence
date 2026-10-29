@@ -81,10 +81,11 @@ export function createVercelWriter({ fetchImpl = fetch, readToken, teamId, timeo
       try { parsed = await response.json(); } catch { parsed = null; }
       const created = isObject(parsed) ? (Array.isArray(parsed.created) ? (parsed.created.length === 1 ? parsed.created[0] : null) : parsed.created) : null;
       const failed = isObject(parsed) ? parsed.failed : undefined;
-      const proven = isObject(created) && created.key === expected.key && created.type === 'sensitive'
+      const proven = isObject(created) && text(created.id) && created.key === expected.key && created.type === 'sensitive'
         && JSON.stringify(created.target) === '["production"]' && (failed === undefined || (Array.isArray(failed) && failed.length === 0));
+      const id = proven ? created.id : null;
       parsed = null;
-      return { outcome: proven ? 'created' : 'ambiguous' };
+      return proven ? { outcome: 'created', id } : { outcome: 'ambiguous' };
     } catch {
       return { outcome: 'ambiguous' };
     } finally {
@@ -212,9 +213,9 @@ export async function runKeyCustody({ op, supabase, vercel, vercelWrite, vercelW
       throw new Stop(added?.outcome === 'rejected' ? 'vercel-env-add-rejected' : 'vercel-env-add-ambiguous-reconcile');
     }
     const signer = (await envsRead('vercel-env-readback')).filter((e) => e.key === config.signerVariable);
-    if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');
+    if (signer.length !== 1 || signer[0].id !== added.id || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');
     if (await call('mcp-check-after', mcpStatus) !== 503) throw new Stop('mcp-not-disabled-after');
-    step('signer-variable-set', { target: signer[0].target, type: signer[0].type, redeployed: false });
+    step('signer-variable-set', { envId: added.id, target: signer[0].target, type: signer[0].type, redeployed: false });
     log('complete');
     return { result: 'complete', kid, keyId: mine[0].id, documentId, publicFingerprint: fingerprint };
   } catch (error) {

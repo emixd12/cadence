@@ -53,9 +53,9 @@ function world(overrides = {}) {
   const vercelWrite = async (path, body, expected) => {
     calls.writes.push({ path, body, expected });
     const posted = JSON.parse(body);
-    if (o.envPostOutcome !== 'rejected') envs = [...envs, { key: posted.key, target: o.wrongTarget ? ['production', 'preview'] : posted.target, type: posted.type }];
+    if (o.envPostOutcome !== 'rejected') envs = [...envs, { id: 'env-new', key: posted.key, target: o.wrongTarget ? ['production', 'preview'] : posted.target, type: posted.type }];
     if (o.enableMcpAfterAdd) mcp = 200;
-    return { outcome: o.envPostOutcome ?? 'created' };
+    return o.envPostOutcome && o.envPostOutcome !== 'created' ? { outcome: o.envPostOutcome } : { outcome: 'created', id: o.createdId ?? 'env-new' };
   };
   const deps = {
     op, supabase, vercel, vercelWrite,
@@ -102,6 +102,8 @@ describe('Ticket 232 signing-key custody', () => {
     for (const old of OLD) expect(keys.find((k) => k.id === old.id).status).toBe(old.status);
     expect(result.publicFingerprint).toBe(publicFingerprint(jwk));
     const last = JSON.parse(w.calls.saves.at(-1));
+    expect(last.steps.at(-1)).toMatchObject({ name: 'signer-variable-set', envId: 'env-new' });
+    expect(JSON.stringify(last)).not.toContain('returned-value');
     expect(last.steps.map((s) => s.name)).toEqual(['vault-bound', 'preflight', 'generated', 'custody-created', 'custody-verified', 'standby-imported', 'signer-variable-set']);
     expect(w.calls.supabase.some((c) => c.method === 'PATCH')).toBe(false);
   });
@@ -158,7 +160,7 @@ describe('Ticket 232 signing-key custody', () => {
   });
 
   it('stops when the secret is not Production-only, cannot be read back, or MCP became enabled', async () => {
-    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ envReadbackStatus: 1 }, 'vercel-env-readback-unreadable'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after']]) {
+    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ envReadbackStatus: 1 }, 'vercel-env-readback-unreadable'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after'], [{ createdId: 'env-other' }, 'signer-variable-readback-mismatch']]) {
       const w = world(overrides);
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
     }
@@ -248,7 +250,7 @@ describe('Ticket 232 Vercel write outcomes', () => {
 });
 
 describe('Ticket 232 one-attempt Vercel writer', () => {
-  const good = { created: { key: 'K', type: 'sensitive', target: ['production'] } };
+  const good = { created: { id: 'env-1', key: 'K', type: 'sensitive', target: ['production'], value: 'returned-value-not-kept' } };
   const make = (behaviour, options = {}) => {
     const seen = [];
     const fetchImpl = (url, init) => {
@@ -268,7 +270,7 @@ describe('Ticket 232 one-attempt Vercel writer', () => {
   for (const [behaviour, outcome] of cases) {
     it(`makes exactly one attempt on ${behaviour} and reports ${outcome}`, async () => {
       const w = make(behaviour);
-      expect(await w.write('/v10/projects/p/env', '{"k":1}', { key: 'K' })).toEqual({ outcome });
+      expect(await w.write('/v10/projects/p/env', '{"k":1}', { key: 'K' })).toEqual(outcome === 'created' ? { outcome, id: 'env-1' } : { outcome });
       expect(w.seen).toHaveLength(1);
       const [{ url, init }] = w.seen;
       expect(url).toBe('https://api.vercel.com/v10/projects/p/env?teamId=team_x');
@@ -284,6 +286,7 @@ describe('Ticket 232 one-attempt Vercel writer', () => {
     ['a non-sensitive type', JSON.stringify({ created: { ...good.created, type: 'encrypted' } })],
     ['a wider target', JSON.stringify({ created: { ...good.created, target: ['production', 'preview'] } })],
     ['two created records', JSON.stringify({ created: [good.created, good.created] })],
+    ['a created record without an id', JSON.stringify({ created: { key: 'K', type: 'sensitive', target: ['production'] } })],
   ];
   for (const [label, body] of bodies) {
     it(`treats a 2xx with ${label} as ambiguous`, async () => {
@@ -294,7 +297,7 @@ describe('Ticket 232 one-attempt Vercel writer', () => {
   }
   it('accepts a single created record in array form', async () => {
     const w = make('ok', { body: JSON.stringify({ created: [good.created], failed: [] }) });
-    expect(await w.write('/v10/projects/p/env', '{}', { key: 'K' })).toEqual({ outcome: 'created' });
+    expect(await w.write('/v10/projects/p/env', '{}', { key: 'K' })).toEqual({ outcome: 'created', id: 'env-1' });
   });
   it('does not call the API without a usable credential', async () => {
     for (const readToken of [() => null, () => '', () => { throw new Error('no file'); }]) {
