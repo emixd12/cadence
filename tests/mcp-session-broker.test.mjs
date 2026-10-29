@@ -426,4 +426,3 @@ describe('Ticket 232 QA session broker', () => {
     await expect(choosePort(allow, async () => false)).rejects.toThrow('no-allowed-free-port');
   });
 });
-
