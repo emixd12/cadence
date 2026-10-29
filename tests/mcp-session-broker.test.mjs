@@ -1,10 +1,11 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { request } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdtempSync, mkdirSync, chmodSync, readFileSync, statSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, chmodSync, readFileSync, statSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir, networkInterfaces } from 'node:os';
 import { join } from 'node:path';
-import { createSessionBroker, brokerRequest, choosePort, googleSignIn, ACCOUNTS } from '../scripts/mcp-session-broker.mjs';
+import { createSessionBroker, brokerRequest, choosePort, googleSignIn, ACCOUNTS, PORT_PREFERENCE } from '../scripts/mcp-session-broker.mjs';
 
 const SUPABASE = 'https://project.example.test';
 const KEY = 'sb_publishable_testkey';
@@ -16,7 +17,7 @@ afterEach(async () => { while (cleanups.length) await cleanups.pop()(); });
 function fakeAuth() {
   const codes = new Map(), access = new Map(), refresh = new Map();
   const logouts = [], requests = [];
-  let kid = 'kid-old', refreshFails = false;
+  let kid = 'kid-old', refreshFails = false, gate = null, logoutFails = false;
   const jwt = (userId) => `${Buffer.from(JSON.stringify({ alg: 'ES256', kid })).toString('base64url')}.${Buffer.from(JSON.stringify({ sub: userId, n: randomBytes(6).toString('hex') })).toString('base64url')}.sig`;
   const issue = (userId) => {
     const token = jwt(userId), rt = randomBytes(12).toString('hex');
@@ -30,6 +31,7 @@ function fakeAuth() {
     const body = init.body ? JSON.parse(init.body) : {};
     requests.push(url.pathname);
     if (url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'pkce') {
+      if (gate) { gate.reached(); await gate.released; }
       const entry = codes.get(body.auth_code);
       codes.delete(body.auth_code);
       const challenge = createHash('sha256').update(body.code_verifier ?? '').digest('base64url');
@@ -47,6 +49,7 @@ function fakeAuth() {
       return userId ? json(200, { id: userId, aud: 'authenticated' }) : json(401, { code: 'bad_jwt', message: 'invalid' });
     }
     if (url.pathname === '/auth/v1/logout') {
+      if (logoutFails) return json(500, { message: 'synthetic-provider-failure' });
       logouts.push({ scope: url.searchParams.get('scope'), userId: access.get((headers.get('authorization') ?? '').replace('Bearer ', '')) });
       return new Response(null, { status: 204 });
     }
@@ -62,6 +65,14 @@ function fakeAuth() {
     },
     rotate: () => { kid = 'kid-new'; },
     failRefresh: () => { refreshFails = true; },
+    failLogout: (value) => { logoutFails = value; },
+    holdExchange: () => {
+      let reached, release;
+      const reachedP = new Promise((r) => { reached = r; });
+      const released = new Promise((r) => { release = r; });
+      gate = { reached, released };
+      return { reached: reachedP, release: () => { gate = null; release(); } };
+    },
   };
 }
 
@@ -281,6 +292,132 @@ describe('Ticket 232 QA session broker', () => {
     const opts = { redirectTo: 'http://127.0.0.1:4327/auth/callback', supabaseUrl: SUPABASE };
     expect(await googleSignIn(stub('https://attacker.example/auth/v1/authorize?x=1'), opts)).toBeNull();
     expect(await googleSignIn(stub(`${SUPABASE}/auth/v1/authorize?x=1`), opts)).toBe(`${SUPABASE}/auth/v1/authorize?x=1`);
+  });
+
+  it('refuses to pin when either refresh fails', async () => {
+    const t = await setup();
+    await t.signIn('A', ACCOUNTS.A);
+    await t.signIn('B', ACCOUNTS.B);
+    t.auth.failRefresh();
+    const pin = await brokerRequest(t.socketPath, { command: 'pin' });
+    expect(pin).toMatchObject({ ok: false, error: 'pin-refresh-failed', pinState: 'none' });
+    expect((await brokerRequest(t.socketPath, { command: 'pinned' })).ok).toBe(false);
+  });
+
+  it('keeps the pre-rotation pin write-once and invalidates it on a new sign-in', async () => {
+    const t = await setup();
+    await t.signIn('A', ACCOUNTS.A);
+    await t.signIn('B', ACCOUNTS.B);
+    expect((await brokerRequest(t.socketPath, { command: 'pin' })).ok).toBe(true);
+    const baseline = (await brokerRequest(t.socketPath, { command: 'pinned' })).sessions;
+    t.auth.rotate();
+    await brokerRequest(t.socketPath, { command: 'refresh' });
+    expect(await brokerRequest(t.socketPath, { command: 'pin' })).toMatchObject({ ok: false, error: 'pin-pinned' });
+    const still = (await brokerRequest(t.socketPath, { command: 'pinned' })).sessions;
+    expect(still.A.accessToken).toBe(baseline.A.accessToken);
+    expect(still.A.kid).toBe('kid-old');
+    await t.signIn('A', ACCOUNTS.A);
+    expect(await brokerRequest(t.socketPath, { command: 'pinned' })).toMatchObject({ ok: false, error: 'pin-unavailable', pinState: 'invalidated' });
+    expect(await brokerRequest(t.socketPath, { command: 'pin' })).toMatchObject({ ok: false, error: 'pin-invalidated' });
+  });
+
+  it('drains an in-flight sign-in before teardown and signs it out', async () => {
+    const t = await setup();
+    const start = await get(t.port, '/start/A');
+    const cookie = start.headers['set-cookie'][0].split(';')[0];
+    const code = t.auth.authorize(start.headers.location, ACCOUNTS.A);
+    const hold = t.auth.holdExchange();
+    const pending = get(t.port, `/auth/callback?code=${code}`, { cookie });
+    await hold.reached;
+    const closing = t.broker.teardown('test');
+    await new Promise((r) => setTimeout(r, 20));
+    hold.release();
+    const [cb] = await Promise.all([pending, closing]);
+    expect(cb.headers.location).toBe('/done/failed');
+    expect(t.broker.status().slots).toEqual({ A: null, B: null });
+    expect(t.auth.logouts).toEqual([{ scope: 'local', userId: ACCOUNTS.A }]);
+    expect(await t.broker.command({ command: 'sessions' })).toEqual({ ok: false, error: 'closing' });
+    expect(existsSync(t.socketPath)).toBe(false);
+  });
+
+  it('refuses a live socket, never removes another broker socket, and replaces only a stale one', async () => {
+    const t = await setup();
+    await t.signIn('A', ACCOUNTS.A);
+    const second = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: t.socketPath, fetchImpl: t.auth.fetchImpl });
+    await expect(second.start()).rejects.toThrow('socket-in-use');
+    await second.teardown('test');
+    expect(existsSync(t.socketPath)).toBe(true);
+    expect((await brokerRequest(t.socketPath, { command: 'status' })).slots.A.userId).toBe(ACCOUNTS.A);
+    const dir = mkdtempSync(join(tmpdir(), 'qa232-'));
+    const stale = join(dir, 's.sock');
+    execFileSync('python3', ['-I', '-c', 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])', stale]);
+    const third = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: stale, fetchImpl: t.auth.fetchImpl });
+    await third.start();
+    expect((await brokerRequest(stale, { command: 'status' })).ok).toBe(true);
+    await third.teardown('test');
+    expect(existsSync(stale)).toBe(false);
+    const fifth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: stale, fetchImpl: t.auth.fetchImpl });
+    await fifth.start();
+    rmSync(stale);
+    execFileSync('python3', ['-I', '-c', 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])', stale]);
+    await fifth.teardown('test');
+    expect(existsSync(stale)).toBe(true);
+    const occupied = join(dir, 'f.sock');
+    writeFileSync(occupied, 'x');
+    const fourth = createSessionBroker({ supabaseUrl: SUPABASE, publishableKey: KEY, port: nextPort++, socketPath: occupied, fetchImpl: t.auth.fetchImpl });
+    await expect(fourth.start()).rejects.toThrow('socket-path-occupied');
+    expect(readFileSync(occupied, 'utf8')).toBe('x');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('holds the pending cap under concurrent starts and releases failed reservations', async () => {
+    let release, count = 0, reachedFour;
+    const gate = new Promise((r) => { release = r; });
+    const four = new Promise((r) => { reachedFour = r; });
+    const t = await setup({ beginSignIn: async (client, options) => {
+      count += 1;
+      if (count === 4) reachedFour();
+      await gate;
+      return googleSignIn(client, options);
+    } });
+    const requests = Array.from({ length: 6 }, () => get(t.port, '/start/A'));
+    await four;
+    await new Promise((r) => setTimeout(r, 50));
+    release();
+    const statuses = (await Promise.all(requests)).map((r) => r.status).sort();
+    expect(statuses).toEqual([303, 303, 303, 303, 429, 429]);
+    expect(count).toBe(4);
+    const failing = await setup({ beginSignIn: async () => null });
+    for (let i = 0; i < 6; i += 1) expect((await get(failing.port, '/start/A')).status).toBe(502);
+  });
+
+  it('never reports a discard or teardown sign-out the provider did not confirm', async () => {
+    const t = await setup({ retryDelayMs: 1 });
+    t.auth.failLogout(true);
+    const wrong = await t.signIn('A', OTHER);
+    expect(wrong.cb.headers.location).toBe('/done/cleanup-failed');
+    expect((await get(t.port, '/done/cleanup-failed')).body).toContain('sign-out pending');
+    expect(t.lines).not.toContain('discarded A');
+    expect(t.lines).toContain('cleanup-failed');
+    expect(t.broker.status().cleanupPending).toBe(1);
+    t.auth.failLogout(false);
+    await t.broker.tick();
+    expect(t.broker.status().cleanupPending).toBe(0);
+    expect(t.auth.logouts).toEqual([{ scope: 'local', userId: OTHER }]);
+    await t.signIn('A', ACCOUNTS.A);
+    await t.signIn('B', ACCOUNTS.B);
+    t.auth.failLogout(true);
+    expect(await t.broker.teardown('test')).toEqual({ unconfirmedSignOuts: 2 });
+    const last = readFileSync(t.receiptPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
+    expect(last).toMatchObject({ event: 'teardown', unconfirmedSignOuts: 2 });
+    expect(t.lines.at(-1)).toBe('teardown test unconfirmed-sign-outs 2');
+  });
+
+  it('prefers allowlisted free ports in ascending order from 4321', async () => {
+    expect(PORT_PREFERENCE).toEqual([4321, 4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329, 4330]);
+    const allow = PORT_PREFERENCE.map((p) => `http://127.0.0.1:${p}/auth/callback`);
+    expect(await choosePort(allow, async (p) => p !== 4321 && p !== 4322)).toBe(4323);
+    expect(await choosePort(allow, async () => true)).toBe(4321);
   });
 
   it('chooses only an exactly allowlisted free loopback port', async () => {

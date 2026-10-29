@@ -103,7 +103,7 @@ it.skipIf(!enabled)('exchanges real PKCE codes, discards a wrong account, refres
     expect(await userOf(live.B.accessToken)).toBe(ACCOUNTS.B);
     expect([sessionCount(ACCOUNTS.A), sessionCount(ACCOUNTS.B)]).toEqual([1, 1]);
 
-    await broker.teardown('rehearsal');
+    expect(await broker.teardown('rehearsal')).toEqual({ unconfirmedSignOuts: 0 });
     expect([sessionCount(ACCOUNTS.A), sessionCount(ACCOUNTS.B)]).toEqual([0, 0]);
     expect(await userOf(live.A.accessToken)).toBeNull();
     const recorded = `${lines.join('\n')}\n${readFileSync(receiptPath, 'utf8')}`;

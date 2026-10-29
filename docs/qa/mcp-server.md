@@ -419,7 +419,8 @@ plan in the next paragraphs is retained as history only.
   publishable key only. No service role, admin link or provider credential. The
   start step adds only `prompt=select_account` so Emi picks the dedicated account.
 - Redirect: the exact allowlisted `http://127.0.0.1:<port>/auth/callback`. Ports
-  4327–4330, then 4326–4324, in that order; 4321–4323 are avoided. Startup reads
+  are tried in ascending order from 4321 to 4330; the first one that is exactly
+  allowlisted and free on both loopback addresses is used. Startup reads
   back `uri_allow_list`, the Site URL and Google enablement through the read-only
   Management API. It requires the exact callback entry and does not change auth
   configuration. The 17:53 UTC readback found all 20 `127.0.0.1` entries for
@@ -429,7 +430,8 @@ plan in the next paragraphs is retained as history only.
 - Binding: HTTP on 127.0.0.1 only; exact `Host` check; GET only; no-store,
   no-referrer, `default-src 'none'` CSP and frame denial; header/request timeouts
   of 5 and 10 seconds; 15-second provider-call timeout; at most four pending
-  attempts.
+  attempts, counting reservations taken before the provider call. A failed
+  start releases its reservation.
 - State: each attempt has its own in-memory PKCE verifier and a 256-bit HttpOnly
   SameSite=Lax cookie scoped to the callback path. Attempts expire after five
   minutes and are deleted on their first callback. The code is exchanged once in
@@ -437,11 +439,20 @@ plan in the next paragraphs is retained as history only.
 - Identity: `auth.getUser` must return exactly A
   `caefd1b8-ea46-485f-8869-119a715fb092` for slot A, or B
   `c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b` for slot B. Anything else, including the
-  other test account, is signed out with local scope and dropped. The page shows
-  only `signed in as A/B: match`, `wrong account: discarded` or a retry notice.
+  other test account, is signed out with local scope and dropped. `discarded` is
+  reported only when the provider confirms the sign-out. On any sign-out error
+  the client stays in a bounded in-memory cleanup list, retried every 30 seconds.
+  The page then says `wrong account: sign-out pending, tell the operator`, and
+  status shows only a `cleanupPending` count. New attempts are refused while
+  eight cleanups are pending. The page shows only `signed in as A/B: match`,
+  `wrong account: discarded`, that pending notice or a retry notice.
 - Custody: sessions stay in broker memory. Runner processes receive access tokens
   through the Unix socket `~/.cadence-qa232/broker.sock`. The socket is 0600 and
-  its directory 0700, owned by the operator; anything else is refused. Tokens are
+  its directory 0700, owned by the operator; anything else is refused. A live
+  socket at that path (another broker) is refused, and only a stale socket owned
+  by the operator is replaced. The broker binds a private name and hard-links it
+  into place, so it never replaces an existing path. Teardown removes the public
+  path only if it is still the broker's own inode. Tokens are
   never written to disk, notes, chat, logs or artifacts. Log lines are fixed
   event names. `session-broker.jsonl` (0600) records only slot, subject, expiry,
   kid and state.
@@ -450,17 +461,22 @@ plan in the next paragraphs is retained as history only.
   separate sessions from the owner's browser tabs, so no refresh-token race with
   the tabs occurs.
 - Teardown: SIGINT, SIGTERM, the `teardown` command or a five-hour lifetime limit
-  signs out both sessions and any pending attempt with local scope. It then
-  clears memory, closes both servers and removes the socket. Run it when the run
-  ends or aborts.
+  first refuses new HTTP and socket work. It then waits for in-flight sign-ins
+  and refreshes to finish, so nothing is stored afterwards. Next it signs out
+  both sessions with local scope and retries unconfirmed sign-outs three times.
+  Finally it clears memory and closes both servers. The receipt and the final log
+  line report `unconfirmedSignOuts`. Any nonzero count must be reported and must
+  not be described as revoked. Run teardown when the run ends or aborts.
 
 ##### Key rotation with broker sessions
 
 1. Immediately before rotation, send `pin`. The broker force-refreshes A and B on
    the current kid `cb295840-0eb2-4b4a-a1ba-c28c5b975361`. It then copies both
    access tokens as the pre-rotation baseline, requiring at least 30 minutes of
-   validity (normally about 60). The baseline is never refreshed. A new sign-in
-   for a slot clears that slot's pin, which means re-pinning before rotation.
+   validity (normally about 60). The pin fails if either refresh fails, and stale
+   tokens are never pinned. It is write-once: a second `pin` is refused, and the
+   baseline is never refreshed. A new sign-in after pinning marks the pin
+   `invalidated`. Rotation must then stop until a fresh, reviewed broker run.
 2. Rotate while MCP stays disabled, then allow the documented propagation time.
 3. Send `refresh`. The live sessions must now carry the new kid; this is the
    fresh new-kid session. Verify both live and pinned tokens with `auth.getUser`
@@ -481,9 +497,11 @@ plan in the next paragraphs is retained as history only.
 4. On `wrong account: discarded` or a retry notice, repeat that profile's step
    within five minutes. The existing Cadence tabs are not touched.
 
-Evidence: offline `tests/mcp-session-broker.test.mjs` (14 cases) uses a fake
-GoTrue behind real supabase-js, so the actual PKCE storage path runs. Fourteen guard
-mutations all fail it (`session-broker-mutations.json`). The opt-in
+Evidence: offline `tests/mcp-session-broker.test.mjs` (21 cases) uses a fake
+GoTrue behind real supabase-js, so the actual PKCE storage path runs. Seven
+cases are direct regressions for the 10f8ab2 review findings. All seven fail
+against 10f8ab2 (`session-broker-regressions-old.log`). All 27 guard mutations
+fail the suite while the unmutated copy passes (`session-broker-mutations.json`). The opt-in
 `tests/mcp-session-broker.local-integration.test.mjs`
 (`CADENCE_QA_BROKER_LOCAL=1`) ran against a disposable auth-only CLI 2.109.1
 stack `cadence-qa232-broker` on ports 56120–56127, which was stopped and removed

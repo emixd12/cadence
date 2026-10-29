@@ -6,17 +6,18 @@
 import { createServer } from 'node:http';
 import { createServer as createNetServer, connect } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, unlinkSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, linkSync, lstatSync, mkdirSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 
 export const ACCOUNTS = Object.freeze({ A: 'caefd1b8-ea46-485f-8869-119a715fb092', B: 'c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b' });
-export const PORT_PREFERENCE = Object.freeze([4327, 4328, 4329, 4330, 4326, 4325, 4324]);
+export const PORT_PREFERENCE = Object.freeze([4321, 4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329, 4330]);
 const COOKIE = 'cadence_qa_attempt';
 const RESULTS = Object.freeze({
   'A-match': 'signed in as A: match',
   'B-match': 'signed in as B: match',
   discarded: 'wrong account: discarded',
+  'cleanup-failed': 'wrong account: sign-out pending, tell the operator',
   failed: 'sign-in failed: try again',
 });
 
@@ -49,6 +50,7 @@ export function createSessionBroker({
   attemptTtlMs = 5 * 60_000, refreshMarginMs = 15 * 60_000, minHandoffMs = 10 * 60_000,
   pinMinMs = 30 * 60_000, requestTimeoutMs = 15_000, maxPendingAttempts = 4,
   maxLifetimeMs = 5 * 60 * 60_000, refreshIntervalMs = 30_000, beginSignIn = googleSignIn,
+  maxPendingCleanup = 8, teardownRetries = 3, retryDelayMs = 1_000,
 }) {
   if (!/^sb_publishable_/.test(publishableKey ?? '')) throw new Error('publishable-key-required');
   if (!Number.isInteger(port)) throw new Error('port-required');
@@ -58,7 +60,11 @@ export function createSessionBroker({
   const attempts = new Map();
   const slots = new Map();
   const pinned = new Map();
-  let httpServer = null, socketServer = null, timer = null, lifetime = null, closed = false;
+  const inflight = new Set();
+  const cleanup = [];
+  let reserved = 0;
+  let httpServer = null, socketServer = null, timer = null, lifetime = null, closed = false, pinState = 'none', ownSocket = null;
+  const track = (promise) => { inflight.add(promise); promise.finally(() => inflight.delete(promise)).catch(() => {}); return promise; };
 
   const receipt = (event, extra = {}) => {
     if (!receiptPath) return;
@@ -75,13 +81,36 @@ export function createSessionBroker({
   };
   const status = () => ({
     slots: { A: describe('A'), B: describe('B') },
+    pinState,
+    cleanupPending: cleanup.length,
     pinned: Object.fromEntries(['A', 'B'].map((slot) => [slot, pinned.has(slot) ? { expiresAt: new Date(pinned.get(slot).expiresAt).toISOString(), kid: pinned.get(slot).kid } : null])),
   });
   const store = (slot, client, session, userId) => {
     slots.set(slot, { client, userId, accessToken: session.access_token, expiresAt: session.expires_at * 1000, kid: decodeKid(session.access_token), state: 'ok' });
   };
+  // Returns true only when the provider confirmed the local-scope sign-out.
+  // An expired access token would make logout answer 401, which the SDK treats as
+  // success, so load (and if needed refresh) the session first.
+  const signOutLocal = async (client) => {
+    try {
+      const loaded = await client.auth.getSession();
+      if (loaded.error) return false;
+      if (!loaded.data?.session) return true;
+      const { error } = await client.auth.signOut({ scope: 'local' });
+      return !error;
+    } catch { return false; }
+  };
   const discard = async (client) => {
-    try { await client.auth.signOut({ scope: 'local' }); } catch { /* the session is dropped from memory either way */ }
+    if (await signOutLocal(client)) return true;
+    if (!cleanup.includes(client)) cleanup.push(client);
+    log('cleanup-failed');
+    receipt('cleanup-failed', { cleanupPending: cleanup.length });
+    return false;
+  };
+  const retryCleanup = async () => {
+    for (const client of [...cleanup]) {
+      if (await signOutLocal(client)) { cleanup.splice(cleanup.indexOf(client), 1); log('cleanup-retried'); receipt('cleanup-retried', { cleanupPending: cleanup.length }); }
+    }
   };
 
   const reply = (res, code, body, headers = {}) => {
@@ -99,11 +128,14 @@ export function createSessionBroker({
 
   const startAttempt = async (slot, res) => {
     purgeExpired();
-    if (attempts.size >= maxPendingAttempts) return reply(res, 429, page('<p>Too many pending sign-ins. Wait five minutes.</p>'));
+    if (cleanup.length >= maxPendingCleanup) return reply(res, 503, page('<p>Sign-out cleanup pending. Tell the operator.</p>'));
+    if (attempts.size + reserved >= maxPendingAttempts) return reply(res, 429, page('<p>Too many pending sign-ins. Wait five minutes.</p>'));
+    reserved += 1;
     const nonce = randomBytes(32).toString('base64url');
     const client = newClient();
     let location = null;
-    try { location = await beginSignIn(client, { redirectTo, supabaseUrl, slot }); } catch { location = null; }
+    try { location = await beginSignIn(client, { redirectTo, supabaseUrl, slot }); } catch { location = null; } finally { reserved -= 1; }
+    if (closed) return reply(res, 503, page('<p>Closing.</p>'));
     if (!location) {
       log(`attempt-failed ${slot}`);
       return reply(res, 502, page('<p>Sign-in could not start.</p>'));
@@ -134,14 +166,15 @@ export function createSessionBroker({
       return done(res, 'failed');
     }
     if (userId !== accounts[attempt.slot]) {
-      await discard(attempt.client);
+      if (!(await discard(attempt.client))) return done(res, 'cleanup-failed');
       log(`discarded ${attempt.slot}`);
       receipt('discarded', { slot: attempt.slot });
       return done(res, 'discarded');
     }
     const previous = slots.get(attempt.slot);
     if (previous) await discard(previous.client);
-    pinned.delete(attempt.slot);
+    if (closed) { await discard(attempt.client); log(`closing-discarded ${attempt.slot}`); return done(res, 'failed'); }
+    if (pinState === 'pinned') { pinned.clear(); pinState = 'invalidated'; receipt('pin-invalidated', { slot: attempt.slot }); }
     store(attempt.slot, attempt.client, session, userId);
     log(`match ${attempt.slot}`);
     receipt('signed-in', { slot: attempt.slot, ...describe(attempt.slot) });
@@ -149,6 +182,7 @@ export function createSessionBroker({
   };
 
   const handle = async (req, res) => {
+    if (closed) return reply(res, 503, page('<p>Closing.</p>'));
     if (req.headers.host !== host) return reply(res, 421, page('<p>Wrong host.</p>'));
     if (req.method !== 'GET') return reply(res, 405, page('<p>Method not allowed.</p>'), { Allow: 'GET' });
     const url = new URL(req.url ?? '/', origin);
@@ -167,6 +201,7 @@ export function createSessionBroker({
     try {
       const { data, error } = await s.client.auth.refreshSession();
       if (error || !data?.session) throw new Error('refresh');
+      if (slots.get(slot) !== s) return false;
       store(slot, s.client, data.session, s.userId);
       log(`refreshed ${slot}`);
       receipt('refreshed', { slot, ...describe(slot) });
@@ -178,7 +213,7 @@ export function createSessionBroker({
       return false;
     }
   };
-  const tick = async () => { for (const slot of ['A', 'B']) await refresh(slot); purgeExpired(); };
+  const tick = async () => { for (const slot of ['A', 'B']) await refresh(slot); await retryCleanup(); purgeExpired(); };
 
   const tokensFor = (source, minMs) => {
     const out = {};
@@ -190,6 +225,7 @@ export function createSessionBroker({
     return out;
   };
   const command = async (request) => {
+    if (closed) return { ok: false, error: 'closing' };
     switch (request?.command) {
       case 'status': return { ok: true, ...status() };
       case 'sessions': { const sessions = tokensFor(slots, minHandoffMs); return sessions ? { ok: true, sessions } : { ok: false, error: 'session-unavailable', ...status() }; }
@@ -200,14 +236,17 @@ export function createSessionBroker({
         return { ok: results.every(Boolean), ...status() };
       }
       case 'pin': {
-        for (const slot of ['A', 'B']) await refresh(slot, true);
-        const current = tokensFor(slots, pinMinMs);
-        if (!current) return { ok: false, error: 'pin-validity', ...status() };
+        if (pinState !== 'none') return { ok: false, error: `pin-${pinState}`, ...status() };
+        pinState = 'pinning';
+        const refreshed = [await refresh('A', true), await refresh('B', true)];
+        const current = refreshed.every(Boolean) && !closed ? tokensFor(slots, pinMinMs) : null;
+        if (!current) { pinState = 'none'; return { ok: false, error: refreshed.every(Boolean) ? 'pin-validity' : 'pin-refresh-failed', ...status() }; }
         for (const slot of ['A', 'B']) pinned.set(slot, { userId: current[slot].userId, accessToken: current[slot].accessToken, expiresAt: Date.parse(current[slot].expiresAt), kid: current[slot].kid });
+        pinState = 'pinned';
         receipt('pinned', status().pinned);
         return { ok: true, ...status() };
       }
-      case 'pinned': { const sessions = tokensFor(pinned, 0); return sessions ? { ok: true, sessions } : { ok: false, error: 'pin-unavailable', ...status() }; }
+      case 'pinned': { const sessions = pinState === 'pinned' ? tokensFor(pinned, 0) : null; return sessions ? { ok: true, sessions } : { ok: false, error: 'pin-unavailable', ...status() }; }
       case 'teardown': { setImmediate(() => { teardown('requested'); }); return { ok: true }; }
       default: return { ok: false, error: 'unknown-command' };
     }
@@ -218,11 +257,7 @@ export function createSessionBroker({
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const info = lstatSync(dir);
     if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid() || (info.mode & 0o077) !== 0) return reject(new Error('socket-directory-not-private'));
-    if (existsSync(socketPath)) {
-      const existing = lstatSync(socketPath);
-      if (!existing.isSocket()) return reject(new Error('socket-path-occupied'));
-      unlinkSync(socketPath);
-    }
+    const listen = () => {
     socketServer = createNetServer((conn) => {
       let buffer = '';
       conn.setTimeout(5_000, () => conn.destroy());
@@ -232,24 +267,54 @@ export function createSessionBroker({
         const end = buffer.indexOf('\n');
         if (end < 0) return;
         let response;
-        try { response = await command(JSON.parse(buffer.slice(0, end))); } catch { response = { ok: false, error: 'bad-request' }; }
+        try { response = await track(command(JSON.parse(buffer.slice(0, end)))); } catch { response = { ok: false, error: 'bad-request' }; }
         conn.end(`${JSON.stringify(response)}\n`);
       });
       conn.on('error', () => {});
     });
     socketServer.once('error', reject);
-    socketServer.listen(socketPath, () => { chmodSync(socketPath, 0o600); resolve(); });
+    // Bind a private name, then hard-link it into place: link() never replaces an
+    // existing path, and Node's close-time unlink only removes the private name.
+    const bound = `${dirname(socketPath)}/.bind-${randomBytes(8).toString('hex')}.sock`;
+    socketServer.listen(bound, () => {
+      try {
+        chmodSync(bound, 0o600);
+        linkSync(bound, socketPath);
+        unlinkSync(bound);
+      } catch {
+        try { unlinkSync(bound); } catch { /* already gone */ }
+        socketServer.close();
+        return reject(new Error('socket-in-use'));
+      }
+      const mine = lstatSync(socketPath);
+      ownSocket = { dev: mine.dev, ino: mine.ino };
+      resolve();
+    });
+    };
+    if (!existsSync(socketPath)) return listen();
+    const existing = lstatSync(socketPath);
+    if (!existing.isSocket() || existing.uid !== process.getuid()) return reject(new Error('socket-path-occupied'));
+    const probe = connect(socketPath);
+    probe.setTimeout(1_000, () => { probe.destroy(); reject(new Error('socket-in-use')); });
+    probe.on('connect', () => { probe.destroy(); reject(new Error('socket-in-use')); });
+    probe.on('error', (error) => {
+      if (error.code !== 'ECONNREFUSED') return reject(new Error('socket-in-use'));
+      const again = lstatSync(socketPath);
+      if (again.dev !== existing.dev || again.ino !== existing.ino) return reject(new Error('socket-in-use'));
+      unlinkSync(socketPath);
+      listen();
+    });
   });
 
   const start = async () => {
     await listenSocket();
-    httpServer = createServer((req, res) => { handle(req, res).catch(() => { if (!res.headersSent) reply(res, 500, page('<p>Error.</p>')); }); });
+    httpServer = createServer((req, res) => { track(handle(req, res)).catch(() => { if (!res.headersSent) reply(res, 500, page('<p>Error.</p>')); }); });
     httpServer.headersTimeout = 5_000;
     httpServer.requestTimeout = 10_000;
     httpServer.keepAliveTimeout = 1_000;
     httpServer.on('clientError', (_, socket) => socket.destroy());
     await new Promise((resolve, reject) => { httpServer.once('error', reject); httpServer.listen(port, '127.0.0.1', resolve); });
-    timer = setInterval(() => { tick().catch(() => {}); }, refreshIntervalMs);
+    timer = setInterval(() => { if (!closed) track(tick()).catch(() => {}); }, refreshIntervalMs);
     lifetime = setTimeout(() => { teardown('lifetime'); }, maxLifetimeMs);
     timer.unref?.(); lifetime.unref?.();
     receipt('started', { port });
@@ -261,17 +326,29 @@ export function createSessionBroker({
     if (closed) return;
     closed = true;
     clearInterval(timer); clearTimeout(lifetime);
-    for (const slot of ['A', 'B']) { const s = slots.get(slot); if (s) await discard(s.client); }
-    for (const a of attempts.values()) await discard(a.client);
-    slots.clear(); pinned.clear(); attempts.clear();
-    await Promise.all([
-      new Promise((resolve) => (httpServer ? httpServer.close(() => resolve()) : resolve())),
-      new Promise((resolve) => (socketServer ? socketServer.close(() => resolve()) : resolve())),
+    const closing = Promise.all([
+      new Promise((resolve) => (httpServer?.listening ? httpServer.close(() => resolve()) : resolve())),
+      new Promise((resolve) => (socketServer?.listening ? socketServer.close(() => resolve()) : resolve())),
     ]);
+    httpServer?.closeIdleConnections?.();
+    while (inflight.size) await Promise.allSettled([...inflight]);
+    for (const slot of ['A', 'B']) { const s = slots.get(slot); if (s) await discard(s.client); }
+    attempts.clear();
+    for (let i = 0; i < teardownRetries && cleanup.length; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      await retryCleanup();
+    }
+    const unconfirmed = cleanup.length;
+    slots.clear(); pinned.clear(); cleanup.length = 0; pinState = 'closed';
     httpServer?.closeAllConnections?.();
-    if (existsSync(socketPath)) unlinkSync(socketPath);
-    receipt('teardown', { reason });
-    log(`teardown ${reason}`);
+    await closing;
+    if (ownSocket && existsSync(socketPath)) {
+      const current = lstatSync(socketPath);
+      if (current.dev === ownSocket.dev && current.ino === ownSocket.ino) unlinkSync(socketPath);
+    }
+    receipt('teardown', { reason, unconfirmedSignOuts: unconfirmed });
+    log(unconfirmed ? `teardown ${reason} unconfirmed-sign-outs ${unconfirmed}` : `teardown ${reason}`);
+    return { unconfirmedSignOuts: unconfirmed };
   };
 
   return { start, teardown, command, tick, status, origin, redirectTo };
