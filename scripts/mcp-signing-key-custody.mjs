@@ -135,7 +135,7 @@ export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, rec
 
     log('op-document-create');
     writeAttempted = true;
-    const created = await call('custody-create', () => op(['document', 'create', '-', '--vault', config.vault, '--title', config.title, '--file-name', 'integration-jwk.json', '--format=json'], JSON.stringify(jwk)));
+    const created = await call('custody-create', () => op(['document', 'create', '/dev/stdin', '--vault', config.vault, '--title', config.title, '--file-name', 'integration-jwk.json', '--format=json'], JSON.stringify(jwk)));
     const createdBody = created?.status === 0 ? parse(created.stdout) : null;
     const documentId = isObject(createdBody) && typeof (createdBody.uuid ?? createdBody.id) === 'string' ? (createdBody.uuid ?? createdBody.id) : null;
     if (!documentId) throw new Stop('custody-create-ambiguous-reconcile-metadata');
@@ -158,7 +158,10 @@ export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, rec
 
     const secret = JSON.stringify(jwk);
     jwk = null;
-    const added = await call('vercel-env-add', () => vercel(['env', 'add', config.signerVariable, '--environment', 'production', '--project', config.web, '--sensitive', '--yes'], secret));
+    // `vercel api --input -` reads stdin to EOF; `vercel env add` accepts only the
+    // first stdin chunk within 500 ms, which could store a truncated secret.
+    const envBody = JSON.stringify({ key: config.signerVariable, value: secret, type: 'sensitive', target: ['production'] });
+    const added = await call('vercel-env-add', () => vercel(['api', `/v10/projects/${config.web}/env`, '-X', 'POST', '--input', '-', '--raw'], envBody));
     if (added?.status !== 0) throw new Stop('vercel-env-add-failed');
     const signer = (await envsRead('vercel-env-readback')).filter((e) => e.key === config.signerVariable);
     if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');

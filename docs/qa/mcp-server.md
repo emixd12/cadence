@@ -498,12 +498,23 @@ expected array or object shape. Every row field a check reads must also be
 present with the right type: vault ID and name, item title, env key and
 signing-key ID, algorithm and status. A failed, unparseable or missing response
 or field stops the run and is never treated as empty. It then generates one ES256 JWK in
-memory. That JWK is piped over stdin to `op document create`, and the item
+memory. That JWK is piped over stdin to `op document create /dev/stdin`, and the item
 metadata and stored document are read back and compared. Next it imports the key
 to Supabase as standby only and requires the same kid and public fingerprint,
-with every old key unchanged. Finally it pipes the JWK over stdin to `vercel env
-add --environment production --sensitive` and reads back a Production-only
-sensitive record, then rechecks `/mcp` 503. After the import, both frozen tuples
+with every old key unchanged. Finally it creates the env record with `vercel api
+/v10/projects/<web>/env -X POST --input - --raw`. The JSON body carries the key,
+type sensitive and target production, and arrives over stdin. The script then
+reads back a Production-only sensitive record and rechecks `/mcp` 503.
+
+Attempt 1 on October 29 at 19:03 UTC failed safely. Given `-`, op checks for
+stdin data the moment it starts, so it raced the runner's write and exited with
+"expected data on stdin but none found". No item, import or env change resulted,
+and the key was never stored. A harmless runner-path probe of `/dev/stdin`
+succeeded, and the probe item was deleted by exact ID. `vercel env add` was also
+replaced: its stdin reader keeps only the first data chunk and gives up after 500
+ms, which could store a truncated secret. `vercel api --input -` reads to EOF.
+The offline `--generate=curl` check (`vercel-api-stdin-check.json`) delivered a
+200 KB body written in two chunks over 3 seconds intact. After the import, both frozen tuples
 must be unchanged and the only addition must be the expected standby kid. The
 private key never appears in argv, files, logs or the 0600 receipt
 `step2-custody.json`. Adapter, subprocess and internal errors become fixed phase
@@ -515,8 +526,8 @@ catch covers `main`. There are no retries. The receipt records the phase and
 whether a write was attempted, plus a `custody-created` step with the document
 ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
 this script. Evidence: 34 offline cases, including direct regressions for the
-b12e0bc and 34821fd findings and a direct EventEmitter runner harness, and 30/30
-mutation kills (`key-custody-mutations.json`).
+b12e0bc and 34821fd findings, the stdin-path forms and a direct EventEmitter
+runner harness, and 34/34 mutation kills (`key-custody-mutations.json`).
 
 ##### Emi's steps
 

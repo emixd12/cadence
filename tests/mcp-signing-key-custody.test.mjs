@@ -42,16 +42,17 @@ function world(overrides = {}) {
   };
   const vercel = async (args, input) => {
     calls.vercel.push({ args, input });
+    if (args[0] === 'api' && args.includes('POST')) {
+      const posted = JSON.parse(input);
+      envs = [...envs, { key: posted.key, target: o.wrongTarget ? ['production', 'preview'] : posted.target, type: posted.type }];
+      if (o.enableMcpAfterAdd) mcp = 200;
+      return { status: o.envPostStatus ?? 0, stdout: JSON.stringify({ created: { key: posted.key, type: posted.type, target: posted.target } }) };
+    }
     if (args[0] === 'api') {
-      const reads = calls.vercel.filter((c) => c.args[0] === 'api').length;
+      const reads = calls.vercel.filter((c) => c.args[0] === 'api' && !c.args.includes('POST')).length;
       if (o.envPreflightRaw !== undefined && reads === 1) return { status: 0, stdout: o.envPreflightRaw };
       if (o.envReadbackStatus !== undefined && reads === 2) return { status: o.envReadbackStatus, stdout: JSON.stringify({ envs }) };
       return { status: 0, stdout: JSON.stringify({ envs: o.signerPresent ? [...envs, { key: CUSTODY.signerVariable, target: ['production'] }] : envs }) };
-    }
-    if (args[0] === 'env' && args[1] === 'add') {
-      envs = [...envs, { key: args[2], target: o.wrongTarget ? ['production', 'preview'] : [args[4]], type: 'sensitive' }];
-      if (o.enableMcpAfterAdd) mcp = 200;
-      return { status: 0, stdout: '' };
     }
     return { status: 1, stdout: '' };
   };
@@ -66,6 +67,7 @@ function world(overrides = {}) {
 }
 
 const privateOf = (w) => JSON.parse(w.calls.op.find((c) => c.args[1] === 'create').input);
+const posts = (w) => w.calls.vercel.filter((c) => c.args.includes('POST'));
 const generated = (w) => w.calls.saves.some((s) => s.includes('"generated"'));
 
 describe('Ticket 232 signing-key custody', () => {
@@ -76,12 +78,16 @@ describe('Ticket 232 signing-key custody', () => {
     const jwk = privateOf(w);
     expect(jwk).toMatchObject({ kty: 'EC', crv: 'P-256', alg: 'ES256', use: 'sig', kid: result.kid });
     expect(typeof jwk.d).toBe('string');
-    expect(w.calls.op.find((c) => c.args[1] === 'create').args).toEqual(['document', 'create', '-', '--vault', CUSTODY.vault, '--title', CUSTODY.title, '--file-name', 'integration-jwk.json', '--format=json']);
+    expect(w.calls.op.find((c) => c.args[1] === 'create').args).toEqual(['document', 'create', '/dev/stdin', '--vault', CUSTODY.vault, '--title', CUSTODY.title, '--file-name', 'integration-jwk.json', '--format=json']);
     const post = w.calls.supabase.find((c) => c.method === 'POST');
     expect(JSON.parse(post.body)).toMatchObject({ algorithm: 'ES256', status: 'standby', private_jwk: { kid: result.kid, d: jwk.d } });
-    const add = w.calls.vercel.find((c) => c.args[0] === 'env');
-    expect(add.args).toEqual(['env', 'add', CUSTODY.signerVariable, '--environment', 'production', '--project', CUSTODY.web, '--sensitive', '--yes']);
-    expect(JSON.parse(add.input).d).toBe(jwk.d);
+    expect(w.calls.op.flatMap((c) => c.args)).not.toContain('-');
+    const add = posts(w)[0];
+    expect(add.args).toEqual(['api', `/v10/projects/${CUSTODY.web}/env`, '-X', 'POST', '--input', '-', '--raw']);
+    const envBody = JSON.parse(add.input);
+    expect(envBody).toMatchObject({ key: CUSTODY.signerVariable, type: 'sensitive', target: ['production'] });
+    expect(JSON.parse(envBody.value)).toEqual(jwk);
+    expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
     const everywhereButStdin = JSON.stringify([w.calls.op.map((c) => c.args), w.calls.vercel.map((c) => c.args), w.calls.saves, w.calls.logs, w.calls.supabase.filter((c) => c.method !== 'POST'), result]);
     expect(everywhereButStdin).not.toContain(jwk.d);
     expect(w.calls.op.filter((c) => c.input !== undefined && c.input.includes(jwk.d)).map((c) => c.args[1])).toEqual(['create']);
@@ -132,7 +138,7 @@ describe('Ticket 232 signing-key custody', () => {
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
       expect(w.calls.op.filter((c) => c.args[1] === 'create')).toHaveLength(1);
       expect(w.calls.supabase.some((c) => c.method === 'POST')).toBe(false);
-      expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
+      expect(posts(w)).toHaveLength(0);
     }
   });
 
@@ -140,12 +146,12 @@ describe('Ticket 232 signing-key custody', () => {
     for (const [overrides, reason] of [[{ importKid: 'supabase-assigned' }, 'standby-readback-mismatch'], [{ flipOld: true }, 'old-key-changed'], [{ flipAlg: true }, 'old-key-changed']]) {
       const w = world(overrides);
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
-      expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
+      expect(posts(w)).toHaveLength(0);
     }
   });
 
   it('stops when the secret is not Production-only, cannot be read back, or MCP became enabled', async () => {
-    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ envReadbackStatus: 1 }, 'vercel-env-readback-unreadable'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after']]) {
+    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ envReadbackStatus: 1 }, 'vercel-env-readback-unreadable'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after'], [{ envPostStatus: 1 }, 'vercel-env-add-failed']]) {
       const w = world(overrides);
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
     }
@@ -161,7 +167,7 @@ describe('Ticket 232 signing-key custody', () => {
     expect(last).toMatchObject({ name: 'stopped', reason: 'standby-import-error', phase: 'standby-import', writeAttempted: true });
     expect(JSON.parse(w.calls.saves.at(-1)).steps.map((x) => x.name)).toContain('custody-verified');
     expect(w.calls.supabase.filter((c) => c.method === 'POST')).toHaveLength(1);
-    expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
+    expect(posts(w)).toHaveLength(0);
   });
 
   it('turns any thrown adapter error into a fixed phase reason without a retry', async () => {
