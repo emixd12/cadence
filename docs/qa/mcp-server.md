@@ -209,17 +209,20 @@ Before this transaction, revoke only newly captured grant IDs through the
 ordinary A/B `oauth_revoke_grant` path. Match each grant's owner and creation
 receipt first; preserve pre-existing grants and shared client registrations.
 
-#### October28 interrupted run: archive-only closure
+#### October28 interrupted run: reviewed abort path
 
-The October28 resume date has expired. Do not run the fixture creator again.
+The owner selected EXTEND on October29. This archive-only path remains an abort
+option, not an instruction to close the run. Resume requires the reviewed
+extension below and a fresh coordinator execution relay.
 The optional `emptyUsers: [B]` manifest field closes only run
 `4db9fe6e-a966-4cca-938b-aee5a1b955b7`, started
 `2026-10-28T02:17:18.882Z`. Both approved identities remain in `users`.
 The generator requires no B rows, exactly category
 `a29dd2d0-5425-4180-a29a-01a026ebb8c0` and Behavior
 `b2c5b6b1-457a-4e58-a14f-e4270c3d341e`, all owned by A.
-Other partial runs remain refused. The original 48-hour span and every SQL
-ownership, creation-receipt, graph-closure and count guard remain unchanged.
+Other partial runs remain refused. The exact original run now has the explicit
+seven-day capture boundary below. Every ownership, creation-receipt, closure
+and count guard remains. Other runs retain the original 48-hour limit.
 
 Refresh metadata only for that captured category and Behavior, and children
 whose `behavior_id` equals that captured ID. Include app-generated Occurrences:
@@ -243,8 +246,9 @@ ordinary-session capture is selected instead, only A needs a fresh sign-in;
 B has no fixture or grant operation. No session is needed solely to revoke
 zero grants. Stop if a grant unexpectedly appears.
 
-Hosted execution still needs the coordinator's archive-only approval. Finish
-and read back well before October30 02:17:18.882UTC; target October29 20:00UTC.
+An abort still needs the coordinator's execution relay. Finish and read back
+before November4 02:17:18.882UTC. The SQL transaction enforces this deadline
+for this run; it does not silently reset the start time.
 Retain all38 Occurrences, category, schedules and original history. Verify one
 new archive configuration event, the captured walk inactive, and no mutation
 of pre-existing data. The isolated rehearsal covers three preserved Behaviors
@@ -324,35 +328,51 @@ The repaired entry uses the frozen shared status resolver and one clock instant.
 It checks the retained `resume-started.json` and `resume-fixture-ids.json`, every
 captured row ID/owner/creation timestamp, schedule, status, note and history
 configuration before writes. The category name and both timestamps must still
-match. Any missing/extra row, changed content, other fixture Behavior or B
-category refuses. It never recreates A's category, walk, Occurrences or Completed
+match. Missing captured rows, changed captured content, other fixture Behaviors
+or a B category refuse. Only validated generated Occurrences may be added. It never recreates A's category, walk, Occurrences or Completed
 event. It finishes A's Not Completed transition/time session, reading and archived
 stretch, then all of B through the same supported paths. Reminder settings stay
 off. No admin, schema or grant change is part of the hosted runner.
 
-The original run ID, start time and initial D=`2026-10-27` stay fixed. The explicit
-amendment `RESUME_D=2026-10-28` still checks the actual Temporal New York date.
-October 27 and October 29 refuse before any request; never inject an old clock.
-The Occurrences cover October 21–28. The original three receipts and prior resume
-receipts remain byte-unchanged. The exclusive `completion-started.json` records
-both dates, actual completion-attempt start, original run/source and prior resume.
-It prevents blind replay after any further partial success.
+The original run ID, start time and initial D=`2026-10-27` stay fixed.
+The operator supplies `executionDate` explicitly as `YYYY-MM-DD`. It must equal
+the actual Temporal New York date before any request. Never inject an old clock
+or derive the input silently. The exclusive `completion-started.json` records
+initial D, execution D, actual New York date, actual attempt timestamp, original
+run/source, prior resume and the capture deadline. Original receipts stay
+byte-unchanged. Any further partial write still stops replay for reconciliation.
+
+New fixtures cover execution D minus seven days through D. A's retained walk
+reuses its existing eight original plus validated generated Occurrences. The
+runner refuses if that graph cannot cover the current eight-day range. It keeps
+A's original October25 Completed event and October27 note target. It finishes
+only October26 Not Completed and the October25 ten-minute time session. It
+never moves those historical actions to a new date. B uses the current range.
+
+The exact original run ends **2026-11-04T02:17:18.882Z**, seven days after its
+original start. November5 would be nearly eight days, not seven. The runner,
+manifest generator and archive SQL enforce the explicit bound. Other run IDs
+retain 48 hours. On the final permitted New York day (November3), October27
+still falls within the isolation script's seven-day range. No isolation guard
+needs widening.
 
 New IDs and creation receipts use `completion-fixture-ids.json` and
 `completion-creation-receipts.json`; pass the former to the isolation script.
 Creation receipts contain IDs, owners and creation times only. Cleanup retains
-the original start and its 48-hour limit: October 30 at 02:17:18.882 UTC. A later
-capture requires reconciliation. The repair never substitutes a new run clock.
+the original start and the explicit November4 boundary. A later capture requires
+reconciliation. The repair never substitutes a new run clock.
 
 `tests/mcp-hosted-fixtures.local-integration.test.mjs` is a separate opt-in local
 harness. It requires Homebrew Supabase 2.109.1, loopback port 56121, the isolated
-`cadence-mcp-232` database and all 94 frozen migrations. It runs the old frozen
-builder to reproduce the failure, then seeds a synthetic replica with the captured
-IDs/timestamps and tests the entire remaining A/B operation at the real current
-time. Only this harness redirects the injected transport. Hosted guards remain
+`cadence-mcp-232` database and all 94 frozen migrations. It seeds a synthetic
+replica with the captured IDs/timestamps, eight original and30 generated
+Occurrences. It tests remaining A/B operations at the actual current time,
+real session refresh, isolation, manifest refresh, and archive. The historical
+SQLSTATE22023 reproduction remains in the earlier rehearsal receipt. Only this harness redirects the injected transport. Hosted guards remain
 unchanged. Local-only privileged seeding never runs through the hosted entry.
-It also proves changed-partial refusal, no duplicate/replayed writes, preserved
-prior Completed history, notes, time sessions and all original receipt bytes.
+Offline guards prove changed-partial refusal. The complete local flow proves
+no replay, preserved Completed history, notes, time sessions, original receipt
+bytes, three unrelated Behaviors and96 unrelated Occurrences.
 Rehearsal success does not authorize a hosted retry without independent review
 and fresh session/target preflight.
 
@@ -362,6 +382,64 @@ Include every row derived from the captured original Behaviors and client-create
 refresh separately. Never adopt a pre-existing Behavior or an unattributable
 row; refuse on missing lineage or an exhausted row bound. The archive transaction
 still enforces exact closure and preserves categories, Occurrences and history.
+
+Use `graphReceipt` on the approved captured graph to retain per-row hashes,
+not note text. `refreshGraphReceipt` requires every captured row/hash to remain
+unchanged, and accepts only new Occurrences. It validates user/Behavior lineage,
+creation time, unresolved/null-note state, untouched timestamps, unique schedule
+identity, and membership in the frozen recurrence resolver's captured schedule.
+Generated dates start October29 and stop at the current day plus30. Record these
+IDs separately as `app-generated`; this describes their accepted provenance
+class, not proof of which client wrote them. Account-scoped sync state stays
+outside the manifest.
+
+Take an explicit checkpoint after each authorized client mutation or isolation
+note restoration. Compare that operation's captured IDs and expected changes
+before accepting its new baseline. Never replace a hash baseline merely because
+it fails. Unknown note/status/edit/deletion changes stop the run. A new client
+Review practice Behavior needs its own creation receipt before capture. The
+refresh helper cannot add Behaviors, schedules or history implicitly.
+
+#### Session continuity and the owner window
+
+The frozen app's Settings page has no browser-client refresh loop. Merely leaving
+it open is insufficient. The frozen server proxy calls `auth.getClaims()` and
+passes refreshed cookies to the browser through `setAll`. The installed frozen
+Supabase SSR/Auth versions are0.10.3/2.107.0. The local rehearsal simulates an
+expired cached session and proves the real refresh-token endpoint, subject,
+new expiry and cookie writes for both accounts. This is not a live browser proof.
+
+During production, navigate/reload only each approved Cadence Settings tab near
+expiry, then read scoped cookie metadata in memory. Require the exact subject,
+current kid and a valid expiry before each phase; capture no token. Do not run
+a separate refresh-token client alongside the browser. Keep a valid pre-rotation
+JWT in memory before rotation and compare it with a fresh new-key session after
+rotation. Refreshing or losing that baseline cannot count as continuity proof.
+If the server does not renew cookies, stop for the matching Google sign-in;
+never repeat a mutation with stale sessions.
+
+Reserve **150 minutes** with the owner, with a30-minute contingency. Owner steps:
+(1) open/re-authenticate both exact Cadence profiles and keep them available;
+(2) approve 1Password/Touch ID if prompted during custody creation;
+(3) approve each Claude web, Claude Code, ChatGPT developer-mode and Inspector
+consent, using only the dedicated accounts; (4) unlock the test Mac if needed.
+The operator checks sessions at preflight, before key rotation, before client
+acceptance and before grant revocation. Normal refresh needs no Google sign-out.
+If refresh fails, at most one sign-in checkpoint per account per affected phase
+is attempted before stopping to reschedule. There is no guarantee that all
+third-party clients finish within150 minutes.
+
+#### Production-only steps after the local rehearsal
+
+| Step | Preconditions | Readback and stop rule |
+|---|---|---|
+| Key custody and rotation | Frozen main/READY pair, PR161 held, MCP503/false; both valid ordinary subjects; Cadence vault ID fgyupy5i26isvkdqofojc5o66u; fresh pre-rotation session baseline. | Generate one ES256 key in memory, pipe to op document create, metadata/public-key match; standby kid match, signer env set, rotate while disabled, retain old keys. Verify fresh new-kid and still-valid old-kid sessions. Stop on any mismatch; no repeat key creation. |
+| Isolation and timeouts | Captured complete fixtures, reviewed script; current signer kid; exact postgres cleanup transport proved separately. | Own RPC writes pass, cross-account/expired/untrusted tokens fail, note restored. Catalog-only owners/SECURITY DEFINER/proconfig/ACL/role timeouts are metadata, not backend cancellation proof. No manual cron or sleep probe. |
+| Activation | Isolation/continuity pass; no competing deployment; frozen source and marketing unchanged. | Set MCP true and correct marketing binding in one env phase, one same-source web redeploy. Require READY/new web ID/source, unauthenticated401, issuer/no-store/CORS. Failure rollback: MCP false plus same-source redeploy; retain all keys. |
+| Trust | Final web ID plus frozen marketing ID; no scheduled run competing; actual source workflow/lock unchanged. | Hash all immutable history bytes first. One normal Preview, false RLS/false init; validate tuple/artifacts/history before Production. Stop on failure or adverse gate; no waiver or blind retry. Retain any intervening immutable additions. |
+| Clients and test Mac | Owner present; explicit A/B identities; only approved fixtures; exact final connector URL. | Capture each consent/grant ID and client result, cross-account refusal and test-Mac A sync. No owner real data. Missing client access remains unverified. |
+| Archive and grants | Approved mutation checkpoints, refreshed lineage/hash manifest; exact postgres role/privileges, deadline not reached. | Archive only captured IDs; preserve all rows/accounts, revoke only captured grants as their user, verify old tokens fail. Read back archive/history/counts and unchanged baselines. No client deletion/purge. |
+
 
 | Step/tool | Source and import audit | Execution rule |
 |---|---|---|

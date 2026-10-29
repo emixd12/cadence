@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Temporal } from '@js-temporal/polyfill';
 import { createBehavior, setBehaviorActive } from '@cadence/core/services/behavior.service';
+import { resolveOccurrenceSchedule } from '@cadence/core/resolvers/recurrence.resolver';
 import { resolveStatusTransition, resolveStatusEvent } from '@cadence/core/resolvers/status.resolver';
 import { createBehaviorStore } from '../lib/db/behavior-store.ts';
 import { applyOccurrenceStatusTransitionRpc } from '../lib/db/occurrenceStatusEvents.repo.ts';
@@ -13,7 +14,7 @@ const ORIGIN = 'https://qjodzutjxtmtzczbloxa.supabase.co';
 const SOURCE = 'eb5afa5be5c49b43bbad3ffd5a25d6eddff30079';
 const CATEGORY = { id: 'a29dd2d0-5425-4180-a29a-01a026ebb8c0', user_id: USERS[0], created_at: '2026-10-28T02:17:19.262435+00:00' };
 const RUN = { runId: '4db9fe6e-a966-4cca-938b-aee5a1b955b7', startedAt: '2026-10-28T02:17:18.882Z', D: '2026-10-27', users: USERS, source: SOURCE };
-const RESUME_D = '2026-10-28';
+export const CAPTURE_DEADLINE = '2026-11-04T02:17:18.882Z';
 export const PARTIAL_IDS = {
   "a": {
     "category": "a29dd2d0-5425-4180-a29a-01a026ebb8c0",
@@ -199,7 +200,9 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
         assert.deepEqual(JSON.parse(readFileSync(`${DIR}/resume-fixture-ids.json`)), PARTIAL_IDS);
         assert(!existsSync(`${DIR}/completion-started.json`));
         const today = Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO('America/New_York').toPlainDate();
-        assert.equal(today.toString(), RESUME_D);
+        assert(/^\d{4}-\d{2}-\d{2}$/.test(input.executionDate));
+        assert.equal(today.toString(), input.executionDate, 'execution-date-mismatch');
+        assert(now.getTime() >= Date.parse(PRIOR_RESUME.resumedAt) && now.getTime() <= Date.parse(CAPTURE_DEADLINE), 'capture-window');
         assert(/^sb_publishable_[A-Za-z0-9_-]+$/.test(input.publishableKey));
         const clients = input.sessions.map((session, index) => {
             assert.equal(session.userId, USERS[index]);
@@ -243,14 +246,16 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
             preflight.push({ userId: USERS[i], authenticated: true, timezone: profile.timezone, collisions: 0 });
         }
         const partial = await readPartial(clients[0], take);
-        assertPartialGraph(partial);
+        const appGenerated = assertPartialGraph(partial, now);
+        save('completion-app-generated', { capturedAt: now.toISOString(), provenance: 'app-generated', rows: appGenerated });
         save('completion-session-preflight', { timestamp: new Date().toISOString(), accounts: preflight });
         if (input.mode === 'preflight')
             return { result: 'preflight-passed', accounts: preflight, requests: calls };
         const start = RUN.startedAt, runId = RUN.runId;
         const fixtures = structuredClone(PARTIAL_IDS), rows = [];
+        const capturedGraph = Object.fromEntries(TABLES.map(table => [table, []]));
         // Never replay a partially successful resume without a new reviewed manifest.
-        writeFileSync(`${DIR}/completion-started.json`, JSON.stringify({ initialD: RUN.D, D: RESUME_D, resumedAt: now.toISOString(), runId, source: SOURCE, priorResume: PRIOR_RESUME.resumedAt }) + '\n', { mode: 0o600, flag: 'wx' });
+        writeFileSync(`${DIR}/completion-started.json`, JSON.stringify({ initialD: RUN.D, D: input.executionDate, actualNewYorkDate: today.toString(), captureDeadline: CAPTURE_DEADLINE, resumedAt: now.toISOString(), runId, source: SOURCE, priorResume: PRIOR_RESUME.resumedAt }) + '\n', { mode: 0o600, flag: 'wx' });
         for (const [i, c] of clients.entries()) {
             const user = USERS[i], slot = i ? 'b' : 'a';
             stage = `${slot}-category`;
@@ -278,12 +283,15 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
                     const instant = date.toZonedDateTime({ timeZone: 'America/New_York', plainTime: Temporal.PlainTime.from(time) }).toInstant().toString();
                     occurrences.push({ id: randomUUID(), user_id: user, behavior_id: b.id, local_date: date.toString(), scheduled_for: instant, schedule_kind: 'exact', schedule_start_time: time + ':00', status: 'unresolved', note: field === 'walk' && delta === 1 ? 'Review sample note' : null });
                 }
+                // The retained walk already covers the current day through the app horizon. Never insert duplicates.
+                if (reuseWalk) assert(occurrences.every(o => partial.occurrences.some(p => p.local_date === o.local_date)), 'partial-range-incomplete');
                 const created = reuseWalk ? partial.occurrences : take(await c.from('occurrences').insert(occurrences).select('id,user_id,created_at,local_date,scheduled_for'));
                 if (field === 'walk') {
-                    f.occurrence = created.find(o => o.local_date === today.subtract({ days: 1 }).toString()).id;
+                    f.occurrence = reuseWalk ? PARTIAL_IDS.a.occurrence : created.find(o => o.local_date === today.subtract({ days: 1 }).toString()).id;
                     save('completion-fixture-ids', fixtures);
                     for (const [days, status] of [[3, 'completed'], [2, 'not_completed']]) {
-                        const o = created.find(o => o.local_date === today.subtract({ days }).toString());
+                        const statusDate = reuseWalk ? (days === 3 ? '2026-10-25' : '2026-10-26') : today.subtract({ days }).toString();
+                        const o = created.find(o => o.local_date === statusDate);
                         if (reuseWalk && days === 3) continue;
                         const occurrence = { status: 'unresolved', completedAt: null, statusMarkedAt: null, note: null };
                         const clock = Temporal.Now.instant();
@@ -291,20 +299,23 @@ export async function runFixtures(input, { directory = '.intent/artifacts/trust2
                         const event = resolveStatusEvent({ occurrence, nextStatus: status, now: clock, update, hasPriorStatusEvent: false });
                         await applyOccurrenceStatusTransitionRpc(c, { occurrenceId: o.id, expectedStatus: 'unresolved', expectedLatestEventId: null, ...update, cancelPendingReminders: true, event });
                     }
-                    const o = created.find(o => o.local_date === today.subtract({ days: 3 }).toString());
+                    const o = created.find(o => o.local_date === (reuseWalk ? '2026-10-25' : today.subtract({ days: 3 }).toString()));
                     take(await c.from('occurrence_time_sessions').insert({ id: randomUUID(), user_id: user, behavior_id: b.id, occurrence_id: o.id, started_at: o.scheduled_for, stopped_at: Temporal.Instant.from(o.scheduled_for).add({ minutes: 10 }).toString() }).select('id,user_id,created_at').single());
                 }
             }
             stage = `${slot}-capture`;
             const ids = [f.walk, f.reading, f.stretch];
             for (const table of TABLES) {
-                const found = take(await c.from(table).select('id,user_id,created_at').eq('user_id', user).in(table === 'categories' || table === 'behaviors' ? 'id' : 'behavior_id', table === 'categories' ? [f.category] : ids).order('id').limit(500));
-                rows.push(...found.map(r => ({ ...r, table, run_id: runId })));
+                const found = take(await c.from(table).select('*').eq('user_id', user).in(table === 'categories' || table === 'behaviors' ? 'id' : 'behavior_id', table === 'categories' ? [f.category] : ids).order('id').limit(500));
+                assert(found.length < 500, 'capture-row-limit');
+                capturedGraph[table].push(...found);
+                rows.push(...found.map(({ id, user_id, created_at }) => ({ id, user_id, created_at, table, run_id: runId })));
                 save('captured-rows', rows);
             }
         }
         const manifest = { version: 1, project: 'qjodzutjxtmtzczbloxa', users: USERS, runId, startedAt: start, capturedAt: new Date().toISOString(), rows, counts: Object.fromEntries(TABLES.map(t => [t, rows.filter(r => r.table === t).length])) };
         save('manifest-initial', manifest);
+        save('completion-graph-receipt', graphReceipt(capturedGraph, manifest.capturedAt));
         save('completion-requests', requestReceipts);
         return { result: 'fixtures-created', D: today.toString(), counts: manifest.counts, requests: calls, manifestSha256: createHash('sha256').update(readFileSync(`${DIR}/manifest-initial.json`)).digest('hex') };
     }
@@ -323,7 +334,11 @@ async function readPartial(client, take) {
     return graph;
 }
 
-export function assertPartialGraph(graph) {
+export function assertPartialGraph(graph, now = new Date()) {
+    const captured = new Set(PARTIAL_ROWS.filter(r => r.table === 'occurrences').map(r => r.id));
+    const generated = graph.occurrences.filter(r => !captured.has(r.id));
+    assertGeneratedOccurrences(generated, graph, PRIOR_RESUME.resumedAt, now);
+    graph = { ...graph, occurrences: graph.occurrences.filter(r => captured.has(r.id)) };
     const order = rows => [...rows].sort((a, b) => a.id.localeCompare(b.id));
     for (const table of TABLES) {
         const expected = PARTIAL_ROWS.filter(row => row.table === table).map(({ table: _, ...row }) => row);
@@ -357,4 +372,54 @@ export function assertPartialGraph(graph) {
     }, 'partial-configuration-snapshot-mismatch');
     const event = graph.occurrence_status_events[0], completed = graph.occurrences.find(o => o.status === 'completed');
     assert(event.occurrence_id === completed.id && event.behavior_id === b.id && event.previous_status === 'unresolved' && event.status === 'completed' && event.status_semantics === 'explicit_user_mark' && event.source_capture_method === 'manual_tap' && event.source_confidence === 'high' && Temporal.Instant.compare(event.recorded_at, completed.status_marked_at) === 0 && Temporal.Instant.compare(event.effective_at, completed.completed_at) === 0, 'partial-event-mismatch');
+    return generated.map(({ id, user_id, behavior_id, created_at, local_date }) => ({ id, user_id, behavior_id, created_at, local_date }));
+}
+
+// Only the named fixture schedules are accepted; the frozen resolver checks date/time membership.
+export function assertGeneratedOccurrences(rows, graph, after, now = new Date()) {
+    assert(rows.length < 500, 'generated-row-limit');
+    const end = Temporal.Instant.from(now.toISOString()).toZonedDateTimeISO('America/New_York').toPlainDate().add({ days: 30 });
+    const seen = new Set();
+    for (const o of rows) {
+        const b = graph.behaviors.find(b => b.id === o.behavior_id && b.user_id === o.user_id);
+        assert(b && USERS.includes(o.user_id) && ['Review walk', 'Review reading', 'Review stretch', 'Review practice'].includes(b.title), 'generated-owner');
+        assert(/^[0-9a-f-]{36}$/.test(o.id) && !seen.has(o.id), 'generated-identity'); seen.add(o.id);
+        assert(Date.parse(o.created_at) >= Date.parse(after) && Date.parse(o.created_at) <= now.getTime(), 'generated-created-at');
+        assert(o.status === 'unresolved' && o.note === null && o.completed_at === null && o.status_marked_at === null, 'generated-content');
+        assert(typeof o.updated_at === 'string' && Temporal.Instant.compare(o.updated_at, o.created_at) === 0, 'generated-edited');
+        const day = Temporal.PlainDate.from(o.local_date);
+        assert(Temporal.PlainDate.compare(day, '2026-10-29') >= 0 && Temporal.PlainDate.compare(day, end) <= 0, 'generated-date');
+        assert(o.schedule_kind === 'exact' && o.schedule_end_time == null && o.schedule_preset == null && o.schedule_range_identity === -1, 'generated-slot');
+        const slot = graph.behavior_schedule_slots.find(s => s.behavior_id === b.id && s.user_id === b.user_id && s.kind === 'exact' && s.start_time === o.schedule_start_time
+            && (o.behavior_schedule_slot_id == null || s.id === o.behavior_schedule_slot_id));
+        const schedule = slot && graph.behavior_schedules.find(s => s.id === slot.behavior_schedule_id && s.behavior_id === b.id && s.user_id === b.user_id);
+        assert(schedule && b.timezone === 'America/New_York', 'generated-schedule');
+        assert(o.behavior_configuration_event_id == null || graph.behavior_configuration_events.some(e => e.id === o.behavior_configuration_event_id && e.behavior_id === b.id && e.user_id === b.user_id), 'generated-configuration');
+        const instant = Temporal.Instant.from(o.scheduled_for);
+        const matches = resolveOccurrenceSchedule({ recurrenceRule: schedule.recurrence_rule, scheduledTime: slot.start_time,
+            timezone: b.timezone, rangeStart: instant, rangeEnd: instant });
+        assert(matches.length === 1 && matches[0].localDate === o.local_date, 'generated-schedule');
+        assert(graph.occurrences.filter(r => r.behavior_id === b.id && r.local_date === o.local_date && r.schedule_start_time === o.schedule_start_time).length === 1, 'generated-duplicate');
+    }
+}
+
+const hashRow = row => createHash('sha256').update(JSON.stringify(row, (_, value) =>
+    value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)).digest('hex');
+
+// Keep hashes, not note text. Call only after capturing the exact approved fixture IDs.
+export function graphReceipt(graph, capturedAt) {
+    return { capturedAt, rows: TABLES.flatMap(table => graph[table].map(row => ({ table, id: row.id, sha256: hashRow(row) }))) };
+}
+
+export function refreshGraphReceipt(previous, graph, now = new Date()) {
+    const current = graphReceipt(graph, now.toISOString());
+    assert(previous.rows.length >= 2 && previous.rows.length <= 500 && current.rows.length <= 500, 'refresh-row-limit');
+    const key = r => `${r.table}/${r.id}`;
+    assert(new Set(previous.rows.map(key)).size === previous.rows.length && new Set(current.rows.map(key)).size === current.rows.length, 'refresh-duplicate');
+    const old = new Map(previous.rows.map(r => [key(r), r.sha256]));
+    for (const r of previous.rows) assert(current.rows.some(c => key(c) === key(r) && c.sha256 === r.sha256), 'captured-row-changed');
+    const additions = current.rows.filter(r => !old.has(key(r)));
+    assert(additions.every(r => r.table === 'occurrences'), 'unexpected-descendant');
+    assertGeneratedOccurrences(graph.occurrences.filter(o => additions.some(r => r.id === o.id)), graph, previous.capturedAt, now);
+    return { receipt: current, appGenerated: additions.map(({ table, id }) => ({ table, id, provenance: 'app-generated' })) };
 }

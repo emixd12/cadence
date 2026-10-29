@@ -1,55 +1,51 @@
 import { expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
 import { randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Temporal } from '@js-temporal/polyfill';
 import { buildFixtureBundle, FIXTURE_SOURCE } from '../scripts/build-mcp-hosted-fixtures.mjs';
+import { buildCleanupSql, QA_USERS as USERS, TABLES } from '../scripts/mcp-fixture-cleanup.mjs';
+import { runHostedIsolation } from '../scripts/mcp-hosted-isolation.mjs';
+import { partialGraph, addGeneratedOccurrences } from './helpers/mcp-fixture-partial.mjs';
 
 const enabled = process.env.CADENCE_MCP_FIXTURE_REHEARSAL === '1';
-const USERS = ['caefd1b8-ea46-485f-8869-119a715fb092', 'c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b'];
-const TABLES = ['categories', 'behaviors', 'behavior_schedules', 'behavior_schedule_slots', 'occurrences', 'occurrence_status_events', 'behavior_definition_events', 'behavior_configuration_events', 'occurrence_time_sessions'];
 const ORIGINAL = { runId: '4db9fe6e-a966-4cca-938b-aee5a1b955b7', startedAt: '2026-10-28T02:17:18.882Z', D: '2026-10-27', users: USERS, source: FIXTURE_SOURCE };
 const CATEGORY = { id: 'a29dd2d0-5425-4180-a29a-01a026ebb8c0', user_id: USERS[0], created_at: '2026-10-28T02:17:19.262435+00:00' };
-const sqlLiteral = value => `'${JSON.stringify(value).replaceAll("'", "''")}'`;
-const sql = query => {
-  const r = spawnSync('docker', ['exec', '-i', 'supabase_db_cadence-mcp-232', 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=sqlstate', '-v', 'SHOW_CONTEXT=never', '-U', 'postgres', '-d', 'postgres'], { input: query, encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024 });
-  if (r.status !== 0) throw Error(`local-sql-${r.stderr.match(/ERROR:\s+([A-Z0-9]{5})/)?.[1] ?? 'failed'}`);
-  return r.stdout.trim();
+const literal = value => `'${JSON.stringify(value).replaceAll("'", "''")}'`;
+const execute = query => {
+  const r = spawnSync('docker', ['exec', '-i', 'supabase_db_cadence-mcp-232', 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=sqlstate', '-v', 'SHOW_CONTEXT=never', '-U', 'postgres', '-d', 'postgres'],
+    { input: query, encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024 });
+  return { ok: r.status === 0, output: r.stdout.trim(), state: r.stderr.match(/(?:ERROR|FATAL):\s+([A-Z0-9]{5})/)?.[1] ?? `exit-${r.status}-signal-${r.signal}-code-${r.error?.code ?? 'none'}` };
 };
+const sql = query => { const r = execute(query); if (!r.ok) throw Error(`local-sql-${r.state ?? 'failed'}`); return r.output; };
 const take = r => { if (r.error) throw Error(`local-api-${r.status ?? 'failed'}`); return r.data; };
 
-it.skipIf(!enabled)('rehearses every remaining fixture operation from the captured A graph on frozen SQL', async () => {
+it.skipIf(!enabled)('rehearses resumed fixtures, session refresh, isolation, descendant capture and archive on frozen SQL', async () => {
   expect(process.versions.node.split('.')[0]).toBe('24');
-  expect(process.env.CADENCE_LOCAL_SUPABASE_URL).toBe('http://127.0.0.1:56121');
+  const origin = process.env.CADENCE_LOCAL_SUPABASE_URL;
+  expect(origin).toBe('http://127.0.0.1:56121');
   expect(execFileSync('/opt/homebrew/bin/supabase', ['--version'], { encoding: 'utf8' }).trim()).toBe('2.109.1');
-  const migrationVersions = sql('select json_agg(version order by version) from supabase_migrations.schema_migrations;');
-  const expectedVersions = execFileSync('git', ['ls-tree', '-r', '--name-only', FIXTURE_SOURCE, 'supabase/migrations'], { encoding: 'utf8' }).trim().split('\n').map(p => p.split('/').at(-1).split('_')[0]).sort();
-  expect(JSON.parse(migrationVersions)).toEqual(expectedVersions); expect(expectedVersions).toHaveLength(94);
-  const origin = process.env.CADENCE_LOCAL_SUPABASE_URL, publishable = process.env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY;
+  const versions = execFileSync('git', ['ls-tree', '-r', '--name-only', FIXTURE_SOURCE, 'supabase/migrations'], { encoding: 'utf8' }).trim().split('\n').map(p => p.split('/').at(-1).split('_')[0]).sort();
+  expect(versions).toHaveLength(94);
+  expect(JSON.parse(sql('select json_agg(version order by version) from supabase_migrations.schema_migrations;'))).toEqual(versions);
+  const publishable = process.env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY;
   const options = { auth: { persistSession: false, autoRefreshToken: false } };
   const admin = createClient(origin, process.env.CADENCE_LOCAL_SUPABASE_SERVICE_KEY, options).auth.admin;
-  const users = [], clients = [], sessions = [], statuses = [], writes = [];
-  mkdirSync('.intent/artifacts', { recursive: true });
-  const root = mkdtempSync('.intent/artifacts/fixture-rehearsal-');
-  const oldRoot = join(root, 'old'), directory = join(root, 'receipts');
-  mkdirSync(join(oldRoot, 'scripts'), { recursive: true }); mkdirSync(directory);
+  const users = [], clients = [], sessions = [], writes = [], refreshes = [];
+  const root = mkdtempSync('.intent/artifacts/fixture-rehearsal-'), directory = join(root, 'receipts'); mkdirSync(directory);
   const save = (name, value) => writeFileSync(join(directory, `${name}.json`), JSON.stringify(value) + '\n', { mode: 0o600 });
+  const insert = (table, row) => {
+    const columns = Object.keys(row).filter(k => k !== 'schedule_range_identity').map(k => `"${k}"`).join(',');
+    sql(`insert into public.${table} (${columns}) select ${columns} from json_populate_record(null::public.${table},${literal(row)});`);
+  };
   try {
-    for (const name of ['build-mcp-hosted-fixtures.mjs', 'mcp-hosted-fixtures.entry.mjs']) {
-      const bytes = execFileSync('git', ['show', `2c8dde41202eb516a301c9c52c69ba832306abea:scripts/${name}`], { encoding: 'utf8' });
-      // Historical builder runs under a test subdirectory; keep git paths repository-relative.
-      writeFileSync(join(oldRoot, 'scripts', name), name.startsWith('build-') ? bytes.replace('cwd: ROOT', `cwd: ${JSON.stringify(process.cwd())}`) : bytes);
-    }
-    // Resolve installed dependencies without copying secrets or a workspace implementation.
-    const { symlinkSync } = await import('node:fs'); symlinkSync(resolve('node_modules'), join(oldRoot, 'node_modules'));
-    const oldBuilder = await import(pathToFileURL(resolve(oldRoot, 'scripts/build-mcp-hosted-fixtures.mjs')).href);
-    oldBuilder.buildFixtureBundle(join(oldRoot, 'old.mjs'));
-    const old = await import(pathToFileURL(resolve(oldRoot, 'old.mjs')).href);
-    const receipt = buildFixtureBundle(join(root, 'fixed.mjs'));
+    const build = buildFixtureBundle(join(root, 'fixed.mjs'));
     const fixed = await import(pathToFileURL(resolve(root, 'fixed.mjs')).href);
-    for (const [i, id] of USERS.entries()) {
+    for (const id of USERS) {
       const email = `fixture-${randomUUID()}@example.invalid`, password = `Qa-${randomUUID()}-aA1!`;
       take(await admin.createUser({ id, email, password, email_confirm: true })); users.push(id);
       const client = createClient(origin, publishable, options);
@@ -57,96 +53,121 @@ it.skipIf(!enabled)('rehearses every remaining fixture operation from the captur
       expect(session.user.id).toBe(id); clients.push(client);
       sessions.push({ userId: id, accessToken: session.access_token });
       take(await client.from('profiles').update({ timezone: 'America/New_York' }).eq('id', id));
-      expect(i).toBeLessThan(2);
     }
-    sql(`insert into public.categories(id,user_id,name,created_at,updated_at) values ('${CATEGORY.id}','${USERS[0]}','Review examples','${CATEGORY.created_at}','${CATEGORY.created_at}');`);
+    const graph = partialGraph(fixed); addGeneratedOccurrences(graph);
+    graph.occurrence_status_events[0].local_date = '2026-10-25';
+    graph.behavior_definition_events[0].recorded_at = graph.behaviors[0].created_at;
+    Object.assign(graph.behavior_configuration_events[0], { recorded_at: graph.behaviors[0].created_at, effective_at: graph.behaviors[0].created_at,
+      changed_fields: ['category_id', 'location_text', 'where_kind', 'schedule_graph', 'browser_reminder_enabled', 'email_reminder_enabled', 'reminder_offset_minutes', 'active', 'timezone'] });
+    for (const table of TABLES) for (const row of graph[table]) insert(table, row);
+    const preserved = [];
+    for (let i = 0; i < 3; i++) {
+      const b = { ...graph.behaviors[0], id: randomUUID(), category_id: null, title: `Preserved ${i}`, created_at: '2026-09-18T00:00:00Z' };
+      insert('behaviors', b); preserved.push(b.id);
+      for (let j = 0; j < 32; j++) {
+        const day = Temporal.PlainDate.from('2026-09-01').add({ days: j });
+        insert('occurrences', { id: randomUUID(), user_id: USERS[0], behavior_id: b.id, status: 'unresolved', schedule_kind: 'exact', schedule_start_time: '09:00:00',
+          local_date: day.toString(), scheduled_for: day.toZonedDateTime({ timeZone: 'America/New_York', plainTime: '09:00' }).toInstant().toString(), created_at: '2026-09-18T00:00:00Z' });
+      }
+    }
+    const preservedSnapshot = () => sql(`select json_build_object('behaviors',(select json_agg(t order by id) from public.behaviors t where id in (${preserved.map(id => `'${id}'`).join(',')})),'occurrences',(select json_agg(t order by id) from public.occurrences t where behavior_id in (${preserved.map(id => `'${id}'`).join(',')})));`);
+    const preservedBefore = preservedSnapshot();
+    sql(`insert into public.occurrence_sync_state(user_id,stale) values ('${USERS[0]}',true) on conflict(user_id) do update set stale=true;`);
     save('execution', ORIGINAL); save('fixture-ids', { a: { category: CATEGORY.id } }); save('creation-receipts', [{ path: '/rest/v1/categories', ...CATEGORY }]);
+    save('resume-started', fixed.PRIOR_RESUME); save('resume-fixture-ids', fixed.PARTIAL_IDS);
     const originalBytes = ['execution', 'fixture-ids', 'creation-receipts'].map(n => readFileSync(join(directory, `${n}.json`), 'utf8'));
-    const input = { mode: 'resume', allowHostedProject: 'qjodzutjxtmtzczbloxa', publishableKey: publishable, sessions };
+    const executionDate = Temporal.Now.plainDateISO('America/New_York').toString();
+    const input = { mode: 'resume', executionDate, allowHostedProject: 'qjodzutjxtmtzczbloxa', publishableKey: publishable, sessions };
     const fetcher = async (url, init) => {
       const u = new URL(url); expect(u.origin).toBe('https://qjodzutjxtmtzczbloxa.supabase.co');
       const response = await fetch(`${origin}${u.pathname}${u.search}`, init);
-      if (init.method === 'POST') {
-        writes.push({ path: u.pathname, status: response.status });
-        if (u.pathname.endsWith('/apply_occurrence_status_transition')) {
-          const body = await response.clone().json();
-          statuses.push({ status: response.status, ...(response.ok ? {} : { code: /^[A-Z0-9]{5}$/.test(body.code) ? body.code : 'unavailable' }) });
-        }
-      }
+      if (init.method !== 'GET') writes.push({ path: u.pathname, status: response.status });
       return response;
     };
-    // Same old builder and real current time reproduce the hosted timestamp-contract failure.
-    const red = await old.runFixtures(input, { directory, fetcher });
-    expect(red).toMatchObject({ result: 'stopped', stage: 'a-walk', lastRequest: { status: 400 } });
-    expect(statuses).toEqual([{ status: 200 }, { status: 400, code: '22023' }]);
-    const graph = {};
-    for (const table of TABLES) {
-      let query = clients[0].from(table).select('*').eq('user_id', USERS[0]);
-      if (table === 'categories') query = query.eq('id', CATEGORY.id);
-      graph[table] = take(await query);
+    const checkGraph = {};
+    for (const table of TABLES) checkGraph[table] = take(await clients[0].from(table).select('*').eq('user_id', USERS[0]).eq(table === 'categories' || table === 'behaviors' ? 'id' : 'behavior_id', table === 'categories' ? CATEGORY.id : fixed.PARTIAL_IDS.a.walk));
+    fixed.assertPartialGraph(checkGraph);
+    const green = await fixed.runFixtures(input, { directory, fetcher });
+    expect(green).toMatchObject({ result: 'fixtures-created' }); expect(green.D).toBe(executionDate);
+    expect(green.counts).toMatchObject({ categories: 2, behaviors: 6, occurrence_status_events: 4, occurrence_time_sessions: 2 });
+    const ids = JSON.parse(readFileSync(join(directory, 'completion-fixture-ids.json')));
+    expect(ids.a.walk).toBe(fixed.PARTIAL_IDS.a.walk); expect(ids.a.occurrence).toBe(fixed.PARTIAL_IDS.a.occurrence);
+    expect(JSON.parse(readFileSync(join(directory, 'completion-app-generated.json'))).rows).toHaveLength(30);
+    for (const [i, client] of clients.entries()) {
+      const f = ids[i ? 'b' : 'a'];
+      const occurrences = take(await client.from('occurrences').select('*').eq('behavior_id', f.walk));
+      expect(occurrences.length).toBe(i ? 8 : 38);
+      expect(occurrences.filter(o => o.status === 'completed')).toHaveLength(1);
+      expect(occurrences.filter(o => o.status === 'not_completed')).toHaveLength(1);
+      expect(occurrences.filter(o => o.note !== null)).toHaveLength(1);
+      const time = take(await client.from('occurrence_time_sessions').select('*').eq('behavior_id', f.walk));
+      expect(time).toHaveLength(1); expect(Date.parse(time[0].stopped_at) - Date.parse(time[0].started_at)).toBe(600000);
+      const session = take(await client.auth.getSession()).session;
+      // Simulate an expired cached session; use the real refresh endpoint and the app's getClaims cookie path.
+      const name = 'sb-127-auth-token', jar = new Map([[name, 'base64-' + Buffer.from(JSON.stringify({ ...session, expires_at: 1 })).toString('base64url')]]);
+      let refreshCalls = 0, cookieWrites = 0;
+      const server = createServerClient(origin, publishable, { cookieOptions: { name }, cookies: {
+        getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+        setAll: values => { cookieWrites++; values.forEach(v => jar.set(v.name, v.value)); },
+      }, global: { fetch: async (url, init) => {
+        expect(new URL(url).origin).toBe(origin);
+        if (new URL(url).pathname === '/auth/v1/token') refreshCalls++;
+        return fetch(url, init);
+      } } });
+      const claims = await server.auth.getClaims();
+      expect(claims.error === null).toBe(true); expect(claims.data?.claims.sub).toBe(USERS[i]);
+      expect(claims.data?.claims.exp > Date.now() / 1000 + 1800).toBe(true);
+      expect(refreshCalls).toBe(1); expect(cookieWrites > 0).toBe(true);
+      const fresh = take(await server.auth.getSession()).session;
+      expect(fresh.expires_at > session.expires_at).toBe(true);
+      expect(fresh.access_token !== session.access_token).toBe(true);
+      expect(take(await client.auth.getUser(session.access_token)).user.id).toBe(USERS[i]);
+      expect((await client.auth.setSession({ access_token: fresh.access_token, refresh_token: fresh.refresh_token })).error === null).toBe(true);
+      refreshes.push({ userId: USERS[i], refreshCalls, cookieWrites, subjectMatch: true, unexpired: true, expiryAdvanced: true, priorSessionStillValid: true });
     }
-    expect(graph.occurrences).toHaveLength(8); expect(graph.occurrence_status_events).toHaveLength(1);
-    // Local-only replica: map generated IDs and creation timestamps to the captured hosted metadata.
-    const mapping = {};
-    for (const table of TABLES) {
-      expect(graph[table].length, table).toBe(fixed.PARTIAL_ROWS.filter(r => r.table === table).length);
-      for (const row of graph[table]) {
-      const retained = table === 'occurrences' ? fixed.PARTIAL_ROWS.find(r => r.id === fixed.PARTIAL_STATUSES.find(s => s.local_date === row.local_date).id) : fixed.PARTIAL_ROWS.find(r => r.table === table);
-      mapping[row.id] = retained.id; row.created_at = retained.created_at;
-      if (row.updated_at) row.updated_at = retained.created_at;
-    }}
-    const replica = JSON.parse(JSON.stringify(graph), (_, v) => typeof v === 'string' && mapping[v] ? mapping[v] : v);
-    const columns = Object.fromEntries(TABLES.map(t => [t, JSON.parse(sql(`select json_agg(attname order by attnum) from pg_attribute where attrelid='public.${t}'::regclass and attnum>0 and not attisdropped and attgenerated='';`)).map(n => `"${n}"`).join(',')]));
-    const seed = g => sql('begin; set local session_replication_role=replica;\n' + [...TABLES].reverse().map(t => t === 'categories' ? `delete from public.categories where id='${CATEGORY.id}';` : `delete from public.${t} where user_id in ('${USERS[0]}','${USERS[1]}');`).join('\n') + '\n' + TABLES.map(t => `insert into public.${t} (${columns[t]}) overriding system value select ${columns[t]} from json_populate_recordset(null::public.${t},${sqlLiteral(g[t])});`).join('\n') + '\ncommit;');
-    seed(replica);
-    save('resume-started', fixed.PRIOR_RESUME); save('resume-fixture-ids', fixed.PARTIAL_IDS);
-    fixed.assertPartialGraph(replica);
+    const isolation = await runHostedIsolation(['--allow-hosted-project', 'qjodzutjxtmtzczbloxa', '--qa-a', USERS[0], '--qa-b', USERS[1], '--fixtures', 'local-only.json'],
+      { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishable, CADENCE_INTEGRATION_JWT_SIGNING_KEY: process.env.CADENCE_LOCAL_INTEGRATION_SIGNING_KEY }, ids, fetcher);
+    expect(isolation.result).toBe('passed');
     const readGraph = async () => {
-      const result = {};
-      for (const table of TABLES) {
-        let query = clients[0].from(table).select('*').eq('user_id', USERS[0]).order('id');
-        if (table === 'categories') query = query.eq('id', CATEGORY.id);
-        result[table] = take(await query);
+      const result = Object.fromEntries(TABLES.map(t => [t, []]));
+      for (const [i, client] of clients.entries()) for (const table of TABLES) {
+        const f = ids[i ? 'b' : 'a'];
+        const rows = take(await client.from(table).select('*').eq('user_id', USERS[i]).in(table === 'categories' || table === 'behaviors' ? 'id' : 'behavior_id', table === 'categories' ? [f.category] : [f.walk, f.reading, f.stretch]).order('id'));
+        result[table].push(...rows);
       }
       return result;
     };
-    const before = await readGraph();
-    expect(before.occurrence_status_events[0].id).toBe('73b2a3e0-1f43-4148-a11a-42290ad9f410');
-    const mismatch = structuredClone(replica); mismatch.occurrences[0].note = 'Changed local replica'; seed(mismatch);
-    writes.length = 0;
-    const rejected = await fixed.runFixtures(input, { directory, fetcher });
-    expect(rejected).toMatchObject({ result: 'stopped', stage: 'session-and-fixture-preflight' }); expect(writes).toHaveLength(0);
-    seed(replica); statuses.length = 0; writes.length = 0;
-    const green = await fixed.runFixtures(input, { directory, fetcher });
-    expect(green.result).toBe('fixtures-created');
-    expect(green.D).toBe('2026-10-28');
-    expect(green.counts).toEqual({ categories: 2, behaviors: 6, behavior_schedules: 6, behavior_schedule_slots: 6, occurrences: 24, occurrence_status_events: 4, behavior_definition_events: 6, behavior_configuration_events: 8, occurrence_time_sessions: 2 });
-    expect(statuses).toEqual([{ status: 200 }, { status: 200 }, { status: 200 }]);
-    const ids = JSON.parse(readFileSync(join(directory, 'completion-fixture-ids.json')));
-    expect(ids.a.walk).toBe(fixed.PARTIAL_IDS.a.walk); expect(ids.a.category).toBe(CATEGORY.id);
-    for (const [index, client] of clients.entries()) {
-      const f = ids[index ? 'b' : 'a'];
-      const occurrences = take(await client.from('occurrences').select('*').eq('behavior_id', f.walk).order('local_date'));
-      expect(occurrences.map(o => o.local_date)).toEqual(Array.from({ length: 8 }, (_, i) => `2026-10-${21 + i}`));
-      expect(occurrences.map(o => o.status)).toEqual(['unresolved','unresolved','unresolved','unresolved','completed','not_completed','unresolved','unresolved']);
-      expect(occurrences.filter(o => o.note !== null).map(o => o.note)).toEqual(['Review sample note']);
-      const time = take(await client.from('occurrence_time_sessions').select('*').eq('behavior_id', f.walk));
-      expect(time).toHaveLength(1); expect(Date.parse(time[0].stopped_at) - Date.parse(time[0].started_at)).toBe(600000);
-      const stretch = take(await client.from('behaviors').select('active,archived_at').eq('id', f.stretch).single());
-      expect(stretch.active).toBe(false); expect(stretch.archived_at).not.toBeNull();
-      const reading = take(await client.from('occurrences').select('local_date').eq('behavior_id', f.reading).order('local_date'));
-      expect(reading.map(o => o.local_date)).toEqual(['2026-10-21','2026-10-23','2026-10-26','2026-10-28']);
-    }
-    const retainedEvent = take(await clients[0].from('occurrence_status_events').select('*').eq('id', before.occurrence_status_events[0].id).single());
-    expect(retainedEvent).toEqual(before.occurrence_status_events[0]);
+    const beforeRefresh = await readGraph(), baseline = fixed.graphReceipt(beforeRefresh, new Date().toISOString());
+    const extraDay = Temporal.PlainDate.from('2026-11-28');
+    const generated = { ...beforeRefresh.occurrences.find(o => o.behavior_id === ids.a.walk && o.note === null && o.status === 'unresolved'), id: randomUUID(), local_date: extraDay.toString(),
+      scheduled_for: extraDay.toZonedDateTime({ timeZone: 'America/New_York', plainTime: '09:00' }).toInstant().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    generated.updated_at = generated.created_at;
+    insert('occurrences', generated);
+    const afterRefresh = await readGraph();
+    const refreshed = fixed.refreshGraphReceipt(baseline, afterRefresh);
+    expect(refreshed.appGenerated).toHaveLength(1);
+    const changed = structuredClone(afterRefresh); changed.occurrences[0].note = 'changed';
+    expect(() => fixed.refreshGraphReceipt(baseline, changed)).toThrowError('captured-row-changed');
+    const rows = TABLES.flatMap(table => afterRefresh[table].map(({ id, user_id, created_at }) => ({ table, id, user_id, created_at, run_id: ORIGINAL.runId })));
+    const manifest = { version: 1, project: 'qjodzutjxtmtzczbloxa', users: USERS, runId: ORIGINAL.runId, startedAt: ORIGINAL.startedAt, capturedAt: new Date().toISOString(), rows, counts: Object.fromEntries(TABLES.map(t => [t, afterRefresh[t].length])) };
+    const missing = structuredClone(manifest); missing.rows = missing.rows.filter(r => r.id !== generated.id); missing.counts.occurrences--;
+    expect(execute(buildCleanupSql(missing)).ok).toBe(false);
+    const cleanup = buildCleanupSql(manifest);
+    expect(execute(cleanup.replace('stamp timestamptz := clock_timestamp()', "stamp timestamptz := '2026-11-04T02:17:18.883Z'::timestamptz")).ok).toBe(false);
+    expect(await readGraph()).toEqual(afterRefresh);
+    expect(execute(cleanup.replace('archived_count <> expected_count', 'true OR archived_count <> expected_count')).ok).toBe(false);
+    expect(await readGraph()).toEqual(afterRefresh);
+    expect(execute(cleanup).ok).toBe(true);
+    const archived = await readGraph(); expect(archived.behaviors.every(b => !b.active && b.archived_at)).toBe(true);
+    for (const table of TABLES.filter(t => !['behaviors', 'behavior_configuration_events'].includes(t))) expect(archived[table]).toEqual(afterRefresh[table]);
+    expect(archived.behavior_configuration_events.length).toBe(afterRefresh.behavior_configuration_events.length + 4);
+    expect(preservedSnapshot()).toBe(preservedBefore);
+    expect(sql(`select stale from public.occurrence_sync_state where user_id='${USERS[0]}';`)).toBe('t');
     for (const [i,n] of ['execution','fixture-ids','creation-receipts'].entries()) expect(readFileSync(join(directory,`${n}.json`),'utf8')).toBe(originalBytes[i]);
-    const callsBefore = writes.length;
-    expect(await fixed.runFixtures(input, { directory, fetcher })).toMatchObject({ result:'stopped',stage:'input',requests:0 });
-    expect(writes).toHaveLength(callsBefore);
-    const evidence = process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT;
-    if (evidence) writeFileSync(evidence, JSON.stringify({ timestamp:new Date().toISOString(),node:process.versions.node,cli:'2.109.1',source:FIXTURE_SOURCE,migrations:94,red:{http:400,sqlstate:'22023'},partial:{occurrences:8,statusEvents:1},green,remainingStatusResults:statuses,replicaMismatchRefused:true,replayRefused:true,originalBytesPreserved:true,bundleSha256:receipt.bundleSha256 },null,2)+'\n');
+    expect(await fixed.runFixtures(input, { directory, fetcher })).toMatchObject({ result: 'stopped', stage: 'input', requests: 0 });
+    if (process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT) writeFileSync(process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT, JSON.stringify({ timestamp: new Date().toISOString(), node: process.versions.node, source: FIXTURE_SOURCE, migrations: 94, cli: '2.109.1', executionDate, seed: { originalOccurrences: 8, appGenerated: 30 }, fixtures: green, refreshes, isolation, manifestRefresh: { appGenerated: 1, counts: manifest.counts }, archive: { activeArchived: 4, alreadyArchived: 2, allRowsRetained: true, preservedBehaviors: 3, preservedOccurrences: 96, syncStateRetained: true }, rollback: true, originalBytesPreserved: true, bundleSha256: build.bundleSha256 }, null, 2) + '\n');
   } finally {
     for (const id of users) take(await admin.deleteUser(id));
-    rmSync(root, { recursive:true, force:true });
+    rmSync(root, { recursive: true, force: true });
   }
-},60000);
+}, 60000);

@@ -99,3 +99,12 @@ it("requires the separately retained capture digest, writes private SQL once, an
     expect(log.mock.calls).toHaveLength(1);
   } finally { log.mockRestore(); error.mockRestore(); rmSync(root, { recursive: true, force: true }); }
 });
+
+it("extends only the exact original run to the explicit seven-day boundary", () => {
+  const m = partialRun(); m.capturedAt = "2026-11-04T02:17:18.882Z";
+  expect(() => buildCleanupSql(m)).not.toThrow();
+  m.capturedAt = "2026-11-04T02:17:18.883Z";
+  expect(() => buildCleanupSql(m)).toThrowError("cleanup-manifest-refused");
+  const other = fixture(); other.capturedAt = "2026-11-03T00:00:00Z";
+  expect(() => buildCleanupSql(other)).toThrowError("cleanup-manifest-refused");
+});

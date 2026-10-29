@@ -25,6 +25,9 @@ DECLARE
   expected_count integer := 0;
   stamp timestamptz := clock_timestamp();
 BEGIN
+  IF manifest->>'runId'='4db9fe6e-a966-4cca-938b-aee5a1b955b7'
+    AND (manifest->>'startedAt' <> '2026-10-28T02:17:18.882Z'
+      OR stamp > '2026-11-04T02:17:18.882Z'::timestamptz) THEN RAISE EXCEPTION 'cleanup-refused'; END IF;
   -- Match the product's account mutation lock, then lock every captured row before writes.
   FOR owner_id IN SELECT value::uuid FROM jsonb_array_elements_text(manifest->'users') ORDER BY value LOOP
     PERFORM pg_advisory_xact_lock(hashtextextended(owner_id::text, 0));

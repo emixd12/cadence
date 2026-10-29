@@ -1,3 +1,5 @@
+import { Temporal } from '@js-temporal/polyfill';
+import { randomUUID } from 'node:crypto';
 // Synthetic replica of the captured graph. No hosted rows or session material are loaded.
 export function partialGraph({ PARTIAL_ROWS, PARTIAL_STATUSES, PARTIAL_IDS }) {
   const tables = ['categories', 'behaviors', 'behavior_schedules', 'behavior_schedule_slots', 'occurrences', 'occurrence_status_events', 'behavior_definition_events', 'behavior_configuration_events', 'occurrence_time_sessions'];
@@ -22,4 +24,13 @@ export function partialGraph({ PARTIAL_ROWS, PARTIAL_STATUSES, PARTIAL_IDS }) {
   const completed = graph.occurrences.find(o => o.status === 'completed');
   Object.assign(graph.occurrence_status_events[0], { behavior_id: b.id, occurrence_id: completed.id, previous_status: 'unresolved', status: 'completed', status_semantics: 'explicit_user_mark', source_capture_method: 'manual_tap', source_confidence: 'high', recorded_at: completed.status_marked_at, effective_at: completed.completed_at });
   return graph;
+}
+
+export function addGeneratedOccurrences(graph) {
+  for (let i = 1; i <= 30; i++) {
+    const day = Temporal.PlainDate.from('2026-10-28').add({ days: i });
+    graph.occurrences.push({ ...graph.occurrences.find(o => o.status === 'unresolved'), id: randomUUID(),
+      local_date: day.toString(), scheduled_for: day.toZonedDateTime({ timeZone: 'America/New_York', plainTime: '09:00' }).toInstant().toString(),
+      note: null, schedule_range_identity: -1, created_at: '2026-10-28T20:42:34.811680Z', updated_at: '2026-10-28T20:42:34.811680Z' });
+  }
 }
