@@ -115,17 +115,31 @@ part of L-002.
   - whether Maps Grounding Lite (Service Specific Terms 10.2.1) is the only permitted
     path;
   - under what conditions the use would be permitted.
-- **Next action (updated 2026-10-23):** await Google's reply on case 76805292, then
-  record it here. The status stays accepted risk. Ticket 219 must test that
-  no duration-bearing value reaches model input. The private briefing workbench keeps
-  synthetic travel facts, because example (vii) bars testing or validating models
-  with Maps Content.
-- **Open point, held until Google replies to case 76805292 (owner decision, October
-  23, 2026):** a yes/no fit conclusion can bound route duration from one side.
-  Example: a run ending 1:30 PM plus an event at 3:00 PM plus "fits: yes" implies the
-  trip takes under 90 minutes. After the reply, decide whether to ask Google about
-  this, or to send only day-level conclusions (for example "travel day"). Ticket 219
-  should weigh the same option.
+- **Support outcome (recorded 2026-10-29):** case 76805292 received an internal
+  consultation, followed by a reply that Technical Support cannot authoritatively
+  approve the architecture or determine compliance. Support referred Cadence to its
+  own legal review and Google Sales for custom licensing, terms or exceptions.
+  This is neither approval nor a finding of noncompliance. The binary-conclusion
+  and Grounding Lite questions remain unresolved. See the
+  [dated correspondence record](legal/2026-10-29-google-maps-case-76805292.md).
+- **Owner direction, 2026-10-29:** save the correspondence in the legal documents
+  and continue developing the feature set. This direction does not establish that
+  compliance risk is absent or expand the October 18 accepted-risk limits. See
+  [the decision record](DECISIONS.md#2026-10-29-google-maps-support-evidence-and-continued-development).
+- **Next action (updated 2026-10-29):** continue under the existing accepted-risk
+  regime; do not await an unspecified further support review or treat the response
+  as clearance. Ticket 219 must test that no duration-bearing value reaches model
+  input. The private briefing workbench keeps synthetic travel facts, because the
+  existing reading of example (vii) bars testing or validating models with Maps
+  Content. Further legal review or a Sales request needs the owner's instruction;
+  record any substantive answer or permission here.
+- **Open point (still unresolved after the October 29 reply):** a yes/no fit
+  conclusion can bound route duration from one side. Example: a run ending 1:30 PM
+  plus an event at 3:00 PM plus "fits: yes" implies the trip takes under 90 minutes.
+  The October 23 owner decision held this point for Google's reply. That reply does
+  not settle it. The options remain asking for an authoritative answer or sending
+  only day-level conclusions (for example "travel day"); Ticket 219 should weigh
+  the same option. No option is newly selected by this evidence update.
 
 ## L-002: Google coordinates sent to a non-Google provider
 

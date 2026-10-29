@@ -1300,3 +1300,28 @@ which listed it among the area checks.
 
 Platform impact: desktop release process only; web, marketing and future mobile are not
 affected. Messaging impact: none.
+
+## 2026-10-29: Google Maps support evidence and continued development
+
+The owner asked to preserve the Google Maps correspondence in the repository's legal
+documents and continue developing the feature set. Recorded from the owner's October
+29 instruction at 13:15 UTC:
+
+> I think this all should be saved in the repo’s legal documents as evidence that we
+> should not worry about this and just continue developing with our feature set
+
+[LEGAL.md L-001](LEGAL.md#l-001-google-maps-content-in-daily-brief-model-input) links
+[the sanitized case 76805292 record](legal/2026-10-29-google-maps-case-76805292.md).
+Google's support consultation ended without authoritative approval or a finding of
+noncompliance. This owner direction is separate from that outcome: it records
+continued development, not a legal finding that there is no risk.
+
+L-001 remains medium / accepted risk under the existing October 18 limits. The binary
+conclusion and Grounding Lite questions, including one-sided duration inference,
+remain unresolved. No existing model-input restriction, runtime gate, public-launch
+or provider-submission requirement is removed. The October 22 and October 27 rules
+separating development from messaging work are unchanged. No code, public policy
+text, deployment or new outreach is authorized by this documentation change.
+
+Platform impact: documentation only; web, desktop, marketing and future mobile
+behavior is unchanged. Messaging impact: none.
