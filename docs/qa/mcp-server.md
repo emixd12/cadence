@@ -466,7 +466,8 @@ plan in the next paragraphs is retained as history only.
   both sessions with local scope and retries unconfirmed sign-outs three times.
   Finally it clears memory and closes both servers. The receipt and the final log
   line report `unconfirmedSignOuts`. Any nonzero count must be reported and must
-  not be described as revoked. Run teardown when the run ends or aborts.
+  not be described as revoked. Repeated teardown calls, such as a second signal,
+  return the same pending result. Run teardown when the run ends or aborts.
 
 ##### Key rotation with broker sessions
 
@@ -497,10 +498,10 @@ plan in the next paragraphs is retained as history only.
 4. On `wrong account: discarded` or a retry notice, repeat that profile's step
    within five minutes. The existing Cadence tabs are not touched.
 
-Evidence: offline `tests/mcp-session-broker.test.mjs` (21 cases) uses a fake
+Evidence: offline `tests/mcp-session-broker.test.mjs` (22 cases) uses a fake
 GoTrue behind real supabase-js, so the actual PKCE storage path runs. Seven
 cases are direct regressions for the 10f8ab2 review findings. All seven fail
-against 10f8ab2 (`session-broker-regressions-old.log`). All 27 guard mutations
+against 10f8ab2 (`session-broker-regressions-old.log`). All 28 guard mutations
 fail the suite while the unmutated copy passes (`session-broker-mutations.json`). The opt-in
 `tests/mcp-session-broker.local-integration.test.mjs`
 (`CADENCE_QA_BROKER_LOCAL=1`) ran against a disposable auth-only CLI 2.109.1

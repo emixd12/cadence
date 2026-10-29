@@ -340,6 +340,30 @@ describe('Ticket 232 QA session broker', () => {
     expect(existsSync(t.socketPath)).toBe(false);
   });
 
+  it('returns the same pending teardown to every caller until cleanup finishes', async () => {
+    const t = await setup();
+    await t.signIn('B', ACCOUNTS.B);
+    const start = await get(t.port, '/start/A');
+    const cookie = start.headers['set-cookie'][0].split(';')[0];
+    const code = t.auth.authorize(start.headers.location, ACCOUNTS.A);
+    const hold = t.auth.holdExchange();
+    const pending = get(t.port, `/auth/callback?code=${code}`, { cookie });
+    await hold.reached;
+    const first = t.broker.teardown('first');
+    const second = t.broker.teardown('second');
+    expect(second).toBe(first);
+    let settled = false;
+    second.then(() => { settled = true; });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(settled).toBe(false);
+    hold.release();
+    const [a, b] = await Promise.all([first, second, pending]);
+    expect(a).toEqual({ unconfirmedSignOuts: 0 });
+    expect(b).toBe(a);
+    expect(t.auth.logouts.map((l) => l.userId).sort()).toEqual([ACCOUNTS.A, ACCOUNTS.B].sort());
+    expect(t.broker.status().slots).toEqual({ A: null, B: null });
+  });
+
   it('refuses a live socket, never removes another broker socket, and replaces only a stale one', async () => {
     const t = await setup();
     await t.signIn('A', ACCOUNTS.A);

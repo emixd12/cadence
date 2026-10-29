@@ -322,8 +322,13 @@ export function createSessionBroker({
     return { origin };
   };
 
-  const teardown = async (reason = 'requested') => {
-    if (closed) return;
+  // Every caller receives the same teardown promise and result.
+  let teardownPromise = null;
+  const teardown = (reason = 'requested') => {
+    teardownPromise ??= runTeardown(reason);
+    return teardownPromise;
+  };
+  const runTeardown = async (reason) => {
     closed = true;
     clearInterval(timer); clearTimeout(lifetime);
     const closing = Promise.all([
