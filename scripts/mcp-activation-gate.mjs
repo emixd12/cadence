@@ -39,10 +39,43 @@ export function judgeBehaviors(result, gate = GATE) {
   return { pass: true, reason: 'a-owned-data', count: ids.length };
 }
 
-/** Listen on the first port in the pool that binds; bind errors are handled, never thrown. */
-async function listenFirst(server, ports, isFree) {
+const abortable = (promise, signal) => (signal ? Promise.race([promise, new Promise((_, reject) => {
+  if (signal.aborted) reject(new Error('aborted'));
+  else signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+})]) : promise);
+
+/**
+ * MCP SDK adapter: one connect and one list_behaviors call. The signal is passed
+ * through callTool's supported options; on abort both awaits reject at once and
+ * the finally block closes the owned client, which aborts the transport's
+ * in-flight requests.
+ */
+export function createListBehaviors(ClientClass, TransportClass, gate = GATE) {
+  return async (token, signal) => {
+    if (signal?.aborted) throw new Error('aborted');
+    const client = new ClientClass({ name: 'cadence-ticket-232-gate', version: '1' });
+    const transport = new TransportClass(new URL(gate.resource), { requestInit: { headers: { Authorization: `Bearer ${token}` } } });
+    try {
+      await abortable(client.connect(transport), signal);
+      return await abortable(client.callTool({ name: 'list_behaviors', arguments: {} }, { signal }), signal);
+    } finally {
+      await client.close().catch(() => {});
+    }
+  };
+}
+
+/**
+ * Listen on the first port in the pool that binds. Bind errors are handled, never
+ * thrown. Cancellation is checked before and after each port probe, and a bind
+ * that completes after cancellation is closed at once; the two checks back each
+ * other up.
+ */
+async function listenFirst(server, ports, isFree, cancelled) {
   for (const port of ports) {
-    if (!(await isFree(port))) continue;
+    if (cancelled()) return null;
+    const free = await isFree(port);
+    if (cancelled()) return null;
+    if (!free) continue;
     const bound = await new Promise((resolve) => {
       const onError = () => { server.off('listening', onListening); resolve(false); };
       const onListening = () => { server.off('error', onError); resolve(true); };
@@ -50,6 +83,7 @@ async function listenFirst(server, ports, isFree) {
       server.once('listening', onListening);
       server.listen(port, '127.0.0.1');
     });
+    if (bound && cancelled()) { server.close(); server.closeAllConnections?.(); return null; }
     if (bound) return port;
   }
   return null;
@@ -63,7 +97,7 @@ async function listenFirst(server, ports, isFree) {
  * @param {(line: string) => void} [deps.log] fixed event names only
  * @param {(origin: string) => void} deps.announce receives only the loopback start URL
  */
-export async function runGate({ fetchImpl = fetch, callListBehaviors, isFree, log = () => {}, announce, gate = GATE, timeoutMs = 20 * 60_000 }) {
+export async function runGate({ fetchImpl = fetch, callListBehaviors, isFree, log = () => {}, announce, gate = GATE, timeoutMs = 20 * 60_000, signal }) {
   // One deadline for everything: discovery, registration, the callback, the token exchange and MCP.
   const deadline = new AbortController();
   const timer = setTimeout(() => deadline.abort(), timeoutMs);
@@ -81,6 +115,9 @@ export async function runGate({ fetchImpl = fetch, callListBehaviors, isFree, lo
     resolveResult({ ...value, clientId, port });
   };
   deadline.signal.addEventListener('abort', () => { if (!settled) { log('gate-timeout'); finish({ result: 'failed', reason: 'timeout' }); } });
+  // External termination (SIGINT/SIGTERM in main) uses the same terminal cleanup.
+  const interrupt = () => { if (!settled) { log('gate-interrupted'); finish({ result: 'failed', reason: 'interrupted' }); } };
+  if (signal?.aborted) interrupt(); else signal?.addEventListener('abort', interrupt, { once: true });
   const once = async (url, init) => {
     if (settled) return null;
     try { return await fetchImpl(url, { redirect: 'error', signal: AbortSignal.any([deadline.signal, AbortSignal.timeout(30_000)]), ...init }); } catch { return null; }
@@ -129,7 +166,7 @@ export async function runGate({ fetchImpl = fetch, callListBehaviors, isFree, lo
       log(verdict.pass ? 'gate-passed' : `gate-failed ${verdict.reason}`);
       return finish({ result: verdict.pass ? 'passed' : 'failed', reason: verdict.reason, behaviors: verdict.count ?? null, scope: typeof tokens.scope === 'string' ? tokens.scope : null });
     });
-    port = await listenFirst(server, gate.ports, isFree);
+    port = await listenFirst(server, gate.ports, isFree, () => settled);
     if (settled) return;
     if (!port) return finish({ result: 'failed', reason: 'no-free-port' });
     const redirectUri = `http://127.0.0.1:${port}/callback`;
@@ -162,13 +199,12 @@ async function main() {
     const c = connect({ host: h, port }); c.setTimeout(1_000, () => { c.destroy(); resolve(true); });
     c.on('connect', () => { c.destroy(); resolve(false); }); c.on('error', () => resolve(true));
   }))).then((r) => r.every(Boolean));
-  const callListBehaviors = async (token, signal) => {
-    const client = new Client({ name: 'cadence-ticket-232-gate', version: '1' });
-    await client.connect(new StreamableHTTPClientTransport(new URL(GATE.resource), { requestInit: { headers: { Authorization: `Bearer ${token}` }, signal } }));
-    try { return await client.callTool({ name: 'list_behaviors', arguments: {} }, undefined, { signal }); } finally { await client.close().catch(() => {}); }
-  };
+  const callListBehaviors = createListBehaviors(Client, StreamableHTTPClientTransport);
+  const terminate = new AbortController();
+  process.once('SIGINT', () => terminate.abort());
+  process.once('SIGTERM', () => terminate.abort());
   const startedAt = new Date().toISOString();
-  const result = await runGate({ callListBehaviors, isFree, log: (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), announce: (u) => process.stdout.write(`open ${u}\n`) });
+  const result = await runGate({ callListBehaviors, isFree, signal: terminate.signal, log: (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), announce: (u) => process.stdout.write(`open ${u}\n`) });
   writeFileSync(out, JSON.stringify({ startedAt, finishedAt: new Date().toISOString(), ...result }, null, 2), { mode: 0o600 });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exit(result.result === 'passed' ? 0 : 1);

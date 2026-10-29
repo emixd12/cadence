@@ -605,12 +605,16 @@ moves to the next port. Only after binding does it register one public native
 DCR client, using PKCE S256, scope `cadence.read` and the `/mcp` resource. After
 A's consent it makes one token exchange and one `list_behaviors` call through
 the MCP SDK. One deadline aborts all in-flight requests, and no work continues
-after it. The gate passes only if the result is not an error and every returned
+after it. The SDK adapter passes the signal through `callTool` options and
+closes its client, which aborts the transport request. A port bound after the
+deadline is closed at once. SIGINT and SIGTERM use the same terminal cleanup. The gate passes only if the result is not an error and every returned
 ID is one of A's six captured Behaviors: the fixture walk, reading and stretch,
 plus `083ddfb7…`, `72472a62…` and `94e8cb9f…`. The result must also include the
 active walk and reading fixtures, with no duplicates and no B or unknown ID. Any failure means
 `rollback` runs at once. Evidence: `tests/mcp-activation.test.mjs` and
-`activation-mutations.json` (37/37).
+`activation-mutations.json` (42/44 killed). The two survivors are the paired
+post-probe cancellation check and late-listener close, each of which covers the
+other.
 
 ##### Emi's steps
 

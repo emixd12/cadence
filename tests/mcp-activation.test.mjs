@@ -3,7 +3,8 @@ import { request, createServer } from 'node:http';
 import { connect } from 'node:net';
 import { createHash } from 'node:crypto';
 import { runActivation, createVercelApi, ACTIVATION } from '../scripts/mcp-activation.mjs';
-import { runGate, judgeBehaviors, GATE } from '../scripts/mcp-activation-gate.mjs';
+import { runGate, judgeBehaviors, createListBehaviors, GATE } from '../scripts/mcp-activation-gate.mjs';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
 const NEW = 'dpl_NewActivation123';
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -346,5 +347,82 @@ describe('Ticket 232 activation gate', () => {
       expect(await skip.promise).toMatchObject({ result: 'failed', reason: 'registration', port: next });
       expect(skip.seen.filter((x) => x.url.endsWith('/oauth/register'))).toHaveLength(1);
     } finally { blocker.close(); }
+  });
+
+  const listening = (p) => new Promise((resolve) => { const c = connect({ host: '127.0.0.1', port: p }); c.on('connect', () => { c.destroy(); resolve(true); }); c.on('error', () => resolve(false)); });
+  const freePort = async (from = GATE.ports.length - 1) => { for (let i = from; i >= 0; i -= 1) if (await realFree(GATE.ports[i])) return GATE.ports[i]; return null; };
+
+  it('never binds after the deadline when the port check is still pending', async () => {
+    const p = await freePort();
+    let release, entered;
+    const held = new Promise((r) => { release = r; });
+    const started = new Promise((r) => { entered = r; });
+    const h = harness({ ports: [p], timeoutMs: 60, isFree: async () => { entered(); await held; return true; } });
+    await started;
+    expect(await h.promise).toMatchObject({ result: 'failed', reason: 'timeout' });
+    release();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await listening(p)).toBe(false);
+    expect(h.seen.filter((x) => x.url.endsWith('/oauth/register'))).toHaveLength(0);
+  });
+
+  it('routes external termination through the same cleanup', async () => {
+    const terminate = new AbortController();
+    const seen = [];
+    let announced;
+    const ready = new Promise((r) => { announced = r; });
+    const promise = runGate({ signal: terminate.signal, isFree: realFree, announce: (u) => announced(u), timeoutMs: 5_000, callListBehaviors: async () => A,
+      fetchImpl: async (url) => { seen.push(url); return url.endsWith('/oauth/register') ? json(201, { client_id: 'client-gate' }) : json(200, { issuer: GATE.origin, authorization_endpoint: `${GATE.origin}/oauth/authorize`, token_endpoint: `${GATE.origin}/oauth/token`, registration_endpoint: `${GATE.origin}/oauth/register` }); } });
+    const start = await ready;
+    const p = Number(new URL(start).port);
+    terminate.abort();
+    expect(await promise).toMatchObject({ result: 'failed', reason: 'interrupted', clientId: 'client-gate', port: p });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(await listening(p)).toBe(false);
+    const before = await runGate({ signal: AbortSignal.abort(), isFree: realFree, announce: () => {}, callListBehaviors: async () => A, fetchImpl: async (url) => { seen.push(url); return json(500, {}); } });
+    expect(before).toMatchObject({ result: 'failed', reason: 'interrupted', clientId: null });
+  });
+
+  it('cancels the real MCP SDK request when the deadline fires', async () => {
+    const p = await freePort();
+    let requestAborted = false, gotRequest;
+    const received = new Promise((r) => { gotRequest = r; });
+    const server = createServer((req, res) => { gotRequest(); req.on('close', () => { if (!res.writableEnded) requestAborted = true; }); });
+    await new Promise((r) => server.listen(p, '127.0.0.1', r));
+    try {
+      const call = createListBehaviors(Client, StreamableHTTPClientTransport, { ...GATE, resource: `http://127.0.0.1:${p}/mcp` });
+      const deadline = new AbortController();
+      let settled = false;
+      const pending = call('synthetic-token', deadline.signal).then(() => 'resolved', () => 'rejected').finally(() => { settled = true; });
+      await received;
+      deadline.abort();
+      expect(await pending).toBe('rejected');
+      expect(settled).toBe(true);
+      await new Promise((r) => setTimeout(r, 100));
+      expect(requestAborted).toBe(true);
+    } finally { server.closeAllConnections?.(); await new Promise((r) => server.close(r)); }
+  });
+
+  it('passes the signal through callTool options and closes the client on abort', async () => {
+    const events = [];
+    let release;
+    class FakeClient {
+      constructor() { events.push('new'); }
+      async connect() { events.push('connect'); }
+      callTool(params, options) { events.push(['callTool', params.name, options?.signal instanceof AbortSignal]); return new Promise((r) => { release = r; }); }
+      async close() { events.push('close'); }
+    }
+    class FakeTransport { constructor(url, opts) { events.push(['transport', String(url), Boolean(opts.requestInit.headers.Authorization)]); } }
+    const deadline = new AbortController();
+    const pending = createListBehaviors(FakeClient, FakeTransport)('t', deadline.signal).then(() => 'resolved', () => 'rejected');
+    await new Promise((r) => setTimeout(r, 10));
+    deadline.abort();
+    expect(await pending).toBe('rejected');
+    expect(events).toContainEqual(['callTool', 'list_behaviors', true]);
+    expect(events.filter((e) => e === 'close').length).toBeGreaterThanOrEqual(1);
+    release?.({});
+    const constructed = events.filter((e) => e === 'new').length;
+    await expect(createListBehaviors(FakeClient, FakeTransport)('t', AbortSignal.abort())).rejects.toThrow('aborted');
+    expect(events.filter((e) => e === 'new').length).toBe(constructed);
   });
 });
