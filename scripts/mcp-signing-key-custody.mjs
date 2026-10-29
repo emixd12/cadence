@@ -11,6 +11,7 @@ export const CUSTODY = Object.freeze({
   title: 'Cadence Ticket232 integration signing key 2026-10-29',
   project: 'qjodzutjxtmtzczbloxa',
   web: 'prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs',
+  team: 'team_BxWfRYU1gqrl6Ba6t7Vm3wp1',
   currentKey: 'cb295840-0eb2-4b4a-a1ba-c28c5b975361',
   signerVariable: 'CADENCE_INTEGRATION_JWT_SIGNING_KEY',
   mcpUrl: 'https://app.cadence-me.com/mcp',
@@ -52,6 +53,32 @@ const keyRow = (v) => isObject(v) && text(v.id) && text(v.algorithm) && text(v.s
  * timeout failure settles once with status 1 and empty stdout, stops the child,
  * and discards stderr and error text. A later exit 0 cannot override it.
  */
+/**
+ * One-attempt Vercel REST write. The Vercel CLI `api` command retries failed
+ * requests, so the secret-bearing POST uses fetch directly: exactly one
+ * attempt, no redirects, bounded time. Any throw, timeout or non-2xx becomes
+ * status 1; the response body is discarded unread.
+ */
+export function createVercelWriter({ fetchImpl = fetch, readToken, teamId, timeoutMs = 30_000 }) {
+  return async (path, body) => {
+    let token = null;
+    try { token = readToken(); } catch { token = null; }
+    if (!text(token)) return { status: 1 };
+    try {
+      const response = await fetchImpl(`https://api.vercel.com${path}?teamId=${encodeURIComponent(teamId)}`, {
+        method: 'POST', body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
+        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      });
+      try { await response.body?.cancel(); } catch { /* discard */ }
+      return { status: response.ok ? 0 : 1 };
+    } catch {
+      return { status: 1 };
+    } finally {
+      token = null;
+    }
+  };
+}
+
 export function createRunner(spawn, timeoutMs = 180_000) {
   return (cmd, args, input) => new Promise((resolve) => {
     let settled = false, stdout = '', child = null, timer = null;
@@ -87,7 +114,7 @@ class Stop extends Error {
  * @param {() => boolean} deps.receiptExists
  * @param {(line: string) => void} [deps.log] fixed event names only
  */
-export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, receiptExists, log = () => {}, generate = generateSigningJwk, config = CUSTODY, baseline = KEY_BASELINE }) {
+export async function runKeyCustody({ op, supabase, vercel, vercelWrite, vercelWriteReady, mcpStatus, save, receiptExists, log = () => {}, generate = generateSigningJwk, config = CUSTODY, baseline = KEY_BASELINE }) {
   const receipt = { startedAt: new Date().toISOString(), steps: [] };
   let phase = 'start', writeAttempted = false;
   const step = (name, extra = {}) => { receipt.steps.push({ at: new Date().toISOString(), name, ...extra }); save(receipt); };
@@ -127,6 +154,7 @@ export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, rec
     if (JSON.stringify(beforeTuples) !== JSON.stringify(baseline.map(tuple).sort())) throw new Stop('signing-keys-drift');
     const envs = await envsRead('vercel-env-preflight');
     if (envs.some((e) => e.key === config.signerVariable)) throw new Stop('signer-variable-exists');
+    if (await call('vercel-write-ready', vercelWriteReady) !== true) throw new Stop('vercel-credential-not-ready');
     step('preflight', { keys: baseline.map((k) => ({ ...k })), signerVariablePresent: false, mcpStatus: 503 });
 
     jwk = generate();
@@ -158,10 +186,10 @@ export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, rec
 
     const secret = JSON.stringify(jwk);
     jwk = null;
-    // `vercel api --input -` reads stdin to EOF; `vercel env add` accepts only the
-    // first stdin chunk within 500 ms, which could store a truncated secret.
+    // One direct REST attempt: `vercel env add` keeps only the first stdin chunk
+    // within 500 ms, and `vercel api` retries failed writes.
     const envBody = JSON.stringify({ key: config.signerVariable, value: secret, type: 'sensitive', target: ['production'] });
-    const added = await call('vercel-env-add', () => vercel(['api', `/v10/projects/${config.web}/env`, '-X', 'POST', '--input', '-', '--raw'], envBody));
+    const added = await call('vercel-env-add', () => vercelWrite(`/v10/projects/${config.web}/env`, envBody));
     if (added?.status !== 0) throw new Stop('vercel-env-add-failed');
     const signer = (await envsRead('vercel-env-readback')).filter((e) => e.key === config.signerVariable);
     if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');
@@ -185,11 +213,20 @@ async function main() {
   const node = '/Users/emi/.npm/_npx/387698761821791d/node_modules/node/bin/node';
   const vc = '/Users/emi/.npm/_npx/67eb4586ca667318/node_modules/vercel/dist/index.js';
   const run = createRunner(spawn);
+  const { homedir } = await import('node:os');
+  const { readFileSync } = await import('node:fs');
+  // The existing Vercel CLI credential, read into memory at write time only.
+  const vercelToken = (marginMs = 120_000) => {
+    const auth = JSON.parse(readFileSync(`${homedir()}/Library/Application Support/com.vercel.cli/auth.json`, 'utf8'));
+    return typeof auth.expiresAt === 'number' && auth.expiresAt * 1000 > Date.now() + marginMs ? auth.token : null;
+  };
   let token = execFileSync('security', ['find-generic-password', '-s', 'Supabase CLI', '-a', 'supabase', '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   if (token.startsWith('go-keyring-base64:')) token = Buffer.from(token.slice(18), 'base64').toString('utf8').trim();
   const result = await runKeyCustody({
     op: (args, input) => run('op', args, input),
     vercel: (args, input) => run(node, [vc, ...args], input),
+    vercelWrite: createVercelWriter({ readToken: () => vercelToken(), teamId: CUSTODY.team }),
+    vercelWriteReady: async () => text(vercelToken(30 * 60_000)),
     supabase: async (path, init = {}) => {
       const r = await fetch(`https://api.supabase.com/v1/projects/${CUSTODY.project}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }, signal: AbortSignal.timeout(30_000) });
       return { status: r.status, body: parse(await r.text()) };

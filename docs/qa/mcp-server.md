@@ -501,10 +501,14 @@ or field stops the run and is never treated as empty. It then generates one ES25
 memory. That JWK is piped over stdin to `op document create /dev/stdin`, and the item
 metadata and stored document are read back and compared. Next it imports the key
 to Supabase as standby only and requires the same kid and public fingerprint,
-with every old key unchanged. Finally it creates the env record with `vercel api
-/v10/projects/<web>/env -X POST --input - --raw`. The JSON body carries the key,
-type sensitive and target production, and arrives over stdin. The script then
-reads back a Production-only sensitive record and rechecks `/mcp` 503.
+with every old key unchanged. Finally it creates the env record with exactly one
+direct `fetch` POST to `https://api.vercel.com/v10/projects/<web>/env?teamId=team_BxWfRYU1gqrl6Ba6t7Vm3wp1`.
+The JSON body carries the key, type sensitive and target production. The request
+uses `redirect: 'error'` and a 30-second timeout, and discards the response body
+unread. The bearer token is the existing Vercel CLI credential, read into memory
+from the CLI's `auth.json` at write time and never logged. Preflight requires it
+to stay valid for at least 30 more minutes. The script then reads back a
+Production-only sensitive record through the CLI and rechecks `/mcp` 503.
 
 Attempt 1 on October 29 at 19:03 UTC failed safely. Given `-`, op checks for
 stdin data the moment it starts, so it raced the runner's write and exited with
@@ -514,7 +518,10 @@ succeeded, and the probe item was deleted by exact ID. `vercel env add` was also
 replaced: its stdin reader keeps only the first data chunk and gives up after 500
 ms, which could store a truncated secret. `vercel api --input -` reads to EOF.
 The offline `--generate=curl` check (`vercel-api-stdin-check.json`) delivered a
-200 KB body written in two chunks over 3 seconds intact. After the import, both frozen tuples
+200 KB body written in two chunks over 3 seconds intact. The installed CLI 65.1.0
+`api` client retries failed requests: the verifier saw four POST attempts on a
+connection reset. The secret-bearing write therefore bypasses the CLI, so a
+reset, 5xx, 4xx or timeout is a single failed attempt that stops the run. After the import, both frozen tuples
 must be unchanged and the only addition must be the expected standby kid. The
 private key never appears in argv, files, logs or the 0600 receipt
 `step2-custody.json`. Adapter, subprocess and internal errors become fixed phase
@@ -526,8 +533,9 @@ catch covers `main`. There are no retries. The receipt records the phase and
 whether a write was attempted, plus a `custody-created` step with the document
 ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
 this script. Evidence: 34 offline cases, including direct regressions for the
-b12e0bc and 34821fd findings, the stdin-path forms and a direct EventEmitter
-runner harness, and 34/34 mutation kills (`key-custody-mutations.json`).
+b12e0bc and 34821fd findings, the stdin-path forms, a direct EventEmitter runner
+harness and direct one-attempt writer cases, and 41/41 mutation kills
+(`key-custody-mutations.json`).
 
 ##### Emi's steps
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { runKeyCustody, publicFingerprint, createRunner, CUSTODY } from '../scripts/mcp-signing-key-custody.mjs';
+import { runKeyCustody, publicFingerprint, createRunner, createVercelWriter, CUSTODY } from '../scripts/mcp-signing-key-custody.mjs';
 
 const OLD = [
   { id: '78be1780-9785-44e5-947a-c839fc20a991', algorithm: 'HS256', status: 'previously_used' },
@@ -8,7 +8,7 @@ const OLD = [
 ];
 
 function world(overrides = {}) {
-  const calls = { op: [], supabase: [], vercel: [], saves: [], logs: [] };
+  const calls = { op: [], supabase: [], vercel: [], writes: [], saves: [], logs: [] };
   const docs = new Map();
   let keys = OLD.map((k) => ({ ...k }));
   let envs = [{ key: 'CADENCE_MCP_ENABLED', target: ['production'], type: 'sensitive' }];
@@ -42,22 +42,24 @@ function world(overrides = {}) {
   };
   const vercel = async (args, input) => {
     calls.vercel.push({ args, input });
-    if (args[0] === 'api' && args.includes('POST')) {
-      const posted = JSON.parse(input);
-      envs = [...envs, { key: posted.key, target: o.wrongTarget ? ['production', 'preview'] : posted.target, type: posted.type }];
-      if (o.enableMcpAfterAdd) mcp = 200;
-      return { status: o.envPostStatus ?? 0, stdout: JSON.stringify({ created: { key: posted.key, type: posted.type, target: posted.target } }) };
-    }
     if (args[0] === 'api') {
-      const reads = calls.vercel.filter((c) => c.args[0] === 'api' && !c.args.includes('POST')).length;
+      const reads = calls.vercel.filter((c) => c.args[0] === 'api').length;
       if (o.envPreflightRaw !== undefined && reads === 1) return { status: 0, stdout: o.envPreflightRaw };
       if (o.envReadbackStatus !== undefined && reads === 2) return { status: o.envReadbackStatus, stdout: JSON.stringify({ envs }) };
       return { status: 0, stdout: JSON.stringify({ envs: o.signerPresent ? [...envs, { key: CUSTODY.signerVariable, target: ['production'] }] : envs }) };
     }
     return { status: 1, stdout: '' };
   };
+  const vercelWrite = async (path, body) => {
+    calls.writes.push({ path, body });
+    const posted = JSON.parse(body);
+    envs = [...envs, { key: posted.key, target: o.wrongTarget ? ['production', 'preview'] : posted.target, type: posted.type }];
+    if (o.enableMcpAfterAdd) mcp = 200;
+    return { status: o.envPostStatus ?? 0 };
+  };
   const deps = {
-    op, supabase, vercel,
+    op, supabase, vercel, vercelWrite,
+    vercelWriteReady: async () => !o.credentialNotReady,
     mcpStatus: async () => (o.mcpEnabled ? 200 : mcp),
     save: (r) => calls.saves.push(JSON.stringify(r)),
     receiptExists: () => Boolean(o.receiptExists),
@@ -67,7 +69,7 @@ function world(overrides = {}) {
 }
 
 const privateOf = (w) => JSON.parse(w.calls.op.find((c) => c.args[1] === 'create').input);
-const posts = (w) => w.calls.vercel.filter((c) => c.args.includes('POST'));
+const posts = (w) => w.calls.writes;
 const generated = (w) => w.calls.saves.some((s) => s.includes('"generated"'));
 
 describe('Ticket 232 signing-key custody', () => {
@@ -82,13 +84,15 @@ describe('Ticket 232 signing-key custody', () => {
     const post = w.calls.supabase.find((c) => c.method === 'POST');
     expect(JSON.parse(post.body)).toMatchObject({ algorithm: 'ES256', status: 'standby', private_jwk: { kid: result.kid, d: jwk.d } });
     expect(w.calls.op.flatMap((c) => c.args)).not.toContain('-');
+    expect(posts(w)).toHaveLength(1);
     const add = posts(w)[0];
-    expect(add.args).toEqual(['api', `/v10/projects/${CUSTODY.web}/env`, '-X', 'POST', '--input', '-', '--raw']);
-    const envBody = JSON.parse(add.input);
+    expect(add.path).toBe(`/v10/projects/${CUSTODY.web}/env`);
+    expect(w.calls.vercel.every((c) => c.args[0] === 'api' && c.args.length === 2)).toBe(true);
+    const envBody = JSON.parse(add.body);
     expect(envBody).toMatchObject({ key: CUSTODY.signerVariable, type: 'sensitive', target: ['production'] });
     expect(JSON.parse(envBody.value)).toEqual(jwk);
     expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
-    const everywhereButStdin = JSON.stringify([w.calls.op.map((c) => c.args), w.calls.vercel.map((c) => c.args), w.calls.saves, w.calls.logs, w.calls.supabase.filter((c) => c.method !== 'POST'), result]);
+    const everywhereButStdin = JSON.stringify([w.calls.op.map((c) => c.args), w.calls.vercel, w.calls.saves, w.calls.logs, w.calls.supabase.filter((c) => c.method !== 'POST'), result]);
     expect(everywhereButStdin).not.toContain(jwk.d);
     expect(w.calls.op.filter((c) => c.input !== undefined && c.input.includes(jwk.d)).map((c) => c.args[1])).toEqual(['create']);
     const keys = w.keys();
@@ -109,6 +113,7 @@ describe('Ticket 232 signing-key custody', () => {
     ['signing-key drift', { keysBefore: [...OLD, { id: 'z', algorithm: 'ES256', status: 'standby' }] }, 'signing-keys-drift'],
     ['an existing standby key', { keysBefore: [{ ...OLD[0], status: 'standby' }, OLD[1]] }, 'signing-keys-drift'],
     ['an existing signer variable', { signerPresent: true }, 'signer-variable-exists'],
+    ['an expiring Vercel credential', { credentialNotReady: true }, 'vercel-credential-not-ready'],
     ['unparseable custody item list', { itemsRaw: 'not json' }, 'op-item-list-unreadable'],
     ['a custody item without a title', { itemsRaw: '[{}]' }, 'op-item-list-unreadable'],
     ['a custody item with a null title', { itemsRaw: '[{"title":null}]' }, 'op-item-list-unreadable'],
@@ -223,5 +228,37 @@ describe('Ticket 232 custody subprocess runner', () => {
     const h = harness('success');
     expect(await h.run('fake', [], 'x')).toEqual({ status: 0, stdout: '{"ok":true}' });
     expect(h.kills).toEqual([]);
+  });
+});
+
+describe('Ticket 232 one-attempt Vercel writer', () => {
+  const make = (behaviour, options = {}) => {
+    const seen = [];
+    const fetchImpl = (url, init) => {
+      seen.push({ url, init });
+      if (behaviour === 'reset') return Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }));
+      if (behaviour === 'hang') return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+      const status = behaviour === '5xx' ? 502 : behaviour === '4xx' ? 409 : 201;
+      return Promise.resolve(new Response('{"value":"echo-not-read"}', { status }));
+    };
+    return { write: createVercelWriter({ fetchImpl, readToken: options.readToken ?? (() => 'cli-token'), teamId: 'team_x', timeoutMs: 30 }), seen };
+  };
+  for (const [behaviour, status] of [['reset', 1], ['5xx', 1], ['4xx', 1], ['hang', 1], ['ok', 0]]) {
+    it(`makes exactly one attempt on ${behaviour}`, async () => {
+      const w = make(behaviour);
+      expect(await w.write('/v10/projects/p/env', '{"k":1}')).toEqual({ status });
+      expect(w.seen).toHaveLength(1);
+      const [{ url, init }] = w.seen;
+      expect(url).toBe('https://api.vercel.com/v10/projects/p/env?teamId=team_x');
+      expect(init).toMatchObject({ method: 'POST', body: '{"k":1}', redirect: 'error' });
+      expect(init.headers.Authorization).toBe('Bearer cli-token');
+    });
+  }
+  it('does not call the API without a usable credential', async () => {
+    for (const readToken of [() => null, () => '', () => { throw new Error('no file'); }]) {
+      const w = make('ok', { readToken });
+      expect(await w.write('/v10/projects/p/env', '{}')).toEqual({ status: 1 });
+      expect(w.seen).toHaveLength(0);
+    }
   });
 });
