@@ -487,6 +487,23 @@ plan in the next paragraphs is retained as history only.
    wants a fresh-login proof as well as a refresh, that is one extra A sign-in on
    the same page, taking about a minute.
 
+##### Key custody script (`scripts/mcp-signing-key-custody.mjs`)
+
+Step 2a runs before the pin. It refuses unless `/mcp` returns 503, the only vault
+named Cadence has ID `fgyupy5i26isvkdqofojc5o66u`, no custody document has the
+fixed title, the project has exactly the two expected keys with none on standby,
+and the Production signer variable is absent. It then generates one ES256 JWK in
+memory. That JWK is piped over stdin to `op document create`, and the item
+metadata and stored document are read back and compared. Next it imports the key
+to Supabase as standby only and requires the same kid and public fingerprint,
+with every old key unchanged. Finally it pipes the JWK over stdin to `vercel env
+add --environment production --sensitive` and reads back a Production-only
+sensitive record, then rechecks `/mcp` 503. The private key never appears in
+argv, files, logs or the 0600 receipt `step2-custody.json`. Any mismatch stops
+the run, an ambiguous custody create is reconciled rather than retried, and there
+is no rotation or redeploy in this script. Evidence: 12 offline cases and 15/15
+mutation kills (`key-custody-mutations.json`).
+
 ##### Emi's steps
 
 1. The operator starts the broker and relays the exact URL, `http://127.0.0.1:<port>/`.
