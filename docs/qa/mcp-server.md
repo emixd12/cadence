@@ -593,13 +593,24 @@ A rejected or ambiguous write is reconciled read-only (the flag value, or the
 production deployments since the start) and is never repeated. Response bodies
 and tokens are never stored.
 
-`node scripts/mcp-activation-gate.mjs` serves a loopback page on 127.0.0.1. It
-registers one public native DCR client and uses PKCE S256, scope `cadence.read`
-and the `/mcp` resource. After A's consent it makes one token exchange and one
-`list_behaviors` call through the MCP SDK. It passes only if the result is not
-an error and contains A's fixture Behaviors and none of B's. Any failure means
+Rollback is the safety disable. It requires only the exact flag record (id, key,
+encrypted, Production-only) and the READY frozen deployment. Binding, alias and
+other-deployment drift, and an unreadable binding or pre-redeploy alias, are all
+recorded but never block it. After the redeploy it still requires the alias on
+the new deployment and `/mcp` 503.
+
+`node scripts/mcp-activation-gate.mjs` binds a loopback page on 127.0.0.1 on
+the first free port, tried in ascending order from 4321 to 4330. A bind error
+moves to the next port. Only after binding does it register one public native
+DCR client, using PKCE S256, scope `cadence.read` and the `/mcp` resource. After
+A's consent it makes one token exchange and one `list_behaviors` call through
+the MCP SDK. One deadline aborts all in-flight requests, and no work continues
+after it. The gate passes only if the result is not an error and every returned
+ID is one of A's six captured Behaviors: the fixture walk, reading and stretch,
+plus `083ddfb7…`, `72472a62…` and `94e8cb9f…`. The result must also include the
+active walk and reading fixtures, with no duplicates and no B or unknown ID. Any failure means
 `rollback` runs at once. Evidence: `tests/mcp-activation.test.mjs` and
-`activation-mutations.json` (27/27).
+`activation-mutations.json` (37/37).
 
 ##### Emi's steps
 

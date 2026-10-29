@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { request } from 'node:http';
+import { request, createServer } from 'node:http';
+import { connect } from 'node:net';
 import { createHash } from 'node:crypto';
 import { runActivation, createVercelApi, ACTIVATION } from '../scripts/mcp-activation.mjs';
 import { runGate, judgeBehaviors, GATE } from '../scripts/mcp-activation-gate.mjs';
@@ -39,7 +40,7 @@ function world(o = {}) {
   };
   const publicFetch = async (url, init = {}) => {
     calls.push({ method: init.method ?? 'GET', public: url });
-    const enabled = created && mcpValue === 'true' && !o.endpointStillDisabled;
+    const enabled = (created && mcpValue === 'true' && !o.endpointStillDisabled) || (created && o.endpointStillEnabled);
     if (url.endsWith('/.well-known/oauth-protected-resource/mcp')) return enabled ? json(200, { resource: `${ACTIVATION.origin}/mcp` }) : json(503, {});
     if (url.endsWith('/mcp')) return enabled ? new Response('{}', { status: 401, headers: { 'content-type': 'application/json', 'www-authenticate': `Bearer resource_metadata="${ACTIVATION.origin}/.well-known/oauth-protected-resource/mcp", error="invalid_token"` } }) : new Response('{}', { status: o.mcpBefore ?? 503, headers: { 'content-type': 'application/json' } });
     if (url.endsWith('/.well-known/oauth-authorization-server')) return enabled ? json(200, { issuer: ACTIVATION.origin }) : json(503, {});
@@ -69,6 +70,47 @@ describe('Ticket 232 activation', () => {
     const w = world({ mode: 'rollback', mcpValue: 'true', alias: NEW });
     expect(await runActivation(w.deps)).toEqual({ result: 'complete', mode: 'rollback', deploymentId: NEW });
     expect(w.writes()[0].body).toEqual({ value: 'false' });
+  });
+
+  it('still rolls back when binding, alias or other deployments drifted, and records them', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true', alias: 'dpl_Elsewhere', binding: 'dpl_Wrong', otherDeploy: true });
+    expect(await runActivation(w.deps)).toEqual({ result: 'complete', mode: 'rollback', deploymentId: NEW });
+    expect(w.writes().map((c) => [c.method, c.body?.value ?? null])).toEqual([['PATCH', 'false'], ['POST', null]]);
+    const steps = JSON.parse(w.saves.at(-1)).steps;
+    expect(steps.find((x) => x.name === 'preconditions')).toMatchObject({ marketingBinding: 'dpl_Wrong', liveAlias: 'dpl_Elsewhere' });
+    expect(steps.find((x) => x.name === 'readbacks')).toMatchObject({ marketingBinding: 'dpl_Wrong', otherProductionDeployments: ['dpl_Other'], mcpStatus: 503 });
+  });
+
+  it('fails a rollback whose endpoint still answers as enabled', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true', alias: NEW, endpointStillEnabled: true });
+    expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason: 'disabled-endpoint-mismatch' });
+  });
+
+  it('rolls back even when the alias cannot be read before the redeploy', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true', alias: NEW });
+    const base = w.deps.api;
+    let posted = false;
+    w.deps.api = async (method, path, body) => {
+      if (method === 'POST') posted = true;
+      return path === `/v4/aliases/${ACTIVATION.alias}` && !posted ? { kind: 'failed' } : base(method, path, body);
+    };
+    expect(await runActivation(w.deps)).toMatchObject({ result: 'complete', mode: 'rollback' });
+    expect(JSON.parse(w.saves.at(-1)).steps.find((x) => x.name === 'preconditions')).toMatchObject({ liveAlias: 'unknown' });
+  });
+
+  it('rolls back even when the binding cannot be read', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true', alias: NEW });
+    const base = w.deps.api;
+    w.deps.api = async (method, path, body) => (path.includes(ACTIVATION.bindingEnv.id) ? { kind: 'failed' } : base(method, path, body));
+    expect(await runActivation(w.deps)).toMatchObject({ result: 'complete', mode: 'rollback' });
+  });
+
+  it('never skips the exact flag record guard in rollback', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true' });
+    const base = w.deps.api;
+    w.deps.api = async (method, path, body) => (path.includes(ACTIVATION.mcpEnv.id) && method === 'GET' ? { kind: 'ok', json: { id: ACTIVATION.mcpEnv.id, key: ACTIVATION.mcpEnv.key, type: 'encrypted', target: ['production', 'preview'], value: 'true' } } : base(method, path, body));
+    expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason: 'mcp-env-read-mismatch' });
+    expect(w.writes()).toHaveLength(0);
   });
 
   const preStops = [
@@ -178,33 +220,45 @@ describe('Ticket 232 one-attempt Vercel API client', () => {
 });
 
 describe('Ticket 232 activation gate', () => {
-  const A = { structuredContent: { behaviors: GATE.aBehaviors.map((id) => ({ id })) } };
+  const A = { structuredContent: { behaviors: GATE.aOwned.map((id) => ({ id })) } };
   it('judges list_behaviors results', () => {
     expect(judgeBehaviors(A)).toMatchObject({ pass: true });
     expect(judgeBehaviors({ structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: GATE.bBehaviors[0] }] } })).toMatchObject({ pass: false, reason: 'cross-account-data' });
-    expect(judgeBehaviors({ structuredContent: { behaviors: [{ id: GATE.aBehaviors[0] }] } })).toMatchObject({ pass: false, reason: 'own-data-missing' });
-    expect(judgeBehaviors({ isError: true, structuredContent: { behaviors: GATE.aBehaviors.map((id) => ({ id })) } })).toMatchObject({ pass: false, reason: 'unreadable-result' });
+    expect(judgeBehaviors({ structuredContent: { behaviors: [{ id: GATE.aRequired[0] }] } })).toMatchObject({ pass: false, reason: 'own-data-missing' });
+    expect(judgeBehaviors({ structuredContent: { behaviors: GATE.aRequired.map((id) => ({ id })) } })).toMatchObject({ pass: true });
+    expect(judgeBehaviors({ isError: true, structuredContent: { behaviors: GATE.aOwned.map((id) => ({ id })) } })).toMatchObject({ pass: false, reason: 'unreadable-result' });
+    expect(judgeBehaviors({ structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: '00000000-0000-4000-8000-000000000000' }] } })).toMatchObject({ pass: false, reason: 'unknown-data' });
+    expect(judgeBehaviors({ structuredContent: { behaviors: [...GATE.aRequired, GATE.aRequired[0]].map((id) => ({ id })) } })).toMatchObject({ pass: false, reason: 'duplicate-data' });
+    expect(GATE.ports).toEqual([4321, 4322, 4323, 4324, 4325, 4326, 4327, 4328, 4329, 4330]);
     expect(judgeBehaviors({ structuredContent: {} })).toMatchObject({ pass: false, reason: 'unreadable-result' });
     expect(judgeBehaviors(null)).toMatchObject({ pass: false });
   });
 
-  let port = 56141;
+  const realFree = (p) => Promise.all(['127.0.0.1', '::1'].map((h) => new Promise((resolve) => {
+    const c = connect({ host: h, port: p }); c.setTimeout(500, () => { c.destroy(); resolve(true); });
+    c.on('connect', () => { c.destroy(); resolve(false); }); c.on('error', () => resolve(true));
+  }))).then((r) => r.every(Boolean));
   const harness = (o = {}) => {
     const seen = [], logs = [];
     let announced;
     const ready = new Promise((r) => { announced = r; });
+    let tokenGate = null;
+    if (o.holdToken) { let release; const held = new Promise((r) => { release = r; }); tokenGate = { held, release }; }
     const fetchImpl = async (url, init = {}) => {
       seen.push({ url, init });
       if (url.endsWith('/.well-known/oauth-authorization-server')) return json(200, { issuer: o.issuer ?? GATE.origin, authorization_endpoint: `${GATE.origin}/oauth/authorize`, token_endpoint: `${GATE.origin}/oauth/token`, registration_endpoint: `${GATE.origin}/oauth/register` });
       if (url.endsWith('/oauth/register')) return o.regFail ? json(400, {}) : json(201, { client_id: 'client-gate' });
-      if (url.endsWith('/oauth/token')) return o.tokenFail ? json(400, { error: 'invalid_grant' }) : json(200, { access_token: 'access-secret', token_type: 'Bearer', scope: 'cadence.read' });
+      if (url.endsWith('/oauth/token')) {
+        if (tokenGate) { tokenGate.signal = init.signal; await tokenGate.held; }
+        return o.tokenFail ? json(400, { error: 'invalid_grant' }) : json(200, { access_token: 'access-secret', token_type: 'Bearer', scope: 'cadence.read' });
+      }
       return json(404, {});
     };
-    const gate = { ...GATE, ports: [port++] };
+    const gate = { ...GATE, ports: o.ports ?? GATE.ports };
     const tokensSeen = [];
-    const promise = runGate({ fetchImpl, gate, isFree: async () => true, log: (l) => logs.push(l), announce: (u) => announced(u), timeoutMs: o.timeoutMs ?? 5_000,
+    const promise = runGate({ fetchImpl, gate, isFree: o.isFree ?? realFree, log: (l) => logs.push(l), announce: (u) => announced(u), timeoutMs: o.timeoutMs ?? 5_000,
       callListBehaviors: async (t) => { tokensSeen.push(t); if (o.mcpThrows) throw new Error('boom'); return o.result ?? A; } });
-    return { promise, ready, seen, logs, tokensSeen, gate };
+    return { promise, ready, seen, logs, tokensSeen, gate, tokenGate };
   };
   const get = (p, path, host) => new Promise((resolve, reject) => {
     const req = request({ host: '127.0.0.1', port: p, path, headers: { host: host ?? `127.0.0.1:${p}` } }, (res) => { let b = ''; res.on('data', (c) => { b += c; }); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: b })); });
@@ -221,6 +275,7 @@ describe('Ticket 232 activation gate', () => {
     const h = harness();
     const { p, url } = await authorize(h);
     expect(`${url.origin}${url.pathname}`).toBe(`${GATE.origin}/oauth/authorize`);
+    expect(GATE.ports).toContain(p);
     expect(Object.fromEntries(url.searchParams)).toMatchObject({ response_type: 'code', client_id: 'client-gate', redirect_uri: `http://127.0.0.1:${p}/callback`, scope: 'cadence.read', code_challenge_method: 'S256', resource: GATE.resource });
     expect((await get(p, '/', 'evil.example')).status).toBe(421);
     const cb = await get(p, `/callback?code=c1&state=${url.searchParams.get('state')}`);
@@ -240,7 +295,7 @@ describe('Ticket 232 activation gate', () => {
   });
 
   it('fails closed on state mismatch, token failure, cross-account data or an MCP error', async () => {
-    for (const [o, badState, reason] of [[{}, true, 'callback'], [{ tokenFail: true }, false, 'token-exchange'], [{ result: { structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: GATE.bBehaviors[1] }] } } }, false, 'cross-account-data'], [{ mcpThrows: true }, false, 'mcp-call-failed']]) {
+    for (const [o, badState, reason] of [[{}, true, 'callback'], [{ tokenFail: true }, false, 'token-exchange'], [{ result: { structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: GATE.bBehaviors[1] }] } } }, false, 'cross-account-data'], [{ result: { structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: '00000000-0000-4000-8000-000000000000' }] } } }, false, 'unknown-data'], [{ mcpThrows: true }, false, 'mcp-call-failed']]) {
       const h = harness(o);
       const { p, url } = await authorize(h);
       const cb = await get(p, `/callback?code=c1&state=${badState ? 'forged' : url.searchParams.get('state')}`);
@@ -260,5 +315,36 @@ describe('Ticket 232 activation gate', () => {
   it('times out without a callback', async () => {
     const h = harness({ timeoutMs: 50 });
     expect(await h.promise).toMatchObject({ result: 'failed', reason: 'timeout' });
+  });
+
+  it('stops all work at the deadline, even with a token exchange in flight', async () => {
+    const h = harness({ holdToken: true, timeoutMs: 400 });
+    const { p, url } = await authorize(h);
+    const pending = get(p, `/callback?code=c1&state=${url.searchParams.get('state')}`).catch(() => null);
+    const result = await h.promise;
+    expect(result).toMatchObject({ result: 'failed', reason: 'timeout', clientId: 'client-gate' });
+    h.tokenGate.release();
+    await pending;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(h.tokenGate.signal.aborted).toBe(true);
+    expect(h.tokensSeen).toEqual([]);
+    expect(h.logs).not.toContain('gate-passed');
+    expect(h.logs).toContain('gate-timeout');
+  });
+
+  it('binds before registering and skips a port that is taken', async () => {
+    const blocker = createServer();
+    const taken = await new Promise((resolve) => { const tryPort = (i) => { blocker.once('error', () => tryPort(i + 1)); blocker.listen(GATE.ports[i], '127.0.0.1', () => resolve(GATE.ports[i])); }; tryPort(9); });
+    try {
+      const only = harness({ ports: [taken], isFree: async () => true });
+      expect(await only.promise).toMatchObject({ result: 'failed', reason: 'no-free-port', clientId: null });
+      expect(only.seen.some((x) => x.url.endsWith('/oauth/register'))).toBe(false);
+      const free = GATE.ports.slice(0, 9).reverse();
+      let next = null;
+      for (const candidate of free) if (await realFree(candidate)) { next = candidate; break; }
+      const skip = harness({ ports: [taken, next], isFree: async () => true, regFail: true });
+      expect(await skip.promise).toMatchObject({ result: 'failed', reason: 'registration', port: next });
+      expect(skip.seen.filter((x) => x.url.endsWith('/oauth/register'))).toHaveLength(1);
+    } finally { blocker.close(); }
   });
 });

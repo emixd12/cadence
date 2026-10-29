@@ -106,17 +106,21 @@ export async function runActivation({ mode, api, publicFetch, sleep, save, recei
     if (receiptExists()) return { result: 'stopped', reason: 'receipt-exists-reconcile-first' };
     const t0 = now();
 
-    // 1. Preconditions.
-    const binding = await readEnv('binding-read', config.bindingEnv);
-    if (binding !== config.frozenMarketing) throw new Stop('marketing-binding-mismatch');
+    // 1. Preconditions. Rollback is the safety disable: it needs only the exact flag
+    // record and the frozen deployment; everything else is recorded, not required.
+    const enable = mode === 'enable';
+    let binding = 'unknown';
+    try { binding = await readEnv('binding-read', config.bindingEnv); } catch (error) { if (enable) throw error; }
+    if (enable && binding !== config.frozenMarketing) throw new Stop('marketing-binding-mismatch');
     const current = await readEnv('mcp-env-read', config.mcpEnv);
     if (current !== 'true' && current !== 'false') throw new Stop('mcp-env-value-unexpected');
     const base = await deployment('frozen-deployment-read', config.frozenWeb);
     if (base.readyState !== 'READY' || base.name !== 'cadence') throw new Stop('frozen-deployment-not-ready');
-    const live = await aliasTarget('alias-read');
-    if (mode === 'enable' && (current !== 'false' || live !== config.frozenWeb)) throw new Stop('enable-precondition');
+    let live = 'unknown';
+    try { live = await aliasTarget('alias-read'); } catch (error) { if (enable) throw error; }
+    if (enable && (current !== 'false' || live !== config.frozenWeb)) throw new Stop('enable-precondition');
     const mcpBefore = await endpoint('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-    if (mode === 'enable' && mcpBefore.status !== 503) throw new Stop('mcp-not-disabled-before-enable');
+    if (enable && mcpBefore.status !== 503) throw new Stop('mcp-not-disabled-before-enable');
     step('preconditions', { marketingBinding: binding, mcpEnv: current, liveAlias: live, frozenWeb: config.frozenWeb, mcpStatus: mcpBefore.status });
 
     // 2. Set the flag: one PATCH attempt, then an exact decrypted readback.
@@ -167,10 +171,12 @@ export async function runActivation({ mode, api, publicFetch, sleep, save, recei
     if (d.readyState !== 'READY') throw new Stop('deployment-readback-not-ready');
     const aliasNow = await aliasTarget('alias-readback');
     if (aliasNow !== newId) throw new Stop('alias-not-on-new-deployment');
-    const others = await productionSince('production-list', t0 - 60_000);
-    if (others.some((x) => x.id !== newId)) throw new Stop('other-production-deployment');
-    const bindingAfter = await readEnv('binding-readback', config.bindingEnv);
-    if (bindingAfter !== config.frozenMarketing) throw new Stop('marketing-binding-changed');
+    let others = 'unknown';
+    try { others = await productionSince('production-list', t0 - 60_000); } catch (error) { if (enable) throw error; }
+    if (enable && others.some((x) => x.id !== newId)) throw new Stop('other-production-deployment');
+    let bindingAfter = 'unknown';
+    try { bindingAfter = await readEnv('binding-readback', config.bindingEnv); } catch (error) { if (enable) throw error; }
+    if (enable && bindingAfter !== config.frozenMarketing) throw new Stop('marketing-binding-changed');
     const mcp = await endpoint('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     const discovery = await endpoint('/.well-known/oauth-authorization-server');
     const resource = await endpoint('/.well-known/oauth-protected-resource/mcp');
@@ -178,7 +184,7 @@ export async function runActivation({ mode, api, publicFetch, sleep, save, recei
       && mcp.challenge.includes(`resource_metadata="${config.origin}/.well-known/oauth-protected-resource/mcp"`)
       && discovery.status === 200 && discovery.json?.issuer === config.origin
       && resource.status === 200 && resource.json?.resource === `${config.origin}/mcp`;
-    step('readbacks', { deploymentId: newId, source: d.gitSource.sha, alias: aliasNow, marketingBinding: bindingAfter, mcpStatus: mcp.status, challengeHasResourceMetadata: mcp.challenge.includes('resource_metadata='), discoveryStatus: discovery.status, issuer: discovery.json?.issuer ?? null, resourceStatus: resource.status, resource: resource.json?.resource ?? null });
+    step('readbacks', { deploymentId: newId, source: d.gitSource.sha, alias: aliasNow, marketingBinding: bindingAfter, otherProductionDeployments: Array.isArray(others) ? others.filter((x) => x.id !== newId).map((x) => x.id) : 'unknown', mcpStatus: mcp.status, challengeHasResourceMetadata: mcp.challenge.includes('resource_metadata='), discoveryStatus: discovery.status, issuer: discovery.json?.issuer ?? null, resourceStatus: resource.status, resource: resource.json?.resource ?? null });
     if (mode === 'enable' && !enabledOk) throw new Stop('enabled-endpoint-mismatch');
     if (mode === 'rollback' && mcp.status !== 503) throw new Stop('disabled-endpoint-mismatch');
     step('complete', { deploymentId: newId });
