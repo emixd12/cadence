@@ -383,6 +383,12 @@ refresh separately. Never adopt a pre-existing Behavior or an unattributable
 row; refuse on missing lineage or an exhausted row bound. The archive transaction
 still enforces exact closure and preserves categories, Occurrences and history.
 
+Before resume writes, `assertPartialGraph` also pins the 30 generated rows
+from the retained October28 capture by ID, owner, Behavior, creation time, date
+and status. Existing schedule/content checks still apply. Missing or replaced
+rows stop the run even when the total count is unchanged; only then can new
+validated descendants join the manifest. Preserve the retained capture.
+
 Use `graphReceipt` on the approved captured graph to retain per-row hashes,
 not note text. `refreshGraphReceipt` requires every captured row/hash to remain
 unchanged, and accepts only new Occurrences. It validates user/Behavior lineage,

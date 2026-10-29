@@ -54,7 +54,7 @@ it.skipIf(!enabled)('rehearses resumed fixtures, session refresh, isolation, des
       sessions.push({ userId: id, accessToken: session.access_token });
       take(await client.from('profiles').update({ timezone: 'America/New_York' }).eq('id', id));
     }
-    const graph = partialGraph(fixed); addGeneratedOccurrences(graph);
+    const graph = partialGraph(fixed); addGeneratedOccurrences(graph, fixed);
     graph.occurrence_status_events[0].local_date = '2026-10-25';
     graph.behavior_definition_events[0].recorded_at = graph.behaviors[0].created_at;
     Object.assign(graph.behavior_configuration_events[0], { recorded_at: graph.behaviors[0].created_at, effective_at: graph.behaviors[0].created_at,
@@ -87,6 +87,18 @@ it.skipIf(!enabled)('rehearses resumed fixtures, session refresh, isolation, des
     const checkGraph = {};
     for (const table of TABLES) checkGraph[table] = take(await clients[0].from(table).select('*').eq('user_id', USERS[0]).eq(table === 'categories' || table === 'behaviors' ? 'id' : 'behavior_id', table === 'categories' ? CATEGORY.id : fixed.PARTIAL_IDS.a.walk));
     fixed.assertPartialGraph(checkGraph);
+    const captured = graph.occurrences.find(o => o.id === fixed.KNOWN_GENERATED_ROWS.at(-1).id);
+    const replacementId = randomUUID();
+    sql(`delete from public.occurrences where id='${captured.id}';`);
+    const deleted = await fixed.runFixtures(input, { directory, fetcher });
+    expect(deleted).toMatchObject({ result: 'stopped', stage: 'session-and-fixture-preflight' });
+    expect(writes).toHaveLength(0);
+    insert('occurrences', { ...captured, id: replacementId });
+    const replaced = await fixed.runFixtures(input, { directory, fetcher });
+    expect(replaced).toMatchObject({ result: 'stopped', stage: 'session-and-fixture-preflight' });
+    expect(writes).toHaveLength(0);
+    sql(`delete from public.occurrences where id='${replacementId}';`);
+    insert('occurrences', captured);
     const green = await fixed.runFixtures(input, { directory, fetcher });
     expect(green).toMatchObject({ result: 'fixtures-created' }); expect(green.D).toBe(executionDate);
     expect(green.counts).toMatchObject({ categories: 2, behaviors: 6, occurrence_status_events: 4, occurrence_time_sessions: 2 });
@@ -165,7 +177,7 @@ it.skipIf(!enabled)('rehearses resumed fixtures, session refresh, isolation, des
     expect(sql(`select stale from public.occurrence_sync_state where user_id='${USERS[0]}';`)).toBe('t');
     for (const [i,n] of ['execution','fixture-ids','creation-receipts'].entries()) expect(readFileSync(join(directory,`${n}.json`),'utf8')).toBe(originalBytes[i]);
     expect(await fixed.runFixtures(input, { directory, fetcher })).toMatchObject({ result: 'stopped', stage: 'input', requests: 0 });
-    if (process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT) writeFileSync(process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT, JSON.stringify({ timestamp: new Date().toISOString(), node: process.versions.node, source: FIXTURE_SOURCE, migrations: 94, cli: '2.109.1', executionDate, seed: { originalOccurrences: 8, appGenerated: 30 }, fixtures: green, refreshes, isolation, manifestRefresh: { appGenerated: 1, counts: manifest.counts }, archive: { activeArchived: 4, alreadyArchived: 2, allRowsRetained: true, preservedBehaviors: 3, preservedOccurrences: 96, syncStateRetained: true }, rollback: true, originalBytesPreserved: true, bundleSha256: build.bundleSha256 }, null, 2) + '\n');
+    if (process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT) writeFileSync(process.env.CADENCE_LOCAL_REHEARSAL_RECEIPT, JSON.stringify({ timestamp: new Date().toISOString(), node: process.versions.node, source: FIXTURE_SOURCE, migrations: 94, cli: '2.109.1', executionDate, seed: { originalOccurrences: 8, appGenerated: 30 }, capturedRowGuards: { deletionRefused: true, replacementRefused: true, writesBeforeRefusal: 0 }, fixtures: green, refreshes, isolation, manifestRefresh: { appGenerated: 1, counts: manifest.counts }, archive: { activeArchived: 4, alreadyArchived: 2, allRowsRetained: true, preservedBehaviors: 3, preservedOccurrences: 96, syncStateRetained: true }, rollback: true, originalBytesPreserved: true, bundleSha256: build.bundleSha256 }, null, 2) + '\n');
   } finally {
     for (const id of users) take(await admin.deleteUser(id));
     rmSync(root, { recursive: true, force: true });

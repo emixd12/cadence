@@ -21,10 +21,10 @@ beforeAll(async () => {
 });
 afterAll(() => rmSync(buildRoot, { recursive: true, force: true }));
 
-async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, changeGraph, now = "2026-10-28T19:25:00Z" } = {}) {
+async function attempt({ mode = "resume", changeCategory, changeFiles, changeInput, bCategory = false, behavior = false, changeGraph, now = "2026-10-28T21:25:00Z" } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "fixture-resume-test-"));
   const files = { "execution": RUN, "fixture-ids": { a: { category: CATEGORY.id } }, "creation-receipts": [{ path: "/rest/v1/categories", ...CATEGORY }], "resume-started": bundle.PRIOR_RESUME, "resume-fixture-ids": bundle.PARTIAL_IDS };
-  const graph = partialGraph(bundle); changeGraph?.(graph);
+  const graph = partialGraph(bundle); addGeneratedOccurrences(graph, bundle); changeGraph?.(graph);
   const category = { ...CATEGORY, name: "Review examples", updated_at: CATEGORY.created_at };
   changeCategory?.(category);
   const input = { mode, executionDate: "2026-10-28", allowHostedProject: "qjodzutjxtmtzczbloxa", publishableKey: "sb_publishable_OFFLINE",
@@ -57,7 +57,7 @@ async function attempt({ mode = "resume", changeCategory, changeFiles, changeInp
     const persisted = Object.fromEntries(Object.keys(files).map(name => [name, JSON.parse(readFileSync(join(directory, `${name}.json`)))]));
     const bytesUnchanged = Object.keys(files).every(name => readFileSync(join(directory, `${name}.json`), "utf8") === originalBytes[name]);
     const resumeReceipt = existsSync(join(directory, "completion-started.json")) ? JSON.parse(readFileSync(join(directory, "completion-started.json"))) : null;
-    const second = mode === "resume" && writes.length ? await runFixtures(input, { directory, fetcher, now: new Date("2026-10-28T19:25:01Z") }) : null;
+    const second = mode === "resume" && writes.length ? await runFixtures(input, { directory, fetcher, now: new Date("2026-10-28T21:25:01Z") }) : null;
     return { result, calls, writes, persisted, second, bytesUnchanged, resumeReceipt };
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
@@ -83,7 +83,7 @@ it("reuses the exact partial graph and submits only the remaining status through
   expect(JSON.stringify(result)).not.toContain("SECRET_PROVIDER_ERROR");
   expect(persisted.execution).toEqual(RUN);
   expect(bytesUnchanged).toBe(true);
-  expect(resumeReceipt).toEqual({ initialD: "2026-10-27", D: "2026-10-28", actualNewYorkDate: "2026-10-28", captureDeadline: bundle.CAPTURE_DEADLINE, resumedAt: "2026-10-28T19:25:00.000Z", runId: RUN.runId, source: FIXTURE_SOURCE, priorResume: bundle.PRIOR_RESUME.resumedAt });
+  expect(resumeReceipt).toEqual({ initialD: "2026-10-27", D: "2026-10-28", actualNewYorkDate: "2026-10-28", captureDeadline: bundle.CAPTURE_DEADLINE, resumedAt: "2026-10-28T21:25:00.000Z", runId: RUN.runId, source: FIXTURE_SOURCE, priorResume: bundle.PRIOR_RESUME.resumedAt });
   expect(second).toMatchObject({ result: "stopped", stage: "input", requests: 0 });
 });
 it("preflight has no writes", async () => {
@@ -143,7 +143,7 @@ it.each([
 });
 
 it("accepts the explicit current date and 30 generated rows without changing the original status targets", async () => {
-  const r = await attempt({ now: "2026-10-29T14:00:00Z", changeInput: i => { i.executionDate = "2026-10-29"; }, changeGraph: addGeneratedOccurrences });
+  const r = await attempt({ now: "2026-10-29T14:00:00Z", changeInput: i => { i.executionDate = "2026-10-29"; } });
   expect(r.writes).toHaveLength(1);
   expect(r.writes[0].payload.target_occurrence_id).toBe("8b4d5d5e-d13b-4ab3-bbe4-66b86f337e7d");
   expect(r.resumeReceipt).toMatchObject({ initialD: "2026-10-27", D: "2026-10-29", actualNewYorkDate: "2026-10-29" });
@@ -169,13 +169,13 @@ it.each([
   g => { g.occurrences.at(-1).created_at = "2026-10-28T01:00:00Z"; },
   g => { g.occurrences.push({ ...g.occurrences.at(-1), id: USERS[0] }); },
 ])("refuses unsafe generated descendants before writes", async mutate => {
-  const r = await attempt({ now: "2026-10-29T14:00:00Z", changeInput: i => { i.executionDate = "2026-10-29"; }, changeGraph: g => { addGeneratedOccurrences(g); mutate(g); } });
+  const r = await attempt({ now: "2026-10-29T14:00:00Z", changeInput: i => { i.executionDate = "2026-10-29"; }, changeGraph: g => { mutate(g); } });
   expect(r.result).toMatchObject({ result: "stopped", stage: "session-and-fixture-preflight" }); expect(r.writes).toHaveLength(0);
 });
 it("refreshes only unchanged captured rows plus attributed generated Occurrences; retains no text", () => {
   const graph = partialGraph(bundle);
   const previous = bundle.graphReceipt(graph, "2026-10-28T18:12:00Z");
-  addGeneratedOccurrences(graph);
+  addGeneratedOccurrences(graph, bundle);
   const next = bundle.refreshGraphReceipt(previous, graph, new Date("2026-10-29T14:00:00Z"));
   expect(next.appGenerated).toHaveLength(30);
   expect(next.appGenerated.every(r => r.provenance === "app-generated")).toBe(true);
@@ -186,4 +186,22 @@ it("refreshes only unchanged captured rows plus attributed generated Occurrences
     const copy = structuredClone(graph); mutate(copy);
     expect(() => bundle.refreshGraphReceipt(previous, copy, new Date("2026-10-29T14:00:00Z"))).toThrow();
   }
+});
+
+it.each([
+  g => { g.occurrences = g.occurrences.filter(o => o.id !== bundle.KNOWN_GENERATED_ROWS.at(-1).id); },
+  g => { g.occurrences.find(o => o.id === bundle.KNOWN_GENERATED_ROWS.at(-1).id).id = USERS[1]; },
+  g => { g.occurrences.find(o => o.id === bundle.KNOWN_GENERATED_ROWS.at(-1).id).created_at = '2026-10-28T21:00:00Z'; },
+  g => { g.occurrences.find(o => o.id === bundle.KNOWN_GENERATED_ROWS.at(-1).id).local_date = '2026-11-28'; },
+])('refuses deletion, replacement or metadata edits of already captured generated rows before writes', async changeGraph => {
+  const r = await attempt({ now: '2026-10-29T14:00:00Z', changeInput: i => { i.executionDate = '2026-10-29'; }, changeGraph });
+  expect(r.result).toMatchObject({ result: 'stopped', stage: 'session-and-fixture-preflight' });
+  expect(r.writes).toHaveLength(0);
+});
+it('accepts the unchanged38 and a genuinely new valid descendant', async () => {
+  const r = await attempt({ mode: 'preflight', now: '2026-10-29T14:00:00Z', changeInput: i => { i.executionDate = '2026-10-29'; }, changeGraph: g => {
+    g.occurrences.push({ ...g.occurrences.at(-1), id: USERS[1], local_date: '2026-11-28', scheduled_for: '2026-11-28T14:00:00Z',
+      created_at: '2026-10-29T13:00:00Z', updated_at: '2026-10-29T13:00:00Z' });
+  } });
+  expect(r.result.result).toBe('preflight-passed'); expect(r.writes).toHaveLength(0);
 });

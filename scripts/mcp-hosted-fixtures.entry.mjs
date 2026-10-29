@@ -15,6 +15,41 @@ const SOURCE = 'eb5afa5be5c49b43bbad3ffd5a25d6eddff30079';
 const CATEGORY = { id: 'a29dd2d0-5425-4180-a29a-01a026ebb8c0', user_id: USERS[0], created_at: '2026-10-28T02:17:19.262435+00:00' };
 const RUN = { runId: '4db9fe6e-a966-4cca-938b-aee5a1b955b7', startedAt: '2026-10-28T02:17:18.882Z', D: '2026-10-27', users: USERS, source: SOURCE };
 export const CAPTURE_DEADLINE = '2026-11-04T02:17:18.882Z';
+// Known generated rows from the retained October28 read-only capture; never replace that baseline.
+export const KNOWN_GENERATED_ROWS = [
+  ["471a3766-b585-462e-9e7a-2f4778913eac", "2026-10-29"],
+  ["89008faa-6cb8-4c14-9655-293ead8d081f", "2026-10-30"],
+  ["4569f59a-09ad-430b-8573-64d8806dd10d", "2026-10-31"],
+  ["fc6fb2a1-3672-4b03-a6a5-cdb683f557a5", "2026-11-01"],
+  ["bbec4fd8-fa76-4479-99c2-20015a1e4348", "2026-11-02"],
+  ["f61f1a74-c5a2-4d16-8e14-5b73620fe6de", "2026-11-03"],
+  ["72d96666-9193-4382-bb0f-d59356eaf96e", "2026-11-04"],
+  ["df4de220-d449-49f0-a463-3ed9c13f3bd7", "2026-11-05"],
+  ["415bb46b-2203-4eae-babc-db7af3edd4c4", "2026-11-06"],
+  ["e47299ea-77ce-440e-8233-077718a43e28", "2026-11-07"],
+  ["7e0672c5-c5ca-4809-ab4b-772817d4ed36", "2026-11-08"],
+  ["4f675232-6811-485e-b6fb-a2eaa7a4931f", "2026-11-09"],
+  ["153a8bcb-26e6-4211-8c51-018df96d3248", "2026-11-10"],
+  ["5e26bfa0-4211-4528-820b-9eccbf9c21a7", "2026-11-11"],
+  ["ef157ff3-e1d5-410a-bc09-cedeb9649e7a", "2026-11-12"],
+  ["07e03c28-42d0-40c8-80a2-55a3977246e7", "2026-11-13"],
+  ["31d3518b-bfb6-4d54-9265-a6585d5f281c", "2026-11-14"],
+  ["ad9a52cb-fc86-4f02-ae50-e41bdcd7d26e", "2026-11-15"],
+  ["86bb23fa-aab8-4849-9740-d76820cb1746", "2026-11-16"],
+  ["b0c065e6-a57e-4d9d-9d0c-4711946ecfc9", "2026-11-17"],
+  ["87b9dc84-0f28-4779-a837-b92820c4220e", "2026-11-18"],
+  ["c56e14a2-e00d-4ddb-8f22-387e13d4ed55", "2026-11-19"],
+  ["0395ad41-fe7c-4ac4-bac6-eb1336910617", "2026-11-20"],
+  ["8afb755f-1bee-4cd3-adf9-a951c955c5b5", "2026-11-21"],
+  ["fa098cff-e6aa-4989-9b6c-f5cf34dd77b3", "2026-11-22"],
+  ["ecc837f0-2c84-49b3-be91-d2095478215e", "2026-11-23"],
+  ["de97963e-161e-4078-a9ba-ed0f9b8a5277", "2026-11-24"],
+  ["0084bea8-dcc3-4fe4-adaa-89e2748b275e", "2026-11-25"],
+  ["38642cfc-28ef-4ddb-a117-30d6c7025cbf", "2026-11-26"],
+  ["31a40d63-ecec-4423-ac58-3ad8f38ecbe6", "2026-11-27"],
+].map(([id, local_date]) => ({ id, local_date, user_id: USERS[0],
+  behavior_id: 'b2c5b6b1-457a-4e58-a14f-e4270c3d341e',
+  created_at: '2026-10-28T20:42:34.81168+00:00', status: 'unresolved' }));
 export const PARTIAL_IDS = {
   "a": {
     "category": "a29dd2d0-5425-4180-a29a-01a026ebb8c0",
@@ -337,6 +372,11 @@ async function readPartial(client, take) {
 export function assertPartialGraph(graph, now = new Date()) {
     const captured = new Set(PARTIAL_ROWS.filter(r => r.table === 'occurrences').map(r => r.id));
     const generated = graph.occurrences.filter(r => !captured.has(r.id));
+    for (const expected of KNOWN_GENERATED_ROWS) {
+        const actual = generated.find(row => row.id === expected.id);
+        assert(actual && ['id', 'user_id', 'behavior_id', 'local_date', 'status'].every(field => actual[field] === expected[field])
+            && Temporal.Instant.compare(actual.created_at, expected.created_at) === 0, 'captured-generated-mismatch');
+    }
     assertGeneratedOccurrences(generated, graph, PRIOR_RESUME.resumedAt, now);
     graph = { ...graph, occurrences: graph.occurrences.filter(r => captured.has(r.id)) };
     const order = rows => [...rows].sort((a, b) => a.id.localeCompare(b.id));
