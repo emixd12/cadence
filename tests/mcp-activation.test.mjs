@@ -1,0 +1,264 @@
+import { describe, expect, it } from 'vitest';
+import { request } from 'node:http';
+import { createHash } from 'node:crypto';
+import { runActivation, createVercelApi, ACTIVATION } from '../scripts/mcp-activation.mjs';
+import { runGate, judgeBehaviors, GATE } from '../scripts/mcp-activation-gate.mjs';
+
+const NEW = 'dpl_NewActivation123';
+const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+function world(o = {}) {
+  const calls = [], saves = [], logs = [];
+  let mcpValue = o.mcpValue ?? 'false', binding = o.binding ?? ACTIVATION.frozenMarketing, alias = o.alias ?? ACTIVATION.frozenWeb;
+  let created = false, polls = 0, clock = 1_800_000_000_000;
+  const env = (id, key, value) => ({ id, key, type: 'encrypted', target: ['production'], value });
+  const api = async (method, path, body) => {
+    calls.push({ method, path, body });
+    if (method === 'GET' && path.startsWith(`/v1/projects/${ACTIVATION.web}/env/${ACTIVATION.bindingEnv.id}`)) return { kind: 'ok', json: env(ACTIVATION.bindingEnv.id, ACTIVATION.bindingEnv.key, binding) };
+    if (method === 'GET' && path.startsWith(`/v1/projects/${ACTIVATION.web}/env/${ACTIVATION.mcpEnv.id}`)) return { kind: 'ok', json: env(ACTIVATION.mcpEnv.id, ACTIVATION.mcpEnv.key, o.readbackValue && calls.filter((c) => c.method === 'PATCH').length ? o.readbackValue : mcpValue) };
+    if (method === 'GET' && path === `/v13/deployments/${ACTIVATION.frozenWeb}`) return { kind: 'ok', json: { id: ACTIVATION.frozenWeb, name: 'cadence', projectId: ACTIVATION.web, target: 'production', readyState: 'READY', gitSource: { sha: ACTIVATION.source } } };
+    if (method === 'GET' && path === `/v13/deployments/${NEW}`) {
+      polls += 1;
+      const state = o.finalState && polls >= 2 ? o.finalState : polls >= 2 ? 'READY' : 'BUILDING';
+      return { kind: 'ok', json: { id: NEW, name: 'cadence', projectId: ACTIVATION.web, target: 'production', readyState: o.neverReady ? 'BUILDING' : state, gitSource: { sha: o.newSha ?? ACTIVATION.source } } };
+    }
+    if (method === 'GET' && path === `/v4/aliases/${ACTIVATION.alias}`) return { kind: 'ok', json: { alias: ACTIVATION.alias, projectId: ACTIVATION.web, deploymentId: created && !o.aliasStuck ? NEW : alias } };
+    if (method === 'GET' && path.startsWith('/v6/deployments')) return { kind: 'ok', json: { deployments: [...(created ? [{ uid: NEW, readyState: 'READY', created: clock }] : []), ...(o.otherDeploy ? [{ uid: 'dpl_Other', readyState: 'READY', created: clock }] : [])] } };
+    if (method === 'PATCH') {
+      if (o.patchKind && o.patchKind !== 'ok') return { kind: o.patchKind };
+      mcpValue = body.value;
+      return { kind: 'ok', json: { id: ACTIVATION.mcpEnv.id, key: ACTIVATION.mcpEnv.key } };
+    }
+    if (method === 'POST') {
+      if (o.postKind && o.postKind !== 'ok') return { kind: o.postKind };
+      created = true;
+      if (o.bindingChangesOnDeploy) binding = 'dpl_Changed';
+      return { kind: 'ok', json: { id: NEW, projectId: o.postProject ?? ACTIVATION.web } };
+    }
+    return { kind: 'failed' };
+  };
+  const publicFetch = async (url, init = {}) => {
+    calls.push({ method: init.method ?? 'GET', public: url });
+    const enabled = created && mcpValue === 'true' && !o.endpointStillDisabled;
+    if (url.endsWith('/.well-known/oauth-protected-resource/mcp')) return enabled ? json(200, { resource: `${ACTIVATION.origin}/mcp` }) : json(503, {});
+    if (url.endsWith('/mcp')) return enabled ? new Response('{}', { status: 401, headers: { 'content-type': 'application/json', 'www-authenticate': `Bearer resource_metadata="${ACTIVATION.origin}/.well-known/oauth-protected-resource/mcp", error="invalid_token"` } }) : new Response('{}', { status: o.mcpBefore ?? 503, headers: { 'content-type': 'application/json' } });
+    if (url.endsWith('/.well-known/oauth-authorization-server')) return enabled ? json(200, { issuer: ACTIVATION.origin }) : json(503, {});
+    return json(404, {});
+  };
+  const deps = {
+    mode: o.mode ?? 'enable', api, publicFetch, save: (r) => saves.push(JSON.stringify(r)), receiptExists: () => Boolean(o.receiptExists),
+    sleep: async (ms) => { clock += ms; }, now: () => clock, log: (l) => logs.push(l), pollMs: 15_000, readyDeadlineMs: o.deadline ?? 600_000,
+  };
+  return { calls, saves, logs, deps, writes: () => calls.filter((c) => c.method === 'PATCH' || (c.method === 'POST' && !c.public)) };
+}
+
+describe('Ticket 232 activation', () => {
+  it('enables with one PATCH and one redeploy, then reads everything back', async () => {
+    const w = world();
+    expect(await runActivation(w.deps)).toEqual({ result: 'complete', mode: 'enable', deploymentId: NEW });
+    const writes = w.writes();
+    expect(writes.map((c) => [c.method, c.path])).toEqual([['PATCH', `/v9/projects/${ACTIVATION.web}/env/${ACTIVATION.mcpEnv.id}`], ['POST', '/v13/deployments?forceNew=1']]);
+    expect(writes[0].body).toEqual({ value: 'true' });
+    expect(writes[1].body).toEqual({ deploymentId: ACTIVATION.frozenWeb, meta: { action: 'redeploy' }, name: 'cadence', target: 'production' });
+    const steps = JSON.parse(w.saves.at(-1)).steps.map((s) => s.name);
+    expect(steps).toEqual(['preconditions', 'mcp-env-set', 'redeploy-created', 'ready-wait', 'readbacks', 'complete']);
+    expect(JSON.parse(w.saves.at(-1)).steps.find((s) => s.name === 'readbacks')).toMatchObject({ mcpStatus: 401, challengeHasResourceMetadata: true, issuer: ACTIVATION.origin, alias: NEW, marketingBinding: ACTIVATION.frozenMarketing });
+  });
+
+  it('rolls back with value false and requires a disabled endpoint', async () => {
+    const w = world({ mode: 'rollback', mcpValue: 'true', alias: NEW });
+    expect(await runActivation(w.deps)).toEqual({ result: 'complete', mode: 'rollback', deploymentId: NEW });
+    expect(w.writes()[0].body).toEqual({ value: 'false' });
+  });
+
+  const preStops = [
+    ['an existing receipt', { receiptExists: true }, 'receipt-exists-reconcile-first'],
+    ['a different marketing binding', { binding: 'dpl_Wrong' }, 'marketing-binding-mismatch'],
+    ['MCP already enabled', { mcpValue: 'true' }, 'enable-precondition'],
+    ['an unexpected flag value', { mcpValue: 'yes' }, 'mcp-env-value-unexpected'],
+    ['the live alias off the frozen deployment', { alias: 'dpl_Elsewhere' }, 'enable-precondition'],
+    ['MCP answering before enable', { mcpBefore: 401 }, 'mcp-not-disabled-before-enable'],
+  ];
+  for (const [label, o, reason] of preStops) {
+    it(`stops before any write on ${label}`, async () => {
+      const w = world(o);
+      expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason });
+      expect(w.writes()).toHaveLength(0);
+    });
+  }
+
+  it('reconciles a rejected or ambiguous flag write read-only and never redeploys or repeats it', async () => {
+    for (const [patchKind, reason] of [['rejected', 'mcp-env-rejected'], ['ambiguous', 'mcp-env-ambiguous-reconcile']]) {
+      const w = world({ patchKind });
+      expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason });
+      expect(w.writes().map((c) => c.method)).toEqual(['PATCH']);
+      expect(JSON.parse(w.saves.at(-1)).steps.find((s) => s.name === 'mcp-env-reconcile')).toMatchObject({ outcome: patchKind, observedValue: 'false' });
+    }
+  });
+
+  it('stops without redeploying when the flag readback differs', async () => {
+    const w = world({ readbackValue: 'false' });
+    expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason: 'mcp-env-readback-mismatch' });
+    expect(w.writes().map((c) => c.method)).toEqual(['PATCH']);
+  });
+
+  it('reconciles a rejected, ambiguous or unproven redeploy by listing and never re-posts', async () => {
+    for (const [o, reason] of [[{ postKind: 'rejected' }, 'redeploy-rejected'], [{ postKind: 'ambiguous' }, 'redeploy-ambiguous-reconcile'], [{ postProject: 'prj_other' }, 'redeploy-ambiguous-reconcile']]) {
+      const w = world(o);
+      expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason });
+      expect(w.writes().map((c) => c.method)).toEqual(['PATCH', 'POST']);
+      expect(JSON.parse(w.saves.at(-1)).steps.some((s) => s.name === 'redeploy-reconcile')).toBe(true);
+    }
+  });
+
+  it('stops on a failed or slow build', async () => {
+    for (const [o, reason] of [[{ finalState: 'ERROR' }, 'deployment-failed'], [{ neverReady: true, deadline: 60_000 }, 'deployment-not-ready-in-time']]) {
+      const w = world(o);
+      expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason });
+    }
+  });
+
+  it('stops when readbacks disagree', async () => {
+    for (const [o, reason] of [
+      [{ aliasStuck: true }, 'alias-not-on-new-deployment'], [{ otherDeploy: true }, 'other-production-deployment'],
+      [{ bindingChangesOnDeploy: true }, 'marketing-binding-changed'], [{ endpointStillDisabled: true }, 'enabled-endpoint-mismatch'],
+      [{ newSha: 'f'.repeat(40) }, 'deployment-readback-mismatch'],
+    ]) {
+      const w = world(o);
+      expect(await runActivation(w.deps)).toEqual({ result: 'stopped', reason });
+      expect(w.writes().map((c) => c.method)).toEqual(['PATCH', 'POST']);
+    }
+  });
+
+  it('maps adapter exceptions to a phase code', async () => {
+    const w = world();
+    w.deps.api = async () => { throw new Error('secret-detail'); };
+    const r = await runActivation(w.deps);
+    expect(r.result).toBe('stopped');
+    expect(r.reason).toMatch(/internal-error$/);
+    expect(JSON.stringify(w.saves)).not.toContain('secret-detail');
+  });
+});
+
+describe('Ticket 232 one-attempt Vercel API client', () => {
+  const make = (behaviour, token = 'tok') => {
+    const seen = [];
+    const fetchImpl = (url, init) => {
+      seen.push({ url, init });
+      if (behaviour === 'reset') return Promise.reject(new TypeError('fetch failed'));
+      if (behaviour === 'hang') return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+      if (behaviour === '5xx') return Promise.resolve(json(502, {}));
+      if (behaviour === '4xx') return Promise.resolve(json(409, {}));
+      if (behaviour === 'array') return Promise.resolve(json(200, []));
+      if (behaviour === '201') return Promise.resolve(json(201, { id: 'x' }));
+      if (behaviour === 'text') return Promise.resolve(new Response('ok', { status: 200 }));
+      return Promise.resolve(json(200, { id: 'x' }));
+    };
+    return { api: createVercelApi({ fetchImpl, readToken: () => token, teamId: 'team_x', timeoutMs: 30 }), seen };
+  };
+  for (const [behaviour, method, kind] of [
+    ['reset', 'PATCH', 'ambiguous'], ['hang', 'POST', 'ambiguous'], ['5xx', 'POST', 'ambiguous'], ['4xx', 'PATCH', 'rejected'], ['text', 'POST', 'ambiguous'], ['ok', 'PATCH', 'ok'],
+    ['reset', 'GET', 'failed'], ['5xx', 'GET', 'failed'], ['201', 'GET', 'failed'], ['201', 'POST', 'ok'], ['array', 'GET', 'failed'], ['text', 'GET', 'failed'], ['ok', 'GET', 'ok'],
+  ]) {
+    it(`${method} ${behaviour} is one attempt and ${kind}`, async () => {
+      const m = make(behaviour);
+      expect((await m.api(method, '/v9/x?y=1', method === 'GET' ? undefined : { v: 1 })).kind).toBe(kind);
+      expect(m.seen).toHaveLength(1);
+      expect(m.seen[0].url).toBe('https://api.vercel.com/v9/x?y=1&teamId=team_x');
+      expect(m.seen[0].init).toMatchObject({ method, redirect: 'error' });
+      expect(m.seen[0].init.headers.Authorization).toBe('Bearer tok');
+    });
+  }
+  it('makes no call without a credential', async () => {
+    const m = make('ok', '');
+    expect((await m.api('PATCH', '/v9/x', {})).kind).toBe('rejected');
+    expect((await m.api('GET', '/v9/x')).kind).toBe('failed');
+    expect(m.seen).toHaveLength(0);
+  });
+});
+
+describe('Ticket 232 activation gate', () => {
+  const A = { structuredContent: { behaviors: GATE.aBehaviors.map((id) => ({ id })) } };
+  it('judges list_behaviors results', () => {
+    expect(judgeBehaviors(A)).toMatchObject({ pass: true });
+    expect(judgeBehaviors({ structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: GATE.bBehaviors[0] }] } })).toMatchObject({ pass: false, reason: 'cross-account-data' });
+    expect(judgeBehaviors({ structuredContent: { behaviors: [{ id: GATE.aBehaviors[0] }] } })).toMatchObject({ pass: false, reason: 'own-data-missing' });
+    expect(judgeBehaviors({ isError: true, structuredContent: { behaviors: GATE.aBehaviors.map((id) => ({ id })) } })).toMatchObject({ pass: false, reason: 'unreadable-result' });
+    expect(judgeBehaviors({ structuredContent: {} })).toMatchObject({ pass: false, reason: 'unreadable-result' });
+    expect(judgeBehaviors(null)).toMatchObject({ pass: false });
+  });
+
+  let port = 56141;
+  const harness = (o = {}) => {
+    const seen = [], logs = [];
+    let announced;
+    const ready = new Promise((r) => { announced = r; });
+    const fetchImpl = async (url, init = {}) => {
+      seen.push({ url, init });
+      if (url.endsWith('/.well-known/oauth-authorization-server')) return json(200, { issuer: o.issuer ?? GATE.origin, authorization_endpoint: `${GATE.origin}/oauth/authorize`, token_endpoint: `${GATE.origin}/oauth/token`, registration_endpoint: `${GATE.origin}/oauth/register` });
+      if (url.endsWith('/oauth/register')) return o.regFail ? json(400, {}) : json(201, { client_id: 'client-gate' });
+      if (url.endsWith('/oauth/token')) return o.tokenFail ? json(400, { error: 'invalid_grant' }) : json(200, { access_token: 'access-secret', token_type: 'Bearer', scope: 'cadence.read' });
+      return json(404, {});
+    };
+    const gate = { ...GATE, ports: [port++] };
+    const tokensSeen = [];
+    const promise = runGate({ fetchImpl, gate, isFree: async () => true, log: (l) => logs.push(l), announce: (u) => announced(u), timeoutMs: o.timeoutMs ?? 5_000,
+      callListBehaviors: async (t) => { tokensSeen.push(t); if (o.mcpThrows) throw new Error('boom'); return o.result ?? A; } });
+    return { promise, ready, seen, logs, tokensSeen, gate };
+  };
+  const get = (p, path, host) => new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: p, path, headers: { host: host ?? `127.0.0.1:${p}` } }, (res) => { let b = ''; res.on('data', (c) => { b += c; }); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: b })); });
+    req.on('error', reject); req.end();
+  });
+  const authorize = async (h) => {
+    const start = await h.ready;
+    const p = Number(new URL(start).port);
+    const redirect = await get(p, '/');
+    return { p, url: new URL(redirect.headers.location) };
+  };
+
+  it('passes on A-owned data with PKCE, one registration and one token exchange', async () => {
+    const h = harness();
+    const { p, url } = await authorize(h);
+    expect(`${url.origin}${url.pathname}`).toBe(`${GATE.origin}/oauth/authorize`);
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ response_type: 'code', client_id: 'client-gate', redirect_uri: `http://127.0.0.1:${p}/callback`, scope: 'cadence.read', code_challenge_method: 'S256', resource: GATE.resource });
+    expect((await get(p, '/', 'evil.example')).status).toBe(421);
+    const cb = await get(p, `/callback?code=c1&state=${url.searchParams.get('state')}`);
+    expect(cb.body).toContain('gate: passed');
+    expect(await h.promise).toMatchObject({ result: 'passed', reason: 'a-owned-data', clientId: 'client-gate', scope: 'cadence.read' });
+    const reg = h.seen.filter((s) => s.url.endsWith('/oauth/register'));
+    expect(reg).toHaveLength(1);
+    expect(JSON.parse(reg[0].init.body)).toMatchObject({ application_type: 'native', token_endpoint_auth_method: 'none', redirect_uris: [`http://127.0.0.1:${p}/callback`], scope: 'cadence.read' });
+    const tok = h.seen.filter((s) => s.url.endsWith('/oauth/token'));
+    expect(tok).toHaveLength(1);
+    const form = new URLSearchParams(tok[0].init.body);
+    expect(createHash('sha256').update(form.get('code_verifier')).digest('base64url')).toBe(url.searchParams.get('code_challenge'));
+    expect(form.get('resource')).toBe(GATE.resource);
+    expect(h.tokensSeen).toEqual(['access-secret']);
+    expect(JSON.stringify(h.logs)).not.toContain('access-secret');
+    expect(JSON.stringify(await h.promise)).not.toContain('access-secret');
+  });
+
+  it('fails closed on state mismatch, token failure, cross-account data or an MCP error', async () => {
+    for (const [o, badState, reason] of [[{}, true, 'callback'], [{ tokenFail: true }, false, 'token-exchange'], [{ result: { structuredContent: { behaviors: [...A.structuredContent.behaviors, { id: GATE.bBehaviors[1] }] } } }, false, 'cross-account-data'], [{ mcpThrows: true }, false, 'mcp-call-failed']]) {
+      const h = harness(o);
+      const { p, url } = await authorize(h);
+      const cb = await get(p, `/callback?code=c1&state=${badState ? 'forged' : url.searchParams.get('state')}`);
+      expect(cb.body).toContain('gate: failed');
+      expect(await h.promise).toMatchObject({ result: 'failed', reason });
+    }
+  });
+
+  it('stops before registering on a discovery mismatch, and on registration failure', async () => {
+    const h1 = harness({ issuer: 'https://evil.example' });
+    expect(await h1.promise).toMatchObject({ result: 'failed', reason: 'discovery' });
+    expect(h1.seen.some((s) => s.url.endsWith('/oauth/register'))).toBe(false);
+    const h2 = harness({ regFail: true });
+    expect(await h2.promise).toMatchObject({ result: 'failed', reason: 'registration' });
+  });
+
+  it('times out without a callback', async () => {
+    const h = harness({ timeoutMs: 50 });
+    expect(await h.promise).toMatchObject({ result: 'failed', reason: 'timeout' });
+  });
+});

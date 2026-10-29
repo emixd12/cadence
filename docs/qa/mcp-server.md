@@ -567,6 +567,40 @@ redeploy, keeping every key. Do not start client acceptance, Trust or any other
 step until that call has passed. Record the deployment ID, the grant ID, the
 tool name and the result status only.
 
+##### Activation scripts (`scripts/mcp-activation.mjs`, `scripts/mcp-activation-gate.mjs`)
+
+`node scripts/mcp-activation.mjs enable` (or `rollback`) uses single direct
+Vercel REST attempts pinned to `team_BxWfRYU1gqrl6Ba6t7Vm3wp1` and project
+`prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs`, with no CLI retry client. It first checks
+these preconditions:
+- the decrypted marketing binding equals `dpl_FxBP12vZPRz3mrdytwCNWrjdXwhj`;
+- the decrypted `CADENCE_MCP_ENABLED` is exactly `false`, on the Production-only
+  encrypted record `iBPzBCetdvLWtmSN`;
+- the frozen web deployment `dpl_AE8GhYkk265Ek9tYdYTEc4bD8EgL` is READY from
+  eb5afa5, the canonical alias is on it, and `/mcp` returns 503.
+
+It then makes one PATCH of the flag, followed by an exact decrypted readback,
+and one POST `/v13/deployments?forceNew=1` that redeploys the frozen deployment
+to production. A bounded poll waits for READY. The readbacks require:
+- the new deployment READY from eb5afa5 in the exact project;
+- the canonical alias moved to the new deployment, with no other production
+  deployment since the start;
+- an unchanged marketing binding;
+- for enable: `/mcp` returning 401 with the `resource_metadata` challenge, the
+  issuer, and the protected resource. Rollback requires 503 instead.
+
+A rejected or ambiguous write is reconciled read-only (the flag value, or the
+production deployments since the start) and is never repeated. Response bodies
+and tokens are never stored.
+
+`node scripts/mcp-activation-gate.mjs` serves a loopback page on 127.0.0.1. It
+registers one public native DCR client and uses PKCE S256, scope `cadence.read`
+and the `/mcp` resource. After A's consent it makes one token exchange and one
+`list_behaviors` call through the MCP SDK. It passes only if the result is not
+an error and contains A's fixture Behaviors and none of B's. Any failure means
+`rollback` runs at once. Evidence: `tests/mcp-activation.test.mjs` and
+`activation-mutations.json` (27/27).
+
 ##### Emi's steps
 
 1. The operator starts the broker and relays the exact URL, `http://127.0.0.1:<port>/`.
