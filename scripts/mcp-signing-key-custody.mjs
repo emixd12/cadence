@@ -17,7 +17,6 @@ export const CUSTODY = Object.freeze({
 });
 
 export const publicFingerprint = (jwk) => createHash('sha256').update(JSON.stringify({ crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y })).digest('hex');
-const keysOf = (body) => (Array.isArray(body) ? body : body?.keys ?? []);
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 
 export function generateSigningJwk() {
@@ -35,66 +34,113 @@ export function generateSigningJwk() {
  * @param {() => boolean} deps.receiptExists
  * @param {(line: string) => void} [deps.log] fixed event names only
  */
-export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, receiptExists, log = () => {}, generate = generateSigningJwk, config = CUSTODY }) {
+export const KEY_BASELINE = Object.freeze([
+  Object.freeze({ id: '78be1780-9785-44e5-947a-c839fc20a991', algorithm: 'HS256', status: 'previously_used' }),
+  Object.freeze({ id: 'cb295840-0eb2-4b4a-a1ba-c28c5b975361', algorithm: 'ES256', status: 'in_use' }),
+]);
+const tuple = (k) => `${k.id}|${k.algorithm}|${k.status}`;
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+class Stop extends Error {
+  constructor(reason) { super(reason); this.reason = reason; }
+}
+
+/**
+ * @param {object} deps
+ * @param {(args: string[], input?: string) => Promise<{status:number, stdout:string}>} deps.op 1Password CLI
+ * @param {(path: string, init?: object) => Promise<{status:number, body:any}>} deps.supabase Management API under /v1/projects/<ref>
+ * @param {(args: string[], input?: string) => Promise<{status:number, stdout:string}>} deps.vercel Vercel CLI
+ * @param {() => Promise<number>} deps.mcpStatus HTTP status of the production MCP endpoint
+ * @param {(receipt: object) => void} deps.save writes the token-free receipt
+ * @param {() => boolean} deps.receiptExists
+ * @param {(line: string) => void} [deps.log] fixed event names only
+ */
+export async function runKeyCustody({ op, supabase, vercel, mcpStatus, save, receiptExists, log = () => {}, generate = generateSigningJwk, config = CUSTODY, baseline = KEY_BASELINE }) {
   const receipt = { startedAt: new Date().toISOString(), steps: [] };
+  let phase = 'start', writeAttempted = false;
   const step = (name, extra = {}) => { receipt.steps.push({ at: new Date().toISOString(), name, ...extra }); save(receipt); };
-  const stop = (reason) => { step('stopped', { reason }); log(`stopped ${reason}`); return { result: 'stopped', reason }; };
-  if (receiptExists()) return { result: 'stopped', reason: 'receipt-exists-reconcile-first' };
+  // Adapter failures become a fixed phase code; no error message, body or cause is kept.
+  const call = async (name, fn) => {
+    phase = name;
+    try { return await fn(); } catch { throw new Stop(`${name}-error`); }
+  };
+  // Fail closed: a nonzero status, unparseable output or unexpected shape is a stop.
+  const cli = async (name, fn, shape) => {
+    const r = await call(name, fn);
+    const value = r?.status === 0 ? parse(r.stdout) : null;
+    if (value === null || !shape(value)) throw new Stop(`${name}-unreadable`);
+    return value;
+  };
+  const keysRead = async (name) => {
+    const r = await call(name, () => supabase('/config/auth/signing-keys'));
+    const list = r?.status === 200 ? (Array.isArray(r.body) ? r.body : isObject(r.body) && Array.isArray(r.body.keys) ? r.body.keys : null) : null;
+    if (!list || !list.every(isObject)) throw new Stop(`${name}-unreadable`);
+    return list;
+  };
+  const envsRead = (name) => cli(name, () => vercel(['api', `/v10/projects/${config.web}/env`]), (v) => isObject(v) && Array.isArray(v.envs) && v.envs.every(isObject)).then((v) => v.envs);
+  let jwk = null;
+  try {
+    if (receiptExists()) return { result: 'stopped', reason: 'receipt-exists-reconcile-first' };
+    if (await call('mcp-check', mcpStatus) !== 503) throw new Stop('mcp-not-disabled');
 
-  if (await mcpStatus() !== 503) return stop('mcp-not-disabled');
+    const vaults = await cli('op-vault-list', () => op(['vault', 'list', '--format=json']), (v) => Array.isArray(v) && v.every(isObject));
+    const cadence = vaults.filter((v) => v.name === 'Cadence');
+    if (cadence.length !== 1 || cadence[0].id !== config.vault) throw new Stop('vault-mismatch');
+    const items = await cli('op-item-list', () => op(['item', 'list', '--vault', config.vault, '--categories', 'Document', '--format=json']), (v) => Array.isArray(v) && v.every(isObject));
+    if (items.some((i) => i.title === config.title)) throw new Stop('custody-title-exists-reconcile');
+    step('vault-bound', { vault: config.vault });
 
-  const vaults = await op(['vault', 'list', '--format=json']);
-  if (vaults.status !== 0) return stop('op-vault-list-failed');
-  const cadence = (parse(vaults.stdout) ?? []).filter((v) => v.name === 'Cadence');
-  if (cadence.length !== 1 || cadence[0].id !== config.vault) return stop('vault-mismatch');
-  const items = await op(['item', 'list', '--vault', config.vault, '--categories', 'Document', '--format=json']);
-  if (items.status !== 0) return stop('op-item-list-failed');
-  if ((parse(items.stdout) ?? []).some((i) => i.title === config.title)) return stop('custody-title-exists-reconcile');
-  step('vault-bound', { vault: config.vault });
+    const before = await keysRead('keys-preflight');
+    const beforeTuples = before.map(tuple).sort();
+    if (JSON.stringify(beforeTuples) !== JSON.stringify(baseline.map(tuple).sort())) throw new Stop('signing-keys-drift');
+    const envs = await envsRead('vercel-env-preflight');
+    if (envs.some((e) => e.key === config.signerVariable)) throw new Stop('signer-variable-exists');
+    step('preflight', { keys: baseline.map((k) => ({ ...k })), signerVariablePresent: false, mcpStatus: 503 });
 
-  const before = await supabase('/config/auth/signing-keys');
-  const beforeKeys = keysOf(before.body).map((k) => ({ id: k.id, algorithm: k.algorithm, status: k.status }));
-  if (before.status !== 200 || beforeKeys.length !== 2 || !beforeKeys.some((k) => k.id === config.currentKey && k.status === 'in_use') || beforeKeys.some((k) => k.status === 'standby')) return stop('signing-keys-drift');
-  const envs = await vercel(['api', `/v10/projects/${config.web}/env`]);
-  if (envs.status !== 0) return stop('vercel-env-list-failed');
-  if ((parse(envs.stdout)?.envs ?? []).some((e) => e.key === config.signerVariable)) return stop('signer-variable-exists');
-  step('preflight', { keys: beforeKeys, signerVariablePresent: false, mcpStatus: 503 });
+    jwk = generate();
+    const kid = jwk.kid, fingerprint = publicFingerprint(jwk);
+    step('generated', { kid, publicFingerprint: fingerprint });
 
-  let jwk = generate();
-  const kid = jwk.kid, fingerprint = publicFingerprint(jwk);
-  step('generated', { kid, publicFingerprint: fingerprint });
+    log('op-document-create');
+    writeAttempted = true;
+    const created = await call('custody-create', () => op(['document', 'create', '-', '--vault', config.vault, '--title', config.title, '--file-name', 'integration-jwk.json', '--format=json'], JSON.stringify(jwk)));
+    const createdBody = created?.status === 0 ? parse(created.stdout) : null;
+    const documentId = isObject(createdBody) && typeof (createdBody.uuid ?? createdBody.id) === 'string' ? (createdBody.uuid ?? createdBody.id) : null;
+    if (!documentId) throw new Stop('custody-create-ambiguous-reconcile-metadata');
+    step('custody-created', { documentId });
+    const item = await cli('custody-metadata', () => op(['item', 'get', documentId, '--vault', config.vault, '--format=json']), isObject);
+    if (item.id !== documentId || item.title !== config.title || item.vault?.id !== config.vault || String(item.category).toUpperCase() !== 'DOCUMENT') throw new Stop('custody-metadata-mismatch');
+    const storedJwk = await cli('custody-readback', () => op(['document', 'get', documentId, '--vault', config.vault]), isObject);
+    if (storedJwk.d !== jwk.d || storedJwk.x !== jwk.x || storedJwk.y !== jwk.y || storedJwk.kid !== kid) throw new Stop('custody-mismatch');
+    step('custody-verified', { documentId, kid, publicFingerprint: fingerprint });
 
-  log('op-document-create');
-  const created = await op(['document', 'create', '-', '--vault', config.vault, '--title', config.title, '--file-name', 'integration-jwk.json', '--format=json'], JSON.stringify(jwk));
-  const documentId = created.status === 0 ? (parse(created.stdout)?.uuid ?? parse(created.stdout)?.id ?? null) : null;
-  if (!documentId) { jwk = null; return stop('custody-create-ambiguous-reconcile-metadata'); }
-  const meta = await op(['item', 'get', documentId, '--vault', config.vault, '--format=json']);
-  const item = meta.status === 0 ? parse(meta.stdout) : null;
-  if (!item || item.title !== config.title || item.vault?.id !== config.vault || String(item.category).toUpperCase() !== 'DOCUMENT') { jwk = null; return stop('custody-metadata-mismatch'); }
-  const stored = await op(['document', 'get', documentId, '--vault', config.vault]);
-  const storedJwk = stored.status === 0 ? parse(stored.stdout) : null;
-  if (!storedJwk || storedJwk.d !== jwk.d || storedJwk.x !== jwk.x || storedJwk.y !== jwk.y || storedJwk.kid !== kid) { jwk = null; return stop('custody-mismatch'); }
-  step('custody-verified', { documentId, kid, publicFingerprint: fingerprint });
+    const body = JSON.stringify({ algorithm: 'ES256', status: 'standby', private_jwk: jwk });
+    const imported = await call('standby-import', () => supabase('/config/auth/signing-keys', { method: 'POST', body }));
+    if (imported?.status !== 201 && imported?.status !== 200) throw new Stop(`standby-import-${Number(imported?.status) || 'unknown'}`);
+    const after = await keysRead('keys-readback');
+    const mine = after.filter((k) => isObject(k.public_jwk) && publicFingerprint(k.public_jwk) === fingerprint);
+    if (mine.length !== 1 || mine[0].status !== 'standby' || mine[0].algorithm !== 'ES256' || (mine[0].public_jwk.kid ?? mine[0].id) !== kid) throw new Stop('standby-readback-mismatch');
+    const afterTuples = after.filter((k) => k !== mine[0]).map(tuple).sort();
+    if (JSON.stringify(afterTuples) !== JSON.stringify(baseline.map(tuple).sort())) throw new Stop('old-key-changed');
+    step('standby-imported', { keyId: mine[0].id, kid, status: 'standby', keys: after.map((k) => ({ id: k.id, algorithm: k.algorithm, status: k.status })) });
 
-  const imported = await supabase('/config/auth/signing-keys', { method: 'POST', body: JSON.stringify({ algorithm: 'ES256', status: 'standby', private_jwk: jwk }) });
-  if (imported.status !== 201 && imported.status !== 200) { jwk = null; return stop(`standby-import-${imported.status}`); }
-  const after = await supabase('/config/auth/signing-keys');
-  const afterKeys = keysOf(after.body);
-  const mine = afterKeys.filter((k) => k.public_jwk && publicFingerprint(k.public_jwk) === fingerprint);
-  if (after.status !== 200 || mine.length !== 1 || mine[0].status !== 'standby' || mine[0].algorithm !== 'ES256' || (mine[0].public_jwk.kid ?? mine[0].id) !== kid) { jwk = null; return stop('standby-readback-mismatch'); }
-  if (afterKeys.length !== beforeKeys.length + 1 || beforeKeys.some((old) => !afterKeys.some((k) => k.id === old.id && k.status === old.status))) { jwk = null; return stop('old-key-changed'); }
-  step('standby-imported', { keyId: mine[0].id, kid, status: 'standby', keys: afterKeys.map((k) => ({ id: k.id, algorithm: k.algorithm, status: k.status })) });
-
-  const added = await vercel(['env', 'add', config.signerVariable, '--environment', 'production', '--project', config.web, '--sensitive', '--yes'], JSON.stringify(jwk));
-  jwk = null;
-  if (added.status !== 0) return stop('vercel-env-add-failed');
-  const envAfter = await vercel(['api', `/v10/projects/${config.web}/env`]);
-  const signer = (parse(envAfter.stdout)?.envs ?? []).filter((e) => e.key === config.signerVariable);
-  if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') return stop('signer-variable-readback-mismatch');
-  if (await mcpStatus() !== 503) return stop('mcp-not-disabled-after');
-  step('signer-variable-set', { target: signer[0].target, type: signer[0].type, redeployed: false });
-  log('complete');
-  return { result: 'complete', kid, keyId: mine[0].id, documentId, publicFingerprint: fingerprint };
+    const secret = JSON.stringify(jwk);
+    jwk = null;
+    const added = await call('vercel-env-add', () => vercel(['env', 'add', config.signerVariable, '--environment', 'production', '--project', config.web, '--sensitive', '--yes'], secret));
+    if (added?.status !== 0) throw new Stop('vercel-env-add-failed');
+    const signer = (await envsRead('vercel-env-readback')).filter((e) => e.key === config.signerVariable);
+    if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');
+    if (await call('mcp-check-after', mcpStatus) !== 503) throw new Stop('mcp-not-disabled-after');
+    step('signer-variable-set', { target: signer[0].target, type: signer[0].type, redeployed: false });
+    log('complete');
+    return { result: 'complete', kid, keyId: mine[0].id, documentId, publicFingerprint: fingerprint };
+  } catch (error) {
+    jwk = null;
+    const reason = error instanceof Stop ? error.reason : `${phase}-internal-error`;
+    try { step('stopped', { reason, phase, writeAttempted }); } catch { /* receipt write failed; still report the fixed reason */ }
+    log(`stopped ${reason}`);
+    return { result: 'stopped', reason };
+  }
 }
 
 async function main() {
@@ -103,13 +149,18 @@ async function main() {
   const out = '.intent/artifacts/trust232/extension-execution/step2-custody.json';
   const node = '/Users/emi/.npm/_npx/387698761821791d/node_modules/node/bin/node';
   const vc = '/Users/emi/.npm/_npx/67eb4586ca667318/node_modules/vercel/dist/index.js';
+  // Subprocess failures resolve to a nonzero status; stderr and error text are discarded.
   const run = (cmd, args, input) => new Promise((resolve) => {
-    const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
-    let stdout = '';
-    const timer = setTimeout(() => child.kill('SIGTERM'), 180_000);
+    let settled = false, stdout = '', timedOut = false;
+    const finish = (status) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ status: timedOut ? 1 : status, stdout: timedOut ? '' : stdout }); } };
+    let child;
+    try { child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] }); } catch { resolve({ status: 1, stdout: '' }); return; }
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); finish(1); }, 180_000);
+    child.on('error', () => finish(1));
+    child.stdin.on('error', () => {});
     child.stdout.on('data', (c) => { stdout += c; });
     child.stderr.on('data', () => {});
-    child.on('close', (status) => { clearTimeout(timer); resolve({ status: status ?? 1, stdout }); });
+    child.on('close', (status) => finish(status ?? 1));
     child.stdin.end(input ?? '');
   });
   let token = execFileSync('security', ['find-generic-password', '-s', 'Supabase CLI', '-a', 'supabase', '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -132,4 +183,6 @@ async function main() {
 }
 
 const { pathToFileURL } = await import('node:url');
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(() => { process.stdout.write('{"result":"stopped","reason":"main-internal-error"}\n'); process.exit(1); });
+}

@@ -490,19 +490,27 @@ plan in the next paragraphs is retained as history only.
 ##### Key custody script (`scripts/mcp-signing-key-custody.mjs`)
 
 Step 2a runs before the pin. It refuses unless `/mcp` returns 503, the only vault
-named Cadence has ID `fgyupy5i26isvkdqofojc5o66u`, no custody document has the
-fixed title, the project has exactly the two expected keys with none on standby,
-and the Production signer variable is absent. It then generates one ES256 JWK in
+named Cadence has ID `fgyupy5i26isvkdqofojc5o66u`, and no custody document has
+the fixed title. The signing keys must be exactly the frozen pair: `78be1780…`
+HS256 previously_used and `cb295840…` ES256 in_use. The Production signer
+variable must be absent. Every CLI and API read needs a success status and the
+expected array or object shape. A failed, unparseable or missing response stops
+the run and is never treated as empty. It then generates one ES256 JWK in
 memory. That JWK is piped over stdin to `op document create`, and the item
 metadata and stored document are read back and compared. Next it imports the key
 to Supabase as standby only and requires the same kid and public fingerprint,
 with every old key unchanged. Finally it pipes the JWK over stdin to `vercel env
 add --environment production --sensitive` and reads back a Production-only
-sensitive record, then rechecks `/mcp` 503. The private key never appears in
-argv, files, logs or the 0600 receipt `step2-custody.json`. Any mismatch stops
-the run, an ambiguous custody create is reconciled rather than retried, and there
-is no rotation or redeploy in this script. Evidence: 12 offline cases and 15/15
-mutation kills (`key-custody-mutations.json`).
+sensitive record, then rechecks `/mcp` 503. After the import, both frozen tuples
+must be unchanged and the only addition must be the expected standby kid. The
+private key never appears in argv, files, logs or the 0600 receipt
+`step2-custody.json`. Adapter, subprocess (spawn, stdin, timeout) and internal
+errors become fixed phase codes, with no raw message, body or cause. A top-level
+catch covers `main`. There are no retries. The receipt records the phase and
+whether a write was attempted, plus a `custody-created` step with the document
+ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
+this script. Evidence: 19 offline cases, including direct regressions for the
+b12e0bc findings, and 21/21 mutation kills (`key-custody-mutations.json`).
 
 ##### Emi's steps
 

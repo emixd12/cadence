@@ -16,7 +16,7 @@ function world(overrides = {}) {
   const op = async (args, input) => {
     calls.op.push({ args, input });
     if (args[0] === 'vault') return { status: 0, stdout: JSON.stringify(o.vaults ?? [{ id: CUSTODY.vault, name: 'Cadence' }, { id: 'other', name: 'Private' }]) };
-    if (args[0] === 'item' && args[1] === 'list') return { status: 0, stdout: JSON.stringify(o.items ?? []) };
+    if (args[0] === 'item' && args[1] === 'list') return { status: 0, stdout: o.itemsRaw ?? JSON.stringify(o.items ?? []) };
     if (args[0] === 'document' && args[1] === 'create') {
       if (o.createFails) return { status: 1, stdout: '' };
       docs.set('doc-1', o.tamperStored ? JSON.stringify({ ...JSON.parse(input), d: 'tampered' }) : input);
@@ -29,17 +29,24 @@ function world(overrides = {}) {
   const supabase = async (path, init = {}) => {
     calls.supabase.push({ path, method: init.method ?? 'GET', body: init.body });
     if (init.method === 'POST') {
+      if (o.postThrows) throw new Error(`request failed: ${init.body}`, { cause: init.body });
       const { private_jwk: p, status, algorithm } = JSON.parse(init.body);
       const { d: _d, ...pub } = p;
       keys.push({ id: o.importKid ?? p.kid, algorithm, status, public_jwk: o.importKid ? { ...pub, kid: o.importKid } : pub });
       if (o.flipOld) keys[0].status = 'revoked';
+      if (o.flipAlg) keys[1].algorithm = 'RS256';
       return { status: 201, body: {} };
     }
     return { status: 200, body: { keys: o.keysBefore && keys.length === 2 ? o.keysBefore : keys } };
   };
   const vercel = async (args, input) => {
     calls.vercel.push({ args, input });
-    if (args[0] === 'api') return { status: 0, stdout: JSON.stringify({ envs: o.signerPresent ? [...envs, { key: CUSTODY.signerVariable, target: ['production'] }] : envs }) };
+    if (args[0] === 'api') {
+      const reads = calls.vercel.filter((c) => c.args[0] === 'api').length;
+      if (o.envPreflightRaw !== undefined && reads === 1) return { status: 0, stdout: o.envPreflightRaw };
+      if (o.envReadbackStatus !== undefined && reads === 2) return { status: o.envReadbackStatus, stdout: JSON.stringify({ envs }) };
+      return { status: 0, stdout: JSON.stringify({ envs: o.signerPresent ? [...envs, { key: CUSTODY.signerVariable, target: ['production'] }] : envs }) };
+    }
     if (args[0] === 'env' && args[1] === 'add') {
       envs = [...envs, { key: args[2], target: o.wrongTarget ? ['production', 'preview'] : [args[4]], type: 'sensitive' }];
       if (o.enableMcpAfterAdd) mcp = 200;
@@ -82,7 +89,7 @@ describe('Ticket 232 signing-key custody', () => {
     for (const old of OLD) expect(keys.find((k) => k.id === old.id).status).toBe(old.status);
     expect(result.publicFingerprint).toBe(publicFingerprint(jwk));
     const last = JSON.parse(w.calls.saves.at(-1));
-    expect(last.steps.map((s) => s.name)).toEqual(['vault-bound', 'preflight', 'generated', 'custody-verified', 'standby-imported', 'signer-variable-set']);
+    expect(last.steps.map((s) => s.name)).toEqual(['vault-bound', 'preflight', 'generated', 'custody-created', 'custody-verified', 'standby-imported', 'signer-variable-set']);
     expect(w.calls.supabase.some((c) => c.method === 'PATCH')).toBe(false);
   });
 
@@ -95,6 +102,10 @@ describe('Ticket 232 signing-key custody', () => {
     ['signing-key drift', { keysBefore: [...OLD, { id: 'z', algorithm: 'ES256', status: 'standby' }] }, 'signing-keys-drift'],
     ['an existing standby key', { keysBefore: [{ ...OLD[0], status: 'standby' }, OLD[1]] }, 'signing-keys-drift'],
     ['an existing signer variable', { signerPresent: true }, 'signer-variable-exists'],
+    ['unparseable custody item list', { itemsRaw: 'not json' }, 'op-item-list-unreadable'],
+    ['an empty Vercel env response', { envPreflightRaw: '{}' }, 'vercel-env-preflight-unreadable'],
+    ['a replaced historical key ID', { keysBefore: [{ ...OLD[0], id: '00000000-0000-4000-8000-000000000000' }, OLD[1]] }, 'signing-keys-drift'],
+    ['a changed current-key algorithm', { keysBefore: [OLD[0], { ...OLD[1], algorithm: 'RS256' }] }, 'signing-keys-drift'],
   ];
   for (const [label, overrides, reason] of refusals) {
     it(`refuses before generating a key on ${label}`, async () => {
@@ -117,17 +128,47 @@ describe('Ticket 232 signing-key custody', () => {
   });
 
   it('stops before setting the secret when the imported kid differs or an old key changed', async () => {
-    for (const [overrides, reason] of [[{ importKid: 'supabase-assigned' }, 'standby-readback-mismatch'], [{ flipOld: true }, 'old-key-changed']]) {
+    for (const [overrides, reason] of [[{ importKid: 'supabase-assigned' }, 'standby-readback-mismatch'], [{ flipOld: true }, 'old-key-changed'], [{ flipAlg: true }, 'old-key-changed']]) {
       const w = world(overrides);
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
       expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
     }
   });
 
-  it('stops when the secret is not Production-only or MCP became enabled', async () => {
-    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after']]) {
+  it('stops when the secret is not Production-only, cannot be read back, or MCP became enabled', async () => {
+    for (const [overrides, reason] of [[{ wrongTarget: true }, 'signer-variable-readback-mismatch'], [{ envReadbackStatus: 1 }, 'vercel-env-readback-unreadable'], [{ enableMcpAfterAdd: true }, 'mcp-not-disabled-after']]) {
       const w = world(overrides);
       expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason });
     }
+  });
+
+  it('turns an adapter error carrying the private key into a fixed reason and records the partial write stage', async () => {
+    const w = world({ postThrows: true });
+    const result = await runKeyCustody(w.deps);
+    expect(result).toEqual({ result: 'stopped', reason: 'standby-import-error' });
+    const d = privateOf(w).d;
+    expect(JSON.stringify([result, w.calls.saves, w.calls.logs])).not.toContain(d);
+    const last = JSON.parse(w.calls.saves.at(-1)).steps.at(-1);
+    expect(last).toMatchObject({ name: 'stopped', reason: 'standby-import-error', phase: 'standby-import', writeAttempted: true });
+    expect(JSON.parse(w.calls.saves.at(-1)).steps.map((x) => x.name)).toContain('custody-verified');
+    expect(w.calls.supabase.filter((c) => c.method === 'POST')).toHaveLength(1);
+    expect(w.calls.vercel.some((c) => c.args[0] === 'env')).toBe(false);
+  });
+
+  it('turns any thrown adapter error into a fixed phase reason without a retry', async () => {
+    const w = world();
+    w.deps.mcpStatus = async () => { throw new Error('boom secret'); };
+    expect(await runKeyCustody(w.deps)).toEqual({ result: 'stopped', reason: 'mcp-check-error' });
+    expect(JSON.stringify(w.calls.saves)).not.toContain('boom');
+  });
+
+  it('reports an unexpected internal error by phase only', async () => {
+    const w = world();
+    w.deps.generate = () => { throw new Error('secret-material-in-message'); };
+    const result = await runKeyCustody(w.deps);
+    expect(result.result).toBe('stopped');
+    expect(result.reason).toMatch(/-internal-error$/);
+    expect(JSON.stringify([result, w.calls.saves, w.calls.logs])).not.toContain('secret-material');
+    expect(w.calls.op.some((c) => c.args[1] === 'create')).toBe(false);
   });
 });
