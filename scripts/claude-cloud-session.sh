@@ -57,8 +57,13 @@ if [ -x "$node_home/bin/node" ]; then
   fi
 fi
 
+# Node ignores HTTPS_PROXY by default. On the direct route, the AgentMail CLI
+# postinstall downloads its binary but never exits, so npm ci hangs.
+export NODE_USE_ENV_PROXY=1
+
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
+    echo 'export NODE_USE_ENV_PROXY=1'
     echo 'export NEXT_TELEMETRY_DISABLED=1'
     echo 'export SUPABASE_TELEMETRY_DISABLED=1'
   } >>"$CLAUDE_ENV_FILE"

@@ -289,10 +289,12 @@ sessions are unaffected. In a cloud session it:
 - installs the latest Node 24 from nodejs.org into `/opt/node24` after checking
   its SHA-256 sum, and puts it first on `PATH` for later commands. The image's
   default is Node 22.
+- sets `NODE_USE_ENV_PROXY=1` for the install and later commands, so Node
+  requests use the session proxy. Without it, the AgentMail CLI postinstall
+  downloads its binary but never exits, and `npm ci` hangs.
 - runs `npm ci` when a `package.json`, the lockfile or the script changed. If
-  the install fails, it retries with `--ignore-scripts`; the AgentMail CLI
-  postinstall downloads from another repository's GitHub release, which the
-  cloud GitHub proxy may refuse.
+  the install fails, it retries with `--ignore-scripts`, which skips the
+  AgentMail CLI binary download.
 - prints the Node version, the install result and the limits below into the
   session's context.
 
@@ -333,14 +335,50 @@ runtime secrets (VAPID private key, cron and reminder secrets, connector
 encryption keys, OAuth client secrets, the integration JWT signing key), and
 Apple or Tauri signing material. No cloud workflow needs them.
 
+Verified in a cloud session on 2026-10-29:
+
+- The first hook version hung. The AgentMail CLI postinstall downloaded its
+  binary on the direct route but never exited, so `npm ci` ran past the hook's
+  900-second timeout. With `NODE_USE_ENV_PROXY=1` the postinstall exits in
+  about 1 second.
+- The fixed hook, run by hand, took 29 seconds from an empty `node_modules`. It
+  installed Node 24.22.2 and the AgentMail CLI binary without the
+  `--ignore-scripts` fallback. A repeat run with no changes took 0.1 seconds.
+- The `--ignore-scripts` fallback installed all packages in 20 seconds.
+- All nine checks passed as npm commands: `agents:check` 5 s,
+  `interactions:check` 1 s, `resolvers:check` under 1 s, `lint` 36 s,
+  `typecheck` 6 s, `test` 104 s, `build` 70 s, `desktop:build` 3 s and
+  `marketing:build` 9 s.
+- The clone is shallow.
+- `gh api repos/emixd12/cadence` works. `gh pr list` fails with HTTP 403
+  because the proxy refuses GraphQL.
+- No network secret was attached. The Supabase, Vercel, Cloudflare, OpenAI and
+  Sequenzy APIs returned 400, 401 or 403, with and without a placeholder
+  `Authorization` header. The Sequenzy root path returns 200 without
+  authentication.
+- Raw TCP to the Supabase pooler on ports 5432 and 6543 timed out, so
+  `npm run supabase -- db push` cannot reach hosted Postgres. `db push` itself
+  was not run. Push hosted migrations from the Mac.
+- Docker is installed but not running. `service docker start` fails on
+  `ulimit`; `dockerd > /tmp/dockerd.log 2>&1 &` starts it.
+- `npm run supabase -- start` failed because `public.ecr.aws` answered every
+  pull with "Data limit exceeded". With `SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io`
+  the images pulled and the migrations applied in 86 seconds. Then the edge
+  runtime container failed, because the VM refuses to raise its open-file
+  limit.
+- `SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io npm run supabase -- start -x edge-runtime`
+  started the stack in 43 seconds with cached images. `db reset` took
+  31 seconds, `npm run smoke:rls:local` passed in 3 seconds, and
+  `stop --no-backup` took 12 seconds.
+
 Not yet verified in a cloud session:
 
+- the hook firing automatically at session start. The first cloud session
+  after this hook reaches `main` confirms it.
 - whether the proxy replaces a placeholder `Authorization` header that a CLI
   sends because it refuses to start without a local token (for example
-  `SUPABASE_ACCESS_TOKEN` or `CLOUDFLARE_API_TOKEN`).
-- whether `npm run supabase -- db push` can reach hosted Postgres through the
-  proxy. Until it is verified, push hosted migrations from the Mac.
-- how long `npm run supabase -- start` takes to pull the local stack's images.
+  `SUPABASE_ACCESS_TOKEN` or `CLOUDFLARE_API_TOKEN`). Testing it needs an
+  attached network secret.
 
 ### Codex local timing QA action
 
