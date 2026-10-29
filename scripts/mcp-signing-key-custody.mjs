@@ -54,25 +54,39 @@ const keyRow = (v) => isObject(v) && text(v.id) && text(v.algorithm) && text(v.s
  * and discards stderr and error text. A later exit 0 cannot override it.
  */
 /**
- * One-attempt Vercel REST write. The Vercel CLI `api` command retries failed
+ * One-attempt Vercel REST write. The Vercel CLI `api` client retries failed
  * requests, so the secret-bearing POST uses fetch directly: exactly one
- * attempt, no redirects, bounded time. Any throw, timeout or non-2xx becomes
- * status 1; the response body is discarded unread.
+ * attempt, no redirects, bounded time. Outcomes:
+ * - created: 2xx with exactly one created record matching key, sensitive type
+ *   and Production-only target, and no failures;
+ * - rejected: 4xx (the API refused; nothing was written);
+ * - ambiguous: throw, reset, timeout, 5xx, other status, or a 2xx whose body
+ *   does not prove the create. The caller must reconcile by read-only metadata
+ *   and must never re-POST.
+ * Response contents are inspected in memory for those fields only.
  */
 export function createVercelWriter({ fetchImpl = fetch, readToken, teamId, timeoutMs = 30_000 }) {
-  return async (path, body) => {
+  return async (path, body, expected) => {
     let token = null;
     try { token = readToken(); } catch { token = null; }
-    if (!text(token)) return { status: 1 };
+    if (!text(token)) return { outcome: 'rejected' };
     try {
       const response = await fetchImpl(`https://api.vercel.com${path}?teamId=${encodeURIComponent(teamId)}`, {
         method: 'POST', body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
         headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       });
-      try { await response.body?.cancel(); } catch { /* discard */ }
-      return { status: response.ok ? 0 : 1 };
+      if (response.status >= 400 && response.status < 500) { try { await response.body?.cancel(); } catch { /* discard */ } return { outcome: 'rejected' }; }
+      if (response.status < 200 || response.status >= 300) { try { await response.body?.cancel(); } catch { /* discard */ } return { outcome: 'ambiguous' }; }
+      let parsed = null;
+      try { parsed = await response.json(); } catch { parsed = null; }
+      const created = isObject(parsed) ? (Array.isArray(parsed.created) ? (parsed.created.length === 1 ? parsed.created[0] : null) : parsed.created) : null;
+      const failed = isObject(parsed) ? parsed.failed : undefined;
+      const proven = isObject(created) && created.key === expected.key && created.type === 'sensitive'
+        && JSON.stringify(created.target) === '["production"]' && (failed === undefined || (Array.isArray(failed) && failed.length === 0));
+      parsed = null;
+      return { outcome: proven ? 'created' : 'ambiguous' };
     } catch {
-      return { status: 1 };
+      return { outcome: 'ambiguous' };
     } finally {
       token = null;
     }
@@ -136,7 +150,7 @@ export async function runKeyCustody({ op, supabase, vercel, vercelWrite, vercelW
     if (!list || !list.every(keyRow)) throw new Stop(`${name}-unreadable`);
     return list;
   };
-  const envsRead = (name) => cli(name, () => vercel(['api', `/v10/projects/${config.web}/env`]), (v) => isObject(v) && Array.isArray(v.envs) && v.envs.every(envRow)).then((v) => v.envs);
+  const envsRead = (name) => cli(name, () => vercel(['api', `/v10/projects/${config.web}/env?teamId=${config.team}`]), (v) => isObject(v) && Array.isArray(v.envs) && v.envs.every(envRow)).then((v) => v.envs);
   let jwk = null;
   try {
     if (receiptExists()) return { result: 'stopped', reason: 'receipt-exists-reconcile-first' };
@@ -189,8 +203,14 @@ export async function runKeyCustody({ op, supabase, vercel, vercelWrite, vercelW
     // One direct REST attempt: `vercel env add` keeps only the first stdin chunk
     // within 500 ms, and `vercel api` retries failed writes.
     const envBody = JSON.stringify({ key: config.signerVariable, value: secret, type: 'sensitive', target: ['production'] });
-    const added = await call('vercel-env-add', () => vercelWrite(`/v10/projects/${config.web}/env`, envBody));
-    if (added?.status !== 0) throw new Stop('vercel-env-add-failed');
+    const added = await call('vercel-env-add', () => vercelWrite(`/v10/projects/${config.web}/env`, envBody, { key: config.signerVariable }));
+    if (added?.outcome !== 'created') {
+      // Never re-POST. Record a read-only reconciliation of whether the record exists.
+      let signerPresent = 'unknown';
+      try { signerPresent = (await envsRead('vercel-env-reconcile')).some((e) => e.key === config.signerVariable); } catch { signerPresent = 'unknown'; }
+      step('vercel-env-reconcile', { outcome: added?.outcome === 'rejected' ? 'rejected' : 'ambiguous', signerPresent });
+      throw new Stop(added?.outcome === 'rejected' ? 'vercel-env-add-rejected' : 'vercel-env-add-ambiguous-reconcile');
+    }
     const signer = (await envsRead('vercel-env-readback')).filter((e) => e.key === config.signerVariable);
     if (signer.length !== 1 || JSON.stringify(signer[0].target) !== '["production"]' || signer[0].type !== 'sensitive') throw new Stop('signer-variable-readback-mismatch');
     if (await call('mcp-check-after', mcpStatus) !== 503) throw new Stop('mcp-not-disabled-after');

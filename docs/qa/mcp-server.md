@@ -507,8 +507,22 @@ The JSON body carries the key, type sensitive and target production. The request
 uses `redirect: 'error'` and a 30-second timeout, and discards the response body
 unread. The bearer token is the existing Vercel CLI credential, read into memory
 from the CLI's `auth.json` at write time and never logged. Preflight requires it
-to stay valid for at least 30 more minutes. The script then reads back a
+to stay valid for at least 30 more minutes. Success requires a 2xx whose body
+holds exactly one created record with the same key, type sensitive and target
+production, and no failures. A 4xx is `rejected`. A throw, reset, timeout, 5xx,
+other status, or a 2xx body that doesn't prove the create is `ambiguous`. Either
+way the script never re-POSTs. It records a read-only reconciliation of whether
+the record exists and stops. Every CLI read pins
+`?teamId=team_BxWfRYU1gqrl6Ba6t7Vm3wp1`; the installed client keeps an explicit
+teamId rather than substituting `currentTeam`. The script then reads back a
 Production-only sensitive record through the CLI and rechecks `/mcp` 503.
+
+Limitation: a sensitive Vercel value can't be read back. The metadata readback
+proves the record's name, target and type, not that the stored JWK is intact.
+A/B session continuity after rotation proves Supabase trusts the key; it does
+not prove the stored Vercel value either. Proof that the deployed signer
+carries the right key is separate: it comes from the activation deployment's
+own token minting and isolation checks.
 
 Attempt 1 on October 29 at 19:03 UTC failed safely. Given `-`, op checks for
 stdin data the moment it starts, so it raced the runner's write and exited with
@@ -534,7 +548,8 @@ whether a write was attempted, plus a `custody-created` step with the document
 ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
 this script. Evidence: 34 offline cases, including direct regressions for the
 b12e0bc and 34821fd findings, the stdin-path forms, a direct EventEmitter runner
-harness and direct one-attempt writer cases, and 41/41 mutation kills
+harness, direct one-attempt writer cases (reset, timeout, 5xx, 3xx, 4xx and nine
+2xx body shapes) and ambiguous/rejected reconciliation, and 47/47 mutation kills
 (`key-custody-mutations.json`).
 
 ##### Emi's steps
