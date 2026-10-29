@@ -293,8 +293,9 @@ sessions are unaffected. In a cloud session it:
   requests use the session proxy. Without it, the AgentMail CLI postinstall
   downloads its binary but never exits, and `npm ci` hangs.
 - runs `npm ci` when a `package.json`, the lockfile or the script changed. If
-  the install fails, it retries with `--ignore-scripts`, which skips the
-  AgentMail CLI binary download.
+  the install fails or runs past 240 seconds, it retries with
+  `--ignore-scripts`, which skips the AgentMail CLI binary download. The
+  retry has the same limit, so the hook ends inside its 900-second timeout.
 - prints the Node version, the install result and the limits below into the
   session's context.
 
@@ -325,6 +326,11 @@ session. Every command in the session can read an environment variable.
 | Cloudflare | `api.cloudflare.com` | `Authorization: Bearer` | DNS reads and verification |
 | OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes |
 
+The proxy replaces any `Authorization` header a request already carries. A CLI
+that refuses to start without a local token therefore works with a
+placeholder. For the Supabase CLI, set `SUPABASE_ACCESS_TOKEN` to `sbp_`
+followed by 40 zeros.
+
 A secret authorizes nothing new: hosted writes, deploys, restarts and real
 sends still need the owner's instruction each time. Supabase, Vercel and
 AgentMail connectors enabled on the owner's claude.ai account also work in a
@@ -341,10 +347,18 @@ Verified in a cloud session on 2026-10-29:
   binary on the direct route but never exited, so `npm ci` ran past the hook's
   900-second timeout. With `NODE_USE_ENV_PROXY=1` the postinstall exits in
   about 1 second.
-- The fixed hook, run by hand, took 29 seconds from an empty `node_modules`. It
-  installed Node 24.22.2 and the AgentMail CLI binary without the
-  `--ignore-scripts` fallback. A repeat run with no changes took 0.1 seconds.
+- The fixed hook, run by hand, took 22 to 29 seconds from an empty
+  `node_modules`. It installed Node 24.22.2 and the AgentMail CLI binary
+  without the `--ignore-scripts` fallback. A repeat run with no changes took
+  0.1 seconds.
+- The hook fired automatically when the session resumed, and its
+  `CLAUDE_ENV_FILE` lines applied: Node 24 and `NODE_USE_ENV_PROXY` were set
+  in later commands.
 - The `--ignore-scripts` fallback installed all packages in 20 seconds.
+- The `npm ci` time limit works. In a test copy with the postinstall forced to
+  hang and a 60-second limit, `timeout` stopped the first attempt and npm
+  exited within 4 seconds. The fallback then installed everything, and the
+  hook reported the timeout. No install process was left running.
 - All nine checks passed as npm commands: `agents:check` 5 s,
   `interactions:check` 1 s, `resolvers:check` under 1 s, `lint` 36 s,
   `typecheck` 6 s, `test` 104 s, `build` 70 s, `desktop:build` 3 s and
@@ -352,10 +366,13 @@ Verified in a cloud session on 2026-10-29:
 - The clone is shallow.
 - `gh api repos/emixd12/cadence` works. `gh pr list` fails with HTTP 403
   because the proxy refuses GraphQL.
-- No network secret was attached. The Supabase, Vercel, Cloudflare, OpenAI and
-  Sequenzy APIs returned 400, 401 or 403, with and without a placeholder
-  `Authorization` header. The Sequenzy root path returns 200 without
-  authentication.
+- Before the owner added network secrets, the Supabase, Vercel, Cloudflare,
+  OpenAI and Sequenzy APIs returned 400, 401 or 403. After, all five returned
+  200, both without an `Authorization` header and with a placeholder one. The
+  Sequenzy root path returns 200 without authentication, so check Sequenzy on
+  `/api/v1/templates`.
+- `npm run supabase -- projects list` listed the hosted project with a
+  placeholder `SUPABASE_ACCESS_TOKEN`.
 - Raw TCP to the Supabase pooler on ports 5432 and 6543 timed out, so
   `npm run supabase -- db push` cannot reach hosted Postgres. `db push` itself
   was not run. Push hosted migrations from the Mac.
@@ -373,12 +390,8 @@ Verified in a cloud session on 2026-10-29:
 
 Not yet verified in a cloud session:
 
-- the hook firing automatically at session start. The first cloud session
-  after this hook reaches `main` confirms it.
-- whether the proxy replaces a placeholder `Authorization` header that a CLI
-  sends because it refuses to start without a local token (for example
-  `SUPABASE_ACCESS_TOKEN` or `CLOUDFLARE_API_TOKEN`). Testing it needs an
-  attached network secret.
+- the hook firing at a fresh session start, as opposed to a resume. The first
+  cloud session after this hook reaches `main` confirms it.
 
 ### Codex local timing QA action
 

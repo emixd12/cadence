@@ -73,16 +73,26 @@ fi
 install_inputs=(scripts/claude-cloud-session.sh package.json package-lock.json apps/*/package.json packages/*/package.json)
 install_hash=node_modules/.cadence-cloud-install.sha256
 install_log="${TMPDIR:-/tmp}/cadence-npm-ci.log"
+# A clean install takes about 25 s. npm can spend 30 s rolling back after
+# SIGTERM, so SIGKILL follows 10 s later. Two attempts and the Node download
+# stay inside the 900 s hook timeout in .claude/settings.json.
+npm_ci_timeout=240
 
 if ! sha256sum --check --status "$install_hash" 2>/dev/null; then
   rm -f "$install_hash"
-  if npm ci --no-audit --no-fund >"$install_log" 2>&1; then
+  timeout -k 10 "$npm_ci_timeout" npm ci --no-audit --no-fund >"$install_log" 2>&1
+  npm_ci_status=$?
+  if [ "$npm_ci_status" -eq 0 ]; then
     sha256sum "${install_inputs[@]}" >"$install_hash"
-  # agentmail-cli downloads its binary from another repository's GitHub
-  # release, which the cloud GitHub proxy may refuse.
-  elif npm ci --no-audit --no-fund --ignore-scripts >>"$install_log" 2>&1; then
+  # A failed or hung install script, such as the agentmail-cli binary
+  # download, must not block the install.
+  elif timeout -k 10 "$npm_ci_timeout" npm ci --no-audit --no-fund --ignore-scripts >>"$install_log" 2>&1; then
     sha256sum "${install_inputs[@]}" >"$install_hash"
-    notes+=("npm ci succeeded only with --ignore-scripts, so the AgentMail CLI binary is missing. Log: $install_log")
+    case "$npm_ci_status" in
+      124 | 137) npm_ci_result="timed out after ${npm_ci_timeout} s" ;;
+      *) npm_ci_result="failed" ;;
+    esac
+    notes+=("npm ci ${npm_ci_result} and succeeded only with --ignore-scripts, so install scripts did not run and the AgentMail CLI binary is missing. Log: $install_log")
   else
     notes+=("npm ci failed. Read $install_log before running checks.")
   fi
