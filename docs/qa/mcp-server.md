@@ -504,8 +504,8 @@ to Supabase as standby only and requires the same kid and public fingerprint,
 with every old key unchanged. Finally it creates the env record with exactly one
 direct `fetch` POST to `https://api.vercel.com/v10/projects/<web>/env?teamId=team_BxWfRYU1gqrl6Ba6t7Vm3wp1`.
 The JSON body carries the key, type sensitive and target production. The request
-uses `redirect: 'error'` and a 30-second timeout, and discards the response body
-unread. The bearer token is the existing Vercel CLI credential, read into memory
+uses `redirect: 'error'` and a 30-second timeout. Only a 2xx response body is
+parsed, in memory, for the fields below; other bodies are discarded. The bearer token is the existing Vercel CLI credential, read into memory
 from the CLI's `auth.json` at write time and never logged. Preflight requires it
 to stay valid for at least 30 more minutes. Success requires a 2xx whose body
 holds exactly one created record with an `id`, the same key, type sensitive and
@@ -547,7 +547,7 @@ a later exit 0 cannot override it. A top-level
 catch covers `main`. There are no retries. The receipt records the phase and
 whether a write was attempted, plus a `custody-created` step with the document
 ID, so an ambiguous write can be reconciled. There is no rotation or redeploy in
-this script. Evidence: 34 offline cases, including direct regressions for the
+this script. Evidence: 55 offline cases, including direct regressions for the
 b12e0bc and 34821fd findings, the stdin-path forms, a direct EventEmitter runner
 harness, direct one-attempt writer cases (reset, timeout, 5xx, 3xx, 4xx and nine
 2xx body shapes) and ambiguous/rejected reconciliation, and 49/49 mutation kills
