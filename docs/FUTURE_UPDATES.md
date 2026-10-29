@@ -157,6 +157,23 @@ Billing, general AI chat/coaching and audio speech remain deferred. The in-app
 read-only horse briefing is the narrow implemented AI feature under Tickets 146–148.
 It adds no payment infrastructure, subscription gate, general chatbot or voice.
 
+## Location permission VM images
+
+A spike on October 27–29, 2026 showed that Cadence for Mac's location permission
+states can be tested in disposable Tart VMs: one image per state (never asked,
+allowed, denied), each set by the owner once. `scripts/location-vm.mjs` installs a
+published DMG in a copy, checks Gatekeeper, reads the Device location line, presses
+**Check again** and **Open Location Services**, and deletes the copy. VMs cannot get
+a position fix, so fix and route checks stay on real hardware. Details, evidence and
+setup: `plans/2026-10-27-location-vm-images.md`.
+
+Future work may make these runs part of installed acceptance. The spike also found
+that an answer to the first prompt given after Cadence's 12-second request deadline
+is lost; that fix needs its own ticket.
+
+Platform impact: desktop only. Web, marketing and future mobile: not applicable.
+Messaging impact: none.
+
 ## Web PWA and offline support
 
 Future work may add:

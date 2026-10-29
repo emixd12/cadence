@@ -69,6 +69,20 @@ else if (command.includes("/axelement")) {
     expect(calls().at(-1)?.args).toEqual(expect.arrayContaining(["BatchMode=yes", "StrictHostKeyChecking=yes", "--", "qa@test-host"]));
   });
 
+  it("passes a VM copy's own key and pinned host key while keeping strict checking", () => {
+    writeFileSync(inventory, JSON.stringify({ devices: [{ ...target, host: "192.168.64.7", identity: "/keys/id", knownHosts: "/keys/Cadence Release/known_hosts", hostKeyAlias: "cadence-loc-vm" }] }));
+    const result = run(["ax", "test-mac", "find", "Device location"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls().at(-1)?.args).toEqual(expect.arrayContaining(["StrictHostKeyChecking=yes", "IdentitiesOnly=yes", "-i", "/keys/id",
+      'UserKnownHostsFile="/keys/Cadence Release/known_hosts"', "HostKeyAlias=cadence-loc-vm", "qa@192.168.64.7"]));
+  });
+
+  it.each([{ identity: "relative/id" }, { knownHosts: "" }, { knownHosts: '/keys/a"b' }, { hostKeyAlias: "-oProxyCommand=x" }])("rejects unsafe SSH fields before SSH: %j", (extra) => {
+    writeFileSync(inventory, JSON.stringify({ devices: [{ ...target, ...extra }] }));
+    expect(run(["check", "test-mac"]).status).toBe(1);
+    expect(calls()).toEqual([]);
+  });
+
   it("preserves quotes and shell metacharacters as one remote AX argument", () => {
     const value = "Bob's $(touch /tmp/do-not-run)";
     const result = run(["ax", "test-mac", "press", "AXButton", value]);
