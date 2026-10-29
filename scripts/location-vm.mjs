@@ -114,10 +114,13 @@ function run(state, dmg, keep) {
 
     // Turning Travel on starts one location request. In the never-asked image it is
     // the first request, and the prompt stays unanswered until the copy is deleted.
-    step("travelAtLaunch", travelState(ax));
-    if (travelState(ax) === "on") { ax("press", "AXCheckBox", "Travel estimates"); pause(5000); }
-    ax("press", "AXCheckBox", "Travel estimates");
-    step("travelOn", travelState(ax));
+    // A run that never started the request must fail rather than report a permission.
+    const travelAtLaunch = travelState(ax);
+    step("travelAtLaunch", travelAtLaunch);
+    if (travelAtLaunch === "unknown") throw new Error("Settings did not show the Travel estimates checkbox.");
+    if (travelAtLaunch === "on") setTravel(ax, "off");
+    setTravel(ax, "on");
+    step("travelOn", "on");
     pause(15_000);
     step("permissionAfterRequest", permissionLine(ax("find", "Device location").out));
     if (ax("find", "^AXButton Check again$").out.includes("Check again")) {
@@ -171,6 +174,11 @@ function travelState(ax) {
 }
 
 // find.js matches "<role> <text>" and prints "<role>: <text>".
+function setTravel(ax, want) {
+  if (ax("press", "AXCheckBox", "Travel estimates").status !== 0) throw new Error(`Could not press Travel estimates to turn it ${want}.`);
+  if (!waitUntil(() => travelState(ax) === want, 15_000)) throw new Error(`Travel estimates did not turn ${want}.`);
+}
+
 function openSettings(ax) {
   ax("press", "AXButton", "Open navigation"); pause(2000);
   ax("press", "AXButton", "Settings");
