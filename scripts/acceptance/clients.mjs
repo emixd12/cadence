@@ -386,7 +386,8 @@ export function childEnv(base, extra = {}) {
 
 /** Find an executable on PATH without running a shell. */
 export function which(name, env = process.env) {
-  for (const dir of String(env.PATH ?? '').split(delimiter)) {
+  const { PATH: searchPath = '' } = env;
+  for (const dir of String(searchPath).split(delimiter)) {
     const candidate = join(dir, name);
     if (dir && existsSync(candidate)) return candidate;
   }

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CLIENT_SCENARIOS, behaviorTitle } from '../scripts/acceptance/client-prompts.mjs';
 import {
-  ANTHROPIC_MCP_BETA, ANTHROPIC_VERSION, CLAUDE_AI_CONNECTOR, CLAUDE_MODEL, ClientStop, TOKEN_ENV, claudeCodeArgs, parseAnthropicResponses,
+  ANTHROPIC_MCP_BETA, ANTHROPIC_VERSION, CLAUDE_AI_CONNECTOR, CLAUDE_MODEL, ClientStop, TOKEN_ENV, parseAnthropicResponses,
   parseClaudeStream, parseInspectorResult, parseOpenaiResponse, runAnthropicApi, runOpenaiApi, toolOutcome,
 } from '../scripts/acceptance/clients.mjs';
 import { compareCalls, createAdapters, evaluate, localIssuer, main, parseClientArgs, readiness, runOneClient } from '../scripts/acceptance/client-runners.mjs';
