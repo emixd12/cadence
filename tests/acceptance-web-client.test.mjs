@@ -44,7 +44,7 @@ function resetState(overrides = {}) {
     connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: false }], grants: [], behaviors: [], activity: [], consentAccountId: USER_A, consentEmail: EMAIL_A,
     requestScopes: ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'],
     approvalsPerTool: 1, stepUp: false, neverReply: false, endlessAfterApproval: false,
-    consentCount: 0, pending: null, messages: [],
+    consentCount: 0, pending: null, messages: [], chats: [], archiveInlineBroken: false, openedPaths: [],
     ...overrides,
   };
 }
@@ -161,6 +161,20 @@ function openCreate() {
 function renderChat() {
   const log = el('div', { id: 'log' });
   root.append(log);
+  // Real chats move to /c/<id> (ChatGPT) or /chat/<id> (Claude) after the first
+  // prompt; the header menu archives (ChatGPT) or deletes (Claude) that chat only.
+  const chatPrefix = flavor === 'chatgpt' ? '/c/' : '/chat/';
+  const currentChat = () => (location.pathname.startsWith(chatPrefix) ? location.pathname.slice(chatPrefix.length) : null);
+  if (!(S.archiveInlineBroken && !currentChat())) {
+    root.append(el('button', { 'aria-label': flavor === 'chatgpt' ? 'Open conversation options' : 'Open chat options', onclick: () => {
+      const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: () => {
+        menu.remove();
+        const confirm = el('div', { role: 'alertdialog' }, el('button', { onclick: async () => { confirm.remove(); await post('/api/archive', { chatId: currentChat() }); } }, flavor === 'chatgpt' ? 'Archive' : 'Delete'));
+        document.body.append(confirm);
+      } }, flavor === 'chatgpt' ? 'Archive' : 'Delete'));
+      document.body.append(menu);
+    } }, '...'));
+  }
   if (flavor === 'chatgpt') {
     const plus = el('button', { 'aria-label': 'Add files and more', onclick: () => {
       const menu = el('div', { role: 'menu' });
@@ -174,7 +188,8 @@ function renderChat() {
   const composer = el('div', { contenteditable: 'true', ...(flavor === 'chatgpt' ? { id: 'prompt-textarea', role: 'textbox' } : { class: 'ProseMirror' }) });
   root.append(composer);
   root.append(el('button', { 'aria-label': flavor === 'chatgpt' ? 'Send prompt' : 'Send message', onclick: async () => {
-    const r = await post('/api/prompt', { text: composer.innerText });
+    const r = await post('/api/prompt', { text: composer.innerText, chatId: currentChat() });
+    if (r.chatId && !currentChat()) history.replaceState(null, '', chatPrefix + r.chatId);
     show(r);
   } }));
   function assistant(text, streaming) {
@@ -219,12 +234,19 @@ function chatServer(flavor) {
       const next = flavor === 'chatgpt' ? '/settings/plugins-settings' : '/customize/connectors';
       return send(200, 'text/html', html('Connected', '<p>done</p>', `if (window.opener) window.close(); else location.href = ${JSON.stringify(next)};`));
     }
+    if (url.pathname === '/api/archive') {
+      const chat = state.chats.find((c) => c.id === input.chatId);
+      if (chat) chat.archived = true;
+      return json({});
+    }
     if (url.pathname === '/api/prompt') {
       state.messages.push(input.text);
-      if (state.neverReply) return json({ kind: 'none' });
+      let chatId = input.chatId;
+      if (!chatId) { chatId = randomUUID(); state.chats.push({ id: chatId, archived: false }); }
+      if (state.neverReply) return json({ kind: 'none', chatId });
       const write = /create a new daily behavior/.test(input.text);
       state.pending = { op: write ? 'create_behavior' : 'list_behaviors', write, title: /"([^"]+)"/.exec(input.text)?.[1] ?? null, approvals: 0 };
-      return json(write || state.approvalsPerTool > 1 ? { kind: 'approve', op: state.pending.op } : finish());
+      return json({ ...(write || state.approvalsPerTool > 1 ? { kind: 'approve', op: state.pending.op } : finish()), chatId });
     }
     if (url.pathname === '/api/approve') {
       state.pending.approvals += 1;
@@ -233,7 +255,8 @@ function chatServer(flavor) {
       return json(finish());
     }
     if (url.pathname === '/api/resume') return json(finish());
-    if (url.pathname === '/' || url.pathname === '/new' || url.pathname.startsWith('/settings/plugins-settings') || url.pathname.startsWith('/customize/connectors')) {
+    if (!url.pathname.startsWith('/api/')) state.openedPaths.push(url.pathname);
+    if (url.pathname === '/' || url.pathname === '/new' || /^\/(c|chat)\/[0-9a-f-]{36}$/.test(url.pathname) || url.pathname.startsWith('/settings/plugins-settings') || url.pathname.startsWith('/customize/connectors')) {
       return send(200, 'text/html', html(flavor === 'chatgpt' ? 'ChatGPT stub' : 'Claude stub', '<div id="root"></div>', chatScript(flavor)));
     }
     return send(404, 'text/plain', 'not found');
@@ -393,7 +416,17 @@ describe('ChatGPT stub', () => {
     const out = await scenario('chatgpt', 'read-write');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
-    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'watcher', 'revoke']);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    // Privacy: each prompt opened a new chat, the run archived both right after
+    // their replies, and it never opened any chat it did not create.
+    expect(state.chats).toHaveLength(2);
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+    expect(parsed(out.lines).filter((e) => e.step.startsWith('prompt-')).map((e) => e.archived)).toEqual([true, true]);
+    expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
+    expect(state.openedPaths.filter((p) => /^\/c\//.test(p))).toEqual([]);
+    const ledger = readFileSync(join(out.run.dir, 'checkpoints.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    expect(ledger.find((r) => r.kind === 'step' && r.name === 'archive-chats' && r.state === 'done').result).toEqual({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
+    expect(ledger.filter((r) => r.kind === 'step' && r.name.startsWith('prompt-') && r.state === 'done').map((r) => [Boolean(r.result.chatId), r.result.archived])).toEqual([[true, true], [true, true]]);
     const connect = parsed(out.lines).find((e) => e.step === 'connect');
     expect(connect.grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read']);
     expect(state.connectors).toEqual([{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }]);
@@ -459,9 +492,44 @@ describe('Claude web stub', () => {
     const again = await scenario('claude-web', 'read-write', { runId: first.result.runId });
     expect(again.result.ok).toBe(true);
     expect(state.consentCount).toBe(consents);
-    expect(parsed(again.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'watcher', 'revoke']);
+    expect(parsed(again.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    // The first attempt archived (deleted) both Claude chats before the watcher miss.
+    expect(state.chats).toHaveLength(2);
+    expect(state.chats.every((c) => c.archived)).toBe(true);
     expect(state.messages).toHaveLength(2);
     expect(activeGrants()).toHaveLength(0);
+  }, 120_000);
+});
+
+describe('test chat cleanup', () => {
+  it('retries an archive that failed after the reply by opening only that chat', async () => {
+    resetState({ archiveInlineBroken: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).filter((e) => e.step.startsWith('prompt-')).map((e) => e.archived)).toEqual([false, false]);
+    expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2 });
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+    // The only chat pages opened by URL are the run's own two chats.
+    expect(state.openedPaths.filter((p) => p.startsWith('/c/')).sort()).toEqual(state.chats.map((c) => `/c/${c.id}`).sort());
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it('keeps the chats only when asked (archiveChats: false)', async () => {
+    state.flavor = 'chatgpt';
+    const context = await browser.newContext();
+    const run = createRun({ target: 'local', accounts: ['A'], scenarios: ['chatgpt:read-write'], root });
+    const lines = [];
+    try {
+      const result = await runWebScenario({
+        site: stubSite('chatgpt'), context, issuer: ISSUER, mcpUrl: `${ISSUER}/mcp`, slot: 'A', scenario: 'read-write',
+        account: { userId: USER_A, email: EMAIL_A }, sessions, rest, cleanup: cleanupModule, watcher: fakeWatcher(), run,
+        label: `web-test-${(counter += 1)}`, out: (line) => lines.push(line), archiveChats: false,
+        timeouts: { consentMs: 15_000, turnMs: 15_000, quietMs: 300 },
+      });
+      expect(result.ok, lines.join('\n')).toBe(true);
+    } finally { run.close(); await context.close(); }
+    expect(parsed(lines).map((e) => e.step)).not.toContain('archive-chats');
+    expect(state.chats.some((c) => c.archived)).toBe(false);
   }, 120_000);
 });
 
@@ -607,6 +675,11 @@ describe('profile guard', () => {
 });
 
 describe('CLI', () => {
+  it('archives test chats by default; --keep-chats turns it off', () => {
+    expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production']).keepChats).toBe(false);
+    expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--keep-chats']).keepChats).toBe(true);
+  });
+
   it('parses the task-note form without a subcommand and requires --allow-production', () => {
     expect(() => parseCli(['--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write'])).toThrow(/allow-production-required/);
     expect(parseCli(['--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production'])).toMatchObject({ command: 'run', client: 'chatgpt', slot: 'A', scenario: 'read-write', port: 4430 });

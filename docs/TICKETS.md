@@ -15314,7 +15314,7 @@ ticket's focused tests, then an independent verifier.
 
 ## Ticket 247: Resumable acceptance run ledger
 
-Status: in review (wave 1). `scripts/acceptance/ledger.mjs` writes
+Status: complete (wave 1). `scripts/acceptance/ledger.mjs` writes
 `.intent/acceptance/<run-id>/` (run.json, checkpoints.jsonl, events.jsonl, STATE.md
 capped at 60 lines). `run.step()` skips finished steps on resume, cleanup reads
 created and granted IDs from the ledger, and `assertSafe` rejects token-like values.
@@ -15323,7 +15323,7 @@ applicable.
 
 ## Ticket 248: OAuth and consent driver for the test accounts
 
-Status: in review (wave 1). `npm run mcp:oauth` covers discovery, dynamic or
+Status: complete (wave 1). `npm run mcp:oauth` covers discovery, dynamic or
 metadata-document client registration, PKCE, consent in headless Chrome
 (`playwright-core`, dev), code exchange, refresh rotation and revocation for read,
 Behaviors, Occurrences and full grants, plus Deny. It refuses a wrong account before
@@ -15332,7 +15332,7 @@ web QA tooling only; desktop, marketing and future mobile not applicable.
 
 ## Ticket 249: Protocol acceptance suite
 
-Status: planned (wave 2). `npm run mcp:accept:protocol -- --target local|production`
+Status: complete (wave 2). `npm run mcp:accept:protocol -- --target local|production`
 replaces the manual Inspector checks with the official SDK client: discovery,
 tools/list against the registry, every read tool, cross-account isolation, step-up
 denial, scoped writes, idempotent create, refresh and 401s. Platform impact: web QA
@@ -15340,7 +15340,7 @@ tooling only; desktop, marketing and future mobile not applicable.
 
 ## Ticket 250: Server-side acceptance watcher
 
-Status: in review (wave 1). `npm run mcp:watch` polls Cadence's OAuth and activity
+Status: complete (wave 1). `npm run mcp:watch` polls Cadence's OAuth and activity
 records for accounts A and B, read-only and without a service-role key, and waits for
 ordered scenario events (`--expect`). Its gap report lists what the server does not
 record. Platform impact: web QA tooling only; desktop, marketing and future mobile not
@@ -15348,7 +15348,7 @@ applicable.
 
 ## Ticket 251: Headless real-client runners
 
-Status: planned (wave 2). `npm run mcp:accept:clients` runs Claude Code, the claude.ai
+Status: complete (wave 2). `npm run mcp:accept:clients` runs Claude Code, the claude.ai
 connector through Claude Code, the Anthropic Messages API MCP connector, the OpenAI
 Responses API MCP tool and Inspector CLI, and cross-checks each with the watcher.
 Platform impact: web QA tooling only; desktop, marketing and future mobile not
@@ -15376,7 +15376,7 @@ marketing and future mobile not applicable.
 
 ## Ticket 254: Agent-scoped secrets through 1Password
 
-Status: in review (wave 1). `npm run agent:secret` reads items from the "Cadence
+Status: complete (wave 1). `npm run agent:secret` reads items from the "Cadence
 Agents" vault through a 1Password service-account token kept in the macOS Keychain,
 passes values to a child process through the environment, and records each access in
 the run ledger without the value. The "Cadence" vault and the MCP signing key keep
@@ -15385,7 +15385,7 @@ only; desktop, marketing and future mobile not applicable.
 
 ## Ticket 255: Browser-driven ChatGPT web and Claude web runs
 
-Status: planned (wave 2). `npm run mcp:accept:web` drives ChatGPT web and Claude web in
+Status: complete (wave 2). `npm run mcp:accept:web` drives ChatGPT web and Claude web in
 a dedicated Chrome profile, completes consent with Ticket 248's helper, and stops with
 a named reason and the guided fallback on a login wall or changed page. Platform
 impact: web QA tooling only; desktop, marketing and future mobile not applicable.

@@ -2,6 +2,7 @@
 // no Docker, Supabase or app is started.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { assertSafe } from '../scripts/acceptance/ledger.mjs';
 import {
   CHECK_SQL, defaultRunId, loopbackOnly, parseRunnerEnv, portsFor, protocolSummary, rewriteConfig, watcherVerdict,
 } from '../.claude/skills/mcp-acceptance/local-stack.mjs';
@@ -31,10 +32,19 @@ describe('local stack helper', () => {
   });
 
   it('names local runs by stack, tier and time, within the ledger and runner rules', () => {
-    const id = defaultRunId('cadence-accept-252dry', 't0', new Date('2026-10-30T11:56:07.123Z'));
-    expect(id).toBe('local-252dry-t0-20261030T115607');
-    expect(id).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/);
-    expect(defaultRunId(`cadence-accept-${'x'.repeat(40)}`, 't1').length).toBeLessThanOrEqual(64);
+    const at = new Date('2026-10-30T11:56:07.123Z');
+    expect(defaultRunId('cadence-accept-252dry', 't0', at)).toBe('local-252dry-t0-1030t115607');
+    // Tags up to the 40 characters --name allows: every default ID stays under the
+    // ledger's 32-character opaque-run limit and passes assertSafe as a run ID.
+    for (const tag of ['252', 'verify3', 'reverify', 'verifier', 'x'.repeat(40), `a${'1'.repeat(39)}`, 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t']) {
+      for (const tier of ['t0', 't1']) {
+        const id = defaultRunId(`cadence-accept-${tag}`, tier, at);
+        expect(id.length).toBeLessThan(32);
+        expect(id).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/);
+        expect(() => assertSafe({ type: 'run', runId: id, run: id })).not.toThrow();
+      }
+    }
+    expect(defaultRunId('cadence-accept-reverify', 't1', at)).toBe('local-reverify-t1-1030t115607');
   });
 
   it('reads runner.env without a shell', () => {

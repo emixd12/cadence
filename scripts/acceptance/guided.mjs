@@ -69,20 +69,25 @@ export function guidedSteps({ client, scenario = 'read-write', slot = 'A', label
     ? 'untick both write boxes ("Change Occurrence statuses and notes" and "Create, edit, archive, and restore Behaviors") if they appear, then click Allow'
     : 'leave any write boxes ticked (if none appear, the client asked for read only), then click Allow';
   const write = `If ${site.label} says it needs more access, follow its reconnect link; on Cadence's screen leave the write boxes ticked and click Allow. Approve the tool call if ${site.label} asks.`;
+  // Privacy rule for Emi's own ChatGPT and Claude accounts (SKILL.md, Hard rules).
+  const privacy = 'Do not open, read or search any other chat.';
+  const cleanup = client === 'chatgpt'
+    ? 'After the reply, archive this test chat (chat menu → Archive).'
+    : 'After the reply, delete this test chat (chat menu → Delete).';
   return [
     {
       id: 'connect', waitFor: ['client-registered', 'grant-created', 'token-issued'],
-      text: `In the Cadence QA Chrome window, open ${site.label}: ${WHERE[client]} (name "${CONNECTOR_NAME}", URL ${PRODUCTION_MCP_URL}). On Cadence's consent screen, check it shows test account ${slot} (${EMAILS[slot]}), ${consent}.`,
+      text: `In the Cadence QA Chrome window, open ${site.label}: ${WHERE[client]} (name "${CONNECTOR_NAME}", URL ${PRODUCTION_MCP_URL}). On Cadence's consent screen, check it shows test account ${slot} (${EMAILS[slot]}), ${consent}. ${privacy}`,
       instruction: `Connect ${site.label} to Cadence QA as account ${slot} and allow the ${readOnly ? 'read-only' : 'full'} grant`,
     },
     {
       id: 'read', waitFor: ['read-succeeded'],
-      text: `In a new ${site.label} chat, send exactly: ${PROMPTS.read()} Approve the tool call if ${site.label} asks.`,
+      text: `Start a new ${site.label} chat and send exactly: ${PROMPTS.read()} Approve the tool call if ${site.label} asks. ${privacy}`,
       instruction: `Send the canned read prompt in a new ${site.label} chat`,
     },
     {
       id: 'write', waitFor: ['write-succeeded'],
-      text: `In the same chat, send exactly: ${PROMPTS.write(label)} ${write}`,
+      text: `In the same chat, send exactly: ${PROMPTS.write(label)} ${write} ${cleanup} ${privacy}`,
       instruction: `Send the canned write prompt in ${site.label}${readOnly ? ' and allow the step-up' : ''}`,
     },
   ];

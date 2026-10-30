@@ -12,8 +12,8 @@
 // tier0, tier1, check and exec load <workdir>/runner.env themselves, so each
 // command works in a fresh shell. tier0 runs the protocol suite with a free
 // callback port, then the watcher over the same run, and prints one PASS or
-// FAIL line. Default run IDs: local-<name without cadence-accept->-t0|t1-<UTC
-// yyyymmddThhmmss>, one run ID per command. check counts active grants and
+// FAIL line. Default run IDs: local-<tag, first 10 characters>-t0|t1-<UTC
+// mmdd't'hhmmss>, under 32 characters, one run ID per command. check counts active grants and
 // token families on the stack (read-only) and exits 1 if any remain.
 //
 // `up` (run from the repository worktree root, Node 24):
@@ -162,10 +162,17 @@ function makeTls(dir) {
   rmSync(join(dir, 'leaf.csr'));
 }
 
-/** Default run ID for one tier: local-<suffix>-<tier>-<UTC yyyymmddThhmmss>. Fits the ledger's 64-character rule. */
+/**
+ * Default run ID for one tier: local-<tag, first 10 characters>-<tier>-<UTC mmdd't'hhmmss>,
+ * for example local-reverify-t1-1030t115607. Always under 32 characters and
+ * lowercase, because the ledger's assertSafe rejects 32+ character runs with an
+ * uppercase letter as possible secrets.
+ */
 export function defaultRunId(name, tier, now = new Date()) {
-  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, '');
-  return `local-${name.replace(/^cadence-accept-/, '')}-${tier}-${stamp}`.slice(0, 64);
+  const iso = now.toISOString();
+  const stamp = `${iso.slice(5, 7)}${iso.slice(8, 10)}t${iso.slice(11, 13)}${iso.slice(14, 16)}${iso.slice(17, 19)}`;
+  const tag = name.replace(/^cadence-accept-/, '').slice(0, 10).replace(/-+$/, '');
+  return `local-${tag}-${tier}-${stamp}`;
 }
 
 /** Parses runner.env (KEY="value" lines written by up). */

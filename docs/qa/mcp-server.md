@@ -25,6 +25,9 @@ owner steps, client quirks and recovery live in the project skill
 - Production runs start with Ticket 256 and the owner's go-ahead, never while
   Ticket 232's cleanup runs, and touch only test accounts A and B.
 - No command prints or stores tokens, codes, cookies, API keys or note text.
+- Web runs on Emi's own ChatGPT and Claude accounts open new chats only, never
+  open or read other chats, and archive (ChatGPT) or delete (Claude) each test chat
+  after its reply (`archive-chats` in the run ledger; first checked live in Ticket 256).
 - Local evidence (2026-10-30, Ticket 252, stack `cadence-accept-252`): `tier0`
   96/96 checks with the watcher satisfied; `tier1` claude-code and inspector pass,
   claude-ai, anthropic-api and openai-api skipped with named reasons; `check` 0 of 8

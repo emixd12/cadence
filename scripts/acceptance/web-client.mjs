@@ -30,7 +30,7 @@ import { parseArgs } from 'node:util';
 import { GRANTS, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
-import { SITES, WebStop, classifyPage, clickable, waitVisible } from './web-sites.mjs';
+import { SITES, WebStop, archiveChat, chatIdOf, classifyPage, clickable, waitVisible } from './web-sites.mjs';
 
 export { SITES, WebStop };
 
@@ -199,7 +199,7 @@ export function guidedFallback({ client, slot = 'A', scenario = 'read-write', re
     `  2. Name "${CONNECTOR_NAME}", URL ${PRODUCTION_MCP_URL}, then connect.`,
     `  3. On Cadence's consent screen, check the account is test account ${slot} and ${s.decision === 'deny' ? 'click Deny' : `allow the ${s.grant} grant`}.`,
     `  4. Start the watcher first: npm run mcp:watch -- --target production --confirm-production --account ${slot} --since 5m --expect ${site?.watcherScenario ?? client}`,
-    '  5. Send the canned prompts from scripts/acceptance/web-client.mjs and approve each tool call.',
+    '  5. In a new chat, send the canned prompts from scripts/acceptance/web-client.mjs and approve each tool call. Then archive (ChatGPT) or delete (Claude) that chat. Never open other chats.',
     '  Guided mode (Ticket 252) owns the full human checklist.',
   ];
 }
@@ -369,7 +369,7 @@ async function failureShot(page, dir, name) {
  */
 export async function runWebScenario({
   site, context, issuer, mcpUrl, slot, scenario: scenarioName, account, sessions, rest, cleanup, watcher, run, label: labelArg,
-  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false,
+  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false, archiveChats = true,
   timeouts = { consentMs: 90_000, turnMs: 180_000, quietMs: 2_500 },
 }) {
   const scenario = SCENARIOS[scenarioName];
@@ -440,6 +440,9 @@ export async function runWebScenario({
     });
     emit({ step: 'grant-checkpoint', ok: true, grantId: grant.grantId, scopes: grant.scopes });
 
+    // Privacy (Emi's ChatGPT and Claude accounts): each prompt opens a new chat,
+    // the run reads only that chat's reply, and archives it right after.
+    const chats = [];
     for (const kind of scenario.prompts) {
       const stepName = `prompt-${kind}`;
       const turn = await run.step(stepName, async ({ interrupted }) => {
@@ -464,10 +467,14 @@ export async function runWebScenario({
           : null;
         const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
         if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
+        const chatId = chatIdOf(site, page.url());
+        // A failed archive here is retried in archive-chats; the reply is already captured.
+        const archived = archiveChats && chatId ? await archiveChat(page, site).then(() => true, () => false) : false;
         await page.close().catch(() => {});
-        return result;
+        return { ...result, chatId, archived };
       });
-      emit({ step: stepName, ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null });
+      chats.push({ chatId: turn.chatId ?? null, archived: Boolean(turn.archived) });
+      emit({ step: stepName, ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null, archived: Boolean(turn.archived) });
     }
 
     if (scenario.prompts.includes('write')) {
@@ -479,6 +486,29 @@ export async function runWebScenario({
         return cp;
       });
       emit({ step: 'creation-checkpoint', ok: true, behaviorId: creation.behaviorId });
+    }
+
+    if (archiveChats && chats.length) {
+      // Before the watcher verdict, so a watcher miss still leaves no test chat behind.
+      const done = await run.step('archive-chats', async () => {
+        let archivedCount = 0;
+        let unknownCount = 0;
+        for (const chat of chats) {
+          if (chat.archived) { archivedCount += 1; continue; }
+          // An interrupted write attempt can leave a chat whose ID was never recorded.
+          if (!chat.chatId) { unknownCount += 1; continue; }
+          const page = await context.newPage();
+          track(page);
+          await page.goto(`${site.origin}${site.chatPathFor(chat.chatId)}`, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => { throw new WebStop('site-unreachable', 'chat-archive'); });
+          const pageState = await classifyPage(page, site);
+          if (pageState !== 'ok') throw new WebStop(pageState, 'chat-archive');
+          await archiveChat(page, site);
+          archivedCount += 1;
+          await page.close().catch(() => {});
+        }
+        return { chatCount: chats.length, archivedCount, unknownCount };
+      });
+      emit({ step: 'archive-chats', ok: true, ...done });
     }
 
     if (watch) {
@@ -552,10 +582,10 @@ export function parseCli(argv) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     client: { type: 'string' }, account: { type: 'string' }, scenario: { type: 'string' }, profile: { type: 'string' },
     port: { type: 'string' }, run: { type: 'string' }, 'allow-production': { type: 'boolean', default: false },
-    'keep-grant': { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
+    'keep-grant': { type: 'boolean', default: false }, 'keep-chats': { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
   } });
   const port = values.port === undefined ? DEFAULT_DEBUG_PORT : Number(values.port);
-  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], listScenarios: values['list-scenarios'] };
+  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], keepChats: values['keep-chats'], listScenarios: values['list-scenarios'] };
   if (opts.listScenarios) return opts;
   assertPort(port);
   if (command === 'dry-run') {
@@ -628,7 +658,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     const label = `web-${opts.client === 'chatgpt' ? 'gpt' : 'claude'}-${opts.slot.toLowerCase()}-${randomBytes(3).toString('hex')}`;
     const run = opts.runId ? resumeRun({ runId: opts.runId }) : createRun({
       target: 'production', accounts: [opts.slot], scenarios: [`${opts.client}:${opts.scenario}`],
-      steps: ['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'revoke'],
+      steps: ['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', ...(opts.keepChats ? [] : ['archive-chats']), 'revoke'],
     });
     const { context, detach } = await attachProfile({ profileDir: opts.profile, port: opts.port });
     try {
@@ -636,7 +666,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         site, context, issuer: PRODUCTION.issuer, mcpUrl: PRODUCTION_MCP_URL, slot: opts.slot, scenario: opts.scenario,
         account: PRODUCTION.accounts[opts.slot], sessions: deps.sessions, rest: deps.rest, cleanup: deps.cleanup,
         watcher: spawnWatcher(), run, label,
-        out, keepGrant: opts.keepGrant,
+        out, keepGrant: opts.keepGrant, archiveChats: !opts.keepChats,
       });
       out(summary({ step: 'done', ok: result.ok, runId: result.runId }));
       return result.ok ? 0 : 1;

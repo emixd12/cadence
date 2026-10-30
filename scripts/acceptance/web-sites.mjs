@@ -115,6 +115,13 @@ const chatgpt = Object.freeze({
   // Names only; values are never read out of the browser.
   sessionCookie: /^__Secure-next-auth\.session-token(\.\d+)?$/,
   chatPath: '/',
+  // Privacy: runs open new chats only and later reopen only a chat they created.
+  chatIdPattern: /^\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+  chatPathFor: (id) => `/c/${id}`,
+  // Archive this chat from its header menu. Not yet seen on the real site (Ticket 256).
+  archiveMenu: exact('Open conversation options', 'Conversation options'),
+  archiveItem: exact('Archive'),
+  archiveConfirm: exact('Archive', 'Confirm'),
   loginPath: /^\/(auth|log-?in)\b/i,
   loginButton: exact('Log in', 'Sign up', 'Sign up for free'),
   composer: '#prompt-textarea, [contenteditable="true"][role="textbox"], textarea[name="prompt-textarea"]',
@@ -158,6 +165,13 @@ const claudeWeb = Object.freeze({
   connectorsPath: '/customize/connectors',
   sessionCookie: /^sessionKey$/,
   chatPath: '/new',
+  chatIdPattern: /^\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+  chatPathFor: (id) => `/chat/${id}`,
+  // Claude has no archive here; the test chat is deleted from its header menu.
+  // Not yet seen on the real site (Ticket 256).
+  archiveMenu: exact('Open chat options', 'Chat options', 'Chat menu'),
+  archiveItem: exact('Delete'),
+  archiveConfirm: exact('Delete', 'Confirm'),
   loginPath: /^\/(login|logout|magic-link)\b/i,
   loginButton: exact('Continue with Google', 'Continue with email', 'Log in', 'Sign in'),
   nameField: exact('Name'),
@@ -211,6 +225,26 @@ const claudeWeb = Object.freeze({
 });
 
 export const SITES = Object.freeze({ chatgpt, 'claude-web': claudeWeb });
+
+/** The chat ID in a page URL on this site, or null (for example a new, unsent chat). */
+export function chatIdOf(site, url) {
+  try {
+    const m = site.chatIdPattern.exec(new URL(url).pathname);
+    return m ? m[1].toLowerCase() : null;
+  } catch { return null; }
+}
+
+/**
+ * Archives (ChatGPT) or deletes (Claude) the chat open in `page`, through that
+ * chat's own header menu. Stops with page-changed at chat-archive when a
+ * control is missing; it never searches or opens other chats.
+ */
+export async function archiveChat(page, site) {
+  await clickNamed(page, site.archiveMenu, 'chat-archive', { timeoutMs: 5_000 });
+  await clickNamed(page, site.archiveItem, 'chat-archive', { timeoutMs: 5_000 });
+  await confirmIfAsked(page, site.archiveConfirm);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+}
 
 /** A copy of a site whose pages live elsewhere (the stub pages in tests). */
 export function withOrigin(site, origin) {

@@ -74,6 +74,10 @@ describe('guided steps', () => {
         expect(steps[0].text).toContain('brittlebeliefs@gmail.com');
         expect(steps[2].text).toContain('Review practice guided-x-b-abc123');
         expect(steps[2].text).toMatch(/needs more access/);
+        // Privacy rule for Emi's own ChatGPT and Claude accounts.
+        expect(steps[1].text).toMatch(/new .* chat/);
+        expect(steps[2].text).toMatch(client === 'chatgpt' ? /archive this test chat/ : /delete this test chat/);
+        for (const s of steps) expect(s.text).toMatch(/do not open, read or search any other chat/i);
         if (scenario === 'step-up') expect(steps[0].text).toMatch(/untick both write boxes/);
         else expect(steps[0].text).toMatch(/leave any write boxes ticked/);
         // Ledger form: one short safe line.

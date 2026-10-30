@@ -38,6 +38,15 @@ Work in your own git worktree, never in Ticket 232's checkout
   stack, ports 553xx). Use the helper below with your own `cadence-accept-<x>` name.
 - **Merges:** nothing from this work merges to main without the coordinator; a main
   merge rebuilds both Vercel projects and needs a Trust refresh.
+- **Privacy (Emi's ChatGPT and Claude accounts):** the QA Chrome profile may hold
+  Emi's own ChatGPT and Claude accounts. Open new chats only. Never open, read or
+  search existing chats, projects, memory or history, not even to recover from a
+  changed page: stop with the named reason instead. Archive (ChatGPT) or delete
+  (Claude) every test chat the run created once its reply is captured. The web runner
+  does this by default and records it in the ledger (`archive-chats`); `--keep-chats`
+  turns it off and needs a reason in the report. Any chat it could not archive is a
+  cleanup item in the report. The archive controls are first checked on the real
+  sites in Ticket 256.
 
 ## Agent autonomy (spec, "Automated MCP client acceptance")
 
@@ -108,8 +117,8 @@ Pass (exit 0) prints `token: present in the Keychain`,
 mapping. Failures and the owner step each one needs:
 - exit 4, no token: Emi runs step 5 of `docs/qa/agent-secrets.md`.
 - exit 6, `cannot read "Cadence Agents"` or `can reach other vaults`: Emi recreates
-  the service account for "Cadence Agents" only (step 4), then step 5. On
-  2026-10-30 the account read "Cadence" instead; until fixed, the API runners skip.
+  the service account for "Cadence Agents" only (step 4), then step 5. (Emi's setup
+  was done and checked on 2026-10-30: the account reads only "Cadence Agents".)
 - exit 6, an item `missing`: Emi creates that key (steps 2–3).
 
 Production sessions expire when Google ends them. Enrollment is a sign-in (Emi's
@@ -147,7 +156,8 @@ node $S down --name $N
   (API base+1, DB base+2; avoid 57xxx and 553xx) and an app port in 4450–4459, the
   only issuers the Tier 1 runner accepts. `up` stops on any port in use.
 - **Run IDs:** one run ID per command. The default is
-  `local-<you>-t0|t1-<UTC yyyymmddThhmmss>`, printed on the first line; pass
+  `local-<you, first 10 characters>-t0|t1-<UTC mmdd't'hhmmss>` (under 32 characters,
+  lowercase, so the ledger never mistakes it for a secret), printed on the first line; pass
   `--run <id>` only to resume that run. Tier 0 and Tier 1 never share a run ID.
 - **Callback ports:** the OAuth redirect is caught inside the driver's browser and
   never bound on the host. `tier0` still picks a free ephemeral port per run; the
@@ -194,9 +204,15 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
 5. ChatGPT web: `npm run mcp:accept:web -- run --client chatgpt --account A --scenario read-write --allow-production --run <id>`,
    then `--scenario step-up`. On a stop it prints `guided-fallback … reason=…`; use
    guided mode below.
+   Privacy: both web runs open a new chat per prompt and archive (ChatGPT) or delete
+   (Claude) it after the reply; check the `archive-chats` line (`archivedCount` equals
+   `chatCount`, `unknownCount` 0). The archive controls are unverified on the real
+   sites until this run: if `archive-chats` stops with `page-changed`, report the run
+   ID and the chats left as a cleanup item. Never open other chats to find them.
 6. Cleanup: every runner revokes its grants. Check with
    `node scripts/acceptance/ledger.mjs ids <id>` and the watcher (`--once`).
-   Archive created Behaviors through the run log (`Review practice …` titles).
+   Archive created Behaviors through the run log (`Review practice …` titles), and
+   confirm every web run's test chats were archived (step 5).
 
 ### Anthropic MCP connector header
 
@@ -218,7 +234,9 @@ npm run mcp:accept:guided -- --client chatgpt|claude-web --scenario read-write|s
 
 Run it in the background. It starts the watcher, then prints
 `--- Steps for Emi … ---`: send that list to Emi as one message, unchanged. Each
-step is marked `seen:` when the records show it; you do not ask her anything.
+step is marked `seen:` when the records show it; you do not ask her anything. The
+steps keep the privacy rule: Emi starts a new chat, opens no other chat, and archives
+(ChatGPT) or deletes (Claude) the test chat after the reply.
 It checkpoints the grant and the created Behavior, then revokes the grant
 (`--keep-grant` keeps it). `--print-only` previews the list without starting
 anything. Exit 0 all steps seen; 1 a step was not seen (it prints the resume
@@ -278,8 +296,9 @@ folder alone:
 - **Local limits:** test login allows 10 users per app process (each Tier 0 run uses
   2, each Tier 1 process 1) and DCR allows 10 registrations an hour. On
   `test-login-quota-reached`, run `down` and `up`.
-- **Parallel test ports:** `tests/acceptance-web-client.test.mjs` binds 4431–4433;
-  two worktrees running it at once fail with `EADDRINUSE`. Run it alone.
+- **Parallel test ports:** the web-client stub tests listen on ephemeral ports (port
+  0) since Ticket 255's 1d11161, so worktrees can run them in parallel. An
+  `EADDRINUSE` now points at a stray process, not the tests.
 - **Load timeouts:** under full-suite load, `core-portability`,
   `desktop-release-acceptance`, `briefing-sequence` and the ledger SIGKILL test can
   time out. Re-run the file alone before calling it a failure. On Node 26, Ticket 232
