@@ -73,6 +73,7 @@
     "launch:cost:preflight": "node scripts/launch-cost-preflight.mjs",
     "launch:surge:drill": "node scripts/launch-surge-drill.mjs",
     "mcp:watch": "node scripts/acceptance/watch.mjs",
+    "mcp:accept:clients": "node scripts/acceptance/client-runners.mjs",
     "smoke:rls": "node scripts/supabase-rls-smoke.mjs",
     "smoke:rls:local": "node scripts/supabase-rls-smoke.mjs --local",
     "smoke:account-sync": "node scripts/account-sync-rpc-smoke.mjs",
