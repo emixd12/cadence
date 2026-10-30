@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNT_SYNC_ENTITY_KINDS, ACCOUNT_SYNC_TIME_LIMIT_MS, accountSyncFingerprint, resolveAccountSync, resolveReviewedAccountSync, type AccountSyncConflictDecision, type AccountSyncEntity, type AccountSyncPlan, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
+import { ACCOUNT_SYNC_CONTRACT, ACCOUNT_SYNC_ENTITY_KINDS, ACCOUNT_SYNC_TIME_LIMIT_MS, accountSyncFingerprint, resolveAccountSync, resolveReviewedAccountSync, type AccountSyncConflictDecision, type AccountSyncEntity, type AccountSyncPlan, type AccountSyncSnapshot } from "@cadence/core/resolvers/account-sync.resolver";
 import { sha256 } from "@cadence/core/hash";
+import { travelHabitSyncJson } from "@cadence/core/services/travel-habits";
 import type { Json } from "@cadence/core/types/json";
 import type { PortabilitySnapshot } from "@cadence/core/types/portability-rows";
 import type { NoteShortcutState } from "@cadence/core/types/note-shortcut";
@@ -60,15 +61,22 @@ async function readAccountSyncInputsWithin(profileId: string, client: SupabaseCl
   };
 }
 
+// Supabase drops a revoked session after its refresh fails, so the next request runs
+// unauthenticated and PostgREST answers 401. Keep that status so the failure reads as
+// "revoked" (Reconnect account) instead of a raw permission error.
+function withSessionStatus<T extends object>(error: T, status: number): T {
+  return status === 401 ? Object.assign(error, { status }) : error;
+}
+
 export async function readHostedAccountSyncEnvelope(client: SupabaseClient, signal?: AbortSignal): Promise<HostedEnvelope> {
   if (!signal) {
     const controller = new AbortController();
     return deadline(readHostedAccountSyncEnvelope(client, controller.signal), controller);
   }
-  let request = client.rpc("read_account_sync_snapshot");
+  let request = client.rpc("read_account_sync_snapshot", { contract: ACCOUNT_SYNC_CONTRACT });
   request = request.abortSignal(signal);
-  const { data, error } = await request;
-  if (error) throw error;
+  const { data, error, status } = await request;
+  if (error) throw withSessionStatus(error, status);
   const envelope = hostedEnvelope(data);
   if (accountSyncFingerprint(envelope) !== envelope.fingerprint) throw new Error("The hosted account snapshot fingerprint is invalid.");
   await localCommand("validateAccountSyncSnapshot", { entities: envelope.entities });
@@ -88,10 +96,10 @@ export async function applyHostedAccountSync(client: SupabaseClient, inputs: Acc
   if (plan.conflicts.length || !plan.idempotencyKey || !plan.fingerprints.merged) throw new Error("Account synchronization conflicts must be resolved before apply.");
   if (plan.fingerprints.baseline !== accountSyncFingerprint(inputs.baseline) || plan.fingerprints.local !== accountSyncFingerprint(inputs.local) || plan.fingerprints.hosted !== inputs.hostedFingerprint) throw new Error("The account synchronization plan is stale.");
   const rpcPlan = { writes: plan.hostedWrites, mergedFingerprint: plan.fingerprints.merged, conflicts: [] };
-  const syncPayload = { schemaVersion: 1, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
+  const syncPayload = { schemaVersion: 1, contract: ACCOUNT_SYNC_CONTRACT, idempotencyKey: plan.idempotencyKey, baselineFingerprint: plan.fingerprints.baseline,
       localFingerprint: plan.fingerprints.local, hostedFingerprint: plan.fingerprints.hosted, planFingerprint: sha256(canonicalJson(rpcPlan)), plan: rpcPlan, attemptedAt };
   const applied = await client.rpc("apply_account_sync_plan", { sync_payload: syncPayload });
-  if (applied.error) throw applied.error;
+  if (applied.error) throw withSessionStatus(applied.error, applied.status);
   const result = applied.data;
   if (!isRecord(result) || result.status !== "applied" || typeof result.fingerprint !== "string") throw new Error("Hosted account synchronization returned an invalid result.");
   const snapshot = hostedEnvelope(result.snapshot);
@@ -172,6 +180,7 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
     routing_consent_at: travel.routingConsentAt,
     onboarding_completed_at: travel.onboardingCompletedAt,
     updated_at: travel.updatedAt,
+    ...travelHabitSyncJson(travel.habits),
   } }];
   add(entities, "category", snapshot.categories);
   for (const graph of snapshot.graphs) {
@@ -190,6 +199,10 @@ export function portabilityEntities(snapshot: AccountSyncPortabilitySnapshot): A
   add(entities, "imported_intervention", snapshot.importedInterventions);
   add(entities, "reminder_delivery", snapshot.reminderDeliveries ?? []);
   add(entities, "note_shortcut_state", snapshot.noteShortcutStates ?? []);
+  add(entities, "place_label_settings", snapshot.placeLabelSettings ?? []);
+  add(entities, "place_marker", snapshot.placeMarkers ?? []);
+  add(entities, "completion_place_label", snapshot.completionPlaceLabels ?? []);
+  add(entities, "where_suggestion_dismissal", snapshot.whereSuggestionDismissals ?? []);
   return entities;
 }
 

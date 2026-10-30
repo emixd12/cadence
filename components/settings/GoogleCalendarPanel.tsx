@@ -14,14 +14,17 @@ export type { CalendarEventRange, GoogleCalendarCoordinator } from "@/lib/ui/goo
 
 type GoogleCalendarPanelProps = Readonly<{
   coordinator: GoogleCalendarCoordinator;
+  agent?: boolean;
   refreshRange: CalendarEventRange;
   callbackMessage?: string;
   wrongAccount?: boolean;
   openExternalUrl?: (url: string) => Promise<void>;
   refreshVersion?: number;
+  /** Renders as one source inside ConnectorLibrary. */
+  nested?: boolean;
 }>;
 
-export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage, wrongAccount = false, openExternalUrl, refreshVersion = 0 }: GoogleCalendarPanelProps) {
+export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage, wrongAccount = false, openExternalUrl, refreshVersion = 0, agent = false, nested = false }: GoogleCalendarPanelProps) {
   const [connection, setConnection] = useState<CalendarConnectionView | null>(null);
   const [calendars, setCalendars] = useState<readonly CalendarListEntry[] | null>(null);
   const [preferences, setPreferences] = useState<CalendarPreferences | null>(null);
@@ -66,6 +69,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
     setPending("refresh"); setMessage(null);
     try {
       setCalendars(await coordinator.listCalendars());
+      if (agent) { setMessage("Calendar list refreshed."); return; }
       if (!connection?.preferences.selectedCalendarIds.length) {
         setMessage("Calendar list refreshed. Select calendars and save to show events.");
         return;
@@ -92,7 +96,7 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   const connectLabel = status === "reconnect_required" ? "Reconnect Google Calendar" : "Connect Google Calendar";
 
   return (
-    <SettingsPanel title="Google Calendar" description="Read-only context from the Google account used for Cadence. Calendar events never change Behavior status or schedules.">
+    <SettingsPanel title={agent ? "Google Calendar for Daily Brief" : "Google Calendar"} headingLevel={nested ? 3 : 2} id={nested && !agent ? "connector-google_calendar" : undefined} description={agent ? "A separate read-only connection for Calendar timing in Daily Brief. Connecting does not enable sharing with OpenAI; enable it in Daily Brief settings after selecting calendars." : "Read-only context from the Google account used for Cadence. Calendar events never change Behavior status or schedules."}>
       <div className="grid max-w-2xl gap-4 text-sm leading-6">
         <p role={message ? "status" : undefined} className="text-muted-readable">{message ?? statusLabel(status)}</p>
         {wrongAccount ? <p role="status" className="text-muted-readable">
@@ -102,15 +106,15 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
           {" "}Cadence does not revoke a wrong-account grant automatically.
         </p> : null}
         {status === "not_configured" ? <p className="text-muted-readable">Calendar connection is not configured for this Cadence deployment.</p> : null}
-        {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting removes Calendar access for this Cadence account. Other devices stop refreshing after they receive this account change.</p> : null}
+        {status === "connected" ? <p className="text-muted-readable">Cadence reads selected calendars only. Disconnecting removes this Calendar connection for this Cadence account. Other devices stop refreshing after they receive this account change.</p> : null}
         {status !== "connected" && status !== "not_configured" ? <button type="button" onClick={connect} disabled={pending !== null} className="product-action product-action-primary min-h-11 w-fit px-3 py-2 text-sm font-bold">{pending === "connect" ? "Opening Calendar connection…" : connectLabel}</button> : null}
         {canManage ? <>
-          <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
+          {!agent ? <fieldset disabled={pending !== null} className="grid gap-3 border-t border-line pt-4">
             <legend className="font-bold text-foreground">Calendar display</legend>
             <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.visible} onChange={(event) => setPreferences({ ...preferences, visible: event.target.checked })} />Show Calendar context on Timeline</label>
             <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={preferences.showAllDay} onChange={(event) => setPreferences({ ...preferences, showAllDay: event.target.checked })} />Show all-day events</label>
-          </fieldset>
-          <CalendarSelector calendars={calendars} preferences={preferences} onChange={setPreferences} disabled={pending !== null} />
+          </fieldset> : null}
+          <CalendarSelector agent={agent} calendars={calendars} preferences={preferences} onChange={setPreferences} disabled={pending !== null} />
           <div className="flex flex-wrap gap-3 border-t border-line pt-4">
             <button type="button" onClick={save} disabled={pending !== null} className="product-action product-action-primary min-h-11 px-3 py-2 text-sm font-bold">{pending === "save" ? "Saving Calendar…" : "Save Calendar settings"}</button>
             <button type="button" onClick={refresh} disabled={pending !== null} className="product-action product-action-secondary min-h-11 px-3 py-2 text-sm font-bold">{pending === "refresh" ? "Refreshing Calendar…" : "Refresh Calendar"}</button>
@@ -122,11 +126,16 @@ export function GoogleCalendarPanel({ coordinator, refreshRange, callbackMessage
   );
 }
 
-function CalendarSelector({ calendars, preferences, onChange, disabled }: Readonly<{
-  calendars: readonly CalendarListEntry[] | null;
+/** Shared calendar choice field; Outlook reuses it with its own selection keys mapped in. */
+export type CalendarChoiceEntry = Pick<CalendarListEntry, "id" | "name" | "primary">;
+
+export function CalendarSelector({ calendars, preferences, onChange, disabled, refreshLabel = "Refresh Calendar", agent }: Readonly<{
+  calendars: readonly CalendarChoiceEntry[] | null;
+  refreshLabel?: string;
   preferences: CalendarPreferences;
   onChange: (preferences: CalendarPreferences) => void;
   disabled: boolean;
+  agent?: boolean;
 }>) {
   const [query, setQuery] = useState("");
   const searchId = useId();
@@ -153,18 +162,19 @@ function CalendarSelector({ calendars, preferences, onChange, disabled }: Readon
         <label htmlFor={searchId}>Search calendars</label>
         <input id={searchId} type="search" value={query} onChange={(event) => setQuery(event.target.value)} className="min-h-11 min-w-0 w-full border border-line bg-background px-3 py-2" />
         <div className="max-h-64 overflow-y-auto overscroll-contain divide-y divide-line">
-          {calendars === null ? <p className="text-muted-readable">Calendar list is not loaded. Try Refresh Calendar.</p>
+          {calendars === null ? <p className="text-muted-readable">Calendar list is not loaded. Try {refreshLabel}.</p>
             : calendars.length === 0 ? <p className="text-muted-readable">No readable calendars are available.</p>
             : matches.length === 0 ? <p className="text-muted-readable">No calendars match your search.</p>
-            : matches.map((calendar) => <CalendarChoice key={calendar.id} calendar={calendar} preferences={preferences} onChange={onChange} />)}
+            : matches.map((calendar) => <CalendarChoice agent={agent} key={calendar.id} calendar={calendar} preferences={preferences} onChange={onChange} />)}
         </div>
       </div>
     </details>
   </fieldset>;
 }
 
-function CalendarChoice({ calendar, preferences, onChange }: Readonly<{
-  calendar: CalendarListEntry;
+function CalendarChoice({ calendar, preferences, onChange, agent }: Readonly<{
+  agent?: boolean;
+  calendar: CalendarChoiceEntry;
   preferences: CalendarPreferences;
   onChange: (preferences: CalendarPreferences) => void;
 }>) {
@@ -177,7 +187,7 @@ function CalendarChoice({ calendar, preferences, onChange }: Readonly<{
   });
   return <div className="grid gap-1 py-1 [overflow-wrap:anywhere]">
     <label className="flex min-h-11 items-center gap-2 font-bold"><input type="checkbox" checked={selected} onChange={(event) => update(event.target.checked, hidden)} />{calendar.name}{calendar.primary ? " (primary)" : ""}</label>
-    {selected ? <label className="flex min-h-11 items-center gap-2 text-muted-readable"><input type="checkbox" checked={!hidden} aria-label={`Visible on Timeline: ${calendar.name}`} onChange={(event) => update(true, !event.target.checked)} />Visible on Timeline</label> : null}
+    {selected && !agent ? <label className="flex min-h-11 items-center gap-2 text-muted-readable"><input type="checkbox" checked={!hidden} aria-label={`Visible on Timeline: ${calendar.name}`} onChange={(event) => update(true, !event.target.checked)} />Visible on Timeline</label> : null}
   </div>;
 }
 

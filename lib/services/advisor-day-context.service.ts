@@ -5,18 +5,26 @@ import type { User } from "@supabase/supabase-js";
 
 import {
   AdvisorDayContextValidationError,
+  projectAdvisorActivityConnector,
   projectAdvisorCadenceSource,
   projectAdvisorCalendarConnector,
+  projectUnavailableAdvisorActivity,
   projectUnavailableAdvisorCalendar,
+  projectUnavailableVersionedAdvisorCalendar,
+  projectVersionedAdvisorCalendarConnector,
   validateAdvisorDayContext,
+  validateVersionedAdvisorDayContext,
 } from "@cadence/core/services/advisor-day-context";
 import { decideOccurrenceSyncCoverage } from "@cadence/core/services/occurrence-sync";
 import {
   ADVISOR_DAY_CONTEXT_LIMITS,
   ADVISOR_DAY_CONTEXT_VERSION,
+  ADVISOR_DAY_CONTEXT_VERSION_1_1,
+  type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
+  type AdvisorCalendarConnectorV1_1,
+  type AdvisorDayContext,
   type AdvisorDayContextErrorCode,
-  type AdvisorDayContextV1,
   type AdvisorDuration,
   type AdvisorOpaqueRef,
   type AdvisorSourceFailureCode,
@@ -40,6 +48,20 @@ import {
   type CalendarCaller,
 } from "@/lib/services/google-calendar.service";
 import { CalendarConnectionError } from "@/lib/services/google-calendar-oauth";
+import { getConnectorConnection } from "@/lib/services/connector-credentials";
+import { getHevyActivities } from "@/lib/services/hevy.service";
+import { getOutlookCalendarConnection, getOutlookCalendarEventsForCaller } from "@/lib/services/outlook-calendar.service";
+import { getIcloudCalendarConnection, getIcloudCalendarEventsForCaller } from "@/lib/services/icloud-calendar.service";
+import { ConnectorError } from "@/lib/types/connectors";
+
+/** Ticket 239: each connector read stops at 25 s or the brief's remaining source budget, whichever is sooner. */
+export const ADVISOR_CONNECTOR_READ_DEADLINE_MS = 25_000;
+
+type AdvisorCalendarFence = Readonly<{
+  calendarIds: string[];
+  connectionGeneration: number;
+  selectionRevision: number;
+}>;
 
 export type AdvisorAuthorizationFence = Readonly<{
   userId: string;
@@ -49,11 +71,19 @@ export type AdvisorAuthorizationFence = Readonly<{
   grantGeneration: number;
   grantExpiresAt: string;
   behaviorIds: string[];
-  calendar: Readonly<{
-    calendarIds: string[];
-    connectionGeneration: number;
-    selectionRevision: number;
-  }> | null;
+  calendar: AdvisorCalendarFence | null;
+  /** Separately disclosed sources (Ticket 239); absent unless the caller requested connector sources. */
+  outlookCalendar?: AdvisorCalendarFence | null;
+  icloudCalendar?: AdvisorCalendarFence | null;
+  hevy?: Readonly<{ connectionGeneration: number }> | null;
+}>;
+
+export type AdvisorConnectorSourceRequest = Readonly<{
+  outlookCalendar: boolean;
+  icloudCalendar: boolean;
+  hevy: boolean;
+  /** Epoch milliseconds after which no connector read starts or continues. */
+  deadlineAt: number;
 }>;
 
 export type AdvisorDayContextCaller = Readonly<{
@@ -78,6 +108,8 @@ type AdvisorDayContextReadInput = Readonly<{
   authorization: AdvisorAuthorizationFence;
   revalidateAuthorization: (signal?: AbortSignal) => Promise<AdvisorAuthorizationFence>;
   includeGoogleCalendar: boolean;
+  /** Each requested source also needs its fence in `authorization`. */
+  connectorSources?: AdvisorConnectorSourceRequest;
   includeRecordedElapsedDurations?: boolean;
     includeHistoricalCompletionTimes?: boolean;
   localDate?: string;
@@ -90,7 +122,7 @@ type AdvisorDayContextReadInput = Readonly<{
 
 export async function readAdvisorDayContext(input: AdvisorDayContextReadInput & Readonly<{
   historyDays?: number;
-}>): Promise<AdvisorDayContextV1> {
+}>): Promise<AdvisorDayContext> {
   const [context] = await readAdvisorDayContexts({
     ...input,
     historyDays: [input.historyDays ?? 90],
@@ -100,11 +132,16 @@ export async function readAdvisorDayContext(input: AdvisorDayContextReadInput & 
 
 export async function readAdvisorDayContexts(input: AdvisorDayContextReadInput & Readonly<{
   historyDays: readonly number[];
-}>): Promise<AdvisorDayContextV1[]> {
+}>): Promise<AdvisorDayContext[]> {
   const clock = input.clock ?? (input.now ? () => input.now as Temporal.Instant : () => Temporal.Now.instant());
   const now = clock();
   const authorization = normalizeAuthorization(input.authorization, input.caller.user.id, now);
   if (input.includeGoogleCalendar && !authorization.calendar) throw new AdvisorDayContextServiceError("access_denied");
+  const sources = input.connectorSources;
+  if (sources && ((sources.outlookCalendar && !authorization.outlookCalendar) || (sources.icloudCalendar && !authorization.icloudCalendar) ||
+      (sources.hevy && !authorization.hevy) || !Number.isFinite(sources.deadlineAt))) {
+    throw new AdvisorDayContextServiceError("access_denied");
+  }
   if (input.historyDays.length < 1 || input.historyDays.length > 2 ||
       input.historyDays.some((days) => !Number.isInteger(days) || days < 1 || days > 90)) {
     throw new AdvisorDayContextServiceError("invalid_request");
@@ -165,6 +202,7 @@ async function assembleDayContexts(
     caller: AdvisorDayContextCaller;
     revalidateAuthorization: (signal?: AbortSignal) => Promise<AdvisorAuthorizationFence>;
     includeGoogleCalendar: boolean;
+    connectorSources?: AdvisorConnectorSourceRequest;
     includeRecordedElapsedDurations?: boolean;
     includeHistoricalCompletionTimes?: boolean;
     historyDays: readonly number[];
@@ -176,7 +214,7 @@ async function assembleDayContexts(
   now: Temporal.Instant,
   clock: () => Temporal.Instant,
   signal: AbortSignal,
-): Promise<AdvisorDayContextV1[]> {
+): Promise<AdvisorDayContext[]> {
   const opaqueRef = createAdvisorOpaqueRef(input.opaqueRefKey, authorization);
   const timezone = await readAdvisorProfileTimezone(input.caller.client, authorization.userId);
   assertNotAborted(signal);
@@ -272,9 +310,28 @@ async function assembleDayContexts(
     source: "google_calendar",
     state: "not_requested",
   };
-  if (input.includeGoogleCalendar) {
-    if (!authorization.calendar) throw new AdvisorDayContextServiceError("access_denied");
-    connector = await readCalendar(input.caller, authorization, localDate, now, opaqueRef, signal);
+  if (input.includeGoogleCalendar && !authorization.calendar) throw new AdvisorDayContextServiceError("access_denied");
+  // Separately disclosed sources read beside Google; a failure in one cancels the others.
+  const sourceRequest = input.connectorSources;
+  const sourceController = new AbortController();
+  const sourceSignal = AbortSignal.any([signal, sourceController.signal]);
+  const reads = Promise.all([
+    input.includeGoogleCalendar ? readCalendar(input.caller, authorization, localDate, now, opaqueRef, signal) : Promise.resolve(connector),
+    sourceRequest?.outlookCalendar && authorization.outlookCalendar
+      ? readConnectorCalendar("outlook_calendar", input.caller, authorization.outlookCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
+    sourceRequest?.icloudCalendar && authorization.icloudCalendar
+      ? readConnectorCalendar("icloud_calendar", input.caller, authorization.icloudCalendar, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
+    sourceRequest?.hevy && authorization.hevy
+      ? readHevyActivity(input.caller, authorization.hevy.connectionGeneration, localDate, clock, opaqueRef, sourceSignal, sourceRequest.deadlineAt) : null,
+  ]);
+  let added: Array<AdvisorCalendarConnectorV1_1 | AdvisorActivityConnector>;
+  try {
+    const [google, outlook, icloud, hevy] = await reads;
+    connector = google;
+    added = [outlook, icloud, hevy].filter((item): item is AdvisorCalendarConnectorV1_1 | AdvisorActivityConnector => item !== null);
+  } catch (error) {
+    sourceController.abort();
+    throw error;
   }
 
   const currentRevision = await readAdvisorCadenceRevision(input.caller.client, {
@@ -286,11 +343,13 @@ async function assembleDayContexts(
   if (currentRevision !== cadenceSnapshot.revision) throw new AdvisorDayContextServiceError("context_changed", true);
   assertNotAborted(signal);
   if (input.includeGoogleCalendar && authorization.calendar) {
-    const currentCalendar = await getCalendarConnection(input.caller);
-    if (currentCalendar.generation !== authorization.calendar.connectionGeneration || currentCalendar.selectionRevision !== authorization.calendar.selectionRevision) {
+    const currentCalendar = await getCalendarConnection(input.caller, "agent");
+    if (currentCalendar.status !== "connected" || currentCalendar.generation !== authorization.calendar.connectionGeneration || currentCalendar.selectionRevision !== authorization.calendar.selectionRevision) {
       throw new AdvisorDayContextServiceError("context_changed", true);
     }
   }
+  assertNotAborted(signal);
+  await assertConnectorSourcesCurrent(input.caller, authorization, sourceRequest);
   assertNotAborted(signal);
   const currentAuthorization = normalizeAuthorization(await input.revalidateAuthorization(signal), input.caller.user.id, clock());
   assertNotAborted(signal);
@@ -309,11 +368,14 @@ async function assembleDayContexts(
   const calendarExpiry = connector.state === "not_requested" || connector.fetchedAt === null
     ? null
     : Temporal.Instant.from(connector.fetchedAt).add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs });
+  const addedExpiry = added.flatMap((item) => item.complete && item.fetchedAt
+    ? [Temporal.Instant.from(item.fetchedAt).add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })] : []);
   const expiresAt = minInstant([
     Temporal.Instant.from(cadenceSnapshot.observedAt).add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs }),
     Temporal.Instant.from(authorization.grantExpiresAt),
     dayEnd.toInstant(),
     ...(calendarExpiry ? [calendarExpiry] : []),
+    ...addedExpiry,
   ]);
   if (Temporal.Instant.compare(expiresAt, finalNow) <= 0) throw new AdvisorDayContextServiceError("context_changed", true);
   const revisionMaterial = JSON.stringify([
@@ -321,7 +383,11 @@ async function assembleDayContexts(
     connector.state,
     connector.state === "not_requested" ? null : [connector.connectionGeneration, connector.selectionRevision, connector.fetchedAt],
     finalNow.toString(),
+    ...(added.length ? [added.map((item) => [item.source, item.state, item.connectionGeneration, "selectionRevision" in item ? item.selectionRevision : null, item.fetchedAt])] : []),
   ]);
+  // Google-only reads keep the exact `1.0` shape; any disclosed new source moves the context to `1.1`.
+  const versioned = added.length > 0;
+  const status = (connector.state === "not_requested" || connector.complete) && added.every((item) => item.complete) ? "complete" : "partial";
   return input.historyDays.map((historyDays) => {
     const historyStartLocalDate = requestedDate.subtract({ days: historyDays }).toString();
     const cadence = projectAdvisorCadenceSource({
@@ -362,8 +428,9 @@ async function assembleDayContexts(
         },
       } : {}),
     });
-    const validated = validateAdvisorDayContext({
-      version: ADVISOR_DAY_CONTEXT_VERSION,
+    const validate = versioned ? validateVersionedAdvisorDayContext : validateAdvisorDayContext;
+    const validated = validate({
+      version: versioned ? ADVISOR_DAY_CONTEXT_VERSION_1_1 : ADVISOR_DAY_CONTEXT_VERSION,
       snapshotId: opaqueRef("snapshot", revisionMaterial),
       accountRef: authorization.accountRef,
       localDate,
@@ -372,11 +439,11 @@ async function assembleDayContexts(
       dayEndAt: dayEnd.toInstant().toString(),
       capturedAt: finalNow.toString(),
       expiresAt: expiresAt.toString(),
-      status: connector.state === "not_requested" || connector.complete ? "complete" : "partial",
+      status,
       authority: "read_only",
       grantGeneration: authorization.grantGeneration,
       cadence,
-      connectors: [connector],
+      connectors: [connector, ...added],
     });
     if (Buffer.byteLength(JSON.stringify(validated), "utf8") > ADVISOR_DAY_CONTEXT_LIMITS.responseBytes) {
       throw new AdvisorDayContextServiceError("context_limit_exceeded");
@@ -442,6 +509,112 @@ async function readCalendar(
   }
 }
 
+/** Remaining source budget, capped at 25 s. Zero or less means the read must not start. */
+function connectorReadDeadline(deadlineAt: number): number {
+  return Math.min(ADVISOR_CONNECTOR_READ_DEADLINE_MS, Math.floor(deadlineAt - Date.now()));
+}
+
+const SOURCE_TIMEOUT = { code: "timeout" as const, retryable: true, retryAfterSeconds: null };
+
+/** Outlook or iCloud: today's selected calendars under the fenced generation, selection, and remaining brief budget. */
+async function readConnectorCalendar(
+  source: "outlook_calendar" | "icloud_calendar",
+  caller: CalendarCaller,
+  fence: AdvisorCalendarFence,
+  localDate: string,
+  clock: () => Temporal.Instant,
+  makeOpaqueRef: AdvisorOpaqueRef,
+  signal: AbortSignal,
+  deadlineAt: number,
+): Promise<AdvisorCalendarConnectorV1_1> {
+  const unavailable = (failure: ReturnType<typeof connectorFailure>) => projectUnavailableVersionedAdvisorCalendar({
+    source, connectionGeneration: fence.connectionGeneration, selectionRevision: fence.selectionRevision, failure,
+  });
+  const deadlineMs = connectorReadDeadline(deadlineAt);
+  if (deadlineMs <= 0) return unavailable(SOURCE_TIMEOUT);
+  const readEvents = source === "outlook_calendar" ? getOutlookCalendarEventsForCaller : getIcloudCalendarEventsForCaller;
+  try {
+    const read = await readEvents(caller, localDate, localDate, {
+      deadlineMs,
+      signal,
+      authorizedCalendarIds: fence.calendarIds,
+      expectedConnectionGeneration: fence.connectionGeneration,
+      expectedSelectionRevision: fence.selectionRevision,
+    });
+    assertNotAborted(signal);
+    return projectVersionedAdvisorCalendarConnector({
+      snapshot: read.result.ok ? read.result.snapshot : read.result.partialSnapshot,
+      selectionRevision: read.connection.selectionRevision,
+      now: clock(),
+      makeOpaqueRef,
+      failure: read.result.ok ? null : read.result.error,
+    });
+  } catch (error) {
+    rethrowSourceError(error);
+    return unavailable(connectorFailure(error));
+  }
+}
+
+/** Today's recorded workouts only: past timing, never a schedule, availability, or completion. */
+async function readHevyActivity(
+  caller: CalendarCaller,
+  connectionGeneration: number,
+  localDate: string,
+  clock: () => Temporal.Instant,
+  makeOpaqueRef: AdvisorOpaqueRef,
+  signal: AbortSignal,
+  deadlineAt: number,
+): Promise<AdvisorActivityConnector> {
+  const deadlineMs = connectorReadDeadline(deadlineAt);
+  if (deadlineMs <= 0) return projectUnavailableAdvisorActivity({ connectionGeneration, failure: SOURCE_TIMEOUT });
+  try {
+    const snapshot = await getHevyActivities(caller, localDate, localDate, { expectedConnectionGeneration: connectionGeneration, signal, deadlineMs });
+    assertNotAborted(signal);
+    return projectAdvisorActivityConnector({ snapshot, now: clock(), makeOpaqueRef });
+  } catch (error) {
+    rethrowSourceError(error);
+    return projectUnavailableAdvisorActivity({ connectionGeneration, failure: connectorFailure(error) });
+  }
+}
+
+function rethrowSourceError(error: unknown): void {
+  if (error instanceof AdvisorDayContextServiceError) throw error;
+  if (error instanceof AdvisorDayContextValidationError && error.code === "context_limit_exceeded") {
+    throw new AdvisorDayContextServiceError("context_limit_exceeded");
+  }
+  if (error instanceof ConnectorError && error.code === "connection_changed") throw new AdvisorDayContextServiceError("context_changed", true);
+}
+
+/** Every disclosed source must still be the connected generation and selection the brief read. */
+async function assertConnectorSourcesCurrent(
+  caller: CalendarCaller,
+  authorization: AdvisorAuthorizationFence,
+  request: AdvisorConnectorSourceRequest | undefined,
+): Promise<void> {
+  if (!request) return;
+  const checks: Array<Promise<boolean>> = [];
+  const calendar = (provider: "outlook_calendar" | "icloud_calendar", fence: AdvisorCalendarFence) =>
+    (provider === "outlook_calendar" ? getOutlookCalendarConnection(caller) : getIcloudCalendarConnection(caller)).then((current) =>
+      current.status === "connected" && current.generation === fence.connectionGeneration && current.selectionRevision === fence.selectionRevision);
+  if (request.outlookCalendar && authorization.outlookCalendar) checks.push(calendar("outlook_calendar", authorization.outlookCalendar));
+  if (request.icloudCalendar && authorization.icloudCalendar) checks.push(calendar("icloud_calendar", authorization.icloudCalendar));
+  const hevy = authorization.hevy;
+  if (request.hevy && hevy) {
+    checks.push(getConnectorConnection(caller, "hevy").then((current) => current.status === "connected" && current.generation === hevy.connectionGeneration));
+  }
+  if ((await Promise.all(checks)).some((current) => !current)) throw new AdvisorDayContextServiceError("context_changed", true);
+}
+
+function connectorFailure(error: unknown): { code: AdvisorSourceFailureCode; retryable: boolean; retryAfterSeconds: number | null } {
+  const code = error instanceof ConnectorError ? error.code : "provider_unavailable";
+  if (code === "reconnect_required" || code === "not_connected") return { code, retryable: false, retryAfterSeconds: null };
+  if (code === "not_configured") return { code: "not_connected", retryable: false, retryAfterSeconds: null };
+  if (code === "permission_denied" || code === "rate_limited" || code === "timeout" || code === "provider_unavailable" || code === "malformed_provider_response" || code === "incomplete_pagination") {
+    return { code, retryable: code === "rate_limited" || code === "timeout" || code === "provider_unavailable", retryAfterSeconds: null };
+  }
+  return { code: "provider_unavailable", retryable: true, retryAfterSeconds: null };
+}
+
 function durationHistory(snapshot: Awaited<ReturnType<typeof readAdvisorCadenceSnapshot>>, userId: string): BehaviorDurationHistoryOccurrence[] {
   const sessionsByOccurrence = new Map<string, typeof snapshot.historySessions>();
   for (const session of snapshot.historySessions) {
@@ -481,7 +654,21 @@ function normalizeAuthorization(value: AdvisorAuthorizationFence, userId: string
   if (calendar && (!Number.isInteger(calendar.connectionGeneration) || calendar.connectionGeneration < 0 || !Number.isInteger(calendar.selectionRevision) || calendar.selectionRevision < 0)) {
     throw new AdvisorDayContextServiceError("access_denied");
   }
-  return { ...value, behaviorIds, calendar };
+  const connectorCalendar = (fence: AdvisorCalendarFence | null | undefined) => {
+    if (!fence) return fence;
+    const ids = uniqueIds(fence.calendarIds, ADVISOR_DAY_CONTEXT_LIMITS.calendars);
+    if (ids.length === 0 || !Number.isInteger(fence.connectionGeneration) || fence.connectionGeneration < 0 ||
+        !Number.isInteger(fence.selectionRevision) || fence.selectionRevision < 0) throw new AdvisorDayContextServiceError("access_denied");
+    return { ...fence, calendarIds: ids };
+  };
+  if (value.hevy && (!Number.isInteger(value.hevy.connectionGeneration) || value.hevy.connectionGeneration < 0)) {
+    throw new AdvisorDayContextServiceError("access_denied");
+  }
+  return {
+    ...value, behaviorIds, calendar,
+    ...("outlookCalendar" in value ? { outlookCalendar: connectorCalendar(value.outlookCalendar) } : {}),
+    ...("icloudCalendar" in value ? { icloudCalendar: connectorCalendar(value.icloudCalendar) } : {}),
+  };
 }
 
 function uniqueIds(ids: readonly string[], max: number): string[] {

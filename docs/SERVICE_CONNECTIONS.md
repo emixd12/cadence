@@ -67,8 +67,10 @@ attachments and readback under `Emi's projects`. Its lifetime follows the existi
 CLI login; `vercel logout` revokes that local session. No new credential was
 issued. Google console inspection uses the existing Identity Scaffolding Chrome
 session for `cadence-calendar-498717`, with support contact
-`info@identityscaffolding.com`. Domain-property setup is pending DNS verification;
-no delegated DNS access, new OAuth grant, or publishing change occurred. The
+`info@identityscaffolding.com`. The `sc-domain:cadence-me.com` property is verified
+through Domain name provider (September 17, 2026; reconfirmed October 24, 2026 for
+`cadence-calendar-agent-prod`); keep its TXT record. This step added no delegated
+DNS access, new OAuth grant, or publishing change. The
 browser session remains valid until logout/expiry; Google sign-out ends access.
 
 

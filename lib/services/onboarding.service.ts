@@ -1,34 +1,16 @@
+import { readTravelSetupPresence } from "@/lib/db/travelSettings.repo";
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
-import { requireCurrentUserId } from "@/lib/auth/current-user";
-import {
-  readCachedBehaviorLogImportRuns,
-  readCachedProfileTimezone,
-  readCachedUserBehaviors,
-} from "@/lib/cache/stable-user-data.cache";
-import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_TIMEZONE } from "@/lib/types/recurrence";
-import type { FirstRunOnboardingState } from "@/lib/types/onboarding";
-
-export async function getFirstRunOnboardingState(): Promise<FirstRunOnboardingState> {
-  const supabase = await createClient();
-  const userId = await requireUserId(supabase);
-  const [behaviors, importRuns, profileTimezone] = await Promise.all([
-    readCachedUserBehaviors(supabase, userId),
-    readCachedBehaviorLogImportRuns(supabase, userId, 1),
-    readCachedProfileTimezone(supabase, userId),
-  ]);
-
-  return createFirstRunOnboardingState({
-    hasAnyBehavior: behaviors.length > 0,
-    hasImportRuns: importRuns.length > 0,
-    timezone: profileTimezone,
-  });
-}
+import type {
+  FirstRunOnboardingState,
+  FirstRunTravelSetup,
+} from "@/lib/types/onboarding";
 
 export function createFirstRunOnboardingState(input: {
   hasAnyBehavior: boolean;
   hasImportRuns: boolean;
   timezone: string | null;
+  travel: FirstRunTravelSetup | null;
 }): FirstRunOnboardingState {
   return {
     hasAnyBehavior: input.hasAnyBehavior,
@@ -37,13 +19,25 @@ export function createFirstRunOnboardingState(input: {
     vapidPublicKey: normalizePublicVapidKey(
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     ),
+    travel: input.travel
+      ? { hasHome: input.travel.hasHome, hasMode: input.travel.hasMode }
+      : null,
   };
 }
 
-async function requireUserId(supabase: AppSupabaseClient): Promise<string> {
-  void supabase;
-
-  return requireCurrentUserId("Sign in again before viewing onboarding.");
+/**
+ * Optional setup must not break Timeline: a failed or missing travel settings
+ * read hides the Home and travel item instead of failing the page.
+ */
+export async function readFirstRunTravelSetup(
+  client: AppSupabaseClient,
+  userId: string,
+): Promise<FirstRunTravelSetup | null> {
+  try {
+    return await readTravelSetupPresence(client, userId);
+  } catch {
+    return null;
+  }
 }
 
 function normalizePublicVapidKey(value: string | undefined): string {

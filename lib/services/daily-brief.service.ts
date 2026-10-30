@@ -1,14 +1,28 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { DailyBriefResponse, DailyBriefSettings } from "@cadence/core/types/daily-brief";
 import { readAdvisorProfileTimezone } from "@/lib/db/advisor-context.repo";
-import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
+import { beginDailyBrief, finishDailyBrief, readDailyBriefPreferences, readDailyBriefTipHistory, recordDailyBriefTip, saveDailyBriefPreferences, type DailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 import { prepareAccountBriefingContexts, briefingAccountRef } from "./briefing-account-context.service";
 import { DailyBriefError, generateDailyBrief, raceBriefAbort as raceAbort, type DailyBriefGenerator } from "./daily-brief-consumer";
 import { generateOpenAIDailyBrief } from "./daily-brief-openai";
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
+import { getOutlookCalendarConnection } from "./outlook-calendar.service";
+import { getIcloudCalendarConnection } from "./icloud-calendar.service";
+import { getHevyConnection } from "./hevy.service";
 
 import { activeBriefingConfig, briefingConfigurationRevision } from "./briefing-pipeline";
 import { measurePerformanceSpan } from "./performance-timing";
+import { readTravelConclusionsSecrets } from "./travel-conclusions-token";
+
+/** The whole in-app attempt, and the time kept back for generation after connector reads (Ticket 239). */
+export const DAILY_BRIEF_DEADLINE_MS = 60_000;
+export const DAILY_BRIEF_GENERATION_RESERVE_MS = 10_000;
+
+const SETTINGS_KEY_SETS = [
+  "enabled,includeCalendar",
+  "enabled,includeCalendar,includeNotes,includeReminderHistory",
+  "enabled,includeCalendar,includeHevy,includeIcloudCalendar,includeNotes,includeOutlookCalendar,includeReminderHistory",
+];
 
 /** Phase diagnostics record span, duration and error code only; never prompts, facts or output. */
 const phase = <T,>(span: string, operation: () => Promise<T>) => measurePerformanceSpan({ span: `daily_brief.${span}` }, operation);
@@ -20,30 +34,76 @@ export async function getDailyBriefSettings(caller: CalendarCaller): Promise<Dai
     configurationRevision: briefingConfigurationRevision(), enabled: preferences.enabled, includeCalendar: preferences.includeCalendar,
     includeReminderHistory: preferences.includeReminderHistory, includeNotes: preferences.includeNotes, revision: preferences.revision,
     optionalSources: dailyBriefOptionalSources(),
+    includeOutlookCalendar: preferences.includeOutlookCalendar, includeIcloudCalendar: preferences.includeIcloudCalendar,
+    includeHevy: preferences.includeHevy, ...await dailyBriefConnectorState(caller, preferences),
     timezone, localDate: Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString() };
 }
 
 /**
- * Accepts the original two controls or all four. Older clients that send two
- * controls revoke the optional sources, so an update never grants them silently.
+ * Accepts exactly the original two controls, the four current controls, or the
+ * four plus the three connector disclosures (Ticket 239). Older clients that
+ * send two or four controls revoke every disclosure they omit, so an update
+ * never grants a source silently. Turning Daily Brief off requires every
+ * disclosure off.
  */
 export async function updateDailyBriefSettings(caller: CalendarCaller, value: unknown): Promise<DailyBriefSettings> {
   const keys = record(value) ? Object.keys(value).sort().join() : "";
-  if (!record(value) || (keys !== "enabled,includeCalendar" && keys !== "enabled,includeCalendar,includeNotes,includeReminderHistory") ||
-      typeof value.enabled !== "boolean" || typeof value.includeCalendar !== "boolean" ||
-      (value.includeReminderHistory !== undefined && typeof value.includeReminderHistory !== "boolean") ||
-      (value.includeNotes !== undefined && typeof value.includeNotes !== "boolean") ||
-      (!value.enabled && (value.includeCalendar || value.includeReminderHistory === true || value.includeNotes === true))) {
+  if (!record(value) || !SETTINGS_KEY_SETS.includes(keys) || Object.values(value).some((item) => typeof item !== "boolean") ||
+      (!value.enabled && Object.entries(value).some(([key, item]) => key !== "enabled" && item === true))) {
     throw new DailyBriefError("invalid_request");
   }
-  if (value.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
-  if (value.includeCalendar && (await getCalendarConnection(caller)).status !== "connected") throw new DailyBriefError("calendar_unavailable");
-  const current = await readDailyBriefPreferences(caller.client);
-  await saveDailyBriefPreferences(caller.client, {
-    enabled: value.enabled, includeCalendar: value.includeCalendar,
+  const input = {
+    enabled: value.enabled as boolean, includeCalendar: value.includeCalendar as boolean,
     includeReminderHistory: value.includeReminderHistory === true, includeNotes: value.includeNotes === true,
-  }, current.revision);
+    includeOutlookCalendar: value.includeOutlookCalendar === true, includeIcloudCalendar: value.includeIcloudCalendar === true,
+    includeHevy: value.includeHevy === true,
+  };
+  if (input.enabled && !process.env.OPENAI_API_KEY) throw new DailyBriefError("not_configured");
+  // Ticket 187: Daily Brief reads Calendar only through the separate agent grant.
+  if (input.includeCalendar && (await getCalendarConnection(caller, "agent")).status !== "connected") throw new DailyBriefError("calendar_unavailable");
+  if (input.includeOutlookCalendar) {
+    const outlook = await getOutlookCalendarConnection(caller);
+    if (outlook.status !== "connected" || outlook.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
+  }
+  if (input.includeIcloudCalendar) {
+    const icloud = await getIcloudCalendarConnection(caller);
+    if (icloud.status !== "connected" || icloud.preferences.selectedSourceIds.length === 0) throw new DailyBriefError("source_unavailable");
+  }
+  if (input.includeHevy && (await getHevyConnection(caller)).status !== "connected") throw new DailyBriefError("source_unavailable");
+  const current = await readDailyBriefPreferences(caller.client);
+  await saveDailyBriefPreferences(caller.client, input, current.revision);
   return getDailyBriefSettings(caller);
+}
+
+/**
+ * Connected sources Settings may offer, and why a disclosed source cannot be used
+ * (Ticket 239 recovery). `changed` means the source is usable but was reconnected
+ * or reselected after the user allowed it, so the stored fence no longer matches
+ * and the brief refuses to start until the user allows it again. A failed status
+ * read offers nothing and reports a disclosed source as unavailable.
+ */
+async function dailyBriefConnectorState(caller: CalendarCaller, preferences: DailyBriefPreferences): Promise<Pick<DailyBriefSettings, "connectorSources" | "connectorAttention">> {
+  const [outlook, icloud, hevy] = await Promise.all([
+    Promise.resolve().then(() => getOutlookCalendarConnection(caller)).catch(() => null),
+    Promise.resolve().then(() => getIcloudCalendarConnection(caller)).catch(() => null),
+    Promise.resolve().then(() => getHevyConnection(caller)).catch(() => null),
+  ]);
+  const outlookConnected = outlook?.status === "connected";
+  const outlookSelected = outlookConnected && outlook.preferences.selectedSourceIds.length > 0;
+  const icloudConnected = icloud?.status === "connected";
+  const icloudSelected = icloudConnected && icloud.preferences.selectedSourceIds.length > 0;
+  const hevyConnected = hevy?.status === "connected";
+  return {
+    connectorSources: { outlookCalendar: outlookSelected, icloudCalendar: icloudSelected, hevy: hevyConnected },
+    connectorAttention: {
+      outlookCalendar: !preferences.includeOutlookCalendar ? null : !outlookConnected ? "unavailable" : !outlookSelected ? "no_calendars"
+        : outlook.generation !== preferences.outlookConnectionGeneration || outlook.selectionRevision !== preferences.outlookSelectionRevision ? "changed" : null,
+      icloudCalendar: !preferences.includeIcloudCalendar ? null : !icloudConnected ? "unavailable" : !icloudSelected ? "no_calendars"
+        : icloud.generation !== preferences.icloudConnectionGeneration || icloud.selectionRevision !== preferences.icloudSelectionRevision ? "changed" : null,
+      hevy: !preferences.includeHevy ? null : !hevyConnected ? "unavailable"
+        : hevy.generation !== preferences.hevyConnectionGeneration ? "changed" : null,
+    },
+  };
 }
 
 export async function requestInAppDailyBrief(caller: CalendarCaller, value: unknown, options: Readonly<{
@@ -51,7 +111,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   now?: () => Temporal.Instant;
   deadlineMs?: number;
 }> = {}): Promise<DailyBriefResponse> {
-  if (!record(value) || Object.keys(value).sort().join() !== "installationId,retry" || typeof value.installationId !== "string" ||
+  // Ticket 219 Option A: an optional signed travel token. Its value is never validated here;
+  // a token that fails any later check only leaves travel conclusions unsupplied.
+  const keys = record(value) ? Object.keys(value).sort().join() : "";
+  if (!record(value) || (keys !== "installationId,retry" && keys !== "installationId,retry,travelConclusions") || typeof value.installationId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.installationId) || typeof value.retry !== "boolean") {
     throw new DailyBriefError("invalid_request");
   }
@@ -60,7 +123,10 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
   const configuration = activeBriefingConfig();
   const configurationRevision = briefingConfigurationRevision(configuration);
   const clock = options.now ?? (() => Temporal.Now.instant());
-  const signal = AbortSignal.timeout(options.deadlineMs ?? 60_000);
+  const deadlineMs = options.deadlineMs ?? DAILY_BRIEF_DEADLINE_MS;
+  // Connector reads end early enough to leave the generation reserve inside the one attempt budget.
+  const sourceDeadlineAt = Date.now() + deadlineMs - DAILY_BRIEF_GENERATION_RESERVE_MS;
+  const signal = AbortSignal.timeout(deadlineMs);
   const installationId = value.installationId;
   const work = async (): Promise<DailyBriefResponse> => {
     const preferences = await phase("preferences", () => readDailyBriefPreferences(caller.client, signal));
@@ -78,12 +144,15 @@ export async function requestInAppDailyBrief(caller: CalendarCaller, value: unkn
       const prepared = await phase("context", () => prepareAccountBriefingContexts(caller, {
         historyDays: [configuration.scope.historyDays],
         includeCalendar: configuration.scope.includeCalendar,
+        // Only this live path reads separately disclosed sources; workbench and history never do.
+        connectorSources: { calendars: configuration.scope.includeCalendar, recordedActivity: true, deadlineAt: sourceDeadlineAt },
         includeRecordedElapsedDurations: configuration.context.includeRecordedElapsedDurations,
         includeHistoricalCompletionTimes: configuration.context.includeHistoricalCompletionTimes,
         signal,
         clock,
         preferences,
         localDate: admission.localDate,
+        travelConclusions: { token: value.travelConclusions ?? null, secrets: readTravelConclusionsSecrets(process.env) },
         ...(configuration.analysis.lanes.length ? { analysis: {
           includeReminders: configuration.analysis.lanes.includes("reminder-effectiveness"),
           includeNotes: configuration.analysis.lanes.includes("notes-failure-themes"),

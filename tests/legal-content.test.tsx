@@ -18,8 +18,11 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("Limits of verification");
     expect(html).toContain("Row Level Security scopes user-owned records");
     expect(html).toContain(
-      "does not send exported behavior data to an AI provider",
+      "Cadence does not send an export to an AI provider",
     );
+    expect(html).toContain("including Calendar timing only after a separate choice");
+    expect(html).toContain("Cadence does not use Google user data to train AI models");
+    expect(html).not.toContain("does not send exported behavior data to an AI provider");
     expect(html).toContain("under the repository&#x27;s MIT license");
     expect(html).not.toContain("Manual truth");
     expect(html).not.toContain("dashboard");
@@ -38,10 +41,10 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("delete their account in Settings");
   });
 
-  it("renders the approved Privacy policy with processor and retention tables", () => {
+  it("renders Privacy with processor, retention and separate connector disclosures", () => {
     const html = renderToStaticMarkup(<LegalPageContent pageKey="privacy" />);
 
-    expect(html).toContain("October 18, 2026");
+    expect(html).toContain("October 24, 2026");
     expect(html).not.toContain("draft");
     expect(html).not.toContain("not legally approved");
     expect(html).toContain("Cadence service providers and purposes");
@@ -60,12 +63,25 @@ describe("trust and legal UI content", () => {
     expect(html).toContain("California disclosures");
     expect(html).toContain("only for people age 18 or older");
     expect(html).not.toContain("does not send behavior data to an AI provider");
+    expect(html).toContain("Optional Daily Brief");
+    expect(html).toContain("each need a separate Daily Brief choice");
+    expect(html).toContain("Hevy requires Hevy Pro");
+    expect(html).toContain("Accounts above 500 workouts");
+    expect(html).toContain("not an atomic snapshot");
+    expect(html).toContain("Apple does not limit this app-specific password to Calendar");
+    expect(html).toContain("does not revoke Outlook, iCloud or Hevy access");
+    expect(html).toContain("separate Microsoft consent with Calendars.Read.");
+    expect(html).toContain("Cadence requests only event titles, times, timezone, availability, response, and calendar names");
+    expect(html).not.toContain("Calendars.ReadBasic");
+    expect(html).toContain("Local checks do not establish public availability");
+    expect(html).toContain("retains no production prompt or briefing history");
+    expect(html).toContain("outside the tracking database, exports, synchronization and user-created backups");
     expect(html).not.toContain("Provider settings and published capabilities were verified");
     expect(html).toContain("Limited Use requirements");
     expect(html).toContain(
       'href="https://developers.google.com/terms/api-services-user-data-policy"',
     );
-    expect(html).toContain("review of Calendar access is pending");
+    expect(html).not.toContain("review of Calendar access is pending");
     expect(html).not.toContain("currently limited to Google OAuth test users");
   });
 
@@ -88,6 +104,27 @@ describe("trust and legal UI content", () => {
     ]) expect(privacy).toContain(disclosure);
   });
 
+  it("separates the Timeline and Daily Brief Google Calendar connections and states the AI training limit", () => {
+    const calendar = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Optional Google Calendar");
+    const copy = calendar?.paragraphs.join(" ") ?? "";
+    for (const disclosure of [
+      "Each requires its own Google consent for the same Google account used to sign in",
+      "Where available, a second connection, Google Calendar for Daily Brief, supplies event timing to Daily Brief only",
+      "Daily Brief reads Calendar only through that connection, never through the Timeline connection",
+      "connecting a calendar alone sends nothing to OpenAI",
+      "does not use information received from Google APIs to develop, improve, or train generalized artificial intelligence or machine-learning models",
+      "Desktop keeps no event cache for Google Calendar for Daily Brief",
+      "Each connection has its own Disconnect",
+      "The other connection stays connected",
+      "Account deletion attempts revocation for each connection",
+      "Limited Use requirements",
+    ]) expect(copy).toContain(disclosure);
+    const daily = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Optional Daily Brief")?.paragraphs.join(" ") ?? "";
+    expect(daily).toContain("Calendar context uses today's selected event timing, timezone, availability and response state without event titles or details");
+    const retention = LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.rows ?? [];
+    expect(retention.find(([label]) => label === "Desktop Google Calendar cache")?.[2]).toContain("for the Timeline connection only");
+  });
+
   it("distinguishes validity, physical cleanup, and shared registration retention", () => {
     const privacy = JSON.stringify(LEGAL_PAGES.privacy);
     for (const disclosure of [
@@ -95,9 +132,9 @@ describe("trust and legal UI content", () => {
       "Failed maintenance can extend storage", "no automatic deletion deadline",
       "does not remove a shared client registration", "live account-owned integration records",
     ]) expect(privacy).toContain(disclosure);
-    expect(LEGAL_PAGES.privacy.updated).toBe("October 18, 2026");
+    expect(LEGAL_PAGES.privacy.updated).toBe("October 24, 2026");
     expect(LEGAL_PAGES.terms.updated).toBe("October 18, 2026");
-    expect(LEGAL_PAGES.trust.updated).toBe("August 27, 2026");
+    expect(LEGAL_PAGES.trust.updated).toBe("October 24, 2026");
     expect(LEGAL_PAGES.privacy.sections.find(({ title }) => title === "Retention")?.table?.caption)
       .toBe("Cadence retention periods as of October 18, 2026");
   });

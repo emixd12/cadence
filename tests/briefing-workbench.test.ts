@@ -31,7 +31,7 @@ async function loadService() {
 }
 
 beforeEach(() => {
-  vi.resetModules();
+  vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget"));
   vi.stubEnv("NODE_ENV", "development");
 });
 
@@ -69,7 +69,8 @@ describe("briefing workbench boundary", () => {
         recipe: "daily_brief@1.0", policy: result.inspector.policyVersion,
       });
       expect(result.inspector.plan.options).toEqual([]);
-      expect(JSON.stringify(payloads[index])).not.toMatch(/travel|departure|durationCandidates/);
+      // Only the synthetic travel fixtures carry travel facts (Ticket 219), never route timing.
+      expect(JSON.stringify(payloads[index])).not.toMatch(fixtureId.startsWith("travel_") ? /departure|arrivalAt|durationSeconds|durationCandidates/ : /travel|departure|durationCandidates/);
     }
     expect(body.results[0].inspector.configurationRevision).not.toBe(body.results[1].inspector.configurationRevision);
   });
@@ -217,19 +218,20 @@ describe("briefing workbench boundary", () => {
     expect(accountRead).not.toHaveBeenCalled();
   });
 
-  it("bounds comparisons and exposes only sanitized generation failures", async () => {
+  it("reserves the configured provider-call cap and sanitizes generation failures", async () => {
+    vi.stubEnv("CADENCE_BRIEFING_BENCH_CALL_LIMIT", "5");
     const run = await loadService();
     const generate = vi.fn<DailyBriefGenerator>().mockRejectedValue(new Error("provider-secret-detail"));
-    for (let count = 0; count < 6; count += 1) {
+    for (let count = 0; count < 2; count += 1) {
       const response = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
       expect(response.status).toBe(200);
       expect(JSON.stringify(await response.json())).not.toContain("provider-secret-detail");
     }
-    expect(generate).toHaveBeenCalledTimes(12);
+    expect(generate).toHaveBeenCalledTimes(4);
     const blocked = await run(request({ fixtureId: "sparse", configs: [config(), config()] }), generate);
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toEqual({ error: "comparison_limit" });
-    expect(generate).toHaveBeenCalledTimes(12);
+    expect(generate).toHaveBeenCalledTimes(4);
   });
 
   it("cancels an in-flight comparison without returning late output or error details", async () => {
@@ -242,8 +244,12 @@ describe("briefing workbench boundary", () => {
     await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
     controller.abort();
     const response = await pending;
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "invalid_or_cancelled_request" });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.results.map((result: { state: string }) => result.state)).toEqual(["cancelled", "cancelled"]);
+    expect(body.dispatchedCalls).toBe(1);
+    expect(body.budget.reserved).toBe(0);
+    expect(JSON.stringify(body)).not.toContain("late-provider-secret");
     expect(generate).toHaveBeenCalledOnce();
   });
 });

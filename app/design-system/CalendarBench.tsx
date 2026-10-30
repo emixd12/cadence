@@ -3,13 +3,14 @@ import { travelBenchEvidence } from "./TravelBench";
 import { Temporal } from "@js-temporal/polyfill";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { resolveTimeline } from "@cadence/core/resolvers/timeline.resolver";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
 import type { GoogleCalendarCoordinator } from "@/lib/ui/google-calendar";
 import type { CalendarConnectionView } from "@/lib/types/google-calendar";
 import { validateExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
 import fixture from "@/tests/fixtures/external-event-snapshot.valid.json";
+import { benchOutlookSnapshot, benchRecordedActivity } from "./ConnectorBench";
 const snapshot = validateExternalEventSnapshot(fixture);
 const connection: CalendarConnectionView = { accountId: snapshot.accountId, status: "connected", generation: 1, selectionRevision: 0,
   preferences: { selectedCalendarIds: [...snapshot.requestedRange.selectedCalendarIds], hiddenCalendarIds: [], visible: true, showAllDay: true } };
@@ -25,7 +26,12 @@ const coordinator: GoogleCalendarCoordinator = {
   disconnect: async () => ({ view: { ...connection, status: "disconnected" }, revocationFailed: false }),
 };
 export function CalendarSettingsBench() {
-  return <GoogleCalendarPanel coordinator={coordinator} refreshRange={snapshot.requestedRange} />;
+  const [mode, setMode] = useState("standard");
+  const [status, setStatus] = useState<CalendarConnectionView["status"]>("connected");
+  const fixtureCoordinator = useMemo(() => ({ ...coordinator, getConnection: async () => ({ ...connection, status }) }), [status]);
+  return <><label className="mb-4 grid gap-2 text-sm">Connection purpose<select className="min-h-11 border border-line bg-background" value={mode} onChange={event => setMode(event.target.value)}><option value="standard">Timeline</option><option value="agent">Daily Brief</option></select></label>
+    <label className="mb-4 grid gap-2 text-sm">Connection state<select className="min-h-11 border border-line bg-background" value={status} onChange={event => setStatus(event.target.value as CalendarConnectionView["status"])}><option value="connected">Connected</option><option value="disconnected">Disconnected</option><option value="not_configured">Not configured</option><option value="reconnect_required">Reconnect required</option></select></label>
+    <GoogleCalendarPanel key={`${mode}-${status}`} agent={mode === "agent"} coordinator={fixtureCoordinator} refreshRange={snapshot.requestedRange} /></>;
 }
 export function CalendarDetailsBench({ preview = false }: { preview?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -49,10 +55,19 @@ const idleAction = async () => ({ status: "idle" as const, message: "Synthetic p
 export function CalendarTimelineBench() {
   const [scenario, setScenario] = useState("calendar");
   const first = snapshot.events[0]!;
-  const events = scenario === "calendar" ? snapshot.events : [{ ...first, kind: "timed" as const, title: "Afternoon appointment", location: "Synthetic destination", startAt: "2026-11-01T19:30:00Z", endAt: "2026-11-01T21:30:00Z", endUnspecified: false, duration: { kind: "known" as const, seconds: 7200 } }];
-  return <><label className="mb-4 grid gap-2 text-sm">Fixture<select className="min-h-11 border border-line bg-background" value={scenario} onChange={(event) => setScenario(event.target.value)}><option value="calendar">Calendar</option><option value="travel">Complete trip: 1:30–6:30 PM</option><option value="no-base">No base: keep outbound</option></select></label>
+  const connectors = scenario === "connectors" || scenario === "connectors-offline";
+  const weather = scenario === "travel-weather" ? "thunderstorm" as const : scenario === "travel-no-position" ? "no_position" as const : undefined;
+  const travel = scenario === "calendar" || connectors ? null : travelBenchEvidence(first.id, scenario !== "no-base", weather);
+  // Weather scenarios show the shared travel status line; the bench never refreshes.
+  const travelStatus = travel && weather ? { view: { accountId: "bench", mode: "walking" as const, navigationPreference: null, settingsRevision: "fixture",
+    expiresAt: "2999-01-01T00:00:00Z", evidence: travel }, message: null, stale: false, pending: false, observedAt: snapshot.fetchedAt, resumesAt: null,
+    refresh: () => undefined } : null;
+  const events = connectors ? [...snapshot.events, ...benchOutlookSnapshot.events] : scenario === "calendar" ? snapshot.events : [{ ...first, kind: "timed" as const, title: "Afternoon appointment", location: "Synthetic destination", startAt: "2026-11-01T19:30:00Z", endAt: "2026-11-01T21:30:00Z", endUnspecified: false, duration: { kind: "known" as const, seconds: 7200 } }];
+  return <><label className="mb-4 grid gap-2 text-sm">Fixture<select className="min-h-11 border border-line bg-background" value={scenario} onChange={(event) => setScenario(event.target.value)}><option value="calendar">Calendar</option><option value="connectors">Google, Outlook, and Hevy</option><option value="connectors-offline">Outlook incomplete, Hevy offline</option><option value="travel">Complete trip: 1:30–6:30 PM</option><option value="travel-weather">Thunderstorms: 15 min weather margin</option><option value="travel-no-position">No device location: no weather margin</option><option value="no-base">No base: keep outbound</option></select></label>
     <DayProgressTimeline timeline={timeline} context={{ events, freshness: snapshot.freshness, now: snapshot.fetchedAt,
       durationEstimates: { "calendar-bench-behavior": { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 0, lookbackDays: 30, provenance: "behavior_default" } },
-      travel: scenario === "calendar" ? null : travelBenchEvidence(first.id, scenario === "travel"), travelMode: "walking" }}
+      travel, travelStatus, travelMode: "walking",
+      recordedActivity: scenario === "connectors" ? benchRecordedActivity.ready : scenario === "connectors-offline" ? benchRecordedActivity.error : null,
+      sourceMessages: scenario === "connectors-offline" ? ["Outlook Calendar context is incomplete; some events may be missing."] : [] }}
     statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction} /></>;
 }

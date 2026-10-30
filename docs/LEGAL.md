@@ -10,6 +10,10 @@ until someone moves them here.
 
 ## How to add or update an entry
 
+Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHANGES.md`,
+not here. Until the pre-launch privacy pass they never block development. Link the
+`P-` entry from the related `L-` entry when both exist.
+
 1. Give a new entry the next ID (`L-013` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
@@ -27,6 +31,8 @@ Status values:
   still be asked.
 - **resolved**: answered, or moot because the matter no longer applies. The entry says
   which.
+- **moved**: the entry now lives in `docs/MESSAGING_CHANGES.md`. The stub names the `P-`
+  entry.
 
 Risk levels:
 
@@ -41,7 +47,7 @@ Risk levels:
 | --- | --- | --- | --- | --- |
 | [L-001](#l-001-google-maps-content-in-daily-brief-model-input) | Google Maps content in Daily Brief model input | accepted risk | medium | 219, 218, 216 |
 | [L-002](#l-002-google-coordinates-sent-to-a-non-google-provider) | Google coordinates sent to a non-Google provider | open | low today | 218, 216 |
-| [L-003](#l-003-ticket-216-radius-comparison-against-google-coordinates) | Ticket 216 radius comparison against Google coordinates | open | high if built as written | 216 |
+| [L-003](#l-003-ticket-216-radius-comparison-against-google-coordinates) | Ticket 216 radius comparison against Google coordinates | resolved (design change) | none | 216 |
 | [L-004](#l-004-google-weather-api-facts-in-model-input) | Google Weather API facts in model input | resolved (moot) | none | 218, 219 |
 | [L-005](#l-005-google-weather-api-shared-one-hour-cache) | Google Weather API shared one-hour cache | resolved (moot) | none | 218 |
 | [L-006](#l-006-weatherkit-shared-cache) | WeatherKit shared cache | resolved (moot) | none | 218 |
@@ -49,7 +55,7 @@ Risk levels:
 | [L-008](#l-008-open-meteo-commercial-status-and-upstream-licences) | Open-Meteo commercial status and upstream licences | open | medium | 218, 219 |
 | [L-009](#l-009-openweather-share-alike) | OpenWeather share-alike | resolved (moot) | none | 218, 219 |
 | [L-010](#l-010-tomorrowio-contract-terms) | Tomorrow.io contract terms | resolved (moot) | none | 218 |
-| [L-011](#l-011-weather-privacy-disclosure-and-attribution) | Weather privacy disclosure and attribution | open | medium | 218, 219 |
+| [L-011](#l-011-weather-privacy-disclosure-and-attribution) | Weather privacy disclosure and attribution | moved to P-003 | — | 218, 219 |
 | [L-012](#l-012-google-maps-notices-in-cadences-terms-and-privacy-content) | Google Maps notices in Cadence's terms and privacy content | closed | low | 213, 214, 165 |
 
 L-004 to L-011 came from the open questions in
@@ -61,7 +67,8 @@ part of L-002.
 - **Question:** May Cadence send facts derived from Google Routes and Geocoding results
   to OpenAI as Daily Brief model input?
 - **Affected:** Ticket 219 (model input), Ticket 218 (weather margin and mode rules),
-  Ticket 216 (label counts, see L-003). Files: `TravelTimingModelProjection` in
+  Ticket 216 (label counts; since L-003's October 22 resolution they no longer depend
+  on Google coordinates). Files: `TravelTimingModelProjection` in
   `packages/core/src/types/travel.ts`, `projectBriefingContext` in
   `packages/core/src/services/briefing-config.ts`, `lib/services/daily-brief-openai.ts`.
 - **Sources** (checked 2026-10-17):
@@ -98,16 +105,34 @@ part of L-002.
   - Exact timing stays in the calculated line beside the brief.
   - The owner accepts this as a business risk without asking Google first.
 - **Status:** accepted risk.
-- **Next action:** ask Google in writing whether the regime complies; this stays open.
-  Ticket 219 must test that no duration-bearing value reaches model input. The private
-  briefing workbench keeps synthetic travel facts, because example (vii) bars testing
-  or validating models with Maps Content.
+- **Question to Google (sent 2026-10-23):** Google Maps Platform support case
+  76805292, opened from the Cadence Cloud project (`habit-tracker-498717`) by
+  info@identityscaffolding.com, as the owner decided on October 22. Issue type
+  Technical, priority P4, contact by email. The case asks:
+  - whether sending Cadence's own yes/no travel conclusions to the Daily Brief model,
+    with no durations, distances, leave-by times or place data, complies with Maps
+    Platform Terms 3.2.3(c);
+  - whether Maps Grounding Lite (Service Specific Terms 10.2.1) is the only permitted
+    path;
+  - under what conditions the use would be permitted.
+- **Next action (updated 2026-10-23):** await Google's reply on case 76805292, then
+  record it here. The status stays accepted risk. Ticket 219 must test that
+  no duration-bearing value reaches model input. The private briefing workbench keeps
+  synthetic travel facts, because example (vii) bars testing or validating models
+  with Maps Content.
+- **Open point, held until Google replies to case 76805292 (owner decision, October
+  23, 2026):** a yes/no fit conclusion can bound route duration from one side.
+  Example: a run ending 1:30 PM plus an event at 3:00 PM plus "fits: yes" implies the
+  trip takes under 90 minutes. After the reply, decide whether to ask Google about
+  this, or to send only day-level conclusions (for example "travel day"). Ticket 219
+  should weigh the same option.
 
 ## L-002: Google coordinates sent to a non-Google provider
 
 - **Question:** May Cadence send a coordinate obtained from Google Maps Platform,
   rounded to a coarse area or not, to a non-Google provider such as a weather API?
-- **Affected:** Ticket 218 (weather area), Ticket 216 (see L-003). Files:
+- **Affected:** Ticket 218 (weather area). Ticket 216 no longer needs Google
+  coordinates after L-003's October 22 resolution. Files:
   `lib/services/travel-provider.ts`, `lib/services/travel-route-refresh.service.ts`.
 - **Sources** (checked 2026-10-17):
   - Maps Platform Terms 3.2.3(a): "Customer will not export, extract, or otherwise
@@ -156,11 +181,17 @@ part of L-002.
   the point-in-polygon example. The example names the Places API, but the list is
   illustrative, so Geocoding coordinates are likely covered too. Labels from this
   comparison would also reach model input as label counts (L-001).
-- **Risk level:** high if built as written.
-- **Owner decision:** none. No design change yet.
-- **Status:** open.
-- **Next action:** resolve before Ticket 216 implementation. Options include asking
-  Google, or comparing against coordinates that are not Google content.
+- **Risk level:** none under the October 22 design. It was high for the design as
+  first written.
+- **Owner decision, 2026-10-22 (option B, relayed by the orchestrating agent session):**
+  place positions come from the user's own device. The user records an "I'm here"
+  marker at Home or a saved place, and Cadence compares the completion position with
+  those markers. Cadence fetches no Google coordinates and compares nothing with them.
+  `docs/DECISIONS.md` (2026-10-22, Ticket 216) records the decision.
+- **Status:** resolved (design change). Reopen if Ticket 216 or a later ticket fetches
+  Google coordinates or compares a position with them.
+- **Next action:** none. Storing marker positions and labels is a privacy-text change,
+  logged as `docs/MESSAGING_CHANGES.md` P-001.
 
 ## L-004: Google Weather API facts in model input
 
@@ -242,12 +273,14 @@ part of L-002.
   suggests no share-alike duty reaches Cadence; the licence page does not say so
   directly.
 - **Risk level:** medium on the free tier; low on a paid plan.
-- **Owner decision:** the owner selected Open-Meteo on 2026-10-18. The plan is not yet
-  chosen; `docs/COSTS.md` assumes API Standard.
-- **Status:** open.
-- **Next action:** the owner confirms the plan before Ticket 218 implementation. Ask
-  Open-Meteo about the UK Met Office share-alike only if Cadence will rely on that
-  model.
+- **Owner decision:** the owner selected Open-Meteo on 2026-10-18. On 2026-10-22
+  (relayed by the orchestrating agent session) the owner chose the plans: use the free
+  Open-Meteo plan for development and testing. The paid API Standard plan is required
+  before commercial use.
+- **Status:** open until Cadence subscribes to API Standard.
+- **Next action:** subscribe to API Standard before commercial use, then record the
+  subscription date here and in `docs/COSTS.md`. Ask Open-Meteo about the UK Met Office
+  share-alike only if Cadence will rely on that model.
 
 ## L-009: OpenWeather share-alike
 
@@ -280,26 +313,9 @@ part of L-002.
 
 ## L-011: Weather privacy disclosure and attribution
 
-- **Question:** What must the privacy content and the interface say once Cadence sends
-  coarse areas to Open-Meteo and uses its forecasts?
-- **Affected:** Tickets 218 and 219; privacy content, `docs/PRODUCT_SPEC.md`, the
-  travel margin line and the Daily Brief.
-- **Sources** (checked 2026-10-17):
-  - [Open-Meteo terms](https://open-meteo.com/en/terms): logs may contain coordinates
-    and are deleted after 90 days.
-  - [Open-Meteo licence](https://open-meteo.com/en/licence): CC BY 4.0 credit, a
-    licence link, a note of changes, and a link next to any displayed data.
-  - Maps Platform Terms 4.4(c)(iii): notify users in advance about "the combination
-    and use of End User's location with any other data provider's data".
-- **Current reading:** the privacy content must name Open-Meteo as a recipient of
-  coarse areas and its 90-day log retention. Weather-derived lines need Open-Meteo
-  attribution nearby. The Google notice applies because travel already combines device
-  position with Google routing.
-- **Risk level:** medium until the disclosure ships.
-- **Owner decision:** none.
-- **Status:** open.
-- **Next action:** draft the disclosure and attribution placement in Ticket 218 and
-  Ticket 219's disclosure update.
+- **Status:** moved to `docs/MESSAGING_CHANGES.md` P-003 on October 22, 2026. P-003 keeps
+  the question, sources, reading and next action. Under the owner's October 22 rule it
+  does not block development before the pre-launch privacy pass.
 
 ## L-012: Google Maps notices in Cadence's terms and privacy content
 
@@ -339,4 +355,5 @@ part of L-002.
 - **Status:** closed October 18, 2026. Production deployment
   `dpl_7ePteYsUBqwQHUfufXVrUJduEDL2` serves the approved notices; live readback passed.
 - **Next action:** retain the verified notices with future releases; this entry is resolved. The Privacy statement that Cadence does not send behavior data
-  to an AI provider is a separate conflict under Ticket 187.
+  to an AI provider is a separate conflict under Ticket 187, logged as
+  `docs/MESSAGING_CHANGES.md` P-005.

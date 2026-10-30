@@ -24,6 +24,10 @@ pub enum AccountSyncEntityKind {
     ImportedIntervention,
     ReminderDelivery,
     NoteShortcutState,
+    PlaceLabelSettings,
+    PlaceMarker,
+    CompletionPlaceLabel,
+    WhereSuggestionDismissal,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -65,6 +69,10 @@ pub fn validate_snapshot(profile: &str, entities: &[AccountSyncEntity]) -> db::R
             AccountSyncEntityKind::ImportedIntervention => { decode_row::<ImportedIntervention>(value)?; }
             AccountSyncEntityKind::ReminderDelivery => { decode_row::<ReminderDelivery>(value)?; }
             AccountSyncEntityKind::NoteShortcutState => { decode_row::<NoteShortcutState>(value)?; }
+            AccountSyncEntityKind::PlaceLabelSettings => { decode_row::<PlaceLabelSettings>(value)?; }
+            AccountSyncEntityKind::PlaceMarker => { decode_row::<PlaceMarker>(value)?; }
+            AccountSyncEntityKind::CompletionPlaceLabel => { decode_row::<CompletionPlaceLabel>(value)?; }
+            AccountSyncEntityKind::WhereSuggestionDismissal => { decode_row::<WhereSuggestionDismissal>(value)?; }
         }
     }
     Ok(())
@@ -117,6 +125,10 @@ fn apply_mode(
             if (matches!(write.kind, AccountSyncEntityKind::Profile) && write.id == "profile")
                 || (matches!(write.kind, AccountSyncEntityKind::NoteShortcutState)
                     && write.id == "global")
+                || (matches!(write.kind, AccountSyncEntityKind::PlaceLabelSettings)
+                    && write.id == "place_labels")
+                || (matches!(write.kind, AccountSyncEntityKind::PlaceMarker)
+                    && db::valid_place_ref(&write.id))
             {
                 Ok(())
             } else {
@@ -208,6 +220,18 @@ fn apply_mode(
             }
             AccountSyncEntityKind::NoteShortcutState => {
                 row_write::<NoteShortcutState>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::PlaceLabelSettings => {
+                row_write::<PlaceLabelSettings>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::PlaceMarker => {
+                row_write::<PlaceMarker>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::CompletionPlaceLabel => {
+                row_write::<CompletionPlaceLabel>(db, profile, write, false, false)?
+            }
+            AccountSyncEntityKind::WhereSuggestionDismissal => {
+                row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)?
             }
         }
     }
@@ -341,8 +365,14 @@ fn validate_write(
                     .as_ref()
                     .and_then(Value::as_object)
                     .ok_or("An account sync upsert requires a value.")?;
-                if ["default_duration_minutes", "end_date", "auto_archived_at", "location_text"]
-                    .iter()
+                if [
+                    "default_duration_minutes",
+                    "end_date",
+                    "auto_archived_at",
+                    "location_text",
+                    "where_kind",
+                ]
+                .iter()
                     .any(|field| !value.contains_key(*field))
                 {
                     return Err("Update Cadence before synchronizing Behavior changes.".into());
@@ -405,6 +435,18 @@ fn validate_write(
         }
         AccountSyncEntityKind::NoteShortcutState => {
             validate_row_write::<NoteShortcutState>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::PlaceLabelSettings => {
+            validate_row_write::<PlaceLabelSettings>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::PlaceMarker => {
+            validate_row_write::<PlaceMarker>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::CompletionPlaceLabel => {
+            validate_row_write::<CompletionPlaceLabel>(db, profile, write, false, false)
+        }
+        AccountSyncEntityKind::WhereSuggestionDismissal => {
+            validate_row_write::<WhereSuggestionDismissal>(db, profile, write, false, false)
         }
     }
 }
@@ -596,6 +638,11 @@ fn mutation_order(write: &AccountSyncWrite, replacement: bool) -> (u8, u8) {
         | AccountSyncEntityKind::ImportedIntervention => 6,
         AccountSyncEntityKind::ReminderDelivery => 8,
         AccountSyncEntityKind::NoteShortcutState => 9,
+        // Settings precede markers, labels and dismissals; labels follow occurrences.
+        AccountSyncEntityKind::PlaceLabelSettings => 10,
+        AccountSyncEntityKind::PlaceMarker
+        | AccountSyncEntityKind::CompletionPlaceLabel
+        | AccountSyncEntityKind::WhereSuggestionDismissal => 11,
     };
     let rank = if write.operation == AccountSyncOperation::Delete {
         u8::MAX - parent_first
@@ -636,10 +683,13 @@ fn profile_write(db: &Connection, profile: &str, write: &AccountSyncWrite) -> db
     )
     .map_err(db::error)?;
     db.execute(
-        "UPDATE travel_settings SET enabled=?2,base_location_text=?3,mode=?4,navigation_preference=?5,routing_consent_at=?6,onboarding_completed_at=?7,updated_at=?8 WHERE user_id=?1",
+        "UPDATE travel_settings SET enabled=?2,base_location_text=?3,mode=?4,navigation_preference=?5,routing_consent_at=?6,onboarding_completed_at=?7,updated_at=?8,preparation_minutes=?9,arrival_buffer_minutes=?10,place_modes=?11,leave_feedback=?12,habits_updated_at=?13 WHERE user_id=?1",
         params![profile, next["travel_enabled"].as_bool().unwrap(), next["base_location_text"].as_str(),
             next["travel_mode"].as_str(), next["navigation_preference"].as_str(), next["routing_consent_at"].as_str(),
-            next["onboarding_completed_at"].as_str(), next["updated_at"].as_str().unwrap()],
+            next["onboarding_completed_at"].as_str(), next["updated_at"].as_str().unwrap(),
+            next["travel_preparation_minutes"].as_i64(), next["travel_arrival_buffer_minutes"].as_i64(),
+            next["travel_place_modes"].to_string(), next["travel_leave_feedback"].to_string(),
+            next["travel_habits_updated_at"].as_str()],
     ).map_err(db::error)?;
     Ok(())
 }
@@ -656,13 +706,20 @@ fn profile_value(db: &Connection, profile: &str) -> db::Result<Value> {
         "routing_consent_at": row.routing_consent_at.as_deref().and_then(normalize_utc_instant),
         "onboarding_completed_at": row.onboarding_completed_at.as_deref().and_then(normalize_utc_instant),
         "updated_at": normalize_utc_instant(&row.updated_at).ok_or("Travel settings timestamp is invalid.")?,
+        // Ticket 217 learned habits share the profile entity with the travel preferences.
+        "travel_preparation_minutes": row.preparation_minutes,
+        "travel_arrival_buffer_minutes": row.arrival_buffer_minutes,
+        "travel_place_modes": row.place_modes,
+        "travel_leave_feedback": row.leave_feedback,
+        "travel_habits_updated_at": row.habits_updated_at.as_deref().and_then(normalize_utc_instant),
     }))
 }
 
 fn validate_profile_value(value: &Value) -> db::Result<()> {
     let row = value.as_object().ok_or("The synced profile value is invalid.")?;
     let expected = ["timezone", "travel_enabled", "base_location_text", "travel_mode", "navigation_preference",
-        "routing_consent_at", "onboarding_completed_at", "updated_at"];
+        "routing_consent_at", "onboarding_completed_at", "updated_at", "travel_preparation_minutes",
+        "travel_arrival_buffer_minutes", "travel_place_modes", "travel_leave_feedback", "travel_habits_updated_at"];
     if row.len() != expected.len() || expected.iter().any(|key| !row.contains_key(*key))
         || !value["timezone"].is_string() || !value["travel_enabled"].is_boolean()
         || !matches!(value["base_location_text"], Value::Null | Value::String(_))
@@ -671,8 +728,28 @@ fn validate_profile_value(value: &Value) -> db::Result<()> {
         || !matches!(value["routing_consent_at"], Value::Null | Value::String(_))
         || !matches!(value["onboarding_completed_at"], Value::Null | Value::String(_))
         || !value["updated_at"].is_string()
+        || !matches!(value["travel_preparation_minutes"], Value::Null | Value::Number(_))
+        || !matches!(value["travel_arrival_buffer_minutes"], Value::Null | Value::Number(_))
+        || !value["travel_place_modes"].is_array()
+        || !value["travel_leave_feedback"].is_array()
+        || !matches!(value["travel_habits_updated_at"], Value::Null | Value::String(_))
     {
         return Err("Update Cadence before synchronizing account data.".into());
+    }
+    let minutes = |key: &str, max: i64| match &value[key] {
+        Value::Null => true,
+        number => number.as_i64().is_some_and(|minutes| (0..=max).contains(&minutes)),
+    };
+    let habits_present = !value["travel_preparation_minutes"].is_null() || !value["travel_arrival_buffer_minutes"].is_null()
+        || value["travel_place_modes"].as_array().is_some_and(|entries| !entries.is_empty())
+        || value["travel_leave_feedback"].as_array().is_some_and(|entries| !entries.is_empty());
+    if !minutes("travel_preparation_minutes", 60) || !minutes("travel_arrival_buffer_minutes", 30)
+        || super::travel::validate_place_modes(&value["travel_place_modes"]).is_err()
+        || super::travel::validate_leave_feedback(&value["travel_leave_feedback"]).is_err()
+        || (habits_present && value["travel_habits_updated_at"].is_null())
+        || value["travel_habits_updated_at"].as_str().is_some_and(|at| normalize_utc_instant(at).is_none())
+    {
+        return Err("The synced travel habits are invalid.".into());
     }
     let mode = value["travel_mode"].as_str();
     let navigation = value["navigation_preference"].as_str();
@@ -943,6 +1020,7 @@ mod tests {
             title: "Graph".into(),
             description: None,
             location_text: None,
+            where_kind: None,
             active: true,
             archive_notes: vec![],
             archived_at: None,
@@ -1247,6 +1325,77 @@ mod tests {
         )
         .unwrap();
         assert!(db::by_id::<NoteShortcutState>(&connection, &profile, "global").is_err());
+    }
+
+    #[test]
+    fn account_sync_applies_profile_travel_habits_and_rejects_unsupported_shapes() {
+        let (_directory, mut connection, profile, _category) = database();
+        let current = profile_value(&connection, &profile).unwrap();
+        assert_eq!(current["travel_place_modes"], json!([]));
+        assert_eq!(current["travel_habits_updated_at"], Value::Null);
+        let mut next = current.clone();
+        next["travel_preparation_minutes"] = json!(15);
+        next["travel_place_modes"] = json!([{"place_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","mode":"walking","chosen_at":"2026-09-01T00:00:00.000000Z"}]);
+        next["travel_habits_updated_at"] = json!("2026-09-01T00:00:00.000000Z");
+        let write = |expected: &Value, value: Value| Request::ApplyAccountSync {
+            profile_id: profile.clone(),
+            writes: vec![AccountSyncWrite {
+                kind: AccountSyncEntityKind::Profile,
+                id: "profile".into(),
+                operation: AccountSyncOperation::Upsert,
+                expected: Some(expected.clone()),
+                value: Some(value),
+            }],
+        };
+        execute(&mut connection, write(&current, next.clone())).unwrap();
+        let saved = super::super::travel::read_value(&connection, &profile).unwrap();
+        assert_eq!(saved["habits"]["preparationMinutes"], 15);
+        assert_eq!(saved["habits"]["placeModes"][0]["mode"], "walking");
+        assert_eq!(profile_value(&connection, &profile).unwrap(), next);
+
+        // A build that predates Ticket 217 sends eight keys and fails closed.
+        let legacy: Value = Value::Object(next.as_object().unwrap().iter()
+            .filter(|(key, _)| !key.starts_with("travel_") || *key == "travel_enabled" || *key == "travel_mode")
+            .map(|(key, value)| (key.clone(), value.clone())).collect());
+        assert_eq!(execute(&mut connection, write(&next, legacy)).unwrap_err(), "Update Cadence before synchronizing account data.");
+        let mut unordered = next.clone();
+        unordered["travel_place_modes"] = json!([
+            {"place_key":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","mode":"walking","chosen_at":"2026-09-01T00:00:00.000000Z"},
+            {"place_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","mode":"walking","chosen_at":"2026-09-01T00:00:00.000000Z"}]);
+        assert_eq!(execute(&mut connection, write(&next, unordered)).unwrap_err(), "The synced travel habits are invalid.");
+        let mut unrevised = next.clone();
+        unrevised["travel_habits_updated_at"] = Value::Null;
+        assert_eq!(execute(&mut connection, write(&next, unrevised)).unwrap_err(), "The synced travel habits are invalid.");
+    }
+
+    #[test]
+    fn account_sync_applies_travel_habits_and_place_labels_in_one_plan() {
+        // Travel release train: Ticket 217's profile habits and Ticket 216's place-label
+        // rows arrive together from a hosted account that has both migrations.
+        let (_directory, mut connection, profile, _category) = database();
+        let current = profile_value(&connection, &profile).unwrap();
+        let mut next = current.clone();
+        next["travel_preparation_minutes"] = json!(20);
+        next["travel_place_modes"] = json!([{"place_key":"a".repeat(43),"mode":"transit","chosen_at":"2026-09-01T00:00:00.000000Z"}]);
+        next["travel_habits_updated_at"] = json!("2026-09-01T00:00:00.000000Z");
+        let settings = json!({"id":"place_labels","enabled":true,"retention":"1_year","enabled_at":"2026-09-01T00:00:00.000000Z",
+            "marker_prompt_dismissed_at":null,"updated_at":"2026-09-01T00:00:00.000000Z"});
+        let marker_id = format!("saved_place:{}", "a".repeat(43));
+        let marker = json!({"id":marker_id,"place_key":"a".repeat(43),"latitude_e6":41_878_100,"longitude_e6":-87_629_800,
+            "accuracy_meters":20,"rule_version":"place-label-rules@1","recorded_at":"2026-09-01T00:00:00.000000Z"});
+        let upsert = |kind: AccountSyncEntityKind, id: &str, expected: Option<Value>, value: Value| AccountSyncWrite {
+            kind, id: id.into(), operation: AccountSyncOperation::Upsert, expected, value: Some(value) };
+        execute(&mut connection, Request::ApplyAccountSync { profile_id: profile.clone(), writes: vec![
+            upsert(AccountSyncEntityKind::PlaceMarker, &marker_id, None, marker),
+            upsert(AccountSyncEntityKind::Profile, "profile", Some(current), next.clone()),
+            upsert(AccountSyncEntityKind::PlaceLabelSettings, "place_labels", None, settings),
+        ] }).unwrap();
+        assert_eq!(profile_value(&connection, &profile).unwrap(), next);
+        let markers: i64 = connection.query_row("SELECT count(*) FROM place_markers WHERE user_id=?1", [&profile], |row| row.get(0)).unwrap();
+        assert_eq!(markers, 1);
+        // The same marker's place key also names the remembered mode, so both describe one place.
+        let saved = super::super::travel::read_value(&connection, &profile).unwrap();
+        assert_eq!(saved["habits"]["placeModes"][0]["placeKey"], "a".repeat(43));
     }
 
     #[test]
@@ -1641,6 +1790,7 @@ mod tests {
             title: "Graph behavior".into(),
             description: None,
             location_text: None,
+            where_kind: None,
             active: false,
             archive_notes: vec![BehaviorArchiveNote {
                 id: "10000000-0000-4000-8000-000000000005".into(),

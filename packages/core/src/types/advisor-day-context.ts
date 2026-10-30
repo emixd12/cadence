@@ -6,9 +6,18 @@ import type {
   ExternalEventSourceTimezoneFallback,
   ExternalEventState,
 } from "./day-progress";
+import type { AdvisorTravelContext } from "./briefing-travel";
 import type { OccurrenceStatus } from "./database";
 
 export const ADVISOR_DAY_CONTEXT_VERSION = "1.0" as const;
+/**
+ * Adds Outlook, iCloud, and Hevy connector kinds. `1.0` stays Google-only and
+ * stored `1.0` records stay readable. Runtime assembly and disclosure: Ticket 239.
+ */
+export const ADVISOR_DAY_CONTEXT_VERSION_1_1 = "1.1" as const;
+export const ADVISOR_CALENDAR_SOURCES = ["google_calendar", "outlook_calendar", "icloud_calendar"] as const;
+export const ADVISOR_CONNECTOR_KINDS = [...ADVISOR_CALENDAR_SOURCES, "hevy"] as const;
+export const ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT = 500;
 export const ADVISOR_DAY_CONTEXT_LIMITS = Object.freeze({
   behaviors: 100,
   occurrences: 200,
@@ -64,7 +73,8 @@ export type AdvisorDuration =
   | Readonly<{
       kind: "known";
       seconds: number;
-      source: "behavior_default" | "completed_stopped_occurrence_mean";
+      /** `description_estimate` comes from Ticket 188's estimate step, never from stored history. */
+      source: "behavior_default" | "completed_stopped_occurrence_mean" | "description_estimate";
       sampleCount: number;
       lookbackDays: 90;
     }>
@@ -78,6 +88,8 @@ export type AdvisorDuration =
 export type AdvisorDurationCandidates = Readonly<{
   configuredDefault: Extract<AdvisorDuration, { kind: "known" }> | null;
   historicalAverage: AdvisorDuration;
+  /** Ticket 188: lowest-priority estimate from the Behavior's title and description. */
+  descriptionEstimate?: Extract<AdvisorDuration, { kind: "known" }> | null;
 }>;
 
 export type AdvisorRecordedElapsedDuration = Readonly<{
@@ -217,10 +229,79 @@ export type AdvisorDayContextV1 = Readonly<{
   grantGeneration: number;
   cadence: AdvisorCadenceSource;
   connectors: Array<AdvisorCalendarConnector | AdvisorCalendarNotRequested>;
+  /** Ticket 219 travel facts. Omitted by contexts that predate it and by most synthetic fixtures. */
+  travel?: AdvisorTravelContext;
 }>;
 
 export type AdvisorOpaqueRef = (
   kind: "account" | "snapshot" | "behavior" | "occurrence" | "calendar" | "event" | "instance" | "series" | "revision"
-    | "configuration" | "status_event" | "note" | "analysis_revision",
+    | "configuration" | "status_event" | "note" | "analysis_revision" | "activity",
   value: string,
 ) => string;
+
+export type AdvisorDayContextVersion =
+  | typeof ADVISOR_DAY_CONTEXT_VERSION
+  | typeof ADVISOR_DAY_CONTEXT_VERSION_1_1;
+export type AdvisorCalendarSource = (typeof ADVISOR_CALENDAR_SOURCES)[number];
+export type AdvisorConnectorKind = (typeof ADVISOR_CONNECTOR_KINDS)[number];
+
+export type AdvisorDayContextRequestV1_1 = Readonly<{
+  version: typeof ADVISOR_DAY_CONTEXT_VERSION_1_1;
+  localDate: string | null;
+  /** Unique known connector kinds. Each new kind still needs its own disclosure (Ticket 239). */
+  connectors: AdvisorConnectorKind[];
+}>;
+
+export type AdvisorDayContextRequest =
+  | AdvisorDayContextRequestV1
+  | AdvisorDayContextRequestV1_1;
+
+/** Same projection as Google, with the source named. Refs are source-namespaced. */
+export type AdvisorCalendarConnectorV1_1 = Omit<AdvisorCalendarConnector, "source"> &
+  Readonly<{ source: AdvisorCalendarSource }>;
+
+/** Actual past workout timing. Never a scheduled event or a Cadence completion. */
+export type AdvisorRecordedActivity = Readonly<{
+  ref: string;
+  startAt: string;
+  endAt: string;
+  duration: Readonly<{ kind: "known"; seconds: number }>;
+  localStartDate: string;
+  location: "unsupported";
+}>;
+
+export type AdvisorActivityConnector = Readonly<{
+  source: "hevy";
+  state: "current" | "unavailable" | "incomplete" | "stale";
+  complete: boolean;
+  fetchedAt: string | null;
+  connectionGeneration: number;
+  schemaVersion: string;
+  adapterVersion: string;
+  coverage: Readonly<{
+    startLocalDate: string;
+    endLocalDate: string;
+    paginationComplete: boolean;
+  }> | null;
+  failure: Readonly<{
+    code: AdvisorSourceFailureCode;
+    retryable: boolean;
+    retryAfterSeconds: number | null;
+  }> | null;
+  activities: AdvisorRecordedActivity[];
+}>;
+
+export type AdvisorConnectorNotRequested = Readonly<{
+  source: AdvisorConnectorKind;
+  state: "not_requested";
+}>;
+
+export type AdvisorDayContextV1_1 = Omit<AdvisorDayContextV1, "version" | "connectors"> &
+  Readonly<{
+    version: typeof ADVISOR_DAY_CONTEXT_VERSION_1_1;
+    connectors: Array<
+      AdvisorCalendarConnectorV1_1 | AdvisorActivityConnector | AdvisorConnectorNotRequested
+    >;
+  }>;
+
+export type AdvisorDayContext = AdvisorDayContextV1 | AdvisorDayContextV1_1;

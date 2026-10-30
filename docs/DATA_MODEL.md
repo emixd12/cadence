@@ -37,6 +37,23 @@ store only user-authored text. A location is trimmed, contains no control
 characters and has at most 500 characters. Removing a Behavior location or base
 sets that value to null. Account deletion removes both through existing cascades.
 
+Migration `20261019180000_add_behavior_where.sql` (Ticket 215) adds nullable
+`behaviors.where_kind`: null means Not set, otherwise `anywhere`, `home` or
+`place`. `behaviors_where_place_text_valid` requires `location_text` exactly when
+`where_kind = 'place'`; the place text stays in `location_text`. The migration
+sets `where_kind = 'place'` for every Behavior that had location text. It calls
+no provider and does not change `updated_at`; place lookups wait for the next
+travel refresh. Travel Settings calls `base_location_text` Home.
+
+The migration ships before the web deployment, so the graph writers and
+`insert_behavior_configuration_event` also accept the previous web build. A
+payload without `where_kind` stores `place` when it has location text, clears
+A place when the text is cleared, and otherwise keeps the stored Where. A plan
+whose snapshots lack `where_kind` is compared with Where read the same way and
+with `where_kind` removed from the expected changed fields. Stored events always
+use the database snapshots. A pre-Where plan that would contradict a stored
+Anywhere or Home is refused; a title-only edit keeps it.
+
 `travel_settings` stores disabled-by-default routing state, optional base, mode,
 supported navigation preference, explicit routing-consent time, onboarding time
 and revision time. Enabling requires both a mode and consent. Disabling clears
@@ -50,8 +67,42 @@ configuration history. SQLite migration 0016 provides the same rows and checks.
 Older saved baselines and BehaviorLog imports normalize missing location fields
 to null and travel to disabled. Existing BehaviorLog formats remain unchanged.
 
-Device samples and route results remain transient. Exclude them from account sync,
-exports, backups, logs and analytics. Since Ticket 214, a provider geocode persists
+Migration `20261024210000_travel_habits.sql` (Ticket 217) adds learned travel
+habits to `travel_settings`. Every value comes from the user: an edit in Travel
+Settings, a travel mode chosen for a place, or a leave-time answer.
+
+- `preparation_minutes` (get-ready time, 0–60) and `arrival_buffer_minutes`
+  (0–30). Null follows the versioned defaults in
+  `packages/core/src/services/travel-habits.ts` (`travel-habit-defaults@1`:
+  10 and 5 minutes).
+- `place_modes`: at most 100 `{place_key, mode, chosen_at}` entries in ascending
+  `place_key` order. `place_key` is the Ticket 216 place key: the unpadded
+  base64url SHA-256 of the normalized place text, equal to the
+  `travel_place_cache` text key. No place text is stored.
+- `leave_feedback`: the newest 30 `{event_ref, local_date, answer, answered_at,
+  rules_version}` answers, at most one per local date, in ascending date order.
+  `event_ref` is the hex SHA-256 of `calendar:<event id>` or
+  `behavior:<occurrence id>`. Answers hold no title, time or location.
+- `habits_updated_at`: null until the first habit change. Habit writes compare
+  this revision only, so they never conflict with a Settings save; Settings saves
+  compare `updated_at` and leave the habit columns alone.
+
+Check functions validate entry shape, order, bounds and canonical
+microsecond instants. A row without a habit revision must hold no learned values.
+Owner RLS and grants are unchanged. Account sync carries the habits in the
+singleton profile entity as `travel_preparation_minutes`,
+`travel_arrival_buffer_minutes`, `travel_place_modes`, `travel_leave_feedback` and
+`travel_habits_updated_at`, so the profile value has 13 keys. Older saved
+baselines read the missing keys as nothing learned. A desktop build that predates
+Ticket 217 rejects the 13-key hosted profile and fails closed on every
+synchronization with "Update Cadence before synchronizing account data." until
+updated, as Ticket 215 builds do for Where. Route durations are never stored to
+learn habits.
+
+Device samples used for travel and route results remain transient. Exclude them
+from account sync, exports, backups, logs and analytics. Ticket 216 place markers
+are the one stored device position: the user records each with "I'm here", and
+they sync and enter desktop backups (see `place_markers` below). Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive
 travel occupancy and collisions without changing scheduled times or statuses.
 Each leg carries its own endpoints, timing, mode, provenance and freshness so one
@@ -202,6 +253,7 @@ create table behaviors (
   title text not null,
   description text,
   location_text text,
+  where_kind text check (where_kind is null or where_kind in ('anywhere', 'home', 'place')),
 
   recurrence_rule jsonb not null,
   scheduled_time time not null,
@@ -219,9 +271,13 @@ create table behaviors (
 );
 ```
 
-`location_text` is an optional user-authored routing destination. It is part of
-the Behavior configuration revision and account-sync row. It is not a provider
-geocode and never stores coordinates or place identifiers.
+`where_kind` is the optional Behavior Where. Not set and Anywhere request no
+route. Home routes to the saved Home when the user is elsewhere and requests no
+route without one. A place routes to `location_text`, an optional user-authored
+routing destination that only `place` keeps. Both columns are part of the
+Behavior configuration revision and account-sync row. Neither is a provider
+geocode; they never store coordinates or place identifiers. A Where suggestion
+never changes these columns on its own.
 
 ### `travel_settings`
 
@@ -235,14 +291,24 @@ create table travel_settings (
   routing_consent_at timestamptz,
   onboarding_completed_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Ticket 217 learned habits; null minutes follow travel-habit-defaults@1.
+  preparation_minutes integer check (preparation_minutes between 0 and 60),
+  arrival_buffer_minutes integer check (arrival_buffer_minutes between 0 and 30),
+  place_modes jsonb not null default '[]',
+  leave_feedback jsonb not null default '[]',
+  habits_updated_at timestamptz
 );
 ```
 
-Supported modes are walking, cycling, transit and driving. Supported navigation
-preferences are Google Maps and Apple Maps. The saved base is optional. Missing
+Supported modes are walking, cycling, transit and driving; Settings calls the
+mode usual travel. `base_location_text` is the optional Home. Since Ticket 215,
+Settings no longer shows `navigation_preference`; saves pass the stored value
+through unchanged, and links follow the platform (Apple Maps on Apple devices,
+Google Maps elsewhere). The column and its sync field remain for compatibility. Missing
 base suppresses final-return advice only. Device samples, provider geocodes,
-route results and Calendar/model grants never enter this table.
+route results and Calendar/model grants never enter this table. Learned habits
+(Ticket 217) are described under Travel locations and preferences above.
 
 `recurrence_rule` and `scheduled_time` store the first schedule's recurrence
 and first time-entry start for compatibility, sorting, and simple summaries.
@@ -264,7 +330,87 @@ The profile update, active-Behavior updates, configuration events, and one
 `timezone_changed` stale-state write share one owner-scoped database
 transaction. A failed Behavior precondition rolls back the profile update.
 Occurrence generation stays outside that transaction and can be retried while
-the committed sync state remains stale.
+the committed sync state remains stale. Desktop applies the same rule, and
+account sync accepts it: a synced timezone change never needs a write for an
+archived Behavior (see `public.apply_account_sync_plan(jsonb)` below).
+
+### Completion place labels (Ticket 216)
+
+Migration `20261024200000_completion_place_labels.sql` adds four owner-scoped
+tables. Owner RLS permits each table's own reads and writes; nothing reads another
+account. Cadence never fetches, stores or compares Google coordinates here.
+
+```sql
+create table place_label_settings (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  id text not null default 'place_labels',      -- constant sync identity
+  enabled boolean not null default false,
+  retention text not null default '90_days',    -- 90_days | 1_year | until_deleted
+  enabled_at timestamptz,                       -- required while enabled
+  marker_prompt_dismissed_at timestamptz,       -- "Not now" on marker prompts
+  updated_at timestamptz not null
+);
+create table place_markers (
+  user_id uuid not null references profiles(id) on delete cascade,
+  id text not null,                             -- 'home' or 'saved_place:' || place_key
+  place_key text not null,                      -- base64url SHA-256 of normalized text
+  latitude_e6 integer not null,                 -- microdegrees
+  longitude_e6 integer not null,
+  accuracy_meters integer not null,             -- 0 through 100
+  rule_version text not null,                   -- place-label-rules@1
+  recorded_at timestamptz not null,
+  primary key (user_id, id)
+);
+create table completion_place_labels (
+  id uuid primary key,                          -- the occurrence ID
+  user_id uuid not null references profiles(id) on delete cascade,
+  behavior_id uuid not null,
+  local_date date not null,
+  label text not null,                          -- home | elsewhere | saved_place:<place key>
+  rule_version text not null,                   -- place-label-rules@1
+  recorded_at timestamptz not null,
+  foreign key (user_id, id) references occurrences(user_id, id) on delete cascade,
+  foreign key (user_id, behavior_id) references behaviors(user_id, id) on delete cascade
+);
+create table where_suggestion_dismissals (
+  id uuid primary key,                          -- the Behavior ID
+  user_id uuid not null references profiles(id) on delete cascade,
+  suggestion text not null,                     -- home | anywhere | add_place | saved_place:<key>
+  rule_version text not null,                   -- where-suggestion-rules@1
+  dismissed_at timestamptz not null,
+  foreign key (user_id, id) references behaviors(user_id, id) on delete cascade
+);
+```
+
+A saved place has no table of its own. Its place key is the same one-way key as
+`travel_place_cache.text_key`, so Behaviors with equally normalized place text
+share a marker. A Home marker stores the place key of the Home text when it was
+recorded; readers ignore it after Home changes.
+
+Triggers keep every writer consistent, including MCP and account sync:
+
+- Markers, labels and dismissals require `place_label_settings.enabled`, read
+  under a share lock held until the write commits. A concurrent opt-out either
+  deletes the admitted write or completes first and makes the write fail.
+- A label requires a Completed occurrence of the same Behavior and local date,
+  read under a share lock.
+- A status change away from Completed deletes that occurrence's label.
+- Turning labels off deletes the owner's labels, markers and dismissals.
+
+Check constraints accept only known rule versions, so a new rule value needs a
+migration. `public.save_place_label_settings(...)` is the web settings save: a
+compare-and-set on `updated_at` that also deletes labels older than the caller's
+retention cutoff in the same transaction. `public.purge_expired_completion_place_labels()`
+is executable by `service_role` only; the daily occurrence-sync cron calls it to
+delete labels past each owner's retention in the profile's local date.
+
+Account sync adds four entity kinds: `place_label_settings` (ID `place_labels`),
+`place_marker` (ID `home` or `saved_place:<key>`), `completion_place_label` and
+`where_suggestion_dismissal`. Conflicts on these kinds resolve without review: a
+deletion wins over an edit, and otherwise the later record wins. The planner drops
+labels whose merged occurrence is not Completed and every row while labels are
+off, matching the triggers, so the post-apply fingerprint matches. Exports omit
+all four tables (export inclusion is a backlog decision, not Ticket 216).
 
 ### `behavior_definition_events`
 
@@ -390,8 +536,12 @@ create table behavior_configuration_events (
 ```
 
 `behavior_configuration_events` stores append-only configuration history. A
-snapshot contains `category_id`, the complete semantic schedule graph, browser
-and email reminder settings, reminder offset, active state, and timezone.
+snapshot contains `category_id`, `location_text`, `where_kind`, the complete
+semantic schedule graph, browser and email reminder settings, reminder offset,
+active state, and timezone. Ticket 215 did not rewrite earlier events. A snapshot
+without `where_kind` reads as `place` when it has location text and as Not set
+otherwise, in SQL change detection, core normalization and exports.
+`where_kind` is an allowed changed field after `location_text`.
 Schedule and time-entry IDs are excluded. Stable sort order, recurrence JSON,
 local times, and reminder values define the semantic graph.
 
@@ -1545,10 +1695,73 @@ conflicts, row preconditions, and idempotency before applying any write. It
 uses the existing owner-validating BehaviorLog restore boundary for graph,
 history, provenance, and protected-Occurrence changes. It applies profile
 timezone and reminder-delivery supplemental writes with compare-and-swap
-checks. The product writes and immutable receipt share one transaction. Public,
+checks. A profile timezone change must leave every Behavior that is active
+before and after the plan in the new timezone. Its upsert carries that timezone,
+or it has no upsert and already uses it. An upsert that archives a Behavior also
+satisfies the rule, and archived Behaviors need no write: they keep their
+historical timezone. Migration
+`20261027221625_account_sync_active_behavior_timezones.sql` set this rule. The
+earlier rule required a timezone upsert for every Behavior, archived ones
+included, so each sync of a timezone change failed on an account with an
+archived Behavior (0.1.6 release finding F1).
+`tests/sql/account-sync-active-behavior-timezone-smoke.sql` covers contracts 1
+and 2. The product writes and immutable receipt share one transaction. Public,
 anonymous, and service-role execution remain revoked; only `authenticated` may
 execute it. This narrow `SECURITY DEFINER` boundary avoids granting direct
 authenticated writes to protected history and graph tables.
+
+### Account sync contracts (October 27, 2026)
+
+Migration `20261027120000_account_sync_contracts.sql` adds contract
+versioning. A contract is the snapshot shape one client build understands.
+Plan: `docs/plans/2026-10-27-sync-compatibility.md`. Applied to hosted on October 27,
+2026.
+
+- `cadence_private.account_sync_contract_additions(contract, kind, field,
+  default_value)` lists what each contract after 1 adds. A row with no `field`
+  adds a whole entity kind. Each added field has a `default_value`, which is used
+  when no stored value exists. Contract 1 is the desktop 0.1.5 shape (SQLite
+  schema 18). Contract 2 adds five Ticket 217 travel-habit profile keys and the
+  four Ticket 216 place-label kinds.
+- `cadence_private.account_sync_snapshot()` is the full snapshot that the public
+  reader used to return.
+- `cadence_private.project_account_sync_snapshot(snapshot, contract)` removes
+  later kinds and fields and recomputes the fingerprint over the result.
+- `public.read_account_sync_snapshot(contract integer)` returns that
+  projection. The no-argument form returns contract 1 for builds that predate
+  contracts.
+- `apply_account_sync_plan` accepts an optional numeric `contract` payload field.
+  A missing field means contract 1. It projects the hosted, merged and receipt
+  fingerprints to that contract. For an older contract, it rejects writes to later
+  kinds or fields. It fills each upsert's `value` and each write's object `expected`
+  with the stored value of every hidden field, or that field's default. This
+  includes compare-and-set checks for permitted deletes. Old inserts receive
+  registered defaults; old updates retain hidden values. Existing protected-row
+  and append-only-history rules still apply. A null or out-of-range read contract
+  is refused. A write contract above
+  `account_sync_current_contract()` is refused. A contract below
+  `account_sync_min_writer_contract()` (now 1) gets "Update Cadence".
+
+`tests/sql/account-sync-contract-smoke.sql` freezes the contract 2 columns of
+every synced table. It fails when a column is added without a registry entry and
+default. `tests/account-sync-contract.test.ts` keeps `ACCOUNT_SYNC_CONTRACT` equal
+to the newest registered contract.
+
+The client includes its contract in the idempotency key. Identical projected
+snapshots under two contracts therefore cannot collide with receipts whose request
+fingerprints include different contract fields. Existing contract-1 receipt keys
+remain valid for the published 0.1.5 client.
+
+`tests/sql/account-sync-contract-write-smoke.sql` exercises the no-argument 0.1.5
+profile, later-field/kind rejection, hidden-habit preservation, projected receipt
+replay, populated hidden settings/markers and account isolation. A rolled-back contract-3 Category column verifies
+old inserts, updates and deletes, plus rejection and replanning after a concurrent
+row revision. Neither fixture changes the deployed registry.
+
+Projection does not disable product lifecycle rules. For example, an older client
+changing a Completed Occurrence to another status still removes its completion
+place label through the existing trigger. The compatibility guarantee preserves
+unknown data during unrelated writes; it does not retain labels that became invalid.
 
 The apply boundary serializes plans per account and locks each written entity
 identity before its ownership check. Immutable receipts retain fingerprints,
@@ -1840,6 +2053,52 @@ never enter exports, sync snapshots, or desktop backups. Hosting infrastructure
 backups may retain sealed ciphertext under the existing provider retention policy.
 Local ownership/race verification: `tests/sql/google-calendar-contract.sql`.
 
+## Hevy, Outlook, and iCloud connector lifecycle (Ticket 235)
+
+Migration `20261019040000_connector_lifecycle.sql` adds owner metadata for the
+new hosted connectors. Google Calendar tables, functions, ciphertext, and
+same-subject rules are unchanged.
+
+- `connector_connections`: primary key `(user_id, provider)`, so each Cadence
+  account has at most one connection per provider. `provider` is `hevy`,
+  `outlook_calendar`, or `icloud_calendar`. `account_digest` is a SHA-256 of the
+  provider-namespaced identity (Hevy `user/info` id, Outlook `tid` plus `sub`, or
+  the iCloud principal href); it is never an email address. `generation` advances
+  on every install, disconnect, and `reconnect_required` transition. `status` is
+  `connected`, `disconnected`, or `reconnect_required`. Authenticated owners
+  have column SELECT on everything except `attempt_hash`, and no write grants.
+- `connector_preferences`: owner SELECT and column UPDATE of
+  `selected_source_ids`, `hidden_source_ids`, `visible`, and `show_all_day`.
+  The existing `cadence_calendar_private.advance_selection()` trigger advances
+  `selection_revision` on every update. Hidden IDs must be a subset of selected
+  IDs; Hevy rows hold no selections.
+- `cadence_calendar_private.connector_credentials` holds one sealed credential
+  per owner and provider, keyed to the connection's identity and generation.
+  `cadence_calendar_private.connector_attempts` holds one five-minute Outlook
+  OAuth attempt per owner with a sealed PKCE verifier. Both enable RLS and deny
+  every client grant, including direct service-role table reads.
+
+Exact `connector_*` RPCs are executable only by `service_role`, use empty search
+paths, and take the owner from the authenticated caller or a consumed attempt.
+Install is a compare-and-swap on generation (and on the attempt hash for
+Outlook). A bound identity must disconnect before a different provider account
+connects; `reconnect_required` keeps the binding. Reads require owner, provider,
+identity digest, and generation to match a connected row. Refresh rotation
+replaces ciphertext only inside the live generation. Disconnect affects one
+provider: it advances the generation, releases the identity, and deletes that
+provider's credential, attempts, and selections. Every row cascades from its
+Auth owner, so failed Auth deletion preserves connections and successful
+deletion removes them. None of these providers documents app-side revocation.
+
+AES-256-GCM uses the separate `CONNECTOR_CREDENTIAL_*` keyring. Associated data
+binds the `cadence-connector-v1` tag, provider, purpose (`credential` or
+`verifier`), owner, identity digest, generation, and attempt hash. Credentials,
+raw provider responses, and source records stay out of exports, BehaviorLog,
+account synchronization, desktop SQLite, and user-created backups. Hosting
+infrastructure backups may retain sealed ciphertext under the existing provider
+retention policy. Local verification: `tests/sql/context-connectors-contract.sql`
+and `tests/connector-lifecycle.test.ts`.
+
 ## Advisor day-context reads (Ticket 146)
 
 Migration `20260919010100_add_advisor_cadence_snapshot.sql` adds owner-scoped
@@ -1899,6 +2158,31 @@ disclosure revision: one automatic start plus three deliberate retries. The fift
 returns `retry_exhausted`. The one-active-generation rule and six starts/minute
 still apply first; no quota or admission record is cleared. A new local day or
 disclosure revision starts at one. The column stores no prompt or generated text.
+
+Migration `20261019041000_daily_brief_connector_disclosure.sql` (Ticket 239):
+
+- `daily_brief_preferences` adds `include_outlook_calendar`,
+  `include_icloud_calendar`, and `include_hevy` (default false; each requires
+  `enabled`). `include_calendar` stays Google Calendar only. Each disclosure
+  stores the connector fence current when it was granted:
+  `outlook_connection_generation` and `outlook_selection_revision`,
+  `icloud_connection_generation` and `icloud_selection_revision`, and
+  `hevy_connection_generation`. Check constraints require the fence exactly when
+  the disclosure is on. Existing rows read every new disclosure as off.
+- `save_daily_brief_preferences_v3` saves all seven controls. Enabling Outlook or
+  iCloud needs a connected `connector_connections` row with a non-empty
+  `connector_preferences.selected_source_ids`; Hevy needs a connected row. A
+  missing source raises `55000`. `save_daily_brief_preferences_v2` now delegates
+  with the three new disclosures off, and the original three-argument save still
+  delegates to v2, so older clients revoke them. Every save bumps the revision and
+  deletes the owner's `daily_brief_runs`.
+- `daily_brief_connector_fence_is_current(user_id)` (private, not granted to
+  clients) checks each disclosed source's connected status, generation, and
+  selection revision. `daily_brief_calendar_fence_is_current` keeps its signature
+  and now also requires it, so the installed `begin_daily_brief` and
+  `finish_daily_brief` fence the new sources without being rewritten.
+- `read_daily_brief_preferences` returns the new keys. The repository treats a
+  missing key as off and rejects a disclosure without its fence.
 
 Migration `20260926170000_daily_brief_analysis_sources.sql` (Tickets 169, 172, 173):
 
@@ -2253,3 +2537,23 @@ Verification: `tests/integration-write.test.ts` and opt-in
 checks, concurrency, exact replay, rollback, ownership, and web/desktop row
 compatibility. Use only an isolated loopback database and the local integration
 test environment documented in `docs/SUPABASE_WORKFLOW.md`.
+
+## Agent Calendar grant (Ticket 187)
+
+Migration `20261022180000_separate_agent_calendar_grant.sql` adds independent owner-scoped
+`google_calendar_agent_connections` and `google_calendar_agent_preferences` tables.
+Connections add `oauth_client_id`; generation, attempt hash, status and selection revision mirror the standard grant.
+The `cadence_calendar_agent_private` schema stores sealed credentials and five-minute, client-bound attempts.
+Owner RLS and column grants match standard Calendar. Only the server credential repository can call `calendar_agent_*` RPCs.
+Every owner row cascades on Auth deletion. Agent credentials and attempts never enter exports, synchronization or desktop backups.
+
+Agent AES-GCM associated data includes its OAuth client ID and agent namespace in addition to owner, subject and generation.
+Standard ciphertext retains its existing format. Tokens and selections are never copied between grants.
+Daily Brief SQL admission, completion and preference fences now reference the agent tables.
+The migration clears existing Calendar disclosure, increments its preference revision, and removes affected outstanding brief attempts.
+Behavior-only preferences and attempts remain unchanged. Fresh agent consent and model disclosure are required.
+`tests/sql/google-calendar-agent-contract.sql` verifies grant isolation, RLS, replay and disconnect boundaries.
+
+The migration was written October 12, 2026 as `20261012213059_…` and never applied to hosted.
+On October 22 it was renamed to sort after hosted migrations already applied through `20261019025157`.
+Its preference save keeps errcode `55000` for stale revisions, matching `20260927173716_fix_daily_brief_nonretryable_conflicts.sql`.

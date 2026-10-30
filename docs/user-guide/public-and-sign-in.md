@@ -40,24 +40,28 @@ Tab and Shift+Tab to reach header, content, and footer links, then Enter to
 activate. At larger text sizes or on a narrow screen, links may wrap; their
 order and labels remain the same.
 
-## Open the macOS preview download
+## Download Cadence for Mac
 
-**Prerequisites:** An Apple Silicon Mac running the supported macOS version.
+**Prerequisites:** An Apple Silicon Mac. Cadence for Mac is tested on macOS 27;
+earlier versions are not tested.
 
 1. Choose **Download for Mac** in the marketing header.
-2. Confirm that the browser downloads the current Cadence preview DMG. The
-   preview uses ad hoc signing and is not notarized.
-3. Open the DMG and follow its installation guidance. Back up existing Cadence
-   data before replacing an installed version.
+2. The browser downloads the current signed Cadence DMG. Apple has notarized it,
+   so macOS opens it after its standard downloaded-app prompt, without
+   **Open Anyway**.
+3. Open the DMG and drag Cadence into Applications. Back up existing Cadence
+   data before replacing an installed version. If you are updating from a
+   preview, choose **Reconnect account** in Settings and sign in once.
 
-**Result and persistence:** The browser stores the current Cadence preview DMG.
-Cadence data does not change unless you install and run the desktop app.
+**Result and persistence:** The browser stores the current Cadence DMG. Cadence
+data does not change unless you install and run the desktop app. Later updates
+arrive inside the app through the stable update channel.
 
 **Recovery or undo:** Remove the downloaded DMG through the operating system if
 you no longer need it.
 
-**Privacy and safety:** The marketing button targets the normal preview DMG, not
-an updater archive or a QA-only failure asset.
+**Privacy and safety:** The marketing button targets the signed release DMG on
+the `desktop-stable` GitHub release, not an updater archive or a QA asset.
 
 **Keyboard and mobile:** Focus **Download for Mac** and press Enter. The link
 starts the same DMG download from narrow layouts.

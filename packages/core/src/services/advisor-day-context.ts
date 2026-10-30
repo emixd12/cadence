@@ -2,9 +2,17 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import type { BehaviorDurationEstimate } from "../types/day-progress";
 import {
+  ADVISOR_CALENDAR_SOURCES,
+  ADVISOR_CONNECTOR_KINDS,
+  ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT,
   ADVISOR_DAY_CONTEXT_LIMITS,
   ADVISOR_DAY_CONTEXT_VERSION,
+  ADVISOR_DAY_CONTEXT_VERSION_1_1,
+  type AdvisorActivityConnector,
   type AdvisorCalendarConnector,
+  type AdvisorCalendarConnectorV1_1,
+  type AdvisorDayContext,
+  type AdvisorDayContextRequest,
   type AdvisorCadenceSource,
   type AdvisorDayContextV1,
   type AdvisorDayContextRequestV1,
@@ -15,16 +23,41 @@ import {
   type AdvisorOccurrence,
   type AdvisorSourceFailureCode,
 } from "../types/advisor-day-context";
+import {
+  ADVISOR_BEHAVIOR_WHERE,
+  ADVISOR_TRAVEL_CONTEXT_VERSION,
+  ADVISOR_TRAVEL_ROUTE_UNAVAILABLE_REASONS,
+  ADVISOR_WEATHER_STATES,
+} from "../types/briefing-travel";
 import type { OccurrenceStatus } from "../types/database";
+import { TRAVEL_MODEL_PROJECTION_VERSION, type TravelLegRole, type TravelMode, type TravelModelFit } from "../types/travel";
+import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
+import { CURRENT_WHERE_SUGGESTION_RULES } from "../resolvers/place-label.resolver";
+import { PLACE_LABEL_RETENTIONS } from "../types/place-labels";
+import { WEATHER_MARGIN_TABLE } from "../resolvers/weather-margin.resolver";
+import { TRAVEL_HABIT_RULES } from "./travel-habits";
 import type {
   ExternalEventFailure,
   ExternalEventSnapshotV1,
+  VersionedExternalEventSnapshot,
 } from "../types/external-event";
 import {
   EXTERNAL_EVENT_ADAPTER_VERSION,
   EXTERNAL_EVENT_SCHEMA_VERSION,
+  EXTERNAL_EVENT_SOURCE_VERSIONS,
 } from "../types/external-event";
-import { validateExternalEventSnapshot } from "./external-event-validation";
+import {
+  HEVY_WORKOUTS_ADAPTER_VERSION,
+  RECORDED_ACTIVITY_MAX_RANGE_DAYS,
+  RECORDED_ACTIVITY_SCHEMA_VERSION,
+  type RecordedActivityFailure,
+  type RecordedActivitySnapshotV1,
+} from "../types/recorded-activity";
+import {
+  validateExternalEventSnapshot,
+  validateVersionedExternalEventSnapshot,
+} from "./external-event-validation";
+import { validateRecordedActivitySnapshot } from "./recorded-activity-validation";
 
 type AdvisorCadenceOccurrenceInput = Readonly<{
   id: string;
@@ -68,6 +101,21 @@ export function validateAdvisorDayContextRequest(value: unknown): AdvisorDayCont
   const connectors = array(request.connectors, "request.connectors", 1);
   if (connectors.length === 1 && connectors[0] !== "google_calendar") fail("request.connectors is invalid.");
   return value as AdvisorDayContextRequestV1;
+}
+
+/** Accepts `1.0` (Google or no connectors) and `1.1` (unique known connector kinds). */
+export function validateVersionedAdvisorDayContextRequest(value: unknown): AdvisorDayContextRequest {
+  const request = record(value, "request");
+  if (request.version === ADVISOR_DAY_CONTEXT_VERSION) return validateAdvisorDayContextRequest(value);
+  exactKeys(request, ["version", "localDate", "connectors"], "request");
+  if (request.version !== ADVISOR_DAY_CONTEXT_VERSION_1_1) fail("request.version is unsupported.");
+  if (request.localDate !== null) plainDate(request.localDate, "request.localDate");
+  const connectors = array(request.connectors, "request.connectors", ADVISOR_CONNECTOR_KINDS.length);
+  if (connectors.some((kind) => !(ADVISOR_CONNECTOR_KINDS as readonly unknown[]).includes(kind))
+    || new Set(connectors).size !== connectors.length) {
+    fail("request.connectors is invalid.");
+  }
+  return value as AdvisorDayContextRequest;
 }
 
 export function projectAdvisorCadenceSource(input: Readonly<{
@@ -206,6 +254,31 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
   failure?: ExternalEventFailure | null;
 }>): AdvisorCalendarConnector {
   const snapshot = validateExternalEventSnapshot(input.snapshot);
+  return projectCalendarConnector(snapshot, input) as AdvisorCalendarConnector;
+}
+
+/**
+ * Any calendar source. Google output equals `projectAdvisorCalendarConnector`.
+ * Outlook and iCloud refs are namespaced by source so equal provider IDs in
+ * different sources never share a ref.
+ */
+export function projectVersionedAdvisorCalendarConnector(input: Readonly<{
+  snapshot: VersionedExternalEventSnapshot | unknown;
+  selectionRevision: number;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: ExternalEventFailure | null;
+}>): AdvisorCalendarConnectorV1_1 {
+  return projectCalendarConnector(validateVersionedExternalEventSnapshot(input.snapshot), input);
+}
+
+function projectCalendarConnector(snapshot: VersionedExternalEventSnapshot, input: Readonly<{
+  selectionRevision: number;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: ExternalEventFailure | null;
+}>): AdvisorCalendarConnectorV1_1 {
+  const scoped = (value: string) => snapshot.source === "google_calendar" ? value : `${snapshot.source}\0${value}`;
   if (snapshot.requestedRange.selectedCalendarIds.length > ADVISOR_DAY_CONTEXT_LIMITS.calendars) {
     throw new AdvisorDayContextValidationError("Advisor Calendar limit exceeded.", "context_limit_exceeded");
   }
@@ -215,10 +288,10 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
 
   const complete = snapshot.completeness === "complete" && snapshot.freshness.state === "current";
   const events = complete ? snapshot.events.map((event) => ({
-    ref: input.makeOpaqueRef("event", `${event.calendarId}\0${event.providerEventId}`),
-    calendarRef: input.makeOpaqueRef("calendar", event.calendarId),
-    logicalInstanceRef: input.makeOpaqueRef("instance", `${event.calendarId}\0${event.logicalInstanceId}`),
-    revision: input.makeOpaqueRef("revision", JSON.stringify(event.revision)),
+    ref: input.makeOpaqueRef("event", scoped(`${event.calendarId}\0${event.providerEventId}`)),
+    calendarRef: input.makeOpaqueRef("calendar", scoped(event.calendarId)),
+    logicalInstanceRef: input.makeOpaqueRef("instance", scoped(`${event.calendarId}\0${event.logicalInstanceId}`)),
+    revision: input.makeOpaqueRef("revision", scoped(JSON.stringify(event.revision))),
     interval: event.kind === "timed"
       ? { kind: "timed" as const, startAt: event.startAt, endAt: event.endAt, duration: event.duration }
       : { kind: "all_day" as const, startLocalDate: event.startLocalDate, endLocalDate: event.endLocalDate, duration: event.duration },
@@ -228,7 +301,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
     availability: event.availability,
     currentUserResponse: event.currentUserResponse,
     recurrence: event.recurrence ? {
-      seriesRef: input.makeOpaqueRef("series", `${event.calendarId}\0${event.recurrence.seriesId}`),
+      seriesRef: input.makeOpaqueRef("series", scoped(`${event.calendarId}\0${event.recurrence.seriesId}`)),
       originalStart: event.recurrence.originalStart,
     } : null,
   })) : [];
@@ -244,7 +317,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
   }
 
   return {
-    source: "google_calendar",
+    source: snapshot.source,
     state,
     complete,
     fetchedAt,
@@ -253,7 +326,7 @@ export function projectAdvisorCalendarConnector(input: Readonly<{
     schemaVersion: snapshot.schemaVersion,
     adapterVersion: snapshot.adapterVersion,
     coverage: snapshot.coverage.map((coverage) => ({
-      calendarRef: input.makeOpaqueRef("calendar", coverage.calendarId),
+      calendarRef: input.makeOpaqueRef("calendar", scoped(coverage.calendarId)),
       startLocalDate: coverage.startLocalDate,
       endLocalDate: coverage.endLocalDate,
       paginationComplete: coverage.paginationComplete,
@@ -291,10 +364,113 @@ export function projectUnavailableAdvisorCalendar(input: Readonly<{
   };
 }
 
+/** Unavailable Outlook or iCloud source state for `1.1`; it carries no events or coverage. */
+export function projectUnavailableVersionedAdvisorCalendar(input: Readonly<{
+  source: Exclude<AdvisorCalendarConnectorV1_1["source"], "google_calendar">;
+  connectionGeneration: number;
+  selectionRevision: number;
+  failure: Readonly<{ code: AdvisorSourceFailureCode; retryable: boolean; retryAfterSeconds: number | null }>;
+}>): AdvisorCalendarConnectorV1_1 {
+  const versions = EXTERNAL_EVENT_SOURCE_VERSIONS[input.source];
+  return {
+    source: input.source,
+    state: "unavailable",
+    complete: false,
+    fetchedAt: null,
+    connectionGeneration: input.connectionGeneration,
+    selectionRevision: input.selectionRevision,
+    schemaVersion: versions.schemaVersion,
+    adapterVersion: versions.adapterVersion,
+    coverage: [],
+    failure: input.failure,
+    events: [],
+  };
+}
+
+/** Unavailable Hevy source state. Missing activity never proves that no workout happened. */
+export function projectUnavailableAdvisorActivity(input: Readonly<{
+  connectionGeneration: number;
+  failure: Readonly<{ code: AdvisorSourceFailureCode; retryable: boolean; retryAfterSeconds: number | null }>;
+}>): AdvisorActivityConnector {
+  return {
+    source: "hevy",
+    state: "unavailable",
+    complete: false,
+    fetchedAt: null,
+    connectionGeneration: input.connectionGeneration,
+    schemaVersion: RECORDED_ACTIVITY_SCHEMA_VERSION,
+    adapterVersion: HEVY_WORKOUTS_ADAPTER_VERSION,
+    coverage: null,
+    failure: input.failure,
+    activities: [],
+  };
+}
+
+/**
+ * Recorded workout timing only. Titles, provider IDs, and every discarded Hevy
+ * field never reach this projection. Incomplete or stale reads expose no
+ * activities. `now` is injected.
+ */
+export function projectAdvisorActivityConnector(input: Readonly<{
+  snapshot: RecordedActivitySnapshotV1 | unknown;
+  now: Temporal.Instant;
+  makeOpaqueRef: AdvisorOpaqueRef;
+  failure?: RecordedActivityFailure | null;
+}>): AdvisorActivityConnector {
+  const snapshot = validateRecordedActivitySnapshot(input.snapshot, { now: input.now });
+  if (snapshot.activities.length > ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT) {
+    throw new AdvisorDayContextValidationError("Advisor activity limit exceeded.", "context_limit_exceeded");
+  }
+  const fetchedAt = Temporal.Instant.from(snapshot.fetchedAt);
+  const fresh = Temporal.Instant.compare(input.now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) <= 0;
+  const state = snapshot.completeness !== "complete" ? "incomplete" : fresh ? "current" : "stale";
+  const complete = state === "current";
+  const failure = input.failure ?? snapshot.failures[0] ?? null;
+  return {
+    source: "hevy",
+    state,
+    complete,
+    fetchedAt: snapshot.fetchedAt,
+    connectionGeneration: snapshot.connectionGeneration,
+    schemaVersion: snapshot.schemaVersion,
+    adapterVersion: snapshot.adapterVersion,
+    coverage: {
+      startLocalDate: snapshot.requestedRange.startLocalDate,
+      endLocalDate: snapshot.requestedRange.endLocalDate,
+      paginationComplete: snapshot.coverage.paginationComplete,
+    },
+    failure: failure ? {
+      code: sourceFailureCode(failure.code),
+      retryable: failure.retryable,
+      retryAfterSeconds: failure.retryAfterSeconds,
+    } : null,
+    activities: complete ? snapshot.activities.map((activity) => ({
+      ref: input.makeOpaqueRef("activity", activity.id),
+      startAt: activity.startAt,
+      endAt: activity.endAt,
+      duration: activity.duration,
+      localStartDate: activity.localStartDate,
+      location: "unsupported" as const,
+    })) : [],
+  };
+}
+
 export function validateAdvisorDayContext(value: unknown): AdvisorDayContextV1 {
+  return validateContext(value, "1.0_only") as AdvisorDayContextV1;
+}
+
+/** Accepts stored `1.0` (Google-only) and `1.1` (any known connector kind). */
+export function validateVersionedAdvisorDayContext(value: unknown): AdvisorDayContext {
+  return validateContext(value, "versioned");
+}
+
+function validateContext(value: unknown, mode: "1.0_only" | "versioned"): AdvisorDayContext {
   const root = record(value, "context");
-  exactKeys(root, ["version", "snapshotId", "accountRef", "localDate", "timezone", "dayStartAt", "dayEndAt", "capturedAt", "expiresAt", "status", "authority", "grantGeneration", "cadence", "connectors"], "context");
-  if (root.version !== ADVISOR_DAY_CONTEXT_VERSION) fail("context.version is unsupported.");
+  exactOptionalKeys(root, ["version", "snapshotId", "accountRef", "localDate", "timezone", "dayStartAt", "dayEndAt", "capturedAt", "expiresAt", "status", "authority", "grantGeneration", "cadence", "connectors"], ["travel"], "context");
+  const version = root.version;
+  if (version !== ADVISOR_DAY_CONTEXT_VERSION && (mode === "1.0_only" || version !== ADVISOR_DAY_CONTEXT_VERSION_1_1)) {
+    fail("context.version is unsupported.");
+  }
   nonempty(root.snapshotId, "context.snapshotId");
   nonempty(root.accountRef, "context.accountRef");
   plainDate(root.localDate, "context.localDate");
@@ -349,17 +525,208 @@ export function validateAdvisorDayContext(value: unknown): AdvisorDayContextV1 {
     });
   }
 
-  const connectors = array(root.connectors, "context.connectors", 1);
-  if (connectors.length !== 1) fail("context.connectors must contain the Google Calendar source state.");
-  connectors.forEach((connector, index) => validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt));
+  const eventRefs = new Set<string>();
+  let connectors: unknown[];
+  if (version === ADVISOR_DAY_CONTEXT_VERSION) {
+    connectors = array(root.connectors, "context.connectors", 1);
+    if (connectors.length !== 1) fail("context.connectors must contain the Google Calendar source state.");
+    connectors.forEach((connector, index) => validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt, ["google_calendar"], eventRefs));
+  } else {
+    connectors = array(root.connectors, "context.connectors", ADVISOR_CONNECTOR_KINDS.length);
+    const sources = connectors.map((connector, index) => record(connector, `connector[${index}]`).source);
+    if (connectors.length === 0 || new Set(sources).size !== sources.length) fail("context.connectors must list each source at most once.");
+    connectors.forEach((connector, index) => {
+      if (record(connector, `connector[${index}]`).source === "hevy") {
+        validateActivityConnector(connector, index, root.localDate as string, root.timezone as string, capturedAt, expiresAt);
+      } else {
+        validateConnector(connector, index, root.localDate as string, capturedAt, expiresAt, ADVISOR_CALENDAR_SOURCES, eventRefs);
+      }
+    });
+  }
   if (root.status === "complete" && connectors.some((connector) => {
     const row = record(connector, "connector");
     return row.state !== "not_requested" && row.complete !== true;
   })) {
     fail("Complete context cannot contain an incomplete connector.");
   }
-  return value as AdvisorDayContextV1;
+  if ("travel" in root) validateTravel(root.travel, { occurrenceRefs, behaviorRefs: new Set([...behaviorRefs, ...historyBehaviorRefs]), eventRefs });
+  return value as AdvisorDayContext;
 }
+
+const TRAVEL_MODES: readonly TravelMode[] = ["walking", "cycling", "transit", "driving"];
+const TRAVEL_LEG_ROLES: readonly TravelLegRole[] = ["outbound", "onward", "return"];
+const TRAVEL_FIT_BASES: readonly TravelModelFit["basis"][] = ["travel_known", "travel_overlap", "late_arrival", "travel_unknown", "duration_unknown"];
+
+/**
+ * Ticket 219. Every field may reach model input, so the shape is closed: enums,
+ * refs already present in the context and bounded whole numbers in the later-stage
+ * slots. No instant, duration or free text is accepted.
+ */
+function validateTravel(value: unknown, refs: Readonly<{ occurrenceRefs: Set<string>; behaviorRefs: Set<string>; eventRefs: Set<string> }>): void {
+  const travel = record(value, "context.travel");
+  exactOptionalKeys(travel, ["version", "routing", "usualMode", "behaviors", "route"], ["habits", "weather", "placeLabels"], "context.travel");
+  if (travel.version !== ADVISOR_TRAVEL_CONTEXT_VERSION) fail("context.travel.version is unsupported.");
+  if (travel.routing !== "on" && travel.routing !== "off") fail("context.travel.routing is invalid.");
+  if (travel.usualMode !== null && !TRAVEL_MODES.includes(travel.usualMode as TravelMode)) fail("context.travel.usualMode is invalid.");
+  if (travel.routing === "off" && travel.usualMode !== null) fail("context.travel.usualMode requires routing.");
+  const behaviorRef = (item: unknown, label: string) => {
+    const ref = nonempty(item, label);
+    if (!refs.behaviorRefs.has(ref)) fail(`${label} has no Behavior in this context.`);
+    return ref;
+  };
+  const destinationRef = (item: unknown, label: string) => {
+    if (item === null) return;
+    const ref = nonempty(item, label);
+    if (!refs.occurrenceRefs.has(ref) && !refs.eventRefs.has(ref)) fail(`${label} has no occurrence or event in this context.`);
+  };
+  const unique = (items: string[], label: string) => { if (new Set(items).size !== items.length) fail(`${label} must be unique.`); };
+  const mode = (item: unknown, label: string, nullable: boolean) => {
+    if (!(nullable && item === null) && !TRAVEL_MODES.includes(item as TravelMode)) fail(`${label} is invalid.`);
+  };
+  const whole = (item: unknown, label: string, max: number) => {
+    if (!Number.isInteger(item) || (item as number) < 0 || (item as number) > max) fail(`${label} is invalid.`);
+  };
+
+  unique(array(travel.behaviors, "context.travel.behaviors", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+    const row = record(item, `travel.behavior[${index}]`);
+    exactKeys(row, ["behaviorRef", "where"], `travel.behavior[${index}]`);
+    if (!(ADVISOR_BEHAVIOR_WHERE as readonly unknown[]).includes(row.where)) fail("travel.behavior.where is invalid.");
+    return behaviorRef(row.behaviorRef, "travel.behavior.behaviorRef");
+  }), "context.travel.behaviors");
+
+  const route = record(travel.route, "context.travel.route");
+  if (route.state === "unavailable") {
+    exactKeys(route, ["state", "reason"], "context.travel.route");
+    if (!(ADVISOR_TRAVEL_ROUTE_UNAVAILABLE_REASONS as readonly unknown[]).includes(route.reason)) fail("context.travel.route.reason is invalid.");
+  } else if (route.state === "available") {
+    if (travel.routing !== "on") fail("context.travel.route requires routing.");
+    exactKeys(route, ["state", "conclusions"], "context.travel.route");
+    const conclusions = record(route.conclusions, "travel.route.conclusions");
+    exactKeys(conclusions, ["version", "travelDay", "calendarEvents", "trips", "fits"], "travel.route.conclusions");
+    if (conclusions.version !== TRAVEL_MODEL_PROJECTION_VERSION) fail("travel.route.conclusions.version is unsupported.");
+    if (conclusions.travelDay !== "yes" && conclusions.travelDay !== "no" && conclusions.travelDay !== "unknown") fail("travel.route.conclusions.travelDay is invalid.");
+    if (typeof conclusions.calendarEvents !== "boolean") fail("travel.route.conclusions.calendarEvents is invalid.");
+    array(conclusions.trips, "travel.route.conclusions.trips", ADVISOR_DAY_CONTEXT_LIMITS.occurrences).forEach((item, index) => {
+      const trip = record(item, `travel.trip[${index}]`);
+      exactKeys(trip, ["destinationRef", "role", "mode", "estimate"], `travel.trip[${index}]`);
+      destinationRef(trip.destinationRef, "travel.trip.destinationRef");
+      if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.trip.role is invalid.");
+      mode(trip.mode, "travel.trip.mode", true);
+      if (trip.estimate !== "current" && trip.estimate !== "unknown") fail("travel.trip.estimate is invalid.");
+    });
+    unique(array(conclusions.fits, "travel.route.conclusions.fits", ADVISOR_DAY_CONTEXT_LIMITS.occurrences).map((item, index) => {
+      const fit = record(item, `travel.fit[${index}]`);
+      exactKeys(fit, ["ref", "conclusion", "basis", "trip", "position"], `travel.fit[${index}]`);
+      const ref = nonempty(fit.ref, "travel.fit.ref");
+      if (!refs.occurrenceRefs.has(ref)) fail("travel.fit.ref has no occurrence in this context.");
+      if (fit.conclusion !== "fits" && fit.conclusion !== "does_not_fit" && fit.conclusion !== "unknown") fail("travel.fit.conclusion is invalid.");
+      if (!TRAVEL_FIT_BASES.includes(fit.basis as TravelModelFit["basis"])) fail("travel.fit.basis is invalid.");
+      if (fit.trip !== null) {
+        const trip = record(fit.trip, "travel.fit.trip");
+        exactKeys(trip, ["destinationRef", "role"], "travel.fit.trip");
+        destinationRef(trip.destinationRef, "travel.fit.trip.destinationRef");
+        if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.fit.trip.role is invalid.");
+      }
+      if (fit.position !== null && fit.position !== "before" && fit.position !== "after") fail("travel.fit.position is invalid.");
+      return ref;
+    }), "travel.route.conclusions.fits");
+  } else {
+    fail("context.travel.route.state is invalid.");
+  }
+
+  if ("habits" in travel) {
+    if (travel.routing !== "on") fail("context.travel.habits requires routing.");
+    const habits = record(travel.habits, "context.travel.habits");
+    exactKeys(habits, ["rulesVersion", "getReadyMinutes", "getReadySource", "placeModes"], "context.travel.habits");
+    if (habits.rulesVersion !== TRAVEL_HABIT_RULES.version) fail("travel.habits.rulesVersion is unsupported.");
+    const preparation = TRAVEL_HABIT_RULES.preparation;
+    whole(habits.getReadyMinutes, "travel.habits.getReadyMinutes", preparation.maxMinutes);
+    if ((habits.getReadyMinutes as number) % preparation.stepMinutes !== 0) fail("travel.habits.getReadyMinutes is invalid.");
+    if (habits.getReadySource !== "default" && habits.getReadySource !== "learned") fail("travel.habits.getReadySource is invalid.");
+    if (habits.getReadySource === "default" && habits.getReadyMinutes !== preparation.defaultMinutes) fail("travel.habits.getReadyMinutes does not match its source.");
+    unique(array(habits.placeModes, "travel.habits.placeModes", ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+      const row = record(item, `travel.placeMode[${index}]`);
+      exactKeys(row, ["behaviorRef", "mode"], `travel.placeMode[${index}]`);
+      mode(row.mode, "travel.placeMode.mode", false);
+      return behaviorRef(row.behaviorRef, "travel.placeMode.behaviorRef");
+    }), "travel.habits.placeModes");
+  }
+  if ("weather" in travel) {
+    if (travel.routing !== "on") fail("context.travel.weather requires routing.");
+    const weather = record(travel.weather, "context.travel.weather");
+    exactKeys(weather, ["source", "tableVersion", "state", "calendarEvents", "trips"], "context.travel.weather");
+    if (weather.source !== "open_meteo") fail("travel.weather.source is invalid.");
+    if (weather.tableVersion !== WEATHER_MARGIN_TABLE_VERSION) fail("travel.weather.tableVersion is unsupported.");
+    if (!(ADVISOR_WEATHER_STATES as readonly unknown[]).includes(weather.state)) fail("travel.weather.state is invalid.");
+    if (typeof weather.calendarEvents !== "boolean") fail("travel.weather.calendarEvents is invalid.");
+    const trips = array(weather.trips, "travel.weather.trips", ADVISOR_DAY_CONTEXT_LIMITS.occurrences);
+    if (weather.state !== "applied" && trips.length) fail("travel.weather.trips require a forecast.");
+    unique(trips.map((item, index) => {
+      const trip = record(item, `travel.weather.trip[${index}]`);
+      exactKeys(trip, ["destinationRef", "role", "mode", "state", "conditions", "marginMinutes", "suggestion"], `travel.weather.trip[${index}]`);
+      destinationRef(trip.destinationRef, "travel.weather.trip.destinationRef");
+      if (!TRAVEL_LEG_ROLES.includes(trip.role as TravelLegRole)) fail("travel.weather.trip.role is invalid.");
+      // As in route trips, only the trip home has no destination.
+      if ((trip.role === "return") !== (trip.destinationRef === null)) fail("travel.weather.trip.destinationRef is invalid.");
+      mode(trip.mode, "travel.weather.trip.mode", false);
+      if (trip.state !== "clear" && trip.state !== "margin" && trip.state !== "unknown") fail("travel.weather.trip.state is invalid.");
+      const conditions = array(trip.conditions, "travel.weather.trip.conditions", WEATHER_MARGIN_TABLE.length);
+      unique(conditions.map((condition) => {
+        if (!WEATHER_MARGIN_TABLE.some((rule) => rule.id === condition)) fail("travel.weather.trip.condition is invalid.");
+        return condition as string;
+      }), "travel.weather.trip.conditions");
+      // The margin is the largest fixed table value among the conditions, never a share of trip time.
+      const margin = WEATHER_MARGIN_TABLE.filter((rule) => conditions.includes(rule.id)).reduce((largest, rule) => Math.max(largest, rule.marginMinutes), 0);
+      if (trip.marginMinutes !== margin || (trip.state === "margin") !== (margin > 0)) fail("travel.weather.trip.marginMinutes is invalid.");
+      if (trip.suggestion !== null) {
+        const suggestion = record(trip.suggestion, "travel.weather.trip.suggestion");
+        exactKeys(suggestion, ["instead", "alternatives"], "travel.weather.trip.suggestion");
+        if (trip.state !== "margin" || suggestion.instead !== trip.mode) fail("travel.weather.trip.suggestion is invalid.");
+        const alternatives = array(suggestion.alternatives, "travel.weather.trip.suggestion.alternatives", TRAVEL_MODES.length - 1);
+        if (!alternatives.length) fail("travel.weather.trip.suggestion.alternatives is invalid.");
+        unique(alternatives.map((alternative) => {
+          mode(alternative, "travel.weather.trip.suggestion.alternative", false);
+          if (alternative === trip.mode) fail("travel.weather.trip.suggestion.alternative is invalid.");
+          return alternative as string;
+        }), "travel.weather.trip.suggestion.alternatives");
+      }
+      return `${trip.role}:${trip.destinationRef ?? ""}`;
+    }), "travel.weather.trips");
+  }
+  if ("placeLabels" in travel) {
+    const labels = record(travel.placeLabels, "context.travel.placeLabels");
+    exactKeys(labels, ["rulesVersion", "periodDays", "behaviors", "retained"], "context.travel.placeLabels");
+    if (labels.rulesVersion !== CURRENT_WHERE_SUGGESTION_RULES.version || labels.periodDays !== CURRENT_WHERE_SUGGESTION_RULES.periodDays) {
+      fail("travel.placeLabels.rulesVersion is unsupported.");
+    }
+    const counts = (value: unknown, label: string) => {
+      const rows = new Map<string, Record<string, unknown>>();
+      unique(array(value, label, ADVISOR_DAY_CONTEXT_LIMITS.behaviors).map((item, index) => {
+        const row = record(item, `travel.placeLabel[${index}]`);
+        exactKeys(row, ["behaviorRef", "total", "home", "wherePlace", "otherSavedPlace", "elsewhere"], `travel.placeLabel[${index}]`);
+        for (const key of PLACE_LABEL_COUNT_KEYS) whole(row[key], `travel.placeLabel.${key}`, 10_000);
+        const parts = (row.home as number) + (row.wherePlace as number) + (row.otherSavedPlace as number) + (row.elsewhere as number);
+        if (row.total === 0 || row.total !== parts) fail("travel.placeLabel.total is invalid.");
+        const ref = behaviorRef(row.behaviorRef, "travel.placeLabel.behaviorRef");
+        rows.set(ref, row);
+        return ref;
+      }), label);
+      return rows;
+    };
+    const period = counts(labels.behaviors, "travel.placeLabels.behaviors");
+    const retained = record(labels.retained, "travel.placeLabels.retained");
+    exactKeys(retained, ["retention", "behaviors"], "travel.placeLabels.retained");
+    if (!(PLACE_LABEL_RETENTIONS as readonly unknown[]).includes(retained.retention)) fail("travel.placeLabels.retained.retention is invalid.");
+    const kept = counts(retained.behaviors, "travel.placeLabels.retained.behaviors");
+    // Every retention keeps at least the 60-day window, so kept history never counts fewer labels.
+    for (const [ref, row] of period) {
+      const whole = kept.get(ref);
+      if (!whole || PLACE_LABEL_COUNT_KEYS.some((key) => (whole[key] as number) < (row[key] as number))) fail("travel.placeLabels.retained is invalid.");
+    }
+  }
+}
+
+const PLACE_LABEL_COUNT_KEYS = ["total", "home", "wherePlace", "otherSavedPlace", "elsewhere"] as const;
 
 function validateHistoricalCompletionTimes(value: unknown, historyValue: unknown, zone: string, refs: Set<string>): void {
   const timing = record(value, "historicalCompletionTimes");
@@ -478,7 +845,7 @@ function validateOccurrence(value: unknown, index: number, localDate: string): v
 
 function validateDurationCandidates(value: unknown): void {
   const candidates = record(value, "occurrence.durationCandidates");
-  exactKeys(candidates, ["configuredDefault", "historicalAverage"], "occurrence.durationCandidates");
+  exactOptionalKeys(candidates, ["configuredDefault", "historicalAverage"], ["descriptionEstimate"], "occurrence.durationCandidates");
   if (candidates.configuredDefault !== null) {
     validateDuration(candidates.configuredDefault);
     const configured = record(candidates.configuredDefault, "occurrence.durationCandidates.configuredDefault");
@@ -487,6 +854,11 @@ function validateDurationCandidates(value: unknown): void {
   validateDuration(candidates.historicalAverage);
   const historical = record(candidates.historicalAverage, "occurrence.durationCandidates.historicalAverage");
   if (historical.kind === "known" && historical.source !== "completed_stopped_occurrence_mean") fail("Historical average duration candidate is invalid.");
+  if (candidates.descriptionEstimate !== undefined && candidates.descriptionEstimate !== null) {
+    validateDuration(candidates.descriptionEstimate);
+    const estimate = record(candidates.descriptionEstimate, "occurrence.durationCandidates.descriptionEstimate");
+    if (estimate.kind !== "known" || estimate.source !== "description_estimate") fail("Description estimate duration candidate is invalid.");
+  }
 }
 
 function validateDuration(value: unknown): void {
@@ -494,7 +866,7 @@ function validateDuration(value: unknown): void {
   if (duration.kind === "known") {
     exactKeys(duration, ["kind", "seconds", "source", "sampleCount", "lookbackDays"], "duration");
     positive(duration.seconds, "duration.seconds");
-    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean") fail("duration.source is invalid.");
+    if (duration.source !== "behavior_default" && duration.source !== "completed_stopped_occurrence_mean" && duration.source !== "description_estimate") fail("duration.source is invalid.");
   } else if (duration.kind === "unknown") {
     exactKeys(duration, ["kind", "reason", "sampleCount", "lookbackDays"], "duration");
     if (duration.reason !== "insufficient_samples" && duration.reason !== "history_limit_exceeded") fail("duration.reason is invalid.");
@@ -503,23 +875,32 @@ function validateDuration(value: unknown): void {
   if (duration.lookbackDays !== 90) fail("duration.lookbackDays is invalid.");
 }
 
-function validateConnector(value: unknown, index: number, localDate: string, capturedAt: Temporal.Instant, expiresAt: Temporal.Instant): void {
+function validateConnector(
+  value: unknown,
+  index: number,
+  localDate: string,
+  capturedAt: Temporal.Instant,
+  expiresAt: Temporal.Instant,
+  allowedSources: readonly string[],
+  eventRefs: Set<string>,
+): void {
   const connector = record(value, `connector[${index}]`);
   if (connector.state === "not_requested") {
     exactKeys(connector, ["source", "state"], `connector[${index}]`);
-    if (connector.source !== "google_calendar") fail("connector.source is invalid.");
+    if (!allowedSources.includes(connector.source as string)) fail("connector.source is invalid.");
     return;
   }
   exactKeys(connector, ["source", "state", "complete", "fetchedAt", "connectionGeneration", "selectionRevision", "schemaVersion", "adapterVersion", "coverage", "failure", "events"], `connector[${index}]`);
-  if (connector.source !== "google_calendar") fail("connector.source is invalid.");
+  if (!allowedSources.includes(connector.source as string)) fail("connector.source is invalid.");
+  const versions = EXTERNAL_EVENT_SOURCE_VERSIONS[connector.source as keyof typeof EXTERNAL_EVENT_SOURCE_VERSIONS];
   if (!(["current", "unavailable", "incomplete", "stale"] as unknown[]).includes(connector.state)) fail("connector.state is invalid.");
   if (typeof connector.complete !== "boolean") fail("connector.complete is invalid.");
   const fetchedAt = connector.fetchedAt === null ? null : instant(connector.fetchedAt, "connector.fetchedAt");
   if (fetchedAt && (Temporal.Instant.compare(fetchedAt, capturedAt) > 0 || Temporal.Instant.compare(expiresAt, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) > 0)) fail("connector.fetchedAt bounds are invalid.");
   integer(connector.connectionGeneration, "connector.connectionGeneration", 0);
   integer(connector.selectionRevision, "connector.selectionRevision", 0);
-  if (connector.schemaVersion !== EXTERNAL_EVENT_SCHEMA_VERSION) fail("connector.schemaVersion is unsupported.");
-  if (connector.adapterVersion !== EXTERNAL_EVENT_ADAPTER_VERSION) fail("connector.adapterVersion is unsupported.");
+  if (connector.schemaVersion !== versions.schemaVersion) fail("connector.schemaVersion is unsupported.");
+  if (connector.adapterVersion !== versions.adapterVersion) fail("connector.adapterVersion is unsupported.");
   const coverage = array(connector.coverage, "connector.coverage", ADVISOR_DAY_CONTEXT_LIMITS.calendars);
   const calendarRefs = new Set<string>();
   coverage.forEach((item, itemIndex) => {
@@ -535,21 +916,79 @@ function validateConnector(value: unknown, index: number, localDate: string, cap
   });
   const events = array(connector.events, "connector.events", ADVISOR_DAY_CONTEXT_LIMITS.externalEvents);
   if (!connector.complete && events.length > 0) fail("Incomplete connector cannot expose events.");
-  const eventRefs = new Set<string>();
   events.forEach((event) => {
     validateEvent(event, calendarRefs);
     const ref = record(event, "event").ref as string;
     if (eventRefs.has(ref)) fail("Event refs must be unique.");
     eventRefs.add(ref);
   });
-  if (connector.failure !== null) {
-    const failure = record(connector.failure, "connector.failure");
-    exactKeys(failure, ["code", "retryable", "retryAfterSeconds"], "connector.failure");
-    validateSourceFailureCode(failure.code);
-    if (typeof failure.retryable !== "boolean") fail("connector.failure.retryable is invalid.");
-    if (failure.retryAfterSeconds !== null) integer(failure.retryAfterSeconds, "connector.failure.retryAfterSeconds", 0);
-  }
+  validateConnectorFailure(connector.failure);
   if (connector.complete !== (connector.state === "current") || (connector.complete && (connector.failure !== null || fetchedAt === null || coverage.some((item) => record(item, "coverage").paginationComplete !== true)))) {
+    fail("Connector completeness fields disagree.");
+  }
+  if (!connector.complete && connector.failure === null && (connector.state === "unavailable" || connector.state === "incomplete")) fail("Unavailable or incomplete connector requires a failure.");
+}
+
+function validateConnectorFailure(value: unknown): void {
+  if (value === null) return;
+  const failure = record(value, "connector.failure");
+  exactKeys(failure, ["code", "retryable", "retryAfterSeconds"], "connector.failure");
+  validateSourceFailureCode(failure.code);
+  if (typeof failure.retryable !== "boolean") fail("connector.failure.retryable is invalid.");
+  if (failure.retryAfterSeconds !== null) integer(failure.retryAfterSeconds, "connector.failure.retryAfterSeconds", 0);
+}
+
+function validateActivityConnector(value: unknown, index: number, localDate: string, zone: string, capturedAt: Temporal.Instant, expiresAt: Temporal.Instant): void {
+  const connector = record(value, `connector[${index}]`);
+  if (connector.state === "not_requested") {
+    exactKeys(connector, ["source", "state"], `connector[${index}]`);
+    return;
+  }
+  exactKeys(connector, ["source", "state", "complete", "fetchedAt", "connectionGeneration", "schemaVersion", "adapterVersion", "coverage", "failure", "activities"], `connector[${index}]`);
+  if (!(["current", "unavailable", "incomplete", "stale"] as unknown[]).includes(connector.state)) fail("connector.state is invalid.");
+  if (typeof connector.complete !== "boolean") fail("connector.complete is invalid.");
+  const fetchedAt = connector.fetchedAt === null ? null : instant(connector.fetchedAt, "connector.fetchedAt");
+  if (fetchedAt && Temporal.Instant.compare(fetchedAt, capturedAt) > 0) fail("connector.fetchedAt bounds are invalid.");
+  if (connector.complete && fetchedAt && Temporal.Instant.compare(expiresAt, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) > 0) fail("connector.fetchedAt bounds are invalid.");
+  integer(connector.connectionGeneration, "connector.connectionGeneration", 0);
+  if (connector.schemaVersion !== RECORDED_ACTIVITY_SCHEMA_VERSION) fail("connector.schemaVersion is unsupported.");
+  if (connector.adapterVersion !== HEVY_WORKOUTS_ADAPTER_VERSION) fail("connector.adapterVersion is unsupported.");
+  let rangeStart: Temporal.Instant | null = null;
+  let rangeEnd: Temporal.Instant | null = null;
+  if (connector.coverage !== null) {
+    const coverage = record(connector.coverage, "connector.coverage");
+    exactKeys(coverage, ["startLocalDate", "endLocalDate", "paginationComplete"], "connector.coverage");
+    const start = plainDate(coverage.startLocalDate, "coverage.startLocalDate");
+    const end = plainDate(coverage.endLocalDate, "coverage.endLocalDate");
+    if (coverage.endLocalDate !== localDate || Temporal.PlainDate.compare(start, end) > 0 || start.until(end).days + 1 > RECORDED_ACTIVITY_MAX_RANGE_DAYS) {
+      fail("Activity coverage must end on the context day and span at most 31 days.");
+    }
+    if (typeof coverage.paginationComplete !== "boolean") fail("coverage.paginationComplete is invalid.");
+    rangeStart = start.toZonedDateTime({ timeZone: zone }).toInstant();
+    rangeEnd = end.add({ days: 1 }).toZonedDateTime({ timeZone: zone }).toInstant();
+  }
+  const activities = array(connector.activities, "connector.activities", ADVISOR_DAY_CONTEXT_ACTIVITY_LIMIT);
+  if (!connector.complete && activities.length > 0) fail("Incomplete connector cannot expose activities.");
+  const refs = new Set<string>();
+  activities.forEach((value) => {
+    const activity = record(value, "activity");
+    exactKeys(activity, ["ref", "startAt", "endAt", "duration", "localStartDate", "location"], "activity");
+    const ref = nonempty(activity.ref, "activity.ref");
+    if (refs.has(ref)) fail("Activity refs must be unique.");
+    refs.add(ref);
+    const start = instant(activity.startAt, "activity.startAt");
+    const end = instant(activity.endAt, "activity.endAt");
+    if (Temporal.Instant.compare(end, start) <= 0) fail("Activity end must follow start.");
+    if (Temporal.Instant.compare(end, capturedAt) > 0) fail("Activity cannot end after capture.");
+    if (!rangeStart || !rangeEnd || Temporal.Instant.compare(start, rangeEnd) >= 0 || Temporal.Instant.compare(end, rangeStart) <= 0) fail("Activity falls outside its coverage.");
+    const duration = record(activity.duration, "activity.duration");
+    exactKeys(duration, ["kind", "seconds"], "activity.duration");
+    if (duration.kind !== "known" || duration.seconds !== start.until(end).total({ unit: "seconds" })) fail("Activity duration does not match its interval.");
+    if (activity.localStartDate !== start.toZonedDateTimeISO(zone).toPlainDate().toString()) fail("Activity localStartDate is invalid.");
+    if (activity.location !== "unsupported") fail("activity.location is invalid.");
+  });
+  validateConnectorFailure(connector.failure);
+  if (connector.complete !== (connector.state === "current") || (connector.complete && (connector.failure !== null || fetchedAt === null || connector.coverage === null || record(connector.coverage, "connector.coverage").paginationComplete !== true))) {
     fail("Connector completeness fields disagree.");
   }
   if (!connector.complete && connector.failure === null && (connector.state === "unavailable" || connector.state === "incomplete")) fail("Unavailable or incomplete connector requires a failure.");

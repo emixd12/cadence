@@ -26,12 +26,14 @@ describe("marketing base layout", () => {
     expect(source).toContain("siteConfig.cadenceAppUrl}/privacy");
   });
 
-  it("links the header macOS download to the current preview DMG", () => {
+  it("links the header macOS download to the version-free stable DMG", () => {
     const site = readFileSync("apps/marketing/src/data/site.ts", "utf8");
 
     expect(site).toContain('label: "Download for Mac"');
     expect(site).toContain(
-      "releases/download/desktop-preview/Cadence_0.1.1-preview.19_aarch64.dmg",
+      '"https://github.com/emixd12/cadence/releases/download/desktop-stable/Cadence_aarch64.dmg"',
     );
+    expect(site).not.toMatch(/Cadence_\d+\.\d+\.\d+[^/"]*_aarch64\.dmg/);
+    expect(site).not.toContain("releases/download/desktop-preview/");
   });
 });

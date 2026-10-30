@@ -223,7 +223,7 @@
     {
       "id": "INT-MKT-012",
       "classification": "external_provider",
-      "reason": "The disclosed macOS preview release and its assets are hosted by GitHub."
+      "reason": "The signed macOS release and its assets are hosted by GitHub."
     },
     {
       "id": "INT-SHELL-001",
@@ -1399,6 +1399,41 @@
       "reason": "Presentation-only event preview/dismissal or external source navigation has no Cadence mutation."
     },
     {
+      "id": "INT-CALENDAR-008",
+      "classification": "external_provider",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CALENDAR-009",
+      "classification": "external_provider",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CALENDAR-010",
+      "classification": "external_provider",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CALENDAR-011",
+      "classification": "destructive_serial_only",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CONNECTOR-001",
+      "classification": "external_provider",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CONNECTOR-002",
+      "classification": "external_provider",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
+      "id": "INT-CONNECTOR-003",
+      "classification": "destructive_serial_only",
+      "reason": "Outlook and Hevy consent, key intake, and external reads require separate synthetic provider authorization."
+    },
+    {
       "id": "INT-BEHAVIOR-030",
       "classification": "not_load_bearing",
       "reason": "Optional Behavior planning inputs change the local form draft; existing save interactions own HTTP writes."
@@ -1436,12 +1471,12 @@
     {
       "id": "INT-TRAVEL-001",
       "classification": "destructive_serial_only",
-      "reason": "Travel settings writes require isolated owner and consent revision checks."
+      "reason": "Home and usual travel writes require isolated owner and revision checks."
     },
     {
       "id": "INT-TRAVEL-002",
-      "classification": "browser_only",
-      "reason": "Explicit foreground OS permission needs browser or installed native acceptance."
+      "classification": "destructive_serial_only",
+      "reason": "The travel toggle writes routing consent with owner revision checks and requests foreground OS permission, which needs browser or installed native acceptance."
     },
     {
       "id": "INT-TRAVEL-003",
@@ -1452,6 +1487,61 @@
       "id": "INT-TRAVEL-004",
       "classification": "external_provider",
       "reason": "Manual travel refresh can trigger a reviewed route provider request."
+    },
+    {
+      "id": "INT-TRAVEL-005",
+      "classification": "browser_only",
+      "reason": "Choosing Where is an unsaved Behavior form draft."
+    },
+    {
+      "id": "INT-WEATHER-001",
+      "classification": "browser_only",
+      "reason": "Opening the Open-Meteo credit or licence is navigation with no Cadence mutation and sends no account facts."
+    },
+    {
+      "id": "INT-TRAVEL-008",
+      "classification": "destructive_serial_only",
+      "reason": "A leave-time answer writes learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
+      "id": "INT-TRAVEL-009",
+      "classification": "destructive_serial_only",
+      "reason": "A travel mode choice writes learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
+      "id": "INT-TRAVEL-010",
+      "classification": "destructive_serial_only",
+      "reason": "Inline habit edits write learned habits with owner and habit-revision checks and can trigger one reviewed route refresh."
+    },
+    {
+      "id": "INT-TRAVEL-006",
+      "classification": "browser_only",
+      "reason": "Check again requests one foreground OS location reading in the browser or installed app and makes no HTTP request."
+    },
+    {
+      "id": "INT-TRAVEL-007",
+      "classification": "not_load_bearing",
+      "reason": "Opening macOS Location Services is a local native action with no HTTP traffic."
+    },
+    {
+      "id": "INT-CALENDAR-012",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-013",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-014",
+      "classification": "external_provider",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
+    },
+    {
+      "id": "INT-CALENDAR-015",
+      "classification": "destructive_serial_only",
+      "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."
     },
     {
       "id": "INT-OAUTH-001",
@@ -1487,6 +1577,56 @@
       "id": "INT-MKT-014",
       "classification": "not_load_bearing",
       "reason": "Static marketing navigation and local clipboard operation have no authenticated data mutations."
+    },
+    {
+      "id": "INT-PLACE-001",
+      "classification": "destructive_serial_only",
+      "reason": "The completion-place opt-in writes settings with owner and revision checks."
+    },
+    {
+      "id": "INT-PLACE-002",
+      "classification": "destructive_serial_only",
+      "reason": "Shortening retention deletes older labels in the same owner-checked save."
+    },
+    {
+      "id": "INT-PLACE-003",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes every completion place label for the owner."
+    },
+    {
+      "id": "INT-PLACE-004",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes every place marker for the owner."
+    },
+    {
+      "id": "INT-PLACE-005",
+      "classification": "destructive_serial_only",
+      "reason": "Turning completion places off deletes labels, markers and dismissals."
+    },
+    {
+      "id": "INT-PLACE-006",
+      "classification": "destructive_serial_only",
+      "reason": "I'm here requests foreground OS location and writes an owner-scoped marker, which needs browser or installed native acceptance."
+    },
+    {
+      "id": "INT-PLACE-007",
+      "classification": "destructive_serial_only",
+      "reason": "Deletes one owner-scoped place marker."
+    },
+    {
+      "id": "INT-PLACE-009",
+      "classification": "destructive_serial_only",
+      "reason": "Dismissal writes an owner-scoped row checked against the opt-in."
+    },
+    {
+      "id": "INT-PLACE-010",
+      "classification": "destructive_serial_only",
+      "reason": "Not now writes the owner's settings with a revision check."
+    },
+    {
+      "id": "INT-PLACE-008",
+      "classification": "browser_only",
+      "reason": "Review Where fills an unsaved Behavior form draft."
     }
   ]
 }

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   source: vi.fn(), calendar: vi.fn(), events: vi.fn(), spend: vi.fn(), readPlaces: vi.fn(), writePlaces: vi.fn(),
   occurrences: vi.fn(), behaviors: vi.fn(), timezone: vi.fn(), geocode: vi.fn(), route: vi.fn(),
-  historySessions: vi.fn(),
+  historySessions: vi.fn(), weather: vi.fn(),
 }));
 
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.source }));
@@ -19,19 +19,22 @@ vi.mock("@/lib/services/travel-provider", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-provider")>()),
   geocodeGoogleAddress: mocks.geocode,
 }));
+vi.mock("@/lib/services/weather-forecast.service", () => ({ readTravelWeather: mocks.weather }));
 vi.mock("@/lib/services/travel-routing.service", async (load) => ({
   ...(await load<typeof import("@/lib/services/travel-routing.service")>()),
   routeTravelLegs: mocks.route,
 }));
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
+import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 
 const now = Temporal.Instant.from("2026-09-22T08:00:00Z");
 const source = {
   settings: { enabled: true, mode: "walking" as const, routingConsentAt: "2026-09-20T00:00:00Z", baseLocationText: "1 Base St", navigationPreference: "google_maps" as const },
   settingsRevision: "settings-1", behaviors: [
-    { id: "behavior-1", locationText: "2 Habit St", updatedAt: "2026-09-20T00:00:00Z" },
-    { id: "behavior-2", locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
+    { id: "behavior-1", whereKind: "place" as const, locationText: "2 Habit St", updatedAt: "2026-09-20T00:00:00Z" },
+    { id: "behavior-2", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
   ],
 };
 const caller = { client: {} as never, user: { id: "owner" } as never };
@@ -53,6 +56,8 @@ beforeEach(() => {
   mocks.geocode.mockImplementation(async (text: string) => ({ kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } }));
   mocks.route.mockImplementation(routeAll);
   mocks.historySessions.mockResolvedValue([]);
+  mocks.timezone.mockResolvedValue("America/New_York");
+  mocks.weather.mockResolvedValue(null);
 });
 
 const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
@@ -67,7 +72,7 @@ const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
 
 describe("refreshTravelRoutes", () => {
   it("looks up only the bounded commitments and the base, behind one reservation", async () => {
-    const behaviors = Array.from({ length: 9 }, (_, index) => ({ id: `b${index}`, locationText: `${index} Test St`, updatedAt: "revision" }));
+    const behaviors = Array.from({ length: 9 }, (_, index) => ({ id: `b${index}`, whereKind: "place" as const, locationText: `${index} Test St`, updatedAt: "revision" }));
     mocks.source.mockResolvedValue({ ...source, behaviors });
     mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
     mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: Array.from({ length: 9 }, (_, index) => ({
@@ -94,7 +99,7 @@ describe("refreshTravelRoutes", () => {
 
   it("does not reserve spend or call the provider when nothing is geocodable", async () => {
     located();
-    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
     const result = await refreshTravelRoutes(caller, day, config, now);
     expect(result.evidence).not.toBeNull();
     expect(mocks.spend).not.toHaveBeenCalled();
@@ -215,6 +220,32 @@ describe("refreshTravelRoutes", () => {
     expect(mocks.events).not.toHaveBeenCalled();
   });
 
+  it("routes a Home Behavior to the saved Home with one shared lookup (Ticket 215)", async () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, behaviors: [{ id: "behavior-1", whereKind: "home", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    const result = await refreshTravelRoutes(caller, { ...day, device: { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T08:00:00Z" } }, config, now);
+    if (!result.evidence) throw new Error("Expected travel evidence.");
+    expect(mocks.geocode).toHaveBeenCalledOnce();
+    expect(mocks.geocode.mock.calls[0]![0]).toBe("1 Base St");
+    expect(result.evidence.legs[0]?.leg).toMatchObject({ role: "outbound", destinationCommitmentRef: "occurrence-1" });
+    expect(result.evidence.legs[0]?.leg.provenance.destinationSource).toBe("saved_base");
+  });
+
+  it.each([
+    ["Anywhere", { whereKind: "anywhere" as const, baseLocationText: "1 Base St" }],
+    ["Not set", { whereKind: null, baseLocationText: "1 Base St" }],
+    ["Home without a saved Home", { whereKind: "home" as const, baseLocationText: null }],
+  ])("requests no route for a %s Behavior (Ticket 215)", async (_label, { whereKind, baseLocationText }) => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText },
+      behaviors: [{ id: "behavior-1", whereKind, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    const result = await refreshTravelRoutes(caller, { ...day, device: { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T08:00:00Z" } }, config, now);
+    expect(result.evidence?.legs).toEqual([]);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.spend).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
   it("uses completed stopped-session history when no Behavior default duration exists", async () => {
     located();
     mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: null }, { id: "behavior-2", default_duration_minutes: null }]);
@@ -226,14 +257,83 @@ describe("refreshTravelRoutes", () => {
     expect(mocks.route.mock.calls.at(-1)![0].routes.some((route: { request: { timing: { at: string } } }) => route.request.timing.at === "2026-09-22T10:10:00Z")).toBe(true);
   });
 
-  it("does not discard paid work when a Note or status changes during routing", async () => {
+  it("does not discard paid work when only a Note changes during routing", async () => {
     located();
     let reads = 0;
     mocks.occurrences.mockImplementation(async (_client: unknown, _user: unknown, start: string) => start === day.startLocalDate
       ? [{ ...occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"),
-        status: ++reads > 1 ? "completed" : "unresolved", updated_at: `revision-${reads}`, note: `note-${reads}` }]
+        updated_at: `revision-${++reads}`, note: `note-${reads}` }]
       : []);
     await expect(refreshTravelRoutes(caller, day, config, now)).resolves.toMatchObject({ accountId: "owner" });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a status change after the original unresolved stop was routed", async () => {
+    located();
+    let completed = false;
+    mocks.occurrences.mockImplementation(async (_client: unknown, _user: unknown, start: string) => start === day.startLocalDate
+      ? [{ ...occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"), status: completed ? "completed" : "unresolved" }]
+      : []);
+    mocks.route.mockImplementation(async (input) => {
+      completed = true;
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it.each(["connected", "disconnected"] as const)("rejects a timezone change during routing when Calendar is %s", async (status) => {
+    located();
+    mocks.calendar.mockResolvedValue({ status, generation: 1, selectionRevision: 1 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [] });
+    mocks.route.mockImplementation(async (input) => {
+      mocks.timezone.mockResolvedValue("Europe/London");
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(mocks.timezone).toHaveBeenLastCalledWith(caller.client, "owner");
+  });
+
+  it("rejects a changed Home value even when the settings revision is unchanged", async () => {
+    located();
+    let moved = false;
+    mocks.source.mockImplementation(async () => moved
+      ? { ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } }
+      : source);
+    mocks.route.mockImplementation(async (input) => {
+      moved = true;
+      return routeAll(input);
+    });
+
+    await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+
+  it("fences stored inputs after the final Calendar reread finishes", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+    const snapshot = { requestedRange: { timezone: "America/New_York" }, events: [] };
+    let releaseCalendar = () => {};
+    const pendingCalendar = new Promise<typeof snapshot>((resolve) => {
+      releaseCalendar = () => resolve(snapshot);
+    });
+    let calendarStarted = () => {};
+    const rereading = new Promise<void>((resolve) => { calendarStarted = resolve; });
+    mocks.events.mockResolvedValueOnce(snapshot).mockImplementation(async () => {
+      calendarStarted();
+      return pendingCalendar;
+    });
+
+    const pending = refreshTravelRoutes(caller, day, config, now);
+    await rereading;
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } });
+    releaseCalendar();
+
+    await expect(pending).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.events).toHaveBeenCalledTimes(2);
     expect(mocks.route).toHaveBeenCalledOnce();
   });
 
@@ -252,4 +352,233 @@ describe("refreshTravelRoutes", () => {
     mocks.source.mockImplementation(async () => (reads += 1) < 3 ? source : { ...source, settingsRevision: "settings-2" });
     await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
   });
+
+  describe("Ticket 217 learned habits", () => {
+    const habits = { preparationMinutes: 15, arrivalBufferMinutes: 10, leaveFeedback: [], updatedAt: "2026-09-21T00:00:00.000000Z",
+      placeModes: [{ placeKey: travelPlaceKey("2 Habit St"), mode: "transit" as const, chosenAt: "2026-09-21T00:00:00.000000Z" }] };
+
+    it("uses the place-cache key for remembered places", () => {
+      expect(travelPlaceKey(" 2  HABIT st ")).toBe(keyOf("2 Habit St"));
+    });
+
+    it("routes with the learned arrival buffer and the remembered mode, and occupies get-ready time", async () => {
+      located();
+      mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, habits }, habitsRevision: habits.updatedAt });
+      const result = await refreshTravelRoutes(caller, day, config, now);
+      const requests = mocks.route.mock.calls[0]![0].routes.map((route: { request: { mode: string; timing: unknown } }) => route.request);
+      expect(requests.map((request: { mode: string }) => request.mode)).toEqual(["transit", "transit"]);
+      expect(requests[0].timing).toEqual({ kind: "arrive_by", at: "2026-09-22T09:50:00Z" });
+      expect(result.habitsRevision).toBe(habits.updatedAt);
+      expect(result.evidence?.segments.filter((segment) => segment.kind === "preparation_buffer"))
+        .toEqual([expect.objectContaining({ startAt: "2026-09-22T09:35:00Z", endAt: "2026-09-22T09:50:00Z" })]);
+      expect(result.evidence?.legs[0]?.leg.destinationPlaceKey).toBe(travelPlaceKey("2 Habit St"));
+    });
+
+    it("falls back to usual travel and the confirmed defaults when nothing was learned", async () => {
+      located();
+      const result = await refreshTravelRoutes(caller, day, config, now);
+      const requests = mocks.route.mock.calls[0]![0].routes.map((route: { request: { mode: string; timing: unknown } }) => route.request);
+      expect(requests[0]).toMatchObject({ mode: "walking", timing: { kind: "arrive_by", at: "2026-09-22T09:55:00Z" } });
+      expect(result.evidence?.segments.filter((segment) => segment.kind === "preparation_buffer"))
+        .toEqual([expect.objectContaining({ startAt: "2026-09-22T09:40:00Z", endAt: "2026-09-22T09:50:00Z" })]);
+    });
+
+    it("withdraws the refresh when habits change during it", async () => {
+      located();
+      let reads = 0;
+      mocks.source.mockImplementation(async () => (reads += 1) < 3 ? { ...source, habitsRevision: null }
+        : { ...source, settings: { ...source.settings, habits }, habitsRevision: habits.updatedAt });
+      await expect(refreshTravelRoutes(caller, day, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    });
+  });
 });
+
+describe("refreshTravelRoutes weather (Ticket 218)", () => {
+  const ready = { status: "ready" as const, baseUrl: "https://api.open-meteo.com/v1/forecast", apiKey: null };
+  // Synthetic sample near a public landmark; never a real user position.
+  const device = { latitude: 40.7484, longitude: -73.9857, accuracyMeters: 20, sampledAt: "2026-09-22T07:59:40Z" };
+  const rainy = { state: "forecast" as const, forecast: { provider: "open-meteo" as const, areaKey: "40.7,-74.0",
+    hourStart: "2026-09-22T08:00:00Z", fetchedAt: now.toString(), expiresAt: "2026-09-22T09:00:00Z",
+    hours: Array.from({ length: 48 }, (_, index) => ({ time: now.add({ hours: index }).toString(), weatherCode: 61, rainMillimeters: 1.2,
+      snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 })) } };
+
+  it("keeps weather off by default", async () => {
+    located();
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now);
+    expect(mocks.weather).toHaveBeenCalledWith({ device, config: { status: "off" }, now });
+    expect(result.evidence && "weather" in result.evidence).toBe(false);
+  });
+
+  it("passes only the request's device sample and applies the fixed margin", async () => {
+    located();
+    mocks.weather.mockResolvedValue(rainy);
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(mocks.weather).toHaveBeenCalledOnce();
+    expect(mocks.weather).toHaveBeenCalledWith({ device, config: ready, now });
+    expect(result.evidence?.weather).toMatchObject({ state: "applied", tableVersion: "weather-margin@1" });
+    expect(result.evidence?.legs[0]?.weather).toMatchObject({ conditions: ["rain"], marginSeconds: 600, suggestion: null,
+      departureAt: "2026-09-22T09:40:00Z", arrivalAt: "2026-09-22T10:00:00Z" });
+    expect(result.evidence?.legs[0]?.estimate?.departureAt).toBe("2026-09-22T09:50:00Z");
+  });
+
+  it("says when there is no position and never blocks routes on a weather failure", async () => {
+    located();
+    mocks.weather.mockResolvedValue({ state: "no_position" });
+    const noPosition = await refreshTravelRoutes(caller, day, config, now, ready);
+    expect(mocks.weather).toHaveBeenCalledWith({ device: null, config: ready, now });
+    expect(noPosition.evidence?.weather?.state).toBe("no_position");
+    mocks.weather.mockRejectedValue(new Error("unexpected"));
+    const failed = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(failed.evidence?.weather?.state).toBe("unavailable");
+    expect(failed.evidence?.legs[0]?.state).toBe("current");
+  });
+
+  it("asks for no weather when no leg needs travel", async () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: null }, behaviors: [{ id: "behavior-1", whereKind: null, locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    await refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    expect(mocks.weather).not.toHaveBeenCalled();
+  });
+
+  it("fences stored inputs after a slower weather request finishes", async () => {
+    located();
+    let releaseWeather = () => {};
+    mocks.weather.mockReturnValue(new Promise<null>((resolve) => {
+      releaseWeather = () => resolve(null);
+    }));
+    let routingFinished = () => {};
+    const routed = new Promise<void>((resolve) => { routingFinished = resolve; });
+    mocks.route.mockImplementation(async (input) => {
+      routingFinished();
+      return routeAll(input);
+    });
+
+    const pending = refreshTravelRoutes(caller, { ...day, device }, config, now, ready);
+    await routed;
+    // Drain the completed route work while the weather provider remains pending.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    mocks.source.mockResolvedValue({ ...source, settings: { ...source.settings, baseLocationText: "4 New Home St" } });
+    releaseWeather();
+
+    await expect(pending).rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).toHaveBeenCalledOnce();
+  });
+});
+
+describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
+  const secret = "test-only-conclusions-secret-0123456789";
+  const ready = { status: "ready" as const, baseUrl: "https://api.open-meteo.com/v1/forecast", apiKey: null };
+  const device = { latitude: 40.7484, longitude: -73.9857, accuracyMeters: 20, sampledAt: "2026-09-22T07:59:40Z" };
+  const rainy = { state: "forecast" as const, forecast: { provider: "open-meteo" as const, areaKey: "40.7,-74.0",
+    hourStart: "2026-09-22T08:00:00Z", fetchedAt: now.toString(), expiresAt: "2026-09-22T09:00:00Z",
+    hours: Array.from({ length: 48 }, (_, index) => ({ time: now.add({ hours: index }).toString(), weatherCode: 61, rainMillimeters: 1.2,
+      snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 })) } };
+  const decode = (token: string) => JSON.parse(Buffer.from(token.split(".")[0]!, "base64url").toString("utf8")) as Record<string, unknown>;
+
+  it("signs only Cadence's conclusions and weather rules for a one-day view", async () => {
+    located();
+    mocks.weather.mockResolvedValue(rainy);
+    const result = await refreshTravelRoutes(caller, { ...day, device }, config, now, ready, secret);
+    expect(result.conclusionsToken).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/);
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+    expect(payload).toMatchObject({ v: 1, sub: "owner", date: "2026-09-22", iat: now.toString(), exp: result.expiresAt,
+      conclusions: { version: "2.0", travelDay: "yes", trips: [
+        { destinationRef: "occurrence:occurrence-1", role: "outbound", mode: "walking", estimate: "current" },
+        { destinationRef: null, role: "return", mode: "walking", estimate: "unknown" },
+      ] },
+      weather: { state: "applied", trips: [
+        { destinationRef: "occurrence:occurrence-1", role: "outbound", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
+        { destinationRef: null, role: "return", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
+      ] },
+      events: {} });
+    // The view itself stays free of model conclusions.
+    expect(result.evidence).not.toHaveProperty("modelProjection");
+    const body = decode(result.conclusionsToken!);
+    const text = JSON.stringify(body);
+    for (const leaked of ["durationSeconds", "departureAt", "arrivalAt", "occupiedSpans", "finalAvailabilityAt", "place_id", "placeId",
+      "Habit St", "Base St", keyOf("2 Habit St"), keyOf("1 Base St"), "40.7", "-73.9", "Google Maps", "600", "09:50", "09:40"]) {
+      expect(text).not.toContain(leaked);
+    }
+    // The only numbers are the token version and the weather table margins; the only instants are issue and expiry.
+    expect(numbers(body)).toEqual([1, 10, 10]);
+    expect(strings(body).filter((value) => /^\d{4}-\d{2}-\d{2}T/.test(value)).sort()).toEqual([result.expiresAt, now.toString()].sort());
+  });
+
+  it("names Calendar trips by event identity and records their provider revision", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [{
+      id: "event-row-1", calendarId: "primary", providerEventId: "provider-1", kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T11:00:00Z", endAt: "2026-09-22T11:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: "etag-1", providerUpdatedAt: null } }] });
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    const payload = decode(result.conclusionsToken!);
+    expect(JSON.stringify(payload.conclusions)).toContain(JSON.stringify("event:primary\u0000provider-1").slice(1, -1));
+    expect(payload.events).toEqual({ "event:primary\u0000provider-1": JSON.stringify({ providerEtag: "etag-1", providerUpdatedAt: null }) });
+    expect(JSON.stringify(payload)).not.toContain("3 Event St");
+    expect(JSON.stringify(payload)).not.toContain("event-row-1");
+  });
+
+  it("binds past and cancelled Calendar events that do not appear in named conclusions", async () => {
+    located();
+    const future = {
+      id: "event-row-future", calendarId: "primary", providerEventId: "provider-future", kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T11:00:00Z", endAt: "2026-09-22T11:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: "etag-future", providerUpdatedAt: null },
+    };
+    const events = [future,
+      { ...future, id: "event-row-past", providerEventId: "provider-past", startAt: "2026-09-22T07:00:00Z", endAt: "2026-09-22T07:30:00Z",
+        revision: { providerEtag: "etag-past", providerUpdatedAt: null } },
+      { ...future, id: "event-row-cancelled", providerEventId: "provider-cancelled", state: "cancelled",
+        revision: { providerEtag: "etag-cancelled", providerUpdatedAt: null } },
+    ];
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events });
+
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+
+    expect(payload).not.toBeNull();
+    expect(payload!.events).toEqual(Object.fromEntries(events.map((event) => [
+      `event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision),
+    ])));
+    expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-past");
+    expect(JSON.stringify(payload!.conclusions)).not.toContain("provider-cancelled");
+  });
+
+  it("keeps route evidence but omits a token when the complete Calendar snapshot is oversized", async () => {
+    located();
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 2, selectionRevision: 3 });
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: Array.from({ length: 500 }, (_, index) => ({
+      id: `event-row-${index}`, calendarId: "primary", providerEventId: `provider-${index}`, kind: "timed", state: "confirmed", currentUserResponse: "accepted",
+      startAt: "2026-09-22T07:00:00Z", endAt: "2026-09-22T07:30:00Z", endUnspecified: false, location: "3 Event St", conference: null,
+      revision: { providerEtag: `etag-${index}`, providerUpdatedAt: null },
+    })) });
+
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(result.evidence?.legs[0]?.state).toBe("current");
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("issues no token without a secret or for a two-day view", async () => {
+    located();
+    expect(await refreshTravelRoutes(caller, day, config, now)).not.toHaveProperty("conclusionsToken");
+    located();
+    expect(await refreshTravelRoutes(caller, { startLocalDate: "2026-09-22", endLocalDate: "2026-09-23" }, config, now, undefined, secret))
+      .not.toHaveProperty("conclusionsToken");
+  });
+});
+
+function numbers(value: unknown): number[] {
+  if (typeof value === "number") return [value];
+  if (Array.isArray(value)) return value.flatMap(numbers);
+  return value && typeof value === "object" ? Object.values(value).flatMap(numbers) : [];
+}
+
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  return value && typeof value === "object" ? [...Object.keys(value), ...Object.values(value).flatMap(strings)] : [];
+}

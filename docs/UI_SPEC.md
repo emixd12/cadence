@@ -248,20 +248,89 @@ text. Preserve hover/focus/tap/click behavior, keyboard access, 44px targets,
 left-side Calendar context and the right-side ledger. Add no separate travel lane
 or permanent duration fill. Unknown timing never creates a precise occupied span.
 
-Show available Calendar location text with Google Maps or a supported preferred
-navigation link. Unresolved addresses can offer Search in maps without claiming a
-verified route. Put optional Behavior location in the existing Behavior form.
-Travel setup explains automatic routing and the optional base. Current position
-is the default immediate origin, ahead of a predicted scheduled position. When
-location is unavailable, request a base for that origin. Missing base withholds
-only final-return advice; current-location-to-event and event-to-event advice
-remain available for usable points. Never insert a base detour automatically.
+Show available Calendar location text with a navigation link that follows the
+platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
+setting. Unresolved addresses can offer Search in maps without claiming a
+verified route. Current position is the default immediate origin, ahead of a
+predicted scheduled position. When location is unavailable, Home or the previous
+stop is the origin. Missing Home withholds only the trip back; current-location-
+to-event and event-to-event advice remain available for usable points. Never
+insert a detour through Home automatically.
+
+Travel Settings (Ticket 215) has three inputs in one column: the Travel estimates
+checkbox with the Google Maps disclosure directly below its label, Home (optional)
+and Usual travel (Walking, Cycling, Transit, Driving). Turning the checkbox on
+records consent and asks for foreground location in the same click; it stays
+disabled, with one line of guidance, until usual travel is chosen. Save travel
+settings stores Home and usual travel. A device-location state line and the
+storage note follow. No separate consent checkbox, "saved base" wording, map-app
+selector or permission-check button. The section carries the `travel` anchor
+that first-run setup opens (Ticket 212).
+
+Ticket 165 adds device-location guidance below the state line. It appears only while
+travel is on and device location is not allowed, not yet allowed or timed out, and
+not during the toggle's own first request. Desktop names System Settings › Privacy &
+Security › Location Services and offers Open Location Services; browsers name the
+site setting (Safari Websites on iPhone and iPad). Both offer Check again, disabled
+while a request runs, and state that saved places and Calendar trips keep working.
+The permission line reads the OS grant without requesting coordinates. Position
+availability and permission stay separate: a position timeout does not revoke an
+allowed grant or erase its status line. When permission is allowed, timeout
+guidance offers another position request rather than asking to enable permission.
+
+Learned travel habits (Ticket 217) follow as a How you travel subsection under a
+rule. Each value is a sentence with an inline select: "You usually need [10 minutes]
+to get ready." and "You like to arrive [5 minutes] early." The default option says
+(default). Remembered places read "You usually [take transit] to Home."; a Calendar
+place shows the date its mode was chosen instead of a name. Each change saves at once
+and announces "Travel habits saved." There are no buffer fields.
+
+On the Timeline, Calendar event details and expanded located Behaviors show a
+"Travel by" select below travel timing when a trip reaches that place: Usual travel
+(the mode) first, then Walking, Cycling, Transit and Driving. After a journey with a
+current outbound estimate ends, the Timeline status area asks once that day: "Your
+leave time for {title} was:" with Too early, About right and Too late as text buttons
+and a muted Not now. An answer is replaced by a one-line confirmation naming the new
+arrival buffer. Controls keep 44px targets and wrap on narrow screens.
+
+The Behavior form shows Where after Description: a select with Not set (default),
+Anywhere, Home and A place. A place adds a required Place text field beside it.
+One hint follows: "Travel estimates and scheduling advice work better when Where
+is set." The pair stacks on narrow screens.
 
 Implementation references: `components/timeline/DayProgressTimeline.tsx`,
-`components/timeline/ExternalEventDetails.tsx`, the existing Behavior form and
-`components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
-`INT-TRAVEL-001` through `INT-TRAVEL-003`; the existing bench includes complete-trip
-and no-base fixtures. Installed acceptance remains in `qa/travel-release.md`.
+`components/timeline/ExternalEventDetails.tsx`, `components/behaviors/BehaviorForm.tsx`
+and `components/settings/TravelSettingsPanel.tsx`. The interaction registry contains
+`INT-TRAVEL-001` through `INT-TRAVEL-007` and, for Ticket 217, `INT-TRAVEL-008`
+through `INT-TRAVEL-010`; the existing bench includes complete-trip and no-base
+fixtures, the panel before usual travel is chosen, the panel with learned habits, the
+desktop location guidance, the journey mode choice, the leave-time question and a
+Home Behavior.
+Installed acceptance remains in `qa/travel-release.md`.
+
+Travel Settings is one panel (combined October 23, 2026 for the travel release
+train). The setup block comes first: the toggle and its disclosure, Home with its
+marker line, usual travel, Save travel settings, the storage notes, then the device
+location line and Ticket 165's guidance. How you travel (Ticket 217) and Completion
+places (Ticket 216) follow as subsections, each under a rule with a bold heading and
+one muted description. At 390 px every control stacks in one column.
+
+Completion places (Ticket 216) is the last subsection of Travel. While off it
+shows one description and Set up completion places. Setup shows three retention
+radios with one plain line each (90 days preselected) and Save where I complete
+Behaviors. While on it shows one count line, the same radios, Delete labels, Delete
+place markers and Turn off. A shorter retention, both deletes and Turn off each ask
+on one inline line with a danger button and Cancel; there is no modal. While labels
+are on, a saved Home shows one marker line below its hint, and the Behavior form
+shows the same line below Where for Home or A place: the marker state and I'm here
+(or Update marker and Remove). A Behavior record shows at most one line below its
+outcome stats: a Where suggestion with Review Where and Dismiss, or, for the first
+Behavior per unmarked place, a marker prompt with I'm here and Not now. Review Where
+opens Details and Settings with Where filled in and the note "Where is filled in from
+a suggestion. Save to keep it." A completion label is silent. Implementation:
+`components/travel/PlaceLabels.tsx`; registry `INT-PLACE-001` through `INT-PLACE-010`;
+bench previews `module.completion-places-section`, `composite.place-marker-control` and
+`composite.behavior-place-assist`.
 
 The current day should be prominent and should begin the forward timeline.
 
@@ -305,11 +374,20 @@ current browser. It should:
 - Sit below the sticky mobile header on narrow screens and remain scrollable
   when the setup rows exceed the available height.
 - Link to the existing create-behavior, notification, timezone, and import
-  controls.
-- Treat import as optional.
+  controls, plus Travel settings where travel routing is configured.
+- Treat import and Home and travel as optional. Each optional row shows one
+  muted description line under its label.
+- Show Home and travel (Ticket 212) last, with a house icon, the action Open
+  travel and the line "Cadence uses these to estimate travel time to and from
+  located Behaviors and Calendar events." It reads Saved when Home and usual
+  travel both exist and Optional otherwise. Show it only after the deployment
+  reports travel routing as configured; while that answer is pending the web
+  pop-up waits rather than inserting the row later. The desktop guide opens at
+  once, asks only with a linked account and appends the row when the answer
+  arrives, so only Skip setup moves.
 - Never request notification permission on page load.
 - Use compact list rows, quiet dividers, and factual state labels such as Done,
-  Not enabled, Blocked, Confirmed, Review, and Optional.
+  Not enabled, Blocked, Confirmed, Review, Optional, and Saved.
 - Provide a Skip setup control.
 - Avoid motivational copy, progress gamification, an inline takeover, or a
   wizard.
@@ -568,8 +646,8 @@ Timezone is managed in Settings and should not be shown as a separate panel in
 the behavior creation form.
 
 Public launch includes a short first-run onboarding flow. It reuses the same
-behavior form, notification permission control, import entry, and timezone
-settings rather than creating a separate onboarding product.
+behavior form, notification permission control, import entry, timezone
+settings, and Travel settings rather than creating a separate onboarding product.
 
 ## Recurrence editor
 
@@ -1052,6 +1130,26 @@ limitation) and "Travel" (up to four calculated lines: travel-created Behavior
 overlaps, departures, the return or an unknown-return note, then a muted "Calculated
 by Cadence … Not written by the model." line). A hypothetical option that overlaps
 travel adds "This time overlaps planned travel." No new buttons; no apply action.
+When the model's facts held weather trips (Ticket 219 stage 2), a muted Open-Meteo
+credit line ("Weather data by Open-Meteo.com (CC BY 4.0)" with site and licence
+links) follows the text, unless the Travel section already shows it.
+
+Recipe 1.1 briefs (Ticket 184 candidate) show options as "Suggested time: 7:00 AM–7:20 AM."
+Tips from logging lanes (late logging, marking times, decisions with no record,
+corrections) use the label "Logging tip"; others keep "Pattern tip". The evidence line
+sits indented under its tip behind a hairline left border. Recipe 1.1 omits the
+"A pattern, not proof of a cause." limitation; the model still never claims a cause.
+Recipe 1.2 briefs (Ticket 184 candidate 3) show each kind of advice under one label.
+All moves share one "New suggested time" heading; each is a bullet such as
+"Walk: 12:30 PM–12:50 PM → 1:10 PM–1:30 PM", with no reason line; the overview never repeats the move. Behavior names render as compact chips. On a
+quiet day the bubble shows only the tip; with no tip either, no bubble appears unless
+calculated travel content is present.
+Recipe 1.2 fills omitted move suggestions only when the projected travel facts permit
+that fallback. A `does_not_fit` occurrence receives no move; unknown or withheld travel
+conclusions cannot restore a move the model omitted. The planner still receives no
+travel facts, and a suggested time never proves that travel fits there.
+A "Setup tip" (recipe 1.2, written by Cadence) asks for a typical length for a Behavior
+with none, with its reason as the indented evidence line.
 
 Settings adds two checkboxes below Calendar timing, each with an exact disclosure
 paragraph, shown only when the server's recipe uses the source (or in development):
@@ -1089,3 +1187,12 @@ Disconnect has an app-specific accessible name and announces success or failure.
 A closed native Recent activity disclosure shows the latest twenty operations,
 times, and outcomes without payloads. Empty and failed loads have distinct text.
 Controls have 44px minimum targets; long client names and hosts wrap at 390px.
+
+## Daily Brief Calendar connection (Ticket 187)
+
+Reuse `GoogleCalendarPanel` in agent mode, titled **Google Calendar for Daily Brief**.
+Show connection status, consent/reconnect, searchable calendar selection, Save, Refresh and Disconnect.
+Omit Timeline visibility and all-day display controls. Refresh reloads calendar discovery only.
+Explain that model sharing requires the separate Daily Brief control after connection and selection.
+Under that Daily Brief control, a disclosure line (`daily-brief-calendar-disclosure`) names what is sent: today's event times, timezone, availability and response, never titles, descriptions, locations or attendees, and never the Timeline connection.
+The existing standard panel keeps Timeline controls. Both panels use the existing Settings layout and narrow-screen wrapping.

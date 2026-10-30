@@ -1,5 +1,42 @@
 # Briefing workbench verification — Tickets 151–155
 
+## Current-main integration review — October 21, 2026
+
+PR #83 now integrates main `d598afc`; its original advisor-analysis title and
+stacked base no longer describe its remaining changes. Main already contains
+Tickets 169–174 and signed-release tooling. The remaining scope is the local
+Compare/Review/Days workbench and its retained review/history/sequence services,
+shared provider budget, pure bubble presentation, repository export cleanup and
+Search Console tooling. No database migration or production preset change is
+introduced relative to main. PR #111 contains the old #83 head and should follow
+the reviewed workbench integration.
+
+Integration corrected one build-blocking regression: the dead-export cleanup
+removed `requireCurrentUser`, but main's OAuth consent and Connected apps service
+uses it. The current helper is restored. The merged account bench also preserves
+main's monthly travel-spend readback and its DOM regression. Current main's OAuth,
+travel-budget and signed-desktop-release behavior remains present.
+
+Validation on Node 24:
+
+- Agents, interactions, resolvers, design-system governance, lint, web TypeScript,
+  shared-core portability, desktop TypeScript, desktop build and web build pass.
+- The focused workbench, history, sequence, budget, review and shared-bubble set
+  passes 173 tests across 12 files.
+- The full suite passes 2,965 tests and skips 165; 20 socket/subprocess tests fail
+  under the execution sandbox. Rerunning all ten affected files with the required
+  local execution access passes all 86 tests. Together the runs validate all
+  2,985 non-skipped tests; this is not a claim of one uninterrupted green run.
+- The web build passes with network-enabled execution. The initial sandboxed
+  build exited with a generic webpack error; that log did not identify a cause.
+
+The development-only loopback gate, same-origin checks, current account consent,
+shared 100-call hourly limit and 30-day local review retention remain enforced.
+Historical evaluation remains retrospective rather than exact as-of replay.
+No private-account model comparison, live Search Console action, schema replay,
+hosted deployment, installed native acceptance or new visual browser pass was
+performed in this review. Existing owner and release gates remain open.
+
 ## Owner-clicked account output — September 21, 2026
 
 The owner ran two comparisons during monitored troubleshooting. Both requests
@@ -644,3 +681,392 @@ for Behaviors outside the configured scope. The word-limit instruction names tip
 - Hosted migration of `20260926150000` and `20260926170000` under deployment authority.
 - Deployed-web and installed-desktop acceptance of recovery, tips and travel lines.
 - Wording re-sample after the final mechanics instruction.
+
+## Compare, saved reviews and feedback-to-candidate loop (Tickets 175–177) — September 28, 2026
+
+Source: `docs/plans/2026-09-27-briefing-bench-review.md`, Phases 0–2. The owner
+authorized full account capture for local reviews (Decision 2026-09-27).
+
+### Original editorial target
+
+The September 30 owner criteria below supersede this earlier target for Ticket 184.
+Review the complete rendered brief, not individual fields.
+
+- The opening explains what matters today, beyond the visible Timeline.
+- The overview usually contains one or two distinct planning points.
+- At most one historical observation appears, relevant to today and supported.
+- A next step appears only when evidence supports it.
+- Quiet days stay short; no tip is a successful outcome.
+- The prose names Behaviors and concrete consequences, without internal terms,
+  judgment, generic encouragement or repeated advice.
+- Marks describe logging time, not when a Behavior happened. Suggestions stay read-only.
+- Start with 80–120 visible words. This is a working range, not a validated
+  reading-speed formula. Never hide material uncertainty to meet it.
+
+After one reading, ask: "What matters today?" and "Was any part unclear, repetitive,
+or unnecessary?"
+
+### Workflow
+
+1. Compare opens first. Choose Synthetic or My account, then Run new comparison.
+   A is the baseline, B the candidate. Each column shows the production bubble,
+   visible word count, repetition and internal-term warnings, and collapsed evidence.
+2. Write feedback in prose. A judgment is optional. Select text inside an output and
+   choose Quote selected text to anchor the comment; add replacement wording if useful.
+3. Open "Turn feedback into a candidate" and choose Write review packet. Ask a coding
+   agent to read the packet path shown and write one proposal file.
+4. Choose Check for proposals. Load a configuration proposal into B, or let the agent
+   make a repository change. Then choose Rerun candidate on this case. A stays pinned.
+5. Record Accept, Needs correction (with a note) or Reject. Promotion remains a
+   separate reviewed repository change.
+
+### Storage
+
+`.local/briefing-bench/v1/<synthetic|account-<ref>>/<case>/` holds `case.json`,
+`candidates.jsonl`, `runs.jsonl`, `feedback.jsonl`, `dispositions.jsonl`,
+`review-packet.md` and `proposals/`. Directories are 0700 and files 0600. Cases
+expire after 30 days and can be deleted from Saved reviews. Account `case.json`
+holds the captured contexts, analysis source and Behavior reference map; the reviews
+API never returns them to the browser. Runs keep withheld output, failures and
+cancellations. A failed write shows "Not saved" and keeps the visible result.
+
+### Verification
+
+- Resolver: a 21:00–00:00 range treats 23:30 marks as on time and 18:00 marks as
+  three hours early; next-day 00:30 marks stay excluded. Before the fix, 23:30 marks
+  measured 1,410 minutes late.
+- Provider-free service tests: case, candidate and run persistence; file modes;
+  anchored feedback and rejected foreign quotations; packet content; proposal
+  validation and malformed-file reporting; dispositions; candidate-only reruns on the
+  same frozen facts; cancellation keeping completed runs; storage failure; deletion,
+  retention and path-like IDs; production and cross-origin refusal.
+- Account tests: captured inputs saved once in the owner partition and withheld from
+  GET; reruns on the captured clock without a new capture; refusal for an uncaptured
+  history window, disabled briefing, a Behavior deleted since capture, and another
+  signed-in owner.
+- DOM tests (26): Compare default, explicit runs, saved-case reload, withheld failures,
+  result retention after edits, cancellation, Not saved, feedback with quotation,
+  draft retention across views, candidate rerun with pinned baseline, packet and
+  proposal loading, decisions, Saved reviews reopen after remount and confirmed delete,
+  browser storage limited to configuration drafts, and account binding and clearing.
+- Browser QA on `http://127.0.0.1:4321/design-system?preview=briefing-workbench`:
+  one synthetic comparison (sparse, marking offset; Cadence default vs Advisor
+  analysis; gpt-5.6-luna, invented facts only). Both runs passed validation and saved.
+  A rendered 49 visible words; B rendered 137 and showed the pattern tip with its
+  evidence line. Feedback saved, the packet was written with configuration
+  differences and the exact comment, and both survived a reload. At 375 px, A stacks
+  above B with no horizontal overflow.
+- Observation from that run: B restated the tip's timing pattern in its overview.
+  The five-word repetition warning did not flag it because the wording differed.
+  Semantic repetition still needs the owner's reading and feedback.
+
+### Remaining gates
+
+- Owner review of real account comparisons through this workflow.
+- Plan Phases 3–4 are implemented under Tickets 182–183 below. Phase 5 remains owner-gated under Ticket 184.
+- Ticket 185 records the separate stored-brief product decision; it does not authorize implementation.
+
+### Review corrections — September 28, 2026
+
+The owner requested a review of Tickets 175–177 and fixes before filing the remaining
+plan. Six new DOM regressions reproduced lost rerun output, feedback attached to the
+wrong pair, edits lost during saving, reused candidate metadata, and stale case/list
+responses. Those regressions now pass. Additional checks cover unchanged timing
+metadata with changed output text and collapsed configuration controls.
+
+- Draft comments belong to a case and exact A/B run pair. Changing B or opening a
+  different case cannot reuse a comment accidentally. Saving preserves the selected
+  older run and any edits made while the request was pending.
+- Source/account changes and authorization failures clear private drafts and fence
+  late reads or writes. An unsaved candidate rerun stays visible beside its baseline; feedback cannot silently
+  attach to the previous saved output. Configuration starts collapsed.
+- Current access checks run before each saved-account dispatch and before ready
+  output is stored. New account captures also recheck before storage. Revocation or
+  context changes stop subsequent dispatches and retain only withheld failure metadata.
+  Calendar replay also matches current connection/selection revisions to the captured
+  connector. Missing capture metadata refuses replay; renewed consent cannot authorize
+  a case captured from a different Calendar selection.
+- Every case read or write enforces the 30-day expiry. Access removes expired files;
+  this local tool has no cleanup worker while closed. Non-missing storage failures
+  surface as failures instead of silently returning an empty feedback list.
+- Reusing a candidate ID requires identical configuration and lineage metadata.
+  Configuration proposals pass the existing configuration parser before listing.
+- Mechanics warnings exempt only complete Behavior-title occurrences, while flagging
+  the same mechanics word elsewhere. This remains a wording diagnostic, not semantic
+  proof; a one-word title can still be ambiguous.
+- Shared presentation helpers align quote validation with overview, suggestions,
+  option, source, tip/evidence, generated-time and warning text. Times now use en-US
+  formatting in the briefing timezone on web and linked desktop. Bubble geometry,
+  evidence and production freshness remain unchanged. The workbench has no travel
+  input; this review does not add travel capture.
+
+Tickets 182–184 cover historical days, sequence/lane review and owner-reviewed
+promotion. Ticket 185 owns the separate stored-brief decision. Actual advice quality
+still needs owner review; contract tests do not establish useful model prose.
+
+Verification on Node 24.19.0: agents, interactions, resolvers, core portability,
+design-system, lint, TypeScript, desktop typecheck/build and web build pass. The
+full suite passes 2,467 tests with 29 skips using two workers. The initial run had
+one desktop release-test timeout under default concurrency; its 46 tests passed
+separately. The workbench has 40 passing DOM tests, including review authorization
+failures and late account refresh. Calendar replay and multi-source quotation
+regressions also pass in the full suite.
+
+Concurrent release work created a copied checkout under `.local`. Tests, lint and
+TypeScript now exclude that local artifact directory. Verification restarted after
+the copied tests entered one run; no release artifact was modified.
+
+Browser QA used a dedicated `127.0.0.1:4321` session with the model key disabled.
+At 1440 px, A and B each measured 608 px and shared their vertical start. At 390 px,
+each measured 358 px and stacked in order. Both widths had no horizontal overflow.
+Configuration starts closed; keyboard Tab moves from Candidate name to Candidate
+rationale. The static long-text bubble wraps, and an explicit run shows
+`not_configured`. No account data or provider generation was used. Saved-result and
+feedback behavior used DOM/service tests with synthetic records. Installed desktop
+and actual model wording were not re-evaluated in this review.
+
+Inventory/usage scans retain the existing catalog and bench exclusions; the new
+presentation test adds one usage. Unrelated discovered mappings remain outside this
+fix. The first independent review returned `fix-first`: Calendar replay lacked its
+connection/selection checks, copied source links lacked matching text separators,
+and review authorization failures left private previews visible. All three now have
+corrections and regression coverage. A late account refresh also cannot restore the
+cleared account labels. A fresh independent read-only review returned `ship` with no
+actionable findings. That reviewer inspected the final corrections and ticket coverage;
+automated and browser verification evidence came from the parent runs recorded above.
+
+
+### Tickets 182–185 — September 28, 2026
+
+Tickets 182–183 implement historical and consecutive-day review. Tickets 184–185
+have a prepared owner packet at `docs/plans/2026-09-28-briefing-owner-review.md`.
+No owner criteria, quality acceptance, production promotion or stored-brief decision
+is inferred. No private account read or actual model generation ran in this task.
+
+Historical evidence:
+
+- `briefing-history.service.ts` supplies guarded development GET/POST routes. It uses
+  existing authenticated repositories and the shared pipeline, without migrations.
+  Defaults are 14 prior days and 07:00 in an explicit timezone; targets cap at 90 days.
+- Retained account state is Retrospective, including later imports, corrections and
+  late creation. Reconstructed remains unavailable. Live time fences authorization,
+  cancellation and 30-day local retention. Evaluation uses the selected clock.
+- Missing dates and targets above 200 occurrences cannot save. Existing reads paginate
+  and fail above 100,000 rows. Original completion counts, elapsed history and past
+  timezone state stay unknown; historical Notes and reminders are omitted.
+- Retained analysis applies existing 10,000/20,000/2,000 row caps. Calendar reads use
+  separate current consent and bounded 31-day chunks. Per-day coverage cannot exceed
+  the provider's actual range. Past Calendar does not enable historical pattern analysis.
+- The pipeline's restrictive historical coverage flag prevents free-time claims from
+  incomplete historical Cadence schedules. Production defaults preserve existing behavior.
+
+Sequence evidence:
+
+- `briefing-sequence.service.ts` plans before generation, derives diagnostic lanes from
+  contracts, validates one case per date, and maintains separate A/B tip history.
+  Simulation assumes selected tips were delivered; generation retains successful tips.
+- `briefing-bench-budget.ts` shares reservations and two provider permits across tabs.
+  Queued calls recheck consent after obtaining a permit. Timeout keeps a permit until
+  the actual provider settles. Cancellation releases undispatched reservations.
+- Failed, rejected, partial and cancelled attempts remain reviewable. Storage failures
+  keep text visible as Not saved. Sequence reports include exact text, reading burden,
+  repeated lane signals, exact feedback counts and failures without grading quality.
+- Tests cover chronology/cooldown, stable fingerprints, empty warm-up, budget/concurrency,
+  timeout, retry, cancellation, storage failure, revocation, partial output, historical
+  gaps, DST/lookback edges, compatibility and per-case feedback drafts.
+
+Browser QA used a dedicated `127.0.0.1:4321` Codex session and synthetic data only.
+The no-model grid showed 14 days. Saving September 14 and 15 produced two selected
+cases. Planning showed four daily-brief calls. Diagnostic planning showed zero calls
+for configurations without eligible lanes and disabled generation. The local report
+was written successfully. Exact feedback prose survived Compare → Days navigation.
+At 1440 px, A/B measured 608 px each and aligned vertically. At 390 px, they measured
+358 px and stacked A above B. Neither viewport overflowed horizontally. Keyboard Tab
+moved from Days to Saved reviews with a visible focus ring. Browser error logs were empty.
+Cancellation/provider behavior used mocked service and DOM checks, not live calls.
+
+Implementation files: `app/design-system/BriefingDays.tsx`, `DailyBriefBench.tsx`,
+`BriefingReview.tsx`; the history/sequence routes; history/sequence/budget services;
+workbench/review/store/pipeline services and the existing Calendar service. Governance,
+route, date/time, design and glossary docs use the existing interaction exclusions.
+No public interaction, desktop surface or marketing claim was added.
+
+Verification on Node 24: the final full suite passed 2,519 tests with 29 existing
+opt-in skips (`npm run test -- --maxWorkers=2 --testTimeout=30000`). Default-timeout
+runs hit existing desktop subprocess checks under load. The final run retains two
+workers and a 30-second test timeout, matching the recorded release-check allowance.
+The initial sandboxed run could not bind local fake-provider/Unix sockets; final
+acceptance allowed those local sockets. Core portability, design-system governance,
+desktop typecheck/build, lint, web TypeScript and web build pass. No migration ran.
+The final shared-source and overnight regressions are included in that suite.
+Independent review found an invalid fixture checksum that omitted its frozen copy.
+The corrected packet now matches all 18 current sources, frozen copies and manifest
+entries. A fresh review then found stale cancellation/report failures clearing newer
+drafts, and saving another day leaving the previous selection plan executable.
+Lifecycle guards and plan invalidation correct both defects. Three DOM regressions
+failed before the correction and pass afterward. After final verification, a fresh
+independent read-only review returned `ship` with no actionable findings. The reviewer
+checked the corrections, source freeze and recorded test evidence. Private-account
+acceptance, model quality, owner decisions, promotion, rollback and release remain open.
+The local workbench returned HTTP 200 after restarting on `127.0.0.1:4321`.
+
+
+### Ticket 184 criteria and coverage profile — September 30, 2026
+
+The owner accepted actionable adherence analysis and day planning from available,
+authorized evidence. The full brief should generally fit a one-minute read with
+concise, precise wording. Quiet days prioritize supported longitudinal insights.
+Vary analysis lanes across days; justified reminders about persistent high-impact
+patterns remain useful. Rewording alone does not establish a different insight.
+The accepted criteria and exact profile definition are in
+`docs/plans/2026-09-28-briefing-owner-review.md`.
+
+| Profile | Iteration | Coverage | Evaluation state | Outcome |
+|---|---|---|---|---|
+| `daily-brief-balanced@1` | 1 | Six tuning cases, ten reserved cases, one seven-day sequence | Freeze refreshed October 16 at `575a48d`; no model runs yet | No candidate accepted |
+
+Future records identify profile revision and iteration separately. Keep exact
+candidate/baseline versions, source freeze, local report references, reading burden,
+repeat rationale and failures with each iteration. Retain prior rows and profile
+revisions. Do not count seven days as seven independent sequence-quality votes.
+This update records criteria and starts the existing workbench; it does not change
+runtime prompts, presets, cooldowns or the production reading policy.
+
+### Ticket 184 iteration 1 — tuning pass 1, October 16, 2026
+
+Profile `daily-brief-balanced@1`, iteration 1, source `575a48d` (freeze
+`ticket184-iter1-20261016`). A `cadence-default`, B `advisor-analysis`, model
+`gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`. The local server ran on
+Node 22.22.3 at `127.0.0.1:4323` because Node 24 is not installed and Docker holds 4321.
+T1–T6 ran once each: 12 calls, 12 passed, none withheld. Held-out H1–H10 and S1 were not run.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| T1 | Neither | Remove "no scheduled change" statements; suggest or stay silent. |
+| T2 | No explicit pick; prefers B's sections | Too technical in both; nest tip evidence; drop causal disclaimer. |
+| T3 | B | Repetition. |
+| T4 | B (best) | Future one-click rescheduling logged in `docs/FUTURE_UPDATES.md`. |
+| T5 | B (best overall) | Give logging-habit tips distinct formatting. |
+| T6 | Neither | Do not mention the absence of conflicts. |
+
+Exact comments are stored as feedback records in the local synthetic cases.
+Eight proposals (P0–P7) for candidate 2 are stored beside them and pass the workbench validator.
+Not proposed for candidate 2: duration estimates from Behavior descriptions conflict with
+the current duration contract (`docs/PRODUCT_SPEC.md`) and need a separate decision.
+Suggesting a refresh after a brief's times pass belongs with Ticket 185's expiry choices.
+No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 2 (candidate 2), October 16, 2026
+
+Source `600f423`. Rerun candidate on each saved T1–T6 case with `advisor-analysis-2`
+(recipe `daily_brief@1.1`, label "Candidate 2", parent = the pass 1 candidate).
+6 calls, 6 passed. Synthetic fixtures carry no descriptions, so no estimate calls ran.
+Agent observations, pending owner review: T1–T3 now give one concrete suggested time;
+T6 says "Nothing is left on today's schedule."; T4 and T5 still say "buffer"; T4 still
+mentions an opening it does not suggest; the T5 realistic-timing tip mixes scheduling
+and logging advice; T2 calls a recorded 20-minute length "approximate".
+
+### Ticket 184 iteration 1 — owner review of candidate 2, October 23, 2026
+
+The owner reviewed one account comparison and T1–T6 pass 2. A was `cadence-default`
+and B was candidate 2. The account comparison ran October 16 on live account data,
+with Calendar and Behavior descriptions included. The review made no new model calls.
+Exact comments are stored as feedback records in each local case. Agent notes inside
+a comment are labeled.
+
+| Case | Owner preference | Main feedback |
+|---|---|---|
+| Account | Neither | The B logging tip is repetitive; remove superfluous text. |
+| T1 | B | Give each kind of suggestion its own formatting. |
+| T2 | B | Still robotic. State the overlap length. Use what the Behavior is to judge whether it needs time between items. |
+| T3 | B | Overlap length is still missing. The move is unclear. Replace the repeated time with one "New suggested time". |
+| T4 | B (closest to the target) | Logging tip formatting and natural move wording work. B offers 7:00 AM, then suggests 12:25 PM; mention one move once. |
+| T5 | No pick | Do not describe a free slot for a Behavior that has no conflict. The tip mixes logging and scheduling advice. Use defined advice lanes, such as Logging tip and New suggested time. Format Behavior names. |
+| T6 | Neither | Do not say there is no issue, and do not show this brief. Show a logging tip or other history-based advice instead. |
+
+The T4 and T6 preferences were inferred from the owner's wording, not stated as a pick.
+The agreed agent observations were: one move stated two or three times, "buffer" and
+"transition room", "approximate" for recorded lengths, and the T5 tip mixing advice types.
+
+Requirements for candidate 3:
+- One labeled block per advice type. Each block carries one kind of advice only.
+- One move per Behavior, stated once, as a "New suggested time" with the original time.
+- Every overlap states how long it is.
+- Behavior titles and descriptions inform whether a move or spacing matters.
+- Behavior names get distinct formatting in brief text.
+- No sentence reports an absent conflict, a fitting slot or a quiet day.
+- No "buffer", "transition room", "reserved", or "approximate" for recorded lengths.
+
+Owner decision, October 23: relax tip spacing so quiet days can show a history-based
+tip. T6 asked for that advice, but the current policy allows at most one tip, with a
+7–30 day cooldown and one-day spacing. Quiet days would often have no allowed tip and
+an empty brief. Candidate 3 relaxes spacing in its own preset only; production is unchanged.
+
+Agent observation, not owner-reviewed: every brief shows "Suggestions only. No
+changes were applied." even when it has no suggestions.
+
+No candidate is accepted. No prompt, preset or production behavior changed.
+
+### Ticket 184 iteration 1 — tuning pass 3 (candidate 3), October 23, 2026
+
+Source: work on `claude/nostalgic-khayyam-34bf80` after `b7ea8af`, committed with this record. Rerun
+candidate on each saved T1–T6 case with `advisor-analysis-3` (recipe `daily_brief@1.2`,
+label "Candidate 3"), model `gpt-5.6-luna`, synthetic clock `2026-11-01T12:00:00Z`.
+The local server ran at `127.0.0.1:4325`. 6 calls, 6 passed, none withheld.
+
+| Case | Words | Result |
+|---|---|---|
+| T1 | 35 | Overlap by 20 minutes; one New suggested time block (12:30 → 1:10 PM). |
+| T2 | 102 | Overlap length stated; one move for Behavior 6; a schedule-load Pattern tip. |
+| T3 | 37 | Same shape as T1. |
+| T4 | 89 | One move only (12:25 PM); the 7:00 AM opening is gone; a recording-only Logging tip. |
+| T5 | 51 | Tip only; no sentence about Walk's free slot. |
+| T6 | 0 | No brief shown: no conflict, and the fixture has no tip finding. |
+
+Agent observations, pending owner review: T4 repeats "minutes before your calendar event"
+in the overview and reason, and "ten minutes is preferred" reads mechanically. The T2
+tip is general advice. T6 shows nothing because the `no_issue` fixture offers no
+history finding, so the quiet-day tip path is exercised only by T5. Synthetic names
+such as "Synthetic behavior 6" give the effort rule nothing to judge. Product type is
+weight 400 only, so names use a Cold Surface fill instead of bold.
+
+### Ticket 184 iteration 1 — candidate 3 owner review rounds, October 23, 2026
+
+Same day, the owner reviewed candidate 3 revisions on T1–T2 and on a fresh account case.
+Exact comments are stored as feedback records in each local case.
+
+Synthetic: T1 preferred B, and later B 3.1. The owner asked for overlap placement
+(start, end, all), name chips, and no reason line under a move. T2 (3.2, no pick) asked
+for moves for every conflicting Behavior, not only the smallest change. T3–T6 were
+rerun but not reviewed in this round.
+
+Account case: live account data, captured 12:25 PM New York, with Calendar and
+owner-confirmed workbench-only descriptions. Later revisions reran on the same
+captured inputs and clock. A was `cadence-default` in every row.
+
+| Revision | Owner | What changed after it |
+|---|---|---|
+| 3.3 | B | No moves: one Behavior with no length blocked the rest of the day. The owner asked that unknown lengths block nothing, titles be estimated, a Setup tip nudge for lengths, and the noticed issues be fixed. |
+| 3.4 | — | Lost its estimate call to a stale dev-server module; not reviewed. |
+| 3.5 | B | The helmet overlap was still raised, a move had no reason, one move went unused, and a shortened name got no chip. All agreed. |
+| 3.6 | No pick | All moves went to Behaviors whose time had passed, and the overview was empty. The owner kept those moves: place them in future free time, and let ranges hold only their estimated length. |
+| 3.7 | — | Agent-found planner bugs: ranges were packed into the moved Behavior's slot, and colliding moves jumped to a later gap. |
+| 3.8 | No pick | Correct moves (12:25, 12:38, 1:18 PM). The owner asked for natural sentences instead of three near-identical ones. |
+| 3.9 | B | One combined overview sentence. The owner asked for one "New suggested time" heading with bullets, and for repetition review to ignore Behavior names. |
+
+The owner's broader request is a Behavior profile for the model, weighted per advice
+lane: description, category, duration, location and Note history. It is not implemented.
+It changes the day-context contract and disclosures, so it needs its own ticket.
+The first bullet of the owner's 3.3 feedback was cut off ("We should include") and is unresolved.
+
+Revision 3.9 also covers the 3.9 display follow-ups: one heading with bullets, and names
+skipped in repetition review. Medication timing: the owner kept moves for overdue
+Behaviors, including Daily Injections. Account runs used `cadence-ticket184-account-run`,
+the pre-Ticket-187 worktree, with this candidate patched in uncommitted. This branch's
+Ticket 187 Calendar migration is not on hosted.
+
+Verification at commit: agents, interactions, resolvers, design-system and core checks,
+lint with zero warnings, web and desktop TypeScript, Vitest (3,153 passed, 94 skipped) and
+the web build pass. Earlier full runs had one desktop release test file exceed its 5 s
+limit under load; it passed alone. No candidate is accepted. No production preset,
+schema or hosted change.

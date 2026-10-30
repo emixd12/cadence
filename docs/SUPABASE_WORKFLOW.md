@@ -86,6 +86,118 @@ configuration records and IDs after restore. Passive imported observations
 accepted the canonical channel/status vocabulary without creating operational
 reminders. Final aggregate cleanup again found no user or application data.
 
+### Reproducible local contract proxy — September 27, 2026
+
+`scripts/supabase-docker-proxy.mjs` replaces the missing temporary create proxy.
+It supports this repository's installed `supabase-go` 2.105.0 backend. Its
+service images and three initialization commands come from that version's
+[Dockerfile](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/pkg/config/templates/Dockerfile)
+and [schema initialization](https://github.com/supabase/cli/blob/v2.105.0/apps/cli-go/internal/db/start/start.go).
+Review those pins before using a different CLI version. Do not widen the
+unnamed-job rule merely to bypass a rejected request. The proxy accepts each
+pinned tag from `public.ecr.aws/supabase` (the CLI default) or
+`ghcr.io/supabase`, which the CLI uses when `SUPABASE_INTERNAL_IMAGE_REGISTRY`
+is `ghcr.io`. On October 23, 2026 both registries served identical manifest
+digests for all seven pins. Recheck the digests before adding a pin.
+
+The proxy requires both exact project labels, project `habit-tracking-app`,
+and network `cadence-local`. It rewrites every explicit published binding to
+`127.0.0.1`. It rejects implicit publishing, host mounts, host namespaces,
+privileged configuration, unknown creates, and other-project mutations.
+Only the three exact Auth, Storage, and Realtime initialization jobs may omit
+a name. Their database host must be `supabase_db_habit-tracking-app` on port
+5432. The proxy never prints request bodies, environments, or daemon errors.
+It logs each rejected request as `Cadence Docker proxy rejected METHOD PATH
+(cause)`: no query string, headers or body. The cause is `policy` or a failed
+ownership read reported by status or error code.
+
+The proxy reads ownership before container or volume lifecycle mutations.
+It requires the existing loopback bridge network and never changes networks.
+It supports normal HTTP response streaming, including Docker's raw log frames.
+It rejects exec, attach/hijack, unscoped prune, build, and settings operations.
+CLI 2.105.0 starts and resets this stack through container lifecycle calls,
+log reads, and PostgreSQL connections; these operations do not need Docker exec.
+`supabase stop` and the CLI's own cleanup after a failed `start` prune with the
+`com.supabase.cli.project=habit-tracking-app` label filter. The proxy forwards
+exactly that container prune and that volume prune (with Docker's `all` flag
+for named volumes). It answers the network prune itself with an empty report,
+so `cadence-local` is never removed. Any other filter, query or body is
+rejected. Before October 23, 2026 every prune was rejected: a failed start left
+the stopped database container and volume behind, and its output always
+contained the proxy rejection, which hid the start's real error.
+
+Run the focused fake-daemon tests before operator review:
+
+```bash
+npx vitest run tests/supabase-docker-proxy.test.ts
+```
+
+Use Node 24. The tests use fake Unix sockets and never contact Docker.
+Actual stack start, reset, binding readback, and authenticated contract remain
+separate acceptance gates. Do not count fake-daemon tests as those gates.
+
+After reviewing the proxy, inspect the existing network and start the proxy:
+
+```bash
+docker network inspect cadence-local --format '{{json .Options}}'
+CADENCE_DOCKER_PROXY_DIR="$(mktemp -d /private/tmp/cadence-docker-proxy.XXXXXX)"
+mkdir -p "$CADENCE_DOCKER_PROXY_DIR/work/supabase"
+cp supabase/config.toml supabase/seed.sql "$CADENCE_DOCKER_PROXY_DIR/work/supabase/"
+cp -R supabase/migrations "$CADENCE_DOCKER_PROXY_DIR/work/supabase/"
+CADENCE_DOCKER_DAEMON="$(docker context inspect --format '{{(index .Endpoints "docker").Host}}')"
+node scripts/supabase-docker-proxy.mjs \
+  "$CADENCE_DOCKER_PROXY_DIR/docker.sock" "${CADENCE_DOCKER_DAEMON#unix://}" &
+CADENCE_DOCKER_PROXY_PID=$!
+```
+
+The network inspection must show `com.docker.network.bridge.host_binding_ipv4`
+equal to `127.0.0.1`. Wait for `Cadence Docker proxy ready.` before continuing.
+The socket uses mode 0600 inside the new private directory. The proxy refuses
+an existing socket; it never replaces another process's socket.
+
+The temporary workdir intentionally omits `.temp`, linked-project metadata,
+credentials, and cached hosted image versions. CLI 2.105.0's `start` checks
+hosted service versions when the workdir contains a project link and CLI
+credentials. Always pass the unlinked temporary workdir below. The copied
+config preserves the same local project ID; no hosted query is needed.
+
+Use the installed Go backend through the npm shim. This avoids the invalid
+signature on the native launcher and also reaches the contract's internal
+`npm run supabase -- status -o env` reader:
+
+```bash
+export SUPABASE_TELEMETRY_DISABLED=1
+export SUPABASE_CLI_BINARY_OVERRIDE="$PWD/node_modules/@supabase/cli-darwin-arm64/bin/supabase-go"
+export DOCKER_HOST="unix://$CADENCE_DOCKER_PROXY_DIR/docker.sock"
+npm run supabase -- start --workdir "$CADENCE_DOCKER_PROXY_DIR/work" --network-id cadence-local \
+  --exclude imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor \
+  >/dev/null 2>&1
+```
+
+The excluded services do not participate in the adapter contract. Studio,
+Edge Runtime, and Vector otherwise mount host files or the Docker socket.
+The start command discards provider output because it contains local keys.
+Require a zero exit status. Do not enable debug logging or save status output.
+
+Inspect only labels, port bindings, network membership, and service health.
+Every published binding must show `127.0.0.1`; stop Cadence's affected container
+immediately if any binding shows `0.0.0.0`, `::`, or an empty address. Before a
+destructive local reset, confirm the disposable local database contains no
+owner data. Then replay and run the existing authenticated contract:
+
+```bash
+npm run supabase -- db reset --local --workdir "$CADENCE_DOCKER_PROXY_DIR/work" \
+  --network-id cadence-local >/dev/null 2>&1
+CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+```
+
+Require a zero reset exit status and repeat binding and health readback after
+the reset. The contract captures CLI keys internally. Its synthetic account
+cleanup must succeed. After local acceptance, stop only the Cadence containers,
+preserve named volumes, and end this proxy with `kill "$CADENCE_DOCKER_PROXY_PID"`.
+Do not reset or delete other projects, change Docker defaults, or substitute
+hosted account data.
+
 ## Schema change workflow
 
 All schema work must be represented by migration files under `supabase/migrations/`.

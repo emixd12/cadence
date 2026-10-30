@@ -1,11 +1,12 @@
 import { DAILY_BRIEF_POLICY_VERSION } from "@cadence/core/types/daily-brief";
 import { createHash } from "node:crypto";
 import { Temporal } from "@js-temporal/polyfill";
-import { parseBriefingConfig, DEFAULT_BRIEFING_CONFIG, scopeBriefingContext, projectBriefingContext } from "@cadence/core/services/briefing-config";
+import { parseBriefingConfig, DEFAULT_BRIEFING_CONFIG, scopeBriefingContext, projectBriefingContext, projectBriefingConnectorSources, splitBriefingContext } from "@cadence/core/services/briefing-config";
 import { selectBriefingReferences } from "@cadence/core/services/briefing-references";
-import { BRIEFING_PLAN_VERSION } from "@cadence/core/types/briefing-plan";
+import { BRIEFING_PLAN_LIMITS, BRIEFING_PLAN_VERSION } from "@cadence/core/types/briefing-plan";
+import { isLaneRecipe, isPlainRecipe } from "@cadence/core/types/briefing-config";
 import { planBriefing } from "@cadence/core/resolvers/briefing-plan.resolver";
-import type { AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
+import type { AdvisorDayContext, AdvisorDayContextV1 } from "@cadence/core/types/advisor-day-context";
 import { BRIEFING_ANALYSIS_VERSION, type BriefingAnalysisResult, type BriefingAnalysisSource, type BriefingFinding } from "@cadence/core/types/briefing-analysis";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import { resolveBriefingAnalysis, selectBriefingTip, type BriefingTipSelection } from "@cadence/core/resolvers/briefing-analysis.resolver";
@@ -16,6 +17,8 @@ export const BRIEFING_PIPELINE_VERSION = "3.0";
 /** Analysis inputs the caller authorized and read. Absent sources leave selected lanes unavailable. */
 export type BriefingAnalysisInput = Readonly<{
   source: BriefingAnalysisSource | null;
+  /** Development retrospective evaluation may inspect retained rows without proving the original scheduled universe. */
+  cadenceComplete?: boolean;
   /** Content-free tip history; omitted by workbench and fixtures, which never record deliveries. */
   shown?: readonly Readonly<{ fingerprint: string; lastShownLocalDate: string }>[];
   fingerprintOf?: (finding: BriefingFinding) => string;
@@ -38,10 +41,27 @@ export function briefingConfigurationRevision(value: unknown = activeBriefingCon
   return createHash("sha256").update(JSON.stringify({ config, references: selectBriefingReferences(config.referenceIds), pipeline: BRIEFING_PIPELINE_VERSION, policy: DAILY_BRIEF_POLICY_VERSION, planner: BRIEFING_PLAN_VERSION })).digest("hex");
 }
 
-export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, now: string, analysisInput?: BriefingAnalysisInput) {
+/**
+ * `alongsideBehaviorRefs` (recipe 1.2): Behaviors that can happen during other
+ * activities. They receive no move options; the consumer also keeps their overlaps
+ * out of the brief.
+ */
+export function prepareBriefing(sourceContext: AdvisorDayContext, value: unknown, now: string, analysisInput?: BriefingAnalysisInput,
+  alongsideBehaviorRefs: ReadonlySet<string> = new Set()) {
   const config = parseBriefingConfig(value);
+  // Ticket 239: existing projections see the Google-only `1.0` view; disclosed sources travel separately.
+  const { context, sources } = splitBriefingContext(sourceContext, config);
   const plannerContext = scopeBriefingContext(context, config);
-  const { facts, contextControls } = projectBriefingContext(context, config);
+  const projected = projectBriefingContext(context, config);
+  const contextControls = projected.contextControls;
+  const connectorSources = projectBriefingConnectorSources(sources);
+  const sourcesComplete = sources.calendars.every((item) => item.complete) && (sources.recordedActivity?.complete ?? true);
+  const facts = connectorSources ? {
+    ...projected.facts,
+    version: sourceContext.version,
+    status: projected.facts.status === "complete" && sourcesComplete ? "complete" as const : "partial" as const,
+    connectorSources,
+  } : projected.facts;
   const references = selectBriefingReferences(config.referenceIds);
   const configurationRevision = briefingConfigurationRevision(config);
   const atMinute = (minute: number) => {
@@ -59,15 +79,31 @@ export function prepareBriefing(context: AdvisorDayContextV1, value: unknown, no
   });
   // A narrowed Behavior view omits fixed commitments and cannot establish availability.
   const plan = planBriefing({ context: plannerContext, now, configurationRevision,
+    ...(sources.calendars.length ? { additionalCalendars: sources.calendars } : {}),
     permittedWindows: windows,
-    fixedCommitmentsComplete: plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
+    fixedCommitmentsComplete: (analysisInput?.cadenceComplete ?? true) && plannerContext.cadence.occurrences.length === context.cadence.occurrences.length,
     alternatives: config.alternatives, allowedSuggestionTypes: config.allowedSuggestionTypes,
-    movableOccurrences: plannerContext.cadence.occurrences.filter((item) => item.status === "unresolved" && config.planner.movableBehaviorRefs.includes(item.behaviorRef)).map((item) => ({
+    // Recipe 1.2: a range Behavior already floats within its span, so it is never moved.
+    movableOccurrences: movableOccurrences(config, plannerContext).filter((item) => !alongsideBehaviorRefs.has(item.behaviorRef) &&
+      !(isLaneRecipe(config.recipe) && item.schedule.kind === "range")).map((item) => ({
       occurrenceRef: item.ref,
       permittedWindows: windows,
-    })), policy: config.planner });
+    })), policy: isLaneRecipe(config.recipe) ? { ...config.planner, onePerOccurrence: true, flexibleSchedules: true } : config.planner });
   const analysis = config.analysis.lanes.length ? prepareAnalysis(config, context, analysisInput) : null;
   return { config, configurationRevision, facts, contextControls, references, plan, analysis, pipelineVersion: BRIEFING_PIPELINE_VERSION, recipe: config.recipe, policyVersion: DAILY_BRIEF_POLICY_VERSION };
+}
+
+/**
+ * Recipe 1.0 moves only explicitly listed Behaviors. Recipes 1.1 and 1.2 treat every
+ * Behavior still unresolved at generation as movable within today, for suggestions
+ * only; the Behavior's schedule never changes. The earliest occurrences fit the planner limit.
+ */
+export function movableOccurrences(config: BriefingConfig, context: AdvisorDayContextV1): AdvisorDayContextV1["cadence"]["occurrences"] {
+  const unresolved = context.cadence.occurrences.filter((item) => item.status === "unresolved");
+  if (!isPlainRecipe(config.recipe)) return unresolved.filter((item) => config.planner.movableBehaviorRefs.includes(item.behaviorRef));
+  return [...unresolved]
+    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.scheduledFor), Temporal.Instant.from(right.scheduledFor)) || left.ref.localeCompare(right.ref))
+    .slice(0, BRIEFING_PLAN_LIMITS.movableOccurrences);
 }
 
 function prepareAnalysis(config: BriefingConfig, context: AdvisorDayContextV1, input: BriefingAnalysisInput | undefined): PreparedBriefingAnalysis {
@@ -78,6 +114,8 @@ function prepareAnalysis(config: BriefingConfig, context: AdvisorDayContextV1, i
     : { version: BRIEFING_ANALYSIS_VERSION, findings: [], lanes: config.analysis.lanes.map((laneId) => ({ laneId, state: "unavailable" as const, reason: "source_not_requested" as const, candidateCount: 0 })) };
   const selection = selectBriefingTip({
     findings: result.findings, maxTips: config.analysis.maxTips, cooldownDays: config.analysis.cooldownDays,
+    // Recipe 1.2 (owner decision, October 23): quiet days may show a different tip on consecutive days.
+    nextDaySpacing: !isLaneRecipe(config.recipe),
     localDate: context.localDate, shown: input?.shown ?? [], fingerprintOf: input?.fingerprintOf ?? ((finding) => finding.id),
   });
   return {

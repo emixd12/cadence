@@ -1,5 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { TravelEvidenceResult, TravelMode } from "../types/travel";
+import type { TravelWeatherSummary, WeatherConditionId, WeatherModeSuggestion } from "../types/weather";
 
 /**
  * Deterministic travel guidance shown beside the Daily Brief (Ticket 170).
@@ -8,9 +9,17 @@ import type { TravelEvidenceResult, TravelMode } from "../types/travel";
  */
 export type BriefTravelGuidanceItem =
   | Readonly<{ kind: "overlap"; behaviorLabel: string; travelLabel: string }>
-  | Readonly<{ kind: "departure"; at: string; label: string; mode: TravelMode }>
+  | Readonly<{ kind: "departure"; at: string; label: string; mode: TravelMode;
+      /** Ticket 218: `at` already includes the fixed weather margin. */
+      weather: BriefTravelWeather | null }>
   | Readonly<{ kind: "return"; at: string }>
   | Readonly<{ kind: "return_unknown" }>;
+
+export type BriefTravelWeather = Readonly<{
+  marginMinutes: number;
+  conditions: readonly WeatherConditionId[];
+  suggestion: WeatherModeSuggestion | null;
+}>;
 
 export type BriefTravelGuidance = Readonly<{
   localDate: string;
@@ -20,6 +29,8 @@ export type BriefTravelGuidance = Readonly<{
   /** Brief option IDs whose proposed interval overlaps travel occupancy. */
   conflictingOptionIds: readonly string[];
   attribution: string | null;
+  /** Ticket 218: weather state and Open-Meteo credit; null while weather is off. */
+  weather: Pick<TravelWeatherSummary, "state" | "attribution"> | null;
   /** Travel-expanded occupancy, used to check brief options without another route request. */
   occupiedSpans: readonly Readonly<{ startAt: string; endAt: string }>[];
 }>;
@@ -88,7 +99,11 @@ export function projectBriefTravelGuidance(input: Readonly<{
     .filter((item) => item.leg.role !== "return" && after(item.estimate!.departureAt))
     .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.estimate!.departureAt), Temporal.Instant.from(right.estimate!.departureAt)))
     .slice(0, 2)
-    .map((item) => ({ kind: "departure" as const, at: item.estimate!.departureAt, label: label(item.leg.destinationCommitmentRef), mode: item.leg.mode }));
+    .map((item) => ({ kind: "departure" as const, at: item.weather?.departureAt ?? item.estimate!.departureAt,
+      label: label(item.leg.destinationCommitmentRef), mode: item.leg.mode,
+      weather: item.weather?.state === "margin"
+        ? { marginMinutes: item.weather.marginSeconds / 60, conditions: item.weather.conditions, suggestion: item.weather.suggestion }
+        : null }));
   const hasReturnLeg = evidence.legs.some((item) => item.leg.role === "return");
   // Without a return leg (no base, leg limit or unknown timing) only the return is withheld; known legs stay.
   const back: BriefTravelGuidanceItem[] = evidence.completeTrip && evidence.finalAvailabilityAt
@@ -102,5 +117,6 @@ export function projectBriefTravelGuidance(input: Readonly<{
     conflictingOptionIds: (input.options ?? []).filter((option) => overlapsTravelSpans(option, evidence.occupiedSpans)).map((option) => option.id),
     occupiedSpans: evidence.occupiedSpans.map((span) => ({ startAt: span.startAt, endAt: span.endAt })),
     attribution: current.find((item) => item.estimate!.attribution)?.estimate!.attribution ?? null,
+    weather: evidence.weather ? { state: evidence.weather.state, attribution: evidence.weather.attribution } : null,
   };
 }

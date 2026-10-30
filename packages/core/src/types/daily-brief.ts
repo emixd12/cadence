@@ -12,12 +12,26 @@ export type DailyBriefing = Readonly<{
   expiresAt: string;
   coverage: "complete" | "partial";
   warnings: readonly string[];
-  suggestions?: readonly Readonly<{ text: string; occurrenceRefs: readonly string[]; referenceIds: readonly string[]; optionId: string | null; option?: BriefingPlanOption }>[];
+  /** Recipe 1.2 adds `behavior`, the moved Behavior's title, taken from the facts rather than model text. */
+  suggestions?: readonly Readonly<{ text: string; occurrenceRefs: readonly string[]; referenceIds: readonly string[]; optionId: string | null; option?: BriefingPlanOption; behavior?: string }>[];
   references?: readonly BriefingReference[];
-  /** Optional pattern tip (Ticket 173). `basis` and `limitation` are deterministic, not model text. */
-  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null }>;
+  /**
+   * Optional pattern tip (Ticket 173). `basis`, `limitation` and `category` are
+   * deterministic, not model text. Recipes 1.1 and 1.2 set `category`; absent means a pattern tip.
+   * Recipe 1.2's `setup` tip is written by Cadence, not the model.
+   */
+  tip?: Readonly<{ text: string; laneId: string; basis: string; limitation: string | null; category?: "pattern" | "logging" | "setup" }>;
+  /**
+   * Recipe 1.2: today's Behavior titles that appear in the visible text, longest first,
+   * so the bubble can highlight them. Deterministic; never model text.
+   */
+  behaviorNames?: readonly string[];
   versions?: Readonly<{ configuration: string; references: string; planner: string; pipeline: string; recipe?: string; policy?: string }>;
+  /** Credits owed for facts the model used (Ticket 219): Open-Meteo weather is CC BY 4.0. */
+  attributions?: readonly "open_meteo"[];
 }>;
+
+export type DailyBriefSourceAttention = "changed" | "no_calendars" | "unavailable";
 
 export type DailyBriefSettings = Readonly<{
   accountRef: string;
@@ -29,6 +43,22 @@ export type DailyBriefSettings = Readonly<{
   includeNotes?: boolean;
   /** Optional sources the server can use; Settings offers only these controls. */
   optionalSources?: Readonly<{ reminders: boolean; notes: boolean }>;
+  /**
+   * Separate connector disclosures (Ticket 239); absent from older servers and
+   * treated as false. `includeCalendar` stays Google Calendar only.
+   */
+  includeOutlookCalendar?: boolean;
+  includeIcloudCalendar?: boolean;
+  includeHevy?: boolean;
+  /** Connected sources this server can disclose; Settings offers a control only for these. */
+  connectorSources?: Readonly<{ outlookCalendar: boolean; icloudCalendar: boolean; hevy: boolean }>;
+  /**
+   * Why a disclosed source cannot be used now; null when it can or is off.
+   * `changed`: reconnected or reselected since it was allowed, so it must be
+   * allowed again. `no_calendars`: connected Outlook with no selected calendar.
+   * `unavailable`: not connected or not supported yet.
+   */
+  connectorAttention?: Readonly<Record<"outlookCalendar" | "icloudCalendar" | "hevy", DailyBriefSourceAttention | null>>;
   revision: number;
   configurationRevision?: string;
   localDate: string;

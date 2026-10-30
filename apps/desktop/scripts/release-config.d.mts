@@ -2,13 +2,19 @@ export const RELEASE_IDENTIFIER: "app.cadence.desktop";
 export const RELEASE_NAME: "Cadence";
 export const RELEASE_TARGET: "aarch64-apple-darwin";
 export const PREVIEW_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-preview/latest.json";
+export const UPDATER_QA_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-updater-qa-20260928/latest.json";
+export const STABLE_ENDPOINT: "https://github.com/emixd12/cadence/releases/download/desktop-stable/latest.json";
+export const DEV_VERSION_PATTERN: RegExp;
 export function createReleaseBuildEnvironment(env: Record<string, string | undefined>): Record<string, string | undefined>;
 export function createPreviewBuildEnvironment(env: Record<string, string | undefined>): Record<string, string | undefined>;
+export function createDevBuildEnvironment(env: Record<string, string | undefined>): Record<string, string | undefined>;
 export type ReleaseOverlay = {
   productName: string;
   identifier: string;
   app: { windows: Record<string, unknown>[] };
-  bundle: { targets: string[]; createUpdaterArtifacts: boolean };
+  bundle: { targets: string[]; createUpdaterArtifacts: boolean; macOS: {
+    entitlements?: string; files?: Record<string, string>;
+  } };
   plugins: { updater: {
     pubkey: string;
     endpoints: string[];
@@ -22,9 +28,17 @@ export type PreviewOverlay = ReleaseOverlay & { version: string; bundle: Release
   macOS: { signingIdentity: string; minimumSystemVersion: string; hardenedRuntime: boolean };
 } };
 export function createPreviewOverlay(base: { app: { windows: Record<string, unknown>[] } }, env: Record<string, string | undefined>, version: string): PreviewOverlay;
+export type DevOverlay = ReleaseOverlay & { version: string; bundle: ReleaseOverlay["bundle"] & {
+  macOS: { signingIdentity: string };
+} };
+export function createDevOverlay(base: { app: { windows: Record<string, unknown>[] } }, env: Record<string, string | undefined>, version: string): DevOverlay;
 export function validatePreviewConfiguration(base: unknown, overlay: unknown): string[];
 export function validatePreviewBuildEnvironment(env: Record<string, string | undefined>): string[];
+export function validateDevConfiguration(base: unknown, overlay: unknown): string[];
+export function validateDevBuildEnvironment(env: Record<string, string | undefined>, base?: unknown): string[];
+export function compareVersions(left: string, right: string): -1 | 0 | 1;
+export function validateDesktopPublicServiceEnvironment(env: Record<string, string | undefined>, base?: unknown): string[];
 export function decodeUpdaterPublicKey(value: unknown): string;
 export function validateReleaseConfiguration(base: unknown, overlay: unknown): string[];
 export function isReleaseUrl(value: string): boolean;
-export function validateSigningEnvironment(env: Record<string, string | undefined>): string[];
+export function validateSigningEnvironment(env: Record<string, string | undefined>, base?: unknown): string[];

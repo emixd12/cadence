@@ -439,6 +439,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          where_kind: string | null
         }
         Insert: {
           active?: boolean
@@ -462,6 +463,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          where_kind?: string | null
         }
         Update: {
           active?: boolean
@@ -485,6 +487,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          where_kind?: string | null
         }
         Relationships: [
           {
@@ -539,6 +542,185 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      completion_place_labels: {
+        Row: {
+          behavior_id: string
+          id: string
+          label: string
+          local_date: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Insert: {
+          behavior_id: string
+          id: string
+          label: string
+          local_date: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Update: {
+          behavior_id?: string
+          id?: string
+          label?: string
+          local_date?: string
+          recorded_at?: string
+          rule_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "completion_place_labels_behavior_fkey"
+            columns: ["user_id", "behavior_id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "completion_place_labels_occurrence_fkey"
+            columns: ["user_id", "id"]
+            isOneToOne: false
+            referencedRelation: "occurrences"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "completion_place_labels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connector_connections: {
+        Row: {
+          account_digest: string | null
+          attempt_hash: string | null
+          generation: number
+          provider: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          account_digest?: string | null
+          attempt_hash?: string | null
+          generation?: number
+          provider: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          account_digest?: string | null
+          attempt_hash?: string | null
+          generation?: number
+          provider?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      connector_preferences: {
+        Row: {
+          hidden_source_ids: string[]
+          provider: string
+          selected_source_ids: string[]
+          selection_revision: number
+          show_all_day: boolean
+          user_id: string
+          visible: boolean
+        }
+        Insert: {
+          hidden_source_ids?: string[]
+          provider: string
+          selected_source_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id: string
+          visible?: boolean
+        }
+        Update: {
+          hidden_source_ids?: string[]
+          provider?: string
+          selected_source_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_preferences_user_id_provider_fkey"
+            columns: ["user_id", "provider"]
+            isOneToOne: true
+            referencedRelation: "connector_connections"
+            referencedColumns: ["user_id", "provider"]
+          },
+        ]
+      }
+      google_calendar_agent_connections: {
+        Row: {
+          attempt_hash: string | null
+          generation: number
+          google_subject: string
+          oauth_client_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempt_hash?: string | null
+          generation?: number
+          google_subject: string
+          oauth_client_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempt_hash?: string | null
+          generation?: number
+          google_subject?: string
+          oauth_client_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_calendar_agent_preferences: {
+        Row: {
+          hidden_calendar_ids: string[]
+          selected_calendar_ids: string[]
+          selection_revision: number
+          show_all_day: boolean
+          user_id: string
+          visible: boolean
+        }
+        Insert: {
+          hidden_calendar_ids?: string[]
+          selected_calendar_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id: string
+          visible?: boolean
+        }
+        Update: {
+          hidden_calendar_ids?: string[]
+          selected_calendar_ids?: string[]
+          selection_revision?: number
+          show_all_day?: boolean
+          user_id?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_agent_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "google_calendar_agent_connections"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       google_calendar_connections: {
         Row: {
@@ -1092,6 +1274,85 @@ export type Database = {
           },
         ]
       }
+      place_label_settings: {
+        Row: {
+          enabled: boolean
+          enabled_at: string | null
+          id: string
+          marker_prompt_dismissed_at: string | null
+          retention: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          enabled?: boolean
+          enabled_at?: string | null
+          id?: string
+          marker_prompt_dismissed_at?: string | null
+          retention?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          enabled_at?: string | null
+          id?: string
+          marker_prompt_dismissed_at?: string | null
+          retention?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_label_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_markers: {
+        Row: {
+          accuracy_meters: number
+          id: string
+          latitude_e6: number
+          longitude_e6: number
+          place_key: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_meters: number
+          id: string
+          latitude_e6: number
+          longitude_e6: number
+          place_key: string
+          recorded_at: string
+          rule_version: string
+          user_id: string
+        }
+        Update: {
+          accuracy_meters?: number
+          id?: string
+          latitude_e6?: number
+          longitude_e6?: number
+          place_key?: string
+          recorded_at?: string
+          rule_version?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_markers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1297,34 +1558,49 @@ export type Database = {
       }
       travel_settings: {
         Row: {
+          arrival_buffer_minutes: number | null
           base_location_text: string | null
           created_at: string
           enabled: boolean
+          habits_updated_at: string | null
+          leave_feedback: Json
           mode: string | null
           navigation_preference: string | null
           onboarding_completed_at: string | null
+          place_modes: Json
+          preparation_minutes: number | null
           routing_consent_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          arrival_buffer_minutes?: number | null
           base_location_text?: string | null
           created_at?: string
           enabled?: boolean
+          habits_updated_at?: string | null
+          leave_feedback?: Json
           mode?: string | null
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
+          place_modes?: Json
+          preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          arrival_buffer_minutes?: number | null
           base_location_text?: string | null
           created_at?: string
           enabled?: boolean
+          habits_updated_at?: string | null
+          leave_feedback?: Json
           mode?: string | null
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
+          place_modes?: Json
+          preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
           user_id?: string
@@ -1377,6 +1653,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      where_suggestion_dismissals: {
+        Row: {
+          dismissed_at: string
+          id: string
+          rule_version: string
+          suggestion: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at: string
+          id: string
+          rule_version: string
+          suggestion: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          rule_version?: string
+          suggestion?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "where_suggestion_dismissals_behavior_fkey"
+            columns: ["user_id", "id"]
+            isOneToOne: false
+            referencedRelation: "behaviors"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "where_suggestion_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1462,6 +1777,51 @@ export type Database = {
         Args: { restore_payload: Json }
         Returns: string
       }
+      calendar_agent_begin_attempt: {
+        Args: {
+          client_nonce: string
+          expected_client_id: string
+          expected_generation: number
+          expected_subject: string
+          owner_id: string
+          return_target: string
+          state_digest: string
+          verifier_ciphertext: string
+        }
+        Returns: number
+      }
+      calendar_agent_consume_attempt: {
+        Args: { state_digest: string }
+        Returns: Json
+      }
+      calendar_agent_disconnect: {
+        Args: {
+          expected_generation: number
+          expected_subject: string
+          next_status: string
+          owner_id: string
+        }
+        Returns: string
+      }
+      calendar_agent_install_credential: {
+        Args: {
+          expected_client_id: string
+          expected_generation: number
+          expected_state_hash: string
+          expected_subject: string
+          owner_id: string
+          token_ciphertext: string
+        }
+        Returns: boolean
+      }
+      calendar_agent_read_credential: {
+        Args: {
+          expected_generation: number
+          expected_subject: string
+          owner_id: string
+        }
+        Returns: string
+      }
       calendar_begin_attempt: {
         Args: {
           client_nonce: string
@@ -1512,6 +1872,61 @@ export type Database = {
           require_enabled: boolean
         }
         Returns: Json
+      }
+      connector_begin_attempt: {
+        Args: {
+          client_nonce: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+          return_target: string
+          state_digest: string
+          verifier_ciphertext: string
+        }
+        Returns: number
+      }
+      connector_consume_attempt: {
+        Args: { provider_key: string; state_digest: string }
+        Returns: Json
+      }
+      connector_disconnect: {
+        Args: {
+          expected_generation: number
+          next_status: string
+          owner_id: string
+          provider_key: string
+        }
+        Returns: number
+      }
+      connector_install_credential: {
+        Args: {
+          credential_ciphertext: string
+          expected_generation: number
+          expected_state_hash: string
+          owner_id: string
+          provider_account_digest: string
+          provider_key: string
+        }
+        Returns: number
+      }
+      connector_read_credential: {
+        Args: {
+          expected_account_digest: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+        }
+        Returns: string
+      }
+      connector_replace_credential: {
+        Args: {
+          credential_ciphertext: string
+          expected_account_digest: string
+          expected_generation: number
+          owner_id: string
+          provider_key: string
+        }
+        Returns: boolean
       }
       consume_launch_rate_limit: {
         Args: { p_action: string }
@@ -1805,7 +2220,10 @@ export type Database = {
         Args: { p_access_token_hash: string; p_resource: string }
         Returns: Json
       }
-      read_account_sync_snapshot: { Args: never; Returns: Json }
+      purge_expired_completion_place_labels: { Args: never; Returns: number }
+      read_account_sync_snapshot:
+        | { Args: never; Returns: Json }
+        | { Args: { contract: number }; Returns: Json }
       read_advisor_analysis_snapshot: {
         Args: {
           history_start_local_date: string
@@ -1881,6 +2299,43 @@ export type Database = {
           p_include_reminder_history: boolean
         }
         Returns: Json
+      }
+      save_daily_brief_preferences_v3: {
+        Args: {
+          p_enabled: boolean
+          p_expected_revision: number
+          p_include_calendar: boolean
+          p_include_hevy: boolean
+          p_include_icloud_calendar: boolean
+          p_include_notes: boolean
+          p_include_outlook_calendar: boolean
+          p_include_reminder_history: boolean
+        }
+        Returns: Json
+      }
+      save_place_label_settings: {
+        Args: {
+          expected_updated_at: string
+          next_enabled: boolean
+          next_marker_prompt_dismissed: boolean
+          next_retention: string
+          retention_cutoff: string
+        }
+        Returns: {
+          enabled: boolean
+          enabled_at: string | null
+          id: string
+          marker_prompt_dismissed_at: string | null
+          retention: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "place_label_settings"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       update_behavior_with_definition_event: {
         Args: {

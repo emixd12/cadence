@@ -24,6 +24,9 @@ import { createLocalNoteShortcutStore } from "../apps/desktop/src/local-note-sho
 import { getNoteShortcutView, listAcceptedNoteShortcuts, manageNoteShortcuts } from "@cadence/core/services/note-shortcut.service";
 import { noteShortcutRevision } from "@cadence/core/resolvers/note-suggestion.resolver";
 import { createLocalOccurrenceActions } from "../apps/desktop/src/local-actions";
+import { createLocalPlaceLabelClient } from "../apps/desktop/src/local-place-labels.service";
+import { portabilityEntities } from "../apps/desktop/src/account/account-sync";
+import { accountSyncFingerprint } from "@cadence/core/resolvers/account-sync.resolver";
 
 const transport = vi.hoisted(() => ({ notify: (_request: unknown): Promise<unknown> => { void _request; return Promise.reject(new Error("OS adapter not configured.")); }, send: (_request: unknown): Promise<unknown> => { void _request; return Promise.reject(new Error("SQLite runner is not started.")); } }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true, invoke: (command: string, args: { request: unknown }) => {
@@ -120,6 +123,39 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       },
     });
   }, 20_000);
+
+  it("persists Behavior Where through SQLite history, restart and Full JSON only (Ticket 215)", async () => {
+    const profile = await localCommand("readProfile", {});
+    const created = await createBehavior(createLocalBehaviorStore(profile.id, NOW), {
+      userId: profile.id, timezone: profile.timezone, recordedAt: NOW.toString(), values: { ...VALUES, whereKind: "home" },
+    });
+    expect(created).toMatchObject({ where_kind: "home", location_text: null });
+    const placed = await updateBehavior(createLocalBehaviorStore(profile.id, NOW.add({ seconds: 1 })), {
+      behaviorId: created.id, expectedUpdatedAt: created.updated_at, recordedAt: NOW.add({ seconds: 1 }).toString(),
+      values: { ...VALUES, whereKind: "place", locationText: " 1 Example Street " },
+    });
+    expect(placed).toMatchObject({ where_kind: "place", location_text: "1 Example Street" });
+    // MCP-style input carries only location text: clearing A place means Not set.
+    const cleared = await updateBehavior(createLocalBehaviorStore(profile.id, NOW.add({ seconds: 2 })), {
+      behaviorId: created.id, expectedUpdatedAt: placed.updated_at, recordedAt: NOW.add({ seconds: 2 }).toString(),
+      values: { ...VALUES, locationText: null },
+    });
+    expect(cleared).toMatchObject({ where_kind: null, location_text: null });
+    await stop(); await start();
+    const [graph] = await localCommand("readBehaviorGraphs", { profileId: profile.id });
+    expect(graph?.behavior).toMatchObject({ where_kind: null, location_text: null });
+    const options = { now: NOW.add({ seconds: 3 }), range: "all" };
+    const bundle = await getLocalExportPageData(profile, options);
+    const events = bundle.jsonBackup.behavior_configuration_events;
+    expect(events.map((event) => [event.next_configuration.where_kind, event.changed_fields.includes("where_kind")]))
+      .toEqual([["home", true], ["place", true], [null, true]]);
+    expect(events[1]!.next_configuration.location_text).toBe("1 Example Street");
+    const behaviorLog = await getLocalExportDownload(profile, "behaviorlog", options);
+    const content = readDesktopZipEntries(behaviorLog.bytes!).map((entry) => entry.content).join("\n");
+    expect(content).not.toContain("1 Example Street");
+    // The portable projection may name a changed field in its notes; no Where value is exported.
+    expect(content).not.toContain('"where_kind":');
+  });
 
   it("preserves a tracking flow through native transactions and a full restart", async () => {
     const profile = await localCommand("readProfile", {});
@@ -282,7 +318,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
         pending.delete(item.id); pending.set(item.id, item);
         while (pending.size > 3) pending.delete(pending.keys().next().value!);
       }
-      if (request.operation === "cancel" && !cancellationFails) for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation) && !cancellationFails) for (const id of request.ids ?? []) pending.delete(id);
       return { pending: [...pending.values()] };
     };
     const limited = await reconcileLocalReminders(NOW.add({ seconds: 3 }));
@@ -330,10 +366,10 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       const request = value as { operation: string; reminders?: Request[]; ids?: string[] };
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered };
-      if (request.operation === "cancel") {
+      if (["cancel", "cancelPending"].includes(request.operation)) {
         cancelled.push(...request.ids ?? []);
         for (const id of request.ids ?? []) pending.delete(id);
-        delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
+        if (request.operation === "cancel") delivered = delivered.filter(({ id }) => !request.ids?.includes(id));
       }
       if (request.operation === "schedule") {
         scheduled = true;
@@ -372,7 +408,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered: [] };
       if (request.operation === "schedule") for (const row of request.reminders ?? []) pending.set(row.id, row);
-      if (request.operation === "cancel") for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation)) for (const id of request.ids ?? []) pending.delete(id);
       return { pending: [...pending.values()] };
     };
     await reconcileLocalReminders(NOW);
@@ -419,7 +455,7 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
       operations.push(request.operation);
       if (request.operation === "status") return { authorization: "authorized" };
       if (request.operation === "delivered") return { delivered: [] };
-      if (request.operation === "cancel") for (const id of request.ids ?? []) pending.delete(id);
+      if (["cancel", "cancelPending"].includes(request.operation)) for (const id of request.ids ?? []) pending.delete(id);
       if (request.operation === "schedule") for (const item of request.reminders ?? []) pending.set(item.id, item);
       return { pending: [...pending.values()] };
     };
@@ -453,5 +489,34 @@ describe.skipIf(!process.env.CADENCE_SQLITE_CONTRACT)("TypeScript adapters again
     expect(pending.has(original.keys().next().value!)).toBe(false);
     expect([...pending.keys()].filter((id) => original.has(id))).toHaveLength(29);
     expect(operations).not.toContain("requestPermission");
+  }, 20_000);
+  it("keeps completion places in SQLite and hands valid rows to account sync (Ticket 216)", async () => {
+    const profile = await localCommand("readProfile", {});
+    const changed = vi.fn();
+    const client = createLocalPlaceLabelClient(changed);
+    expect((await client.load()).settings.enabled).toBe(false);
+    const created = await createBehavior(createLocalBehaviorStore(profile.id, NOW), {
+      userId: profile.id, timezone: profile.timezone, recordedAt: NOW.toString(), values: { ...VALUES, whereKind: "place", locationText: "1 Example Gym" },
+    });
+    const marker = { place: { kind: "saved_place" as const, text: "1 Example Gym" }, position: { latitudeE6: 41_878_100, longitudeE6: -87_629_800, accuracyMeters: 20 }, sampleAgeSeconds: 2 };
+    await expect(client.recordMarker(marker)).rejects.toThrow(/Turn on/);
+    let state = await client.saveSettings({ enabled: true, retention: "90_days", markerPromptDismissed: false, expectedUpdatedAt: null });
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.markerPrompt).toMatch(/^saved_place:/);
+    state = await client.recordMarker(marker);
+    expect(state.placeMarkers).toHaveLength(1);
+    expect(state.behaviors.find(({ behaviorId }) => behaviorId === created.id)?.markerPrompt).toBeNull();
+    await client.dismissSuggestion({ behaviorId: created.id, suggestion: "anywhere", ruleVersion: "where-suggestion-rules@1" });
+    expect(changed).toHaveBeenCalledTimes(3);
+    await stop(); await start();
+    // Local rows normalize and validate exactly as the planner requires.
+    const entities = portabilityEntities(await localCommand("readImportSnapshot", { profileId: profile.id }));
+    expect(entities.filter(({ kind }) => ["place_label_settings", "place_marker", "where_suggestion_dismissal"].includes(kind))).toHaveLength(3);
+    expect(accountSyncFingerprint({ entities })).toMatch(/^[a-f0-9]{64}$/);
+    state = await createLocalPlaceLabelClient().saveSettings({ enabled: false, retention: "90_days", markerPromptDismissed: false,
+      expectedUpdatedAt: (await createLocalPlaceLabelClient().load()).settings.updatedAt });
+    expect(state.placeMarkers).toEqual([]);
+    const after = await localCommand("readPlaceLabels", { profileId: profile.id });
+    expect(after.markers).toEqual([]);
+    expect(after.dismissals).toEqual([]);
   }, 20_000);
 });

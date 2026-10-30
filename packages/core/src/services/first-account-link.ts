@@ -9,15 +9,19 @@ import type { BehaviorConfigurationSnapshot } from "../types/behavior-configurat
 
 const DEFAULT_TIMEZONE = "America/New_York";
 
-// Private account fields cannot travel through the location-free BehaviorLog export.
+// Private account fields cannot travel through the location-free BehaviorLog export,
+// which also omits Behavior Where (Ticket 215) and completion place labels (Ticket 216).
 export function firstLinkIncludesTravel(snapshot: AccountSyncSnapshot): boolean {
   return snapshot.entities.some(({ kind, value }) => {
+    if (kind === "place_label_settings" || kind === "place_marker" || kind === "completion_place_label" || kind === "where_suggestion_dismissal") return true;
     const row = object(value);
+    // Learned travel habits (Ticket 217) have a revision once anything was learned.
     if (kind === "profile") return !!(row.travel_enabled || row.base_location_text || row.travel_mode ||
-      row.navigation_preference || row.routing_consent_at || row.onboarding_completed_at);
-    if (kind === "behavior") return !!row.location_text;
+      row.navigation_preference || row.routing_consent_at || row.onboarding_completed_at || row.travel_habits_updated_at);
+    if (kind === "behavior") return !!(row.location_text || row.where_kind);
     return kind === "configuration_event" && [row.previous_configuration, row.next_configuration]
-      .some((configuration) => configuration && (object(configuration).location_text || object(configuration).locationText));
+      .some((configuration) => configuration && (object(configuration).location_text || object(configuration).locationText
+        || object(configuration).where_kind || object(configuration).whereKind));
   });
 }
 
@@ -59,7 +63,7 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
   if (snapshot.profile.timezone !== DEFAULT_TIMEZONE) return true;
   const travel = snapshot.travelSettings;
   if (travel && (travel.enabled || travel.baseLocationText || travel.mode || travel.navigationPreference ||
-    travel.routingConsentAt || travel.onboardingCompletedAt)) return true;
+    travel.routingConsentAt || travel.onboardingCompletedAt || travel.habits?.updatedAt)) return true;
   const categories = [...snapshot.categories]
     .sort((left, right) => left.sort_order - right.sort_order)
     .map(({ name }) => name);
@@ -71,5 +75,6 @@ export function hasRecognizedLocalData(snapshot: PortabilitySnapshot & { reminde
     snapshot.importRuns.length > 0 || snapshot.mappings.length > 0 ||
     snapshot.importedNotes.length > 0 || snapshot.importedInterventions.length > 0 ||
     (snapshot.reminderDeliveries?.length ?? 0) > 0 ||
-    (snapshot.noteShortcutStates?.length ?? 0) > 0;
+    (snapshot.noteShortcutStates?.length ?? 0) > 0 ||
+    (snapshot.placeLabelSettings?.length ?? 0) > 0;
 }

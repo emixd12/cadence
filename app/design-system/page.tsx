@@ -1,6 +1,9 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
-import { TravelSettingsBench } from "./TravelBench";
+import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
+import { TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
+import { FirstRunOnboardingBench } from "./OnboardingBench";
+import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -38,7 +41,6 @@ import {
   ScreenContentLoading,
   ScreenFrame,
 } from "@/components/layout/ScreenFrame";
-import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { NoteShortcutSettings, type NoteShortcutAction } from "@/components/note-shortcuts/NoteShortcutControls";
 import {
   AccountDeletionPanel,
@@ -60,6 +62,8 @@ import { OccurrenceRow } from "@/components/timeline/OccurrenceRow";
 import { StatusButtons } from "@/components/timeline/StatusButtons";
 import { TimeTracker } from "@/components/timeline/TimeTracker";
 import { Timeline } from "@/components/timeline/Timeline";
+import { TravelWeatherCredit } from "@/components/timeline/TravelWeather";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
@@ -87,7 +91,6 @@ import type {
   BehaviorLogRestorePageData,
 } from "@/lib/types/behaviorlog-restore-ui";
 import type { ExportBundle } from "@/lib/types/export";
-import type { FirstRunOnboardingState } from "@/lib/types/onboarding";
 import type { PublicTrustView } from "@/lib/services/public-trust-evidence.service";
 import type {
   OccurrenceActionState,
@@ -1598,10 +1601,7 @@ const previewFactories: Record<
   "flow.first-run-onboarding-panel": () => (
       <ProductPreview maxHeight="28rem">
         <div className="relative min-h-[24rem] bg-background">
-          <FirstRunOnboardingPanel
-            onboarding={onboardingFixture}
-            storageKey="cadence-first-run-bench-dismissed"
-          />
+          <FirstRunOnboardingBench />
         </div>
       </ProductPreview>
     ),
@@ -1614,11 +1614,23 @@ const previewFactories: Record<
       </ProductPreview>
     ),
   "module.google-calendar-panel": () => <ProductPreview><CalendarSettingsBench /></ProductPreview>,
+  "module.connector-library": () => <ProductPreview maxHeight="48rem"><ConnectorLibraryBench /></ProductPreview>,
+  "module.icloud-calendar-panel": () => <ProductPreview><IcloudCalendarPanelBench /></ProductPreview>,
+  "module.outlook-calendar-panel": () => <ProductPreview><OutlookCalendarPanelBench /></ProductPreview>,
+  "module.hevy-panel": () => <ProductPreview><HevyPanelBench /></ProductPreview>,
+  "composite.recorded-activity-list": () => <ProductPreview><RecordedActivityBench /></ProductPreview>,
   "module.travel-settings-panel": () => <ProductPreview><TravelSettingsBench /></ProductPreview>,
+  "module.travel-habits-section": () => <ProductPreview><TravelHabitsBench /></ProductPreview>,
+  "composite.travel-mode-choice": () => <ProductPreview><TravelModeChoiceBench /></ProductPreview>,
+  "composite.travel-leave-question": () => <ProductPreview><TravelLeaveQuestionBench /></ProductPreview>,
+  "module.completion-places-section": () => <ProductPreview><CompletionPlacesSectionBench /></ProductPreview>,
+  "composite.place-marker-control": () => <ProductPreview><PlaceMarkerControlBench /></ProductPreview>,
+  "composite.behavior-place-assist": () => <ProductPreview><BehaviorPlaceAssistBench /></ProductPreview>,
   "module.daily-brief-bubble": () => <ProductPreview><DailyBriefBubbleBench /></ProductPreview>,
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
   "composite.external-event-details": () => <ProductPreview><CalendarDetailsBench /></ProductPreview>,
   "composite.external-event-preview": () => <ProductPreview><CalendarDetailsBench preview /></ProductPreview>,
+  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
   "module.day-progress-timeline": () => <ProductPreview maxHeight="48rem"><CalendarTimelineBench /></ProductPreview>,
   "module.timeline": () => (
       <ProductPreview maxHeight="48rem">
@@ -2030,17 +2042,11 @@ const trustEvidenceFixture: PublicTrustView = {
   })),
 };
 
-const onboardingFixture: FirstRunOnboardingState = {
-  hasAnyBehavior: false,
-  hasImportRuns: false,
-  timezone: "America/New_York",
-  vapidPublicKey: "",
-};
-
 const activeBehavior: BehaviorView = {
   id: "behavior-reset",
   title: "Evening reset",
   description: "Close the day with a short checklist and note anything unusual.",
+  whereKind: "home",
   categoryId: "category-home",
   categoryName: "Home",
   recurrenceSummary: "Weekly on Mon, Wed, Fri",

@@ -12,12 +12,14 @@ export function AccountPanel({ state, configured, connected, busy, onSignIn, onC
     {connected ? <>
       <p className="mt-4 max-w-2xl text-sm leading-6">{state.status === "linked" ? `Signed in${state.email ? ` as ${state.email}` : " with Google"}.` : "This Mac remains connected to its Cadence account."}</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">SQLite is this Mac’s offline working copy. Account changes synchronize while Cadence runs with connectivity.</p>
+      {state.status === "linked" && state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
       {state.status === "error" ? <p role="alert" className="mt-3 text-sm leading-6 text-accent">{state.message}</p> : null}
       {state.status === "waiting" ? <><p role="status" className="mt-3 text-sm leading-6">Complete account reconnection in your browser.</p>
         <button type="button" disabled={busy} onClick={onCancel} className="product-action product-action-secondary mt-4 min-h-11 py-2 text-sm">Cancel reconnect</button></> : null}
     </> : state.status === "linked" ? <>
       <p className="mt-4 max-w-2xl text-sm leading-6">Signed in{state.email ? ` as ${state.email}` : " with Google"}.</p>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-readable">Your local data has not been uploaded or replaced. Choose how to link it in the next step.</p>
+      {state.notice ? <p role="status" className="mt-3 text-sm leading-6">{state.notice}</p> : null}
     </> : <>
       <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-readable">Sign in with the Google account you use for Cadence. Local tracking remains available without an account.</p>
       {!configured ? <p role="status" className="mt-3 text-sm leading-6 text-muted-readable">Account sign-in is not configured in this build.</p> : null}

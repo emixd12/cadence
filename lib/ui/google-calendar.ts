@@ -10,6 +10,7 @@ import type {
   CalendarListEntry,
   CalendarPreferences,
 } from "@/lib/types/google-calendar";
+import { registerTimelineConnectorReload } from "./timeline-connector-reloads";
 
 export type CalendarEventRange = Readonly<{
   startLocalDate: string;
@@ -32,6 +33,8 @@ export type WebCalendarTimelineState = Readonly<{
   error: string | null;
   hiddenCalendarIds: readonly string[];
   showAllDay: boolean;
+  /** Last read connection status; `disconnected` state also covers `reconnect_required` and `unavailable`. */
+  connectionStatus?: CalendarConnectionView["status"];
 }>;
 
 const EVENT_CACHE = new Map<string, ExternalEventSnapshotV1>();
@@ -39,14 +42,10 @@ type PendingEvents = Readonly<{ accountId: string; epoch: number; promise: Promi
 
 const PENDING_EVENTS = new Map<string, PendingEvents>();
 const ACCOUNT_EPOCHS = new Map<string, number>();
-const TIMELINE_RELOADS = new Set<() => Promise<boolean>>();
 const EVENT_REFRESH_MS = 15 * 60_000;
 let activeAccountId: string | null = null;
 
-export async function reloadWebTimelineConnectors(): Promise<boolean> {
-  const results = await Promise.all([...TIMELINE_RELOADS].map((reload) => reload()));
-  return results.every(Boolean);
-}
+export { reloadWebTimelineConnectors } from "./timeline-connector-reloads";
 
 export const webGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
   async getConnection() {
@@ -141,7 +140,7 @@ export function useWebGoogleCalendarTimeline(input: Readonly<{
       if (connection.status !== "connected") {
         clearAccount(connection.accountId);
         lastSnapshot.current = null;
-        setState({ state: "disconnected", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: false });
+        setState({ state: "disconnected", snapshot: null, error: null, hiddenCalendarIds: [], showAllDay: false, connectionStatus: connection.status });
         return connection.status === "disconnected";
       }
       if (!connection.preferences.visible || connection.preferences.selectedCalendarIds.length === 0) {
@@ -179,9 +178,7 @@ export function useWebGoogleCalendarTimeline(input: Readonly<{
 
   useEffect(() => {
     if (!input.enabled || !range) return;
-    const reload = () => refresh(true);
-    TIMELINE_RELOADS.add(reload);
-    return () => { TIMELINE_RELOADS.delete(reload); };
+    return registerTimelineConnectorReload(() => refresh(true));
   }, [input.enabled, range, refresh]);
 
   useEffect(() => {
@@ -322,3 +319,19 @@ function calendarError(error: unknown): string {
   if (!(error instanceof CalendarClientError)) return "provider_unavailable";
   return error.code;
 }
+
+/** Agent Settings never read or populate the ordinary Timeline event cache. */
+export const webAgentGoogleCalendarCoordinator: GoogleCalendarCoordinator = {
+  getConnection: () => request<CalendarConnectionView>("/api/google-calendar/connection?purpose=agent"),
+  async beginConnect() {
+    const result = await request<{ url: string }>("/api/google-calendar/connection?purpose=agent", { method: "POST", body: JSON.stringify({ target: "web" }) });
+    window.location.assign(result.url);
+  },
+  async listCalendars() { return (await request<{ calendars: CalendarListEntry[] }>("/api/google-calendar/calendars?purpose=agent")).calendars; },
+  savePreferences: (preferences) => request<CalendarConnectionView>("/api/google-calendar/calendars?purpose=agent", { method: "PUT", body: JSON.stringify(preferences) }),
+  async disconnect() {
+    const { revocationFailed, ...view } = await request<CalendarConnectionView & { revocationFailed: boolean }>("/api/google-calendar/connection?purpose=agent", { method: "DELETE" });
+    return { view, revocationFailed };
+  },
+  async refreshEvents() { throw new CalendarClientError("permission_denied"); },
+};

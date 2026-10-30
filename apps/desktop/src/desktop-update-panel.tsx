@@ -2,7 +2,7 @@ import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { desktopUpdater } from "./native-updater";
 import type { DesktopUpdateState } from "./desktop-updater";
 
-type RestartActions = Readonly<{ onRestart?: () => void; onDiscardAndRestart?: () => void; onCancelRestart?: () => void; restartBlocked?: boolean }>;
+type RestartActions = Readonly<{ onRestart?: () => void; onDiscardAndRestart?: () => void; onCancelRestart?: () => void; restartBlocked?: boolean; restartError?: string }>;
 
 export function DesktopUpdatePanel(props: RestartActions) {
   const state = useSyncExternalStore(desktopUpdater.subscribe, desktopUpdater.getSnapshot, desktopUpdater.getSnapshot);
@@ -14,7 +14,7 @@ export function DesktopUpdatePanel(props: RestartActions) {
 }
 
 export function DesktopUpdateSection({ state, onCheck, onAutomaticDownloads, onDownload, onInstall, onRetry,
-  onRestart, onDiscardAndRestart, onCancelRestart, restartBlocked }: RestartActions & Readonly<{
+  onRestart, onDiscardAndRestart, onCancelRestart, restartBlocked, restartError }: RestartActions & Readonly<{
   state: DesktopUpdateState; onCheck: () => void; onAutomaticDownloads: (enabled: boolean) => void;
   onDownload: () => void; onInstall: () => void; onRetry: () => void;
 }>) {
@@ -55,6 +55,7 @@ export function DesktopUpdateSection({ state, onCheck, onAutomaticDownloads, onD
       {state.phase === "error" ? <button type="button" onClick={onRetry} className="product-action product-action-primary min-h-11 py-2 text-sm">Retry update</button> : null}
       {state.phase === "installed" ? <button type="button" onClick={onRestart} disabled={!onRestart} className="product-action product-action-primary min-h-11 py-2 text-sm">Restart Cadence</button> : null}
     </div>
+    {state.phase === "installed" && restartError ? <p role="alert" className="mt-3 max-w-2xl text-sm leading-6 text-accent">{restartError}</p> : null}
     {restartBlocked ? <div role="status" className="mt-4 border-t border-line pt-4 text-sm leading-6">
       <p>Save your changes before restarting, or explicitly discard your unsaved drafts.</p>
       <div className="mt-2 flex flex-wrap gap-3">

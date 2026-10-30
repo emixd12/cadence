@@ -10,7 +10,23 @@ export type DailyBriefPreferences = {
   revision: number;
   calendarConnectionGeneration: number | null;
   calendarSelectionRevision: number | null;
+  /**
+   * Separate connector disclosures (Ticket 239). `includeCalendar` stays Google
+   * only. Each binds the connection generation, and calendars also the
+   * selection revision, current when it was granted.
+   */
+  includeOutlookCalendar: boolean;
+  outlookConnectionGeneration: number | null;
+  outlookSelectionRevision: number | null;
+  includeIcloudCalendar: boolean;
+  icloudConnectionGeneration: number | null;
+  icloudSelectionRevision: number | null;
+  includeHevy: boolean;
+  hevyConnectionGeneration: number | null;
 };
+
+export type DailyBriefPreferenceInput = Pick<DailyBriefPreferences, "enabled" | "includeCalendar" | "includeReminderHistory" | "includeNotes">
+  & Partial<Pick<DailyBriefPreferences, "includeOutlookCalendar" | "includeIcloudCalendar" | "includeHevy">>;
 
 export type DailyBriefBeginResult =
   | { state: "acquired"; leaseToken: string; localDate: string }
@@ -50,17 +66,21 @@ export async function readDailyBriefPreferences(
 
 export async function saveDailyBriefPreferences(
   client: AppSupabaseClient,
-  input: Pick<DailyBriefPreferences, "enabled" | "includeCalendar" | "includeReminderHistory" | "includeNotes">,
+  input: DailyBriefPreferenceInput,
   expectedRevision: number,
   signal?: AbortSignal,
 ): Promise<DailyBriefPreferences> {
+  // Omitted connector disclosures save as off; a save never grants one silently.
   const request = client.rpc(
-    "save_daily_brief_preferences_v2",
+    "save_daily_brief_preferences_v3",
     {
       p_enabled: input.enabled,
       p_include_calendar: input.includeCalendar,
       p_include_reminder_history: input.includeReminderHistory,
       p_include_notes: input.includeNotes,
+      p_include_outlook_calendar: input.includeOutlookCalendar === true,
+      p_include_icloud_calendar: input.includeIcloudCalendar === true,
+      p_include_hevy: input.includeHevy === true,
       p_expected_revision: expectedRevision,
     },
   );
@@ -166,6 +186,27 @@ export async function listDailyBriefBehaviorIds(
   return (data ?? []).map(({ id }) => id);
 }
 
+/** Ticket 188: owner-scoped descriptions for active Behaviors. Callers must check disclosure first. */
+export async function listDailyBriefBehaviorDescriptions(
+  client: AppSupabaseClient,
+  userId: string,
+  behaviorIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<Record<string, string>> {
+  if (!behaviorIds.length) return {};
+  const request = client
+    .from("behaviors")
+    .select("id, description")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .in("id", [...behaviorIds])
+    .not("description", "is", null)
+    .limit(101);
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  if (error) throw storageError(error);
+  return Object.fromEntries((data ?? []).flatMap(({ id, description }) => description?.trim() ? [[id, description]] : []));
+}
+
 /** Private workbench labels only; never sent to a model by this read. */
 export async function listBriefingWorkbenchBehaviors(client: AppSupabaseClient, userId: string) {
   const { data, error } = await client.from("behaviors").select("id,title")
@@ -188,9 +229,13 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
     || (record.include_reminder_history !== undefined && typeof record.include_reminder_history !== "boolean")
     || (record.include_notes !== undefined && typeof record.include_notes !== "boolean")
     || (!record.include_calendar && (record.calendar_connection_generation !== null || record.calendar_selection_revision !== null))
+    || !connectorFenceValid(record, "include_outlook_calendar", ["outlook_connection_generation", "outlook_selection_revision"])
+    || !connectorFenceValid(record, "include_icloud_calendar", ["icloud_connection_generation", "icloud_selection_revision"])
+    || !connectorFenceValid(record, "include_hevy", ["hevy_connection_generation"])
   ) {
     throw new Error("Daily Brief preferences returned an invalid result.");
   }
+  const fence = (key: string) => (record[key] ?? null) as number | null;
   return {
     enabled: record.enabled,
     includeCalendar: record.include_calendar,
@@ -200,7 +245,26 @@ function parsePreferences(value: unknown): DailyBriefPreferences {
     revision: record.revision as number,
     calendarConnectionGeneration: record.calendar_connection_generation as number | null,
     calendarSelectionRevision: record.calendar_selection_revision as number | null,
+    // Absent before migration 20261019041000; absence never grants disclosure.
+    includeOutlookCalendar: record.include_outlook_calendar === true,
+    outlookConnectionGeneration: record.include_outlook_calendar === true ? fence("outlook_connection_generation") : null,
+    outlookSelectionRevision: record.include_outlook_calendar === true ? fence("outlook_selection_revision") : null,
+    includeIcloudCalendar: record.include_icloud_calendar === true,
+    icloudConnectionGeneration: record.include_icloud_calendar === true ? fence("icloud_connection_generation") : null,
+    icloudSelectionRevision: record.include_icloud_calendar === true ? fence("icloud_selection_revision") : null,
+    includeHevy: record.include_hevy === true,
+    hevyConnectionGeneration: record.include_hevy === true ? fence("hevy_connection_generation") : null,
   };
+}
+
+/** A missing key is off. A present disclosure must carry every bound fence value. */
+function connectorFenceValid(record: JsonRecord, flag: string, fences: readonly string[]): boolean {
+  const value = record[flag];
+  if (value === undefined) return fences.every((key) => record[key] === undefined || record[key] === null);
+  if (typeof value !== "boolean") return false;
+  return fences.every((key) => value
+    ? Number.isSafeInteger(record[key]) && (record[key] as number) >= 0
+    : record[key] === undefined || record[key] === null);
 }
 
 function parseBeginResult(value: unknown): DailyBriefBeginResult {

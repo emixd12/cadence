@@ -439,7 +439,7 @@ Settings. Local mode keeps Local profile. Disconnect choices remain in Settings.
 ### Settings Panels
 
 - **Page structure:** Settings is a single-column stack of unboxed sections separated by one 1px Ash Line divider between neighbors, following the One-Line-Per-Boundary Rule. Sections draw no perimeter or `border-y` of their own, and no side-by-side section grid. Section content keeps a readable measure: prose within roughly 65ch and form controls at a compact single-column width instead of multi-column desktop sprawl.
-- **Daily Brief:** Settings uses two native checkboxes for explicit Daily Brief enablement and optional selected Calendar timing. The disclosure stays factual, links to provider retention terms, and states that the model cannot change Cadence or Calendar records.
+- **Daily Brief:** Settings uses native checkboxes for explicit Daily Brief enablement and optional selected Google Calendar timing. Each connected Outlook Calendar, iCloud Calendar, or Hevy source adds its own default-off checkbox with an indented, `aria-describedby` disclosure of exactly what is sent; a still-on disclosure the brief cannot use stays visible with a plain, source-specific note: not connected, no selected calendars, or reconnected/reselected since it was allowed. Only the reconnected/reselected state adds a secondary 44px **Allow <source> again** button beside the note. Saving another choice turns such sources off rather than renewing them. The disclosure stays factual, links to provider retention terms, and states that the model cannot change Cadence or Calendar records.
 - **Profile:** Quiet label/value rows only.
 - **Timezone:** One native select of IANA timezones whose selected value is the saved timezone; the select is the single source for "current timezone", with no separate current or browser-detected value rows and no visible label repeating the section heading. When the browser-detected timezone differs from the saved one, show one quiet muted line, "Detected {timezone}", with an inline secondary Use detected timezone text action that updates the select; when they match or detection is unavailable, show nothing. Saving stays an explicit primary Save timezone action, with helper copy explaining the schedule impact. If the browser cannot enumerate timezones, fall back to a plain IANA text field.
 - **Notification permission:** One section with a Browser notifications status value plus a single primary text action. Permission prompts must be triggered by the user, not on page load.
@@ -609,14 +609,38 @@ visibility. Escape restores summary focus. CalendarSettingsBench includes long
 names and enough synthetic choices to exercise scrolling.
 
 
+## Connected sources (Ticket 238)
+
+Settings groups read-only sources in one `ConnectorLibrary` SettingsPanel: a
+divider-separated list in fixed order (Google Calendar, Outlook Calendar,
+iCloud Calendar, Hevy). Each source is a nested SettingsPanel with an h3 title,
+a one-line kind and boundary description, a status line, and its own controls.
+No new tokens, icon sets, cards, or modals. Outlook reuses the shared
+`CalendarSelector` field and the Google button vocabulary. Hevy uses one labeled
+password-type field that clears on submit. iCloud uses labeled email/password fields that clear on submission, a broader
+credential-custody disclosure, and the same CalendarSelector. Reconnect states
+retain a Disconnect action. Desktop local mode shows each source as requiring a linked account.
+Disconnect and account deletion copy name the provider-side removal step and
+never claim Cadence revoked provider access.
+
+Timeline markers name their source in accessible labels and details. Google
+keeps its bundled provider asset; Outlook uses the neutral lucide calendar
+glyph, not provider artwork. Recorded Hevy workouts are a plain
+`RecordedActivityList` under today's date title (Workout, time range, duration,
+12px muted text and an activity glyph). They are never axis markers, overlap
+cues, or Occurrence changes. Non-Google calendar status lines reuse the
+`calendarState` style. `ConnectorBench` and the Day Progress fixture menu cover
+connected, not connected, not configured, needs reconnection, status
+unavailable, desktop local, stale, incomplete, and offline states.
+
 ## Briefing workbench (Tickets 151–155)
 
 `/design-system?preview=briefing-workbench` uses neutral bench controls and the real
 horse bubble. Two columns stack on narrow screens. Voice, scope, reference, and
 planner fieldsets use labeled native controls. Runs require an explicit action;
-editing configuration cancels and discards results. Inspectors expose effective
+editing configuration preserves reviewed output and marks changed drafts. Inspectors expose effective
 facts, omissions, planner constraints/rejections and versions. Draft storage and
-exports contain configuration only. Review notes and generated output stay in memory.
+exports contain configuration only. Local cases retain captured inputs, outputs and exact feedback for 30 days, with expiry enforced on access.
 The Context source selector defaults to Synthetic. My account shows current access,
 sign-in/Settings links, an access refresh action and authorized Behavior checkboxes.
 Run comparison requires enabled briefing access. Calendar controls reflect separate
@@ -633,6 +657,12 @@ IDs, owning symbols and related terms. Document previews wrap and scroll within
 the bench, with copyable file paths, VS Code links, downloads and original sources.
 These controls use the existing neutral bench styles and never generate a comparison.
 
+
+Tickets 182–183 add Days beside Compare and Saved reviews. Native date/time controls
+open a no-model evidence grid. One selected day shows source limits; A/B retain
+complete text below. Sequence planning displays the provider-call count before
+generation. Diagnostic lane previews remain labeled and separate. Cancel preserves
+completed results; storage failures show Not saved. Mobile stacks A above B.
 
 ## Recipe-scoped briefing workbench
 
@@ -682,3 +712,28 @@ have separate text. Controls preserve 44px targets and semantic live feedback.
 ## Developer documentation (Ticket 229)
 
 The Astro DeveloperLayout reuses BaseLayout, IBM Plex typography and marketing tokens. A sticky left navigation and right section contents surround a bounded prose column. The layout stacks on mobile. Native details controls, underlined links, scrollable field tables and code blocks preserve keyboard access. Copy buttons announce success or failure. The existing design-system surface catalog owns this marketing mapping.
+
+## Agent Calendar settings — Ticket 187
+
+Web and linked desktop reuse `GoogleCalendarPanel` for a separate Daily Brief grant.
+Agent mode retains the same Settings panel, searchable selection, actions, status and 44px targets.
+It omits Timeline display controls and explains the separate model-data disclosure.
+`CalendarSettingsBench` provides purpose and connection-state fixtures; the interaction registry records purpose variants of INT-CALENDAR-001–004.
+
+## Daily Brief recipe 1.1 bubble — Ticket 184
+
+Recipe 1.1 briefs keep the bubble's sections and tokens. Option lines read "Suggested time".
+Logging-lane tips use the "Logging tip" label. The evidence line sits under the tip with a
+1px `border-line` left border and 12px indent. `DailyBriefBubbleBench` shows this state.
+
+## Daily Brief recipe 1.2 bubble — Ticket 184
+
+Recipe 1.2 briefs (candidate 3) group suggestions by type. Each group sits above a
+`border-line` hairline with one muted label, such as "New suggested time", and a
+disc-bulleted list (`list-disc`, 20px indent). A move bullet is the Behavior name and
+"current → new" times, with no reason line. Suggestions without a time use the label
+"Suggestion", one bullet each. Behavior names that Cadence lists in `behaviorNames` render as
+compact chips (1px `border-line`, `bg-surface` fill, 4px side padding, Ink text) in the
+overview, move line and tip. Weight stays 400 under the no-bold rule. A Cadence-written
+"Setup tip" uses the same tip block and label style. An empty overview is omitted; an empty brief renders no bubble.
+`DailyBriefBubbleBench` shows the 1.2 state after the 1.1 state.

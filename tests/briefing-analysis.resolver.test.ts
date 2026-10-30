@@ -399,6 +399,18 @@ describe("occasional tip selection across days", () => {
     expect(pick("2026-09-15", [a], shown).tip?.id).toBe("a");
   });
 
+  it("lets a different tip follow the next day when next-day spacing is off, keeping one tip per day and cooldown", () => {
+    const a = finding("a"), b = finding("b");
+    const shown = [{ fingerprint: "a|share:4", lastShownLocalDate: "2026-09-01" }];
+    const relaxed = (localDate: string, findings: BriefingFinding[], history = shown) =>
+      selectBriefingTip({ findings, maxTips: 1, cooldownDays: 14, nextDaySpacing: false, localDate, shown: history, fingerprintOf });
+    expect(relaxed("2026-09-02", [a, b]).decisions).toEqual([{ findingId: "a", decision: "cooldown" }, { findingId: "b", decision: "selected" }]);
+    // Another tip already shown today still blocks a second one.
+    expect(relaxed("2026-09-02", [b], [...shown, { fingerprint: "c|share:4", lastShownLocalDate: "2026-09-02" }]).tip).toBeNull();
+    // The default keeps next-day spacing.
+    expect(pick("2026-09-02", [b], shown).decisions).toEqual([{ findingId: "b", decision: "spacing" }]);
+  });
+
   it("requires relevance to today and honors a zero ceiling", () => {
     expect(pick("2026-09-01", [finding("a", false)], []).decisions).toEqual([{ findingId: "a", decision: "not_relevant" }]);
     expect(selectBriefingTip({ findings: [finding("a")], maxTips: 0, cooldownDays: 14, localDate: "2026-09-01", shown: [], fingerprintOf }).tip).toBeNull();
@@ -425,6 +437,21 @@ describe("review fixes", () => {
     expect(analyze(source({ occurrences: after, periods: [period("behavior_y", "2026-09-01")] }), ["realistic-timing"], 30).findings[0]).toMatchObject({
       counts: { medianOffsetMinutes: 180 }, proposal: { detail: { direction: "later", scheduledTime: "09:00", scheduledEndTime: "13:00" } },
     });
+  });
+
+  it("treats a range ending at midnight as ending the next day, and still ignores next-day marks", () => {
+    // 21:00–00:00 range. Six same-day marks at 23:30 are inside the range: no finding.
+    const inside = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m1", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00", markedAt: `${date}T23:30:00-04:00` }));
+    expect(analyze(source({ occurrences: inside, periods: [period("behavior_m1", "2026-09-01")] }), ["realistic-timing"], 30).findings).toEqual([]);
+    // Six same-day marks at 18:00 are three hours before the range starts.
+    const before = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m2", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00", markedAt: `${date}T18:00:00-04:00` }));
+    expect(analyze(source({ occurrences: before, periods: [period("behavior_m2", "2026-09-01")] }), ["realistic-timing"], 30).findings[0]).toMatchObject({
+      counts: { medianOffsetMinutes: -180 }, proposal: { detail: { direction: "earlier", scheduledTime: "21:00", scheduledEndTime: "00:00" } },
+    });
+    // Marks at 00:30 the next day are logging delay, not timing samples.
+    const nextDay = dates("2026-09-10", "2026-09-16").map((date) => occurrence("behavior_m3", date, "completed", { kind: "range", startTime: "21:00", endTime: "00:00",
+      markedAt: `${Temporal.PlainDate.from(date).add({ days: 1 }).toString()}T00:30:00-04:00` }));
+    expect(analyze(source({ occurrences: nextDay, periods: [period("behavior_m3", "2026-09-01")] }), ["realistic-timing"], 30).findings).toEqual([]);
   });
 
   it("ranks findings by strength relative to each lane's threshold, not raw units", () => {

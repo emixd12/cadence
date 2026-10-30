@@ -445,12 +445,14 @@
       "id": "flow.first-run-setup",
       "name": "First-run setup",
       "tier": "flow",
-      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, and import controls.",
+      "definition": "Optional first-run setup that appears as a non-modal Timeline pop-up and routes into existing behavior, notification, timezone, import, and travel controls.",
       "sharedContract": [
         "Never requests notification permission on page load",
         "Uses factual status labels without progress or reward language",
         "Links into existing app controls rather than creating a separate wizard",
-        "Import stays optional and does not block setup completion"
+        "Import stays optional and does not block setup completion",
+        "Home and travel stays optional, appears only when the deployment reports travel routing as configured, and reads presence flags rather than the Home text",
+        "Optional rows show one description line from the shared model"
       ],
       "surfaceImplementations": [
         {
@@ -484,7 +486,7 @@
             "docs/DESKTOP_BUILD.md"
           ],
           "implementationIds": [],
-          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress."
+          "notes": "The local guide reuses the existing checklist model, dismissal preference, and task navigation. Settings can reopen it; native interaction QA remains in progress. Ticket 212: Home and travel reads presence from local SQLite and appears only when a linked account's hosted routing report says configured; local mode omits it."
         },
         {
           "surfaceId": "mobile",
@@ -513,7 +515,7 @@
         "A shared continuous day-progress axis shows read-only Calendar context, explicit stale coverage, and advisory duration estimates without changing manual occurrence statuses.",
         "Google Calendar provider icons identify the source; thin #DA3278 overlap borders preserve status fills; event durations recolor the 1px axis without thickening it.",
         "Quick previews reserve bottom space; explicit event details use a centered, bounded native modal.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {
@@ -530,9 +532,13 @@
             "tests/occurrence-note-shortcuts-ui.test.tsx",
             "components/timeline/DayProgressTimeline.tsx",
             "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/TravelLeaveQuestion.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
-            "public/brand/google-calendar.svg"
+            "public/brand/google-calendar.svg",
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "module.timeline",
@@ -543,9 +549,13 @@
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
-            "composite.external-event-preview"
+            "composite.travel-mode-choice",
+            "composite.travel-leave-question",
+            "composite.external-event-preview",
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "marketing",
@@ -572,17 +582,25 @@
             "tests/occurrence-note-shortcuts-ui.test.tsx",
             "components/timeline/DayProgressTimeline.tsx",
             "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/TravelModeChoice.tsx",
+            "components/timeline/TravelLeaveQuestion.tsx",
             "docs/qa/day-progress-release.md",
             "components/timeline/day-progress-timeline.module.css",
-            "public/brand/google-calendar.svg"
+            "public/brand/google-calendar.svg",
+            "components/timeline/RecordedActivityList.tsx",
+            "components/timeline/TravelWeather.tsx"
           ],
           "implementationIds": [
             "composite.occurrence-note-form",
             "module.day-progress-timeline",
             "composite.external-event-details",
-            "composite.external-event-preview"
+            "composite.travel-mode-choice",
+            "composite.travel-leave-question",
+            "composite.external-event-preview",
+            "composite.recorded-activity-list",
+            "composite.travel-weather-credit"
           ],
-          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Tickets 133\u2013137 wire the accepted Ticket 132 day-progress layout into both production clients. Synthetic DOM and resolver checks cover the shared implementation. Live Calendar, installed desktop, idle/minimized, and release acceptance remain pending in docs/qa/day-progress-release.md. Ticket 149 updates Calendar inspection and Timeline reload. See docs/qa/calendar-inspection-refresh.md. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 218 adds the fixed weather margin, mode suggestion and Open-Meteo credit to shared travel timing."
         },
         {
           "surfaceId": "mobile",
@@ -758,7 +776,7 @@
             "module.daily-brief-bubble",
             "module.daily-brief-settings-panel"
           ],
-          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. No native editor or marketing capability follows."
+          "notes": "Automatic daily invocation preserves account/day admission. Repository configuration drives shared suggestions and sources. The internal /design-system?preview=briefing-workbench compares frozen synthetic or authorized account facts under existing briefing/Calendar disclosure; recipe identity, independent context controls, duration source selection, a contract-linked glossary and editable repository document links support inspection. Daily Brief policy 2.0 omits ledger recaps and source diagnostics; the private inspector retains input decisions and coverage. Ticket 239 adds separate default-off Outlook Calendar, iCloud Calendar, and Hevy workout-timing disclosures in the shared Settings panel; each control appears only while its source is connected or still disclosed, and iCloud offers none until Ticket 240. No native editor or marketing capability follows."
         },
         {
           "surfaceId": "marketing",
@@ -811,7 +829,7 @@
         "Category drafts retain errors; deletion confirms assignment counts and preserves Behavior history; reorder uses accessible buttons.",
         "Global Note shortcuts hides quick-fill and proposals without deleting accepted shortcuts or saved Notes.",
         "Optional read-only Google Calendar requires separate consent for the signed-in Google account; compact searchable selection shows selected-name tags and preserves per-calendar visibility plus explicit Save. Refresh also reloads discovery.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {
@@ -827,7 +845,12 @@
             "components/settings/CategoryPanel.tsx",
             "components/note-shortcuts/NoteShortcutControls.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/TravelHabitsSection.tsx",
+            "components/settings/ConnectorLibrary.tsx",
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/HevyPanel.tsx",
+            "components/settings/IcloudCalendarPanel.tsx"
           ],
           "implementationIds": [
             "module.timezone-panel",
@@ -837,9 +860,14 @@
             "module.category-panel",
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
-            "module.travel-settings-panel"
+            "module.travel-settings-panel",
+            "module.travel-habits-section",
+            "module.connector-library",
+            "module.outlook-calendar-panel",
+            "module.hevy-panel",
+            "module.icloud-calendar-panel"
           ],
-          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "Settings modules are fixture-backed in the bench with bench-only actions for mutable controls. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 238 nests Google, Outlook, iCloud availability, and Hevy in ConnectorLibrary; each source fails separately."
         },
         {
           "surfaceId": "marketing",
@@ -867,15 +895,27 @@
             "apps/desktop/src/desktop-update-panel.tsx",
             "tests/desktop-update-panel.test.tsx",
             "components/settings/GoogleCalendarPanel.tsx",
-            "components/settings/TravelSettingsPanel.tsx"
+            "components/settings/TravelSettingsPanel.tsx",
+            "components/settings/TravelHabitsSection.tsx",
+            "components/settings/ConnectorLibrary.tsx",
+            "components/settings/OutlookCalendarPanel.tsx",
+            "components/settings/HevyPanel.tsx",
+            "apps/desktop/src/calendar/use-connectors.ts",
+            "tests/desktop-connectors-hook.dom.test.tsx",
+            "components/settings/IcloudCalendarPanel.tsx"
           ],
           "implementationIds": [
             "module.category-panel",
             "module.note-shortcut-controls",
             "module.google-calendar-panel",
-            "module.travel-settings-panel"
+            "module.travel-settings-panel",
+            "module.travel-habits-section",
+            "module.connector-library",
+            "module.outlook-calendar-panel",
+            "module.hevy-panel",
+            "module.icloud-calendar-panel"
           ],
-          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md."
+          "notes": "The local screen reuses timezone controls, reports native reminder coverage, exposes database controls, and presents the first account-link data choice. Automated account-choice and native protected-backup checks pass; live hosted first-link acceptance remains in progress. The settings fixture bench is apps/desktop/?bench=settings. Tickets 129 and 131 add verified recovery totals and explicit backup deletion, automatic-download controls, nonmodal update review, and draft-safe restart. Native release acceptance remains pending. Tickets 162\u2013165 add shared travel controls and transient deterministic occupancy; release gates remain in docs/qa/travel-release.md. Ticket 238 mounts ConnectorLibrary in linked-account mode; local mode shows each source as requiring a linked account. Per-source caches stay in calendar-cache.sqlite3; installed-native acceptance is unverified."
         },
         {
           "surfaceId": "mobile",
@@ -901,7 +941,7 @@
         "Archive preserves history",
         "Category and Sort native selects affect active and archived lists; hidden rows retain drafts, aggregate analytics keep their full scope.",
         "Repeated Note matching remains explicit, Behavior-scoped, and user-reviewed before quick fill.",
-        "Travel uses optional user-authored locations and separate routing/device permissions. Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
+        "Travel uses optional Behavior Where, Home and usual travel; one toggle records routing consent and asks for foreground location (Ticket 215). Known travel occupancy survives an unknown final return; native/provider acceptance remains gated."
       ],
       "surfaceImplementations": [
         {

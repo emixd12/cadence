@@ -3,6 +3,7 @@ import { applyHostedAccountSync, normalizeAccountSyncBaseline, planAccountSync, 
 import { accountSyncFingerprint, resolveAccountSync } from "@cadence/core/resolvers/account-sync.resolver";
 import { emptyPortabilitySnapshot } from "./helpers/portability-fixture";
 import { canonicalJson } from "../apps/desktop/src/account/canonical-json";
+import { syncFailureStatus } from "../apps/desktop/src/sync-engine";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -52,13 +53,33 @@ describe("desktop account sync adapter", () => {
     const rpc = vi.fn(() => ({ abortSignal }));
     const client = { rpc } as unknown as SupabaseClient;
     await expect(readHostedAccountSyncEnvelope(client)).resolves.toEqual(hosted);
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot");
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 2 });
     expect(abortSignal).toHaveBeenCalledOnce();
     expect(native.invoke).toHaveBeenCalledWith("local_store", { request: { operation: "validateAccountSyncSnapshot", entities: hosted.entities } });
 
     const invalid = { ...hosted, fingerprint: "0".repeat(64) };
     const invalidClient = { rpc: vi.fn(() => ({ abortSignal: vi.fn(async () => ({ data: invalid, error: null })) })) } as unknown as SupabaseClient;
     await expect(readHostedAccountSyncEnvelope(invalidClient)).rejects.toThrow("fingerprint is invalid");
+  });
+
+  it("reports a revoked session when sync RPCs run without a session", async () => {
+    // After a failed refresh Supabase drops the session; PostgREST then answers 401 with 42501.
+    const denied = (name: string) => ({ code: "42501", message: `permission denied for function ${name}`, details: null, hint: null });
+    const snapshotClient = (status: number) => ({ rpc: vi.fn(() => ({ abortSignal: vi.fn(async () => ({ data: null, error: denied("read_account_sync_snapshot"), status })) })) }) as unknown as SupabaseClient;
+    const revoked = await readHostedAccountSyncEnvelope(snapshotClient(401)).catch((error: unknown) => error);
+    expect(syncFailureStatus(revoked)).toEqual({ state: "revoked" });
+    // A signed-in permission failure is not a session problem and keeps its message.
+    const forbidden = await readHostedAccountSyncEnvelope(snapshotClient(403)).catch((error: unknown) => error);
+    expect(syncFailureStatus(forbidden)).toEqual({ state: "failed", message: "permission denied for function read_account_sync_snapshot" });
+
+    const baseline = { entities: [{ kind: "profile", id: "profile", value: { timezone: "UTC" } }] } as const;
+    const local = { entities: [{ kind: "profile", id: "profile", value: { timezone: "America/New_York" } }] } as const;
+    const hostedSnapshot = { entities: [...baseline.entities] };
+    const syncPlan = resolveAccountSync({ accountLinkId: "hosted", baseline, local, hosted: hostedSnapshot });
+    const inputs = { accountLinkId: "hosted", baseline, local, hosted: hostedSnapshot, baselineFingerprint: accountSyncFingerprint(baseline), hostedFingerprint: accountSyncFingerprint(hostedSnapshot), outboxHighWater: 2 };
+    const applyClient = { rpc: vi.fn(async () => ({ data: null, error: denied("apply_account_sync_plan"), status: 401 })) } as never;
+    const applyFailure = await applyHostedAccountSync(applyClient, inputs, syncPlan, "2026-09-01T12:00:00Z").catch((error: unknown) => error);
+    expect(syncFailureStatus(applyFailure)).toEqual({ state: "revoked" });
   });
 
   it("stops incompatible downloads before either sync commit or acknowledgement", async () => {
@@ -70,7 +91,7 @@ describe("desktop account sync adapter", () => {
     });
     const rpc = vi.fn(() => ({ abortSignal: vi.fn(async () => ({ data: hosted, error: null })) }));
     await expect(synchronizeAccount("local", { rpc } as unknown as SupabaseClient)).resolves.toEqual({ state: "update_required", message: "Update required to synchronize" });
-    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot");
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("read_account_sync_snapshot", { contract: 2 });
     expect(native.invoke.mock.calls.some(([name, args]) => name === "auth_complete_account_sync" || args?.request.operation === "applyAccountSync")).toBe(false);
   });
 
@@ -92,6 +113,11 @@ describe("desktop account sync adapter", () => {
       routing_consent_at: null,
       onboarding_completed_at: null,
       updated_at: "2026-06-08T16:00:00Z",
+      travel_preparation_minutes: null,
+      travel_arrival_buffer_minutes: null,
+      travel_place_modes: [],
+      travel_leave_feedback: [],
+      travel_habits_updated_at: null,
     } }] });
     expect(accountSyncFingerprint(normalized)).toBe(digest);
   });

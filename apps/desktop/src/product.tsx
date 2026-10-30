@@ -9,9 +9,18 @@ import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSetting
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
-import { createLocalTravelSettingsClient } from "./local-travel-settings.service";
-import { readMacForegroundLocation } from "./foreground-location";
+import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
+import { createLocalPlaceLabelClient } from "./local-place-labels.service";
+import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
+import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPermission } from "./foreground-location";
 import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
+import { useDesktopConnectors } from "./calendar/use-connectors";
+import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
+import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
+import { OutlookCalendarPanel } from "@/components/settings/OutlookCalendarPanel";
+import { HevyPanel } from "@/components/settings/HevyPanel";
+import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
+import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { createDesktopDailyBriefClient } from "./daily-brief";
 import { TimelineScreen } from "./timeline-screen";
 import { BehaviorsScreen } from "./behaviors-screen";
@@ -256,7 +265,7 @@ export function Product() {
   const restartUpdate = (discard = false) => {
     setRestartError("");
     if (syncRunning.current || accountBusy || hasPendingLocalCommands() || hasPendingDesktopWrites()) {
-      setRestartError("Wait for the current save or synchronization to finish before restarting.");
+      setRestartError("Cadence is still saving or synchronizing. Try Restart again in a moment, or quit and reopen Cadence to finish the update.");
       return;
     }
     if (discard && !discardUnsavedDesktopDrafts()) return;
@@ -265,7 +274,7 @@ export function Product() {
     void desktopUpdater.restart();
   };
   const restartActions = { onRestart: () => restartUpdate(), onDiscardAndRestart: () => restartUpdate(true),
-    onCancelRestart: () => setRestartBlocked(false), restartBlocked };
+    onCancelRestart: () => setRestartBlocked(false), restartBlocked, restartError };
   const profile = bundle?.timeline.profile;
   useEffect(() => {
     if (!profile || !auth.current) { setFirstLink(null); setSyncReady(false); return; }
@@ -296,13 +305,20 @@ export function Product() {
   const dailyBriefClient = useMemo(() => calendarClient && accountUserId ? createDesktopDailyBriefClient(calendarClient) : null, [calendarClient, accountUserId]);
   const travelSettingsClient = useMemo(() => {
     const local = createLocalTravelSettingsClient();
-    return { load: local.load, save: async (value: Parameters<typeof local.save>[0]) => {
+    return { load: local.load, placeLabels: local.placeLabels, save: async (value: Parameters<typeof local.save>[0]) => {
       const saved = await local.save(value);
+      setSyncRequest((previous) => previous + 1);
+      return saved;
+    }, saveHabits: async (value: Parameters<typeof local.saveHabits>[0]) => {
+      // Learned habits reach the hosted route through account synchronization (Ticket 217).
+      const saved = await local.saveHabits(value);
       setSyncRequest((previous) => previous + 1);
       return saved;
     } };
   }, []);
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 216: place labels live in SQLite; each change asks account sync to run.
+  const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
   const calendarRange = {
     startLocalDate: bundle?.timeline.timeline.todayLocalDate ?? "1970-01-01",
     endLocalDate: bundle?.timeline.timeline.daySections.at(-1)?.localDate ?? "1970-01-01",
@@ -313,6 +329,19 @@ export function Product() {
     accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York", range: calendarRange,
     enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
   });
+  const connectors = useDesktopConnectors({
+    client: calendarClient,
+    screen: activeScreen === "timeline" || activeScreen === "settings" ? activeScreen : null,
+    accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
+    todayLocalDate: calendarRange.startLocalDate, lastLocalDate: calendarRange.endLocalDate,
+    enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
+  });
+  const outlookTimeline = connectors.outlook;
+  const icloudTimeline = connectors.icloud;
+  const icloudEvents = icloudTimeline.snapshot?.events.filter((event) => !icloudTimeline.hiddenCalendarIds.includes(event.calendarId)
+    && (icloudTimeline.showAllDay || event.kind !== "all_day")) ?? [];
+  const outlookEvents = outlookTimeline.snapshot?.events.filter((event) => !outlookTimeline.hiddenCalendarIds.includes(event.calendarId)
+    && (outlookTimeline.showAllDay || event.kind !== "all_day")) ?? [];
   const currentTravelCorrections = useMemo(() => (travelCorrections.accountId === accountUserId ? travelCorrections.items : []).filter((correction) => calendar.snapshot?.events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [travelCorrections, calendar.snapshot, accountUserId]);
   const visibleCalendarEvents = calendar.preferences?.visible ? calendar.snapshot?.events.filter((event) =>
     !calendar.preferences!.hiddenCalendarIds.includes(event.calendarId)
@@ -320,16 +349,17 @@ export function Product() {
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} },
-      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
+      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
   const calendarContext = {
     travelMessage: travel.message,
     travelStatus: travel,
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
-    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: travel.view?.navigationPreference,
-    events: visibleCalendarEvents,
-    freshness: calendar.snapshot ? { ...calendar.snapshot.freshness, label: calendar.label,
-      ...(calendar.stale ? { state: "stale" as const, canAssertNoOverlap: false } : {}) }
-      : { state: "unavailable" as const, refreshedAt: null, label: calendar.label, canAssertNoOverlap: false },
+    travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
+    travelSettingsClient,
+    // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
+    events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
+    ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),
+    recordedActivity: connectors.hevy,
   };
   const syncAccount = useCallback((): Promise<SyncCompletion> => {
     if (!syncReady || !accountUserId || !profileId || !auth.current) {
@@ -383,13 +413,14 @@ export function Product() {
     return completion;
   }, [accountUserId, conflictReview, profileId, refreshScreen, syncReady]);
   const refreshCalendar = calendar.refresh;
+  const refreshConnectors = connectors.refresh;
   const reloadTimeline = useCallback(async () => {
     const synced = accountUserId ? await syncAccount() : null;
     const accountCurrent = synced ? synced.status.state === "current" : true;
     const cadenceCurrent = synced?.localCurrent || await refreshScreen();
-    const calendarCurrent = await refreshCalendar("manual");
-    return accountCurrent && cadenceCurrent && calendarCurrent;
-  }, [accountUserId, refreshCalendar, refreshScreen, syncAccount]);
+    const [calendarCurrent, connectorsCurrent] = await Promise.all([refreshCalendar("manual"), refreshConnectors("manual")]);
+    return accountCurrent && cadenceCurrent && calendarCurrent && connectorsCurrent;
+  }, [accountUserId, refreshCalendar, refreshConnectors, refreshScreen, syncAccount]);
   useEffect(() => {
     if (!syncReady) return;
     const trigger = () => syncAccount();
@@ -476,17 +507,18 @@ export function Product() {
     {account.status === "linked" || syncReady || disconnectResult ? <AccountDisconnectPanel busy={accountBusy} result={disconnectResult} error={disconnectError} onDisconnect={disconnect} /> : null}</>;
 
   return <DesktopApp account={account} activeScreen={activeScreen} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} conflictCount={conflictReview?.conflicts.length ?? 0}>
+    <PlaceLabelProvider key={`places-${accountUserId ?? "local"}`} client={placeLabelClient} desktop>
     {!isTauri() ? <div className="p-8"><h1 className="text-3xl font-bold">Open Cadence on your Mac</h1>
       <p className="mt-4">Local tracking uses the desktop app’s SQLite database. This browser preview cannot read or change it.</p></div> : null}
     <DesktopUpdateNotice required={syncStatus.state === "update_required"} {...restartActions} />
-    {restartError ? <p role="status" className="px-4 py-3 text-sm text-accent">{restartError}</p> : null}
     {loading ? <p role="status" className="p-8">Opening local tracking data…</p> : null}
     {error ? <div role="alert" className="m-6 border border-line p-4"><p>{error}</p>
       <button className="product-action product-action-primary mt-3" onClick={refresh}>Try again</button></div> : null}
     {bundle && occurrenceActions && behaviorActions ? <>
       {activeScreen === "timeline" ? <DesktopOnboardingGuide key={guideRequest} forceOpen={guideRequest > 0} onDismiss={() => setGuideRequest(0)}
         hasAnyBehavior={bundle.timeline.behaviors.length > 0} hasImportRuns={bundle.hasImportRuns} currentTimezone={bundle.timeline.profile.timezone}
-        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS} /> : null}
+        permission={permission} coverage={coverage} onNavigate={navigate} availableScreens={AVAILABLE_SCREENS}
+        loadTravelSetup={readLocalTravelSetupPresence} readTravelRoutingConfigured={travelClient?.configured ?? null} /> : null}
       {activeScreen === "timeline" ? <TimelineScreen timeline={bundle.timeline.timeline} {...occurrenceActions}
         shortcutsByBehavior={bundle.shortcuts.accepted} dayProgress={calendarContext}
         notificationTarget={notificationTarget}
@@ -502,10 +534,22 @@ export function Product() {
         categoryControls={<CategoryPanel categories={bundle.timeline.categories}
           assignments={bundle.timeline.behaviors.map((behavior) => ({ id: behavior.id, categoryId: behavior.category_id, active: behavior.active, updatedAt: behavior.updated_at }))} action={categoryAction} />}
         accountControls={completeAccountControls}
-        calendarControls={calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} />
-          : <section className="py-4"><h2 className="text-xl">Google Calendar</h2><p className="mt-3 text-sm text-muted-readable">{calendar.label}</p></section>}
-        dailyBriefControls={<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop />}
-        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} desktop />}
+        calendarControls={<ConnectorLibrary sources={[
+          { id: "google_calendar", content: calendar.coordinator ? <GoogleCalendarPanel key={accountUserId ?? "local"} coordinator={calendar.coordinator} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} wrongAccount={calendar.wrongAccount} openExternalUrl={openCalendarSourceUrl} nested />
+            : <ConnectorUnavailable id="google_calendar" reason={calendar.label} /> },
+          { id: "outlook_calendar", content: connectors.outlookCoordinator ? <OutlookCalendarPanel key={`outlook-${accountUserId}`} coordinator={connectors.outlookCoordinator}
+            refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")}
+            callbackMessage={connectors.outlookMessage} refreshVersion={connectors.panelVersion} />
+            : <ConnectorUnavailable id="outlook_calendar" reason={connectorUnavailableReason("Outlook Calendar", connectors.unavailableReason)} /> },
+          { id: "icloud_calendar", content: connectors.icloudCoordinator ? <IcloudCalendarPanel key={`icloud-${accountUserId}`} coordinator={connectors.icloudCoordinator}
+            refreshRange={outlookTimelineRange(calendarRange.startLocalDate, calendarRange.endLocalDate, profile?.timezone ?? "America/New_York")} />
+            : <ConnectorUnavailable id="icloud_calendar" reason={connectorUnavailableReason("iCloud Calendar", connectors.unavailableReason)} /> },
+          { id: "hevy", content: connectors.hevyCoordinator ? <HevyPanel key={`hevy-${accountUserId}`} coordinator={connectors.hevyCoordinator}
+            localDate={calendarRange.startLocalDate} timezone={profile?.timezone ?? "America/New_York"} refreshVersion={connectors.panelVersion} />
+            : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
+        ]} />}
+        dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
+        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}
@@ -513,6 +557,7 @@ export function Product() {
         onReconcile={() => refreshReminders()} onShowOnboarding={() => { setGuideRequest((value) => value + 1); navigate("timeline"); }} /> : null}
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
     </> : null}
+    </PlaceLabelProvider>
   </DesktopApp>;
 }
 

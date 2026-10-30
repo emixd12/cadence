@@ -8,6 +8,9 @@ import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import type { DailyBriefClient } from "@/lib/ui/daily-brief";
 
+const travelToken = vi.hoisted(() => vi.fn<(accountId: string | null, localDate: string) => string | null>(() => null));
+vi.mock("@/lib/ui/travel", async (load) => ({ ...(await load<typeof import("@/lib/ui/travel")>()), travelConclusionsToken: travelToken }));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -45,6 +48,25 @@ function client(overrides: Partial<DailyBriefClient> = {}): DailyBriefClient {
 }
 
 describe("Daily Brief UI", () => {
+  it("returns the latest signed travel conclusions with the request, and nothing without a travel account (Ticket 219)", async () => {
+    travelToken.mockImplementation((accountId) => accountId === "owner" ? "signed.token" : null);
+    const linked = client();
+    await act(() => root.render(<DailyBriefLauncher client={linked} travelAccountId="owner" sessionKey="owner" />));
+    await vi.waitFor(() => expect(linked.requestBrief).toHaveBeenCalledOnce());
+    expect(travelToken).toHaveBeenCalledWith("owner", settings.localDate);
+    expect(linked.requestBrief).toHaveBeenCalledWith(expect.objectContaining({ travelConclusions: "signed.token" }), expect.any(AbortSignal));
+    await act(() => root.unmount());
+    root = createRoot(container);
+    localStorage.clear();
+    // Account-free desktop and signed-out views have no travel account, so the request carries no token.
+    const local = client();
+    await act(() => root.render(<DailyBriefLauncher client={local} sessionKey="local" />));
+    await vi.waitFor(() => expect(local.requestBrief).toHaveBeenCalledOnce());
+    expect(vi.mocked(local.requestBrief).mock.calls[0]![0]).not.toHaveProperty("travelConclusions");
+    travelToken.mockReset();
+    travelToken.mockReturnValue(null);
+  });
+
   it("starts once, announces ready text politely, and keeps the dismiss control reachable", async () => {
     const adapter = client();
     await act(() => root.render(<DailyBriefLauncher client={adapter} />));
@@ -104,6 +126,11 @@ describe("Daily Brief UI", () => {
     await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false }));
     expect(container.querySelector('a[href="https://developers.openai.com/api/docs/guides/your-data"]')).not.toBeNull();
     expect(container.textContent).toContain("cannot change tracking or Calendar records");
+    expect(controls[1]!.getAttribute("aria-describedby")).toBe("daily-brief-calendar-disclosure");
+    const calendarDisclosure = container.querySelector("#daily-brief-calendar-disclosure")?.textContent ?? "";
+    expect(calendarDisclosure).toContain("Sends today’s event times, timezone, availability and your response for those calendars.");
+    expect(calendarDisclosure).toContain("Event titles, descriptions, locations and attendees are not sent.");
+    expect(calendarDisclosure).toContain("Your Timeline Google Calendar connection is never used.");
   });
 });
 
@@ -118,6 +145,99 @@ it("offers optional sources with exact disclosures and revokes them when Daily B
   expect(notes.checked).toBe(true);
   await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!.click());
   await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: false, includeCalendar: false, includeReminderHistory: false, includeNotes: false }));
+});
+
+it("offers each connected source as a separate default-off disclosure and revokes all of them on disable (Ticket 239)", async () => {
+  const offered: DailyBriefSettings = { ...settings, includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false,
+    connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: true } };
+  const adapter = client({ preferences: vi.fn(async () => offered), updatePreferences: vi.fn(async (input) => ({ ...offered, ...input })) });
+  await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+  await vi.waitFor(() => expect(container.textContent).toContain("Include selected Outlook Calendar timing"));
+  expect(container.textContent).toContain("Include today’s recorded Hevy workout times");
+  expect(container.textContent).toContain("Exercises, sets, weights, notes and titles are not sent");
+  expect(container.textContent).toContain("never completes a Behavior");
+  expect(container.textContent).not.toContain("iCloud");
+  const outlook = container.querySelector<HTMLInputElement>('input[aria-describedby="daily-brief-outlook-disclosure"]')!;
+  expect(outlook.checked).toBe(false);
+  await act(() => outlook.click());
+  await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false,
+    includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: false }));
+  await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!.click());
+  await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: false, includeCalendar: false, includeReminderHistory: false, includeNotes: false,
+    includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false }));
+});
+
+it("keeps a disclosure for a disconnected source visible so it can be turned off, and sends four keys to older servers", async () => {
+  const stale: DailyBriefSettings = { ...settings, includeHevy: true, includeOutlookCalendar: false, includeIcloudCalendar: false,
+    connectorSources: { outlookCalendar: false, icloudCalendar: false, hevy: false } };
+  const adapter = client({ preferences: vi.fn(async () => stale) });
+  await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+  await vi.waitFor(() => expect(container.textContent).toContain("Hevy is not connected"));
+  expect(container.textContent).not.toContain("Outlook");
+  const hevy = container.querySelector<HTMLInputElement>('input[aria-describedby="daily-brief-hevy-disclosure"]')!;
+  expect(hevy.checked).toBe(true);
+  expect(hevy.disabled).toBe(false);
+
+  await act(() => root.unmount());
+  root = createRoot(container);
+  const older = client();
+  await act(() => root.render(<DailyBriefSettingsPanel client={older} />));
+  await vi.waitFor(() => expect(container.textContent).toContain("Enable Daily Brief"));
+  expect(container.textContent).not.toMatch(/Outlook|Hevy|iCloud/);
+  await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!.click());
+  await vi.waitFor(() => expect(older.updatePreferences).toHaveBeenCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false }));
+});
+
+describe("connector disclosure recovery (Ticket 239)", () => {
+  const recovery: DailyBriefSettings = { ...settings, includeReminderHistory: false, includeNotes: false,
+    includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: true,
+    connectorSources: { outlookCalendar: true, icloudCalendar: false, hevy: true },
+    connectorAttention: { outlookCalendar: "changed", icloudCalendar: null, hevy: "changed" } };
+  const checkbox = (id: string) => container.querySelector<HTMLInputElement>(`input[aria-describedby="${id}"]`)!;
+  const button = (text: string) => [...container.querySelectorAll("button")].find((item) => item.textContent === text);
+
+  it("explains a reconnected or reselected source and allows exactly that source again", async () => {
+    const adapter = client({ preferences: vi.fn(async () => recovery), updatePreferences: vi.fn(async (input) => ({ ...recovery, ...input,
+      connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: null } })) });
+    await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Outlook Calendar was reconnected or its selected calendars changed after you allowed it"));
+    expect(container.textContent).toContain("Hevy was reconnected after you allowed it");
+    expect(container.textContent).not.toContain("Hevy was reconnected or its selected calendars");
+    await act(() => button("Allow Outlook Calendar again")!.click());
+    // Allowing Outlook never renews the other changed source.
+    await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: true, includeCalendar: false, includeReminderHistory: false, includeNotes: false,
+      includeOutlookCalendar: true, includeIcloudCalendar: false, includeHevy: false }));
+    await vi.waitFor(() => expect(button("Allow Outlook Calendar again")).toBeUndefined());
+  });
+
+  it("revokes, never renews, changed or unavailable sources on an unrelated save", async () => {
+    const adapter = client({ preferences: vi.fn(async (): Promise<DailyBriefSettings> => ({ ...recovery, connectorAttention: { outlookCalendar: "no_calendars", icloudCalendar: null, hevy: "changed" },
+      connectorSources: { outlookCalendar: false, icloudCalendar: false, hevy: true } })) });
+    await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+    await vi.waitFor(() => expect(container.textContent).toContain("No Outlook Calendar calendars are selected"));
+    expect(container.textContent).not.toContain("Outlook Calendar is not connected");
+    expect(button("Allow Outlook Calendar again")).toBeUndefined();
+    await act(() => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!.click());
+    await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith({ enabled: true, includeCalendar: true, includeReminderHistory: false, includeNotes: false,
+      includeOutlookCalendar: false, includeIcloudCalendar: false, includeHevy: false }));
+  });
+
+  it("keeps a current source on during an unrelated save and lets a changed source be turned off", async () => {
+    const adapter = client({ preferences: vi.fn(async (): Promise<DailyBriefSettings> => ({ ...recovery, connectorAttention: { outlookCalendar: null, icloudCalendar: null, hevy: "changed" } })) });
+    await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+    await vi.waitFor(() => expect(button("Allow Hevy again")).toBeDefined());
+    await act(() => checkbox("daily-brief-hevy-disclosure").click());
+    await vi.waitFor(() => expect(adapter.updatePreferences).toHaveBeenLastCalledWith(expect.objectContaining({ includeOutlookCalendar: true, includeHevy: false })));
+  });
+
+  it("shows a source-specific error when a source cannot be allowed", async () => {
+    const { DailyBriefRequestError } = await import("@/lib/ui/daily-brief");
+    const adapter = client({ preferences: vi.fn(async () => recovery), updatePreferences: vi.fn(async () => { throw new DailyBriefRequestError("source_unavailable"); }) });
+    await act(() => root.render(<DailyBriefSettingsPanel client={adapter} />));
+    await vi.waitFor(() => expect(button("Allow Hevy again")).toBeDefined());
+    await act(() => button("Allow Hevy again")!.click());
+    await vi.waitFor(() => expect(container.querySelector('[role="alert"]')?.textContent).toContain("not connected or has no selected calendar"));
+  });
 });
 
 it("renders suggestion provenance from trusted metadata without an apply action", async () => {
@@ -140,8 +260,8 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
     travel={{ localDate: settings.localDate, observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit" }, { kind: "return_unknown" }],
-      conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
+      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit", weather: null }, { kind: "return_unknown" }],
+      weather: null, conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
     briefing={{
       text: "Dentist anchors the afternoon.", localDate: settings.localDate, timezone: settings.timezone,
       generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [],
@@ -163,7 +283,7 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
 it("omits travel from another day", async () => {
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
-    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
+    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, weather: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
     briefing={{ text: "Quiet day.", localDate: settings.localDate, timezone: settings.timezone, generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] }} />));
   expect(container.textContent).not.toContain("Travel");
 });

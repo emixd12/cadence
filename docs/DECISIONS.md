@@ -509,6 +509,18 @@ update must upgrade an older installed version through the real updater after a
 protected database backup. Do not create a disposable migration build or a
 separate migration ticket now.
 
+## macOS 14 runtime acceptance deferral
+
+Decision date: 2026-09-27. Ticket: 115.
+
+The owner deferred macOS 14 runtime acceptance. It no longer blocks Ticket 115.
+Keep the declared and compiled macOS 14 deployment target unchanged. Run the
+production acceptance matrix on the current Apple Silicon host and record the
+exact tested macOS version and build for each candidate. Do not claim macOS 14
+compatibility or support for untested newer versions. Developer ID signing,
+notarization, stapled app/DMG verification, quarantined downloaded-DMG
+Gatekeeper launch, production Keychain, and upgrade acceptance remain gates.
+
 ## Desktop native reminder horizon
 
 Decision date: 2026-08-30. Tickets: 108 and 112.
@@ -769,6 +781,85 @@ Implementation decisions, recorded for owner review:
 - Historical Calendar associations report unavailable; no historical Calendar read
   was added.
 
+## 2026-09-27: Replay-based briefing bench and stored daily brief
+
+Historical decision record, reconciled October 21, 2026. The later workbench
+execution uses Tickets 175–177 and 182–184; Tickets 178–181 belong to desktop
+release work. Ticket 185 remains the stored-brief lifecycle gate. Its later
+packet calls the 07:00 cutoff pending despite the confirmation recorded below;
+reconcile that discrepancy without assuming the owner withdrew the instruction.
+This entry preserves the original direction and does not activate storage or
+supersede current consent, privacy, deployment or acceptance gates.
+
+The owner asked to test the advisor across many days and all lanes on their own
+dogfooded account, with less clutter, and consented to using their data (including
+model transmission) for this evaluation. They decided: the day's brief is the first
+run at or after 7:00 AM local, stored so later openings and a reopen after dismissal
+show it without a new model run; the workbench budget rises to 100 model calls per
+hour; workbench runs are saved with their settings in compact, git-ignored local
+storage; replay reads Google Calendar for past dates.
+
+This reverses the documented "no stored briefing text" and "do not reopen dismissed
+output" rules once implemented. `docs/plans/briefing-bench-refactor.md` records the
+pain points, current system, conflicts to resolve and phases (proposed Tickets
+175–181). No code changed with this decision. The owner confirmed the 7:00 AM
+interpretation: the first opening at or after 7:00 AM local generates and stores the
+day's brief; earlier openings show none. Past Calendar reads under Google
+verification remain to be confirmed before their phase.
+
+## 2026-09-27: Briefing workbench saves reviews locally, including account captures
+
+The owner asked to implement Phases 0–2 of the briefing-bench audit
+(`docs/plans/2026-09-27-briefing-bench-review.md`) as Tickets 175–177, and authorized
+full account capture for the development workbench.
+
+- The complete rendered brief is the review unit. The editorial target is a roughly
+  45-second read: one or two planning points and at most one supported observation.
+  80–120 visible words is a working range, not a validated formula.
+- The workbench saves cases, candidates, runs, prose feedback, agent proposals and
+  owner decisions under `.local/briefing-bench/`. This replaces the earlier rule that
+  private comparison output stays in memory and clears when the tab is hidden.
+  Account cases save the captured inputs once so they can be rerun exactly. Storage
+  is owner-partitioned, 0700/0600, expires after 30 days and supports deletion.
+  Expiry blocks reads and writes. Physical cleanup runs when the local workbench
+  accesses expired cases; no background deletion runs while the workbench is closed.
+  `.gitignore` only prevents commits; it is not access control.
+- A saved case reruns on its captured clock. Reruns still need current consent: same
+  owner, enabled briefing, captured sources still disclosed, and captured Behaviors
+  still active. A deleted or archived Behavior withdraws the case from reruns.
+- Feedback becomes a proposal through a Markdown packet read by an existing coding
+  agent. No agent framework or embedded chat is added. Proposals are validated and
+  displayed, never executed, and never become production rules; promotion stays a
+  reviewed repository change.
+- Model-weight training, historical reconstruction (Phase 3), batch and lane-preview
+  review with call budgets (Phase 4), promotion (Phase 5) and stored daily briefs
+  are not implemented.
+
+
+## 2026-09-30: Daily Brief evaluation criteria and versioned coverage profiles
+
+The owner supplied Ticket 184's evaluation criteria before reviewing candidate outputs.
+
+- Useful briefs provide actionable adherence insights through behavioral analysis
+  and planning for the day's Behaviors and outside connector events. Use available
+  evidence within existing authorization, disclosure and evidence-quality limits.
+- The complete brief has a general one-minute reading cap. Prefer concise, precise
+  wording. This supersedes the earlier 45-second evaluation target. A configurable
+  reading length remains a possible future setting, not an implemented feature.
+- Quiet days prioritize supported longitudinal insights over day-management tips.
+- Prefer different analysis lanes across days, while revisiting persistent patterns
+  of high importance or impact when useful. Wording variation may help presentation;
+  it does not itself remove substantive repetition.
+- The initial coverage is six tuning cases, ten reserved evaluation cases and one
+  seven-day sequence. Name it `daily-brief-balanced@1`. Support distinct coverage
+  profiles and retain their revisions and evaluation iterations separately.
+
+`docs/plans/2026-09-28-briefing-owner-review.md` defines this first profile and its
+frozen cases. `docs/qa/briefing-workbench.md` records iteration state. Candidate
+acceptance, promotion, deployment and stored-brief decisions remain separate.
+This is an evaluation direction; runtime policy and production presets are unchanged.
+
+
 ## 2026-10-08: Rename the repository to emixd12/cadence
 
 Ticket 186. The owner renamed the existing repository; it keeps ID `1261353608`,
@@ -860,3 +951,352 @@ a later client can reuse the contract.
 This decision authorizes the tickets. It authorizes no hosted migration push,
 signing-key import, deployment, legal publication, or directory submission. Those
 remain owner-only actions.
+
+## 2026-10-17: Travel redesign budget, Behavior Where and model input
+
+The travel review found hosted routing stopped since September 25 because the
+nonrenewing 40-refresh pilot budget ran out. The owner decided:
+
+- Travel spend has an absolute ceiling of US$5 per user per month at Google list
+  price. The ceiling is permissive; the design should spend well below it.
+- Behavior Where is optional: Not set, Anywhere, Home or a saved place. Not set
+  differs from Anywhere. Cadence may suggest a Where from completion place labels
+  stored only after a separate opt-in. A suggestion never changes a Behavior.
+- The Daily Brief model receives slow-changing travel facts, learned travel habits
+  and a weather outlook. Core calculates all times. Exact leave-by times stay in the
+  calculated line beside the brief. Addresses, coordinates, place IDs and raw
+  provider responses never reach the model.
+- Travel Settings shrink to the toggle with its disclosure, Home and usual travel.
+  Learned values replace buffer settings.
+
+Tickets 213–219 record the scope. This decision approves product direction only.
+It grants no provider spending, migration, deployment, new provider or model-data
+transmission. The disclosure update and the Google terms review gate model input.
+
+## 2026-10-18: Google route data in model input; legal register
+
+The owner set a risk regime for Google Maps data in Daily Brief model input:
+
+- Cadence may send the model only its own deterministic conclusions derived from
+  Google route data. Examples: "run fits before the afternoon trip: yes", "travel
+  day", "the Home Behavior does not fit today because of travel".
+- It never sends route durations, rounded trip lengths, leave-by times, or anything
+  from which a route duration can be recovered. A departure time shown next to an
+  event time, for example, reveals the duration.
+- Exact timing stays in the calculated line beside the brief.
+- The owner accepts this as a business risk without asking Google first. Asking Google
+  in writing stays an open item.
+
+This replaces the Google terms review gate from the 2026-10-17 decision. The
+disclosure update still gates model input.
+
+The owner also created one legal register, [`docs/LEGAL.md`](LEGAL.md), for all legal
+matters and questions. Entry L-001 records this regime. Open questions from
+`docs/plans/2026-10-17-weather-provider-comparison.md` moved there.
+
+## 2026-10-18: Weather provider is Open-Meteo
+
+The owner selected Open-Meteo as Ticket 218's weather provider, as recommended in
+`docs/plans/2026-10-17-weather-provider-comparison.md`. Its CC BY 4.0 licence allows
+caching one forecast per area per hour, sharing it across users and sending derived
+facts to the model. It covers the world with hourly forecasts.
+
+- `docs/COSTS.md` assumes the API Standard plan at US$29 per month. The plan choice
+  stays open in `docs/LEGAL.md` entry L-008.
+- The weather area comes from the device position (`docs/LEGAL.md` entry L-002).
+- The Google Weather API would conflict with the regime above, because its forecast
+  facts would be Google content in model input.
+
+This selects the provider. Buying the plan and creating the API key wait for the
+owner's authorization when Ticket 218 is implemented.
+
+## 2026-10-19: Accept hosted custody of the iCloud app-specific password
+
+Ticket 240. The owner accepted the documented risk that Cadence's hosted server
+holds a sealed iCloud app-specific password, although Apple does not limit that
+password to Calendar; it can reach at least iCloud Mail and Contacts. Cadence
+still uses it only for read-only CalDAV `PROPFIND`/`REPORT` calls, and disconnect
+and account deletion still tell the user to revoke it. This unblocks owner-run
+live tests with a real Apple credential. Hosted migration, deployment and user
+release remain separate approvals.
+
+
+## 2026-10-21: Request Calendars.Read for Outlook Calendar
+
+Ticket 242. Live testing showed Microsoft Graph rejects personal Microsoft
+account tokens that carry only `Calendars.ReadBasic`, contrary to its permission
+tables; `Calendars.Read` works. The owner requires personal accounts to work, so
+the Outlook connector requests `Calendars.Read` for all Microsoft accounts. This
+supersedes the earlier choice of `Calendars.ReadBasic` as the least-privileged
+scope. Cadence still requests only the contract's fields and never downloads
+bodies, attachments or extensions; disclosures say Microsoft's permission is
+broader than what Cadence reads.
+
+## 2026-10-22: Travel budget posture confirmed
+
+Tickets 213–219. The owner confirmed the posture that the October 17 records marked as
+an assumption. The US$5 travel ceiling applies per user per calendar month, in the
+user's timezone, and covers Google Maps calls only. Hosting, the Daily Brief model and
+weather are tracked separately in `docs/COSTS.md`. This matches the implemented
+monthly ledger in Ticket 213. Recorded from the owner's October 22 decisions, relayed
+by the orchestrating agent session.
+
+## 2026-10-22: Privacy conflicts never block development before launch
+
+Until the pre-launch privacy pass, privacy, disclosure and marketing-language
+conflicts are logged in `docs/MESSAGING_CHANGES.md` and never block development.
+In-progress work proceeds as if no privacy policy constrains it. The pass is not yet
+ticketed. Provider-terms and licence questions stay in `docs/LEGAL.md`; `docs/LEGAL.md`
+L-011 moved to P-003. `AGENTS.md` ("Privacy changes") states the rule. This decision
+changes no hosted text and authorizes no deployment. Recorded from the owner's October
+22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 165 macOS location permission and directions test
+
+Signed Cadence for Mac 0.1.3 was published on October 22, 2026 (Tickets 115, 178 and
+181). In September testing of signed rc.3, macOS did not show the first location
+prompt; enabling Cadence by hand in Location Services worked
+(`docs/qa/travel-release.md`, September 29). That file records no 0.1.3 retest. The
+owner chose both options:
+
+- A: in-app guidance for the manual macOS permission path, System Settings › Privacy &
+  Security › Location Services › Cadence.
+- B: investigate why the first permission prompt does not appear.
+
+The navigation directions test runs after Ticket 215 deploys. Platform impact: desktop
+implements A and B; web, marketing and future mobile are not affected. Recorded from
+the owner's October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-22: Ticket 216 "I'm here" place markers and confirmed starting values
+
+The owner chose option B. Place positions come from the user's own device: the user
+records an "I'm here" marker at Home or a saved place, through a UI that asks the user
+to record it. Cadence compares the completion position with those markers. It fetches
+no Google coordinates and compares nothing with them, which resolves `docs/LEGAL.md`
+L-003.
+
+- The distances and suggestion rules in Ticket 216 are confirmed as starting values.
+  They are versioned and auditable, so a later change is traceable.
+- The user chooses label retention from two or three options. This replaces the fixed
+  90-day proposal.
+- Full JSON export of labels and markers moves to backlog Ticket 244. It does not
+  block Ticket 216.
+- Privacy-text changes are logged as `docs/MESSAGING_CHANGES.md` P-001.
+
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 217 starting values confirmed
+
+The owner confirmed Ticket 217's proposed defaults and step sizes as starting values:
+a 10-minute get-ready time, a 5-minute arrival buffer, 5-minute feedback steps within
+0–30 minutes, and at most one leave-time question a day. Privacy-text changes for
+stored habits and feedback taps are logged as `docs/MESSAGING_CHANGES.md` P-002.
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 218 free Open-Meteo plan for testing and a fixed margin table
+
+- Development and testing use the free Open-Meteo plan. The paid API Standard plan is
+  required before commercial use; `docs/LEGAL.md` L-008 stays open until Cadence
+  subscribes.
+- The weather margin is a versioned, fixed table: minutes per weather condition, never
+  a share of trip time.
+- Privacy and attribution items are logged as `docs/MESSAGING_CHANGES.md` P-003.
+
+This supersedes the open plan choice in "2026-10-18: Weather provider is Open-Meteo".
+Recorded from the owner's October 22 decisions, relayed by the orchestrating agent
+session.
+
+## 2026-10-22: Ticket 219 disclosures logged, not blocking
+
+The Daily Brief model-data disclosure, the re-consent for travel, habit and weather
+facts, and the marketing language are logged as `docs/MESSAGING_CHANGES.md` P-004 to
+P-006. They do not block development. This supersedes, for development, the
+disclosure gate in "2026-10-17: Travel redesign budget, Behavior Where and model
+input" and "2026-10-18: Google route data in model input; legal register". The
+written question to Google about the `docs/LEGAL.md` L-001 regime is sent from
+info@identityscaffolding.com; L-001 stays accepted risk. Recorded from the owner's
+October 22 decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Ticket 219 live conclusions reach the brief through a signed token
+
+The owner chose Option A. The travel routes response carries a server-signed (HMAC)
+token that holds only Cadence's deterministic route and weather conclusions. The
+Daily Brief request returns the token, and the server verifies it before the
+conclusions enter model input. This needs a new server-only secret and makes no
+extra Google calls. Live conclusions reach the model only after the secret is
+provisioned.
+
+Option B, routing the day again during brief generation, was rejected: it adds paid
+calls and breaks Ticket 170's rule against extra paid routing merely to generate
+prose. The `docs/LEGAL.md` L-001 regime still applies, including its open point on
+yes/no conclusions that bound a route duration from one side. Privacy text: P-004 in
+`docs/MESSAGING_CHANGES.md`.
+
+Ticket 219 implements the token on the travel release train (PR #138). Platform
+impact: web hosts the token and its verification; linked desktop uses the same hosted
+routes and brief generation; marketing claims are reviewed under P-006; future
+mobile would use the hosted path. Recorded from the owner's October 23 decisions,
+relayed by the orchestrating agent session.
+
+## 2026-10-23: Place-label counts cover the suggestion window and full history
+
+Daily Brief model input carries per-Behavior place-label counts for two periods,
+labeled separately: the 60-day suggestion window and the user's full retained label
+history. This keeps the retention copy's promise that longer retention lets the
+advisor learn more. Counts carry no place keys, positions or text. Privacy text:
+P-001 and P-004 in `docs/MESSAGING_CHANGES.md`. Recorded from the owner's October 23
+decisions, relayed by the orchestrating agent session.
+
+## 2026-10-23: Dev-signed desktop builds; the owner gates notarization and publication
+
+The owner is Cadence's only user. Each desktop change had been producing its own
+notarized release candidate, with an owner approval, two-Mac installed acceptance, a
+release packet and publication steps. Nine Developer ID candidates were built after
+September 27, and only 0.1.3 was published. Signing and notarization themselves took
+about three minutes for the 0.1.5 candidate.
+
+- A dev-signed build carries the production Developer ID signature, entitlements and
+  provisioning profile, without a secure timestamp. It is not notarized, has no DMG or
+  updater archive, and is never published. Building it contacts no Apple service. `apps/desktop/scripts/release.mjs dev-build` builds it and
+  `apps/desktop/scripts/install-dev-build.mjs` installs it. Commands, version rules
+  and rollback: `docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
+- Standing approval: agents may build dev-signed builds and install them on the
+  owner's Macs without asking each time. Installation goes through the install
+  script, which keeps its protected copies. Cadence must already be quit; agents
+  never quit it. Builds come from main, or from a branch whose SQLite migrations
+  match `origin/main`.
+- A dev-signed build satisfies a ticket's installed desktop acceptance. Checks that
+  need a notarized or downloaded artifact stay with releases: Gatekeeper on a
+  quarantined download, the DMG, and updates from the published feed.
+- Still the owner's call each time: any Apple notarization submission (`release.mjs
+  build`), any upload, feed or marketing-link change, `--allow-unmerged-migrations`,
+  and restoring a protected database copy, which discards later changes.
+- The owner decides when a batch ships as a notarized release. Merging a desktop
+  change no longer implies a signed candidate. The release gates in
+  `docs/DESKTOP_RELEASE.md` are unchanged.
+
+Platform impact: desktop release tooling only. Web, marketing and future mobile are
+not affected. Recorded from the owner's October 23 instruction in the release-process
+session.
+
+## 2026-10-23: Remove the "not a medical dosing app" agent directive
+
+The owner removed "not a medical dosing app" from the `AGENTS.md` product
+description. Agents kept raising it against advisor work (for example, Daily
+Brief moves for medication Behaviors), and it is not meaningful during
+development. "Medication dose tracking" is also removed from the out-of-scope
+list; no dose-tracking feature is planned or ticketed by this change. Public
+README and marketing wording is unchanged; review it in the pre-launch privacy
+and marketing pass (`docs/MESSAGING_CHANGES.md`).
+
+This supersedes the line in "2026-10-18: Cadence MCP server and AI plugins"
+that says the phrase "stays true."
+
+## 2026-10-24: Right-sized desktop release acceptance and a version-free download link
+
+Cadence for Mac 0.1.3 shipped on October 22 after three notarized candidates. Each one
+repeated the full two-Mac installed matrix and a long packet. Moving the download link
+then took a marketing PR, a production marketing deployment and a Trust redeploy. The
+owner approved three changes, quoted below. This entry supersedes the October 23 line
+"The release gates in `docs/DESKTOP_RELEASE.md` are unchanged."
+
+- **Acceptance.** Every notarized release after 0.1.3 needs four checks on the exact
+  artifact:
+  - all 14 artifact checks in `release.mjs build`;
+  - notarization, plus Gatekeeper on a quarantined download;
+  - an upgrade from the last published version, with the data comparison;
+  - the real updater, when the SQLite schema changes or the last published version
+    changed its updater files.
+
+  Area checks run only when `git diff` from the last published commit touches their
+  files. They cover sign-in callback replays, session renewal and revoked-session tests,
+  Calendar callback replays, native reminders, and the second Mac or a new macOS user.
+  Evidence from a dev-signed build or an earlier candidate counts while those files are
+  unchanged. Packets follow `docs/qa/desktop-release-packet-template.md`. The file lists
+  are in `docs/DESKTOP_RELEASE.md`, "Release acceptance".
+- **The test Mac stays on the last published release.** Dev-signed builds go only to
+  the owner's Mac. This narrows the October 23 standing approval, which covered both
+  Macs.
+- **The real-updater test runs during publication.** Published builds read only the
+  stable feed. So the stable feed changes first, and the test Mac updates through it and
+  passes the data comparison. Only then do the download link and the preview feed move.
+  On failure, the previous feed is restored.
+- **The download link is version-free.** The `desktop-stable` release carries a copy of
+  the current DMG named `Cadence_aarch64.dmg`, and **Download for Mac** links to it.
+  Each publication replaces that asset, so it needs no marketing PR, deployment or Trust
+  marketing-ID refresh. The public Trust evidence never requests a release asset, and
+  the files it digests were byte-identical before and after the change (October 24).
+  Every merge to `main` still rebuilds marketing and needs the Trust refresh.
+- **One upload authorized.** The owner authorized uploading a copy of the published 0.1.3
+  DMG (SHA-256 `aaa4ce67a79622584cd82ebb5111edd966e6834c030871a96b79d950d60e6539`) to
+  `desktop-stable` as `Cadence_aarch64.dmg`, before the link change merges.
+- **Unchanged.** The owner instructs each notarization, every other upload, each feed
+  change, each publication and each merge of a release change.
+
+The owner's words: "I approve all three release-policy changes in PR #143 as proposed,
+and I authorize uploading a copy of the published 0.1.3 DMG to the desktop-stable
+release as Cadence_aarch64.dmg."
+
+Platform impact: the desktop release process, and the marketing download link
+(`INT-MKT-012`). Web and future mobile are not affected. Recorded from the owner's
+October 24 sign-off, relayed by the orchestrating agent session.
+
+## 2026-10-24: Local Dagger checks before every push; no Dagger Cloud
+
+The repository defines its CI checks as a Dagger module (`dagger.toml`,
+`.dagger/modules/cadence/main.dang`). The owner chose to run them locally only:
+
+- The owner and agents run `dagger check` before every push. Unchanged checks
+  return from cache, so repeat verification costs about 1 s on the owner's Mac.
+- GitHub Actions `CI` stays the free merge gate.
+- Dagger Cloud and Cloud Checks are not used. They cost at least US$20 per month.
+- A `ci.yml` step that runs `dagger check` on the GitHub runner is optional and
+  not added. The runner starts with an empty cache, so each run would take about
+  as long as a cold local run.
+
+The owner's words: "I want us to skip Cloud Checks."
+
+Platform impact: development tooling only. Web, desktop, marketing and future
+mobile behavior is unchanged; the Dagger checks build web, desktop frontend and
+marketing exactly as `CI` does.
+
+## 2026-10-27: Messaging and compliance is a separate track
+
+The owner separated messaging and compliance work from development. It replaces the
+2026-10-22 rule that covered privacy text only.
+
+- `docs/PRIVACY_CHANGES.md` is renamed `docs/MESSAGING_CHANGES.md`. It now covers
+  Privacy and Terms, Trust, in-app copy, the user guide, marketing (including the
+  README) and provider submissions such as Google OAuth verification. `P-` IDs keep
+  their numbers.
+- Development tickets log the change and continue. They do not edit that text or
+  the tests that assert it unless the ticket says so. Each ticket states its
+  messaging impact beside its platform impact.
+- Messaging work runs in its own tickets: Ticket 245 (Google verification for the
+  Daily Brief Calendar client) and Ticket 246 (pre-launch messaging pass).
+- Only outward actions wait on open entries: provider submissions, public launch and
+  public listings. Merges, hosted migrations and deployments never do.
+- Consequence: PR #152 no longer waits for the Google submission evidence. Ticket 245
+  records that evidence. P-012 gates the Google submission, not development.
+- `docs/LEGAL.md` keeps provider terms, licences and legal risk decisions.
+- No `agents:check` enforcement for now.
+
+## 2026-10-27: Never-run macOS user check removed from release acceptance
+
+The owner removed the "Second Mac or new macOS user" area check from desktop release
+acceptance. This narrows the 2026-10-24 "Right-sized desktop release acceptance" entry,
+which listed it among the area checks.
+
+- The check is no longer a release gate or a ticket gate. Release packets record it as
+  "Not required: removed by owner decision, October 27, 2026".
+- The idea stays in `docs/FUTURE_UPDATES.md`, "Never-run Mac or macOS user test
+  workflow". In the owner's words, "it should not interfere with development until it is
+  added to workflow."
+- Its trigger files are dropped from the area-check table. The reminder files remain
+  under the Native reminders check.
+- Creating a macOS user stays an owner action (`AGENTS.md`).
+
+Platform impact: desktop release process only; web, marketing and future mobile are not
+affected. Messaging impact: none.

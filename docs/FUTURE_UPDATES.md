@@ -47,15 +47,28 @@ Still deferred:
   preview, explicit human approval, stale-context checks, conflict handling,
   idempotency, audit history, revocation, and atomic apply behavior. Read and
   execution grants remain separate.
+  Owner request (Ticket 184 review, October 16, 2026): when a brief offers a
+  supported time, let the user move that day's Behavior to it with one action
+  after a confirmation step. Start with Cadence Behaviors for the current day.
+  Moving external Calendar events comes later and needs a Calendar write grant.
 - An external advisor transport. The in-app briefing needs no delegated
   consumer or generic connector framework. The remote MCP server is no longer
   deferred; see "MCP server follow-ups" below.
 - Two-way Calendar sync and source-event editing.
-- Other connectors for Cadence Daily Brief. The day-context contract may support
-  relevant authorized connectors, but only existing Google Calendar context is
-  in the initial plan. Focus Keeper capabilities remain unverified.
-- Different or multiple Google accounts for one Cadence account, and Calendar
-  connections in account-free desktop mode.
+- Connectors beyond Google Calendar and the Outlook, iCloud, and Hevy sources
+  locally implemented in Tickets 233–240, with live/release acceptance open under 228. Focus Keeper capabilities remain unverified.
+- Generic CalDAV coverage for providers such as Fastmail, Zoho, and Yahoo. Each
+  needs its own authentication research and ticket. Not implemented.
+- Read-only subscription-feed calendars, such as Proton shared links. Link
+  possession and freshness limits need disclosure. Not implemented.
+- EventKit access to local-only Mac calendars. It is a native permission, not a
+  web-capable connector, and is outside the approved iCloud path.
+- Apple Account "supported app" authorization for iCloud, if Apple publishes a
+  developer path. It could replace app-specific passwords.
+- Hevy early-stop pagination or change-feed reads, after Hevy documents workout
+  ordering or creation events.
+- Different or multiple accounts per provider for one Cadence account, and
+  connector access in account-free desktop mode.
 - New timezone controls and daylight-saving presentation refinements. Existing
   timezone and day-boundary correctness remains required for the planned feature.
 - Native mobile implementation, web offline caching, and closed-app helpers.
@@ -189,3 +202,14 @@ If offline/PWA support moves into scope, add:
 - service worker or PWA config files
 
 The cache resolver should stay pure and should not read browser APIs directly.
+
+## Never-run Mac or macOS user test workflow
+
+A future development or test workflow could install Cadence from the candidate DMG on a
+Mac, or a macOS user, where Cadence never ran. It would cover the first permission
+prompts (location and notifications), the denied state after turning Cadence off in
+System Settings, and the first account link.
+
+It is not a release gate, ticket gate or development requirement until it is adopted
+into a workflow (`docs/DECISIONS.md`, 2026-10-27). Creating the macOS user stays an
+owner action.

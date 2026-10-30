@@ -39,7 +39,7 @@ the apex `/`.
 | `/faq` | implemented in Astro marketing app | Frequently asked questions | Covers Cadence philosophy, privacy, time tracking, and BehaviorLog portability. |
 | `/docs` | implemented in Astro marketing app | Technical docs entry point for Cadence, BehaviorLog, machine-readable mirrors, and future docs structure | Links to Markdown mirrors, `llms.txt`, `llms-full.txt`, route manifest, sitemap, robots, example bundle, and future docs map. |
 | `/examples` | implemented in Astro marketing app | Sanitized sample BehaviorLog bundle page | Downloads a build-generated `.behaviorlog.zip` that passes the pinned BehaviorLog reference validator. |
-| `/about` | implemented in Astro marketing app | Philosophy, governance, scope boundaries, and open-source posture | No desktop/mobile teaser, billing, AI, analytics, or marketing-cookie scope. |
+| `/about` | implemented in Astro marketing app | Philosophy, governance, scope boundaries, and open-source posture | Product and disclosure copy only; no new mobile, billing, analytics or marketing-cookie feature. Optional Daily Brief disclosure does not imply release acceptance. |
 
 Marketing compatibility redirects:
 
@@ -156,6 +156,32 @@ No route creates, changes, or deletes a provider event.
 the initiating cookie user. Desktop callbacks use a fixed result and opaque
 Keychain-correlated state, never credentials.
 
+## Planned connector routes (Tickets 235–240)
+
+Planned October 18, 2026. Hevy (Ticket 236) and Outlook (Ticket 237) routes are
+implemented locally with synthetic tests. Ticket 240 also implements the iCloud
+routes locally; no live Apple account or deployment is verified. Hevy
+`POST /api/hevy/connection` accepts exactly `{apiKey}` under the 8 KB cap and
+returns the view without the key; its `DELETE` adds revocation `hevy_api_key`. Each provider gets its own routes,
+mirroring the Google connector. No generic connector route or new primary screen
+is added. All responses are no-store, use the same session, same-origin, and
+Tauri-origin rules, and expose no provider write.
+
+| Route | Methods | Ticket | Purpose |
+|---|---|---:|---|
+| `/api/outlook-calendar/connection` | GET, POST, PUT, DELETE | 224 | Status; start consent; desktop completion with the desktop session and Keychain client state; disconnect with the Microsoft removal instruction |
+| `/auth/outlook-calendar/callback` | GET | 224 | Web: consume one-use state, require the initiating cookie user, PKCE, nonce, issuer, `tid`/`sub` binding, sealed install. Desktop: forward code and state to `cadence://outlook-calendar/callback` without consuming the attempt |
+| `/api/outlook-calendar/calendars` | GET, PUT | 224 | List readable calendars; save selection |
+| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/icloud-calendar/connection` | GET, POST, DELETE | 227 | Status, accept credential once, disconnect |
+| `/api/icloud-calendar/calendars` | GET, PUT | 227 | Discover `VEVENT` calendars; save selection |
+| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/hevy/connection` | GET, POST, DELETE | 223 | Status, accept API key once, disconnect |
+| `/api/hevy/activities?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot `1.0.0`; inclusive local days, end no later than today, at most 31 days |
+
+Routes call provider services; services own credentials, provider I/O, and
+validation. Settings remains the only connector UI location.
+
 ## In-app briefing boundary (Tickets 145–148)
 
 Current code still has disabled `GET /api/advisor/day-context`: 401 without a
@@ -168,6 +194,9 @@ sign-in and the existing linked-desktop authenticated request path. The server
 derives the owner, local day and allowed fields, calls the bounded internal read
 service, then the model adapter. Return validated briefing text and provenance,
 not credentials or a raw export. POST starts generation, never a source mutation.
+The body holds `installationId`, `retry` and, optionally, the signed
+`travelConclusions` token from the latest one-day travel view (Ticket 219 Option A).
+The server alone verifies that token; it never widens what the caller may request.
 
 Require web origin/CSRF checks, exact desktop broker origins, RLS ownership,
 feature/disclosure checks, bounded attempts, output validation and `no-store`.
@@ -194,6 +223,14 @@ Production returns 404. GET uses existing sign-in and returns current briefing
 access plus authorized Behavior labels only; it never captures context or generates.
 POST accepts either a known fixture ID plus two validated configurations, or exact
 fields `mode: "account"`, `accountRef`, `preferenceRevision` and two configurations.
+Tickets 176–177 add an optional `review` object (case ID and candidate records) that
+saves the case and every run locally, and `mode: "saved"` with `accountRef` (or null)
+to rerun one or two configurations on a saved case's frozen inputs.
+`GET/POST /api/dev/briefing-reviews` call `briefing-review.service.ts` with the same
+guard. GET lists or opens saved cases (`source=synthetic|account`, optional `caseId`)
+and never returns captured account inputs. POST saves feedback and proposal
+decisions, writes a review packet, or deletes a case. Account sources require sign-in
+and use the owner's partition.
 The expected account reference is a mismatch guard, never an owner selector.
 Account mode authenticates through the existing first-party request boundary and
 uses revocable briefing/Calendar consent. One capture supplies both history windows.
@@ -220,6 +257,36 @@ event revisions before and after provider work. It makes no tracking, Calendar, 
 Daily Brief mutation. A generated brief requests day scope once through the shared
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
+Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
+state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
+leg may carry its fixed weather margin. The server derives the weather area from the
+request's device sample only; the route accepts no area, forecast or provider URL.
+Ticket 219 Option A: with `TRAVEL_CONCLUSIONS_SIGNING_SECRET` set, a one-day response
+also carries `conclusionsToken`. It is Cadence's own conclusions for that view,
+HMAC-signed and bound to the user, local date, stored travel inputs and the view's
+expiry. Clients keep it in page memory only and return it unchanged as
+`travelConclusions` in `POST /api/advisor/brief`. The server verifies it there; any
+failure leaves trip and weather facts `not_supplied` and never fails the brief.
+
+`GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
+or the Behavior's own place text, keyed by place key. Calendar-only places get no
+name. `PUT /api/travel/habits` accepts exactly `{ expectedUpdatedAt, change }` with one
+of four changes (get-ready time, arrival buffer, place mode, leave-time answer). The
+server derives the owner, plans the change with the shared core rules and compares
+the habit revision only; a stale revision returns 409. Neither method calls a
+provider or accepts an owner ID, position or route result.
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
 
 ## MCP server and OAuth authorization server (Tickets 220–232)
 
@@ -285,3 +352,25 @@ request verifies a Cadence Bearer token before protocol handling. Cookie session
 never authorize MCP. Scope/rate admission calls the shared integration operation
 layer; user data remains RLS-scoped. Transport limits and verified protocol versions
 are recorded in `MCP_INTEGRATION.md` and `qa/mcp-server.md`.
+
+
+### Historical briefing and sequence evaluation (Tickets 182–183)
+
+`GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical
+exploration/case saves through `briefing-history.service.ts`. `POST
+/api/dev/briefing-sequence` simulates or starts a reserved chronological job; GET
+reads retained partial output and DELETE cancels queued work. The service delegates
+to existing comparison generation. All routes use the existing development-only,
+loopback/same-origin guard and authenticated account partitions. A past Calendar
+read uses a separate development adapter with live authorization. No new hosted RPC,
+production route, migration or production tip-history write is introduced.
+`POST /api/dev/briefing-reviews` also writes a local selected-case sequence report.
+
+## Calendar purpose routing (Ticket 187)
+
+`/api/google-calendar/connection` and `/api/google-calendar/calendars` accept `purpose=agent` for the separate Daily Brief grant.
+Absent purpose or `purpose=standard` keeps existing Timeline behavior. Invalid purpose values fail validation.
+`/api/google-calendar/events` remains standard-only; agent event retrieval stays inside authorized briefing services.
+The shared `/auth/google-calendar/callback` uses distinct random state namespaces and one-time attempt tables.
+Agent web callbacks return `agentCalendar` status; desktop callbacks include `purpose=agent`.
+Desktop Keychain entries isolate pending standard and agent consent.

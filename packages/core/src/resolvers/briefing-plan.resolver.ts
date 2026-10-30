@@ -10,6 +10,7 @@ import {
   BRIEFING_PLAN_VERSION,
   type BriefingDayEvidence,
   type BriefingDayEvidenceAssumption,
+  type BriefingOverlapParticipant,
   type BriefingDayEvidenceCalendarFreshness,
   type BriefingDayEvidenceFinding,
   type BriefingPlanInput,
@@ -49,6 +50,10 @@ type Candidate = Readonly<{
   calendarEventRefs: readonly string[];
   fixedOccurrenceRefs: readonly string[];
   distanceMilliseconds: number;
+  /** The current interval overlaps a timed commitment, not only its buffer. */
+  currentOverlaps: boolean;
+  /** Latest permitted start in the free range this candidate came from. */
+  latestStart: Temporal.Instant;
 }>;
 
 export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
@@ -118,27 +123,31 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
   if (context.status !== "complete") {
     return unavailableResult(base, input, unresolved, "context_partial", "The day context is partial.");
   }
-  if (!connector || connector.state === "not_requested") {
+  // Every requested Calendar source must be current and complete; one source never proves another's free time.
+  const calendars = requestedCalendars(input);
+  if (calendars.length === 0) {
     return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
   }
-  if (connector.state !== "current" || !connector.complete || connector.coverage.some((row) => !row.paginationComplete)) {
-    return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar coverage is not current and complete.");
-  }
-  if (connector.coverage.length === 0) {
-    return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
-  }
-  const fetchedAt = connector.fetchedAt ? instant(connector.fetchedAt, "connector.fetchedAt") : null;
-  if (
-    !fetchedAt
-    || Temporal.Instant.compare(fetchedAt, now) > 0
-    || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0
-    || connector.coverage.some((row) => row.startLocalDate !== context.localDate || row.endLocalDate !== context.localDate)
-  ) {
-    return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar freshness or day coverage is invalid.");
+  for (const calendarSource of calendars) {
+    if (calendarSource.state !== "current" || !calendarSource.complete || calendarSource.coverage.some((row) => !row.paginationComplete)) {
+      return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar coverage is not current and complete.");
+    }
+    if (calendarSource.coverage.length === 0) {
+      return unavailableResult(base, input, unresolved, "calendar_missing", "Complete Calendar coverage is required for scheduling options.");
+    }
+    const fetchedAt = calendarSource.fetchedAt ? instant(calendarSource.fetchedAt, "connector.fetchedAt") : null;
+    if (
+      !fetchedAt
+      || Temporal.Instant.compare(fetchedAt, now) > 0
+      || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0
+      || calendarSource.coverage.some((row) => row.startLocalDate !== context.localDate || row.endLocalDate !== context.localDate)
+    ) {
+      return unavailableResult(base, input, unresolved, "calendar_not_current", "Calendar freshness or day coverage is invalid.");
+    }
   }
 
   const occurrences = new Map(context.cadence.occurrences.map((item) => [item.ref, item]));
-  const calendarBlocks = connector.events.flatMap((event) => calendarBlock(event, context));
+  const calendarBlocks = calendars.flatMap((calendarSource) => calendarSource.events.flatMap((event) => calendarBlock(event, context)));
   const calendarEventRefs = [...new Set(calendarBlocks.flatMap((block) => block.calendarEventRef ?? []))].sort();
   const rejections: BriefingPlanRejection[] = [...dayEvidenceRejections(dayEvidence)];
   const candidates: Candidate[] = [];
@@ -170,9 +179,13 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
 
     const currentStart = instant(occurrence.scheduledFor, "occurrence.scheduledFor");
     const current = interval(currentStart, duration.seconds);
-    const occurrenceBlocks = fixedOccurrenceBlocks(context.cadence.occurrences, movable.occurrenceRef, context);
+    const occurrenceBlocks = fixedOccurrenceBlocks(context.cadence.occurrences, movable.occurrenceRef, context, input.policy.flexibleSchedules === true,
+      { calendarBlocks, bufferSeconds: input.policy.bufferMinutes * 60, now });
     const blocks = [...calendarBlocks, ...occurrenceBlocks];
     const fixedOccurrenceRefs = [...new Set(occurrenceBlocks.flatMap((block) => block.occurrenceRef ?? []))].sort();
+    const currentEnd = instant(current.endAt, "current end");
+    const currentOverlaps = blocks.some((block) => !block.allDay &&
+      Temporal.Instant.compare(block.start, currentEnd) < 0 && Temporal.Instant.compare(currentStart, block.end) < 0);
     const ranges = movable.permittedWindows
       .flatMap((permittedRange) => freeStartRanges(permittedRange, blocks, duration.seconds, input.policy.bufferMinutes * 60, now))
       .sort((left, right) => Temporal.Instant.compare(left.start, right.start) || Temporal.Instant.compare(left.end, right.end));
@@ -205,6 +218,8 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
         calendarEventRefs,
         fixedOccurrenceRefs,
         distanceMilliseconds: Math.abs(currentStart.until(proposedStart).total({ unit: "milliseconds" })),
+        currentOverlaps,
+        latestStart: range.end,
       });
     }
     if (byStart.size === 0) {
@@ -216,7 +231,10 @@ export function planBriefing(input: BriefingPlanInput): BriefingPlanResult {
   }
 
   candidates.sort((left, right) => compareCandidates(left, right, input.policy.preference));
-  const options = candidates.slice(0, input.alternatives).map((candidate, index): BriefingPlanOption => ({
+  const chosen = input.policy.onePerOccurrence
+    ? selectOnePerOccurrence(candidates, input.alternatives, input.policy.bufferMinutes * 60)
+    : candidates.slice(0, input.alternatives);
+  const options = chosen.map((candidate, index): BriefingPlanOption => ({
     id: `option_${index + 1}`,
     occurrenceRef: candidate.occurrenceRef,
     intervals: { current: candidate.current, proposed: candidate.proposed },
@@ -257,9 +275,10 @@ function resolveDayEvidence(
   contextIsCurrent: boolean,
 ): DayEvidenceResolution {
   const context = input.context;
-  const connector = context.connectors[0];
+  const calendars = requestedCalendars(input);
   const calendar = calendarFreshness(input, now, contextIsCurrent);
-  const fetchedAt = connector && connector.state !== "not_requested" ? connector.fetchedAt : null;
+  const fetchedAt = calendars.map((item) => item.fetchedAt).filter((value): value is string => value !== null)
+    .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left), Temporal.Instant.from(right)))[0] ?? null;
   const cadenceObservedAt = instant(context.cadence.observedAt, "context.cadence.observedAt");
   const cadenceCurrent = contextIsCurrent
     && Temporal.Instant.compare(cadenceObservedAt, now) <= 0
@@ -293,31 +312,33 @@ function resolveDayEvidence(
       return Temporal.Instant.compare(start, dayStart) >= 0 && Temporal.Instant.compare(start, dayEnd) < 0;
     })
     .sort((left, right) => left.ref.localeCompare(right.ref));
+  // Known events from each current source stay observable when another source is missing.
   const observedCalendarBlocks = calendar === "current_complete" || calendar === "current_partial"
-    ? connector && connector.state !== "not_requested"
-      ? connector.events.flatMap((event) => calendarBlock(event, context))
-      : []
+    ? calendars.filter((item) => isCurrentFreshness(sourceFreshness(input, item, now, contextIsCurrent)))
+      .flatMap((item) => item.events.flatMap((event) => calendarBlock(event, context)))
     : [];
   const drafts: DayEvidenceDraft[] = [];
   const bufferSeconds = input.policy.bufferMinutes * 60;
 
   // ponytail: Pair scans are bounded by 200 Occurrences and 500 events; use an interval sweep if those caps grow.
+  // Flexible schedules: a range is a flexible span, not a reservation, so it is never one side of an overlap.
+  const flexibleRange = (occurrence: AdvisorOccurrence) => input.policy.flexibleSchedules === true && occurrence.schedule.kind === "range";
   for (let index = 0; index < remaining.length; index += 1) {
     const occurrence = remaining[index]!;
-    const known = knownOccurrenceInterval(occurrence, context.timezone);
+    const known = flexibleRange(occurrence) ? null : knownOccurrenceInterval(occurrence, context.timezone);
     if (!known) continue;
     for (let peerIndex = index + 1; peerIndex < remaining.length; peerIndex += 1) {
       const peer = remaining[peerIndex]!;
-      const peerKnown = knownOccurrenceInterval(peer, context.timezone);
+      const peerKnown = flexibleRange(peer) ? null : knownOccurrenceInterval(peer, context.timezone);
       if (!peerKnown) continue;
-      addPairEvidence(drafts, known, peerKnown, {
+      addPairEvidence(drafts, { ...known, ref: occurrence.ref, source: "occurrence" }, { ...peerKnown, ref: peer.ref, source: "occurrence" }, {
         occurrenceRefs: [occurrence.ref, peer.ref].sort(),
         calendarEventRefs: [],
       }, [...known.assumptions, ...peerKnown.assumptions], calendar, bufferSeconds, now, dayEnd);
     }
     for (const block of observedCalendarBlocks) {
       if (block.allDay || !block.endKnown || !block.calendarEventRef) continue;
-      addPairEvidence(drafts, known, { start: block.start, end: block.end, assumptions: [] }, {
+      addPairEvidence(drafts, { ...known, ref: occurrence.ref, source: "occurrence" }, { start: block.start, end: block.end, assumptions: [], ref: block.calendarEventRef, source: "calendar_event" }, {
         occurrenceRefs: [occurrence.ref],
         calendarEventRefs: [block.calendarEventRef],
       }, known.assumptions, calendar, bufferSeconds, now, dayEnd);
@@ -328,8 +349,8 @@ function resolveDayEvidence(
     const block = knownCalendarBlocks[index]!;
     for (let peerIndex = index + 1; peerIndex < knownCalendarBlocks.length; peerIndex += 1) {
       const peer = knownCalendarBlocks[peerIndex]!;
-      addPairEvidence(drafts, { start: block.start, end: block.end, assumptions: [] },
-        { start: peer.start, end: peer.end, assumptions: [] }, {
+      addPairEvidence(drafts, { start: block.start, end: block.end, assumptions: [], ref: block.calendarEventRef!, source: "calendar_event" },
+        { start: peer.start, end: peer.end, assumptions: [], ref: peer.calendarEventRef!, source: "calendar_event" }, {
           occurrenceRefs: [],
           calendarEventRefs: [block.calendarEventRef!, peer.calendarEventRef!].sort(),
         }, [], calendar, bufferSeconds, now, dayEnd);
@@ -352,7 +373,8 @@ function resolveDayEvidence(
     if (permittedWindows.length === 0) reasons.push("no_permitted_window");
 
     if (reasons.length === 0 && canClaimFeasibleOpportunities && duration.kind === "known") {
-      const occurrenceBlocks = fixedOccurrenceBlocks(remaining, occurrence.ref, context);
+      const occurrenceBlocks = fixedOccurrenceBlocks(remaining, occurrence.ref, context, input.policy.flexibleSchedules === true,
+        { calendarBlocks: observedCalendarBlocks, bufferSeconds, now });
       const blocks = [...observedCalendarBlocks, ...occurrenceBlocks].filter((block) =>
         Temporal.Instant.compare(block.end.add({ seconds: bufferSeconds }), now) > 0
         && permittedWindows.some((permittedWindow) => overlaps(
@@ -431,10 +453,18 @@ function resolveDayEvidence(
   };
 }
 
+type PairSide = Readonly<{
+  start: Temporal.Instant;
+  end: Temporal.Instant;
+  assumptions: readonly BriefingDayEvidenceAssumption[];
+  ref: string;
+  source: BriefingOverlapParticipant["source"];
+}>;
+
 function addPairEvidence(
   drafts: DayEvidenceDraft[],
-  left: Readonly<{ start: Temporal.Instant; end: Temporal.Instant; assumptions: readonly BriefingDayEvidenceAssumption[] }>,
-  right: Readonly<{ start: Temporal.Instant; end: Temporal.Instant; assumptions: readonly BriefingDayEvidenceAssumption[] }>,
+  left: PairSide,
+  right: PairSide,
   refs: BriefingDayEvidenceFinding["refs"],
   assumptions: readonly BriefingDayEvidenceAssumption[],
   freshness: BriefingDayEvidenceCalendarFreshness,
@@ -446,7 +476,7 @@ function addPairEvidence(
   const overlapEnd = earlier(dayEnd, earlier(left.end, right.end));
   if (Temporal.Instant.compare(overlapStart, overlapEnd) < 0) {
     drafts.push({ kind: "known_overlap", interval: intervalBetween(overlapStart, overlapEnd), refs,
-      assumptions: dedupeAssumptions(assumptions), freshness, sortAt: overlapStart });
+      participants: overlapParticipants(left, right), assumptions: dedupeAssumptions(assumptions), freshness, sortAt: overlapStart });
     return;
   }
   if (bufferSeconds === 0) return;
@@ -476,12 +506,39 @@ function calendarFreshness(
   now: Temporal.Instant,
   contextIsCurrent: boolean,
 ): BriefingDayEvidenceCalendarFreshness {
-  const connector = input.context.connectors[0];
-  if (!connector || connector.state === "not_requested" || connector.state === "unavailable" || !connector.fetchedAt) return "missing";
+  const states = requestedCalendars(input).map((item) => sourceFreshness(input, item, now, contextIsCurrent));
+  if (states.length === 0 || states.every((state) => state === "missing")) return "missing";
+  if (states.length === 1) return states[0]!;
+  // Several sources: any stale source makes the combined view stale; any gap makes it partial.
+  if (states.includes("stale")) return "stale";
+  return states.every((state) => state === "current_complete") ? "current_complete" : "current_partial";
+}
+
+type PlannerCalendar = NonNullable<BriefingPlanInput["additionalCalendars"]>[number];
+
+/** Google from the `1.0` view first, then separately disclosed Outlook or iCloud sources (Ticket 239). */
+function requestedCalendars(input: BriefingPlanInput): readonly PlannerCalendar[] {
+  const google = input.context.connectors[0];
+  return [...(google && google.state !== "not_requested" ? [google] : []), ...(input.additionalCalendars ?? [])];
+}
+
+function isCurrentFreshness(state: BriefingDayEvidenceCalendarFreshness): boolean {
+  return state === "current_complete" || state === "current_partial";
+}
+
+function sourceFreshness(
+  input: BriefingPlanInput,
+  connector: PlannerCalendar,
+  now: Temporal.Instant,
+  contextIsCurrent: boolean,
+): BriefingDayEvidenceCalendarFreshness {
+  if (connector.state === "unavailable" || !connector.fetchedAt) return "missing";
   const fetchedAt = instant(connector.fetchedAt, "connector.fetchedAt");
   if (!contextIsCurrent || connector.state === "stale" || Temporal.Instant.compare(fetchedAt, now) > 0
     || Temporal.Instant.compare(now, fetchedAt.add({ milliseconds: ADVISOR_DAY_CONTEXT_LIMITS.freshnessMs })) >= 0) return "stale";
-  const complete = input.context.status === "complete" && connector.state === "current" && connector.complete
+  // The `1.0` view's status reflects Google only; added sources carry their own completeness.
+  const statusComplete = connector.source !== "google_calendar" || input.context.status === "complete";
+  const complete = statusComplete && connector.state === "current" && connector.complete
     && connector.coverage.length > 0 && connector.coverage.every((row) => row.paginationComplete
       && row.startLocalDate === input.context.localDate && row.endLocalDate === input.context.localDate);
   return complete ? "current_complete" : "current_partial";
@@ -577,11 +634,21 @@ function rejection(
   return { occurrenceRef, code, reason };
 }
 
+/**
+ * Other unresolved occurrences that a move must avoid. By default an unknown length
+ * blocks until the day (or range) ends, and a range blocks its whole span. With
+ * `flexible` (recipe 1.2), an unknown length blocks nothing; that occurrence only loses
+ * its own suggestions. A range with a known length holds only that length, packed at
+ * the earliest free time in its span after `now`, so the rest of the span stays open.
+ */
 function fixedOccurrenceBlocks(
   occurrences: readonly AdvisorOccurrence[],
   movingRef: string,
   context: BriefingPlanInput["context"],
+  flexible = false,
+  packing?: Readonly<{ calendarBlocks: readonly Block[]; bufferSeconds: number; now: Temporal.Instant }>,
 ): Block[] {
+  if (flexible) return flexibleOccurrenceBlocks(occurrences, movingRef, context, packing);
   const dayEnd = instant(context.dayEndAt, "context.dayEndAt");
   return occurrences.flatMap((occurrence): Block[] => {
     if (occurrence.ref === movingRef || occurrence.status !== "unresolved" || occurrence.localDate !== context.localDate) return [];
@@ -598,6 +665,39 @@ function fixedOccurrenceBlocks(
       occurrenceRef: occurrence.ref,
     }] : [];
   });
+}
+
+function flexibleOccurrenceBlocks(
+  occurrences: readonly AdvisorOccurrence[],
+  movingRef: string,
+  context: BriefingPlanInput["context"],
+  packing: Readonly<{ calendarBlocks: readonly Block[]; bufferSeconds: number; now: Temporal.Instant }> | undefined,
+): Block[] {
+  // Packing sees every exact occurrence, including the one being moved, so no range is packed into its slot.
+  const today = occurrences.filter((occurrence) => occurrence.status === "unresolved" && occurrence.localDate === context.localDate);
+  const exactAll = today.flatMap((occurrence): Block[] => {
+    if (occurrence.schedule.kind === "range") return [];
+    const known = knownOccurrenceInterval(occurrence, context.timezone);
+    return known && Temporal.Instant.compare(known.end, known.start) > 0
+      ? [{ start: known.start, end: known.end, endKnown: true, allDay: false, occurrenceRef: occurrence.ref }]
+      : [];
+  });
+  const exact = exactAll.filter((block) => block.occurrenceRef !== movingRef);
+  const placed: Block[] = [];
+  const ranges = today.filter((occurrence) => occurrence.ref !== movingRef)
+    .filter((occurrence) => occurrence.schedule.kind === "range" && occurrence.duration.kind === "known")
+    .sort((left, right) => left.scheduledFor.localeCompare(right.scheduledFor) || left.ref.localeCompare(right.ref));
+  for (const occurrence of ranges) {
+    if (occurrence.duration.kind !== "known") continue;
+    const spanStart = later(instant(occurrence.scheduledFor, "occurrence.scheduledFor"), packing?.now ?? instant(occurrence.scheduledFor, "occurrence.scheduledFor"));
+    const spanEnd = rangeEnd(occurrence, context.timezone);
+    if (Temporal.Instant.compare(spanStart, spanEnd) >= 0) continue;
+    const avoid = [...(packing?.calendarBlocks ?? []).filter((block) => !block.allDay), ...exactAll, ...placed];
+    const first = freeStartRanges(intervalBetween(spanStart, spanEnd), avoid, occurrence.duration.seconds, packing?.bufferSeconds ?? 0, spanStart)[0];
+    if (!first) continue;
+    placed.push({ start: first.start, end: first.start.add({ milliseconds: durationMilliseconds(occurrence.duration.seconds) }), endKnown: true, allDay: false, occurrenceRef: occurrence.ref });
+  }
+  return [...exact, ...placed];
 }
 
 function rangeEnd(occurrence: AdvisorOccurrence, timezone: string): Temporal.Instant {
@@ -658,6 +758,44 @@ function freeStartRanges(
   });
 }
 
+/**
+ * One move per occurrence. Occurrences that overlap a commitment come before ones
+ * that only miss the buffer, then earliest current time first. Each occurrence takes
+ * its best candidate that keeps the buffer from moves already chosen. `candidates`
+ * arrive sorted by preference.
+ */
+function selectOnePerOccurrence(candidates: readonly Candidate[], limit: number, bufferSeconds: number): Candidate[] {
+  const byOccurrence = new Map<string, Candidate[]>();
+  for (const candidate of candidates) byOccurrence.set(candidate.occurrenceRef, [...(byOccurrence.get(candidate.occurrenceRef) ?? []), candidate]);
+  const order = [...byOccurrence.values()].sort((left, right) =>
+    Number(right[0]!.currentOverlaps) - Number(left[0]!.currentOverlaps)
+    || Temporal.Instant.compare(instant(left[0]!.current.startAt, "current start"), instant(right[0]!.current.startAt, "current start"))
+    || left[0]!.occurrenceRef.localeCompare(right[0]!.occurrenceRef));
+  const chosen: Candidate[] = [];
+  const collides = (start: Temporal.Instant, seconds: number) => chosen.find((other) =>
+    overlaps(start.subtract({ seconds: bufferSeconds }), start.add({ milliseconds: durationMilliseconds(seconds + bufferSeconds) }),
+      instant(other.proposed.startAt, "chosen start"), instant(other.proposed.endAt, "chosen end")));
+  // A candidate that collides slides later within its own free range, past each chosen move.
+  const place = (candidate: Candidate): Candidate | null => {
+    const seconds = candidate.proposed.duration.seconds;
+    let start = instant(candidate.proposed.startAt, "proposed start");
+    for (let blocker = collides(start, seconds); blocker; blocker = collides(start, seconds)) {
+      start = instant(blocker.proposed.endAt, "chosen end").add({ seconds: bufferSeconds });
+      if (Temporal.Instant.compare(start, candidate.latestStart) > 0) return null;
+    }
+    return start.toString() === candidate.proposed.startAt ? candidate : { ...candidate, proposed: interval(start, seconds),
+      distanceMilliseconds: Math.abs(instant(candidate.current.startAt, "current start").until(start).total({ unit: "milliseconds" })) };
+  };
+  for (const group of order) {
+    if (chosen.length >= limit) break;
+    for (const candidate of group) {
+      const placed = place(candidate);
+      if (placed) { chosen.push(placed); break; }
+    }
+  }
+  return chosen;
+}
+
 function compareCandidates(left: Candidate, right: Candidate, preference: BriefingPlanInput["policy"]["preference"]): number {
   if (preference === "least_change" && left.distanceMilliseconds !== right.distanceMilliseconds) {
     return left.distanceMilliseconds - right.distanceMilliseconds;
@@ -673,6 +811,21 @@ function interval(start: Temporal.Instant, seconds: number): BriefingPlanInterva
     endAt: start.add({ milliseconds: durationMilliseconds(seconds) }).toString(),
     duration: { kind: "known", seconds },
   };
+}
+
+/**
+ * Where the overlap falls within each side, from the unclipped intervals: all of it,
+ * its start, its end, or its middle. Lets prose say "the last 10 minutes of Walk".
+ */
+function overlapParticipants(left: PairSide, right: PairSide): readonly BriefingOverlapParticipant[] {
+  const start = later(left.start, right.start);
+  const end = earlier(left.end, right.end);
+  const part = (side: PairSide): BriefingOverlapParticipant["part"] => {
+    const atStart = Temporal.Instant.compare(start, side.start) === 0;
+    const atEnd = Temporal.Instant.compare(end, side.end) === 0;
+    return atStart && atEnd ? "all" : atStart ? "start" : atEnd ? "end" : "middle";
+  };
+  return [left, right].map((side) => ({ ref: side.ref, source: side.source, interval: intervalBetween(side.start, side.end), part: part(side) }));
 }
 
 function intervalBetween(start: Temporal.Instant, end: Temporal.Instant): BriefingPlanInterval {
@@ -700,6 +853,10 @@ function validateInput(input: BriefingPlanInput): void {
     throw new Error("policy.preference is unsupported.");
   }
   if (typeof input.fixedCommitmentsComplete !== "boolean") throw new Error("fixedCommitmentsComplete must be boolean.");
+  const added = (input.additionalCalendars ?? []).map((item) => item.source);
+  if (added.some((source) => source !== "outlook_calendar" && source !== "icloud_calendar") || new Set(added).size !== added.length) {
+    throw new Error("additionalCalendars must list Outlook or iCloud at most once each.");
+  }
   if (input.movableOccurrences.length > BRIEFING_PLAN_LIMITS.movableOccurrences) {
     throw new Error("movableOccurrences exceeds its limit.");
   }

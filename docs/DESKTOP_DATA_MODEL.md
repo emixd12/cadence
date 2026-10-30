@@ -1,5 +1,48 @@
 # Desktop data model
 
+Schema version 20 adds completion place labels (Ticket 216). Migration
+`0020_completion_place_labels.sql` mirrors the four hosted tables in DATA_MODEL:
+`place_label_settings`, `place_markers`, `completion_place_labels` and
+`where_suggestion_dismissals`, with the same checks on place keys, microdegree
+ranges, accuracy, labels and rule versions. Insert and update triggers require the
+opt-in, and a label requires a Completed occurrence of the same Behavior and local
+date. Deletions run in the store commands, not in triggers, so account sync applies
+each deletion exactly once: `applyStatusTransition` deletes the label when status
+leaves Completed, and the `commitPlaceLabels` settings save deletes everything when
+labels turn off and older labels when retention shortens. The desktop client deletes
+labels past retention when it loads them. `commitPlaceLabels` journals only a request
+hash and a null result, so the outbox never keeps marker positions. Domain-revision
+triggers cover all four tables. Account snapshots carry them as four entity kinds;
+older builds fail closed with "Update Cadence". Native backups include the tables.
+
+Schema version 18 adds the optional Behavior Where (Ticket 215). Migration
+`0018_behavior_where.sql` adds nullable `behaviors.where_kind` (`anywhere`,
+`home` or `place`; null means Not set) and sets `place` for every Behavior with
+location text. Two triggers keep the hosted rule that only `place` keeps
+`location_text`, because SQLite cannot add a table check to an existing table.
+Native row validation rejects an unknown Where and place text on any other value.
+Configuration history is not rewritten: the native snapshot normalizer reads a
+missing `whereKind` as `place` when `locationText` is set and as null otherwise,
+and `where_kind` is an allowed changed field. Account synchronization requires
+`where_kind` in every Behavior upsert, so a build that predates it fails closed
+with "Update Cadence before synchronizing Behavior changes." Local edits and
+export use the shared core rules. Travel Settings and the Behavior form are the
+shared web components; desktop links always open Apple Maps.
+
+Schema version 19 adds learned travel habits (Ticket 217). Migration
+`0019_travel_habits.sql` adds `preparation_minutes`, `arrival_buffer_minutes`,
+`place_modes`, `leave_feedback` and `habits_updated_at` to `travel_settings`, matching
+the hosted columns. Existing rows read as nothing learned. Column checks bound the
+minutes and the JSON array lengths; two triggers require a habit revision for any
+learned value. The native `commitTravelHabits` command and account-sync apply
+validate entry shape, ascending order, the 43-character place key, the hex event
+reference and canonical microsecond instants before writing. A habit commit compares
+`habits_updated_at` with `IS`, so it never conflicts with a travel settings save.
+Account synchronization carries the habits in the profile entity, which now has 13
+keys. A build that predates them rejects the hosted profile while validating the
+snapshot and fails closed with "Update Cadence before synchronizing account data."
+Raw SQLite backups include the columns automatically.
+
 Schema version 16 adds optional Behavior locations and the owner-authored travel
 settings singleton. Travel defaults to disabled. Migration 0016 stores no device
 sample, provider geocode or route result.
@@ -139,8 +182,8 @@ The final app must obtain its own permission and reconcile actual OS readback.
 | Tables | Contract |
 |---|---|
 | `profiles`, `categories` | Stable local identity and current default category Rows |
-| `behaviors`, `behavior_schedules`, `behavior_schedule_slots` | Full current Behavior graph, optional user-authored location, compatibility fields, custom and preset ranges, retained IDs and creation instants |
-| `travel_settings` | Disabled-by-default routing preference, optional user-authored base, separate consent and CAS revision; no device or provider data |
+| `behaviors`, `behavior_schedules`, `behavior_schedule_slots` | Full current Behavior graph, optional Where and user-authored place text, compatibility fields, custom and preset ranges, retained IDs and creation instants |
+| `travel_settings` | Disabled-by-default routing preference, optional user-authored base, separate consent and CAS revision, and learned habits with their own revision (Ticket 217); no device, provider or route-duration data |
 | `behavior_definition_events` | Definition history; updates cannot rewrite events |
 | `behavior_configuration_events` | Configuration snapshots and deferred current-event pointer ownership |
 | `occurrences` | Schedule snapshots, nullable configuration lineage, status snapshot, note, explicit local date |
@@ -499,6 +542,39 @@ The backup remains until the user acknowledges and deletes that exact recovery c
 
 Schema 0013 remains in chronological order as a compatibility prerequisite. The
 repair release includes its table migration without activating Note shortcut UI.
+
+## Sync contract
+
+Desktop sends `ACCOUNT_SYNC_CONTRACT` from
+`packages/core/src/resolvers/account-sync.resolver.ts` with every hosted read and
+apply. The server returns only that contract's kinds and fields, and it keeps
+hosted fields that this build cannot see. The native reader stays strict. Any
+unexpected field therefore signals a server projection fault, not a newer
+schema.
+
+The contract also namespaces client idempotency keys. A build with a new contract
+must not reuse an older contract's receipt, even when their projected data is
+identical. Native schema upgrades still require a new desktop build.
+
+Contract 1 matches published 0.1.5 and the recorded 0.1.6-dev.2 from `ed93fff`
+(SQLite schema 18), whose sync source is unchanged from 0.1.5's `41e4549`.
+Compatibility follows source and sync shape, not a version label. Only
+unversioned development builds from later source that requires the expanded
+profile need coordinated replacement from contract-2 source when this migration
+ships. No later installed development build is recorded, and the current Mac
+build is unverified. Published 0.1.3 still needs an update because it predates the
+Where fields. The complete matrix is in
+`docs/plans/2026-10-27-sync-compatibility.md`.
+
+Rules for a schema change:
+
+- **Additive** (a new optional field or kind): give the column a default and
+  register it in `cadence_private.account_sync_contract_additions` under the next
+  contract. Raise `ACCOUNT_SYNC_CONTRACT` and add matching SQLite fields.
+  Published builds keep synchronizing without the new data.
+- **Breaking** (a rename, a removal, a change in meaning or allowed values, or a
+  cross-row invariant that old builds could violate): also raise
+  `account_sync_min_writer_contract()`. Builds below it show "Update Cadence".
 
 ## Dependency-safe synchronization (Ticket 130)
 

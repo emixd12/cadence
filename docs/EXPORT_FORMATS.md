@@ -104,11 +104,15 @@ Historical definitions and configuration can contain sensitive context, so the
 Export & Import screen discloses this default before download. There is no
 separate history option.
 
-Full JSON also preserves optional user-authored `location_text` on each
-Behavior and in prior and next configuration snapshots. JSONL, CSV, Markdown,
-and BehaviorLog omit saved location text. The BehaviorLog raw Cadence
-configuration view removes `location_text` and location-only changed-field
-markers before writing. Travel settings and the saved base are preserved by
+Full JSON also preserves optional user-authored `location_text` and the
+Behavior Where (`where_kind`: `null` for Not set, `anywhere`, `home` or `place`;
+Ticket 215) on each Behavior and in prior and next configuration snapshots.
+Snapshots recorded before Where read as `place` when they have location text.
+JSONL, CSV, Markdown, and BehaviorLog omit saved location text and Where. The
+BehaviorLog raw Cadence configuration view removes `location_text`, `where_kind`
+and their changed-field markers before writing. No export format includes Ticket 216
+completion place labels, place markers, their settings or suggestion dismissals;
+inclusion is a backlog decision. Travel settings and the saved base are preserved by
 the native SQLite backup. They are not part of the hosted App JSON artifact,
 which has no JSON restore input.
 
@@ -280,8 +284,8 @@ remain the true artifact counts.
 Behavior records include `schedules[]` as the current app-native schedule
 structure. `recurrence_rule`, `scheduled_time`, and `schedule_slots` remain in
 app-native exports for backward compatibility with old records and older tools.
-Full JSON Behavior records include nullable `location_text`. Other export
-formats omit it.
+Full JSON Behavior records include nullable `where_kind` and `location_text`.
+Other export formats omit both.
 Occurrence `note` values are `null` unless the include-notes option is selected.
 
 ## BehaviorLog bundle
@@ -332,8 +336,8 @@ Core alignment rules:
   `rules.definition_history_policy: "event_sourced"`.
 - `raw/cadence/behavior_configuration_events.jsonl` is an optional, hashed
   Cadence-specific file. It contains the same deterministically sorted records
-  as Full JSON `behavior_configuration_events` except saved Behavior locations
-  and location-only changed-field markers are removed. It has `required: false`
+  as Full JSON `behavior_configuration_events` except saved Behavior locations,
+  Where and their changed-field markers are removed. It has `required: false`
   and no core schema reference. The manifest extension declares its path,
   count, `recorded_at`/`id` ordering, and `export_only` history-replay support.
 - Core schedules are segmented only when `schedule_graph`, `timezone`, or

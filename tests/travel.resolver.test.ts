@@ -6,6 +6,7 @@ import {
   resolveTravelEvidence,
   resolveTravelPlan,
 } from "../packages/core/src/resolvers/travel.resolver";
+import { travelPlaceKey } from "../packages/core/src/services/travel-place-key";
 import type {
   TravelCommitment,
   TravelEndpoint,
@@ -315,7 +316,7 @@ describe("resolveTravelEvidence", () => {
     ]);
   });
 
-  it("projects timing only when explicitly enabled", () => {
+  it("projects conclusions only when explicitly enabled, never timing", () => {
     const plan = resolveTravelPlan(planningInput({ now: "2026-09-16T12:00:00Z" }));
     const results = plan.legs.map((leg) => resultFor(
       leg,
@@ -328,8 +329,11 @@ describe("resolveTravelEvidence", () => {
       modelProjection: "enabled",
     });
 
-    expect(evidence.modelProjection?.legs).toHaveLength(2);
-    expect(JSON.stringify(evidence.modelProjection)).not.toMatch(/latitude|longitude|placeId|originRef|destinationRef/);
+    expect(evidence.modelProjection).toMatchObject({ version: "2.0", travelDay: "yes", calendarEvents: true, fits: [] });
+    expect(evidence.modelProjection?.trips.map((trip) => [trip.role, trip.destinationRef, trip.estimate])).toEqual([
+      ["outbound", "event-1", "current"], ["return", null, "current"],
+    ]);
+    expect(JSON.stringify(evidence.modelProjection)).not.toMatch(/latitude|longitude|placeId|originRef|\d{4}-\d{2}-\d{2}T|3000/);
   });
 });
 
@@ -488,4 +492,69 @@ it("withdraws stale duration-dependent routes without invalidating range schedul
   expect(resolveTravelAfterDecisions(evidence, occurrences)).toBeNull();
   const range = { ...evidence, behaviorSources: [{ ref: "exact", behaviorId: "behavior", unresolved: true }] };
   expect(resolveTravelAfterDecisions(range, occurrences)).toBe(range);
+});
+
+describe("Ticket 217 learned buffers", () => {
+  const departures = (plan: ReturnType<typeof resolveTravelPlan>) => plan.legs.map((leg) => resultFor(leg, leg.role === "return"
+    ? estimate("2026-09-16T20:30:00Z", "2026-09-16T21:00:00Z", 1800)
+    : estimate("2026-09-16T17:50:00Z", "2026-09-16T18:20:00Z", 1800)));
+
+  it("occupies get-ready time before an outbound departure without moving the route", () => {
+    const without = resolveTravelPlan(planningInput());
+    const learned = { ...BUFFERS, preparationSeconds: 600 };
+    const plan = resolveTravelPlan(planningInput({ buffers: learned }));
+    expect(plan.legs.map((leg) => leg.id)).toEqual(without.legs.map((leg) => leg.id));
+    expect(plan.legs.map((leg) => leg.request)).toEqual(without.legs.map((leg) => leg.request));
+
+    const evidence = resolveTravelEvidence(evidenceInput(plan, departures(plan), [
+      candidate("behavior-before", "2026-09-16T17:30:00Z", "2026-09-16T17:45:00Z"),
+      candidate("behavior-earlier", "2026-09-16T17:00:00Z", "2026-09-16T17:30:00Z"),
+    ], learned));
+    const preparation = evidence.segments.filter((segment) => segment.kind === "preparation_buffer");
+    expect(preparation).toEqual([expect.objectContaining({
+      startAt: "2026-09-16T17:40:00Z", endAt: "2026-09-16T17:50:00Z", sourceRefs: ["event-1"],
+    })]);
+    expect(plan.legs.find((leg) => leg.id === preparation[0]!.legId)?.role).toBe("outbound");
+    expect(evidence.collisions).toEqual([expect.objectContaining({ candidateRef: "behavior-before", travelCreated: true })]);
+
+    const zero = resolveTravelEvidence(evidenceInput(without, departures(without), [], BUFFERS));
+    expect(zero.segments.some((segment) => segment.kind === "preparation_buffer")).toBe(false);
+  });
+
+  it("adds no get-ready time before onward or return legs", () => {
+    const learned = { ...BUFFERS, preparationSeconds: 900 };
+    const plan = resolveTravelPlan(planningInput({ buffers: learned, commitments: [
+      commitment("event-1", "2026-09-16T18:30:00Z", "2026-09-16T19:00:00Z", endpoint("one", "calendar", "one-r1", 2)),
+      commitment("event-2", "2026-09-16T20:00:00Z", "2026-09-16T20:30:00Z", endpoint("two", "calendar", "two-r1", 3)),
+    ] }));
+    const evidence = resolveTravelEvidence(evidenceInput(plan, plan.legs.map((leg) => resultFor(leg,
+      leg.role === "outbound" ? estimate("2026-09-16T17:50:00Z", "2026-09-16T18:20:00Z", 1800)
+        : leg.role === "onward" ? estimate("2026-09-16T19:10:00Z", "2026-09-16T19:40:00Z", 1800)
+          : estimate("2026-09-16T20:40:00Z", "2026-09-16T21:10:00Z", 1800))), [], learned));
+    const preparation = evidence.segments.filter((segment) => segment.kind === "preparation_buffer");
+    expect(preparation).toHaveLength(1);
+    expect(plan.legs.find((leg) => leg.id === preparation[0]!.legId)?.role).toBe("outbound");
+  });
+
+  it("rejects a negative get-ready time and keeps a learned arrival buffer in the arrival target", () => {
+    expect(() => resolveTravelPlan(planningInput({ buffers: { ...BUFFERS, preparationSeconds: -1 } })))
+      .toThrow("Preparation buffer must be finite and non-negative.");
+    const plan = resolveTravelPlan(planningInput({ buffers: { arrivalSeconds: 300, exitSeconds: 0, settlingSeconds: 0, preparationSeconds: 600 } }));
+    expect(plan.legs[0]!.request.timing).toEqual({ kind: "arrive_by", at: "2026-09-16T18:25:00Z" });
+  });
+
+  it("carries a remembered mode and its place key to the journey, never to the trip home", () => {
+    const placeKey = travelPlaceKey("1 Gym Street");
+    const remembered = { ...commitment("event-1", "2026-09-16T18:30:00Z", "2026-09-16T20:30:00Z",
+      endpoint("event-1-place", "calendar", "event-1-place-r1", 2)), mode: "transit" as TravelMode, placeKey };
+    const plan = resolveTravelPlan(planningInput({ commitments: [remembered] }));
+    expect(plan.legs.map((leg) => [leg.role, leg.mode, leg.destinationPlaceKey])).toEqual([
+      ["outbound", "transit", placeKey],
+      ["return", "transit", null],
+    ]);
+    const evidence = resolveTravelEvidence(evidenceInput(plan, departures(plan), []));
+    expect(evidence.legs.map(({ leg }) => leg.destinationPlaceKey)).toEqual([placeKey, null]);
+    expect(() => resolveTravelPlan(planningInput({ commitments: [{ ...remembered, placeKey: "Main Street" }] })))
+      .toThrow("Travel commitment place key must be a place key.");
+  });
 });

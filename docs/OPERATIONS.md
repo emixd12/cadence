@@ -56,7 +56,132 @@ Supabase and AgentMail are dev dependencies. The Sequenzy command downloads
 the exact reviewed CLI version through npm's isolated execution cache, so it
 requires npm registry access when that version is not already cached.
 
+### Search Console agent CLI
+
+Use the existing `gcloud` identity `info@identityscaffolding.com` to impersonate
+`polyak-agent@polyak-precious--1726112956978.iam.gserviceaccount.com`.
+The CLI targets only `sc-domain:cadence-me.com`. It captures short-lived tokens
+in memory and preserves existing ADC credentials and global CLI configuration.
+No service-account key or additional OAuth client is required.
+
+Cloud IAM impersonation and Search Console property access are separate.
+Scoped token minting and the Search Console API succeeded on 2026-10-07;
+the service account did not yet have Cadence property access.
+The owner must grant this service account **Full** user access in Search Console
+before the commands can operate on Cadence. Confirm the grant with `verify`.
+
+```bash
+npm run search-console -- verify
+npm run search-console -- sitemaps
+npm run search-console -- inspect --url http://cadence-me.com/
+npm run search-console -- inspect --url https://cadence-me.com/
+npm run search-console -- query --start 2026-10-01 --end 2026-10-07 --dimensions page,query
+```
+
+Read commands request `https://www.googleapis.com/auth/webmasters.readonly`.
+The following writes request `https://www.googleapis.com/auth/webmasters`.
+Run a write only after a specific operator instruction names that action and
+sitemap URL. Access authorization alone does not authorize sitemap changes.
+
+```bash
+npm run search-console -- submit-sitemap --sitemap https://cadence-me.com/sitemap.xml
+npm run search-console -- delete-sitemap --sitemap https://cadence-me.com/sitemap.xml
+```
+
+Deletion removes the sitemap submission, not website files or search results.
+Inspection returns Google's indexed state, not a live crawl. The API cannot
+enumerate Page indexing exclusions or request indexing for ordinary HTML pages.
+Use the Search Console report or an authorized export for excluded examples.
+Performance queries return at most 25,000 rows per invocation and do not paginate.
+Before the property grant, `verify` returned HTTP 404 on 2026-10-07.
+HTTP 403 or 404 requires checking property access, token scope, API enablement, and quota;
+never print tokens to diagnose it. See Google's [authorization guide](https://developers.google.com/webmaster-tools/v1/how-tos/authorizing).
+The October 7 alert evidence is in `docs/qa/2026-10-07-search-console-indexing.md`.
+
+CLI verification on 2026-10-07: agents, interactions, resolvers, lint, typecheck,
+and build passed. `npm run test -- --maxWorkers=2 --testTimeout=30000` passed
+2,523 tests; 29 skipped. The sandbox blocked existing socket tests and font
+downloads; authorized reruns passed. Both requested token scopes reached
+`sites.list` with HTTP 200 and no Cadence entry. No sitemap write was executed.
+
 ## Standard verification
+
+### Disposable local Supabase rehearsal
+
+`.github/workflows/supabase-rehearsal.yml` runs on relevant pull requests and
+manual dispatch. Pull requests use GitHub's merge commit; the job summary records
+the checked commit/tree and PR head/base. It runs on a fresh `ubuntu-24.04` VM
+with Node 24, read-only repository permission and no hosted secrets or deployment
+environment. `scripts/supabase-rehearsal.sh` is restricted to that disposable
+runner; use `docs/SUPABASE_WORKFLOW.md` for operator-owned local databases.
+
+The rehearsal uses the lockfile's CLI 2.105.0 Linux Go backend and existing
+project-scoped Docker proxy. It pulls the seven existing pinned images from
+`public.ecr.aws/supabase`, the pinned CLI's official default registry and an
+existing proxy allowlist entry. The registry and pull inventory come from the
+rehearsal helper and the proxy's immutable image list; image pins are not copied.
+The rehearsal first pulls the seven approved pins sequentially with standard
+Docker through the same proxy. This isolates registry access, reduces concurrent
+pull pressure and caches the images before CLI startup. There is no registry or
+image fallback, registry login step, or package permission. It copies only
+config, the empty seed and tracked
+migrations into an unlinked workdir, keeps published ports on `127.0.0.1`, and
+checks service health before and after `db reset --local`. The tracked migration
+version list must exactly match the applied list; its count is derived from the
+tested tree. All `tests/sql/*.sql` rollback fixtures then run with
+`psql -X -v ON_ERROR_STOP=1`, followed by:
+
+```bash
+npm run smoke:rls:local
+npm run smoke:account-sync:local
+CADENCE_SUPABASE_CONTRACT=1 npx vitest run tests/behavior-store-supabase.contract.test.ts
+```
+
+Registry evidence, October 27, 2026: authenticated GHCR
+[run 40561396997](https://github.com/emixd12/cadence/actions/runs/40561396997)
+failed the isolated `postgres:17.6.1.132` pull with the fixed
+`registry_rate_limit` signal, before any migration check. Read-only manifest
+probes at 18:37–18:38 UTC returned 429/`TOOMANYREQUESTS` for six GHCR pins and
+ECR's `storage-api:v1.60.4`; the other manifests returned 200. No missing-manifest
+response or `Retry-After` header was observed. Only PostgREST could be compared
+across both registries and its indexes were byte-identical. The other six
+cross-registry identities were not reverified. ECR availability is not guaranteed.
+
+Each image pull permits at most four attempts, with 10-, 20-, and 40-second
+backoff only for explicit throttling or specific network interruptions
+(`unexpected EOF`, connection reset, I/O timeout, or TLS handshake timeout).
+Authentication, missing manifests, proxy rejection, disk/certificate errors,
+unknown failures, truncated diagnostics, and process time limits stop retries.
+The delay must fit inside the remaining startup budget. This follows the
+[ECR throttling/backoff guidance](https://docs.aws.amazon.com/AmazonECR/latest/userguide/common-errors.html)
+and the documented retry treatment of
+[closed connections and read timeouts](https://docs.aws.amazon.com/boto3/latest/guide/retries.html).
+Docker also has its own layer retries within the same command deadline;
+[Docker 28.0.4](https://github.com/moby/moby/blob/v28.0.4/distribution/errors.go)
+does not retry `TOOMANYREQUESTS` internally.
+
+Local API credentials stay inside the existing config reader. Startup/reset
+output is suppressed; failures identify the phase and show only container names,
+health, ports and networks. Failed pulls and starts also report their exit code
+and bounded diagnostics from at most the final 64 KiB of private output: fixed
+failure categories/signals, approved registry and image names, allowlisted HTTP
+status codes, the fixed retry delay, and whether earlier output was omitted. No raw message, URL, query,
+header, key or credential is emitted. Signals are observations; they do not prove
+which failure caused the exit. Plain "rate limit" text does not establish registry
+throttling. The proxy logs any rejected request as method and path only. Sequential
+pulls share the first start's 8-minute budget; the second start gets 8 minutes
+from a stopped stack with this project's two volumes removed. An unrecovered image
+pull stops the rehearsal before startup. The 30-minute job
+stops only its Cadence containers before ending the proxy. Docker cleanup is
+limited to the CLI's prunes filtered by this project's label; the shared network
+is never pruned, and nothing touches hosted resources. The runner discards its
+temporary volumes afterward.
+
+A successful run establishes migration replay and local database contracts for
+the recorded source. Provider acceptance, the Outlook support/scope decision,
+installed desktop compatibility and the authorized hosted rollout remain
+separate gates. A workflow definition or fake-daemon proxy test is not a completed
+database rehearsal.
 
 ### Day-progress review bench (Ticket 132)
 
@@ -86,6 +211,58 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+### Dagger checks
+
+Dagger runs the CI checks in containers on a local machine.
+`dagger.toml` lists the workspace modules, and `dagger.lock` pins module
+versions and image digests. `.dagger/modules/cadence/main.dang` defines one
+check per CI step, each running the matching npm script.
+
+Do not install `dagger.io/js/vitest` while the CLI is v1.0.0-beta.21. Its test
+discovery uses a brace glob that this engine's workspace search does not match,
+so `dagger check` would skip every test and still pass.
+
+Install the pinned CLI once, and keep Docker Desktop running:
+
+```bash
+curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=1.0.0-beta.21 BIN_DIR="$HOME/.local/bin" sh
+```
+
+Run from the repository root:
+
+```bash
+dagger check                          # every check, concurrently
+dagger check -l                       # list checks
+dagger check cadence/typecheck        # one check
+dagger check cadence/lint cadence/test
+dagger check -i                       # open a shell where an exec fails
+dagger call cadence shell terminal    # shell in the checks' container
+```
+
+Agents run `dagger check --progress=report` before every push. A passing run
+prints one line per check. A failing check prints only its own log; the `test`
+check uses Vitest's `agent` reporter, so a failure prints the failing tests and
+the summary, not all 340 files. Set `DAGGER_NO_NAG=1` to drop the Dagger Cloud
+sign-up hint from the output. If Docker or the Dagger CLI is unavailable, run
+the npm commands above.
+
+The engine caches every step by its inputs. An unchanged check finishes from
+cache. Only a change to a `package.json` or `package-lock.json` reinstalls
+dependencies. Cadence checks run on `node:24-bookworm`, which ships the `git`
+and `python3` that some tests call. The module reads the working tree with
+`.gitignore` rules and also excludes `.env*` files, `node_modules`, `.next`,
+`.claude`, `.local` and `.vercel`.
+
+Dagger covers every GitHub Actions `CI` step except `public-source:check`, which
+needs full Git history. GitHub Actions `CI` stays the merge gate. Dagger runs
+only on local machines: do not enable Dagger Cloud, Cloud Checks or Cloud
+engines (`docs/DECISIONS.md`, 2026-10-24).
+
+Each check reads the whole working tree, minus the excluded paths. So any edit,
+even to a doc, reruns every check, but not the dependency install. On the
+owner's Mac, the first run took 217 s, mostly image pulls and `npm ci`. A run
+after a source edit took 45 s, and an unchanged run took 1 s.
 
 For UI changes, also run the app and inspect at least:
 
@@ -1191,6 +1368,22 @@ deployment through the deployment's Vercel alias inventory before fetching it.
 The daily schedule resolves the latest Ready Production deployments. It reuses
 an unexpired RLS result only while all three release subjects still match.
 
+The collection job grants `GITHUB_TOKEN` `security-events: read` for CodeQL
+alerts and `vulnerability-alerts: read` for Dependabot alerts, following
+[GitHub's workflow permission reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
+Secret-scanning alerts require a separate GitHub App or personal access token;
+the current workflow has neither and reports that result as Unavailable. A
+permission declaration does not establish a Passed result: verify the collected
+evidence in Preview before Production publication.
+
+Alert counts represent a complete observed pagination walk, using at most ten
+pages of 100 alerts each. A further page, failed request, malformed response, or
+inconsistent pagination makes that provider aggregate Unavailable rather than
+publishing a partial count. Provider APIs do not give an atomic snapshot across
+pages. Secret-scanning requests preserve `hide_secret=true`, and the collector
+returns only aggregate data; alert contents and provider error bodies are not
+included in logs or public evidence.
+
 The protected environments own `VERCEL_TOKEN`, `SUPABASE_ACCESS_TOKEN`,
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
 `SUPABASE_SERVICE_ROLE_KEY`. Environment variables own both Vercel project
@@ -1349,7 +1542,7 @@ setting.
 ## Desktop implementation and release gates
 
 Tickets 107–114 implement the macOS track in `docs/DESKTOP_BUILD.md`. Ticket 115
-defers Apple-trusted distribution acceptance. Tickets 116–122 plan optional
+owns Apple-trusted distribution acceptance and is in progress. Tickets 116–122 implement optional
 desktop account synchronization. Preserve unrelated working-tree edits and both
 current deployments. Next.js stays at the repository root.
 
@@ -1374,6 +1567,9 @@ an ad hoc signed development app with a bound bundle identity; it does not
 satisfy Developer ID signing, notarization, or final-release gates. The local
 signing config must not be used for final release builds. Ticket 113's separate
 ad hoc preview procedure is recorded in `docs/DESKTOP_RELEASE.md`.
+For installed testing on the owner's Macs, `release.mjs dev-build` and
+`install-dev-build.mjs` build and install Developer ID signed, unnotarized apps; see
+`docs/DESKTOP_RELEASE.md`, "Dev-signed builds".
 `desktop:dev:web` exposes the
 developer bench without claiming native APIs work in a browser. For Codex local QA, select the first free port
 in 4321–4330 and bind loopback. Never let the server choose outside that pool.
@@ -1397,6 +1593,14 @@ Release tooling runs the desktop frontend build with the reviewed environment,
 disables Tauri's nested frontend build, and verifies both public values exist in
 the fresh frontend output before Tauri runs. Native staged-app configured-state
 acceptance remains the packaging and runtime gate.
+Production `check` and `build` also require public `VITE_CALENDAR_BROKER_ORIGIN`.
+Calendar, Daily Brief, and Travel share this origin; use `https://app.cadence-me.com`.
+Production preflight rejects credentials, paths, queries, fragments, and origins
+without an exact reviewed native CSP `connect-src` entry. Fresh frontend output
+must contain the configured origin before Tauri runs. Build reports record public
+variable names and presence without values; this does not prove installed acceptance.
+Preview and local builds may omit the broker origin. Both CSP policies retain
+the legacy broker and allow the current production origin without arbitrary widening.
 Ad hoc preview builds also select the legacy macOS login-Keychain path and fail
 verification when its compiled marker is absent. Production candidates do not
 inherit this preview-only flag and retain the Data Protection Keychain path.
@@ -1423,11 +1627,13 @@ of rollback: deterministic stale writes must return application conflicts.
 
 Before broad extraction, verify persistent SQLite writes, atomic rollback,
 native scheduling/cancellation, notification activation, and restart behavior.
-Before a production release, verify the shared local-Supabase/real-SQLite
+The first production release, 0.1.3, verified the shared local-Supabase/real-SQLite
 contract suite, full tracking parity, offline launch, actual WKWebView rendering,
-upgrade preservation, and accurate verified native reminder coverage. For the
-first schema-changing desktop update, also test an older installed version
-upgrading through the real updater with a protected database backup.
+upgrade preservation, and accurate verified native reminder coverage. Later releases
+follow `docs/DESKTOP_RELEASE.md`, "Release acceptance": four checks on every release,
+including the real updater when the SQLite schema changes, and area checks only when
+the release changes that area's files. Publication follows "Publication" in the same
+file and changes no marketing source.
 
 Native reminders target the next 30 days and prioritize nearest eligible
 reminders. The owner accepted a clearly displayed OS-limited horizon on
@@ -1446,9 +1652,12 @@ required; the horizon decision does not complete Ticket 108.
 
 Keep signing/updater credentials out of source, logs, and browser code. Ticket
 113's ad hoc Apple Silicon preview and updater acceptance are complete. Ticket
-115 defers Apple Developer Program access, Developer ID signing, notarization,
+115 owns Apple Developer Program access, Developer ID signing, notarization,
 stapled app/DMG verification, quarantined notarized-DMG Gatekeeper acceptance,
-and Apple Silicon macOS 14 execution. See `docs/DESKTOP_RELEASE.md`.
+and installed acceptance on the current Apple Silicon host. The owner deferred
+macOS 14 runtime acceptance without changing the declared and compiled minimum.
+Record the candidate's exact tested macOS version and build. See
+`docs/DESKTOP_RELEASE.md`.
 
 The owner authorized Cadence distribution of the six exact asset hashes in
 `docs/qa/2026-08-30-desktop-asset-provenance.md`. Keep MIT exclusions, reserved
@@ -1521,6 +1730,46 @@ Server environment names: `GOOGLE_CALENDAR_CLIENT_ID`,
 configured HTTPS `/auth/google-calendar/callback` path. Desktop uses only public
 `VITE_CALENDAR_BROKER_ORIGIN`; it never packages these server secrets.
 
+Hevy, Outlook, and iCloud credentials (Ticket 235) use a separate server-only
+keyring: `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` (canonical base64, 32 bytes),
+`CONNECTOR_CREDENTIAL_KEY_ID`, and optional `CONNECTOR_CREDENTIAL_DECRYPTION_KEYS`.
+Never reuse the Google key. Missing configuration reports `not_configured`. The
+same rotation rules below apply.
+
+Outlook Calendar (Ticket 237) adds server-only `OUTLOOK_CALENDAR_CLIENT_ID` (the
+Entra application GUID), `OUTLOOK_CALENDAR_CLIENT_SECRET`, and
+`OUTLOOK_CALENDAR_CALLBACK_URL` (exact HTTPS `/auth/outlook-calendar/callback`,
+on the same host as the web session).
+
+App registration steps (owner-run, not authorized in local work):
+
+1. Register one multitenant app that also accepts personal Microsoft accounts
+   (authority `common`), with the exact web redirect URI above.
+2. Under API permissions, keep only the delegated Microsoft Graph
+   `Calendars.Read` permission (Ticket 242). Remove the default `User.Read` that the
+   portal adds to new registrations. Add no application permissions and no
+   `Calendars.ReadBasic`, write, shared-calendar, `profile`, or `email` permission.
+   Graph rejects personal-account tokens that carry only `Calendars.ReadBasic`
+   (401, empty body), so that permission cannot serve personal accounts.
+3. Create a client secret and store it only in the server environment.
+
+The token check refuses any present Graph permission other than
+`Calendars.Read`, so a leftover `User.Read` makes every connect fail as
+`consent_denied`. Microsoft echoes an earlier `Calendars.ReadBasic` consent next to
+`Calendars.Read` (live, October 22, 2026); because it is a subset of `Calendars.Read`,
+it is accepted only alongside it, and a `Calendars.ReadBasic`-only grant is refused. A connection created before Ticket 242 with only
+`Calendars.ReadBasic` moves to `reconnect_required` on its next read; the user
+reconnects and grants `Calendars.Read`. `Calendars.Read` allows reading event
+details, so data minimization is in the adapter: every Graph request, including
+provider next links, selects only contract fields and never bodies, attachments, or
+extensions. An omitted `scope` in the token response is accepted because
+Microsoft documents that it then covers the requested scopes. Status reports `not_configured` until both these values and the
+connector keyring are present. Disconnect deletes Cadence's sealed refresh token
+only. Microsoft documents no app-side revocation for these scopes, so Settings
+must send users to their Microsoft account or My Apps permissions page. Publisher
+verification and per-tenant consent policy remain release gates. Local
+implementation does not authorize app registration or live-account access.
+
 For key rotation, retain old decrypt keys while credentials use those key IDs.
 New consent seals with the current key. Remove an old key only after every
 connection using it reconnects or disconnects. Missing keys fail closed and
@@ -1539,6 +1788,63 @@ Hosted ciphertext can exist in infrastructure backups under the existing retenti
 policy. Cadence exports, account synchronization, and user-created desktop backups
 exclude credentials and cached events. Test the local SQL contract before any hosted
 rollout. The combined release ledger remains `docs/qa/day-progress-release.md`.
+
+## Connector expansion acceptance and operation (Tickets 233–241)
+
+Tickets 233–241 have independent local source/synthetic approval. `STATUS.md`,
+under "Owner-run live acceptance", records the later authorized provider tests.
+Those tests do not establish installed-desktop, hosted-deployment or public-release
+acceptance. Repository review alone does not authorize real provider reads,
+publication, deployment, or hosted configuration changes.
+
+Outlook uses only delegated `Calendars.Read` plus identity/offline scopes
+(Ticket 242), with explicit field selection. One personal account and one
+home-tenant work/school account (per-user consent) passed live on 2026-10-22.
+Cross-tenant behavior and publisher verification remain release gates. Hevy
+requires Pro. Its key has no documented read-only scope;
+the adapter permits only account verification, count and workout-list GETs.
+A today-only read still scans global history, up to 500 workouts/50 pages.
+Larger accounts return incomplete without workout page reads. Stable before/after
+counts and page counts mean no detected change, not an atomic snapshot.
+Concurrent changes may escape detection. Cadence discards workout detail fields;
+only timing reaches Timeline or separately authorized Daily Brief.
+
+iCloud uses hosted CalDAV with sealed Apple Account email and app-specific
+password. That password is broader than Calendar. The owner accepted hosted
+custody on 2026-10-19; release remains a separate gate. The recorded local live test
+covered discovery, server-expanded recurrence, all-day and cross-zone events.
+Installed and deployed acceptance remain unverified. Unsupported recurrence/timezones
+are quarantined as incomplete; they do not prove an empty calendar. No EventKit
+or local-only Mac Calendar access is implemented.
+
+Each source has a separate default-off Daily Brief disclosure. Generation and
+calendar-selection changes require renewed permission. Disablement and older
+client preference saves revoke the new choices. Only current, disclosed timing
+can reach the model; raw provider details and credentials cannot. Source failures
+never change manual Behavior status. Travel remains Google-only. Existing
+production brief retention remains unchanged: no prompt/text history in Cadence,
+bounded operational metadata, `store:false` with provider retention still possible.
+
+Credentials remain sealed in the hosted private schema. Web snapshots stay in
+memory; desktop uses disposable per-source caches outside tracking exports,
+account synchronization and user-created backups. Infrastructure backups can
+retain ciphertext under the existing seven-day policy. Failed/incomplete reads
+may retain stale complete snapshots; offline clients learn of remote removal
+when they next check. Desktop sign-out/account switch clears local caches.
+Disconnect and successful Auth deletion remove live credentials but do not revoke
+Microsoft, Apple or Hevy access. Direct users to Microsoft app permissions/My Apps,
+Apple app-specific-password revocation, or Hevy key removal/regeneration.
+
+Reuse unchanged lifecycle/disclosure migration evidence and native unit-test
+results from the shared PR Context. Main's #110 fix for the inherited
+`tests/sql/behavior-end-date-lifecycle-smoke.sql:138` test failure is included in
+the reviewed PR stack. Repeat the migration smoke suite in a disposable local
+database before hosted rollout.
+Full-suite desktop-release-acceptance tests have intermittently exceeded their
+unchanged five-second timeout, then passed unchanged. No base-SHA CI link proves
+the cause of that timing observation. Never reset retained `habit-tracking-app`.
+Ticket 241 evidence lives in the workspace task and shared PR Context notes.
+Local disclosure edits do not supersede release approval for published notices.
 
 ## Public Calendar verification execution (Tickets 138–141)
 
@@ -1662,39 +1968,50 @@ back generation without affecting tracking or Calendar event records.
 ## Internal briefing workbench (Tickets 151–155)
 
 Open `/design-system?preview=briefing-workbench` on the selected loopback development
-port. Load or duplicate a repository preset, edit bounded controls, then explicitly
-run a synthetic comparison only under authorized provider testing. Opening the bench,
-loading a preset, and editing controls never invoke the model. A run makes at most two
-sequential calls, bounded to 25 seconds each and 60 seconds overall. The server admits
-one comparison at a time and six per process hour; restarting development resets that
-process-local budget. Synthetic mode never reads real account or Calendar data.
+port. Compare opens first; Days supports chronological review, and Saved reviews
+holds local cases and exact prose feedback. Opening controls never invokes a model.
+A new comparison captures one snapshot for A/B. Historical exploration performs
+explicit no-model reads. Save one selected day before running it. Captured inputs
+preserve their original clock; current reads of past dates are Retrospective.
+Unsupported reconstruction remains unavailable. Per-source coverage explains gaps,
+late changes, unknown duration and missing historical Note/reminder state.
 
-The owner extended Ticket 154 to My account mode. Select it, sign in through the
-existing web flow, and enable Daily Brief model-data access in Settings. Optional
-Calendar data additionally requires its separate model-data permission and the
-configuration checkbox. Mode selection and access refresh read only access metadata
-and authorized Behavior labels. Only Run comparison captures facts and invokes the
-model. One raw snapshot supplies both configurations; history windows filter records
-before aggregation. Account/source/disclosure checks run before each submission and
-before delivery. Comparison attempts never consume the daily briefing allowance.
+The workbench reserves provider calls before generation. The process-wide hourly
+ceiling defaults to 100 (`CADENCE_BRIEFING_BENCH_CALL_LIMIT`, 1–100), replacing the
+old six-comparison limit. At most two provider calls execute concurrently across
+tabs. Every dispatch counts, including rejection, failure and dispatched cancellation.
+Undispatched cancellation releases its reservation. Calls, tokens and price remain
+different measures; unavailable provider usage is reported as unavailable.
+Production admission remains separate. Restarting the process resets this local budget.
 
-Account-specific selections, facts, generated text and review notes stay in memory.
-Delivered results survive window blur/focus and remain inspectable after snapshot
-expiry, with an expired-snapshot notice. Freshness still gates submission and delivery;
-the production Daily Brief still expires. Focus rechecks account access without
-clearing an unchanged account. Private results clear when the tab becomes hidden,
-on page navigation, mode/configuration changes, or account/consent changes and access
-check failures. Saving/exporting presets remains available only
-in Synthetic mode. The owner will sign in and test private comparisons personally;
-agents must not run those comparisons. No new provider, deployment or native release
-authority follows from this development-only extension.
+Days requires a no-model chronological plan before generation. Warm-up is explicit
+(empty in the UI); simulation assumes selected tips were delivered. Actual sequence
+history retains only successful tips and never writes production tip history.
+Diagnostic previews bypass cross-lane ranking/cooldown, preserve evidence and consent
+checks, and remain separate from complete daily-brief quality review. Retry creates
+a new attempt. Cancel stops queued work, preserves completed output, and claims no
+provider refund. Saved runs persist; unsaved sequence output remains inspectable in
+process memory for one hour. Private browser state clears on account/consent changes.
+
+My account uses existing sign-in and Daily Brief disclosure. Optional Calendar reads
+also require current disclosure, connection and selection. Past Calendar is a separate
+explicit request and remains Retrospective; it never activates the historical
+Calendar-pattern lane. Current owner, source access and retained Behavior access
+are checked before transmissions. Live time controls auth/expiry/cancellation;
+replay time controls evaluation only. Local-only and unsynced desktop data are absent.
+The owner runs private comparisons personally; agents do not run them.
+
+Cases, candidates, runs, feedback and reports live under `.local/briefing-bench/`
+with owner-only permissions and 30-day retention enforced on access. Inputs above
+the capture cap become Review only or fail an explicit historical save. Old cases
+remain readable. Individual cases support deletion. Review packets and sequence
+reports stay local; never commit private case text or identifiers.
 
 The preset data lives in `packages/core/src/data/briefing-presets.json`.
-`activeBriefingConfig()` in `lib/services/briefing-pipeline.ts` selects the default
-configuration. Only an ordinary reviewed repository change promotes a preset.
-The workbench stores one validated configuration draft in browser storage and can
-export/import configuration JSON. Generated output, facts and review notes remain in
-memory. Version or control changes discard pending comparisons.
+`activeBriefingConfig()` in `lib/services/briefing-pipeline.ts` selects the default.
+Drafts, simulations, feedback and lane previews never promote a preset. Ticket 184
+requires owner-set criteria and explicit comparison acceptance before promotion.
+Ticket 185 is a separate stored-production-brief proposal, not this local case store.
 
 Catalog summaries are original paraphrases with source dates and limitations in
 `packages/core/src/data/briefing-references.json`. Review the original source before
@@ -1776,7 +2093,31 @@ Rollback first removes the clearance flag. Foreground clients clear transient ev
 when they refresh, lose focus, go offline or reach their five-minute expiry.
 User-authored locations and tracking remain intact. Do not roll back the additive
 schema while newer desktop clients can synchronize. Travel never resets Daily Brief
-admission or dismissal; no travel facts enter the model in this release.
+admission or dismissal. Ticket 219 limits travel facts in model input to the
+conclusions-only regime in `docs/TICKETS.md`; never durations or times.
+
+## Travel conclusions signing secret (Ticket 219 Option A)
+
+`TRAVEL_CONCLUSIONS_SIGNING_SECRET` is a server-only HMAC key. `POST /api/travel/routes`
+signs Cadence's own conclusions for a one-day view with it. That means yes/no fits,
+trips, unknowns and weather rule conclusions; no durations or times. The Daily Brief
+request returns that token unchanged, and the server verifies the signature, owner,
+local date, expiry and current stored travel inputs before using it.
+
+- Without the secret, routes issue no token and every brief reports trip and weather
+  facts as `not_supplied`. Briefs never fail because of a token.
+- Generate at least 32 random characters, for example `openssl rand -base64 48`.
+  Never prefix it with `NEXT_PUBLIC_` or `VITE_`. Never put it in desktop builds,
+  logs, exports, tickets or chat.
+- Provisioning in Vercel (Production and Preview, sensitive) is an owner-gated rollout
+  step. Redeploy after setting it.
+- Rotation: move the current value to `TRAVEL_CONCLUSIONS_SIGNING_SECRET_PREVIOUS`, set
+  a new current value and redeploy. Remove the previous value after the longest view
+  expiry has passed; route views expire within minutes. The previous key only
+  verifies; it never signs, and it never works without a current key.
+- Rollback: remove the secret. Clients keep working and briefs omit trip facts.
+- Local testing: put a generated value only in git-ignored `.env.development.local`.
+  Tests use inline test-only values.
 
 ## Historical completion-time context
 
@@ -1898,3 +2239,48 @@ consent RPC in place of Ticket 227's future UI. It deletes its synthetic user
 and registrations and stops its own development server. It never reads or
 copies `.env.local`; local Supabase keys enter the child environment in memory.
 A clean isolated database reset and generated-type comparison remain required.
+
+## Agent Calendar grant (Ticket 187)
+
+Implementation checklist: `docs/plans/2026-10-12-agent-calendar-cloud-rollout.md`.
+The rollout requires corrected AI disclosures and a demonstrated barrier against older AI readers.
+
+Ticket 187 separates AI Calendar access from Timeline Calendar access. Cadence sign-in stays unchanged.
+The existing standard client remains non-agentic; confirm that classification before rollout.
+Daily Brief and private workbench current/historical reads use a new agent client exclusively.
+No Workspace MCP endpoint or additional Google scope is introduced.
+
+Provision the agent client in a different Google Cloud project from both standard Calendar and sign-in.
+Google token revocation affects grants across clients within one project.
+Configure these server-only values alongside the existing Calendar settings:
+
+- `GOOGLE_CALENDAR_PROJECT_ID`: actual standard Calendar project ID.
+- `GOOGLE_CALENDAR_AGENT_PROJECT_ID`: actual, distinct agent Calendar project ID.
+- `GOOGLE_CALENDAR_AGENT_CLIENT_ID` and `GOOGLE_CALENDAR_AGENT_CLIENT_SECRET`: the agent client.
+
+The agent client uses the same HTTPS callback path and encryption keyring as standard Calendar.
+Register the active callback on the agent client. Register the legacy callback only if that origin remains supported.
+Runtime rejects missing agent credentials, equal project IDs, and equal client IDs. It never falls back to standard credentials.
+Project IDs are configuration assertions; verify actual client ownership and agentic classification in Google Console.
+Complete consent-screen branding, authorized domains, Calendar API enablement, and sensitive-scope verification for the new project.
+Do not copy standard refresh tokens or change the standard client ID.
+
+Rollout order:
+1. Confirm both project/client inventories, classification, callbacks, scopes and verification with an authorized Google owner session.
+2. Keep AI Calendar requests unavailable during the migration/application cutover. Do not run old AI readers against newly enabled agent preferences.
+3. Apply `20261022180000_separate_agent_calendar_grant.sql` through the approved Supabase migration workflow, then deploy the matching server source.
+4. Add verified agent configuration. The migration clears old Calendar disclosures and outstanding brief attempts for those accounts only.
+5. Obtain fresh consent in **Google Calendar for Daily Brief**, select calendars, and enable Calendar separately in **Daily Brief**.
+6. Verify web and an installed desktop build with both grants. Disconnect each independently; verify the other still reads Calendar and sign-in works.
+7. Check denied consent, Workspace policy rejection, revoked refresh, missing configuration, replay, wrong account and account deletion.
+8. Record sanitized evidence in `docs/qa/2026-10-12-agentic-calendar.md` before closing Ticket 187.
+
+Agent credentials, attempts, preferences, generations and pending requests are separate from standard Calendar.
+Desktop uses a separate Keychain pending-state entry, the hosted broker, and no agent event cache.
+Account deletion cascades both grants and attempts provider revocation after Auth deletion succeeds.
+A Google revocation outage leaves local credentials deleted and reports the existing manual-removal warning.
+Pre-separation workbench cases containing Calendar data remain locally reviewable, but cannot be rerun against the model.
+
+Rollback removes agent configuration and disables Calendar disclosure. Preserve the standard connection and additive schema.
+Do not roll back to source that sends standard-grant Calendar data to AI. Behavior-only briefing can remain enabled.
+The email's November 11/12 dates remain notice evidence; live classification is a separate verification gate.

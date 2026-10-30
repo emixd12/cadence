@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>/1234567/calendars/home/timed.ics</d:href>
+    <d:propstat>
+      <d:prop><d:getetag>"e-timed"</d:getetag><c:calendar-data><![CDATA[BEGIN:VCALENDAR

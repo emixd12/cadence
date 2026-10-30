@@ -63,12 +63,22 @@ link remains one focus target.
 **Prerequisites:** The Cadence deployment has enabled the optional Google
 Calendar connector, and you connected the same Google
 identity used for the Cadence account. If Settings says Calendar is not
-configured, the deployment has not enabled provider access. Google's review of
-Calendar access is pending. The connector is not yet verified for public rollout.
+configured, the deployment has not enabled provider access. See the current
+release evidence for deployment and installed-client acceptance.
 
-Cadence requests read-only Calendar-list and event scopes through a separate
-consent flow. It reads your subscribed calendar list for selection, then reads
-events from selected calendars within the displayed inclusive date range. Depending on Google data and permissions, normalized event details can
+Cadence can offer two Google Calendar connections. Each asks for read-only
+Calendar-list and event access through its own Google consent:
+
+- **Google Calendar** shows events in Timeline.
+- **Google Calendar for Daily Brief**, where available, gives Daily Brief
+  today's event timing. Daily Brief then reads Calendar only through this
+  connection, never through the Timeline connection, and Timeline does not show
+  its events.
+
+Each connection reads your subscribed calendar list so you can choose its
+calendars. It then reads events from those calendars: the Timeline connection
+for the displayed inclusive date range, the Daily Brief connection for today.
+Depending on Google data and permissions, normalized event details can
 include title, description, time or date span, timezone, location, organizer,
 attendees, conference links, recurrence facts, response, busy/free state,
 attachment links, revision, and a source URL. Cadence does not download
@@ -78,15 +88,26 @@ terms and privacy policy. Cadence's use and transfer of Google API information
 adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
 including its Limited Use requirements.
 
+**AI use:** Connecting a calendar sends nothing to OpenAI. Daily Brief sends
+Calendar timing only after you also turn Calendar on under **Daily Brief**. It
+then sends today's event timing, timezone, availability and response state,
+without titles or other event details. Cadence does not use information from
+Google APIs to develop, improve, or train generalized AI or machine-learning
+models, and does not transfer it to anyone for that purpose.
+
 **Data custody:** Vercel runtime processes Calendar API requests and returned
-event details while serving a refresh. Supabase stores the Calendar connection
-and display preferences with the Cadence account. It stores the Google refresh
-credential as account-bound encrypted ciphertext in a private database schema.
+event details while serving a refresh or preparing a briefing. Supabase stores
+each connection, its calendar selections and, for the Timeline connection,
+display preferences with the Cadence account. It stores each Google refresh
+credential separately as account-bound encrypted ciphertext in a private
+database schema.
 Cadence does not store Google event details in its hosted database. Browser and
 desktop clients receive normalized event snapshots, not the Google credential.
-Desktop may store the last complete normalized snapshot in the separate
-`calendar-cache.sqlite3` file. That file can contain the readable event details
-listed above. It contains no Google credential or raw Google response.
+For the Timeline connection, desktop may store the last complete normalized
+snapshot in the separate `calendar-cache.sqlite3` file. That file can contain
+the readable event details listed above. It contains no Google credential or raw
+Google response. Desktop keeps no event cache for Google Calendar for Daily
+Brief.
 
 **Exports and backups:** Calendar credentials and event snapshots are excluded
 from JSONL, CSV, App JSON, BehaviorLog, account synchronization, and user-created
@@ -95,13 +116,14 @@ the disposable Calendar cache. Supabase daily infrastructure backups can retain
 sealed credential ciphertext for the current seven-day backup window after live
 deletion. A user-created export cannot restore a Calendar connection.
 
-**Disconnect and deletion:** **Disconnect Google Calendar** marks the connection
-disconnected, clears selected calendar IDs, and deletes the live credential
-before Cadence attempts to revoke the Google grant. If Google cannot confirm
-revocation, Cadence tells you to remove the grant in Google Account permissions.
-Account deletion attempts the same revocation and then removes the Auth user and
-owner-scoped live Calendar records. If revocation fails, Google Account
-permissions may still show the grant. Provider or hosting backup remnants can
+**Disconnect and deletion:** Each connection has its own Disconnect. Disconnect
+marks that connection disconnected, clears its selected calendar IDs, and
+deletes its live credential before Cadence attempts to revoke its Google grant.
+The other connection stays connected. If Google cannot confirm revocation,
+Cadence tells you to remove the grant in Google Account permissions. Account
+deletion attempts revocation for each connection and then removes the Auth user
+and owner-scoped live Calendar records. If revocation fails, Google Account
+permissions may still show a grant. Provider or hosting backup remnants can
 outlast the live record under their retention policies. Other devices stop
 refreshing when they next observe the connection change.
 
@@ -115,6 +137,47 @@ does not keep Calendar event details in the Cadence database backup.
 **Recovery or undo:** Reconnect Calendar to grant read-only access again.
 Deleting the Cadence account is permanent and does not recreate any data when a
 new account later connects to the same Google identity.
+
+## Outlook, iCloud, Hevy, and Daily Brief data
+
+These connectors are locally implemented and independently verified with synthetic
+inputs. Live providers, installed desktop behavior and deployment remain unverified.
+iCloud real-credential use and release also require the owner's acceptance of
+hosted custody of an app-specific password that Apple does not limit to Calendar.
+See [Timeline source instructions](timeline.md#connected-sources-outlook-calendar-icloud-calendar-and-hevy).
+
+Cadence seals Outlook refresh credentials, the iCloud email and app-specific
+password, and the Hevy API key in its hosted private schema. Client intake is
+transient. Clients never persist these credentials. Vercel processes provider
+responses; Cadence does not persist source records in its hosted database.
+Web snapshots stay in memory. Desktop uses a separate disposable per-source
+cache outside tracking exports, synchronization and user-created backups.
+Infrastructure backups may retain deleted ciphertext for the existing seven-day
+window. An offline device can retain stale context until its next connection
+check or local account disconnect. Sign-out and account switch clear desktop caches.
+
+Disconnect removes Cadence's saved access. Successful account deletion cascades
+live connector records; a failed deletion preserves connections. Neither action
+revokes these providers' grants or credentials. Remove Cadence in Microsoft
+account app permissions or work/school My Apps, revoke the app-specific password
+at account.apple.com, or remove or regenerate the API key in Hevy settings.
+
+Hevy requires Pro. Its API can return exercise and other workout details;
+Cadence discards them and keeps only identity/revision and timing fields needed
+for normalized snapshots. Timeline shows timing and duration only. A request for
+today still scans global history up to 500 workouts; larger accounts report
+incomplete without page reads. Count/page checks detect some changes, not an
+atomic snapshot. A workout never completes a Behavior or proves free time.
+
+Connecting or displaying a source never permits model access. Each source needs
+its own default-off Daily Brief choice before today's timing can reach OpenAI.
+Calendar titles/details and credentials stay out. Hevy contributes only past
+recorded timing. Reconnect or calendar reselection requires renewed permission.
+Turning Daily Brief off revokes optional choices; older client saves also revoke
+new source choices. Pending results are fenced after withdrawal or account changes.
+Cadence retains no production prompt or briefing history. Text stays in memory;
+preferences and bounded operational metadata persist. OpenAI retention can apply
+even with `store:false`. Withdrawal cannot recall input already sent.
 
 ## Create an export before deletion
 

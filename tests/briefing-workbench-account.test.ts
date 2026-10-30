@@ -27,7 +27,7 @@ function request(overrides = {}, signal?: AbortSignal) { return new Request(`${o
 const output = { text: 'Review your supplied context.', occurrenceRefs: [], suggestions: [] };
 
 beforeEach(() => {
-  vi.resetModules(); vi.resetAllMocks(); vi.stubEnv('NODE_ENV', 'development');
+  vi.resetModules(); Reflect.deleteProperty(globalThis, Symbol.for("cadence.briefingBenchBudget")); vi.resetAllMocks(); vi.stubEnv('NODE_ENV', 'development');
   mocks.spend.mockResolvedValue(125_000);
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-01T12:00:00Z'));
   mocks.authenticate.mockResolvedValue(caller); mocks.preferences.mockResolvedValue(preferences); mocks.settings.mockResolvedValue(settings);
@@ -38,6 +38,16 @@ beforeEach(() => {
     configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current }));
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+
+it('explains why a signed-in account cannot use port 3000', async () => {
+  const { readBriefingWorkbenchAccount } = await import('@/lib/services/briefing-workbench.service');
+  const response = await readBriefingWorkbenchAccount(new Request('http://127.0.0.1:3000/api/dev/briefing-comparison', {
+    headers: { 'sec-fetch-site': 'same-origin' },
+  }));
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: 'access_denied', recovery: 'Open this development workbench on localhost port 4321–4330.' });
+  expect(mocks.authenticate).not.toHaveBeenCalled();
+});
 
 it('captures once, freezes planning, narrows each scope and never consumes daily admission', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
@@ -53,7 +63,7 @@ it('captures once, freezes planning, narrows each scope and never consumes daily
   expect(facts[1].context.cadence.history.lookbackDays).toBe(30);
   expect(facts[1].context.cadence.occurrences).toEqual([]); expect(facts[1].context.cadence.history.behaviors).toEqual([]);
   expect(facts[1].context).not.toHaveProperty('connectors');
-  expect(mocks.current).toHaveBeenCalledTimes(5);
+  expect(mocks.current).toHaveBeenCalledTimes(7);
   expect(mocks.begin).not.toHaveBeenCalled(); expect(mocks.finish).not.toHaveBeenCalled();
   expect(response.headers.get('cache-control')).toContain('no-store');
 });
@@ -90,7 +100,7 @@ it('rejects a different owner, disabled consent and stale consent before model s
 it('withholds both results if consent or source changes after the first generation', async () => {
   const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
   const { DailyBriefError } = await import('@/lib/services/daily-brief-consumer');
-  mocks.current.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new DailyBriefError('context_changed'));
+  mocks.current.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new DailyBriefError('context_changed'));
   const generate = vi.fn(async () => ({ ...output, text: 'PRIVATE_GENERATED_TEXT' }));
   const response = await runBriefingComparison(request(), generate);
   expect(response.status).toBe(409); expect(await response.text()).not.toMatch(/PRIVATE_GENERATED_TEXT|inspector|cadence/);
@@ -167,4 +177,38 @@ it('captures requested historical timing once and excludes it independently from
   expect(body.results[1].inspector.facts.cadence).not.toHaveProperty('historicalCompletionTimes');
   expect(mocks.begin).not.toHaveBeenCalled();
   expect(mocks.finish).not.toHaveBeenCalled();
+});
+
+it('sends descriptions only after workbench confirmation and only for estimating configurations', async () => {
+  const { runBriefingComparison } = await import('@/lib/services/briefing-workbench.service');
+  const { BRIEFING_PRESETS } = await import('@cadence/core/services/briefing-config');
+  const candidate = structuredClone(BRIEFING_PRESETS.find((item) => item.id === 'advisor-analysis-2')!.config);
+  mocks.capture.mockImplementation(async (_caller, input) => ({ preferences,
+    contexts: input.historyDays.map((days: number) => briefingFixture('missing_duration', config(days))),
+    configurationRefs: { behavior_owned: 'behavior_fixture' }, assertCurrent: mocks.current,
+    analysisSource: null, descriptions: input.descriptions ? { behavior_fixture: 'About a 25 minute walk.' } : null }));
+  const generate = vi.fn(async () => ({ ...output, tip: null }));
+  const estimate = vi.fn(async () => ({ estimates: [{ behaviorRef: 'behavior_fixture', minutes: 25, basis: 'stated' }] }));
+
+  expect((await runBriefingComparison(request({ configs: [config(), candidate], descriptionsConfirmed: false }), generate, undefined, { estimate })).status).toBe(400);
+  expect((await runBriefingComparison(request({ configs: [config(), candidate] }), generate, undefined, { estimate })).status).toBe(200);
+  expect(mocks.capture.mock.calls.at(-1)![1]).not.toHaveProperty('descriptions');
+  expect(estimate).not.toHaveBeenCalled();
+
+  const response = await runBriefingComparison(request({ configs: [config(), candidate], descriptionsConfirmed: true }), generate, undefined, { estimate });
+  const body = await response.json();
+  expect(response.status).toBe(200);
+  expect(mocks.capture.mock.calls.at(-1)![1].descriptions).toEqual({ ownerConfirmed: true });
+  expect(estimate).toHaveBeenCalledOnce();
+  expect(body.results[0].inspector).not.toHaveProperty('durationEstimates.items.0');
+  expect(body.results[1].inspector.durationEstimates).toMatchObject({ state: 'ready', estimates: [{ behaviorRef: 'behavior_fixture', minutes: 25 }] });
+  expect(body.dispatchedCalls).toBe(3);
+});
+
+
+it('refuses rerunning Calendar-derived cases captured before agent grant separation', async () => {
+  const { assertSavedCaseAuthorized } = await import('@/lib/services/briefing-workbench.service');
+  const saved = { source: { mode: 'account', accountRef: 'account_owner' }, capture: { includeCalendar: true } };
+  await expect(assertSavedCaseAuthorized(caller as Parameters<typeof assertSavedCaseAuthorized>[0], preferences as Parameters<typeof assertSavedCaseAuthorized>[1],
+    saved as Parameters<typeof assertSavedCaseAuthorized>[2], new AbortController().signal)).rejects.toThrow('review_only');
 });
