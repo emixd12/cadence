@@ -97,6 +97,8 @@ const chatgpt = Object.freeze({
   consentClient: 'ChatGPT',
   watcherScenario: 'chatgpt',
   connectorsPath: '/#settings/Connectors',
+  // Names only; values are never read out of the browser.
+  sessionCookie: /^__Secure-next-auth\.session-token(\.\d+)?$/,
   chatPath: '/',
   loginPath: /^\/(auth|log-?in)\b/i,
   loginButton: exact('Log in', 'Sign up', 'Sign up for free'),
@@ -175,6 +177,7 @@ const claudeWeb = Object.freeze({
   consentClient: 'Claude',
   watcherScenario: 'claude-web',
   connectorsPath: '/settings/connectors',
+  sessionCookie: /^sessionKey$/,
   chatPath: '/new',
   loginPath: /^\/(login|logout|magic-link)\b/i,
   loginButton: exact('Continue with Google', 'Continue with email', 'Log in', 'Sign in'),

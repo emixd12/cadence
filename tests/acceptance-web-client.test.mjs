@@ -14,7 +14,7 @@ import { createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { launchChrome } from '../scripts/acceptance/consent-page.mjs';
 import {
   DEFAULT_PROFILE_DIR, SCENARIOS, assertProfileDir, attachProfile, dryRunSite, guidedFallback, main,
-  openProfile, parseCli, profileOwnsPort, runWebScenario,
+  openProfile, parseCli, profileOwnsPort, runWebScenario, signInStatus,
 } from '../scripts/acceptance/web-client.mjs';
 import { SITES, WebStop, withOrigin } from '../scripts/acceptance/web-sites.mjs';
 
@@ -481,6 +481,22 @@ describe('failure reasons', () => {
     { grants: [{ grant_id: randomUUID(), client_id: 'c', client_name: 'ChatGPT', scopes: ['cadence.read'], created_at: iso() }] }), 60_000);
 });
 
+describe('sign-in status', () => {
+  it('reads cookie names only and ignores expired cookies', async () => {
+    const context = await browser.newContext();
+    try {
+      const future = Math.floor(Date.now() / 1000) + 3600;
+      await context.addCookies([
+        { name: '__Secure-next-auth.session-token.0', value: FAKE_COOKIE, url: 'https://chatgpt.com', expires: future, secure: true },
+        { name: 'sessionKey', value: FAKE_COOKIE, url: 'https://claude.ai', expires: Math.floor(Date.now() / 1000) + 5, secure: true },
+      ]);
+      expect(await signInStatus({ context })).toEqual({ chatgpt: true, 'claude-web': true });
+      expect(await signInStatus({ context, now: () => Date.now() + 60_000 })).toEqual({ chatgpt: true, 'claude-web': false });
+      expect(JSON.stringify(await signInStatus({ context }))).not.toContain(FAKE_COOKIE);
+    } finally { await context.close(); }
+  });
+});
+
 describe('dry run', () => {
   it('reaches the connector settings without clicking', async () => {
     resetState({ connectors: [{ name: 'Cadence QA', url: 'x', connected: false }] });
@@ -526,11 +542,15 @@ describe('profile guard', () => {
   it('attaches only when the profile owns the port', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'accept-255-profile-'));
     try {
-      writeFileSync(join(dir, 'DevToolsActivePort'), '4430\n/devtools/browser/x\n');
-      const ps = `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=${dir} --remote-debugging-port=4430 --no-first-run`;
-      expect(profileOwnsPort({ profileDir: dir, port: 4430, listProcesses: () => ps })).toBe(true);
-      expect(profileOwnsPort({ profileDir: dir, port: 4430, listProcesses: () => ps.replace(dir, '/other') })).toBe(false);
-      expect(profileOwnsPort({ profileDir: dir, port: 4431, listProcesses: () => ps })).toBe(false);
+      const ours = `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=${dir} --remote-debugging-port=4430 --no-first-run`;
+      const owns = (commands, port = 4430) => profileOwnsPort({ profileDir: dir, port, listenerPids: () => Object.keys(commands).join('\n'), commandOf: (pid) => commands[pid] });
+      expect(owns({ 101: ours })).toBe(true);
+      expect(owns({ 101: ours.replace(dir, '/other') })).toBe(false);
+      expect(owns({ 101: ours.replace(dir, `${dir}-copy`) })).toBe(false);
+      expect(owns({ 101: ours }, 4431)).toBe(false);
+      expect(owns({ 101: ours, 202: '/usr/bin/nc -l 4430' })).toBe(false);
+      expect(owns({})).toBe(false);
+      expect(owns({ 101: `/tmp/fake-chrome --user-data-dir=${dir} --remote-debugging-port=4430` })).toBe(false);
       let connected = false;
       await expect(attachProfile({ profileDir: dir, owns: () => false, connect: async () => { connected = true; } })).rejects.toMatchObject({ reason: 'profile-not-open' });
       expect(connected).toBe(false);

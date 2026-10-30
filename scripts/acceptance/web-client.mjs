@@ -128,18 +128,27 @@ const devtoolsUp = async (port, fetchImpl = fetch) => {
   try { return (await fetchImpl(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(2_000) })).ok; } catch { return false; }
 };
 
+const execText = (bin, args) => execFileSync(bin, args, { encoding: 'utf8', maxBuffer: 1 << 20, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+
 /**
- * True when a Chrome process runs with exactly this profile and port. The
- * DevToolsActivePort file in the profile and the process list must agree, so
- * an unrelated Chrome on the same port is never attached to.
+ * True when every process listening on the loopback port is a Chrome started
+ * with exactly this profile and port, so an unrelated Chrome (or anything
+ * else) on the same port is never attached to. Chrome does not write
+ * DevToolsActivePort for a fixed port, so the listener's command line decides.
  */
-export function profileOwnsPort({ profileDir, port, readFile = readFileSync, listProcesses = () => execFileSync('/bin/ps', ['-axww', '-o', 'command='], { encoding: 'utf8', maxBuffer: 1 << 24 }) }) {
-  let active;
-  try { active = Number(readFile(join(profileDir, 'DevToolsActivePort'), 'utf8').split('\n')[0]); } catch { return false; }
-  if (active !== port) return false;
-  let processes = '';
-  try { processes = listProcesses(); } catch { return false; }
-  return processes.split('\n').some((line) => line.includes(`--user-data-dir=${profileDir}`) && line.includes(`--remote-debugging-port=${port}`));
+export function profileOwnsPort({
+  profileDir, port,
+  listenerPids = () => execText('/usr/sbin/lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t']),
+  commandOf = (pid) => execText('/bin/ps', ['-ww', '-p', pid, '-o', 'command=']),
+}) {
+  let pids;
+  try { pids = [...new Set(listenerPids().split('\n').map((p) => p.trim()).filter((p) => /^\d+$/.test(p)))]; } catch { return false; }
+  if (!pids.length) return false;
+  return pids.every((pid) => {
+    let command = '';
+    try { command = commandOf(pid); } catch { return false; }
+    return command.startsWith(`${CHROME_BIN} `) && command.includes(`--user-data-dir=${profileDir} `) && command.includes(`--remote-debugging-port=${port}`);
+  });
 }
 
 /**
@@ -304,6 +313,19 @@ async function openConnectors(page, site, step) {
     const again = await classifyPage(page, site);
     throw new WebStop(again === 'ok' ? 'page-changed' : again, step);
   }
+}
+
+/**
+ * Sign-in state from cookie names only, with no page opened, so it can poll
+ * while Emi signs in. Values never leave the browser's cookie store.
+ */
+export async function signInStatus({ context, sites = Object.values(SITES), now = () => Date.now() }) {
+  const result = {};
+  for (const site of sites) {
+    const names = (await context.cookies(site.origin)).filter((c) => c.expires === -1 || c.expires * 1000 > now()).map((c) => c.name);
+    result[site.id] = names.some((n) => site.sessionCookie.test(n));
+  }
+  return result;
 }
 
 /** Dry run: reach the connector settings in the kept profile. Clicks nothing. */
@@ -522,7 +544,7 @@ async function productionDeps(env) {
 
 export function parseCli(argv) {
   const positionals = argv.filter((a) => !a.startsWith('-'));
-  const command = ['open', 'dry-run', 'run', 'revoke'].includes(positionals[0]) ? positionals[0] : 'run';
+  const command = ['open', 'status', 'dry-run', 'run', 'revoke'].includes(positionals[0]) ? positionals[0] : 'run';
   const args = command === positionals[0] ? argv.slice(argv.indexOf(command) + 1) : argv;
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     client: { type: 'string' }, account: { type: 'string' }, scenario: { type: 'string' }, profile: { type: 'string' },
@@ -568,6 +590,14 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       out(summary({ step: 'open', ok: true, state: result.state, port: result.port }));
       out('Sign in to ChatGPT and Claude in this window, then leave it open. Later runs attach to it.');
       return 0;
+    }
+    if (opts.command === 'status') {
+      const { context, detach } = await attachProfile({ profileDir: opts.profile, port: opts.port });
+      try {
+        const signedIn = await signInStatus({ context });
+        out(summary({ step: 'status', ok: true, signedIn }));
+        return Object.values(signedIn).every(Boolean) ? 0 : 1;
+      } finally { await detach(); }
     }
     if (opts.command === 'dry-run') {
       const { context, detach } = await attachProfile({ profileDir: opts.profile, port: opts.port });
