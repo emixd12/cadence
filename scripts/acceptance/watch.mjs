@@ -18,8 +18,8 @@
 import { execFile } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { isCliEntry } from './cli-entry.mjs';
 import { SCENARIOS } from './scenarios/index.mjs';
 
 export { SCENARIOS };
@@ -80,33 +80,48 @@ const stepMatches = (step, event, bound) => {
  * Ordered match of a scenario against events sorted by time. Steps whose kind
  * the source cannot see are `unverifiable` and do not block. `grantId` (from
  * --grant) restricts the grant step to that grant.
+ *
+ * Binding steps (bindsClient, bindsGrant) backtrack: each matching candidate
+ * is tried in order, and the first one under which every later step matches
+ * wins. A window can hold other clients, and one client can hold several
+ * grants (a read-only link, then a full one). Other steps take their earliest
+ * match, which leaves the most room for the steps after them. With no full
+ * match, the deepest partial match is reported.
  */
 export function matchScenario(scenario, events, { kinds = KINDS, grantId = null } = {}) {
   const sorted = sortEvents(events);
-  const bound = { grant: null, client: null, presetGrant: grantId };
-  const steps = [];
-  let cursor = 0;
-  for (const [index, step] of scenario.steps.entries()) {
-    if (!kinds.includes(step.kind)) { steps.push({ id: step.id, status: 'unverifiable', step }); continue; }
-    const found = sorted.findIndex((event, i) => i >= cursor && stepMatches(step, event, bound));
-    if (found < 0) {
-      // Nearest same-kind evidence shows why, for example a denied write.
-      const near = sorted.filter((e) => e.kind === step.kind && (!step.sameGrant || !bound.grant || e.grantId === bound.grant)
-        && (!step.access || OPERATION_ACCESS[e.operation] === step.access)).slice(-3);
-      steps.push({ id: step.id, status: 'missing', step, near });
-      // Order matters, so every later step is missing too.
-      for (const rest of scenario.steps.slice(index + 1)) {
-        steps.push({ id: rest.id, status: kinds.includes(rest.kind) ? 'missing' : 'unverifiable', step: rest, near: [] });
-      }
-      break;
+  const all = scenario.steps;
+  let best = { index: -1, path: [], bound: null };
+  const solve = (index, cursor, bound, path) => {
+    if (index === all.length) return { path, bound };
+    const step = all[index];
+    if (!kinds.includes(step.kind)) return solve(index + 1, cursor, bound, [...path, { id: step.id, status: 'unverifiable', step }]);
+    const binds = step.bindsGrant || step.bindsClient;
+    for (let i = cursor; i < sorted.length; i++) {
+      const event = sorted[i];
+      if (!stepMatches(step, event, bound)) continue;
+      const next = { ...bound, ...(step.bindsGrant ? { grant: event.grantId } : {}), ...(step.bindsClient ? { client: event.clientId } : {}) };
+      const done = solve(index + 1, i + 1, next, [...path, { id: step.id, status: 'matched', step, event }]);
+      if (done) return done;
+      if (!binds) break;
     }
-    const event = sorted[found];
-    if (step.bindsGrant) bound.grant = event.grantId;
-    if (step.bindsClient) bound.client = event.clientId;
-    steps.push({ id: step.id, status: 'matched', step, event });
-    cursor = found + 1;
+    if (index > best.index) best = { index, path, bound };
+    return null;
+  };
+  const start = { grant: null, client: null, presetGrant: grantId };
+  const done = solve(0, 0, start, []);
+  if (done) return { scenario: scenario.name, satisfied: true, grantId: done.bound.grant, steps: done.path };
+  const { index, path, bound } = best;
+  const step = all[index];
+  // Nearest same-kind evidence shows why, for example a denied write.
+  const near = sorted.filter((e) => e.kind === step.kind && (!step.sameGrant || !bound.grant || e.grantId === bound.grant)
+    && (!step.access || OPERATION_ACCESS[e.operation] === step.access)).slice(-3);
+  const steps = [...path, { id: step.id, status: 'missing', step, near }];
+  // Order matters, so every later step is missing too.
+  for (const rest of all.slice(index + 1)) {
+    steps.push({ id: rest.id, status: kinds.includes(rest.kind) ? 'missing' : 'unverifiable', step: rest, near: [] });
   }
-  return { scenario: scenario.name, satisfied: steps.every((s) => s.status !== 'missing'), grantId: bound.grant, steps };
+  return { scenario: scenario.name, satisfied: false, grantId: bound.grant, steps };
 }
 
 const describeStep = (step) => {
@@ -445,7 +460,7 @@ export const formatTimelineLine = (e) => `${e.at}  ${e.account ?? '?'}  ${e.kind
 
 /** Ledger record: the event without its internal dedupe key. */
 export const ledgerRecord = (event, runId) => {
-  const { key: _key, ...rest } = event;
+  const rest = Object.fromEntries(Object.entries(event).filter(([name]) => name !== 'key'));
   return { type: 'watcher.event', run: runId, ...rest };
 };
 
@@ -599,19 +614,14 @@ async function resolveLocalUsers(dbUrl, options) {
   return resolved;
 }
 
-async function publishableKey() {
-  const fromEnv = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(fromEnv ?? '')) return fromEnv;
-  // Same read-only Management API lookup as Ticket 232's scripts.
-  let token = (await run('/usr/bin/security', ['find-generic-password', '-s', 'Supabase CLI', '-a', 'supabase', '-w'])).trim();
-  if (token.startsWith('go-keyring-base64:')) token = Buffer.from(token.slice(18), 'base64').toString('utf8').trim();
-  let keys;
-  try {
-    const r = await fetch('https://api.supabase.com/v1/projects/qjodzutjxtmtzczbloxa/api-keys?reveal=false', { headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(20_000) });
-    keys = r.status === 200 ? await r.json() : null;
-  } catch { keys = null; } finally { token = ''; }
-  const pub = Array.isArray(keys) ? keys.filter((k) => k?.type === 'publishable' && /^sb_publishable_/.test(k.api_key ?? '')) : [];
-  return pub.length === 1 ? pub[0].api_key : fail('publishable-key-unavailable');
+/**
+ * Production publishable key from CADENCE_QA_SUPABASE_PUBLISHABLE_KEY, the same
+ * variable Ticket 248 reads. Public, but the watcher never reaches for an owner
+ * credential to look it up.
+ */
+export function publishableKeyFrom(env) {
+  const key = env?.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  return /^sb_publishable_[A-Za-z0-9_-]+$/.test(key ?? '') ? key : fail('qa-publishable-key-missing');
 }
 
 /**
@@ -647,7 +657,7 @@ async function productionTokenFor(publishableKey) {
   return createSessionTokenFor(mod, { publishableKey });
 }
 
-export async function main(args = process.argv.slice(2), print = (line) => process.stdout.write(`${line}\n`)) {
+export async function main(args = process.argv.slice(2), print = (line) => process.stdout.write(`${line}\n`), env = process.env) {
   let options;
   try {
     options = parseWatchArgs(args);
@@ -660,7 +670,7 @@ export async function main(args = process.argv.slice(2), print = (line) => proce
     if (options.target === 'production') {
       const { createRest, USERS } = await import('../mcp-acceptance-cleanup.mjs');
       if (USERS.A !== TEST_ACCOUNTS.A.userId || USERS.B !== TEST_ACCOUNTS.B.userId) fail('test-account-mismatch');
-      const key = await publishableKey();
+      const key = publishableKeyFrom(env);
       const rest = createRest({ origin: PRODUCTION_SUPABASE_ORIGIN, publishableKey: key, tokenFor: await productionTokenFor(key) });
       source = createRpcSource({ rest, accounts: options.accounts, sinceIso });
     } else if (options.source === 'db') {
@@ -683,4 +693,4 @@ export async function main(args = process.argv.slice(2), print = (line) => proce
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await main();
+if (isCliEntry(import.meta)) process.exitCode = await main();

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { INTEGRATION_OPERATIONS } from '../packages/core/src/integration/operations.ts';
 import {
   OPERATION_ACCESS, SCENARIOS, createSessionTokenFor, SOURCE_KINDS, TEST_ACCOUNTS, WatchError, assertLocalDbUrl, createDbSource, createDiffer,
-  createLedgerSink, createRpcSource, main, matchScenario, parseSince, parseWatchArgs, psqlQuery, watch,
+  createLedgerSink, createRpcSource, main, matchScenario, parseSince, parseWatchArgs, psqlQuery, publishableKeyFrom, watch,
 } from '../scripts/acceptance/watch.mjs';
 import { USERS } from '../scripts/mcp-acceptance-cleanup.mjs';
 
@@ -225,6 +225,47 @@ describe('scenarios on the local db source', () => {
     expect(r.out).not.toContain('re-consented');
   });
 
+  it('backtracks past an earlier, unrelated DCR client in the window (wave 1 repro 1)', async () => {
+    const world = makeWorld('inspector');
+    // Another run's DCR client, registered earlier, with no grant for A or B: account is null.
+    world.clients.unshift({ client_ref: id(40), ...CLIENTS.inspector, client_id: id(41), client_name: 'Other run', application_type: 'web', t: 2 });
+    const r = await runWatch({ world, opts: { expect: 'inspector', timeoutMs: 120_000 } });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('scenario inspector: satisfied (grant 00000000)');
+    const result = matchScenario(SCENARIOS.inspector, createDiffer({ sinceIso: SINCE, sourceName: 'db' })(
+      await createDbSource({ query: async () => dbRows(world, T0 + 100_000), userIds: { A, B }, sinceIso: SINCE }).snapshot(), at(100)));
+    expect(result.satisfied).toBe(true);
+    expect(result.steps[0].event.clientId).toBe(CLIENTS.inspector.client_id);
+  });
+
+  it('backtracks from a read-only grant to a later full grant on the same client (wave 1 repro 2)', async () => {
+    const world = makeWorld('inspector', { write: null });
+    world.grants[0].scopes = ['cadence.read'];
+    world.grants.push({ grant_id: id(31), client_ref: id(1), user: A, scopes: FULL, t: 30, reconsent: null, revokeT: null });
+    world.families.push({ family_id: id(32), grant_id: id(31), user: A, t: 32, offline_access: true, revokeT: null });
+    world.activity.push({ id: 4, grant_id: id(31), client_ref: id(1), user: A, operation: 'list_behaviors', outcome: 'success', error_code: null, t: 35 });
+    world.activity.push({ id: 5, grant_id: id(31), client_ref: id(1), user: A, operation: 'create_behavior', outcome: 'success', error_code: null, t: 50 });
+    const snapshot = await createDbSource({ query: async () => dbRows(world, T0 + 100_000), userIds: { A, B }, sinceIso: SINCE }).snapshot();
+    const result = matchScenario(SCENARIOS.inspector, createDiffer({ sinceIso: SINCE, sourceName: 'db' })(snapshot, at(100)));
+    expect(result.satisfied).toBe(true);
+    expect(result.grantId).toBe(id(31));
+    expect(result.steps.find((s) => s.id === 'write-succeeded').status).toBe('matched');
+    // The same backtracking applies to API scenarios without --grant.
+    expect(matchScenario(SCENARIOS['anthropic-api'], createDiffer({ sinceIso: SINCE, sourceName: 'db' })(snapshot, at(100))).grantId).toBe(id(31));
+    const r = await runWatch({ world, opts: { expect: 'inspector' } });
+    expect(r.code).toBe(0);
+  });
+
+  it('reports the deepest partial match when no binding satisfies the scenario', async () => {
+    const world = makeWorld('inspector', { write: 'denied' });
+    world.grants.push({ grant_id: id(31), client_ref: id(1), user: A, scopes: ['cadence.read'], t: 30, reconsent: null, revokeT: null });
+    const snapshot = await createDbSource({ query: async () => dbRows(world, T0 + 100_000), userIds: { A, B }, sinceIso: SINCE }).snapshot();
+    const result = matchScenario(SCENARIOS.inspector, createDiffer({ sinceIso: SINCE, sourceName: 'db' })(snapshot, at(100)));
+    expect(result.satisfied).toBe(false);
+    expect(result.steps.map((s) => s.status)).toEqual(['matched', 'matched', 'matched', 'matched', 'missing']);
+    expect(result.grantId).toBe(id(3));
+  });
+
   it('prints each event once across polls', async () => {
     const r = await runWatch({ world: makeWorld('claude-code'), opts: { timeoutMs: 120_000 } });
     const calls = r.lines.filter((l) => l.includes('tool.call'));
@@ -385,6 +426,18 @@ describe('arguments, ledger and CLI', () => {
     expect(errors).toEqual(['watch-stopped confirm-production-required']);
     expect(await main(['--target', 'local', '--db-url', 'postgresql://u:p@example.com/db'], (l) => errors.push(l))).toBe(2);
     expect(errors.at(-1)).toBe('watch-stopped db-url-not-loopback');
+  });
+
+  it('production reads the QA publishable key from the environment and never an owner credential', async () => {
+    expect(publishableKeyFrom({ CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc_123' })).toBe('sb_publishable_abc_123');
+    for (const env of [{}, { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc' }, { CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }]) {
+      expect(() => publishableKeyFrom(env)).toThrow('qa-publishable-key-missing');
+    }
+    const lines = [];
+    expect(await main(['--target', 'production', '--confirm-production'], (l) => lines.push(l), {})).toBe(2);
+    expect(lines).toEqual(['watch-stopped qa-publishable-key-missing']);
+    const source = readFileSync(new URL('../scripts/acceptance/watch.mjs', import.meta.url), 'utf8');
+    for (const banned of ['api.supabase.com', 'Supabase CLI', 'find-generic-password', '/usr/bin/security']) expect(source).not.toContain(banned);
   });
 
   it('declares which event kinds each source can see', () => {

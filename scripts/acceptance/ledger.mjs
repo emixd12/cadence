@@ -414,7 +414,7 @@ async function main() {
   else throw new LedgerStop('command');
 }
 
-const { pathToFileURL } = await import('node:url');
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const { isCliEntry } = await import('./cli-entry.mjs');
+if (isCliEntry(import.meta)) {
   main().catch((e) => { process.stdout.write(`${JSON.stringify({ result: 'stopped', reason: reasonOf(e) })}\n`); process.exit(1); });
 }

@@ -23,7 +23,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
-import { pathToFileURL } from 'node:url';
+import { isCliEntry } from './cli-entry.mjs';
 import {
   AcceptanceError, PRODUCTION, Secret, createKeychainSessionStore, createMemorySessionStore, createSessionManager, enrollProduction,
 } from './test-account-sessions.mjs';
@@ -450,7 +450,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta)) {
   main().then((code) => { process.exitCode = code; }).catch((error) => {
     process.stdout.write(`${summaryLine({ step: 'stopped', ok: false, error: error instanceof AcceptanceError ? error.code : 'unexpected' })}\n`);
     process.exitCode = 1;
