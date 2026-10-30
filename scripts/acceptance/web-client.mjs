@@ -22,14 +22,15 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { isCliEntry } from './cli-entry.mjs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { GRANTS, READ_SCOPE, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
+import { GRANTS, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
-import { SITES, WebStop, classifyPage, clickNamed, clickable, findConnectorRow, waitVisible } from './web-sites.mjs';
+import { SITES, WebStop, classifyPage, clickable, findConnectorRow, waitVisible } from './web-sites.mjs';
 
 export { SITES, WebStop };
 
@@ -76,12 +77,6 @@ const SLOTS = ['A', 'B'];
 const LABEL = /^[a-z0-9-]{1,40}$/;
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** The CLI's main-module check, safe when run through a symlinked path. */
-export function isMainModule(argv1, moduleUrl) {
-  if (!argv1) return false;
-  try { return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl)); } catch { return false; }
-}
 
 // ---- Profile ----------------------------------------------------------------
 
@@ -254,9 +249,8 @@ export async function completeConsent({ context, issuer, account, site, decision
  * scenario allows one, and wait until the reply has finished. Returns counts
  * and a hash of the reply; the text itself is never kept.
  */
-export async function driveTurn({ page, site, context, issuer, onConsent = null, timeoutMs, quietMs = 2_500, track }) {
+export async function driveTurn({ page, site, context, issuer, onConsent = null, timeoutMs, quietMs = 2_500, track, before }) {
   const assistant = page.locator(site.assistant);
-  const before = await assistant.count().catch(() => 0);
   const deadline = Date.now() + timeoutMs;
   let approvals = 0;
   let consents = 0;
@@ -434,6 +428,8 @@ export async function runWebScenario({
         const state = await classifyPage(page, site);
         if (state !== 'ok') throw new WebStop(state, stepName);
         await site.enableInChat(page, CONNECTOR_NAME);
+        // Count turns before sending, so a fast reply is not mistaken for an old one.
+        const before = await page.locator(site.assistant).count().catch(() => 0);
         await sendPrompt(page, site, kind === 'write' ? PROMPTS.write(label) : PROMPTS.read());
         const stepUp = kind === 'write' && scenario.stepUpGrant
           ? async () => {
@@ -441,7 +437,7 @@ export async function runWebScenario({
             await consentAnswer('allow', scenario.stepUpGrant)();
           }
           : null;
-        const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track });
+        const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
         if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
         await page.close().catch(() => {});
         return result;
@@ -624,6 +620,4 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   }
 }
 
-if (isMainModule(process.argv[1], import.meta.url)) {
-  process.exitCode = await main();
-}
+if (isCliEntry(import.meta)) process.exitCode = await main();

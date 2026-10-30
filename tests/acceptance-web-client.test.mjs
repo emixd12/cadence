@@ -2,18 +2,18 @@
 // chat sites and a stub Cadence consent page (DOM copied from the real one).
 // The real Ticket 232 cleanup helpers and the Ticket 247 ledger run against an
 // in-memory rest adapter. Uses installed Chrome, headless, on ports 4431–4433.
+import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as cleanupModule from '../scripts/mcp-acceptance-cleanup.mjs';
 import { createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { launchChrome } from '../scripts/acceptance/consent-page.mjs';
 import {
-  DEFAULT_PROFILE_DIR, SCENARIOS, assertProfileDir, attachProfile, dryRunSite, guidedFallback, isMainModule, main,
+  DEFAULT_PROFILE_DIR, SCENARIOS, assertProfileDir, attachProfile, dryRunSite, guidedFallback, main,
   openProfile, parseCli, profileOwnsPort, runWebScenario,
 } from '../scripts/acceptance/web-client.mjs';
 import { SITES, WebStop, withOrigin } from '../scripts/acceptance/web-sites.mjs';
@@ -51,7 +51,7 @@ function toolCall(op, outcome) {
 /** The Supabase REST surface Ticket 232's cleanup helpers call, as test account A. */
 const rest = async (slot, method, path, body) => {
   if (slot !== 'A') return { status: 403, json: null };
-  if (path === '/rest/v1/rpc/oauth_list_grants') return { status: 200, json: activeGrants().map(({ revokedAt, ...g }) => g) };
+  if (path === '/rest/v1/rpc/oauth_list_grants') return { status: 200, json: activeGrants().map((g) => Object.fromEntries(Object.entries(g).filter(([k]) => k !== 'revokedAt'))) };
   if (path === '/rest/v1/rpc/oauth_revoke_grant') {
     const g = state.grants.find((x) => x.grant_id === body.p_grant_id);
     if (g) g.revokedAt = iso();
@@ -310,7 +310,7 @@ beforeAll(async () => {
 }, 60_000);
 afterAll(async () => {
   await browser?.close();
-  for (const s of servers) await new Promise((resolve) => s.close(resolve));
+  for (const s of servers) { s.closeAllConnections(); await new Promise((resolve) => s.close(resolve)); }
   rmSync(root, { recursive: true, force: true });
 });
 beforeEach(() => resetState());
@@ -323,7 +323,7 @@ const stubSite = (client) => withOrigin(SITES[client], `http://127.0.0.1:${CHAT_
 const fakeWatcher = (decide = () => {
   const ok = (op) => state.activity.some((a) => a.operation === op && a.outcome === 'success');
   return ok('list_behaviors') && ok('create_behavior') ? 0 : 1;
-}) => ({ started: 0, start() { this.started += 1; return { result: Promise.resolve().then(() => new Promise((r) => setTimeout(() => r(decide()), 50))), stop() {} }; } });
+}) => ({ started: 0, start() { this.started += 1; return { get result() { return new Promise((r) => setTimeout(() => r(decide()), 50)); }, stop() {} }; } });
 
 let counter = 0;
 async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts, label } = {}) {
@@ -363,7 +363,7 @@ function assertNoLeaks({ lines, run }) {
 describe('ChatGPT stub', () => {
   it('connects, consents, prompts, approves, captures the reply and cleans up', async () => {
     const out = await scenario('chatgpt', 'read-write');
-    expect(out.result).toMatchObject({ ok: true });
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
     expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'watcher', 'revoke']);
     const connect = parsed(out.lines).find((e) => e.step === 'connect');
@@ -388,7 +388,7 @@ describe('ChatGPT stub', () => {
   it('steps up from a read-only grant when the write is denied', async () => {
     resetState({ requestScopes: ['cadence.read'], stepUp: true });
     const out = await scenario('chatgpt', 'step-up');
-    expect(out.result.ok).toBe(true);
+    expect(out.result.ok, out.lines.join('\n')).toBe(true);
     const write = parsed(out.lines).find((e) => e.step === 'prompt-write');
     expect(write.consentCount).toBe(1);
     expect(state.activity.map((a) => `${a.operation}:${a.outcome}`)).toEqual(['create_behavior:success', 'create_behavior:denied', 'list_behaviors:success']);
@@ -405,7 +405,7 @@ describe('ChatGPT stub', () => {
 
   it('records Deny with no grant', async () => {
     const out = await scenario('chatgpt', 'deny');
-    expect(out.result.ok).toBe(true);
+    expect(out.result.ok, out.lines.join('\n')).toBe(true);
     expect(state.grants).toHaveLength(0);
     expect(parsed(out.lines).find((e) => e.step === 'deny-check').grantCount).toBe(0);
   }, 120_000);
@@ -415,7 +415,7 @@ describe('Claude web stub', () => {
   it('reconnects an existing connector through a popup and approves with Allow once', async () => {
     resetState({ connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }], approvalsPerTool: 2 });
     const out = await scenario('claude-web', 'read-write');
-    expect(out.result).toMatchObject({ ok: true });
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     expect(state.connectors).toHaveLength(1);
     expect(state.consentCount).toBe(1);
     const turns = parsed(out.lines).filter((e) => e.step.startsWith('prompt-'));
@@ -537,7 +537,7 @@ describe('profile guard', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
   it('opens the profile as a normal Chrome window with only the loopback DevTools port', async () => {
-    const dir = join(mkdtempSync(join(tmpdir(), 'accept-255-profile-')), 'QA Chrome');
+    const dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'accept-255-profile-'))), 'QA Chrome');
     const calls = [];
     let up = false;
     const result = await openProfile({
@@ -568,17 +568,14 @@ describe('CLI', () => {
     expect(lines.map((l) => l.split(':')[0])).toEqual(Object.keys(SCENARIOS));
     expect(await main(['run', '--client', 'chatgpt'], {}, (l) => lines.push(l))).toBe(2);
   });
-  it('treats a symlinked script path as the main module', () => {
+  it('runs through a symlinked script path', () => {
     const dir = mkdtempSync(join(tmpdir(), 'accept-255-link-'));
     try {
-      const real = join(process.cwd(), 'scripts', 'acceptance', 'web-client.mjs');
       const link = join(dir, 'web-client.mjs');
-      symlinkSync(real, link);
-      const url = pathToFileURL(real).href;
-      expect(isMainModule(link, url)).toBe(true);
-      expect(isMainModule(real, url)).toBe(true);
-      expect(isMainModule(join(dir, 'other.mjs'), url)).toBe(false);
-      expect(isMainModule(undefined, url)).toBe(false);
+      symlinkSync(join(process.cwd(), 'scripts', 'acceptance', 'web-client.mjs'), link);
+      const r = spawnSync(process.execPath, [link, '--list-scenarios'], { encoding: 'utf8', timeout: 30_000 });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('read-write:');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
   it('prints a guided fallback naming the client, account and reason', () => {

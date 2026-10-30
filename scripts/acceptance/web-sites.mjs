@@ -61,6 +61,17 @@ export async function fillNamed(page, name, value, step, { timeoutMs = 15_000 } 
 }
 
 /**
+ * Click the confirmation in a separate confirm dialog, if one appears. A
+ * dialog that holds the connector list is the settings panel itself, not a
+ * confirmation, so it is skipped.
+ */
+export async function confirmIfAsked(page, name, timeoutMs = 3_000) {
+  const dialogs = page.getByRole('alertdialog').or(page.getByRole('dialog').filter({ hasNot: page.getByRole('listitem') }));
+  const confirm = await waitVisible(clickable(dialogs, name), timeoutMs);
+  if (confirm) await confirm.click({ timeout: 5_000 }).catch(() => {});
+}
+
+/**
  * login-wall, bot-check or ok. A redirect to another host (an identity
  * provider) counts as a login wall.
  */
@@ -141,8 +152,7 @@ const chatgpt = Object.freeze({
     const disconnect = await waitVisible(clickable(page, this.disconnect), 3_000);
     if (disconnect) {
       await disconnect.click();
-      const confirm = await waitVisible(clickable(page.getByRole('alertdialog').or(page.getByRole('dialog')).last(), this.confirmDisconnect), 3_000);
-      if (confirm) await confirm.click();
+      await confirmIfAsked(page, this.confirmDisconnect);
     }
     await clickNamed(page, this.connect, 'connector-connect');
   },
@@ -196,8 +206,7 @@ const claudeWeb = Object.freeze({
     const disconnect = await waitVisible(clickable(row, this.disconnect), 2_000);
     if (disconnect) {
       await disconnect.click();
-      const confirm = await waitVisible(clickable(page.getByRole('alertdialog').or(page.getByRole('dialog')).last(), this.confirmDisconnect), 3_000);
-      if (confirm) await confirm.click();
+      await confirmIfAsked(page, this.confirmDisconnect);
     }
     await clickNamed(page, this.connect, 'connector-connect', { scope: row });
   },
