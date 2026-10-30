@@ -45,6 +45,14 @@ function loadInventory() {
         fail(`Device "${device.name}" needs a nonempty "${key}" without control characters.`);
     }
     if (device.app !== undefined && !device.app.startsWith("/")) fail(`Device "${device.name}" needs an absolute app path.`);
+    // Disposable VM copies (scripts/location-vm.mjs) use their own key and a pinned host key.
+    // ssh splits an unquoted UserKnownHostsFile at spaces, so the path is quoted and may not hold quotes.
+    for (const key of ["identity", "knownHosts"]) {
+      if (device[key] !== undefined && (typeof device[key] !== "string" || !device[key].startsWith("/") || /[\x00-\x1f"]/.test(device[key])))
+        fail(`Device "${device.name}" needs an absolute "${key}" path.`);
+    }
+    if (device.hostKeyAlias !== undefined && (typeof device.hostKeyAlias !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(device.hostKeyAlias)))
+      fail(`Device "${device.name}" needs a plain "hostKeyAlias".`);
   }
   return devices;
 }
@@ -57,8 +65,15 @@ function device(name) {
 
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 
+function sshOptions(target) {
+  return [...SSH_OPTIONS,
+    ...(target.identity ? ["-o", "IdentitiesOnly=yes", "-i", target.identity] : []),
+    ...(target.knownHosts ? ["-o", `UserKnownHostsFile="${target.knownHosts}"`] : []),
+    ...(target.hostKeyAlias ? ["-o", `HostKeyAlias=${target.hostKeyAlias}`] : [])];
+}
+
 function ssh(target, command, { input, timeoutMs = 120_000 } = {}) {
-  return spawnSync("ssh", [...SSH_OPTIONS, "--", `${target.user}@${target.host}`, command], { encoding: "utf8", input, timeout: timeoutMs });
+  return spawnSync("ssh", [...sshOptions(target), "--", `${target.user}@${target.host}`, command], { encoding: "utf8", input, timeout: timeoutMs });
 }
 
 function run(target, command, options) {
