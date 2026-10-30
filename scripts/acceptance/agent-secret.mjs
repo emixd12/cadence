@@ -12,6 +12,7 @@
 //     --env OPENAI_API_KEY=openai-api-key/credential \
 //     -- <command> [args...]
 //   npm run agent:secret -- --check [--env NAME=item ...]
+//   pbpaste | npm run agent:secret -- --store-token
 //
 // How it works:
 // 1. Reads the service-account token from the macOS Keychain (generic password,
@@ -28,9 +29,15 @@
 // messages are fixed templates that name items only. op's stderr is classified,
 // never relayed. What the child does with a value is the child's responsibility.
 //
+// --store-token (setup step 5) reads the service-account token from stdin,
+// checks its shape, writes it through `security -i` on stdin (never argv, and
+// not the password prompt, which keeps only 128 bytes), then reads it back and
+// compares lengths. It prints lengths only. `--check` verifies it with op.
+//
 // Exit codes: the child's code when it runs; 2 usage; 3 refused reference;
 // 4 token missing from the Keychain; 5 op could not read an item; 6 --check failed;
-// 127 command not found.
+// 7 --store-token input is not a plausible token; 8 --store-token write or
+// read-back failed; 127 command not found.
 //
 // Setup (Emi, once): docs/qa/agent-secrets.md.
 import { spawn } from 'node:child_process';
@@ -52,6 +59,12 @@ const ENV_DENY = new Set(['PATH', 'HOME', 'SHELL', 'USER', 'LOGNAME', 'TMPDIR', 
 const ENV_DENY_PREFIXES = ['OP_', 'DYLD_', 'LD_', 'NPM_'];
 const CALLER_PATTERN = /[^A-Za-z0-9 ._:/@-]/g;
 const OP_TIMEOUT_MS = 60_000;
+// ops_ plus base64 or base64url. Real tokens are several hundred characters. The
+// lower bound rejects the 128-character prefix the old `-w` prompt kept; the upper
+// bound keeps the `security -i` line under its 4,088-byte limit.
+const TOKEN_PATTERN = /^ops_[A-Za-z0-9+/=._-]{246,3796}$/;
+const SERVICE_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const SECURITY_LINE_LIMIT = 4088;
 
 export class AgentSecretError extends Error {
   constructor(code, message) {
@@ -105,7 +118,7 @@ export function checkEnvName(name) {
  * refusals }. Refused specs are collected (not thrown) so they reach the ledger.
  */
 export function parseCli(argv) {
-  const out = { check: false, run: null, caller: null, specs: [], refusals: [], command: null, args: [] };
+  const out = { check: false, storeToken: false, keychainService: null, run: null, caller: null, specs: [], refusals: [], command: null, args: [] };
   const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -115,6 +128,14 @@ export function parseCli(argv) {
       break;
     }
     if (arg === '--check') { out.check = true; continue; }
+    if (arg === '--store-token') { out.storeToken = true; continue; }
+    if (arg === '--keychain-service') {
+      const value = argv[i + 1];
+      i += 1;
+      if (!SERVICE_PATTERN.test(value ?? '')) throw new AgentSecretError('usage', '--keychain-service expects a lowercase name');
+      out.keychainService = value;
+      continue;
+    }
     if (arg === '--run' || arg === '--caller' || arg === '--env') {
       const value = argv[i + 1];
       if (value === undefined || value === '--') throw new AgentSecretError('usage', `${arg} needs a value`);
@@ -140,6 +161,11 @@ export function parseCli(argv) {
       continue;
     }
     throw new AgentSecretError('usage', `unknown argument "${safeLabel(arg)}"`);
+  }
+  if (out.keychainService && !out.storeToken) throw new AgentSecretError('usage', '--keychain-service is only for --store-token');
+  if (out.storeToken) {
+    if (out.check || out.command || out.run || out.caller || out.specs.length || out.refusals.length) throw new AgentSecretError('usage', '--store-token takes no other options');
+    return out;
   }
   if (!out.check && !out.command) throw new AgentSecretError('usage', 'missing "-- <command>"');
   if (!out.check && out.specs.length === 0 && out.refusals.length === 0) throw new AgentSecretError('usage', 'at least one --env NAME=item is required');
@@ -172,11 +198,12 @@ export function ledgerPathFor({ run, cwd = process.cwd() }) {
 }
 
 /** Runs a helper process and captures its output in memory only. */
-function capture(command, args, { env, timeoutMs = OP_TIMEOUT_MS }) {
+function capture(command, args, { env, timeoutMs = OP_TIMEOUT_MS, input = undefined }) {
   return new Promise((resolvePromise) => {
     let child;
     try {
-      child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(command, args, { env, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+      if (input !== undefined) { child.stdin.on('error', () => {}); child.stdin.end(input); }
     } catch {
       resolvePromise({ code: 127, stdout: Buffer.alloc(0), stderr: '' });
       return;
@@ -223,6 +250,55 @@ async function readToken(env) {
   return token.length > 0 ? token : null;
 }
 
+async function readStdin(stream) {
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/**
+ * Setup step 5. The token arrives on stdin and leaves only through stdin of
+ * `security -i`. Output names lengths, the service and the account, never the token.
+ */
+async function storeToken({ service, env, io, stdin }) {
+  if (stdin.isTTY) {
+    writeLine(io.stderr, 'pipe the token in, for example: pbpaste | npm run agent:secret -- --store-token');
+    return 2;
+  }
+  let token = (await readStdin(stdin)).trim();
+  if (!TOKEN_PATTERN.test(token)) {
+    token = '';
+    writeLine(io.stderr, 'the input is not a plausible 1Password service-account token (ops_ and base64, 250 to 3,800 characters, no spaces or line breaks); nothing was stored');
+    return 7;
+  }
+  const line = `add-generic-password -U -s ${service} -a ${KEYCHAIN_ACCOUNT} -T /usr/bin/security -w ${token}`;
+  if (Buffer.byteLength(line) > SECURITY_LINE_LIMIT) {
+    writeLine(io.stderr, 'the token is too long for the Keychain command line; nothing was stored');
+    return 7;
+  }
+  const keychainEnv = pick(env, ['PATH', 'HOME']);
+  const write = await capture('security', ['-i'], { env: keychainEnv, input: `${line}\n`, timeoutMs: 120_000 });
+  if (write.code !== 0) {
+    writeLine(io.stderr, `could not write the Keychain item (service "${service}", account "${KEYCHAIN_ACCOUNT}")`);
+    return 8;
+  }
+  const read = await capture('security', ['find-generic-password', '-s', service, '-a', KEYCHAIN_ACCOUNT, '-w'], { env: keychainEnv, timeoutMs: 120_000 });
+  const back = read.code === 0 ? read.stdout.toString('utf8').replace(/\r?\n$/, '') : '';
+  const expected = token.length;
+  const matches = back === token;
+  token = '';
+  if (back.length !== expected) {
+    writeLine(io.stderr, `read back ${back.length} characters, expected ${expected} (service "${service}", account "${KEYCHAIN_ACCOUNT}")`);
+    return 8;
+  }
+  if (!matches) {
+    writeLine(io.stderr, `read back ${back.length} characters, but they differ from the input`);
+    return 8;
+  }
+  writeLine(io.stdout, `stored ${expected} characters; read back ${back.length} (service "${service}", account "${KEYCHAIN_ACCOUNT}"). Verify with: npm run agent:secret -- --check`);
+  return 0;
+}
+
 function childEnv(env, values) {
   const out = {};
   for (const [key, value] of Object.entries(env)) if (!key.startsWith('OP_')) out[key] = value;
@@ -237,7 +313,7 @@ function writeLine(stream, text) {
  * Main entry. Returns the exit code. `io` lets tests capture stdout/stderr;
  * `env` and `cwd` default to the current process.
  */
-export async function runAgentSecret(argv, { env = process.env, cwd = process.cwd(), io = { stdout: process.stdout, stderr: process.stderr } } = {}) {
+export async function runAgentSecret(argv, { env = process.env, cwd = process.cwd(), io = { stdout: process.stdout, stderr: process.stderr }, stdin = process.stdin } = {}) {
   let parsed;
   try {
     parsed = parseCli(argv);
@@ -245,6 +321,7 @@ export async function runAgentSecret(argv, { env = process.env, cwd = process.cw
     writeLine(io.stderr, error instanceof AgentSecretError ? error.message : 'invalid arguments');
     return 2;
   }
+  if (parsed.storeToken) return storeToken({ service: parsed.keychainService ?? KEYCHAIN_SERVICE, env, io, stdin });
   const ledger = ledgerPathFor({ run: parsed.run, cwd });
   const caller = safeCaller(parsed.caller ?? (parsed.command ? basename(parsed.command) : 'check'));
   const log = (entry) => recordAccess(ledger, { caller, vault: AGENT_VAULT, ...entry });

@@ -44,13 +44,41 @@ MCP signing key are untouched and still prompt.
 
    1Password shows the token (`ops_…`) once. Optionally keep a copy in your
    Personal vault, not in Cadence Agents.
-5. Store the token in the macOS Keychain. In your own Terminal, run the command
-   below and paste the token at each of its two prompts. The `-w` flag with no
-   value makes `security` prompt, so the token never enters shell history:
+5. Store the token in the macOS Keychain. Copy the token, then run **one** of
+   these in your own Terminal. Both read the token from the clipboard and pass it
+   to `security -i` on stdin, so it never appears in a process argument list or
+   in shell history. Both check that it looks like a token (`ops_`, then 246 to
+   3,796 base64 characters, with no spaces or line breaks), store it under
+   service `cadence-agent-1password` and account `service-account-token`, read
+   it back and compare lengths. They print only lengths, never the token.
+
+   Don't use `security add-generic-password … -w` with no value. Its password
+   prompt keeps only the first 128 characters, and the token is much longer.
+
+   From the Cadence checkout:
 
    ```bash
-   security add-generic-password -s cadence-agent-1password -a service-account-token -U -T /usr/bin/security -w
+   pbpaste | npm run agent:secret -- --store-token
    ```
+
+   Or from any directory, with no checkout (zsh or bash; `printf` is a shell
+   builtin, so the token is never a process argument):
+
+   ```bash
+   t="$(pbpaste)"; if [[ $t == ops_* && ${#t} -ge 250 && ${#t} -le 3800 && $t != *[^A-Za-z0-9+/=._-]* ]]; then if printf 'add-generic-password -U -s cadence-agent-1password -a service-account-token -T /usr/bin/security -w %s\n' "$t" | security -i >/dev/null 2>&1; then n="$(security find-generic-password -s cadence-agent-1password -a service-account-token -w 2>/dev/null | tr -d '\n' | wc -c | tr -d ' ')"; if [[ $n == "${#t}" ]]; then echo "OK: stored ${#t} characters, read back $n"; else echo "NOT OK: read back $n characters, expected ${#t}"; fi; else echo "NOT OK: the Keychain write failed"; fi; else echo "NOT OK: the clipboard does not hold an ops_ token; nothing stored"; fi; unset t n
+   ```
+
+   Success looks like `OK: stored 900 characters, read back 900` (your numbers
+   will differ, but the two must match). Then copy something else to clear the
+   clipboard.
+
+   **Redo after an older attempt.** An earlier version of this step used the
+   `-w` password prompt, which stored only the first 128 characters. To check,
+   run `security find-generic-password -s cadence-agent-1password -a
+   service-account-token -w | tr -d '\n' | wc -c`; it prints a length only. If
+   it prints 128, copy the token again (from your Personal vault copy, or create
+   a new service account in step 4 and delete the old one) and run either
+   command above. `-U` replaces the item. An agent then runs `--check`.
 
 That is all. An agent then verifies the setup with the `--check` command below and
 reports the result. Nothing else is asked of Emi.
@@ -90,7 +118,9 @@ npm run agent:secret -- --check --env ANTHROPIC_API_KEY=anthropic-api-key --env 
 - `--check` fails if the service account can reach any vault other than Cadence
   Agents.
 - Exit codes: the child's code; 2 usage; 3 refused; 4 no token in the Keychain;
-  5 op could not read an item; 6 `--check` failed; 127 command not found.
+  5 op could not read an item; 6 `--check` failed; 7 `--store-token` input is not
+  a plausible token; 8 `--store-token` write or read-back failed; 127 command not
+  found.
 
 ## Security notes
 
