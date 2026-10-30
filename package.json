@@ -27,6 +27,7 @@
     "marketing:preview": "npm --workspace apps/marketing run preview",
     "design-system:check": "node scripts/check-design-system.mjs",
     "agents:check": "node scripts/check-agents.mjs",
+    "agent:secret": "node scripts/acceptance/agent-secret.mjs",
     "interactions:check": "node scripts/check-interactions.mjs",
     "resolvers:check": "node scripts/check-resolvers.mjs",
     "core:check": "node scripts/check-core-portability.mjs",
