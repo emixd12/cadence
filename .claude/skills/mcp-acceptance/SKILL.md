@@ -41,12 +41,24 @@ Work in your own git worktree, never in Ticket 232's checkout
 - **Privacy (Emi's ChatGPT and Claude accounts):** the QA Chrome profile may hold
   Emi's own ChatGPT and Claude accounts. Open new chats only. Never open, read or
   search existing chats, projects, memory or history, not even to recover from a
-  changed page: stop with the named reason instead. Archive (ChatGPT) or delete
-  (Claude) every test chat the run created once its reply is captured. The web runner
-  does this by default and records it in the ledger (`archive-chats`); `--keep-chats`
-  turns it off and needs a reason in the report. Any chat it could not archive is a
-  cleanup item in the report. The archive controls are first checked on the real
-  sites in Ticket 256.
+  changed page: stop with the named reason instead. Every test prompt starts with
+  `[Cadence QA]`, so test chats are easy to find.
+  - ChatGPT: archive every test chat the run created once its reply is captured
+    (archiving can be undone). The web runner does this by default.
+  - Claude: keep test chats. Deleting cannot be undone, so the runner deletes them
+    only with `--delete-claude-chats`, and only when the coordinator asks for it.
+  - The ledger step `archive-chats` records `chatCount`, `archivedCount`,
+    `keptCount` and `unknownCount`. `--keep-chats` turns cleanup off for both sites
+    and needs a reason in the report. Any ChatGPT chat it could not archive is a
+    cleanup item in the report. The archive and delete controls are first checked on
+    the real sites in Ticket 256.
+  - **If a run ever stops with `archive-unconfirmed` or `archive-touched-other-chat`,
+    tell Emi straight away**, in one message, before anything else: the reason, the
+    run ID, the site and the chat title. For `archive-touched-other-chat` the stop
+    line's `affectedChats` lists each missing chat's ID and sidebar title, which is
+    printed to the console only and never written to the run folder. For
+    `archive-unconfirmed` it is the run's own test chat, whose title starts with
+    `[Cadence QA]`. Do not retry the run, and do not open any chat to check.
 
 ## Agent autonomy (spec, "Automated MCP client acceptance")
 
@@ -204,21 +216,26 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
 5. ChatGPT web: `npm run mcp:accept:web -- run --client chatgpt --account A --scenario read-write --allow-production --run <id>`,
    then `--scenario step-up`. On a stop it prints `guided-fallback … reason=…`; use
    guided mode below.
-   Privacy: both web runs open a new chat per prompt and archive (ChatGPT) or delete
-   (Claude) it after the reply; check the `archive-chats` line (`archivedCount` equals
-   `chatCount`, `unknownCount` 0). The archive controls are unverified on the real
-   sites until this run: if `archive-chats` stops with `page-changed`, report the run
-   ID and the chats left as a cleanup item. Never open other chats to find them.
+   Privacy: both web runs open a new `[Cadence QA]` chat per prompt. ChatGPT archives
+   it after the reply: check the `archive-chats` line (`archivedCount` equals
+   `chatCount`, `unknownCount` 0). Claude keeps it (`keptCount` equals `chatCount`)
+   unless the coordinator asked for `--delete-claude-chats`. The controls are
+   unverified on the real sites until this run: if `archive-chats` stops with
+   `page-changed`, report the run ID and the chats left as a cleanup item. Never open
+   other chats to find them.
    The runner acts only on the run's own chat: it checks the URL carries the recorded
    chat ID, uses the one options control inside the conversation (never the sidebar),
    and stops with `page-changed` before clicking if that control is missing or
-   ambiguous. After clicking it stops with `archive-unconfirmed` if the chat is still
-   there, or `archive-touched-other-chat` if any other listed chat disappeared. Report
-   the last one to Emi at once: one of her own chats may have been archived or deleted.
+   ambiguous, or if a matching control sits in a row that links to another chat.
+   After clicking it stops with `archive-touched-other-chat` if any other listed chat
+   disappeared (checked first, also when it times out), or `archive-unconfirmed` if
+   the run's chat is still there. Both go to Emi straight away, with the chat title
+   (Hard rules, Privacy).
 6. Cleanup: every runner revokes its grants. Check with
    `node scripts/acceptance/ledger.mjs ids <id>` and the watcher (`--once`).
    Archive created Behaviors through the run log (`Review practice …` titles), and
-   confirm every web run's test chats were archived (step 5).
+   confirm every ChatGPT test chat was archived and every Claude test chat was kept
+   (step 5).
 
 ### Anthropic MCP connector header
 
@@ -241,8 +258,9 @@ npm run mcp:accept:guided -- --client chatgpt|claude-web --scenario read-write|s
 Run it in the background. It starts the watcher, then prints
 `--- Steps for Emi … ---`: send that list to Emi as one message, unchanged. Each
 step is marked `seen:` when the records show it; you do not ask her anything. The
-steps keep the privacy rule: Emi starts a new chat, opens no other chat, and archives
-(ChatGPT) or deletes (Claude) the test chat after the reply.
+steps keep the privacy rule: Emi starts a new chat (the prompts start with
+`[Cadence QA]`), opens no other chat, archives a ChatGPT test chat after the reply,
+and keeps a Claude test chat.
 It checkpoints the grant and the created Behavior, then revokes the grant
 (`--keep-grant` keeps it). `--print-only` previews the list without starting
 anything. Exit 0 all steps seen; 1 a step was not seen (it prints the resume

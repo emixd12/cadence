@@ -34,6 +34,9 @@ const USER_A = cleanupModule.USERS.A;
 const EMAIL_A = 'cadence.testing.is@gmail.com';
 const FAKE_COOKIE = 'FAKEcookieVALUEthatMustNeverAppear0123456789abcdef';
 const REPLY_SECRET = 'NOTE-TEXT-must-not-leak-7731';
+// Title of Emi's other chats in the stub sidebar. Printed only when reporting a
+// chat the run must tell her about; never written to the run folder.
+const OTHER_TITLE = 'Emi private chat';
 
 // ---- Shared stub state --------------------------------------------------------
 
@@ -48,7 +51,7 @@ function resetState(overrides = {}) {
     // Emi's own chats in the sidebar, each with a same-named options button that
     // comes before the conversation in DOM order. They must never change.
     otherChats: [{ id: randomUUID(), archived: false }, { id: randomUUID(), archived: false }],
-    duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false,
+    duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false, historyInMain: false, noHeaderControl: false, stayAfterArchive: false,
     ...overrides,
   };
 }
@@ -86,6 +89,7 @@ const html = (title, body, script = '') => `<!doctype html><html><head><meta cha
 // One client script for both flavors; the markup follows each adapter's roles.
 const chatScript = (flavor) => `
 const flavor = ${JSON.stringify(flavor)};
+const OTHER_TITLE = ${JSON.stringify(OTHER_TITLE)};
 const issuer = ${JSON.stringify(ISSUER)};
 const S = await (await fetch('/api/state')).json();
 const post = (p, b) => fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b ?? {}) }).then((r) => r.json());
@@ -178,25 +182,30 @@ function renderChat() {
       const confirm = el('div', { role: 'alertdialog' }, el('button', { onclick: async () => {
         confirm.remove();
         await post('/api/archive', { chatId });
-        if (leave) location.href = flavor === 'chatgpt' ? '/' : '/new';
+        if (leave && !S.stayAfterArchive) location.href = flavor === 'chatgpt' ? '/' : '/new';
         else location.reload();
       } }, itemName));
       document.body.append(confirm);
     } }, itemName));
     document.body.append(menu);
   } }, '...');
-  const nav = el('nav', { 'aria-label': 'Chat history' });
-  for (const c of [...S.otherChats, ...S.chats].filter((x) => !x.archived)) {
-    nav.append(el('div', {}, el('a', { href: chatPrefix + c.id }, 'Chat ' + c.id.slice(0, 4)), optionsButton(c.id, false)));
-  }
-  root.prepend(nav);
   const main = el('main');
+  // History rows in <nav> (default) or, in the reviewer's layout, as plain divs inside <main>.
+  const historyList = S.historyInMain ? el('div', { class: 'history' }) : el('nav', { 'aria-label': 'Chat history' });
+  // The reviewer's layout has exactly one history row (another chat), so its button is the only match.
+  const rows = S.historyInMain ? S.otherChats.slice(0, 1) : [...S.otherChats, ...S.chats];
+  for (const c of rows.filter((x) => !x.archived)) {
+    const title = S.otherChats.some((o) => o.id === c.id) ? OTHER_TITLE + ' ' + c.id.slice(0, 4) : 'Chat ' + c.id.slice(0, 4);
+    historyList.append(el('div', {}, el('a', { href: chatPrefix + c.id }, title), optionsButton(c.id, false)));
+  }
+  if (S.historyInMain) main.append(historyList); else root.prepend(historyList);
   root.append(main);
   // The header appears once the chat exists (at load for a reopened chat, after
   // the first prompt for a new one). archiveInlineBroken hides it on the first visit.
   const renderHeader = () => {
     if (!currentChat() || main.querySelector('header')) return;
     if (S.archiveInlineBroken && !location.search.includes('reopened')) return;
+    if (S.noHeaderControl) { main.append(el('header', {}, el('h2', {}, 'Conversation'))); return; }
     main.append(el('header', {}, optionsButton(currentChat(), true)));
     if (S.duplicateOptions) main.append(optionsButton(currentChat(), true));
   };
@@ -409,7 +418,7 @@ const fakeWatcher = (decide = () => {
 }) => ({ started: 0, start() { this.started += 1; return { get result() { return new Promise((r) => setTimeout(() => r(decide()), 50)); }, stop() {} }; } });
 
 let counter = 0;
-async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts, label } = {}) {
+async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts, label, deleteClaudeChats = false } = {}) {
   state.flavor = client;
   const context = await browser.newContext();
   const run = runId ? resumeRun({ runId, root }) : createRun({ target: 'local', accounts: ['A'], scenarios: [`${client}:${name}`], root });
@@ -418,7 +427,7 @@ async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts
     const result = await runWebScenario({
       site: stubSite(client), context, issuer: ISSUER, mcpUrl: `${ISSUER}/mcp`, slot: 'A', scenario: name,
       account: { userId: USER_A, email: EMAIL_A }, sessions, rest, cleanup: cleanupModule, watcher, run,
-      label: label ?? `web-test-${(counter += 1)}`, out: (line) => lines.push(line),
+      label: label ?? `web-test-${(counter += 1)}`, out: (line) => lines.push(line), deleteClaudeChats,
       timeouts: timeouts ?? { consentMs: 15_000, turnMs: 15_000, quietMs: 300 },
     });
     const cookiesLeft = (await context.cookies(ISSUER)).length;
@@ -439,6 +448,7 @@ function assertNoLeaks({ lines, run }) {
     expect(blob).not.toContain('Use the Cadence QA connector');
     expect(blob).not.toContain(`${ISSUER}/oauth`);
   }
+  for (const f of runFiles(run).filter((x) => !x.endsWith('.png'))) expect(readFileSync(f, 'utf8')).not.toContain(OTHER_TITLE);
 }
 
 // ---- Runs against the stubs -------------------------------------------------------
@@ -454,11 +464,11 @@ describe('ChatGPT stub', () => {
     expect(state.chats).toHaveLength(2);
     expect(state.chats.every((c) => c.archived)).toBe(true);
     expect(parsed(out.lines).filter((e) => e.step.startsWith('prompt-')).map((e) => e.archived)).toEqual([true, true]);
-    expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
+    expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, keptCount: 0, unknownCount: 0 });
     expect(state.openedPaths.filter((p) => /^\/c\//.test(p))).toEqual([]);
     expect(state.otherChats.every((c) => !c.archived)).toBe(true);
     const ledger = readFileSync(join(out.run.dir, 'checkpoints.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
-    expect(ledger.find((r) => r.kind === 'step' && r.name === 'archive-chats' && r.state === 'done').result).toEqual({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
+    expect(ledger.find((r) => r.kind === 'step' && r.name === 'archive-chats' && r.state === 'done').result).toEqual({ chatCount: 2, archivedCount: 2, keptCount: 0, unknownCount: 0 });
     expect(ledger.filter((r) => r.kind === 'step' && r.name.startsWith('prompt-') && r.state === 'done').map((r) => [Boolean(r.result.chatId), r.result.archived])).toEqual([[true, true], [true, true]]);
     const connect = parsed(out.lines).find((e) => e.step === 'connect');
     expect(connect.grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read']);
@@ -526,10 +536,12 @@ describe('Claude web stub', () => {
     expect(again.result.ok).toBe(true);
     expect(state.consentCount).toBe(consents);
     expect(parsed(again.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
-    // The first attempt archived (deleted) both Claude chats before the watcher miss.
+    // Claude test chats are kept by default (deletion cannot be undone); the
+    // ledger records them as kept, and every prompt carries the [Cadence QA] marker.
     expect(state.chats).toHaveLength(2);
-    expect(state.chats.every((c) => c.archived)).toBe(true);
-    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
+    expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+    expect(parsed(again.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 0, keptCount: 2 });
+    expect(state.messages.every((m) => m.startsWith('[Cadence QA] '))).toBe(true);
     expect(state.messages).toHaveLength(2);
     expect(activeGrants()).toHaveLength(0);
   }, 120_000);
@@ -549,36 +561,70 @@ describe('test chat cleanup', () => {
     assertNoLeaks(out);
   }, 120_000);
 
-  // Every case below has Emi's other chats in the sidebar with same-named buttons first in DOM order.
+  // Every case below has Emi's other chats in the sidebar with same-named buttons
+  // first in DOM order. Claude cases opt in to deletion (deleteClaudeChats).
+  const opt = (client) => ({ deleteClaudeChats: client === 'claude-web' });
+  const untouched = () => expect(state.otherChats.every((c) => !c.archived)).toBe(true);
   for (const client of ['chatgpt', 'claude-web']) {
     it(`${client}: archives only the run's own chat when sidebar buttons share the name and come first`, async () => {
-      const out = await scenario(client, 'read-write');
+      const out = await scenario(client, 'read-write', opt(client));
       expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
       expect(state.chats.every((c) => c.archived)).toBe(true);
-      expect(state.otherChats.every((c) => !c.archived)).toBe(true);
+      untouched();
+    }, 120_000);
+
+    it(`${client}: stops with page-changed and touches nothing when the conversation has two matching menus`, async () => {
+      resetState({ duplicateOptions: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+      expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+      assertNoLeaks(out);
+    }, 120_000);
+
+    it(`${client}: stops with page-changed and touches nothing when the reopened URL is not the run's chat`, async () => {
+      resetState({ archiveInlineBroken: true, redirectOnOpen: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+      expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+    }, 120_000);
+
+    it(`${client}: refuses a history row's control inside main when the header has none, before any click`, async () => {
+      resetState({ historyInMain: true, noHeaderControl: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+      expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+      assertNoLeaks(out);
+    }, 120_000);
+
+    it(`${client}: reports another chat that disappeared, with its title, and never the wrong reason`, async () => {
+      resetState({ archiveAlsoOther: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'archive-touched-other-chat', step: 'chat-archive' });
+      const stopLine = parsed(out.lines).find((e) => e.reason === 'archive-touched-other-chat');
+      expect(stopLine.affectedChats).toEqual([{ chatId: state.otherChats[0].id, title: `${OTHER_TITLE} ${state.otherChats[0].id.slice(0, 4)}` }]);
+      assertNoLeaks(out);
+    }, 120_000);
+
+    it(`${client}: a timeout after the click still reports another chat that disappeared`, async () => {
+      resetState({ archiveAlsoOther: true, stayAfterArchive: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'archive-touched-other-chat', step: 'chat-archive' });
     }, 120_000);
   }
 
-  it('stops with page-changed and touches nothing when the conversation has two matching menus', async () => {
-    resetState({ duplicateOptions: true });
-    const out = await scenario('chatgpt', 'read-write');
-    expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
-    expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
-    assertNoLeaks(out);
-  }, 120_000);
-
-  it("stops with page-changed and touches nothing when the reopened URL is not the run's chat", async () => {
-    resetState({ archiveInlineBroken: true, redirectOnOpen: true });
-    const out = await scenario('chatgpt', 'read-write');
-    expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
-    expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
-  }, 120_000);
-
-  it('stops when another chat disappears from the sidebar after the archive', async () => {
-    resetState({ archiveAlsoOther: true });
-    const out = await scenario('claude-web', 'read-write');
-    expect(out.result).toMatchObject({ ok: false, reason: 'archive-touched-other-chat', step: 'chat-archive' });
-  }, 120_000);
+  it('claude-web: keeps test chats by default and deletes them only with deleteClaudeChats', async () => {
+    const kept = await scenario('claude-web', 'read-write');
+    expect(kept.result, kept.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(kept.lines).filter((e) => e.step.startsWith('prompt-')).map((e) => e.archived)).toEqual([false, false]);
+    expect(parsed(kept.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 0, keptCount: 2, unknownCount: 0 });
+    expect(state.chats.some((c) => c.archived)).toBe(false);
+    expect(state.messages.every((m) => m.startsWith('[Cadence QA] '))).toBe(true);
+    resetState();
+    const deleted = await scenario('claude-web', 'read-write', { deleteClaudeChats: true });
+    expect(deleted.result.ok).toBe(true);
+    expect(parsed(deleted.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, keptCount: 0 });
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+  }, 240_000);
 
   it('keeps the chats only when asked (archiveChats: false)', async () => {
     state.flavor = 'chatgpt';
@@ -744,6 +790,8 @@ describe('CLI', () => {
   it('archives test chats by default; --keep-chats turns it off', () => {
     expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production']).keepChats).toBe(false);
     expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--keep-chats']).keepChats).toBe(true);
+    expect(parseCli(['run', '--client', 'claude-web', '--account', 'A', '--scenario', 'read-write', '--allow-production']).deleteClaudeChats).toBe(false);
+    expect(parseCli(['run', '--client', 'claude-web', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--delete-claude-chats']).deleteClaudeChats).toBe(true);
   });
 
   it('parses the task-note form without a subcommand and requires --allow-production', () => {

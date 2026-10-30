@@ -69,8 +69,9 @@ export const SCENARIOS = Object.freeze({
 });
 
 export const PROMPTS = Object.freeze({
-  read: () => `Use the ${CONNECTOR_NAME} connector to list my Cadence behaviors. Reply with only the number of behaviors.`,
-  write: (label) => `Use the ${CONNECTOR_NAME} connector to create a new daily behavior titled "Review practice ${label}". Do not change anything else. Reply with the word DONE when it is created.`,
+  // Every test prompt starts with [Cadence QA] so Emi can find (and remove) test chats.
+  read: () => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to list my Cadence behaviors. Reply with only the number of behaviors.`,
+  write: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to create a new daily behavior titled "Review practice ${label}". Do not change anything else. Reply with the word DONE when it is created.`,
 });
 
 const SLOTS = ['A', 'B'];
@@ -199,7 +200,7 @@ export function guidedFallback({ client, slot = 'A', scenario = 'read-write', re
     `  2. Name "${CONNECTOR_NAME}", URL ${PRODUCTION_MCP_URL}, then connect.`,
     `  3. On Cadence's consent screen, check the account is test account ${slot} and ${s.decision === 'deny' ? 'click Deny' : `allow the ${s.grant} grant`}.`,
     `  4. Start the watcher first: npm run mcp:watch -- --target production --confirm-production --account ${slot} --since 5m --expect ${site?.watcherScenario ?? client}`,
-    '  5. In a new chat, send the canned prompts from scripts/acceptance/web-client.mjs and approve each tool call. Then archive (ChatGPT) or delete (Claude) that chat. Never open other chats.',
+    '  5. In a new chat, send the canned prompts from scripts/acceptance/web-client.mjs and approve each tool call. Then archive that chat on ChatGPT; keep it on Claude (it starts with [Cadence QA]). Never open other chats.',
     '  Guided mode (Ticket 252) owns the full human checklist.',
   ];
 }
@@ -369,7 +370,7 @@ async function failureShot(page, dir, name) {
  */
 export async function runWebScenario({
   site, context, issuer, mcpUrl, slot, scenario: scenarioName, account, sessions, rest, cleanup, watcher, run, label: labelArg,
-  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false, archiveChats = true,
+  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false, archiveChats = true, deleteClaudeChats = false,
   timeouts = { consentMs: 90_000, turnMs: 180_000, quietMs: 2_500 },
 }) {
   const scenario = SCENARIOS[scenarioName];
@@ -442,6 +443,9 @@ export async function runWebScenario({
 
     // Privacy (Emi's ChatGPT and Claude accounts): each prompt opens a new chat,
     // the run reads only that chat's reply, and archives it right after.
+    // ChatGPT archives can be undone; Claude deletions cannot, so Claude test
+    // chats are kept unless the caller opts in (deleteClaudeChats).
+    const cleanChats = archiveChats && (site.chatCleanup === 'archive' || deleteClaudeChats);
     const chats = [];
     for (const kind of scenario.prompts) {
       const stepName = `prompt-${kind}`;
@@ -470,7 +474,7 @@ export async function runWebScenario({
         const chatId = chatIdOf(site, page.url());
         // A stop before any click (page-changed) is retried in archive-chats; the
         // reply is already captured. Anything after a click stops the run.
-        const archived = archiveChats && chatId
+        const archived = cleanChats && chatId
           ? await archiveChat(page, site, chatId).then(() => true, (error) => { if (error instanceof WebStop && error.reason === 'page-changed') return false; throw error; })
           : false;
         await page.close().catch(() => {});
@@ -494,6 +498,7 @@ export async function runWebScenario({
     if (archiveChats && chats.length) {
       // Before the watcher verdict, so a watcher miss still leaves no test chat behind.
       const done = await run.step('archive-chats', async () => {
+        if (!cleanChats) return { chatCount: chats.length, archivedCount: 0, keptCount: chats.length, unknownCount: 0 };
         let archivedCount = 0;
         let unknownCount = 0;
         for (const chat of chats) {
@@ -509,7 +514,7 @@ export async function runWebScenario({
           archivedCount += 1;
           await page.close().catch(() => {});
         }
-        return { chatCount: chats.length, archivedCount, unknownCount };
+        return { chatCount: chats.length, archivedCount, keptCount: 0, unknownCount };
       });
       emit({ step: 'archive-chats', ok: true, ...done });
     }
@@ -533,7 +538,9 @@ export async function runWebScenario({
     const stop = error instanceof WebStop ? error
       : new WebStop(typeof error?.reason === 'string' ? error.reason : error instanceof AcceptanceError ? error.code : 'internal-error', 'unknown');
     const shot = await failureShot(current, runDir, `${stop.step ?? 'run'}`);
-    emit({ step: stop.step ?? 'run', ok: false, reason: stop.reason, screenshot: shot });
+    // affectedChats (ID and sidebar title) goes to the console only, so the agent
+    // can tell Emi which of her chats changed; never to the ledger.
+    emit({ step: stop.step ?? 'run', ok: false, reason: stop.reason, screenshot: shot, ...(stop.affectedChats ? { affectedChats: stop.affectedChats } : {}) });
     for (const line of guidedFallback({ client: site.id, slot, scenario: scenarioName, reason: stop.reason })) out(line);
     return { ok: false, runId: run.runId, reason: stop.reason, step: stop.step };
   } finally {
@@ -585,10 +592,10 @@ export function parseCli(argv) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     client: { type: 'string' }, account: { type: 'string' }, scenario: { type: 'string' }, profile: { type: 'string' },
     port: { type: 'string' }, run: { type: 'string' }, 'allow-production': { type: 'boolean', default: false },
-    'keep-grant': { type: 'boolean', default: false }, 'keep-chats': { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
+    'keep-grant': { type: 'boolean', default: false }, 'keep-chats': { type: 'boolean', default: false }, 'delete-claude-chats': { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
   } });
   const port = values.port === undefined ? DEFAULT_DEBUG_PORT : Number(values.port);
-  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], keepChats: values['keep-chats'], listScenarios: values['list-scenarios'] };
+  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], keepChats: values['keep-chats'], deleteClaudeChats: values['delete-claude-chats'], listScenarios: values['list-scenarios'] };
   if (opts.listScenarios) return opts;
   assertPort(port);
   if (command === 'dry-run') {
@@ -669,7 +676,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         site, context, issuer: PRODUCTION.issuer, mcpUrl: PRODUCTION_MCP_URL, slot: opts.slot, scenario: opts.scenario,
         account: PRODUCTION.accounts[opts.slot], sessions: deps.sessions, rest: deps.rest, cleanup: deps.cleanup,
         watcher: spawnWatcher(), run, label,
-        out, keepGrant: opts.keepGrant, archiveChats: !opts.keepChats,
+        out, keepGrant: opts.keepGrant, archiveChats: !opts.keepChats, deleteClaudeChats: opts.deleteClaudeChats,
       });
       out(summary({ step: 'done', ok: result.ok, runId: result.runId }));
       return result.ok ? 0 : 1;

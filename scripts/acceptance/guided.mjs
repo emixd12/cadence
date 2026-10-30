@@ -73,7 +73,7 @@ export function guidedSteps({ client, scenario = 'read-write', slot = 'A', label
   const privacy = 'Do not open, read or search any other chat.';
   const cleanup = client === 'chatgpt'
     ? 'After the reply, archive this test chat (chat menu → Archive).'
-    : 'After the reply, delete this test chat (chat menu → Delete).';
+    : 'After the reply, keep this test chat; its messages start with [Cadence QA], so it is easy to find later.';
   return [
     {
       id: 'connect', waitFor: ['client-registered', 'grant-created', 'token-issued'],

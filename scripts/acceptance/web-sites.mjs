@@ -122,6 +122,8 @@ const chatgpt = Object.freeze({
   archiveMenu: exact('Open conversation options', 'Conversation options'),
   archiveItem: exact('Archive'),
   archiveConfirm: exact('Archive', 'Confirm'),
+  // Archiving can be undone, so runs archive ChatGPT test chats by default.
+  chatCleanup: 'archive',
   loginPath: /^\/(auth|log-?in)\b/i,
   loginButton: exact('Log in', 'Sign up', 'Sign up for free'),
   composer: '#prompt-textarea, [contenteditable="true"][role="textbox"], textarea[name="prompt-textarea"]',
@@ -172,6 +174,9 @@ const claudeWeb = Object.freeze({
   archiveMenu: exact('Open chat options', 'Chat options', 'Chat menu'),
   archiveItem: exact('Delete'),
   archiveConfirm: exact('Delete', 'Confirm'),
+  // Deleting cannot be undone, so runs keep Claude test chats unless asked
+  // (--delete-claude-chats); the [Cadence QA] prompt marker makes them easy to find.
+  chatCleanup: 'delete',
   loginPath: /^\/(login|logout|magic-link)\b/i,
   loginButton: exact('Continue with Google', 'Continue with email', 'Log in', 'Sign in'),
   nameField: exact('Name'),
@@ -240,18 +245,30 @@ export function chatIdOf(site, url) {
 const CONVERSATION = 'main, [role="main"], #page-header';
 const NOT_CONVERSATION = 'nav, aside, [role="navigation"], [role="complementary"]';
 
-/** Chat IDs linked anywhere on the page (the sidebar history), read from link targets only. */
-export async function listedChatIds(page, site) {
-  const hrefs = await page.locator('a[href]').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
-  const ids = new Set();
-  for (const href of hrefs) {
+/**
+ * Chats linked anywhere on the page (the history list): chat ID → link title.
+ * Titles stay in memory; they are printed only to name a chat the run must
+ * report to Emi, never written to the run folder.
+ */
+export async function listedChats(page, site) {
+  const links = await page.locator('a[href]').evaluateAll((as) => as.map((a) => [a.getAttribute('href'), (a.textContent ?? '').trim()]));
+  const chats = new Map();
+  for (const [href, title] of links) {
     const id = chatIdOf(site, new URL(href, page.url()).href);
-    if (id) ids.add(id);
+    if (id && !chats.has(id)) chats.set(id, title.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 80));
   }
-  return ids;
+  return chats;
 }
 
-/** Visible elements named like the chat options control inside the conversation area, outside any navigation. */
+export async function listedChatIds(page, site) {
+  return new Set((await listedChats(page, site)).keys());
+}
+
+/**
+ * Visible elements named like the chat options control inside the conversation
+ * area, outside any navigation, each with the chat IDs its ancestors (below the
+ * conversation root) link to. A history row's button sits next to that row's link.
+ */
 async function conversationOptions(page, site) {
   const all = page.getByRole('button', { name: site.archiveMenu });
   const found = [];
@@ -259,20 +276,44 @@ async function conversationOptions(page, site) {
   for (let i = 0; i < count; i += 1) {
     const item = all.nth(i);
     if (!(await item.isVisible().catch(() => false))) continue;
-    const inside = await item.evaluate((el, [inner, outer]) => Boolean(el.closest(inner)) && !el.closest(outer), [CONVERSATION, NOT_CONVERSATION]).catch(() => false);
-    if (inside) found.push(item);
+    const hrefs = await item.evaluate((el, [inner, outer]) => {
+      const root = el.closest(inner);
+      if (!root || el.closest(outer)) return null;
+      const seen = [];
+      for (let node = el; node && node !== root; node = node.parentElement) {
+        if (node.matches('a[href]')) seen.push(node.getAttribute('href'));
+        for (const a of node.querySelectorAll('a[href]')) seen.push(a.getAttribute('href'));
+      }
+      return seen;
+    }, [CONVERSATION, NOT_CONVERSATION]).catch(() => null);
+    if (hrefs === null) continue;
+    const linked = new Set(hrefs.map((href) => chatIdOf(site, new URL(href, page.url()).href)).filter(Boolean));
+    found.push({ item, linked });
   }
   return found;
+}
+
+/** Other chats listed before the click and missing now, with their titles. */
+function missingChats(before, after) {
+  return [...before].filter(([id]) => !after.has(id)).map(([chatId, title]) => ({ chatId, title }));
+}
+
+function touchedOther(affected) {
+  const stop = new WebStop('archive-touched-other-chat', 'chat-archive');
+  stop.affectedChats = affected;
+  return stop;
 }
 
 /**
  * Archives (ChatGPT) or deletes (Claude) the run's own chat `chatId`, which
  * must be the chat open in `page`. Before any click it stops with page-changed
- * at chat-archive when the URL is not that chat or when the options control
- * inside the conversation area is missing or ambiguous; nothing is touched.
- * Afterwards it requires the chat to be gone (archive-unconfirmed otherwise)
- * and every other chat listed before to still be listed
- * (archive-touched-other-chat otherwise). It never searches or opens other chats.
+ * at chat-archive when the URL is not that chat, when the options control
+ * inside the conversation area is missing or ambiguous, or when a matching
+ * control's ancestors link to another chat (a history row); nothing is touched.
+ * Afterwards every other chat listed before must still be listed
+ * (archive-touched-other-chat, with the missing chats' titles, checked first,
+ * also on timeout), and the run's chat must be gone (archive-unconfirmed).
+ * It never searches or opens other chats.
  */
 export async function archiveChat(page, site, chatId, { timeoutMs = 10_000 } = {}) {
   if (!chatId || chatIdOf(site, page.url()) !== chatId) throw new WebStop('page-changed', 'chat-archive');
@@ -282,24 +323,34 @@ export async function archiveChat(page, site, chatId, { timeoutMs = 10_000 } = {
     await new Promise((r) => setTimeout(r, 200));
     options = await conversationOptions(page, site);
   }
+  if (options.some((o) => [...o.linked].some((id) => id !== chatId))) throw new WebStop('page-changed', 'chat-archive');
   if (options.length !== 1) throw new WebStop('page-changed', 'chat-archive');
   if (chatIdOf(site, page.url()) !== chatId) throw new WebStop('page-changed', 'chat-archive');
-  const before = await listedChatIds(page, site);
+  const before = await listedChats(page, site);
   before.delete(chatId);
-  await options[0].click({ timeout: 5_000 });
+  await options[0].item.click({ timeout: 5_000 });
   await clickNamed(page, site.archiveItem, 'chat-archive', { scope: page.getByRole('menu'), timeoutMs: 5_000 });
   await confirmIfAsked(page, site.archiveConfirm);
   // Wait until the page has left the chat and the chat is no longer listed.
-  let after = null;
   for (;;) {
     await page.waitForLoadState('domcontentloaded').catch(() => {});
-    const left = chatIdOf(site, page.url()) !== chatId;
-    const listed = left ? await listedChatIds(page, site).catch(() => null) : null;
-    if (listed && !listed.has(chatId)) { after = listed; break; }
-    if (Date.now() >= deadline + 5_000) throw new WebStop('archive-unconfirmed', 'chat-archive');
+    const listed = await listedChats(page, site).catch(() => null);
+    if (listed) {
+      const missing = missingChats(before, listed);
+      if (missing.length) throw touchedOther(missing);
+      if (chatIdOf(site, page.url()) !== chatId && !listed.has(chatId)) return;
+    }
+    if (Date.now() >= deadline + 5_000) {
+      // Timed out: another chat vanishing outranks "still there".
+      const last = await listedChats(page, site).catch(() => null);
+      if (last) {
+        const missing = missingChats(before, last);
+        if (missing.length) throw touchedOther(missing);
+      }
+      throw new WebStop('archive-unconfirmed', 'chat-archive');
+    }
     await new Promise((r) => setTimeout(r, 200));
   }
-  for (const id of before) if (!after.has(id)) throw new WebStop('archive-touched-other-chat', 'chat-archive');
 }
 
 /** A copy of a site whose pages live elsewhere (the stub pages in tests). */
