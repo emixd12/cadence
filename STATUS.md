@@ -1,5 +1,32 @@
 # Implementation Status
 
+## Automated MCP client acceptance: Tickets 247–256 — October 30, 2026
+
+QA tooling for MCP and AI-client acceptance, on the unpushed branch
+`mcp-acceptance-automation`. Plan and platform impact: `docs/TICKETS.md` (Tickets
+247–256). No production calls; Ticket 232's live run, scripts and captured records
+are untouched.
+
+- In review (wave 1, integrated): Ticket 247 run ledger
+  (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
+  (`npm run mcp:oauth`), Ticket 250 server-side watcher (`npm run mcp:watch`) and
+  Ticket 254 agent-scoped secrets (`npm run agent:secret`). Each passed its focused
+  tests and a local isolated-stack run where it needs a database. An independent
+  verifier is reviewing them.
+- Planned: Tickets 249, 251 and 255 (wave 2), Ticket 252 and conditional Ticket 253
+  (wave 3), and Ticket 256, the production client retest (wave 4, needs the owner's
+  go-ahead).
+- Owner step pending for Ticket 254: create the "Cadence Agents" vault, the
+  spend-limited Anthropic and OpenAI keys and a read-only service account
+  (`docs/qa/agent-secrets.md`).
+- Product finding from Ticket 248, not fixed here: clicking Allow or Deny before the
+  consent page hydrates sends a native form POST with `Origin: null`, and the Server
+  Action CSRF check returns 500.
+
+Platform impact: web QA tooling only (scripts, tests, docs); Ticket 253 would touch
+the MCP server. Desktop, marketing and future mobile: not applicable, because the
+tooling tests only the hosted MCP server. Messaging impact: none.
+
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
 Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
