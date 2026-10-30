@@ -30,7 +30,7 @@ import { parseArgs } from 'node:util';
 import { GRANTS, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
-import { SITES, WebStop, classifyPage, clickable, findConnectorRow, waitVisible } from './web-sites.mjs';
+import { SITES, WebStop, classifyPage, clickable, waitVisible } from './web-sites.mjs';
 
 export { SITES, WebStop };
 
@@ -191,8 +191,8 @@ export function guidedFallback({ client, slot = 'A', scenario = 'read-write', re
   const site = SITES[client];
   const s = SCENARIOS[scenario] ?? SCENARIOS['read-write'];
   const where = client === 'chatgpt'
-    ? 'Settings → Apps → Advanced settings: turn on Developer mode, then Create'
-    : 'Settings → Connectors → Add custom connector';
+    ? 'Settings → Plugins → Cadence QA → Reconnect (or create the developer app if it is missing)'
+    : 'Customize → Connectors → Yours → Cadence QA → Connect (or Add connector → Add custom connector)';
   return [
     `guided-fallback ${client} reason=${reason}`,
     `  1. In the Cadence QA Chrome window, open ${site?.label ?? client}: ${where}.`,
@@ -308,7 +308,7 @@ async function openConnectors(page, site, step) {
   await page.goto(`${site.origin}${site.connectorsPath}`, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => { throw new WebStop('site-unreachable', step); });
   const state = await classifyPage(page, site);
   if (state !== 'ok') throw new WebStop(state, step);
-  const ready = await waitVisible(clickable(page, site.settingsReady).or(page.getByRole('heading', { name: site.settingsReady })), 20_000);
+  const ready = await waitVisible(site.settingsMarker(page), 20_000);
   if (!ready) {
     const again = await classifyPage(page, site);
     throw new WebStop(again === 'ok' ? 'page-changed' : again, step);
@@ -328,13 +328,16 @@ export async function signInStatus({ context, sites = Object.values(SITES), now 
   return result;
 }
 
-/** Dry run: reach the connector settings in the kept profile. Clicks nothing. */
+/**
+ * Dry run: reach the connector settings in the kept profile and look for the
+ * Cadence QA connector. Clicks only Claude's "Yours" list filter; saves nothing.
+ */
 export async function dryRunSite({ context, site, screenshotDir = null }) {
   const page = await context.newPage();
   try {
     await openConnectors(page, site, 'dry-run');
-    const existing = await findConnectorRow(page, CONNECTOR_NAME, 2_000);
-    return { client: site.id, ok: true, reached: 'connector-settings', connectorPresent: Boolean(existing), developerMode: await site.developerModeState(page) };
+    const existing = await site.findConnector(page, CONNECTOR_NAME);
+    return { client: site.id, ok: true, reached: 'connector-settings', connectorPresent: Boolean(existing) };
   } catch (error) {
     if (!(error instanceof WebStop)) throw error;
     const shot = screenshotDir ? await failureShot(page, screenshotDir, `dry-run-${site.id}`) : null;
@@ -406,8 +409,8 @@ export async function runWebScenario({
       const page = await context.newPage();
       track(page);
       await openConnectors(page, site, 'connector-settings');
-      const row = await findConnectorRow(page, CONNECTOR_NAME);
-      if (row) await site.reconnect(page, row);
+      const entry = await site.findConnector(page, CONNECTOR_NAME);
+      if (entry) await site.reconnect(page, entry, CONNECTOR_NAME);
       else await site.addConnector(page, { name: CONNECTOR_NAME, url: mcpUrl });
       const consent = await consentAnswer(scenario.decision, scenario.grant)();
       await sessions.absorbBrowserCookies(slot, await context.cookies(issuer)).catch(() => ({ rotated: false }));

@@ -1,7 +1,8 @@
 // Ticket 255: browser-driven ChatGPT web and Claude web runs, against stub
 // chat sites and a stub Cadence consent page (DOM copied from the real one).
 // The real Ticket 232 cleanup helpers and the Ticket 247 ledger run against an
-// in-memory rest adapter. Uses installed Chrome, headless, on ports 4431–4433.
+// in-memory rest adapter. Uses installed Chrome, headless, and three free
+// ports in Ticket 255's range 4431–4439 (so two copies can run side by side).
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -18,8 +19,23 @@ import {
 } from '../scripts/acceptance/web-client.mjs';
 import { SITES, WebStop, withOrigin } from '../scripts/acceptance/web-sites.mjs';
 
-const CHAT_PORTS = { chatgpt: 4431, 'claude-web': 4432 };
-const ISSUER = 'http://127.0.0.1:4433';
+const CHAT_PORTS = {};
+let ISSUER = null;
+
+async function listenInRange(server, used) {
+  for (let port = 4431; port <= 4439; port += 1) {
+    if (used.has(port)) continue;
+    try {
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
+      });
+      used.add(port);
+      return port;
+    } catch { /* port taken; try the next one */ }
+  }
+  throw new Error('no-free-port-4431-4439');
+}
 const USER_A = cleanupModule.USERS.A;
 const EMAIL_A = 'cadence.testing.is@gmail.com';
 const FAKE_COOKIE = 'FAKEcookieVALUEthatMustNeverAppear0123456789abcdef';
@@ -30,8 +46,8 @@ const REPLY_SECRET = 'NOTE-TEXT-must-not-leak-7731';
 let state;
 function resetState(overrides = {}) {
   state = {
-    flavor: null, loginWall: false, botCheck: false, missingCreate: false, devMode: false,
-    connectors: [], grants: [], behaviors: [], activity: [], consentAccountId: USER_A, consentEmail: EMAIL_A,
+    flavor: null, loginWall: false, botCheck: false, missingCreate: false,
+    connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: false }], grants: [], behaviors: [], activity: [], consentAccountId: USER_A, consentEmail: EMAIL_A,
     requestScopes: ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'],
     approvalsPerTool: 1, stepUp: false, neverReply: false, endlessAfterApproval: false,
     consentCount: 0, pending: null, messages: [],
@@ -77,60 +93,75 @@ const S = await (await fetch('/api/state')).json();
 const post = (p, b) => fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b ?? {}) }).then((r) => r.json());
 const root = document.getElementById('root');
 const authorizeUrl = (scope) => issuer + '/oauth/authorize?client=' + (flavor === 'chatgpt' ? 'ChatGPT' : 'Claude') + '&return=' + encodeURIComponent(location.origin + '/oauth-cb') + '&scope=' + encodeURIComponent(scope.join(' '));
-const settings = flavor === 'chatgpt' ? location.hash === '#settings/Connectors' : location.pathname === '/settings/connectors';
+// Settings pages mirror the real ones read on 2026-10-30 (see web-sites.mjs).
+const path = location.pathname;
+const settings = flavor === 'chatgpt' ? path.startsWith('/settings/plugins-settings') : path.startsWith('/customize/connectors');
 function el(tag, attrs = {}, ...kids) { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v); } for (const k of kids) n.append(k); return n; }
 if (S.botCheck) { document.title = 'Just a moment...'; root.append(el('p', {}, 'Verify you are human')); }
 else if (S.loginWall) { root.append(el('button', {}, 'Log in')); }
 else if (settings) renderSettings();
 else renderChat();
-window.addEventListener('hashchange', () => location.reload());
 
 function renderSettings() {
-  const dialog = el('div', { role: 'dialog' });
+  const main = el('main');
+  root.append(main);
+  const detail = path.endsWith('/plugin_x') || path.endsWith('/yours/id/1');
+  const c = S.connectors[0];
   if (flavor === 'chatgpt') {
-    dialog.append(el('div', { role: 'tablist' }, el('button', { role: 'tab' }, 'Apps')));
-    dialog.append(el('button', { role: 'switch', 'aria-label': 'Developer mode', 'aria-checked': String(S.devMode), onclick: async () => { await post('/api/dev'); location.reload(); } }));
-    if (!S.missingCreate) dialog.append(el('button', { onclick: openCreate }, 'Create'));
-  } else {
-    dialog.append(el('h1', {}, 'Connectors'));
-    if (!S.missingCreate) dialog.append(el('button', { onclick: openCreate }, 'Add custom connector'));
+    if (detail) {
+      main.append(el('h1', {}, c.name), el('a', { href: '#' }, 'View details'), el('button', {}, 'Uninstall'));
+      if (!c.connected) main.append(el('button', { 'aria-label': "Reconnect Emiliano's " + c.name + ' account Primary', onclick: () => { location.href = authorizeUrl(S.requestScopes); } }, 'Reconnect'));
+      main.append(el('button', {}, 'Connect another account'));
+      return;
+    }
+    main.append(el('h1', {}, 'Plugins'), el('button', {}, 'Browse directory'), el('input', { type: 'search', 'aria-label': 'Search installed plugins' }));
+    main.append(el('a', { href: '/settings/plugins-settings/plugin_a' }, 'Adobe Design, combine, and edit'));
+    for (const x of S.connectors) main.append(el('a', { href: '/settings/plugins-settings/plugin_x' }, x.name + ' ' + x.name));
+    return;
   }
-  const list = el('ul');
-  for (const c of S.connectors) {
-    const item = el('li', {}, el('span', {}, c.name));
-    if (flavor === 'chatgpt') {
-      item.addEventListener('click', (e) => { if (e.target === item || e.target.tagName === 'SPAN') showDetail(c); });
-    } else if (c.connected) item.append(el('button', { onclick: async () => { await post('/api/disconnect'); location.reload(); } }, 'Disconnect'));
-    else item.append(el('button', { onclick: () => window.open(authorizeUrl(S.requestScopes), 'oauth', 'popup') }, 'Connect'));
-    list.append(item);
+  main.append(el('h1', {}, 'Customize'));
+  if (detail) {
+    main.append(el('a', { href: '/customize/connectors' }, 'Your connectors'));
+    main.append(el('button', { 'aria-label': 'More options for ' + c.name, onclick: () => {
+      const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: async () => {
+        menu.remove();
+        const confirm = el('div', { role: 'alertdialog' }, el('button', { onclick: async () => { await post('/api/disconnect'); location.reload(); } }, 'Disconnect'));
+        document.body.append(confirm);
+      } }, 'Disconnect'));
+      document.body.append(menu);
+    } }, '...'));
+    if (!c.connected) main.append(el('p', {}, 'You started connecting but did not finish.'), el('button', { onclick: () => window.open(authorizeUrl(S.requestScopes), 'oauth', 'popup') }, 'Connect'));
+    return;
   }
-  dialog.append(list);
-  root.append(dialog);
-}
-function showDetail(c) {
-  const d = el('div', { role: 'dialog' }, el('h2', {}, c.name));
-  if (c.connected) d.append(el('button', { onclick: async () => { await post('/api/disconnect'); d.remove(); showDetail({ ...c, connected: false }); } }, 'Disconnect'));
-  else d.append(el('button', { onclick: () => { location.href = authorizeUrl(S.requestScopes); } }, 'Connect'));
-  document.body.append(d);
+  main.append(el('div', { role: 'tablist' }, el('button', { role: 'tab', 'aria-selected': 'true' }, 'Connectors')));
+  const yours = el('button', { role: 'radio', 'aria-checked': 'false' }, 'Yours');
+  main.append(el('div', { role: 'radiogroup', 'aria-label': 'Connectors' }, yours, el('button', { role: 'radio', 'aria-checked': 'true' }, 'Discover')));
+  main.append(el('button', { 'aria-label': 'Add connector', onclick: () => {
+    const menu = el('div', { role: 'menu', 'aria-label': 'Add connector' });
+    if (!S.missingCreate) menu.append(el('div', { role: 'menuitem', onclick: () => { menu.remove(); openCreate(); } }, 'Add custom connector'));
+    document.body.append(menu);
+  } }, 'Add'));
+  const panel = el('div');
+  main.append(panel);
+  yours.addEventListener('click', () => {
+    yours.setAttribute('aria-checked', 'true');
+    const table = el('table');
+    for (const x of S.connectors) {
+      const row = el('tr', { 'aria-label': 'View ' + x.name, onclick: () => { location.href = '/customize/connectors/yours/id/1'; } }, el('td', {}, x.name), el('td', {}, x.connected ? 'Connected' : 'Connect'));
+      table.append(row);
+    }
+    panel.replaceChildren(table);
+  });
 }
 function openCreate() {
   const d = el('div', { role: 'dialog' });
   const field = (label, id) => { d.append(el('label', { for: id }, label)); const i = el('input', { id }); d.append(i); return i; };
   const name = field('Name', 'f-name');
-  const url = field(flavor === 'chatgpt' ? 'MCP server URL' : 'Remote MCP server URL', 'f-url');
-  let trust = null;
-  if (flavor === 'chatgpt') {
-    d.append(el('label', { for: 'f-auth' }, 'Authentication'));
-    const sel = el('select', { id: 'f-auth' }, el('option', {}, 'None'), el('option', {}, 'OAuth'));
-    d.append(sel);
-    trust = el('input', { type: 'checkbox', id: 'f-trust' });
-    d.append(trust, el('label', { for: 'f-trust' }, 'I understand and want to continue'));
-  }
+  const url = field('Remote MCP server URL', 'f-url');
   d.append(el('button', { onclick: async () => {
-    if (flavor === 'chatgpt' && (!trust.checked || d.querySelector('select').value !== 'OAuth')) return;
     await post('/api/connectors', { name: name.value, url: url.value });
-    if (flavor === 'chatgpt') location.href = authorizeUrl(S.requestScopes); else location.reload();
-  } }, flavor === 'chatgpt' ? 'Create' : 'Add'));
+    location.reload();
+  } }, 'Add'));
   document.body.append(d);
 }
 function renderChat() {
@@ -185,14 +216,13 @@ function chatServer(flavor) {
     for await (const chunk of req) body += chunk;
     const input = body ? JSON.parse(body) : {};
     if (url.pathname === '/api/state') return json({ ...state, stepUpDone: Boolean(state.stepUpDone) });
-    if (url.pathname === '/api/dev') { state.devMode = !state.devMode; return json({}); }
     if (url.pathname === '/api/connectors') { state.connectors.push({ name: input.name, url: input.url, connected: false }); return json({}); }
     if (url.pathname === '/api/disconnect') { for (const c of state.connectors) c.connected = false; return json({}); }
     if (url.pathname === '/api/enable') { state.enabled = true; return json({}); }
     if (url.pathname === '/oauth-cb') {
       const ok = url.searchParams.get('connected') === '1';
       if (ok) for (const c of state.connectors) c.connected = true;
-      const next = flavor === 'chatgpt' ? '/#settings/Connectors' : '/settings/connectors';
+      const next = flavor === 'chatgpt' ? '/settings/plugins-settings' : '/customize/connectors';
       return send(200, 'text/html', html('Connected', '<p>done</p>', `if (window.opener) window.close(); else location.href = ${JSON.stringify(next)};`));
     }
     if (url.pathname === '/api/prompt') {
@@ -209,7 +239,7 @@ function chatServer(flavor) {
       return json(finish());
     }
     if (url.pathname === '/api/resume') return json(finish());
-    if (url.pathname === '/' || url.pathname === '/new' || url.pathname === '/settings/connectors') {
+    if (url.pathname === '/' || url.pathname === '/new' || url.pathname.startsWith('/settings/plugins-settings') || url.pathname.startsWith('/customize/connectors')) {
       return send(200, 'text/html', html(flavor === 'chatgpt' ? 'ChatGPT stub' : 'Claude stub', '<div id="root"></div>', chatScript(flavor)));
     }
     return send(404, 'text/plain', 'not found');
@@ -301,10 +331,15 @@ let browser;
 const servers = [];
 let root;
 beforeAll(async () => {
-  for (const [server, port] of [[chatServer('chatgpt'), CHAT_PORTS.chatgpt], [chatServer('claude-web'), CHAT_PORTS['claude-web']], [issuerServer(), 4433]]) {
-    await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
+  const used = new Set();
+  for (const client of ['chatgpt', 'claude-web']) {
+    const server = chatServer(client);
+    CHAT_PORTS[client] = await listenInRange(server, used);
     servers.push(server);
   }
+  const issuer = issuerServer();
+  ISSUER = `http://127.0.0.1:${await listenInRange(issuer, used)}`;
+  servers.push(issuer);
   browser = await launchChrome({ headless: true });
   root = mkdtempSync(join(tmpdir(), 'accept-255-'));
 }, 60_000);
@@ -354,21 +389,20 @@ function assertNoLeaks({ lines, run }) {
     expect(blob).not.toContain(FAKE_COOKIE);
     expect(blob).not.toContain(REPLY_SECRET);
     expect(blob).not.toContain('Use the Cadence QA connector');
-    expect(blob).not.toMatch(/https?:\/\/127\.0\.0\.1:4433\/oauth/);
+    expect(blob).not.toContain(`${ISSUER}/oauth`);
   }
 }
 
 // ---- Runs against the stubs -------------------------------------------------------
 
 describe('ChatGPT stub', () => {
-  it('connects, consents, prompts, approves, captures the reply and cleans up', async () => {
+  it('reconnects the existing app, consents, prompts, approves, captures the reply and cleans up', async () => {
     const out = await scenario('chatgpt', 'read-write');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
     expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'watcher', 'revoke']);
     const connect = parsed(out.lines).find((e) => e.step === 'connect');
     expect(connect.grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read']);
-    expect(state.devMode).toBe(true);
     expect(state.connectors).toEqual([{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }]);
     expect(state.enabled).toBe(true);
     const write = parsed(out.lines).find((e) => e.step === 'prompt-write');
@@ -424,6 +458,7 @@ describe('Claude web stub', () => {
   }, 120_000);
 
   it('adds a missing connector, then resumes after a watcher miss without reconnecting', async () => {
+    resetState({ connectors: [] });
     const first = await scenario('claude-web', 'read-write', { watcher: fakeWatcher(() => 1) });
     expect(first.result).toMatchObject({ ok: false, reason: 'watcher-unsatisfied', step: 'watcher' });
     expect(activeGrants()).toHaveLength(1);
@@ -456,7 +491,8 @@ describe('failure reasons', () => {
     expect(parsed(out.lines).at(-1).screenshot).toBe('failure-connector-settings.png');
   }, 60_000);
   it('bot check', () => expectStop('claude-web', 'read-write', 'bot-check', 'connector-settings', { botCheck: true }), 60_000);
-  it('changed page', () => expectStop('claude-web', 'read-write', 'page-changed', 'connector-create', { missingCreate: true }), 60_000);
+  it('changed page', () => expectStop('claude-web', 'read-write', 'page-changed', 'connector-create', { missingCreate: true, connectors: [] }), 60_000);
+  it('a missing ChatGPT app, which the runner does not create', () => expectStop('chatgpt', 'read-write', 'connector-missing', 'connector-create', { connectors: [] }), 60_000);
   it('wrong Cadence account on the consent page, before clicking', async () => {
     await expectStop('chatgpt', 'read-write', 'consent-wrong-account', 'consent', { consentAccountId: cleanupModule.USERS.B });
     expect(state.consentCount).toBe(0);
@@ -473,7 +509,8 @@ describe('failure reasons', () => {
     const out = await scenario('claude-web', 'read-write', { watcher });
     expect(out.result).toMatchObject({ ok: false, reason: 'ticket-232-grants-active', step: 'preflight' });
     expect(watcher.started).toBe(0);
-    expect(state.connectors).toHaveLength(0);
+    expect(state.consentCount).toBe(0);
+    expect(state.connectors[0].connected).toBe(false);
     expect(out.lines.join('\n')).not.toContain('5d764426');
     expect(runFiles(out.run).map((f) => readFileSync(f, 'utf8')).join('\n')).not.toContain('5d764426');
   }, 60_000);
@@ -498,15 +535,17 @@ describe('sign-in status', () => {
 });
 
 describe('dry run', () => {
-  it('reaches the connector settings without clicking', async () => {
-    resetState({ connectors: [{ name: 'Cadence QA', url: 'x', connected: false }] });
+  it('reaches the connector settings and finds the connector without changing anything', async () => {
     const context = await browser.newContext();
     try {
       const gpt = await dryRunSite({ context, site: stubSite('chatgpt') });
-      expect(gpt).toEqual({ client: 'chatgpt', ok: true, reached: 'connector-settings', connectorPresent: true, developerMode: 'off' });
+      expect(gpt).toEqual({ client: 'chatgpt', ok: true, reached: 'connector-settings', connectorPresent: true });
       const claude = await dryRunSite({ context, site: stubSite('claude-web') });
-      expect(claude).toMatchObject({ ok: true, connectorPresent: true, developerMode: 'not-applicable' });
-      expect(state.devMode).toBe(false);
+      expect(claude).toEqual({ client: 'claude-web', ok: true, reached: 'connector-settings', connectorPresent: true });
+      expect(state.consentCount).toBe(0);
+      expect(state.connectors).toEqual([{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: false }]);
+      resetState({ connectors: [] });
+      expect(await dryRunSite({ context, site: stubSite('chatgpt') })).toMatchObject({ ok: true, connectorPresent: false });
       resetState({ loginWall: true });
       const dir = join(root, 'dry');
       expect(await dryRunSite({ context, site: stubSite('claude-web'), screenshotDir: dir })).toMatchObject({ ok: false, reason: 'login-wall', screenshot: 'failure-dry-run-claude-web.png' });

@@ -89,6 +89,21 @@ export async function classifyPage(page, site) {
 }
 
 // ---- Sites ------------------------------------------------------------------
+//
+// Page structure read from the real sites on 2026-10-30 (dry run, signed in):
+// - ChatGPT: Settings → Integrations → Plugins at /settings/plugins-settings
+//   (the old #settings/Connectors redirects there). Each plugin is a link named
+//   "<name> <description>"; its detail page has "Reconnect <account>" and
+//   "Connect another account". Developer apps show "Version dev mode".
+// - Claude: Customize → Connectors at /customize/connectors (the old
+//   /settings/connectors shows a "Connectors have moved" notice). "Add
+//   connector" opens a menu with "Add custom connector"; the "Yours" filter
+//   lists connectors as table rows named "View <name>"; a detail page has
+//   "Connect" and "More options for <name>".
+// Not yet seen on the real sites: ChatGPT's create-app form, Claude's custom
+// connector form fields, the chat composer, tool approvals and replies.
+
+const startsWithName = (name) => new RegExp(`^\\s*${escape(name)}(\\s|$)`);
 
 const chatgpt = Object.freeze({
   id: 'chatgpt',
@@ -96,26 +111,12 @@ const chatgpt = Object.freeze({
   origin: 'https://chatgpt.com',
   consentClient: 'ChatGPT',
   watcherScenario: 'chatgpt',
-  connectorsPath: '/#settings/Connectors',
+  connectorsPath: '/settings/plugins-settings',
   // Names only; values are never read out of the browser.
   sessionCookie: /^__Secure-next-auth\.session-token(\.\d+)?$/,
   chatPath: '/',
   loginPath: /^\/(auth|log-?in)\b/i,
   loginButton: exact('Log in', 'Sign up', 'Sign up for free'),
-  settingsReady: exact('Apps', 'Apps & Connectors', 'Apps and Connectors', 'Connectors'),
-  // Developer mode lives under the settings' advanced section.
-  advanced: exact('Advanced settings', 'Advanced'),
-  developerMode: exact('Developer mode'),
-  create: exact('Create', 'Create app', 'Create connector', 'Add connector'),
-  nameField: exact('Name'),
-  urlField: /^\s*(MCP server URL|Server URL|MCP Server URL|URL)\s*$/i,
-  authField: /^\s*Authentication\s*$/i,
-  authOAuth: exact('OAuth'),
-  trust: /I (understand|trust)/i,
-  submitCreate: exact('Create'),
-  connect: exact('Connect', 'Reconnect', 'Sign in'),
-  disconnect: exact('Disconnect'),
-  confirmDisconnect: exact('Disconnect', 'Confirm'),
   composer: '#prompt-textarea, [contenteditable="true"][role="textbox"], textarea[name="prompt-textarea"]',
   send: exact('Send prompt', 'Send message', 'Send'),
   composerTools: exact('Add files and more', 'Add photos & files', 'Add photos and files', 'Tools'),
@@ -124,39 +125,17 @@ const chatgpt = Object.freeze({
   reauthorize: exact('Connect', 'Reconnect', 'Sign in', 'Authorize'),
   stop: /^\s*Stop( generating| streaming| response)?\s*$/i,
   assistant: '[data-message-author-role="assistant"]',
-  /** Turn developer mode on (the dry run only reads it). */
-  async developerModeState(page) {
-    const toggle = await waitVisible(page.getByRole('switch', { name: this.developerMode }).or(page.getByRole('checkbox', { name: this.developerMode })), 3_000);
-    if (!toggle) return 'unknown';
-    const checked = await toggle.getAttribute('aria-checked').catch(() => null);
-    return checked === 'true' ? 'on' : checked === 'false' ? 'off' : 'unknown';
+  settingsMarker(page) { return page.getByRole('searchbox', { name: 'Search installed plugins' }); },
+  async findConnector(page, name, timeoutMs = 3_000) {
+    return waitVisible(page.getByRole('main').getByRole('link', { name: startsWithName(name) }), timeoutMs);
   },
-  async addConnector(page, { name, url }) {
-    if (await this.developerModeState(page) === 'off') {
-      await clickNamed(page, this.developerMode, 'developer-mode');
-    }
-    await clickNamed(page, this.create, 'connector-create');
-    await fillNamed(page, this.nameField, name, 'connector-name');
-    await fillNamed(page, this.urlField, url, 'connector-url');
-    const auth = await waitVisible(page.getByRole('combobox', { name: this.authField }).or(page.getByLabel(this.authField)), 3_000);
-    if (auth) {
-      const tag = await auth.evaluate((node) => node.tagName).catch(() => '');
-      if (tag === 'SELECT') await auth.selectOption({ label: 'OAuth' });
-      else { await auth.click(); await clickNamed(page, this.authOAuth, 'connector-auth'); }
-    }
-    const trust = await waitVisible(page.getByRole('checkbox', { name: this.trust }).or(page.getByLabel(this.trust)), 3_000);
-    if (trust && !(await trust.isChecked().catch(() => false))) await trust.check();
-    await clickNamed(page, this.submitCreate, 'connector-submit', { scope: page.getByRole('dialog').last() });
-    // ChatGPT starts its OAuth flow as soon as the connector is created.
-  },
-  async reconnect(page, row) {
-    await row.click();
-    const disconnect = await waitVisible(clickable(page, this.disconnect), 3_000);
-    if (disconnect) {
-      await disconnect.click();
-      await confirmIfAsked(page, this.confirmDisconnect);
-    }
-    await clickNamed(page, this.connect, 'connector-connect');
+  // Creating a developer app has not been verified on the real site; the
+  // existing "Cadence QA" app is reconnected instead.
+  async addConnector() { throw new WebStop('connector-missing', 'connector-create'); },
+  async reconnect(page, entry, name) {
+    await entry.click();
+    await waitVisible(page.getByRole('heading', { name: exact(name) }), 15_000);
+    await clickNamed(page, new RegExp(`^\\s*Reconnect\\b.*${escape(name)}`), 'connector-reconnect');
   },
   async enableInChat(page, name) {
     await clickNamed(page, this.composerTools, 'chat-tools');
@@ -176,42 +155,52 @@ const claudeWeb = Object.freeze({
   origin: 'https://claude.ai',
   consentClient: 'Claude',
   watcherScenario: 'claude-web',
-  connectorsPath: '/settings/connectors',
+  connectorsPath: '/customize/connectors',
   sessionCookie: /^sessionKey$/,
   chatPath: '/new',
   loginPath: /^\/(login|logout|magic-link)\b/i,
   loginButton: exact('Continue with Google', 'Continue with email', 'Log in', 'Sign in'),
-  settingsReady: exact('Connectors', 'Add custom connector'),
-  create: exact('Add custom connector', 'Add connector'),
   nameField: exact('Name'),
   urlField: /^\s*(Remote MCP server URL|MCP server URL|Server URL|URL)\s*$/i,
-  submitCreate: exact('Add'),
-  connect: exact('Connect', 'Reconnect'),
-  disconnect: exact('Disconnect'),
-  confirmDisconnect: exact('Disconnect', 'Confirm'),
   composer: 'div[contenteditable="true"].ProseMirror, [contenteditable="true"][role="textbox"], div[contenteditable="true"]',
   send: exact('Send message', 'Send'),
   approve: exact('Allow once', 'Allow', 'Approve', 'Confirm'),
   reauthorize: exact('Connect', 'Reconnect', 'Authorize'),
   stop: /^\s*Stop( response| generating)?\s*$/i,
   assistant: '[data-is-streaming], [data-testid="assistant-message"]',
-  async developerModeState() { return 'not-applicable'; },
+  settingsMarker(page) { return page.getByRole('button', { name: exact('Add connector') }); },
+  /** Switches the list to "Yours" (a view filter) and finds the row. */
+  async findConnector(page, name, timeoutMs = 3_000) {
+    // The list can re-render (for example after adding a connector), which
+    // resets the filter, so the filter is checked again on every pass.
+    const deadline = Date.now() + timeoutMs;
+    const row = page.getByRole('row', { name: exact(`View ${name}`) });
+    for (;;) {
+      const yours = await waitVisible(page.getByRole('radio', { name: exact('Yours') }), Math.max(0, deadline - Date.now()));
+      if (!yours) throw new WebStop('page-changed', 'connector-list');
+      if (await yours.getAttribute('aria-checked').catch(() => null) !== 'true') await yours.click({ timeout: 5_000 }).catch(() => {});
+      const found = await waitVisible(row, 1_000);
+      if (found || Date.now() >= deadline) return found;
+    }
+  },
   async addConnector(page, { name, url }) {
-    await clickNamed(page, this.create, 'connector-create');
+    await clickNamed(page, exact('Add connector'), 'connector-create');
+    await clickNamed(page, exact('Add custom connector'), 'connector-create');
     await fillNamed(page, this.nameField, name, 'connector-name');
     await fillNamed(page, this.urlField, url, 'connector-url');
-    await clickNamed(page, this.submitCreate, 'connector-submit', { scope: page.getByRole('dialog').last() });
-    // Claude lists the connector first; Connect starts OAuth in a new window.
-    const row = await waitVisible(page.getByRole('listitem').filter({ hasText: name }).or(page.locator('[data-connector-name]').filter({ hasText: name })), 15_000);
-    await clickNamed(page, this.connect, 'connector-connect', { scope: row ?? page });
+    await clickNamed(page, exact('Add'), 'connector-submit', { scope: page.getByRole('dialog').last() });
+    const entry = await this.findConnector(page, name, 15_000);
+    if (!entry) throw new WebStop('page-changed', 'connector-submit');
+    await this.reconnect(page, entry, name);
   },
-  async reconnect(page, row) {
-    const disconnect = await waitVisible(clickable(row, this.disconnect), 2_000);
-    if (disconnect) {
-      await disconnect.click();
-      await confirmIfAsked(page, this.confirmDisconnect);
-    }
-    await clickNamed(page, this.connect, 'connector-connect', { scope: row });
+  async reconnect(page, entry, name) {
+    await entry.click();
+    const connect = await waitVisible(clickable(page.getByRole('main'), exact('Connect')), 10_000);
+    if (connect) { await connect.click(); return; }
+    await clickNamed(page, exact(`More options for ${name}`), 'connector-reconnect');
+    await clickNamed(page, exact('Disconnect'), 'connector-reconnect');
+    await confirmIfAsked(page, exact('Disconnect', 'Confirm'));
+    await clickNamed(page, exact('Connect'), 'connector-reconnect', { scope: page.getByRole('main') });
   },
   // A connected custom connector is on for new chats.
   async enableInChat() {},
@@ -222,12 +211,4 @@ export const SITES = Object.freeze({ chatgpt, 'claude-web': claudeWeb });
 /** A copy of a site whose pages live elsewhere (the stub pages in tests). */
 export function withOrigin(site, origin) {
   return Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(site)), site, { origin }));
-}
-
-/** The connector row on the settings page, or null. */
-export async function findConnectorRow(page, name, timeoutMs = 5_000) {
-  const byName = exact(name);
-  const row = page.getByRole('listitem').filter({ has: page.getByText(byName) })
-    .or(page.locator('[data-connector-name]').filter({ has: page.getByText(byName) }));
-  return waitVisible(row, timeoutMs);
 }
