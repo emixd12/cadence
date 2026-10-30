@@ -389,7 +389,11 @@ legacy responses use SSE without sessions. GET and DELETE return authenticated
 cache hints. Every descriptor includes its title, description, annotations,
 input/output schema and OAuth scopes in both `securitySchemes` and `_meta` for
 client compatibility. Successful calls return validated `structuredContent` and
-short text. Stable tool errors carry actionable messages; authentication and
+the same data serialized as JSON in one text block, as the MCP tools spec
+recommends. Clients that pass only text to the model (the Anthropic API MCP
+connector and the OpenAI Responses MCP tool; Ticket 256 finding, October 30, 2026)
+read it there. Before, the text said only "<Tool> succeeded.". Error results keep
+their short text. Stable tool errors carry actionable messages; authentication and
 scope errors also carry `_meta["mcp/www_authenticate"]`.
 
 The optional `_meta["openai/profile"]` marker is deliberately absent. OpenAI's

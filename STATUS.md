@@ -1,5 +1,19 @@
 # Implementation Status
 
+## MCP tool results include their JSON as text — October 30, 2026
+
+Ticket 256 found that successful MCP tool results carried data only in
+`structuredContent`, with the text "<Tool> succeeded.". The Anthropic API MCP
+connector and the OpenAI Responses MCP tool pass only text to the model, so they
+could not read results. `lib/mcp/server.ts` now also returns the same data
+serialized as JSON in one text block, as the MCP tools spec recommends.
+`structuredContent` and error results are unchanged. Tests cover every registry
+tool. Merge waits until Ticket 256's browser phase finishes. Not verified: the two
+API clients against production after deploy.
+
+Platform impact: deployed web MCP server only. Desktop, marketing and future mobile:
+not applicable. Messaging impact: none.
+
 ## Ticket 232 follow-up fixes — October 30, 2026
 
 One PR on `fix/oauth-client-extra-grant-types` fixes the October 29 live-acceptance
