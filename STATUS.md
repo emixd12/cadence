@@ -39,7 +39,8 @@ and green CI. The hosted migration push is not done and needs the owner's explic
 
 Platform impact: web OAuth server and MCP (deployed web). Desktop, marketing and
 future mobile: not applicable; the CodeQL fix is developer tooling only. Messaging
-impact: none.
+impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
+here).
 
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
