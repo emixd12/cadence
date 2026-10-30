@@ -242,8 +242,8 @@ export function chatIdOf(site, url) {
 // Where a conversation's own header and body live, and where other chats are
 // listed. The options control is looked up only inside the first and never
 // inside the second.
-const CONVERSATION = 'main, [role="main"], #page-header';
-const NOT_CONVERSATION = 'nav, aside, [role="navigation"], [role="complementary"]';
+export const CONVERSATION = 'main, [role="main"], #page-header';
+export const NOT_CONVERSATION = 'nav, aside, [role="navigation"], [role="complementary"]';
 
 /**
  * Chats linked anywhere on the page (the history list): chat ID → link title.
@@ -266,8 +266,9 @@ export async function listedChatIds(page, site) {
 
 /**
  * Visible elements named like the chat options control inside the conversation
- * area, outside any navigation, each with the chat IDs its ancestors (below the
- * conversation root) link to. A history row's button sits next to that row's link.
+ * area, outside any navigation, each with every chat ID its conversation root
+ * links to. A history row inside the root, or any other chat link there, shows
+ * that the area is not only the run's conversation.
  */
 async function conversationOptions(page, site) {
   const all = page.getByRole('button', { name: site.archiveMenu });
@@ -279,11 +280,10 @@ async function conversationOptions(page, site) {
     const hrefs = await item.evaluate((el, [inner, outer]) => {
       const root = el.closest(inner);
       if (!root || el.closest(outer)) return null;
+      // Every chat link in the conversation root, including the control's own row.
       const seen = [];
-      for (let node = el; node && node !== root; node = node.parentElement) {
-        if (node.matches('a[href]')) seen.push(node.getAttribute('href'));
-        for (const a of node.querySelectorAll('a[href]')) seen.push(a.getAttribute('href'));
-      }
+      if (el.matches('a[href]')) seen.push(el.getAttribute('href'));
+      for (const a of root.querySelectorAll('a[href]')) seen.push(a.getAttribute('href'));
       return seen;
     }, [CONVERSATION, NOT_CONVERSATION]).catch(() => null);
     if (hrefs === null) continue;
@@ -308,8 +308,9 @@ function touchedOther(affected) {
  * Archives (ChatGPT) or deletes (Claude) the run's own chat `chatId`, which
  * must be the chat open in `page`. Before any click it stops with page-changed
  * at chat-archive when the URL is not that chat, when the options control
- * inside the conversation area is missing or ambiguous, or when a matching
- * control's ancestors link to another chat (a history row); nothing is touched.
+ * inside the conversation area is missing or ambiguous, or when that area links
+ * to any other chat; and with no-other-chats-listed when no other chat is
+ * listed, since damage could not be detected. Nothing is touched in either case.
  * Afterwards every other chat listed before must still be listed
  * (archive-touched-other-chat, with the missing chats' titles, checked first,
  * also on timeout), and the run's chat must be gone (archive-unconfirmed).
@@ -328,6 +329,8 @@ export async function archiveChat(page, site, chatId, { timeoutMs = 10_000 } = {
   if (chatIdOf(site, page.url()) !== chatId) throw new WebStop('page-changed', 'chat-archive');
   const before = await listedChats(page, site);
   before.delete(chatId);
+  // With no other chat listed, a wrong click could not be detected afterwards.
+  if (before.size === 0) throw new WebStop('no-other-chats-listed', 'chat-archive');
   await options[0].item.click({ timeout: 5_000 });
   await clickNamed(page, site.archiveItem, 'chat-archive', { scope: page.getByRole('menu'), timeoutMs: 5_000 });
   await confirmIfAsked(page, site.archiveConfirm);

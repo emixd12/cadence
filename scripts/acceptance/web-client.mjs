@@ -30,7 +30,7 @@ import { parseArgs } from 'node:util';
 import { GRANTS, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
-import { SITES, WebStop, archiveChat, chatIdOf, classifyPage, clickable, waitVisible } from './web-sites.mjs';
+import { CONVERSATION, NOT_CONVERSATION, SITES, WebStop, archiveChat, chatIdOf, classifyPage, clickable, waitVisible } from './web-sites.mjs';
 
 export { SITES, WebStop };
 
@@ -333,7 +333,7 @@ export async function signInStatus({ context, sites = Object.values(SITES), now 
  * Dry run: reach the connector settings in the kept profile and look for the
  * Cadence QA connector. Clicks only Claude's "Yours" list filter; saves nothing.
  */
-export async function dryRunSite({ context, site, screenshotDir = null }) {
+export async function dryRunSite({ context, site, screenshotDir = null, screenshots = 'off' }) {
   const page = await context.newPage();
   try {
     await openConnectors(page, site, 'dry-run');
@@ -341,19 +341,36 @@ export async function dryRunSite({ context, site, screenshotDir = null }) {
     return { client: site.id, ok: true, reached: 'connector-settings', connectorPresent: Boolean(existing) };
   } catch (error) {
     if (!(error instanceof WebStop)) throw error;
-    const shot = screenshotDir ? await failureShot(page, screenshotDir, `dry-run-${site.id}`) : null;
+    const shot = screenshotDir ? await failureShot(page, screenshotDir, `dry-run-${site.id}`, screenshots, site) : null;
     return { client: site.id, ok: false, reason: error.reason, step: error.step, screenshot: shot };
   } finally {
     await page.close().catch(() => {});
   }
 }
 
-async function failureShot(page, dir, name) {
-  if (!page || page.isClosed?.()) return null;
+/**
+ * Failure screenshot. Modes: 'off' (the default on real sites), 'conversation'
+ * (--screenshots: an element shot of the conversation area only, skipped when
+ * that area holds navigation or any chat link, so no sidebar or chat titles are
+ * captured), and 'full' (stub pages in tests only).
+ */
+async function failureShot(page, dir, name, mode = 'off', site = null) {
+  if (mode === 'off' || !page || page.isClosed?.()) return null;
   try {
+    let target = null;
+    if (mode === 'conversation') {
+      const area = page.locator(CONVERSATION).first();
+      if (!(await area.isVisible().catch(() => false))) return null;
+      const clean = await area.evaluate((el, [outer, linkPattern]) => !el.querySelector(outer)
+        && ![...el.querySelectorAll('a[href]')].some((a) => new RegExp(linkPattern, 'i').test(new URL(a.getAttribute('href'), location.href).pathname)),
+      [NOT_CONVERSATION, site?.chatIdPattern?.source ?? '^/(c|chat)/']).catch(() => false);
+      if (!clean) return null;
+      target = area;
+    } else if (mode !== 'full') return null;
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const file = join(dir, `failure-${name}.png`);
-    await page.screenshot({ path: file, fullPage: false, timeout: 10_000 });
+    if (target) await target.screenshot({ path: file, timeout: 10_000 });
+    else await page.screenshot({ path: file, fullPage: false, timeout: 10_000 });
     chmodSync(file, 0o600);
     return `failure-${name}.png`;
   } catch { return null; }
@@ -370,7 +387,7 @@ async function failureShot(page, dir, name) {
  */
 export async function runWebScenario({
   site, context, issuer, mcpUrl, slot, scenario: scenarioName, account, sessions, rest, cleanup, watcher, run, label: labelArg,
-  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false, archiveChats = true, deleteClaudeChats = false,
+  out = (line) => process.stdout.write(`${line}\n`), now = () => new Date(), keepGrant = false, archiveChats = true, deleteClaudeChats = false, screenshots = 'off',
   timeouts = { consentMs: 90_000, turnMs: 180_000, quietMs: 2_500 },
 }) {
   const scenario = SCENARIOS[scenarioName];
@@ -537,7 +554,7 @@ export async function runWebScenario({
   } catch (error) {
     const stop = error instanceof WebStop ? error
       : new WebStop(typeof error?.reason === 'string' ? error.reason : error instanceof AcceptanceError ? error.code : 'internal-error', 'unknown');
-    const shot = await failureShot(current, runDir, `${stop.step ?? 'run'}`);
+    const shot = await failureShot(current, runDir, `${stop.step ?? 'run'}`, screenshots, site);
     // affectedChats (ID and sidebar title) goes to the console only, so the agent
     // can tell Emi which of her chats changed; never to the ledger.
     emit({ step: stop.step ?? 'run', ok: false, reason: stop.reason, screenshot: shot, ...(stop.affectedChats ? { affectedChats: stop.affectedChats } : {}) });
@@ -592,10 +609,10 @@ export function parseCli(argv) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     client: { type: 'string' }, account: { type: 'string' }, scenario: { type: 'string' }, profile: { type: 'string' },
     port: { type: 'string' }, run: { type: 'string' }, 'allow-production': { type: 'boolean', default: false },
-    'keep-grant': { type: 'boolean', default: false }, 'keep-chats': { type: 'boolean', default: false }, 'delete-claude-chats': { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
+    'keep-grant': { type: 'boolean', default: false }, 'keep-chats': { type: 'boolean', default: false }, 'delete-claude-chats': { type: 'boolean', default: false }, screenshots: { type: 'boolean', default: false }, 'list-scenarios': { type: 'boolean', default: false },
   } });
   const port = values.port === undefined ? DEFAULT_DEBUG_PORT : Number(values.port);
-  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], keepChats: values['keep-chats'], deleteClaudeChats: values['delete-claude-chats'], listScenarios: values['list-scenarios'] };
+  const opts = { command, profile: values.profile ?? DEFAULT_PROFILE_DIR, port, runId: values.run ?? null, allowProduction: values['allow-production'], keepGrant: values['keep-grant'], keepChats: values['keep-chats'], deleteClaudeChats: values['delete-claude-chats'], screenshots: values.screenshots ? 'conversation' : 'off', listScenarios: values['list-scenarios'] };
   if (opts.listScenarios) return opts;
   assertPort(port);
   if (command === 'dry-run') {
@@ -648,7 +665,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       try {
         const dir = join('.intent', 'acceptance', `dry-run-${randomBytes(3).toString('hex')}`);
         for (const client of opts.clients) {
-          const result = await dryRunSite({ context, site: SITES[client], screenshotDir: dir });
+          const result = await dryRunSite({ context, site: SITES[client], screenshotDir: dir, screenshots: opts.screenshots });
           out(summary({ step: 'dry-run', ...result }));
           if (!result.ok) { ok = false; for (const line of guidedFallback({ client, reason: result.reason })) out(line); }
         }
@@ -676,7 +693,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         site, context, issuer: PRODUCTION.issuer, mcpUrl: PRODUCTION_MCP_URL, slot: opts.slot, scenario: opts.scenario,
         account: PRODUCTION.accounts[opts.slot], sessions: deps.sessions, rest: deps.rest, cleanup: deps.cleanup,
         watcher: spawnWatcher(), run, label,
-        out, keepGrant: opts.keepGrant, archiveChats: !opts.keepChats, deleteClaudeChats: opts.deleteClaudeChats,
+        out, keepGrant: opts.keepGrant, archiveChats: !opts.keepChats, deleteClaudeChats: opts.deleteClaudeChats, screenshots: opts.screenshots,
       });
       out(summary({ step: 'done', ok: result.ok, runId: result.runId }));
       return result.ok ? 0 : 1;

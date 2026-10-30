@@ -51,7 +51,7 @@ function resetState(overrides = {}) {
     // Emi's own chats in the sidebar, each with a same-named options button that
     // comes before the conversation in DOM order. They must never change.
     otherChats: [{ id: randomUUID(), archived: false }, { id: randomUUID(), archived: false }],
-    duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false, historyInMain: false, noHeaderControl: false, stayAfterArchive: false,
+    duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false, historyInMain: false, noHeaderControl: false, stayAfterArchive: false, otherLinkInMain: false,
     ...overrides,
   };
 }
@@ -210,6 +210,8 @@ function renderChat() {
     if (S.duplicateOptions) main.append(optionsButton(currentChat(), true));
   };
   renderHeader();
+  // A link to another chat elsewhere in the conversation root (not near the control).
+  if (S.otherLinkInMain && S.otherChats.length) main.append(el('div', { class: 'related' }, el('a', { href: chatPrefix + S.otherChats[S.otherChats.length - 1].id }, 'Related')));
   if (flavor === 'chatgpt') {
     const plus = el('button', { 'aria-label': 'Add files and more', onclick: () => {
       const menu = el('div', { role: 'menu' });
@@ -418,7 +420,7 @@ const fakeWatcher = (decide = () => {
 }) => ({ started: 0, start() { this.started += 1; return { get result() { return new Promise((r) => setTimeout(() => r(decide()), 50)); }, stop() {} }; } });
 
 let counter = 0;
-async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts, label, deleteClaudeChats = false } = {}) {
+async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts, label, deleteClaudeChats = false, screenshots = 'full' } = {}) {
   state.flavor = client;
   const context = await browser.newContext();
   const run = runId ? resumeRun({ runId, root }) : createRun({ target: 'local', accounts: ['A'], scenarios: [`${client}:${name}`], root });
@@ -427,7 +429,7 @@ async function scenario(client, name, { watcher = fakeWatcher(), runId, timeouts
     const result = await runWebScenario({
       site: stubSite(client), context, issuer: ISSUER, mcpUrl: `${ISSUER}/mcp`, slot: 'A', scenario: name,
       account: { userId: USER_A, email: EMAIL_A }, sessions, rest, cleanup: cleanupModule, watcher, run,
-      label: label ?? `web-test-${(counter += 1)}`, out: (line) => lines.push(line), deleteClaudeChats,
+      label: label ?? `web-test-${(counter += 1)}`, out: (line) => lines.push(line), deleteClaudeChats, screenshots,
       timeouts: timeouts ?? { consentMs: 15_000, turnMs: 15_000, quietMs: 300 },
     });
     const cookiesLeft = (await context.cookies(ISSUER)).length;
@@ -610,6 +612,20 @@ describe('test chat cleanup', () => {
       const out = await scenario(client, 'read-write', opt(client));
       expect(out.result).toMatchObject({ ok: false, reason: 'archive-touched-other-chat', step: 'chat-archive' });
     }, 120_000);
+
+    it(`${client}: refuses when the conversation root links to another chat anywhere, before any click`, async () => {
+      resetState({ otherLinkInMain: true });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+      expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+    }, 120_000);
+
+    it(`${client}: refuses when no other chats are listed, because damage could not be detected`, async () => {
+      resetState({ otherChats: [] });
+      const out = await scenario(client, 'read-write', opt(client));
+      expect(out.result).toMatchObject({ ok: false, reason: 'no-other-chats-listed', step: 'chat-archive' });
+      expect(state.chats.some((c) => c.archived)).toBe(false);
+    }, 120_000);
   }
 
   it('claude-web: keeps test chats by default and deletes them only with deleteClaudeChats', async () => {
@@ -642,6 +658,34 @@ describe('test chat cleanup', () => {
     } finally { run.close(); await context.close(); }
     expect(parsed(lines).map((e) => e.step)).not.toContain('archive-chats');
     expect(state.chats.some((c) => c.archived)).toBe(false);
+  }, 120_000);
+});
+
+describe('failure screenshots on real sites', () => {
+  const pngHeight = (file) => readFileSync(file).readUInt32BE(20);
+  it('takes none by default', async () => {
+    resetState({ loginWall: true });
+    const out = await scenario('chatgpt', 'read-write', { screenshots: 'off' });
+    expect(out.result).toMatchObject({ ok: false, reason: 'login-wall' });
+    expect(runFiles(out.run).some((f) => f.endsWith('.png'))).toBe(false);
+    expect(parsed(out.lines).at(-1).screenshot).toBeNull();
+  }, 120_000);
+
+  it('with --screenshots, captures only the conversation area, never the sidebar', async () => {
+    resetState({ neverReply: true });
+    const out = await scenario('chatgpt', 'read-write', { screenshots: 'conversation', timeouts: { consentMs: 15_000, turnMs: 3_000, quietMs: 300 } });
+    expect(out.result).toMatchObject({ ok: false, reason: 'reply-timeout' });
+    const shot = runFiles(out.run).find((f) => f.endsWith('.png'));
+    expect(shot).toBeTruthy();
+    // An element shot of <main> (the conversation header), much shorter than the 720 px viewport with the sidebar.
+    expect(pngHeight(shot)).toBeLessThan(200);
+  }, 120_000);
+
+  it('with --screenshots, skips the shot when the conversation area shows other chats', async () => {
+    resetState({ neverReply: true, historyInMain: true });
+    const out = await scenario('chatgpt', 'read-write', { screenshots: 'conversation', timeouts: { consentMs: 15_000, turnMs: 3_000, quietMs: 300 } });
+    expect(out.result).toMatchObject({ ok: false, reason: 'reply-timeout' });
+    expect(runFiles(out.run).some((f) => f.endsWith('.png'))).toBe(false);
   }, 120_000);
 });
 
@@ -721,7 +765,7 @@ describe('dry run', () => {
       expect(await dryRunSite({ context, site: stubSite('chatgpt') })).toMatchObject({ ok: true, connectorPresent: false });
       resetState({ loginWall: true });
       const dir = join(root, 'dry');
-      expect(await dryRunSite({ context, site: stubSite('claude-web'), screenshotDir: dir })).toMatchObject({ ok: false, reason: 'login-wall', screenshot: 'failure-dry-run-claude-web.png' });
+      expect(await dryRunSite({ context, site: stubSite('claude-web'), screenshotDir: dir, screenshots: 'full' })).toMatchObject({ ok: false, reason: 'login-wall', screenshot: 'failure-dry-run-claude-web.png' });
     } finally { await context.close(); }
   }, 60_000);
 });
@@ -792,6 +836,9 @@ describe('CLI', () => {
     expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--keep-chats']).keepChats).toBe(true);
     expect(parseCli(['run', '--client', 'claude-web', '--account', 'A', '--scenario', 'read-write', '--allow-production']).deleteClaudeChats).toBe(false);
     expect(parseCli(['run', '--client', 'claude-web', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--delete-claude-chats']).deleteClaudeChats).toBe(true);
+    expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production']).screenshots).toBe('off');
+    expect(parseCli(['run', '--client', 'chatgpt', '--account', 'A', '--scenario', 'read-write', '--allow-production', '--screenshots']).screenshots).toBe('conversation');
+    expect(parseCli(['dry-run', '--screenshots']).screenshots).toBe('conversation');
   });
 
   it('parses the task-note form without a subcommand and requires --allow-production', () => {

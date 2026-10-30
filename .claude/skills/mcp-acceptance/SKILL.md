@@ -59,6 +59,10 @@ Work in your own git worktree, never in Ticket 232's checkout
     printed to the console only and never written to the run folder. For
     `archive-unconfirmed` it is the run's own test chat, whose title starts with
     `[Cadence QA]`. Do not retry the run, and do not open any chat to check.
+  - Screenshots: the web runner takes none on the real sites by default.
+    `--screenshots` captures only the conversation area, and skips the shot when
+    that area shows navigation or any chat link, so the sidebar and chat titles
+    never reach the run folder.
 
 ## Agent autonomy (spec, "Automated MCP client acceptance")
 
@@ -226,7 +230,10 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    The runner acts only on the run's own chat: it checks the URL carries the recorded
    chat ID, uses the one options control inside the conversation (never the sidebar),
    and stops with `page-changed` before clicking if that control is missing or
-   ambiguous, or if a matching control sits in a row that links to another chat.
+   ambiguous, or if the conversation area links to any other chat. It also refuses,
+   with `no-other-chats-listed`, when no other chat is listed before the click,
+   because a wrong click could not be detected then; the chat stays in place, so
+   report it as a cleanup item.
    After clicking it stops with `archive-touched-other-chat` if any other listed chat
    disappeared (checked first, also when it times out), or `archive-unconfirmed` if
    the run's chat is still there. Both go to Emi straight away, with the chat title
