@@ -1282,3 +1282,21 @@ The owner separated messaging and compliance work from development. It replaces 
   records that evidence. P-012 gates the Google submission, not development.
 - `docs/LEGAL.md` keeps provider terms, licences and legal risk decisions.
 - No `agents:check` enforcement for now.
+
+## 2026-10-27: Never-run macOS user check removed from release acceptance
+
+The owner removed the "Second Mac or new macOS user" area check from desktop release
+acceptance. This narrows the 2026-10-24 "Right-sized desktop release acceptance" entry,
+which listed it among the area checks.
+
+- The check is no longer a release gate or a ticket gate. Release packets record it as
+  "Not required: removed by owner decision, October 27, 2026".
+- The idea stays in `docs/FUTURE_UPDATES.md`, "Never-run Mac or macOS user test
+  workflow". In the owner's words, "it should not interfere with development until it is
+  added to workflow."
+- Its trigger files are dropped from the area-check table. The reminder files remain
+  under the Native reminders check.
+- Creating a macOS user stays an owner action (`AGENTS.md`).
+
+Platform impact: desktop release process only; web, marketing and future mobile are not
+affected. Messaging impact: none.

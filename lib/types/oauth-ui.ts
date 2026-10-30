@@ -16,7 +16,10 @@ export type ConsentView = {
   logoUri: string | null;
   verified: boolean;
   redirectHost: string;
+  /** Requested scopes plus scopes the active grant already holds, in canonical order. */
   scopes: OAuthScope[];
+  /** Scopes the caller already granted this client for this resource. */
+  grantedScopes: OAuthScope[];
   offlineAccess: boolean;
 };
 export type ConnectedAppsView = {

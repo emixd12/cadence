@@ -56,7 +56,6 @@ files are unchanged since that build. Name the build and its commit.
 | Session renewal and revoked session | | |
 | Calendar callback replay | | |
 | Native reminders | | |
-| Second Mac or new macOS user | | |
 
 Ticket acceptance in this release: links to the tickets' QA records.
 

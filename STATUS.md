@@ -1,5 +1,166 @@
 # Implementation Status
 
+## Ticket 232 follow-up fixes — October 30, 2026
+
+One PR on `fix/oauth-client-extra-grant-types` fixes the October 29 live-acceptance
+defects. The owner decided (October 30) to merge and deploy after independent review
+and green CI. The hosted migration push is not done and needs the owner's explicit go.
+
+- Claude web metadata (`4fb3ee6`): Claude web's CIMD
+  (`https://claude.ai/oauth/mcp-oauth-client-metadata`) also lists the JWT-bearer
+  grant, so Cadence rejected it with `invalid_client_metadata`. Metadata may now list
+  unsupported grant types if `authorization_code` is present; nothing beyond
+  `authorization_code` and `refresh_token` is stored or issued.
+- Re-consent keeps earlier permissions: migration
+  `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` replaces
+  `oauth_read_pending` (adds the caller's active `granted_scopes`) and
+  `oauth_finish_pending` (accepts requested plus already granted scopes). The
+  consent screen marks those **already granted** and keeps them selected; clearing
+  one still narrows. Fixture `tests/sql/ticket-232-oauth-reconsent-scopes.sql`.
+  Until the hosted push, the deployed app reads no `granted_scopes` and behaves as
+  before.
+- ChatGPT write scopes: the initial 401 challenged only `cadence.read`, and MCP
+  clients request a challenged scope set. Challenged scopes mean required, and the
+  writes are optional, so the initial 401 now omits `scope`; clients fall back to
+  protected-resource `scopes_supported` (all three). Step-up challenges name read
+  plus the missing write scope. Details in `docs/MCP_INTEGRATION.md` §13. Consent
+  defaults are unchanged. Ticket 256 verifies the live ChatGPT link.
+- CodeQL alert #21 (`js/regex-injection`, `scripts/test-device.mjs`): `ax find` no
+  longer compiles the operator's pattern locally; it bounds it to 1–200 printable
+  characters, and the device's `find.js` compiles it as before.
+- Local verification on October 30 in the separate project `cadence-reconsent-232b`
+  through the reviewed Docker proxy with only its project identity changed: start
+  replayed all 95 migrations (ledger equal), every published port on `127.0.0.1`.
+  The new fixture and the OAuth persistence, family-deadline, maintenance and
+  write-replay fixtures passed. The new fixture fails against the previous
+  functions. Type generation was not run; no table or function signature changed.
+  An earlier direct start of `cadence-reconsent-232` without the proxy published
+  ports on all interfaces; it was stopped within a minute, before any fixture ran.
+  `habit-tracking-app` was not touched.
+- Not verified: hosted push and readback, Claude web and ChatGPT links after deploy.
+
+Platform impact: web OAuth server and MCP (deployed web). Desktop, marketing and
+future mobile: not applicable; the CodeQL fix is developer tooling only. Messaging
+impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
+here).
+
+## Account sync timezone rule for archived Behaviors — October 27, 2026
+
+Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
+source. The hosted push is not done and needs the owner's explicit authorization.
+
+- Bug: a profile timezone change on a linked Mac failed every sync when the account
+  had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
+  every Behavior (rule from `20260901054332`, kept in `20261027120000`). Desktop
+  `update_timezone` and the web Settings RPC move only active Behaviors, as
+  `docs/DATA_MODEL.md` and `docs/DATETIME_STRATEGY.md` specify. The docs agree:
+  archived Behaviors keep their historical timezone. Reproduced on published 0.1.5;
+  the same rule is on `main`.
+- Fix forward: `20261027221625_account_sync_active_behavior_timezones.sql` replaces
+  only that rule in `cadence_private.apply_account_sync_plan`. Every Behavior active
+  before and after the plan must end in the new timezone: its upsert carries the
+  timezone, or it has no upsert and already uses it. An upsert that archives a
+  Behavior also satisfies the rule. Read signatures, contract registry, old-client
+  projection and grants are unchanged.
+- A plain `active` filter was not enough. It still rejected a plan that archives a
+  Behavior and changes the timezone in one offline session, and a plan that leaves
+  an active Behavior already in the target timezone unwritten.
+- Fixture `tests/sql/account-sync-active-behavior-timezone-smoke.sql` builds each
+  plan as the hosted diff of the web Settings RPC and applies it through the real RPC
+  as contract 1 (no contract field, no-argument reader) and contract 2. Four plans
+  must apply; two plans that omit an active Behavior must still be rejected.
+- Local rehearsal on October 27 in the separate project `cadence-f1-timezone`,
+  through the reviewed Docker proxy with only its project identity changed: start and
+  `db reset --local` passed with all 94 migrations (ledger equal), and all seven
+  services stayed on `cadence-local` with loopback-only bindings. All 28 SQL
+  fixtures, the RLS smoke (92 ownership checks), the account-sync smoke and the
+  authenticated BehaviorStore contract passed. Auth users ended at zero. The new
+  fixture fails on the `20261027120000` rule with the F1 message, and a plain
+  `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
+  named volumes are kept. `habit-tracking-app` was not touched. Type generation was
+  refused by the proxy; no function signature changed.
+- Not verified: hosted push and readback, and a timezone change synced from an
+  installed Mac after the push.
+
+Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
+timezone change after the push, with no desktop code change. Web: no change; its
+Settings RPC already moves only active Behaviors. Marketing: not applicable. Future
+mobile: a mobile client would sync under the same server rule. Messaging impact: none.
+
+## Cadence for Mac 0.1.6 release — October 27, 2026
+
+**Published October 27, 2026** on the owner's instruction. Release source `8be778a`
+(version 0.1.6, account-sync contract 2, SQLite schema 20) was built, notarized (app
+`156960f0…`, DMG `3a2f6806…`) and published to `desktop-stable`. The stable feed has
+offered 0.1.6 since 22:33:43Z and the preview feed since 22:47:28Z. The test Mac upgraded from
+0.1.5 through the real updater: schema 18 → 20, no lost rows, contract-2 convergence. The
+public readback and the quarantined download of the version-free DMG pass. The revoked-session
+check passed, including the test Mac's reconnect (re-linked 22:51:27Z; synced again on October 28
+at 00:38:06Z with 0 pending). PR #158 merged on October 28 as `02ad42b`. The Trust marketing-ID
+refresh followed: the variable now names marketing deployment `dpl_Hnpbc6Q8…`, and the
+app was redeployed as `dpl_3ZeAo1qe…` (ready 00:39:28Z). The never-run macOS user check:
+Not required: removed by owner decision, October 27, 2026. Packet:
+`docs/qa/2026-10-27-desktop-0.1.6-release-packet.md`. Evidence:
+`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`.
+
+- Rollout step 3 passed on installed clients. Published 0.1.5 on the test Mac and the
+  recorded `0.1.6-dev.2` on the owner's Mac synced again under contract 1, sent their
+  pending writes and converged on the hosted contract-1 fingerprint. After the test
+  account gained travel habits and a place-label settings row, 0.1.5 writes left them
+  byte-identical.
+- `0.1.7-dev.1` (the dev-signed build of `8be778a`) upgraded the owner's Mac from schema
+  18 to 20 with no lost rows; the release acceptance comparison passed. Travel habits and
+  place-label settings synced web → Mac, and a Home marker synced Mac → hosted under
+  contract 2.
+- Sign-in and Calendar callback replays and session renewal passed. Ticket 165: allowed
+  state and the status-only permission read pass; the denied state stays with the owner.
+  Ticket 187 installed desktop consent passes: the Daily Brief Calendar grant connected
+  with one calendar and the Timeline grant unchanged. The owner then turned on Calendar
+  timing for Daily Brief (`includeCalendar: true`, read back at 00:20Z on October 28).
+- Not established: a completion place label on an installed Mac (CoreLocation returned
+  no fix), installed receipt replay, and a contract-1 profile write that lands.
+- Known issue, not a regression: a timezone change on a linked Mac with an archived
+  Behavior stalls sync, because the server requires every Behavior and both clients
+  update only active ones. Fixed in source by migration
+  `20261027221625` (entry above); the hosted push needs the owner's authorization.
+
+Platform impact: desktop release only; web, marketing and future mobile have no change.
+Messaging impact: none; the packet holds draft release notes for the owner.
+
+## Account sync contract migration applied — October 27, 2026
+
+The owner authorized the push on October 27. Migration
+`20261027120000_account_sync_contracts.sql` was applied to hosted project
+`qjodzutjxtmtzczbloxa` at 20:31:10 UTC. Its SQL SHA-256 is `a21ab54b…c4a6`, the
+file the disposable rehearsal tested. The hosted half of PR #153 is live.
+
+- Before: `migration list --linked` matched 92 entries through `20261024210000`,
+  with no hosted-only entries. The dry run listed only this migration.
+- The push used the Homebrew Supabase CLI 2.109.1. The project-local CLI binary
+  still fails at startup. The earlier Supabase MCP attempts played no part.
+- Ledger readback: 93 matched entries, ending at `20261027120000`. Nothing is
+  local-only or hosted-only.
+- Functions: the six `cadence_private` functions and both
+  `public.read_account_sync_snapshot` signatures exist. Each hosted body matches
+  the migration text verbatim. Only `authenticated` can execute them; `anon` and
+  `service_role` cannot. Every function has an empty `search_path`, and
+  `apply_account_sync_plan` stays security definer.
+- Registry: nine contract-2 rows, as the migration inserts. `authenticated` has
+  select only; `anon` and `service_role` have no access. The current contract is
+  2, and the minimum writer contract is 1.
+- Types: hosted `public` types from `gen types --linked` match
+  `lib/db/database.types.ts`. The only differences are generator boilerplate: the
+  `graphql_public` block, the `PostgrestVersion` marker and parentheses.
+- Data API: anonymous calls to both signatures return 42501. An unknown function
+  returns PGRST202, so the API serves the new overload.
+
+Rollout step 3 in `docs/plans/2026-10-27-sync-compatibility.md` ran after this
+readback; the 0.1.6 release entry above records it. Installed Macs synced under
+contracts 1 and 2, and 0.1.5 writes left travel habits and place labels unchanged.
+
+Platform impact: hosted sync for linked desktop. Web screens and marketing have
+no change. Future mobile is not affected.
+
 ## Account sync contracts — October 27, 2026
 
 Approved by the owner on October 27. The contract implementation lets additive

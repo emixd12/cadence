@@ -100,6 +100,7 @@ export async function fetchClientMetadata(clientId: string, hop = fetchMetadataH
 function verifiedClient(clientId: string, type: "cimd" | "dcr", redirects: string[]): OAuthVerifiedClient | null {
   if (type === "cimd") {
     if (clientId === "https://claude.ai/oauth/claude-code-client-metadata") return "claude_code";
+    if (clientId === "https://claude.ai/oauth/mcp-oauth-client-metadata") return "claude";
     if (clientId === "https://chatgpt.com/oauth/client.json") return "chatgpt";
     return null;
   }
@@ -123,10 +124,14 @@ export function validateClientMetadata(value: unknown, clientId: string, type: "
     doc.token_endpoint_auth_methods_supported.every((method) => typeof method === "string") &&
     doc.token_endpoint_auth_methods_supported.includes("none");
   if (doc.token_endpoint_auth_method !== undefined && doc.token_endpoint_auth_method !== "none" && !publicAlternative) throw new OAuthError("invalid_client_metadata");
-  for (const [key, allowed] of [["grant_types", ["authorization_code", "refresh_token"]], ["response_types", ["code"]]] as const) {
-    const list = doc[key];
-    if (list !== undefined && (!Array.isArray(list) || !list.length || list.some((v) => !(allowed as readonly unknown[]).includes(v)))) throw new OAuthError("invalid_client_metadata");
-  }
+  // Claude's CIMD also advertises the JWT-bearer grant. Unsupported grant types are
+  // ignored, never granted: the token endpoint accepts only authorization_code and
+  // refresh_token. The client must still support the authorization-code flow.
+  const grants = doc.grant_types;
+  if (grants !== undefined && (!Array.isArray(grants) || !grants.length || grants.length > 10 ||
+      grants.some((v) => typeof v !== "string" || !v || v.length > 200) || !grants.includes("authorization_code"))) throw new OAuthError("invalid_client_metadata");
+  const responses = doc.response_types;
+  if (responses !== undefined && (!Array.isArray(responses) || !responses.length || responses.some((v) => v !== "code"))) throw new OAuthError("invalid_client_metadata");
   const name = doc.client_name ?? (type === "dcr" ? "Unverified app" : null);
   if (typeof name !== "string" || !name.trim() || name.length > 200 || /[\u0000-\u001f\u007f]/.test(name)) throw new OAuthError("invalid_client_metadata");
   const uri = (key: string) => {

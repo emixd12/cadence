@@ -35,7 +35,7 @@ export function ConsentForm({ consent, action }: { consent: ConsentView; action:
         {consent.scopes.filter((scope) => scope !== "cadence.read").map((scope) => (
           <label key={scope} className="flex min-h-11 cursor-pointer items-center gap-3 py-2 text-sm leading-6">
             <input type="checkbox" name="scope" value={scope} defaultChecked className="h-4 w-4 shrink-0 accent-primary" />
-            <span>{OAUTH_PERMISSION_LABELS[scope]}</span>
+            <span>{OAUTH_PERMISSION_LABELS[scope]}{consent.grantedScopes.includes(scope) ? <span className="text-muted-readable"> (already granted)</span> : null}</span>
           </label>
         ))}
       </fieldset>

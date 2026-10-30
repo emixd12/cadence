@@ -14394,7 +14394,7 @@
         }
       ],
       "availability": "Signed in; consent also requires a valid browser-bound pending request.",
-      "success_result": "Issue a single-use authorization code for only the selected permissions.",
+      "success_result": "Issue a single-use authorization code for only the selected permissions. On re-consent, permissions the app already holds appear as already granted and stay selected unless the user clears them.",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_grant"
@@ -14418,7 +14418,7 @@
           "tests/oauth-ui.dom.test.tsx",
           "tests/oauth-ui-actions.test.ts"
         ],
-        "notes": "Consent controls, safe view projections, server-action validation and revocation tested."
+        "notes": "Consent controls, safe view projections, server-action validation, step-up re-consent with already granted permissions, and revocation tested; tests/sql/ticket-232-oauth-reconsent-scopes.sql covers the database rule."
       },
       "platforms": {
         "web": {

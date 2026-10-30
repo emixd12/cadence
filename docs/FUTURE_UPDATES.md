@@ -219,3 +219,14 @@ If offline/PWA support moves into scope, add:
 - service worker or PWA config files
 
 The cache resolver should stay pure and should not read browser APIs directly.
+
+## Never-run Mac or macOS user test workflow
+
+A future development or test workflow could install Cadence from the candidate DMG on a
+Mac, or a macOS user, where Cadence never ran. It would cover the first permission
+prompts (location and notifications), the denied state after turning Cadence off in
+System Settings, and the first account link.
+
+It is not a release gate, ticket gate or development requirement until it is adopted
+into a workflow (`docs/DECISIONS.md`, 2026-10-27). Creating the macOS user stays an
+owner action.

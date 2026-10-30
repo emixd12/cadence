@@ -97,6 +97,22 @@ describe("client metadata and redirect validation", () => {
     expect(validateClientMetadata(claude, "https://claude.ai/oauth/claude-code-client-metadata", "cimd").applicationType).toBe("native");
     expect(() => validateClientMetadata({ ...claude, application_type: "web" }, url, "cimd")).toThrow();
   });
+  it("accepts Claude's CIMD, which also advertises the JWT-bearer grant, without granting it", () => {
+    const claudeWeb = { client_id: "https://claude.ai/oauth/mcp-oauth-client-metadata", client_name: "Claude",
+      grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"], response_types: ["code"],
+      token_endpoint_auth_method: "none", redirect_uris: ["https://claude.ai/api/mcp/auth_callback"] };
+    const registration = validateClientMetadata(claudeWeb, claudeWeb.client_id, "cimd");
+    expect(registration).toMatchObject({ applicationType: "web", verifiedClient: "claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] });
+    expect(JSON.stringify(registration)).not.toContain("jwt-bearer");
+    expect(validateClientMetadata(claudeWeb, "https://example.com/claude-lookalike", "cimd").verifiedClient).toBeNull();
+    expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["urn:ietf:params:oauth:grant-type:jwt-bearer"] }, claudeWeb.client_id, "cimd")).toThrow();
+    expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["refresh_token", "client_credentials"] }, claudeWeb.client_id, "cimd")).toThrow();
+    expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["authorization_code", 7] }, claudeWeb.client_id, "cimd")).toThrow();
+    expect(() => validateClientMetadata({ ...claudeWeb, grant_types: [] }, claudeWeb.client_id, "cimd")).toThrow();
+    expect(() => validateClientMetadata({ ...claudeWeb, grant_types: "authorization_code" }, claudeWeb.client_id, "cimd")).toThrow();
+    expect(() => validateClientMetadata({ ...claudeWeb, response_types: ["code", "token"] }, claudeWeb.client_id, "cimd")).toThrow();
+  });
+
   it("matches only exact redirects, except loopback port", () => {
     expect(redirectAllowed(["http://localhost/callback"], "http://localhost:12345/callback")).toBe(true);
     expect(redirectAllowed(["http://127.0.0.1/callback"], "http://127.0.0.1:4321/callback")).toBe(true);
