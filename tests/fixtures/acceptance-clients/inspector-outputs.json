@@ -1,0 +1,8 @@
+{
+  "_source": "Shapes observed from MCP Inspector 2.13.0 CLI (--format json --quiet) against the local stack on 2026-10-30; payloads reduced.",
+  "toolsList": "{\"result\":{\"tools\":[{\"name\":\"get_account_context\"},{\"name\":\"list_behaviors\"},{\"name\":\"get_behavior\"},{\"name\":\"list_categories\"},{\"name\":\"get_timeline\"},{\"name\":\"list_occurrences\"},{\"name\":\"get_occurrence\"},{\"name\":\"get_adherence_summary\"},{\"name\":\"search\"},{\"name\":\"fetch\"},{\"name\":\"set_occurrence_status\"},{\"name\":\"update_occurrence_note\"},{\"name\":\"create_behavior\"},{\"name\":\"update_behavior\"},{\"name\":\"archive_behavior\"},{\"name\":\"restore_behavior\"}]}}",
+  "createOk": "{\"result\":{\"structuredContent\":{\"behavior\":{\"id\":\"e3e71997-b9a6-4e0c-a6f2-d08a9afc562b\"}},\"content\":[{\"type\":\"text\",\"text\":\"Create Behavior succeeded.\"}]}}",
+  "toolError": "{\"result\":{\"isError\":true,\"structuredContent\":{\"error\":{\"code\":\"not_found\"}},\"content\":[{\"type\":\"text\",\"text\":\"Behavior not found.\"}]}}",
+  "stepUpStderr": "{\"error\":{\"code\":\"error\",\"message\":\"Insufficient scope: required \\\"cadence.behaviors.write\\\"\"}}",
+  "authRequiredStderr": "{\"error\":{\"code\":\"auth_required\",\"message\":\"Interactive OAuth requires a TTY on stdin or stderr (or MCP_AUTO_OPEN_ENABLED=true). For CI/non-interactive runs use --stored-auth-only.\"}}"
+}

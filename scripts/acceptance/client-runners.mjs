@@ -42,7 +42,7 @@ import {
   CLAUDE_AI_CONNECTOR, CLAUDE_MODEL, ClientStop, LIMITS, OPENAI_MODEL, TOKEN_ENV, childEnv, claudeCodeArgs, findInspector,
   inspectorArgs, inspectorConfig, parseClaudeInit, parseClaudeStream, parseInspectorResult, runAnthropicApi, runOpenaiApi, runProcess, which,
 } from './clients.mjs';
-import { LedgerStop, createRun, resumeRun } from './ledger.mjs';
+import { DEFAULT_ROOT, LedgerStop, createRun, resumeRun } from './ledger.mjs';
 import { OPERATION_ACCESS, TEST_ACCOUNTS, PRODUCTION_SUPABASE_ORIGIN, assertLocalDbUrl, createDbSource, createDiffer, createRpcSource, ledgerRecord, matchScenario, psqlQuery } from './watch.mjs';
 
 export const CLIENTS = Object.freeze(['claude-code', 'claude-ai', 'anthropic-api', 'openai-api', 'inspector']);
@@ -86,7 +86,7 @@ export function parseClientArgs(argv) {
     else {
       if (!values.issuer || !values['ca-file'] || !values['db-url']) stop('local-needs-issuer-ca-file-db-url');
       issuer = localIssuer(values.issuer);
-      assertLocalDbUrl(values['db-url']);
+      try { assertLocalDbUrl(values['db-url']); } catch (error) { stop(typeof error?.code === 'string' ? error.code : 'db-url-invalid'); }
     }
   } else {
     if (values.issuer || values['db-url'] || values['ca-file']) stop('production-fixed-issuer');
@@ -330,11 +330,11 @@ export function createAdapters({ issuer, env, caFile, claudeAuth, openaiModel, c
     inspector: async ({ token, scenario, label }) => withTemp(async (cwd) => {
       const cli = inspectorCli();
       if (!cli) throw new ClientStop('missing-inspector');
-      const childEnvironment = childEnv(env, { ...caEnv, MCP_INSPECTOR_SECRET_STORE: 'memory', MCP_INSPECTOR_PERSIST_TOKENS: 'none',
-        MCP_CATALOG_PATH: join(cwd, 'catalog.json'), MCP_CLIENT_CONFIG_PATH: join(cwd, 'client.json'), HOME: cwd });
+      // HOME points at the run's empty temp folder, so Inspector's own storage stays there and is deleted afterwards.
+      const childEnvironment = childEnv(env, { ...caEnv, MCP_INSPECTOR_SECRET_STORE: 'memory', MCP_INSPECTOR_PERSIST_TOKENS: 'none', HOME: cwd });
       const call = async (method, tool = null, args = null) => {
-        const result = await run(process.execPath, [cli, ...inspectorArgs({ method, tool, args })], { env: childEnvironment, cwd, fd3: inspectorConfig(issuer, token.reveal()), timeoutMs: 60_000 });
-        return { exitCode: result.code, ...parseInspectorResult(result.stdout, { method }) };
+        const result = await run(process.execPath, [cli, ...inspectorArgs({ method, tool, args })], { env: childEnvironment, cwd, fd3: inspectorConfig(issuer, token.reveal()), timeoutMs: 60_000, keepStderr: true });
+        return { exitCode: result.code, ...parseInspectorResult(result.stdout, { method, stderr: result.stderr }) };
       };
       const listed = await call('tools/list');
       const toolCalls = [];
@@ -343,11 +343,11 @@ export function createAdapters({ issuer, env, caFile, claudeAuth, openaiModel, c
         const args = Object.fromEntries(Object.entries(step.args).map(([k, v]) => [k, v && typeof v === 'object' && v.from ? created.get(v.from) ?? null : v]));
         if (Object.values(args).some((v) => v === null)) { toolCalls.push({ tool: step.tool, ok: false, errorCode: 'missing-input' }); continue; }
         const r = await call('tools/call', step.tool, args);
-        if (!r.parsed) { toolCalls.push({ tool: step.tool, ok: false, errorCode: 'unparsed' }); continue; }
+        if (!r.parsed) { toolCalls.push({ tool: step.tool, ok: false, errorCode: `unparsed-exit-${r.exitCode}` }); continue; }
         if (r.behaviorId) created.set(step.tool, r.behaviorId);
         toolCalls.push({ tool: step.tool, ok: r.ok, errorCode: r.errorCode, ...(r.behaviorId ? { behaviorId: r.behaviorId } : {}) });
       }
-      return { toolCount: listed.toolCount ?? null, toolCalls, foreignToolCallCount: 0, listExitCode: listed.exitCode };
+      return { toolCount: listed.toolCount ?? null, toolCalls, foreignToolCallCount: 0, listExitCode: listed.exitCode, listErrorCode: listed.errorCode ?? null };
     }),
   };
 }
@@ -435,7 +435,7 @@ export async function createHarness(options, env) {
 // CLI
 // ---------------------------------------------------------------------------
 
-export async function main(argv = process.argv.slice(2), { env = process.env, out = (line) => process.stdout.write(`${line}\n`), harnessFactory = createHarness } = {}) {
+export async function main(argv = process.argv.slice(2), { env = process.env, out = (line) => process.stdout.write(`${line}\n`), harnessFactory = createHarness, root = DEFAULT_ROOT } = {}) {
   let options;
   try { options = parseClientArgs(argv); } catch (error) { out(JSON.stringify({ step: 'usage', ok: false, error: reasonOf(error) })); return 2; }
   if (options.list) {
@@ -452,7 +452,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   const steps = options.clients.map((c) => `client:${c}`);
   let run;
   try {
-    run = options.runId ? openRun(options, steps) : createRun({ target: options.target, accounts: [options.slot], scenarios: [scenario.name], steps });
+    run = options.runId ? openRun(options, steps, root) : createRun({ target: options.target, accounts: [options.slot], scenarios: [scenario.name], steps, root });
   } catch (error) { out(JSON.stringify({ step: 'ledger', ok: false, error: reasonOf(error) })); return 2; }
   const { runId } = run;
   out(JSON.stringify({ step: 'run', runId }));
@@ -486,10 +486,10 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   return results.some((r) => r.outcome === 'fail') ? 1 : 0;
 }
 
-function openRun(options, steps) {
-  try { return resumeRun({ runId: options.runId }); } catch (error) {
+function openRun(options, steps, root) {
+  try { return resumeRun({ runId: options.runId, root }); } catch (error) {
     if (error instanceof LedgerStop && error.reason === 'run-missing') {
-      return createRun({ target: options.target, accounts: [options.slot], scenarios: [options.scenario], steps, runId: options.runId });
+      return createRun({ target: options.target, accounts: [options.slot], scenarios: [options.scenario], steps, runId: options.runId, root });
     }
     throw error;
   }

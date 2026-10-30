@@ -75,7 +75,12 @@ export function toolOutcome({ isError, structured = null, content = null }) {
   }
   const failed = Boolean(isError) || errorCode !== null;
   if (failed && errorCode === null) {
-    for (const t of texts(content)) { const m = t.match(CODE_PATTERN); if (m) { errorCode = m[1]; break; } }
+    // Clients often show an HTTP 403 step-up challenge as text ("Insufficient scope: …") instead of the tool error.
+    for (const t of texts(content)) {
+      const m = t.match(CODE_PATTERN);
+      if (m) { errorCode = m[1]; break; }
+      if (/insufficient[ _]scope/i.test(t)) { errorCode = 'insufficient_scope'; break; }
+    }
   }
   return { ok: !failed, errorCode: failed ? errorCode ?? 'unknown' : null, behaviorId: failed ? null : behaviorId };
 }
@@ -334,22 +339,36 @@ export const inspectorConfig = (issuer, token) => JSON.stringify({
 });
 
 export function inspectorArgs({ method, tool = null, args = null }) {
-  const out = ['--config', '/dev/fd/3', '--server', 'cadence', '--method', method, '--format', 'json', '--quiet'];
+  // --stored-auth-only: never start interactive OAuth; the bearer header is the only credential.
+  const out = ['--config', '/dev/fd/3', '--server', 'cadence', '--method', method, '--format', 'json', '--quiet', '--stored-auth-only'];
   if (tool) out.push('--tool-name', tool, '--tool-args-json', JSON.stringify(args ?? {}));
   return out;
 }
 
-/** Inspector --format json prints the result object, or `{ error }`. */
-export function parseInspectorResult(stdout, { method }) {
-  const body = parseJson(String(stdout).trim());
-  if (!body || typeof body !== 'object') return { parsed: false };
-  if (method === 'tools/list') return { parsed: true, toolCount: Array.isArray(body.tools) ? body.tools.length : null, error: Boolean(body.error) };
-  if (body.error && !body.content && !body.structuredContent) {
-    const status = Number(body.error.status) || null;
-    const message = typeof body.error.message === 'string' ? body.error.message : '';
-    const code = message.match(CODE_PATTERN)?.[1] ?? (status === 403 ? 'insufficient_scope' : status === 401 ? 'authentication_required' : 'transport-error');
+/**
+ * Inspector --format json prints the result object on stdout; with --quiet a
+ * failure is one `{ error: { code, message } }` envelope on stderr. Only the
+ * error code is kept.
+ */
+export function parseInspectorResult(stdout, { method, stderr = '' }) {
+  const raw = parseJson(String(stdout).trim());
+  // 2.13.0 wraps the payload as { result } (or { error }).
+  const body = raw && typeof raw === 'object' && raw.result && typeof raw.result === 'object' ? raw.result : raw;
+  const envelopeError = (error) => {
+    const status = Number(error?.status) || null;
+    const message = typeof error?.message === 'string' ? error.message : '';
+    const own = typeof error?.code === 'string' && /^[a-z0-9_-]{1,40}$/.test(error.code) ? `inspector-${error.code}`.replace(/_/g, '-') : 'transport-error';
+    // The SDK client reports a 403 step-up challenge as "Insufficient scope: required …" with no status.
+    const code = message.match(CODE_PATTERN)?.[1] ?? (status === 403 || /^insufficient scope\b/i.test(message) ? 'insufficient_scope'
+      : status === 401 ? 'authentication_required' : own);
     return { parsed: true, ok: false, errorCode: code, behaviorId: null };
+  };
+  if (!body || typeof body !== 'object') {
+    const envelope = parseJson(String(stderr).trim().split('\n').at(-1) ?? '');
+    return envelope?.error && typeof envelope.error === 'object' ? envelopeError(envelope.error) : { parsed: false };
   }
+  if (method === 'tools/list') return { parsed: true, toolCount: Array.isArray(body.tools) ? body.tools.length : null, error: Boolean(body.error) };
+  if (body.error && !body.content && !body.structuredContent) return envelopeError(body.error);
   const outcome = toolOutcome({ isError: body.isError, structured: body.structuredContent ?? null, content: body.content });
   return { parsed: true, ...outcome };
 }
@@ -378,13 +397,14 @@ export function which(name, env = process.env) {
  * Spawn and collect stdout in memory. stderr is counted, not kept. Output is
  * never echoed. `fd3` writes a string to an extra pipe and closes it.
  */
-export function runProcess(file, args, { env, cwd, stdin = null, fd3 = null, timeoutMs = LIMITS.timeoutMs, maxBytes = 8 * 1024 * 1024, stopWhen = null }) {
+export function runProcess(file, args, { env, cwd, stdin = null, fd3 = null, timeoutMs = LIMITS.timeoutMs, maxBytes = 8 * 1024 * 1024, stopWhen = null, keepStderr = false }) {
   return new Promise((resolve) => {
     const stdio = ['pipe', 'pipe', 'pipe', ...(fd3 === null ? [] : ['pipe'])];
     let child;
-    try { child = spawn(file, args, { env, cwd, stdio }); } catch { resolve({ code: null, signal: null, stdout: '', stderrBytes: 0, spawnFailed: true }); return; }
+    try { child = spawn(file, args, { env, cwd, stdio }); } catch { resolve({ code: null, signal: null, stdout: '', stderr: '', stderrBytes: 0, spawnFailed: true }); return; }
     let stdout = '';
     let stderrBytes = 0;
+    let stderr = '';
     let killed = null;
     const kill = (why) => { if (!killed) { killed = why; child.kill('SIGKILL'); } };
     const timer = setTimeout(() => kill('timeout'), timeoutMs);
@@ -393,11 +413,12 @@ export function runProcess(file, args, { env, cwd, stdin = null, fd3 = null, tim
       if (stdout.length > maxBytes) kill('output-too-large');
       else if (stopWhen?.(stdout)) kill('stopped');
     });
-    child.stderr.on('data', (chunk) => { stderrBytes += chunk.length; });
+    // stderr is kept (in memory only) when the caller parses an error envelope from it.
+    child.stderr.on('data', (chunk) => { stderrBytes += chunk.length; if (keepStderr && stderr.length < 64 * 1024) stderr += chunk; });
     child.on('error', () => {});
     child.stdin.on('error', () => {});
     child.stdin.end(stdin ?? '');
     if (fd3 !== null) { child.stdio[3].on('error', () => {}); child.stdio[3].end(fd3); }
-    child.on('close', (code, signal) => { clearTimeout(timer); resolve({ code, signal, stdout, stderrBytes, killed }); });
+    child.on('close', (code, signal) => { clearTimeout(timer); resolve({ code, signal, stdout, stderrBytes, killed, ...(keepStderr ? { stderr } : {}) }); });
   });
 }
