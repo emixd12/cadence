@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-013` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-014` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -82,6 +82,7 @@ Status values:
 | [P-010](#p-010-separate-google-calendar-grant-for-daily-brief) | Separate Google Calendar grant for Daily Brief | drafted | 187 | Privacy, Settings |
 | [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
 | [P-012](#p-012-daily-brief-trip-conclusions-come-from-the-timeline-calendar-connection) | Daily Brief trip conclusions come from the Timeline Calendar connection | logged | 219, 187 | Privacy |
+| [P-013](#p-013-ai-client-re-consent-keeps-already-granted-permissions) | AI client re-consent keeps already granted permissions | logged | 232 | In-app consent copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -487,4 +488,25 @@ cite has not changed.
   say that trip conclusions about events present in both connections come from the
   Timeline connection's event locations and Google Maps (with P-004). Google's
   sensitive-scope review of `cadence-calendar-agent-prod` reads this Privacy text.
+- **Status:** logged.
+
+## P-013: AI client re-consent keeps already granted permissions
+
+- **Change:** when an AI client asks again for more access (step-up), the consent
+  screen lists the permissions the app already holds, marks them "(already
+  granted)" and keeps them selected. Switching one off still removes it. Separately,
+  the first sign-in challenge no longer names only read, so AI clients should ask
+  for all three published permissions (writes on by default as before). Not yet
+  verified live for ChatGPT (Ticket 256).
+  Code: `components/oauth/ConsentForm.tsx`, `lib/services/oauth-ui.service.ts`,
+  `lib/mcp/server.ts`, migration `20261030230000_oauth_reconsent_keeps_granted_scopes.sql`.
+  The "(already granted)" label is the in-app copy the Ticket 232 follow-up requires.
+- **Affected:** Ticket 232 follow-up (PR #170). Files:
+  `docs/user-guide/privacy-and-account.md` ("Connect and disconnect an AI client").
+- **Conflicting current text:** "Switch off either write permission to narrow access.
+  Choose **Allow** to connect or **Deny** to refuse." It does not say that a repeat
+  request shows earlier permissions as already granted and keeps them on.
+- **Update needed:** add that when an app asks again for more access, permissions it
+  already has are marked already granted and stay on unless the user switches them
+  off. Directory submission text that describes consent should match.
 - **Status:** logged.

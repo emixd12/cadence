@@ -6,6 +6,7 @@ import { completeOAuthConsent, getOAuthConsent } from "@/lib/services/oauth/cons
 import { oauthConfig, OAuthError } from "@/lib/services/oauth/protocol";
 import type { ConnectedAppsView, ConsentView } from "@/lib/types/oauth-ui";
 
+const SCOPE_ORDER: OAuthScope[] = ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function consentRequest(method: "GET" | "POST") {
@@ -16,11 +17,15 @@ export async function getConsentPageData(requestId: string): Promise<ConsentView
   const { user, error } = await getCurrentUser();
   if (error || !user) return null;
   const consent = await getOAuthConsent(await consentRequest("GET"), requestId, await createClient());
+  // Step-up re-consent shows the active grant's scopes as already granted and selected,
+  // so approving a new request keeps them unless the user clears one.
+  const shown = SCOPE_ORDER.filter((scope) => consent.scopes.includes(scope) || consent.grantedScopes.includes(scope));
   return {
     requestId, accountId: user.id, email: user.email ?? "Signed-in account",
     clientName: consent.clientName, logoUri: consent.logoUri,
     verified: consent.verifiedClient !== null, redirectHost: new URL(consent.redirectUri).host,
-    scopes: consent.scopes, offlineAccess: consent.offlineAccess,
+    scopes: shown, grantedScopes: SCOPE_ORDER.filter((scope) => consent.grantedScopes.includes(scope)),
+    offlineAccess: consent.offlineAccess,
   };
 }
 
@@ -31,8 +36,7 @@ export async function submitOAuthConsent(form: FormData) {
   if (typeof id !== "string" || !UUID.test(id) || form.get("account_id") !== user.id ||
       !["allow", "deny"].includes(String(decision))) throw new OAuthError("invalid_request");
   const values = form.getAll("scope");
-  const allowed: OAuthScope[] = ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"];
-  if (decision === "allow" && (values.some((value) => !allowed.includes(value as OAuthScope)) ||
+  if (decision === "allow" && (values.some((value) => !SCOPE_ORDER.includes(value as OAuthScope)) ||
       !values.includes("cadence.read") || new Set(values).size !== values.length)) throw new OAuthError("invalid_scope");
   const response = await completeOAuthConsent(
     await consentRequest("POST"), id, decision === "deny" ? null : values as OAuthScope[], await createClient(),

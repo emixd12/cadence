@@ -2401,7 +2401,9 @@ raising. Raising would roll back the reuse revocation.
 - `oauth_approve_consent(...)` validates the client, the redirect URI (exact, or
   port-agnostic for loopback), the scopes, and the resource. It creates or
   updates the caller's grant, clears the client's unused-registration expiry,
-  and stores a 10-minute code hash. Re-consent replaces the grant's scopes.
+  and stores a 10-minute code hash. Re-consent stores exactly the approved
+  scopes, so an explicit narrowing applies immediately. Step-up keeps earlier
+  scopes through `oauth_finish_pending` (below).
 - `oauth_list_grants()` lists the caller's active grants for Connected apps.
 - `oauth_revoke_grant(grant_id)` revokes the caller's grant, all of its tokens,
   and its pending codes. The next token check fails.
@@ -2453,7 +2455,16 @@ consent with the signed-in user's database client.
 `oauth_read_pending` and `oauth_finish_pending` require the browser-secret hash.
 The finish function locks and consumes the request in the same transaction as
 `oauth_approve_consent`; it accepts only a subset of requested tracking scopes.
-A null scope list denies and consumes without creating a grant. The server
+A null scope list denies and consumes without creating a grant.
+
+Migration `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` (Ticket 232
+follow-up) keeps earlier permissions on step-up re-consent. `oauth_read_pending`
+also returns `granted_scopes`: the caller's active grant scopes for the same
+client and resource, or an empty list. The consent screen shows them as already
+granted and selected. `oauth_finish_pending` accepts any subset of requested plus
+already granted scopes. Another account's grant and revoked grants never count.
+No table or signature changes; both functions keep their grants. Local
+verification: `tests/sql/ticket-232-oauth-reconsent-scopes.sql`. The server
 also requires a same-origin POST and a matching HttpOnly cookie. Neither the
 browser secret nor the client state appears in the consent URL.
 

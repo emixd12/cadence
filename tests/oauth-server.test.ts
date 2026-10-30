@@ -195,6 +195,13 @@ describe("consent handoff", () => {
     await expect(getOAuthConsent(request("GET", issuer, false), requestId, { rpc } as never)).rejects.toThrow();
     await expect(completeOAuthConsent(request("POST", "https://evil.example"), requestId, ["cadence.read"], { rpc } as never)).rejects.toMatchObject({ status: 403 });
   });
+  it("reads the active grant's scopes for step-up, and none from databases without the field", async () => {
+    expect((await getOAuthConsent(request("GET"), requestId, { rpc } as never)).grantedScopes).toEqual([]);
+    overrides.oauth_read_pending = { ...(overrides.oauth_read_pending as object), granted_scopes: ["cadence.read", "cadence.occurrences.write"] };
+    expect((await getOAuthConsent(request("GET"), requestId, { rpc } as never)).grantedScopes).toEqual(["cadence.read", "cadence.occurrences.write"]);
+    overrides.oauth_read_pending = { ...(overrides.oauth_read_pending as object), granted_scopes: ["cadence.admin"] };
+    await expect(getOAuthConsent(request("GET"), requestId, { rpc } as never)).rejects.toThrow();
+  });
   it("rejects consent when refreshed client metadata removes the redirect", async () => {
     overrides.oauth_get_client = { ...client, redirect_uris: ["https://client.example/new-callback"] };
     await expect(completeOAuthConsent(request(), requestId, ["cadence.read"], { rpc } as never)).rejects.toMatchObject({ code: "invalid_request" });

@@ -1,5 +1,49 @@
 # Implementation Status
 
+## Ticket 232 follow-up fixes — October 30, 2026
+
+One PR on `fix/oauth-client-extra-grant-types` fixes the October 29 live-acceptance
+defects. The owner decided (October 30) to merge and deploy after independent review
+and green CI. The hosted migration push is not done and needs the owner's explicit go.
+
+- Claude web metadata (`4fb3ee6`): Claude web's CIMD
+  (`https://claude.ai/oauth/mcp-oauth-client-metadata`) also lists the JWT-bearer
+  grant, so Cadence rejected it with `invalid_client_metadata`. Metadata may now list
+  unsupported grant types if `authorization_code` is present; nothing beyond
+  `authorization_code` and `refresh_token` is stored or issued.
+- Re-consent keeps earlier permissions: migration
+  `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` replaces
+  `oauth_read_pending` (adds the caller's active `granted_scopes`) and
+  `oauth_finish_pending` (accepts requested plus already granted scopes). The
+  consent screen marks those **already granted** and keeps them selected; clearing
+  one still narrows. Fixture `tests/sql/ticket-232-oauth-reconsent-scopes.sql`.
+  Until the hosted push, the deployed app reads no `granted_scopes` and behaves as
+  before.
+- ChatGPT write scopes: the initial 401 challenged only `cadence.read`, and MCP
+  clients request a challenged scope set. Challenged scopes mean required, and the
+  writes are optional, so the initial 401 now omits `scope`; clients fall back to
+  protected-resource `scopes_supported` (all three). Step-up challenges name read
+  plus the missing write scope. Details in `docs/MCP_INTEGRATION.md` §13. Consent
+  defaults are unchanged. Ticket 256 verifies the live ChatGPT link.
+- CodeQL alert #21 (`js/regex-injection`, `scripts/test-device.mjs`): `ax find` no
+  longer compiles the operator's pattern locally; it bounds it to 1–200 printable
+  characters, and the device's `find.js` compiles it as before.
+- Local verification on October 30 in the separate project `cadence-reconsent-232b`
+  through the reviewed Docker proxy with only its project identity changed: start
+  replayed all 95 migrations (ledger equal), every published port on `127.0.0.1`.
+  The new fixture and the OAuth persistence, family-deadline, maintenance and
+  write-replay fixtures passed. The new fixture fails against the previous
+  functions. Type generation was not run; no table or function signature changed.
+  An earlier direct start of `cadence-reconsent-232` without the proxy published
+  ports on all interfaces; it was stopped within a minute, before any fixture ran.
+  `habit-tracking-app` was not touched.
+- Not verified: hosted push and readback, Claude web and ChatGPT links after deploy.
+
+Platform impact: web OAuth server and MCP (deployed web). Desktop, marketing and
+future mobile: not applicable; the CodeQL fix is developer tooling only. Messaging
+impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
+here).
+
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
 Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
