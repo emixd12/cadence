@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { INTEGRATION_OPERATIONS } from '../packages/core/src/integration/operations.ts';
 import {
-  OPERATION_ACCESS, SCENARIOS, SOURCE_KINDS, TEST_ACCOUNTS, WatchError, assertLocalDbUrl, createDbSource, createDiffer,
+  OPERATION_ACCESS, SCENARIOS, createSessionTokenFor, SOURCE_KINDS, TEST_ACCOUNTS, WatchError, assertLocalDbUrl, createDbSource, createDiffer,
   createLedgerSink, createRpcSource, main, matchScenario, parseSince, parseWatchArgs, psqlQuery, watch,
 } from '../scripts/acceptance/watch.mjs';
 import { USERS } from '../scripts/mcp-acceptance-cleanup.mjs';
@@ -399,5 +399,31 @@ describe('arguments, ledger and CLI', () => {
     const snapshot = await createDbSource({ query: async () => dbRows(world, T0 + 100_000), userIds: { A, B }, sinceIso: SINCE }).snapshot();
     const events = createDiffer({ sinceIso: SINCE, sourceName: 'db' })(snapshot, at(100));
     expect(matchScenario(SCENARIOS.inspector, events).satisfied).toBe(false);
+  });
+});
+
+describe('production session adapter (Ticket 248 module shape)', () => {
+  const fakeModule = (current) => {
+    const made = [];
+    return { made, PRODUCTION: { supabaseUrl: 'https://qjodzutjxtmtzczbloxa.supabase.co' },
+      createKeychainSessionStore: () => ({ kind: 'keychain' }),
+      createSessionManager: (config) => { made.push(config); return { current }; } };
+  };
+  it('builds a production manager and caches each token between polls', async () => {
+    let clock = 0, calls = 0;
+    const mod = fakeModule(async (slot, opts) => { calls++; expect(opts.expectUserId).toBe(TEST_ACCOUNTS[slot].userId); return { accessToken: `${slot}-${SECRETS[0]}` }; });
+    const tokenFor = createSessionTokenFor(mod, { publishableKey: 'sb_publishable_x', now: () => clock });
+    expect(mod.made[0]).toMatchObject({ target: 'production', supabaseUrl: 'https://qjodzutjxtmtzczbloxa.supabase.co', publishableKey: 'sb_publishable_x', store: { kind: 'keychain' } });
+    expect(await tokenFor('A')).toBe(`A-${SECRETS[0]}`);
+    clock = 59_000; await tokenFor('A');
+    expect(calls).toBe(1);
+    clock = 61_000; await tokenFor('A');
+    expect(calls).toBe(2);
+  });
+  it('returns null on session errors and refuses an unknown module', async () => {
+    const tokenFor = createSessionTokenFor(fakeModule(async () => { throw new Error('session-missing'); }), { publishableKey: 'sb_publishable_x' });
+    expect(await tokenFor('B')).toBeNull();
+    expect(() => createSessionTokenFor({ accessTokenFor() {} }, { publishableKey: 'sb_publishable_x' })).toThrow('session-provider-unavailable');
+    expect(() => createSessionTokenFor({ ...fakeModule(async () => ({})), PRODUCTION: { supabaseUrl: 'https://evil.example' } }, { publishableKey: 'sb_publishable_x' })).toThrow('session-provider-unavailable');
   });
 });

@@ -615,17 +615,36 @@ async function publishableKey() {
 }
 
 /**
- * Production sessions come from Ticket 248's kept test-account sessions. The
- * live Ticket 232 broker socket is never used.
+ * Production sessions come from Ticket 248's kept test-account sessions
+ * (scripts/acceptance/test-account-sessions.mjs). current() verifies the user
+ * with Auth and refreshes near expiry, so each account's token is reused for
+ * `cacheMs` between polls. Failures return null, which the rest adapter turns
+ * into a fixed unreadable label. The live Ticket 232 broker socket is never used.
  */
-async function productionTokenFor() {
+export function createSessionTokenFor(sessionsModule, { publishableKey, now = () => Date.now(), cacheMs = 60_000 }) {
+  const { createSessionManager, createKeychainSessionStore, PRODUCTION } = sessionsModule ?? {};
+  if (typeof createSessionManager !== 'function' || typeof createKeychainSessionStore !== 'function' || PRODUCTION?.supabaseUrl !== PRODUCTION_SUPABASE_ORIGIN) {
+    fail('session-provider-unavailable');
+  }
+  const manager = createSessionManager({ target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey, store: createKeychainSessionStore() });
+  const cache = new Map();
+  return async (slot) => {
+    const hit = cache.get(slot);
+    if (hit && now() - hit.at < cacheMs) return hit.token;
+    cache.delete(slot);
+    try {
+      const token = (await manager.current(slot, { expectUserId: TEST_ACCOUNTS[slot].userId }))?.accessToken;
+      if (typeof token !== 'string' || !token) return null;
+      cache.set(slot, { token, at: now() });
+      return token;
+    } catch { return null; }
+  };
+}
+
+async function productionTokenFor(publishableKey) {
   let mod;
   try { mod = await import('./test-account-sessions.mjs'); } catch { fail('session-provider-unavailable'); }
-  const fn = mod.accessTokenFor ?? mod.getAccessToken;
-  if (typeof fn !== 'function') fail('session-provider-unavailable');
-  return async (slot) => {
-    try { const token = await fn(slot, { target: 'production' }); return typeof token === 'string' ? token : null; } catch { return null; }
-  };
+  return createSessionTokenFor(mod, { publishableKey });
 }
 
 export async function main(args = process.argv.slice(2), print = (line) => process.stdout.write(`${line}\n`)) {
@@ -641,7 +660,8 @@ export async function main(args = process.argv.slice(2), print = (line) => proce
     if (options.target === 'production') {
       const { createRest, USERS } = await import('../mcp-acceptance-cleanup.mjs');
       if (USERS.A !== TEST_ACCOUNTS.A.userId || USERS.B !== TEST_ACCOUNTS.B.userId) fail('test-account-mismatch');
-      const rest = createRest({ origin: PRODUCTION_SUPABASE_ORIGIN, publishableKey: await publishableKey(), tokenFor: await productionTokenFor() });
+      const key = await publishableKey();
+      const rest = createRest({ origin: PRODUCTION_SUPABASE_ORIGIN, publishableKey: key, tokenFor: await productionTokenFor(key) });
       source = createRpcSource({ rest, accounts: options.accounts, sinceIso });
     } else if (options.source === 'db') {
       const dbUrl = await localDbUrl(options);
