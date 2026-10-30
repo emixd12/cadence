@@ -547,6 +547,8 @@ export type PendingAuthorization = {
   redirectUri: string;
   resource: string;
   scopes: OAuthScope[];
+  /** Scopes of the caller's active grant for this client and resource; empty when none. */
+  grantedScopes: OAuthScope[];
   offlineAccess: boolean;
   state: string | null;
   expiresAt: string;
@@ -574,7 +576,9 @@ export async function readPendingAuthorization(client: AppSupabaseClient, id: st
   return {
     id: requireString(row, "id"), clientId: requireString(row, "client_id"), clientName: requireString(row, "client_name"),
     verifiedClient: asVerifiedClient(row.verified_client), redirectUri: requireString(row, "redirect_uri"),
-    resource: requireString(row, "resource"), scopes: asScopes(row.scopes), offlineAccess: row.offline_access === true,
+    resource: requireString(row, "resource"), scopes: asScopes(row.scopes),
+    // Databases before 20261030230000 omit granted_scopes; treat that as no prior grant.
+    grantedScopes: row.granted_scopes === undefined ? [] : asScopes(row.granted_scopes), offlineAccess: row.offline_access === true,
     state: asString(row.state), expiresAt: requireString(row, "expires_at"),
   };
 }

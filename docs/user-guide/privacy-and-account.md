@@ -281,8 +281,10 @@ gates in addition to visual styling. After navigation, focus moves to the
 Start a Cadence connection from your AI client. Sign in with Google if needed.
 Review the client name, verified or unverified label, return host, and account.
 Read access is required and includes notes, which may contain sensitive data.
-Switch off either write permission to narrow access. Choose **Allow** to connect
-or **Deny** to refuse. Expired requests must be restarted from the AI client.
+Switch off either write permission to narrow access. When an app asks again for
+more access, permissions it already has are marked **already granted** and stay
+on unless you switch them off. Choose **Allow** to connect or **Deny** to refuse.
+Expired requests must be restarted from the AI client.
 
 Open **Settings → Connected apps** to review permissions, connected dates, and
 last use. Expand **Recent activity** for operations, times, and outcomes. Cadence
