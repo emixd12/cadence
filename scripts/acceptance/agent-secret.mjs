@@ -37,7 +37,8 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { constants as osConstants } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isCliEntry } from './cli-entry.mjs';
+import { assertSafe } from './ledger.mjs';
 
 export const AGENT_VAULT = 'Cadence Agents';
 export const KEYCHAIN_SERVICE = 'cadence-agent-1password';
@@ -74,13 +75,20 @@ export function parseSecretRef(ref) {
     if (parts.length < 2 || parts.length > 3) throw new AgentSecretError('refused', 'invalid item reference');
     vault = parts[0];
     rest = parts.slice(1).join('/');
-    if (vault !== AGENT_VAULT) throw new AgentSecretError('refused', `vault "${safeLabel(vault)}" is outside the agent vault "${AGENT_VAULT}"`);
+    if (vault !== AGENT_VAULT) throw new AgentSecretError('refused', `the vault is outside the agent vault "${AGENT_VAULT}"`);
   }
   const parts = rest.split('/');
   if (parts.length > 2) throw new AgentSecretError('refused', 'invalid item reference');
   const [item, field = DEFAULT_FIELD] = parts;
   if (!NAME_PATTERN.test(item) || !NAME_PATTERN.test(field)) throw new AgentSecretError('refused', 'invalid item reference');
+  // A raw key passed by mistake must never reach the ledger or stderr.
+  if (looksLikeSecret(item) || looksLikeSecret(field)) throw new AgentSecretError('refused', 'the reference looks like a secret value, not an item name');
   return { vault, item, field };
+}
+
+/** Item and field names are short labels. Uses Ticket 247's ledger safety rules. */
+function looksLikeSecret(name) {
+  try { assertSafe({ name }); return false; } catch { return true; }
 }
 
 /** Validates an environment variable name for a secret value. */
@@ -124,7 +132,8 @@ export function parseCli(argv) {
           seen.add(env);
           out.specs.push({ env, ...parseSecretRef(ref) });
         } catch (error) {
-          if (error instanceof AgentSecretError && error.code === 'refused') out.refusals.push({ env: safeLabel(env), ref: safeLabel(ref), reason: error.message });
+          // A rejected reference is never kept, logged or echoed.
+          if (error instanceof AgentSecretError && error.code === 'refused') out.refusals.push({ env: safeLabel(env), reason: error.message });
           else throw error;
         }
       }
@@ -152,6 +161,8 @@ export function recordAccess(ledgerPath, entry) {
   mkdirSync(dirname(ledgerPath), { recursive: true });
   const line = { type: 'secret_access', at: new Date().toISOString(), caller: entry.caller, item: entry.item, field: entry.field, vault: entry.vault, env: entry.env, outcome: entry.outcome };
   if (entry.reason) line.reason = entry.reason;
+  // Last guard: a line that looks like it holds a secret is not written.
+  try { assertSafe(line); } catch { throw new AgentSecretError('ledger-unsafe', 'refused to write an unsafe ledger line'); }
   appendFileSync(ledgerPath, `${JSON.stringify(line)}\n`, { mode: 0o600 });
   try { chmodSync(ledgerPath, 0o600); } catch { /* best effort on existing files */ }
 }
@@ -240,7 +251,7 @@ export async function runAgentSecret(argv, { env = process.env, cwd = process.cw
 
   if (parsed.refusals.length > 0) {
     for (const refusal of parsed.refusals) {
-      log({ item: refusal.ref, field: null, vault: null, env: refusal.env, outcome: 'refused', reason: 'outside_agent_vault_or_invalid' });
+      log({ item: null, field: null, vault: null, env: refusal.env, outcome: 'refused', reason: 'outside_agent_vault_or_invalid' });
       writeLine(io.stderr, `refused ${refusal.env}: ${refusal.reason}`);
     }
     return 3;
@@ -319,7 +330,7 @@ async function runCheck(parsed, token, env, io) {
   return missing.length > 0 ? 6 : 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isCliEntry(import.meta)) {
   runAgentSecret(process.argv.slice(2)).then(
     (code) => { process.exitCode = code; },
     (error) => {

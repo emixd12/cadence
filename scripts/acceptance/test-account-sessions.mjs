@@ -56,9 +56,9 @@ const isLoopback = (value) => {
 };
 
 /**
- * Stored record. The first four fields are the session broker's handoff format
+ * Session record. The first four fields are the session broker's handoff format
  * (`userId`, `accessToken`, `expiresAt`, `kid`); `refreshToken` lets the agent
- * resume after the access token expires.
+ * resume after the access token expires. The Keychain keeps persistedRecord().
  */
 export function recordFromSession(session, { target, slot, user }) {
   if (!session?.access_token || !session?.refresh_token || !user?.id || !Number.isFinite(session.expires_at)) {
@@ -71,13 +71,23 @@ export function recordFromSession(session, { target, slot, user }) {
   };
 }
 
+/**
+ * What the Keychain keeps: only the fields needed to refresh. `security -i`
+ * rejects command lines over 4,088 bytes, and a production access token alone
+ * can exceed that once base64-encoded. The access token lives in memory only.
+ */
+export const persistedRecord = (record) => ({
+  format: record.format, target: record.target, slot: record.slot, userId: record.userId, email: record.email ?? null, refreshToken: record.refreshToken,
+});
+
 /** The broker's token-free-at-rest handoff shape, for runners that already accept it. */
 export const toBrokerSession = (record) => ({ userId: record.userId, accessToken: record.accessToken, expiresAt: record.expiresAt, kid: record.kid });
 
+/** A full record, or a persisted one without the access token. */
 export function validRecord(value, { target, slot }) {
   return Boolean(value && value.format === SESSION_FORMAT && value.target === target && value.slot === slot &&
-    typeof value.userId === 'string' && typeof value.accessToken === 'string' && typeof value.refreshToken === 'string' &&
-    Number.isFinite(Date.parse(value.expiresAt)));
+    typeof value.userId === 'string' && typeof value.refreshToken === 'string' &&
+    (value.accessToken === undefined || (typeof value.accessToken === 'string' && Number.isFinite(Date.parse(value.expiresAt)))));
 }
 
 export function createMemorySessionStore() {
@@ -100,8 +110,10 @@ const runSecurity = (args, input, execImpl) => new Promise((resolve, reject) => 
 
 /**
  * macOS Keychain store. Writes go through `security -i` on stdin, so the value
- * never appears in a process argument list. Values are base64 JSON.
+ * never appears in a process argument list. Values are base64 JSON of
+ * persistedRecord(): the access token is never stored.
  */
+const SECURITY_LINE_LIMIT = 4088;
 export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImpl = execFile } = {}) {
   if (!/^[a-z0-9-]+$/.test(service)) throw new AcceptanceError('keychain-service-invalid');
   const account = (key) => {
@@ -119,8 +131,10 @@ export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImp
       try { return JSON.parse(Buffer.from(out.trim(), 'base64').toString('utf8')); } catch { throw new AcceptanceError('keychain-item-corrupt'); }
     },
     async set(key, record) {
-      const value = Buffer.from(JSON.stringify(record), 'utf8').toString('base64');
-      await runSecurity(['-i'], `add-generic-password -U -s ${service} -a ${account(key)} -l "Cadence QA session ${account(key)}" -w ${value}\n`, execImpl);
+      const value = Buffer.from(JSON.stringify(persistedRecord(record)), 'utf8').toString('base64');
+      const line = `add-generic-password -U -s ${service} -a ${account(key)} -l "Cadence QA session ${account(key)}" -w ${value}`;
+      if (Buffer.byteLength(line) > SECURITY_LINE_LIMIT) throw new AcceptanceError('keychain-record-too-large');
+      await runSecurity(['-i'], `${line}\n`, execImpl);
     },
     async delete(key) {
       try { await runSecurity(['delete-generic-password', '-s', service, '-a', account(key)], undefined, execImpl); } catch (error) {
@@ -141,6 +155,8 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   if (!/^sb_publishable_/.test(publishableKey ?? '')) throw new AcceptanceError('publishable-key-required');
   const known = accounts ?? (target === 'production' ? PRODUCTION.accounts : {});
   const expected = { ...known };
+  // Access tokens stay in this process: the store keeps only what refresh needs.
+  const live = new Map();
   const keyFor = (slot) => {
     if (!SLOTS.includes(slot)) throw new AcceptanceError('slot-invalid');
     return `${target}:${slot}`;
@@ -158,6 +174,7 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   const save = async (slot, session, user) => {
     const record = recordFromSession(session, { target, slot, user });
     await store.set(keyFor(slot), record);
+    live.set(slot, { accessToken: record.accessToken, expiresAt: record.expiresAt, kid: record.kid });
     return record;
   };
   const ssrClient = (jar) => createServerClient(supabaseUrl, publishableKey, {
@@ -177,7 +194,9 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
     if (!record) throw new AcceptanceError('session-missing');
     if (!validRecord(record, { target, slot })) throw new AcceptanceError('session-invalid');
     if (record.userId !== want) throw new AcceptanceError('wrong-account');
-    if (Date.parse(record.expiresAt) - now() < refreshMarginMs) {
+    // The refresh token always comes from the store, which holds the latest rotation.
+    const access = live.get(slot) ?? (record.accessToken ? { accessToken: record.accessToken, expiresAt: record.expiresAt, kid: record.kid } : null);
+    if (!access || Date.parse(access.expiresAt) - now() < refreshMarginMs) {
       const { data, error } = await authClient().auth.refreshSession({ refresh_token: record.refreshToken });
       if (error || !data?.session) throw new AcceptanceError('session-refresh-failed');
       const user = await verifiedUser(data.session.access_token);
@@ -185,8 +204,8 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
       if (user.id !== want) throw new AcceptanceError('wrong-account');
       return record;
     }
-    if ((await verifiedUser(record.accessToken)).id !== want) throw new AcceptanceError('wrong-account');
-    return record;
+    if ((await verifiedUser(access.accessToken)).id !== want) throw new AcceptanceError('wrong-account');
+    return { ...record, ...access };
   };
 
   /** Supabase SSR auth cookies for the app origin, in Playwright's cookie shape. */
@@ -259,7 +278,7 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   return {
     target, current, browserCookies, absorbBrowserCookies, enrollLocalTestLogin, userRpc,
     account: (slot) => (expected[slot] ? { ...expected[slot] } : null),
-    forget: (slot) => store.delete(keyFor(slot)),
+    forget: (slot) => { live.delete(slot); return store.delete(keyFor(slot)); },
   };
 }
 

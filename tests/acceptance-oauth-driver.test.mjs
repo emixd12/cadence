@@ -104,6 +104,77 @@ describe('Keychain store', () => {
     expect(await store.get('production:A')).toEqual(record);
     expect(await store.get('production:A')).toBeNull();
   });
+  // `security -i` rejects command lines over 4,088 bytes. This fake enforces that limit and keeps items in memory.
+  const limitedSecurity = () => {
+    const items = new Map();
+    const calls = [];
+    const execImpl = (file, args, _options, callback) => {
+      const child = new EventEmitter();
+      const call = { file, args, stdin: '' };
+      calls.push(call);
+      const finish = () => {
+        if (args[0] === '-i') {
+          if (Buffer.byteLength(call.stdin.replace(/\n$/, '')) > 4088) return callback(Object.assign(new Error('line too long'), { code: 1 }), '');
+          const m = /^add-generic-password -U -s (\S+) -a (\S+) -l "[^"]*" -w (\S+)\n$/.exec(call.stdin);
+          if (!m) return callback(Object.assign(new Error('parse'), { code: 1 }), '');
+          items.set(`${m[1]}|${m[2]}`, m[3]);
+          return callback(null, '');
+        }
+        if (args[0] === 'find-generic-password') {
+          const value = items.get(`${args[args.indexOf('-s') + 1]}|${args[args.indexOf('-a') + 1]}`);
+          return value ? callback(null, `${value}\n`) : callback(Object.assign(new Error('missing'), { code: 44 }), '');
+        }
+        return callback(Object.assign(new Error('unsupported'), { code: 1 }), '');
+      };
+      child.stdin = { end: (input) => { call.stdin = input ?? ''; setImmediate(finish); } };
+      return child;
+    };
+    return { items, calls, execImpl };
+  };
+  // A realistic production session over 3 KB: a large Google-user JWT and a Supabase refresh token.
+  const bigAccess = `eyJhbGciOiJFUzI1NiIsImtpZCI6ImtpZC0xIn0.${Buffer.from(JSON.stringify({ sub: ACCOUNTS.A, user_metadata: { pad: 'x'.repeat(2600) } })).toString('base64url')}.c2lnbmF0dXJl`;
+  const bigSession = (refresh) => fakeSession(ACCOUNTS.A, refresh, bigAccess);
+
+  it('stores a production session over 3 KB and keeps only what refresh needs', async () => {
+    const { items, calls, execImpl } = limitedSecurity();
+    const store = createKeychainSessionStore({ execImpl });
+    const record = recordFromSession(bigSession('v1-refresh-abcdef'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A, email: 'cadence.testing.is@gmail.com' } });
+    expect(Buffer.byteLength(JSON.stringify(record))).toBeGreaterThan(3000);
+    await store.set('production:A', record);
+    expect(calls[0].args).toEqual(['-i']);
+    const stored = await store.get('production:A');
+    expect(stored).toEqual({ format: SESSION_FORMAT, target: 'production', slot: 'A', userId: ACCOUNTS.A, email: 'cadence.testing.is@gmail.com', refreshToken: 'v1-refresh-abcdef' });
+    expect(Buffer.from(items.get('cadence-qa-oauth-session|production:A'), 'base64').toString('utf8')).not.toContain(bigAccess.slice(0, 40));
+  });
+
+  it('a production manager refreshes from a stored record without an access token, writes the rotation back, and reuses the access token in memory', async () => {
+    const { execImpl } = limitedSecurity();
+    const store = createKeychainSessionStore({ execImpl });
+    await store.set('production:A', recordFromSession(bigSession('refresh-one'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } }));
+    let refreshes = 0;
+    const fetchImpl = vi.fn(async (input, init = {}) => {
+      const url = new URL(String(input));
+      expect(url.origin).toBe(PRODUCTION.supabaseUrl);
+      if (url.pathname === '/auth/v1/token') {
+        refreshes += 1;
+        return json(bigSession(`refresh-${refreshes + 1}`));
+      }
+      if (url.pathname === '/auth/v1/user') {
+        return new Headers(init.headers).get('Authorization') === `Bearer ${bigAccess}` ? json({ id: ACCOUNTS.A, email: 'cadence.testing.is@gmail.com' }) : json({ message: 'invalid' }, 401);
+      }
+      return json({}, 404);
+    });
+    const manager = createSessionManager({ target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, store, fetchImpl });
+    const first = await manager.current('A');
+    expect(first.accessToken).toBe(bigAccess);
+    expect(first.refreshToken).toBe('refresh-2');
+    expect((await store.get('production:A')).refreshToken).toBe('refresh-2');
+    expect(await store.get('production:A')).not.toHaveProperty('accessToken');
+    const second = await manager.current('A');
+    expect(second.accessToken).toBe(bigAccess);
+    expect(refreshes).toBe(1);
+  });
+
   it('rejects unexpected account names', async () => {
     const store = createKeychainSessionStore({ execImpl: fakeSecurity().execImpl });
     await expect(store.get('production:C')).rejects.toMatchObject({ code: 'keychain-account-invalid' });

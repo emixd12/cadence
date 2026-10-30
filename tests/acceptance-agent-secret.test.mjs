@@ -184,7 +184,27 @@ describe('agent-secret wrapper', () => {
     const lines = ledgerLines(join(work, '.intent/acceptance/secret-access.jsonl'));
     expect(lines).toHaveLength(5);
     expect(lines.every((l) => l.outcome === 'refused' && l.caller === 'node')).toBe(true);
-    expect(lines[0].item).toBe('op://Cadence/mcp-signing-key/private key');
+    // A rejected reference is never logged or echoed.
+    expect(lines.every((l) => l.item === null && l.field === null)).toBe(true);
+    for (const line of lines) expect(JSON.stringify(line)).not.toMatch(/mcp-signing-key|Personal|Private|otp/);
+  });
+
+  it('refuses a raw key passed as the item reference and never logs or echoes it', () => {
+    const longKey = `sk-ant-api03-${randomBytes(48).toString('base64url')}`;
+    const secretPart = (ref) => ref.replace(/^op:\/\//, '').split('/').find((p) => p.length > 20);
+    const refs = [secrets.anthropic, `${secrets.openai}/credential`, longKey, `op://${secrets.anthropic}/x/y`, `op://${AGENT_VAULT}/${secrets.openai}`, `ghp_${randomBytes(18).toString('hex')}`];
+    for (const ref of refs) {
+      const result = run(['--run', 'runs/raw', '--env', `ANTHROPIC_API_KEY=${ref}`, '--', process.execPath, '-e', 'process.exit(0)']);
+      expect(result.code, ref).toBe(3);
+      expect(result.stderr).toContain('refused ANTHROPIC_API_KEY');
+      expect(result.stderr).not.toContain(secretPart(ref));
+      expectNoLeak(result);
+    }
+    const ledger = readFileSync(join(work, 'runs/raw/events.jsonl'), 'utf8');
+    for (const ref of refs) expect(ledger).not.toContain(secretPart(ref));
+    expect(ledgerLines(join(work, 'runs/raw/events.jsonl')).every((l) => l.outcome === 'refused' && l.item === null)).toBe(true);
+    expect(opCalls()).toEqual([]);
+    expect(existsSync(join(home, 'security-calls.log'))).toBe(false);
   });
 
   it('refuses reserved environment names', () => {
@@ -270,6 +290,16 @@ describe('agent-secret parsing', () => {
     for (const ref of ['op://Cadence/x/y', 'op://cadence agents/x/y', '', 'a/b/c', '../x', 'x?attribute=otp', 'op://Cadence Agents/x/y/z']) {
       expect(() => parseSecretRef(ref), ref).toThrow();
     }
+  });
+
+  it('refuses references shaped like a secret, and its message never contains the reference', () => {
+    for (const ref of ['sk-ant-FAKE-0123456789abcdef01234567', 'sk-proj-FAKE-abcdef/credential', 'anthropic-api-key/sk-FAKE-0123456789', 'ops_FAKEFAKEFAKE1234', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef0123', `op://sb_secret_FAKE123456/x/y`]) {
+      let error;
+      try { parseSecretRef(ref); } catch (caught) { error = caught; }
+      expect(error, ref).toMatchObject({ code: 'refused' });
+      for (const part of ref.replace(/^op:\/\//, '').split('/')) if (part.length > 6) expect(error.message).not.toContain(part);
+    }
+    expect(parseSecretRef('anthropic-api-key')).toMatchObject({ item: 'anthropic-api-key' });
   });
 
   it('collects refusals instead of throwing so they reach the ledger', () => {
