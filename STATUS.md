@@ -20,8 +20,13 @@ are untouched.
   isolated-stack runs; their production paths are built but not run (Ticket 256).
   255 passed its stub-page tests; its real-site dry run waits for the owner to sign
   in to ChatGPT and Claude in the dedicated QA Chrome profile.
-- Planned: Ticket 252 and conditional Ticket 253 (wave 3), and Ticket 256, the
-  production client retest (wave 4, needs the owner's go-ahead).
+- In review (wave 3): Ticket 252 acceptance skill
+  (`.claude/skills/mcp-acceptance`, with a local loopback stack helper) and the
+  guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`). A local
+  Tier 0 and Tier 1 run passed with the skill's commands; the guided runner was
+  checked against the real local watcher and fixture tests.
+- Planned: conditional Ticket 253 (wave 3), and Ticket 256, the production client
+  retest (wave 4, needs the owner's go-ahead).
 - Owner step pending for Ticket 254: create the "Cadence Agents" vault, the
   spend-limited Anthropic and OpenAI keys and a read-only service account
   (`docs/qa/agent-secrets.md`). Ticket 251's readiness check found the current

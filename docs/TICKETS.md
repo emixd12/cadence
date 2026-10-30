@@ -15356,10 +15356,15 @@ applicable.
 
 ## Ticket 252: MCP acceptance skill and guided human steps
 
-Status: planned (wave 3). Adds `.claude/skills/mcp-acceptance/SKILL.md`, the guided
-fallback `npm run mcp:accept:guided`, and the matching `AGENTS.md`,
-`docs/qa/mcp-server.md`, `STATUS.md` and ticket updates. Platform impact: web QA
-tooling and docs only; desktop, marketing and future mobile not applicable.
+Status: in review (wave 3). Adds `.claude/skills/mcp-acceptance/SKILL.md` (tiers,
+commands, accounts A and B, secrets by 1Password item name, production rules,
+resume from `STATE.md`, client quirks, agent autonomy and stop conditions, recovery)
+with `local-stack.mjs`, an isolated loopback stack for local rehearsals. Adds the
+guided fallback `npm run mcp:accept:guided -- --client chatgpt|claude-web`, which
+starts the watcher with `--expect`, prints the owner's numbered steps and marks each
+step from Cadence's records, plus the `AGENTS.md` paragraph and the "Automated
+acceptance" section in `docs/qa/mcp-server.md`. Platform impact: web QA tooling and
+docs only; desktop, marketing and future mobile not applicable.
 
 ## Ticket 253: Sanitized MCP request trace (only if Ticket 250 needs it)
 

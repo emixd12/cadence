@@ -1,5 +1,34 @@
 # MCP server local acceptance — Ticket 228
 
+## Automated acceptance — Tickets 247–256
+
+Agents run MCP and AI-client acceptance from the command line and check each client
+step against Cadence's own OAuth and activity records. The procedure, commands,
+owner steps, client quirks and recovery live in the project skill
+`.claude/skills/mcp-acceptance/SKILL.md`.
+
+| Command | What it does |
+|---|---|
+| `npm run mcp:accept:protocol` | Tier 0: official SDK client with scripted OAuth and consent; every registry tool, isolation, step-up, refresh and revocation (Ticket 249) |
+| `npm run mcp:accept:clients` | Tier 1: Claude Code, the claude.ai connector, Anthropic and OpenAI API connectors and Inspector CLI, each cross-checked with the watcher (Ticket 251) |
+| `npm run mcp:accept:web` | Tier 2: ChatGPT web and Claude web driven in the Cadence QA Chrome profile (Ticket 255) |
+| `npm run mcp:accept:guided` | Tier 2 fallback: prints the owner's numbered steps, runs the watcher with `--expect` and marks each step from the records (Ticket 252) |
+| `npm run mcp:watch` | Read-only watcher over accounts A and B; `--expect <scenario>` (Ticket 250) |
+| `npm run mcp:oauth` | OAuth and consent driver; production session enrollment and status (Ticket 248) |
+| `npm run agent:secret` | Agent-scoped keys from the "Cadence Agents" vault; `--check` reads no value (Ticket 254, `docs/qa/agent-secrets.md`) |
+
+- Every run writes `.intent/acceptance/<run-id>/`; `STATE.md` there is enough to
+  resume (`node scripts/acceptance/ledger.mjs state <run-id>`).
+- Local rehearsals use an isolated loopback stack from
+  `.claude/skills/mcp-acceptance/local-stack.mjs up|status|down`, never
+  `habit-tracking-app`.
+- Production runs start with Ticket 256 and the owner's go-ahead, never while
+  Ticket 232's cleanup runs, and touch only test accounts A and B.
+- No command prints or stores tokens, codes, cookies, API keys or note text.
+- Local evidence (2026-10-30, Ticket 252, stack `cadence-accept-252`): protocol run
+  96/96 checks with the watcher satisfied; Tier 1 claude-code and inspector pass,
+  claude-ai, anthropic-api and openai-api skipped with named reasons.
+
 ## Bounded hosted isolation preparation — Ticket 232 (October 28)
 
 This procedure is prepared, not executed. It is a separate hosted opt-in;
