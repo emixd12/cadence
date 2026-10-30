@@ -13,12 +13,20 @@ are untouched.
   Ticket 254 agent-scoped secrets (`npm run agent:secret`). Each passed its focused
   tests and a local isolated-stack run where it needs a database. An independent
   verifier is reviewing them.
-- Planned: Tickets 249, 251 and 255 (wave 2), Ticket 252 and conditional Ticket 253
-  (wave 3), and Ticket 256, the production client retest (wave 4, needs the owner's
-  go-ahead).
+- In review (wave 2, integrated): Ticket 249 protocol acceptance suite
+  (`npm run mcp:accept:protocol`), Ticket 251 headless real-client runners
+  (`npm run mcp:accept:clients`) and Ticket 255 browser-driven ChatGPT web and
+  Claude web runs (`npm run mcp:accept:web`). 249 and 251 passed local
+  isolated-stack runs; their production paths are built but not run (Ticket 256).
+  255 passed its stub-page tests; its real-site dry run waits for the owner to sign
+  in to ChatGPT and Claude in the dedicated QA Chrome profile.
+- Planned: Ticket 252 and conditional Ticket 253 (wave 3), and Ticket 256, the
+  production client retest (wave 4, needs the owner's go-ahead).
 - Owner step pending for Ticket 254: create the "Cadence Agents" vault, the
   spend-limited Anthropic and OpenAI keys and a read-only service account
-  (`docs/qa/agent-secrets.md`).
+  (`docs/qa/agent-secrets.md`). Ticket 251's readiness check found the current
+  service account reads "Cadence" instead of "Cadence Agents", so the API runners
+  stay skipped until that is redone.
 - Product finding from Ticket 248, not fixed here: clicking Allow or Deny before the
   consent page hydrates sends a native form POST with `Origin: null`, and the Server
   Action CSRF check returns 500.

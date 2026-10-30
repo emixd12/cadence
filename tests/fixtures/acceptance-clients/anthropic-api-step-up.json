@@ -1,0 +1,16 @@
+{
+  "_source": "Constructed from the documented Messages API MCP connector shapes. The step-up denial text follows what the official SDK client reports for Cadence's 403 challenge.",
+  "responses": [
+    {
+      "id": "msg_fixture_3", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "stop_reason": "end_turn",
+      "usage": { "input_tokens": 1900, "output_tokens": 180 },
+      "content": [
+        { "type": "mcp_tool_use", "id": "mcptoolu_fixture_4", "name": "get_account_context", "server_name": "cadence", "input": {} },
+        { "type": "mcp_tool_result", "tool_use_id": "mcptoolu_fixture_4", "is_error": false, "content": [ { "type": "text", "text": "Get Cadence account context succeeded." } ] },
+        { "type": "mcp_tool_use", "id": "mcptoolu_fixture_5", "name": "create_behavior", "server_name": "cadence", "input": {} },
+        { "type": "mcp_tool_result", "tool_use_id": "mcptoolu_fixture_5", "is_error": true, "content": [ { "type": "text", "text": "Insufficient scope: required \"cadence.behaviors.write\"" } ] },
+        { "type": "text", "text": "FAILED insufficient_scope" }
+      ]
+    }
+  ]
+}

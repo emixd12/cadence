@@ -1,0 +1,13 @@
+{
+  "_source": "Constructed from the documented Responses API remote MCP shapes; a failed call populates error.",
+  "response": {
+    "id": "resp_fixture_2", "object": "response", "status": "completed", "model": "gpt-6-luna",
+    "usage": { "input_tokens": 1500, "output_tokens": 120 },
+    "output": [
+      { "id": "mcpl_fixture_2", "type": "mcp_list_tools", "server_label": "cadence", "tools": [ { "name": "get_account_context" }, { "name": "create_behavior" } ] },
+      { "id": "mcp_fixture_4", "type": "mcp_call", "server_label": "cadence", "name": "get_account_context", "arguments": "{}", "output": "Get Cadence account context succeeded.", "error": null },
+      { "id": "mcp_fixture_5", "type": "mcp_call", "server_label": "cadence", "name": "create_behavior", "arguments": "{}", "output": null, "error": "Error executing tool create_behavior: insufficient_scope" },
+      { "id": "msg_fixture_2", "type": "message", "role": "assistant", "content": [ { "type": "output_text", "text": "FAILED insufficient_scope" } ] }
+    ]
+  }
+}

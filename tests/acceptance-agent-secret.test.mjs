@@ -296,6 +296,32 @@ describe('agent-secret wrapper', () => {
     expect(run(['--bogus', '--', 'node']).code).toBe(2);
     expect(opCalls()).toEqual([]);
   });
+
+  it('never prints argument values in usage errors, even a raw key in the wrong place', () => {
+    // Alphanumeric and hyphenated keys pass a printable-label check, so the
+    // message must not echo the argument at all.
+    const child = ['--', process.execPath, '-e', '0'];
+    const lowerKeys = [secrets.openai, `sk${randomBytes(20).toString('hex')}`];
+    // Uppercase-only keys are valid environment names, so they reach the
+    // duplicate-mapping check instead of the name check.
+    const upperKey = `AKIA${randomBytes(10).toString('hex').toUpperCase()}`;
+    const cases = [
+      ...lowerKeys.flatMap((key) => [
+        [key, ['--env', `${key}=OPENAI_API_KEY`, ...child]],
+        [key, [key, ...child]],
+      ]),
+      [upperKey, [upperKey, ...child]],
+      [upperKey, ['--env', `${upperKey}=openai-api-key`, '--env', `${upperKey}=openai-api-key`, ...child]],
+    ];
+    for (const [key, args] of cases) {
+      const result = run(args);
+      expect(result.code).toBe(2);
+      expect(result.stderr.includes(key), 'key echoed to stderr').toBe(false);
+      expect(result.stdout.includes(key), 'key echoed to stdout').toBe(false);
+    }
+    expect(opCalls()).toEqual([]);
+    expect(existsSync(join(home, 'security-calls.log'))).toBe(false);
+  });
 });
 
 describe('agent-secret --store-token (setup step 5)', () => {
