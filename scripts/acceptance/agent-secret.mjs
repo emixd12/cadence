@@ -104,9 +104,12 @@ function looksLikeSecret(name) {
   try { assertSafe({ name }); return false; } catch { return true; }
 }
 
-/** Validates an environment variable name for a secret value. */
+/**
+ * Validates an environment variable name for a secret value. Usage errors never
+ * echo the argument: a reversed mapping puts a raw key where the name goes.
+ */
 export function checkEnvName(name) {
-  if (!ENV_PATTERN.test(name)) throw new AgentSecretError('usage', `invalid environment variable name "${safeLabel(name)}"`);
+  if (!ENV_PATTERN.test(name)) throw new AgentSecretError('usage', 'invalid environment variable name in --env (expected uppercase letters, digits and _)');
   if (ENV_DENY.has(name) || ENV_DENY_PREFIXES.some((prefix) => name.startsWith(prefix))) {
     throw new AgentSecretError('refused', `environment variable "${name}" is reserved`);
   }
@@ -149,7 +152,7 @@ export function parseCli(argv) {
         const ref = value.slice(eq + 1);
         try {
           checkEnvName(env);
-          if (seen.has(env)) throw new AgentSecretError('usage', `environment variable "${env}" is mapped twice`);
+          if (seen.has(env)) throw new AgentSecretError('usage', `--env at position ${i + 1} maps an environment variable that is already mapped`);
           seen.add(env);
           out.specs.push({ env, ...parseSecretRef(ref) });
         } catch (error) {
@@ -160,7 +163,8 @@ export function parseCli(argv) {
       }
       continue;
     }
-    throw new AgentSecretError('usage', `unknown argument "${safeLabel(arg)}"`);
+    // Never echo the argument: a stray positional may be a raw key.
+    throw new AgentSecretError('usage', `unknown argument at position ${i + 1}`);
   }
   if (out.keychainService && !out.storeToken) throw new AgentSecretError('usage', '--keychain-service is only for --store-token');
   if (out.storeToken) {
