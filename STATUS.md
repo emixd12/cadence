@@ -7,26 +7,31 @@ QA tooling for MCP and AI-client acceptance, on the unpushed branch
 247–256). No production calls; Ticket 232's live run, scripts and captured records
 are untouched.
 
-- In review (wave 1, integrated): Ticket 247 run ledger
-  (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
-  (`npm run mcp:oauth`), Ticket 250 server-side watcher (`npm run mcp:watch`) and
-  Ticket 254 agent-scoped secrets (`npm run agent:secret`). Each passed its focused
-  tests and a local isolated-stack run where it needs a database. An independent
-  verifier is reviewing them.
-- In review (wave 2, integrated): Ticket 249 protocol acceptance suite
-  (`npm run mcp:accept:protocol`), Ticket 251 headless real-client runners
-  (`npm run mcp:accept:clients`) and Ticket 255 browser-driven ChatGPT web and
-  Claude web runs (`npm run mcp:accept:web`). 249 and 251 passed local
-  isolated-stack runs; their production paths are built but not run (Ticket 256).
-  255 passed its stub-page tests; its real-site dry run waits for the owner to sign
-  in to ChatGPT and Claude in the dedicated QA Chrome profile.
-- In review (wave 3): Ticket 252 acceptance skill
+- Complete (waves 1 and 2, integrated and independently verified): Ticket 247 run
+  ledger (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
+  (`npm run mcp:oauth`), Ticket 249 protocol acceptance suite
+  (`npm run mcp:accept:protocol`), Ticket 250 server-side watcher
+  (`npm run mcp:watch`), Ticket 251 headless real-client runners
+  (`npm run mcp:accept:clients`), Ticket 254 agent-scoped secrets
+  (`npm run agent:secret`) and Ticket 255 browser-driven ChatGPT web and Claude web
+  runs (`npm run mcp:accept:web`). 249 and 251 passed local isolated-stack runs;
+  their production paths are built but not run (Ticket 256). 255 passed its
+  stub-page tests and a real-site dry run that reached the connector settings in
+  both apps, with no prompts sent.
+- In review (wave 3, integrated): Ticket 252 acceptance skill
   (`.claude/skills/mcp-acceptance`, with a local loopback stack helper) and the
   guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`). A local
   Tier 0 and Tier 1 run passed with the skill's commands; the guided runner was
   checked against the real local watcher and fixture tests.
-- Planned: conditional Ticket 253 (wave 3), and Ticket 256, the production client
-  retest (wave 4, needs the owner's go-ahead).
+- On hold: conditional Ticket 253. Ticket 250's gap report found it not required
+  for the six scenarios.
+- Planned: Ticket 256, the production client retest (wave 4, needs the owner's
+  go-ahead).
+- Known local test timeout, not caused by this branch:
+  `tests/desktop-release-cli.test.ts` times out (5 s) on 7–9 of 27 tests on both
+  this branch and `origin/main` `eb5afa5`, and passes 27/27 with a 30 s timeout. On
+  this Mac the first run of each newly written executable takes about 0.8 s, and
+  each test writes eight fresh stub tools.
 - Owner step pending for Ticket 254: create the "Cadence Agents" vault, the
   spend-limited Anthropic and OpenAI keys and a read-only service account
   (`docs/qa/agent-secrets.md`). Ticket 251's readiness check found the current
