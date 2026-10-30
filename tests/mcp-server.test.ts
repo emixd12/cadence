@@ -76,8 +76,8 @@ describe("MCP route with official SDK", () => {
     const response = await GET(new Request(url, { headers: authorization ? { authorization } : {} }));
     expect(response.status).toBe(401);
     expect(response.headers.get("www-authenticate")).toContain('resource_metadata="http://127.0.0.1:4321/.well-known/oauth-protected-resource/mcp"');
-    // Clients request exactly this set at link time; consent keeps each write optional.
-    expect(response.headers.get("www-authenticate")).toContain('scope="cadence.read cadence.occurrences.write cadence.behaviors.write"');
+    // No scope: optional writes are not required, so clients fall back to PRM scopes_supported.
+    expect(response.headers.get("www-authenticate")).not.toContain("scope=");
     expect(executeMcpOperation).not.toHaveBeenCalled();
   });
   it("rejects expired, revoked and wrong-resource credentials returned by verification", async () => {
@@ -104,11 +104,17 @@ describe("MCP route with official SDK", () => {
       challengeScopes(createIntegrationError("insufficient_scope", "Write.", { requiredScopes: ["cadence.occurrences.write"] })),
       challengeScopes(createIntegrationError("insufficient_scope", "Unknown.")),
     ];
-    expect(sets).toEqual([
-      ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"],
-      ["cadence.read"], ["cadence.read", "cadence.occurrences.write"], ["cadence.read"],
-    ]);
-    for (const set of sets) expect(parseScopes(set.join(" ")).scopes).toEqual(set);
+    expect(sets).toEqual([null, ["cadence.read"], ["cadence.read", "cadence.occurrences.write"], ["cadence.read"]]);
+    for (const set of sets.slice(1)) expect(parseScopes(set!.join(" ")).scopes).toEqual(set);
+  });
+  it("still serves a read-only token", async () => {
+    vi.mocked(verifyMcpAccessToken).mockResolvedValue({ ...grant, scopes: ["cadence.read"] });
+    const listed = await POST(request("tools/list"));
+    expect(listed.status).toBe(200);
+    expect(listed.headers.has("www-authenticate")).toBe(false);
+    const called = await POST(request("tools/call", { name: "list_categories", arguments: {} }));
+    expect(called.status).toBe(200);
+    expect((await called.json()).result).toMatchObject({ structuredContent: { categories: [] } });
   });
   it("returns HTTP 429 with stable error and Retry-After", async () => {
     vi.mocked(executeMcpOperation).mockResolvedValue({ ok: false, error: createIntegrationError("rate_limited", "Retry later.", { retryAfterSeconds: 12 }) });

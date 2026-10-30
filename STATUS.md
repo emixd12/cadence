@@ -20,9 +20,11 @@ and green CI. The hosted migration push is not done and needs the owner's explic
   Until the hosted push, the deployed app reads no `granted_scopes` and behaves as
   before.
 - ChatGPT write scopes: the initial 401 challenged only `cadence.read`, and MCP
-  clients request exactly a challenged scope set. It now names all three tracking
-  scopes; step-up challenges name read plus the missing write scope. Details in
-  `docs/MCP_INTEGRATION.md` §13. Consent defaults are unchanged.
+  clients request a challenged scope set. Challenged scopes mean required, and the
+  writes are optional, so the initial 401 now omits `scope`; clients fall back to
+  protected-resource `scopes_supported` (all three). Step-up challenges name read
+  plus the missing write scope. Details in `docs/MCP_INTEGRATION.md` §13. Consent
+  defaults are unchanged. Ticket 256 verifies the live ChatGPT link.
 - CodeQL alert #21 (`js/regex-injection`, `scripts/test-device.mjs`): `ax find` no
   longer compiles the operator's pattern locally; it bounds it to 1–200 printable
   characters, and the device's `find.js` compiles it as before.

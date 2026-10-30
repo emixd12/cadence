@@ -495,8 +495,9 @@ cite has not changed.
 - **Change:** when an AI client asks again for more access (step-up), the consent
   screen lists the permissions the app already holds, marks them "(already
   granted)" and keeps them selected. Switching one off still removes it. Separately,
-  AI clients now ask for all three permissions at first connection (read plus both
-  writes, writes on by default as before), so ChatGPT shows the write switches.
+  the first sign-in challenge no longer names only read, so AI clients should ask
+  for all three published permissions (writes on by default as before). Not yet
+  verified live for ChatGPT (Ticket 256).
   Code: `components/oauth/ConsentForm.tsx`, `lib/services/oauth-ui.service.ts`,
   `lib/mcp/server.ts`, migration `20261030230000_oauth_reconsent_keeps_granted_scopes.sql`.
   The "(already granted)" label is the in-app copy the Ticket 232 follow-up requires.

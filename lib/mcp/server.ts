@@ -22,22 +22,23 @@ export function mcpTools(): Tool[] {
 }
 
 /**
- * MCP clients request exactly the challenged scope set when one is present
- * (MCP authorization, "Scope Selection Strategy"). The initial 401 therefore
- * names every tracking scope, matching protected-resource scopes_supported;
- * consent still lets the user turn each write permission off. A step-up
- * challenge names read plus the missing scope, because every MCP request needs
- * read and authorization requests without read are rejected.
+ * Challenged scopes are required for the current request (MCP authorization,
+ * "Scope Selection Strategy"; RFC 6750 section 3). Writes are optional, so the
+ * initial or invalid-token 401 names no scope: clients then request every scope
+ * in protected-resource scopes_supported, and consent keeps each write optional.
+ * A step-up challenge names read plus the missing scope, because every MCP
+ * request needs read and authorization requests without read are rejected.
  */
-export function challengeScopes(error: IntegrationError): string[] {
-  if (error.code !== "insufficient_scope") return [...INTEGRATION_SCOPE_LIST];
+export function challengeScopes(error: IntegrationError): string[] | null {
+  if (error.code !== "insufficient_scope") return null;
   const needed = new Set<string>(["cadence.read", ...(error.required_scopes ?? [])]);
   return INTEGRATION_SCOPE_LIST.filter((scope) => needed.has(scope));
 }
 
 function challenge(error: IntegrationError, issuer: string) {
   const code = error.code === "insufficient_scope" ? "insufficient_scope" : "invalid_token";
-  return `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp", error="${code}", scope="${challengeScopes(error).join(" ")}"`;
+  const scopes = challengeScopes(error);
+  return `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp", error="${code}"${scopes ? `, scope="${scopes.join(" ")}"` : ""}`;
 }
 
 function toolError(error: IntegrationError, issuer: string) {
