@@ -5,7 +5,8 @@ import { POST, GET, OPTIONS } from "@/app/mcp/route";
 import { verifyMcpAccessToken } from "@/lib/services/oauth/server";
 import { createIntegrationContext } from "@/lib/integrations/request-context";
 import { executeMcpOperation } from "@/lib/integrations/operations/execute";
-import { mcpTools } from "@/lib/mcp/server";
+import { challengeScopes, mcpTools } from "@/lib/mcp/server";
+import { parseScopes } from "@/lib/services/oauth/protocol";
 
 vi.mock("@/lib/services/oauth/server", () => ({ verifyMcpAccessToken: vi.fn() }));
 vi.mock("@/lib/integrations/request-context", () => ({ createIntegrationContext: vi.fn() }));
@@ -75,7 +76,8 @@ describe("MCP route with official SDK", () => {
     const response = await GET(new Request(url, { headers: authorization ? { authorization } : {} }));
     expect(response.status).toBe(401);
     expect(response.headers.get("www-authenticate")).toContain('resource_metadata="http://127.0.0.1:4321/.well-known/oauth-protected-resource/mcp"');
-    expect(response.headers.get("www-authenticate")).toContain('scope="cadence.read"');
+    // Clients request exactly this set at link time; consent keeps each write optional.
+    expect(response.headers.get("www-authenticate")).toContain('scope="cadence.read cadence.occurrences.write cadence.behaviors.write"');
     expect(executeMcpOperation).not.toHaveBeenCalled();
   });
   it("rejects expired, revoked and wrong-resource credentials returned by verification", async () => {
@@ -89,8 +91,24 @@ describe("MCP route with official SDK", () => {
     expect(response.status).toBe(403);
     const { result } = await response.json();
     expect(result.isError).toBe(true);
-    expect(result._meta["mcp/www_authenticate"][0]).toContain('scope="cadence.behaviors.write"');
+    // Step-up names read with the missing write scope: authorization requests without read are rejected.
+    expect(result._meta["mcp/www_authenticate"][0]).toContain('scope="cadence.read cadence.behaviors.write"');
     expect(response.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
+    expect(response.headers.get("www-authenticate")).toContain('scope="cadence.read cadence.behaviors.write"');
+    expect(result.structuredContent.error.required_scopes).toEqual(["cadence.behaviors.write"]);
+  });
+  it("challenges with scope sets the authorization endpoint accepts", () => {
+    const sets = [
+      challengeScopes(createIntegrationError("authentication_required", "Sign in.")),
+      challengeScopes(createIntegrationError("insufficient_scope", "Read.", { requiredScopes: ["cadence.read"] })),
+      challengeScopes(createIntegrationError("insufficient_scope", "Write.", { requiredScopes: ["cadence.occurrences.write"] })),
+      challengeScopes(createIntegrationError("insufficient_scope", "Unknown.")),
+    ];
+    expect(sets).toEqual([
+      ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"],
+      ["cadence.read"], ["cadence.read", "cadence.occurrences.write"], ["cadence.read"],
+    ]);
+    for (const set of sets) expect(parseScopes(set.join(" ")).scopes).toEqual(set);
   });
   it("returns HTTP 429 with stable error and Retry-After", async () => {
     vi.mocked(executeMcpOperation).mockResolvedValue({ ok: false, error: createIntegrationError("rate_limited", "Retry later.", { retryAfterSeconds: 12 }) });

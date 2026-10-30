@@ -134,6 +134,7 @@ Cadence implements the behavior or that a client accepts it.
 | Client registration | Authorization servers SHOULD support Client ID Metadata Documents. Dynamic Client Registration (RFC 7591) MAY be supported and is deprecated, kept for compatibility. | MCP authorization |
 | Issuer identification | Authorization servers SHOULD return `iss` in every authorization response, including errors, and then MUST advertise `authorization_response_iss_parameter_supported: true` (RFC 9207). | MCP authorization |
 | Scopes and step-up | Servers SHOULD put `scope` in `WWW-Authenticate`. Insufficient scope SHOULD return 403 with `error="insufficient_scope"`, the required scopes, and `resource_metadata`. `offline_access` SHOULD NOT appear in protected-resource `scopes_supported`. | MCP authorization |
+| Client scope selection | At link time clients use the `scope` in the initial 401 `WWW-Authenticate` when present, else all PRM `scopes_supported`. On step-up they SHOULD request the union of earlier scopes and the challenged ones. Read 2026-10-30. | [MCP 2026-07-28 authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization#scope-selection-strategy) |
 | Tokens in URLs | Access tokens MUST NOT appear in the query string; `Authorization: Bearer` on every request. | MCP authorization |
 | Claude discovery | Claude needs a 401 (it ignores `WWW-Authenticate` on 200), uses only the first `authorization_servers` entry, and requires `resource` to equal the MCP URL exactly. | [Claude connector authentication](https://claude.com/docs/connectors/building/authentication) |
 | Claude CIMD | Claude uses CIMD only when metadata advertises `client_id_metadata_document_supported: true` and `none` in `token_endpoint_auth_methods_supported`; otherwise it falls back to DCR. DCR registers a new client on every fresh connection. | Claude connector authentication |
@@ -406,6 +407,23 @@ receipts. The transport adds neither duplicate write activity nor a postcommit
 validation failure. Admission storage failures fail closed with a stable error.
 HTTP 401 includes protected-resource metadata and scope; missing write scopes
 return 403; exhausted grants return 429 with `Retry-After`.
+
+**Challenge scopes (Ticket 232 follow-up, October 30, 2026).** On October 29
+ChatGPT linked with `cadence.read` only and never offered the write permissions.
+Cause: the initial 401 challenged `scope="cadence.read"`, and the MCP scope
+selection strategy makes clients request exactly a challenged set when one is
+present. ChatGPT's tool `securitySchemes` and `_meta` were already correct and do
+not override that challenge. The initial 401 now names all three tracking scopes,
+the same set as protected-resource `scopes_supported`. Consent still lets the user
+switch each write off; the owner's defaults (writes on) are unchanged. A step-up
+403 now names `cadence.read` with the missing write scope. Before, it named only
+the write scope, and a client that sent exactly that set got `invalid_scope`,
+because `/oauth/authorize` requires `cadence.read`. The error body's
+`required_scopes` still lists only the missing scope. Server-side union of
+earlier permissions on re-consent is in `docs/DATA_MODEL.md` (migration
+`20261030230000`). Not verified: a live ChatGPT link after deployment; OpenAI's
+plugin authentication page does not state ChatGPT's selection order, so this rests
+on the MCP rule.
 
 Origins are limited to the configured issuer, `https://claude.ai` and
 `https://chatgpt.com`. Development additionally permits localhost/127.0.0.1 HTTP
