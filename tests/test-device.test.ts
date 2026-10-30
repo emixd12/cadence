@@ -69,6 +69,19 @@ else if (command.includes("/axelement")) {
     expect(calls().at(-1)?.args).toEqual(expect.arrayContaining(["BatchMode=yes", "StrictHostKeyChecking=yes", "--", "qa@test-host"]));
   });
 
+  it("passes documented find patterns unchanged and bounds them before SSH", () => {
+    const result = run(["ax", "test-mac", "find", "Sync now|Synced (just now)?"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls().at(-1)?.command).toContain("'Sync now|Synced (just now)?'");
+    const before = calls().length;
+    for (const pattern of ["", "x".repeat(201), "Sync\nnow"]) {
+      const rejected = run(["ax", "test-mac", "find", pattern]);
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stderr).toContain("Invalid find pattern");
+    }
+    expect(calls()).toHaveLength(before);
+  });
+
   it("preserves quotes and shell metacharacters as one remote AX argument", () => {
     const value = "Bob's $(touch /tmp/do-not-run)";
     const result = run(["ax", "test-mac", "press", "AXButton", value]);
