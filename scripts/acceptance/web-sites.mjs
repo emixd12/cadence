@@ -188,7 +188,11 @@ const claudeWeb = Object.freeze({
     await clickNamed(page, exact('Add custom connector'), 'connector-create');
     await fillNamed(page, this.nameField, name, 'connector-name');
     await fillNamed(page, this.urlField, url, 'connector-url');
-    await clickNamed(page, exact('Add'), 'connector-submit', { scope: page.getByRole('dialog').last() });
+    const dialog = page.getByRole('dialog').last();
+    await clickNamed(page, exact('Add'), 'connector-submit', { scope: dialog });
+    // Let the form close (and any re-render settle) before reading the list.
+    await dialog.waitFor({ state: 'detached', timeout: 15_000 }).catch(() => { throw new WebStop('page-changed', 'connector-submit'); });
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
     const entry = await this.findConnector(page, name, 15_000);
     if (!entry) throw new WebStop('page-changed', 'connector-submit');
     await this.reconnect(page, entry, name);

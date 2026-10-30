@@ -1,8 +1,8 @@
 // Ticket 255: browser-driven ChatGPT web and Claude web runs, against stub
 // chat sites and a stub Cadence consent page (DOM copied from the real one).
 // The real Ticket 232 cleanup helpers and the Ticket 247 ledger run against an
-// in-memory rest adapter. Uses installed Chrome, headless, and three free
-// ports in Ticket 255's range 4431–4439 (so two copies can run side by side).
+// in-memory rest adapter. Uses installed Chrome, headless, and three ephemeral
+// loopback ports, so parallel runs never collide.
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -22,19 +22,13 @@ import { SITES, WebStop, withOrigin } from '../scripts/acceptance/web-sites.mjs'
 const CHAT_PORTS = {};
 let ISSUER = null;
 
-async function listenInRange(server, used) {
-  for (let port = 4431; port <= 4439; port += 1) {
-    if (used.has(port)) continue;
-    try {
-      await new Promise((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
-      });
-      used.add(port);
-      return port;
-    } catch { /* port taken; try the next one */ }
-  }
-  throw new Error('no-free-port-4431-4439');
+/** Ephemeral loopback port, so parallel runs of this file never collide. */
+async function listenEphemeral(server) {
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => { server.off('error', reject); resolve(); });
+  });
+  return server.address().port;
 }
 const USER_A = cleanupModule.USERS.A;
 const EMAIL_A = 'cadence.testing.is@gmail.com';
@@ -331,14 +325,13 @@ let browser;
 const servers = [];
 let root;
 beforeAll(async () => {
-  const used = new Set();
   for (const client of ['chatgpt', 'claude-web']) {
     const server = chatServer(client);
-    CHAT_PORTS[client] = await listenInRange(server, used);
+    CHAT_PORTS[client] = await listenEphemeral(server);
     servers.push(server);
   }
   const issuer = issuerServer();
-  ISSUER = `http://127.0.0.1:${await listenInRange(issuer, used)}`;
+  ISSUER = `http://127.0.0.1:${await listenEphemeral(issuer)}`;
   servers.push(issuer);
   browser = await launchChrome({ headless: true });
   root = mkdtempSync(join(tmpdir(), 'accept-255-'));
