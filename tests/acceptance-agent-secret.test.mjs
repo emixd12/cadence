@@ -42,13 +42,32 @@ beforeEach(() => {
   work = join(root, 'work');
   home = join(root, 'home');
   for (const dir of [fakebin, work, home]) mkdirSync(dir);
-  // Fake Keychain: only answers the exact service/account lookup with -w.
+  // Fake Keychain: answers the exact service/account lookup with -w, and
+  // \`security -i\` writes with the real 4,088-byte line limit. Stored items live
+  // in fakebin/store.json, outside the directories the leak scan reads.
   writeExecutable(join(fakebin, 'security'), `
-const { readFileSync, appendFileSync } = require('node:fs');
+const { readFileSync, appendFileSync, writeFileSync, existsSync } = require('node:fs');
 const { join } = require('node:path');
 const config = JSON.parse(readFileSync(join(__dirname, 'config.json'), 'utf8'));
 const args = process.argv.slice(2);
 appendFileSync(join(process.env.HOME, 'security-calls.log'), JSON.stringify(args) + '\\n');
+const storePath = join(__dirname, 'store.json');
+const store = existsSync(storePath) ? JSON.parse(readFileSync(storePath, 'utf8')) : {};
+if (args[0] === '-i') {
+  const input = readFileSync(0, 'utf8');
+  for (const line of input.split('\\n').filter(Boolean)) {
+    if (Buffer.byteLength(line) > 4088) { process.stderr.write('security: line too long\\n'); process.exit(1); }
+    const m = /^add-generic-password -U -s (\\S+) -a (\\S+) -T \\/usr\\/bin\\/security -w (\\S+)$/.exec(line);
+    if (!m) { process.stderr.write('security: unknown command\\n'); process.exit(1); }
+    store[m[1] + '|' + m[2]] = config.truncateStore ? m[3].slice(0, config.truncateStore) : m[3];
+  }
+  writeFileSync(storePath, JSON.stringify(store));
+  process.exit(0);
+}
+if (args[0] === 'find-generic-password' && args.includes('-w')) {
+  const kept = store[args[args.indexOf('-s') + 1] + '|' + args[args.indexOf('-a') + 1]];
+  if (kept !== undefined) { process.stdout.write(kept + '\\n'); process.exit(0); }
+}
 const ok = args[0] === 'find-generic-password' && args.includes('-w')
   && args[args.indexOf('-s') + 1] === ${JSON.stringify(KEYCHAIN_SERVICE)}
   && args[args.indexOf('-a') + 1] === ${JSON.stringify(KEYCHAIN_ACCOUNT)};
@@ -103,9 +122,9 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function run(args, extraEnv = {}) {
+function run(args, extraEnv = {}, input = undefined) {
   const env = { PATH: `${fakebin}:${process.env.PATH}`, HOME: home, OP_ACCOUNT: 'should-not-pass', OP_SERVICE_ACCOUNT_TOKEN: 'parent-token-should-not-pass', ...extraEnv };
-  const result = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: work, env, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: work, env, encoding: 'utf8', input });
   return { code: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -276,6 +295,116 @@ describe('agent-secret wrapper', () => {
     expect(run(['--env', 'A=x', '--env', 'A=y', '--', 'node']).code).toBe(2);
     expect(run(['--bogus', '--', 'node']).code).toBe(2);
     expect(opCalls()).toEqual([]);
+  });
+});
+
+describe('agent-secret --store-token (setup step 5)', () => {
+  // A realistic service-account token: ops_ plus base64url, well over the prompt's 128 bytes.
+  const fakeToken = () => `ops_${randomBytes(1200).toString('base64url')}`;
+  const stored = () => {
+    const path = join(fakebin, 'store.json');
+    return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+  };
+  const securityCalls = () => {
+    const path = join(home, 'security-calls.log');
+    return existsSync(path) ? readFileSync(path, 'utf8') : '';
+  };
+  const expectTokenNowhere = (result, token) => {
+    const haystacks = [result.stdout, result.stderr, securityCalls(), ...[...filesUnder(work), ...filesUnder(home)].map((f) => readFileSync(f, 'utf8'))];
+    for (const text of haystacks) {
+      expect(text.includes(token)).toBe(false);
+      expect(text.includes(token.slice(4, 40))).toBe(false);
+    }
+  };
+
+  it('stores a token over 1,500 characters from stdin, untruncated, under the service and account the wrapper reads', () => {
+    const token = fakeToken();
+    expect(token.length).toBeGreaterThan(1500);
+    const result = run(['--store-token'], {}, `${token}\n`);
+    expect(result.code).toBe(0);
+    expect(stored()[`${KEYCHAIN_SERVICE}|${KEYCHAIN_ACCOUNT}`]).toBe(token);
+    expect(result.stdout).toContain(`stored ${token.length} characters; read back ${token.length}`);
+    expect(result.stdout).toContain('--check');
+    // Written through security -i on stdin: never in argv.
+    expect(securityCalls()).toContain('["-i"]');
+    expectTokenNowhere(result, token);
+    // The wrapper then reads the same item.
+    setup({ token: 'unused' });
+    writeFileSync(join(fakebin, 'store.json'), JSON.stringify({ [`${KEYCHAIN_SERVICE}|${KEYCHAIN_ACCOUNT}`]: token }));
+    const check = run(['--check'], {}, '');
+    expect(check.stdout).toContain('token: present in the Keychain');
+  });
+
+  it('refuses tokens with the wrong shape without storing or echoing them', () => {
+    const bad = [
+      '', 'ops_short', `ops_${'A'.repeat(124)}`, `sk-ant-${randomBytes(800).toString('base64url')}`, `ops_${randomBytes(600).toString('base64url')} trailing`,
+      `ops_${'A'.repeat(4000)}`, `${fakeToken()}\n${fakeToken()}`,
+    ];
+    for (const input of bad) {
+      const result = run(['--store-token'], {}, input);
+      expect(result.code, input.slice(0, 12)).toBe(7);
+      expect(result.stderr).toContain('agent-secret:');
+      for (const part of input.split(/\s+/)) if (part.length > 12) expect(result.stderr + result.stdout).not.toContain(part.slice(4, 30));
+    }
+    expect(stored()).toEqual({});
+    expect(securityCalls()).toBe('');
+  });
+
+  it('fails when the read-back length differs, as a prompt-truncated write would', () => {
+    setup({ truncateStore: 128 });
+    const token = fakeToken();
+    const result = run(['--store-token'], {}, token);
+    expect(result.code).toBe(8);
+    expect(result.stderr).toContain(`read back 128 characters, expected ${token.length}`);
+    expectTokenNowhere(result, token);
+  });
+
+  it('accepts a throwaway Keychain service for tests and refuses it elsewhere', () => {
+    const token = fakeToken();
+    expect(run(['--store-token', '--keychain-service', 'cadence-agent-1password-throwaway'], {}, token).code).toBe(0);
+    expect(stored()['cadence-agent-1password-throwaway|service-account-token']).toBe(token);
+    expect(run(['--store-token', '--keychain-service', 'Bad Name'], {}, token).code).toBe(2);
+    expect(run(['--keychain-service', 'x', '--', 'node']).code).toBe(2);
+    expect(run(['--store-token', '--env', 'A=anthropic-api-key'], {}, token).code).toBe(2);
+  });
+
+  it('documents step 5 without the truncating prompt, with the npm path, a Terminal one-liner and a redo line', () => {
+    const doc = readFileSync(fileURLToPath(new URL('../docs/qa/agent-secrets.md', import.meta.url)), 'utf8');
+    const step5 = doc.slice(doc.indexOf('5. Store the token'), doc.indexOf('That is all.'));
+    expect(step5).toContain('pbpaste | npm run agent:secret -- --store-token');
+    expect(step5).toMatch(/printf .*\| security -i/);
+    expect(step5).not.toMatch(/-T \/usr\/bin\/security -w\s*\n/);
+    expect(step5).toMatch(/128/);
+    expect(step5).toMatch(/--check/);
+  });
+
+  it('runs the documented Terminal one-liner: stores the whole token, refuses bad shapes and prints no token', () => {
+    const doc = readFileSync(fileURLToPath(new URL('../docs/qa/agent-secrets.md', import.meta.url)), 'utf8');
+    const oneLiner = doc.split('\n').find((line) => line.trim().startsWith('t="$(pbpaste)"')).trim();
+    expect(oneLiner).toContain(`-s ${KEYCHAIN_SERVICE} -a ${KEYCHAIN_ACCOUNT}`);
+    expect(oneLiner).toContain('${#t} -ge 250 && ${#t} -le 3800');
+    const clip = join(root, 'clipboard');
+    const shell = (text) => {
+      writeFileSync(clip, text);
+      const result = spawnSync('bash', ['-c', `pbpaste() { cat ${JSON.stringify(clip)}; }; ${oneLiner}`], { env: { PATH: `${fakebin}:${process.env.PATH}`, HOME: home }, encoding: 'utf8' });
+      return { code: result.status, stdout: result.stdout, stderr: result.stderr };
+    };
+    const token = fakeToken();
+    const good = shell(token);
+    expect(good.stdout.trim()).toBe(`OK: stored ${token.length} characters, read back ${token.length}`);
+    expect(stored()[`${KEYCHAIN_SERVICE}|${KEYCHAIN_ACCOUNT}`]).toBe(token);
+    expect(securityCalls()).toContain('["-i"]');
+    expectTokenNowhere(good, token);
+    for (const bad of ['ops_short', `ops_${'A'.repeat(124)}`, `sk-ant-${randomBytes(800).toString('base64url')}`, `ops_${randomBytes(600).toString('base64url')} x`]) {
+      const result = shell(bad);
+      expect(result.stdout).toContain('NOT OK: the clipboard does not hold an ops_ token');
+      expect(result.stdout + result.stderr).not.toContain(bad.slice(4, 30));
+    }
+    expect(stored()[`${KEYCHAIN_SERVICE}|${KEYCHAIN_ACCOUNT}`]).toBe(token);
+    setup({ truncateStore: 128 });
+    const truncated = shell(token);
+    expect(truncated.stdout.trim()).toBe(`NOT OK: read back 128 characters, expected ${token.length}`);
+    expectTokenNowhere(truncated, token);
   });
 });
 
