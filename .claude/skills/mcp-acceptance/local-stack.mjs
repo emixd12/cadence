@@ -3,7 +3,18 @@
 //
 //   node .claude/skills/mcp-acceptance/local-stack.mjs up     [--name cadence-accept-run] [--db-base 56150] [--app-port 4450]
 //   node .claude/skills/mcp-acceptance/local-stack.mjs status [--name …]
+//   node .claude/skills/mcp-acceptance/local-stack.mjs tier0  [--name …] [--run <id>]
+//   node .claude/skills/mcp-acceptance/local-stack.mjs tier1  [--name …] [--run <id>] [--scenario read-write|step-up] [--client all|<a,b>] [--account A|B]
+//   node .claude/skills/mcp-acceptance/local-stack.mjs check  [--name …]
+//   node .claude/skills/mcp-acceptance/local-stack.mjs exec   [--name …] -- <command> [args…]
 //   node .claude/skills/mcp-acceptance/local-stack.mjs down   [--name …]
+//
+// tier0, tier1, check and exec load <workdir>/runner.env themselves, so each
+// command works in a fresh shell. tier0 runs the protocol suite with a free
+// callback port, then the watcher over the same run, and prints one PASS or
+// FAIL line. Default run IDs: local-<name without cadence-accept->-t0|t1-<UTC
+// yyyymmddThhmmss>, one run ID per command. check counts active grants and
+// token families on the stack (read-only) and exits 1 if any remain.
 //
 // `up` (run from the repository worktree root, Node 24):
 //  1. copies supabase/config.toml and seed.sql into a private /tmp workdir,
@@ -24,6 +35,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:https';
 import { createServer } from 'node:net';
+import { createInterface } from 'node:readline';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -150,6 +162,128 @@ function makeTls(dir) {
   rmSync(join(dir, 'leaf.csr'));
 }
 
+/** Default run ID for one tier: local-<suffix>-<tier>-<UTC yyyymmddThhmmss>. Fits the ledger's 64-character rule. */
+export function defaultRunId(name, tier, now = new Date()) {
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, '');
+  return `local-${name.replace(/^cadence-accept-/, '')}-${tier}-${stamp}`.slice(0, 64);
+}
+
+/** Parses runner.env (KEY="value" lines written by up). */
+export function parseRunnerEnv(text) {
+  const env = {};
+  for (const line of text.split('\n')) {
+    const m = /^([A-Z][A-Z0-9_]*)=(".*")$/.exec(line.trim());
+    if (m) env[m[1]] = JSON.parse(m[2]);
+  }
+  return env;
+}
+
+/** The protocol summary line from report.md, for example "Target: local · 96/96 checks passed · PASS". */
+export function protocolSummary(report) {
+  const line = report.split('\n').find((l) => /\d+\/\d+ checks passed/.test(l));
+  return line ? line.replace(/^Target: \w+ · /, '') : null;
+}
+
+/** Only the watcher's verdict block (from "scenario …" on); the event timeline stays in the run folder. */
+export function watcherVerdict(lines) {
+  const start = lines.findIndex((l) => l.startsWith('scenario '));
+  return start === -1 ? lines.filter((l) => /^watch-stopped|^source-error/.test(l)) : lines.slice(start);
+}
+
+const freePort = () => new Promise((r, reject) => {
+  const s = createServer();
+  s.once('error', reject);
+  s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); });
+});
+
+function loadStack(name) {
+  if (!existsSync(stateFile(name))) fail(`${name} is not up; run up first`);
+  const work = readFileSync(stateFile(name), 'utf8').trim();
+  if (!work.startsWith(`/tmp/${name}.`) || !existsSync(join(work, 'runner.env'))) fail(`${name} has no runner.env; run down, then up`);
+  return { work, env: parseRunnerEnv(readFileSync(join(work, 'runner.env'), 'utf8')), state: JSON.parse(readFileSync(join(work, 'state.json'), 'utf8')) };
+}
+
+/** Runs a child with the stack env; `onLine` sees stdout lines (printed unless it returns false). */
+function runChild(cmd, args, { env, cwd, onLine = () => true }) {
+  return new Promise((r) => {
+    const child = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'inherit'] });
+    createInterface({ input: child.stdout }).on('line', (line) => { if (onLine(line) !== false) say(line); });
+    child.once('error', () => r(127));
+    child.once('close', (code) => r(code ?? 1));
+  });
+}
+
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+async function tier0({ name, runId }) {
+  const { env, state } = loadStack(name);
+  const id = runId ?? defaultRunId(name, 't0');
+  if (!RUN_ID.test(id)) fail('--run must match [A-Za-z0-9][A-Za-z0-9._-]{0,63}');
+  const callbackPort = await freePort();
+  const since = new Date(Date.now() - 5_000).toISOString();
+  let accounts = null;
+  say(`tier0 run ${id} (callback port ${callbackPort})`);
+  const code = await runChild(process.execPath, ['scripts/acceptance/protocol.mjs', '--target', 'local', '--issuer', env.CADENCE_ACCEPT_ISSUER,
+    '--ca-file', env.CADENCE_ACCEPT_CA_FILE, '--callback-port', String(callbackPort), '--run', id], {
+    env, cwd: state.repo,
+    onLine: (line) => { try { const j = JSON.parse(line); if (j.result === 'accounts') accounts = j; } catch { /* report table line */ } return true; },
+  });
+  const reportFile = join(state.repo, '.intent', 'acceptance', id, 'report.md');
+  const summary = existsSync(reportFile) ? protocolSummary(readFileSync(reportFile, 'utf8')) : null;
+  if (!accounts) { say(`tier0 ${id}: FAIL (protocol exit ${code}, no accounts line; ${summary ?? 'no report'})`); process.exit(1); }
+  const lines = [];
+  const watchCode = await runChild(process.execPath, ['scripts/acceptance/watch.mjs', '--target', 'local', '--db-url', env.CADENCE_ACCEPT_DB_URL,
+    '--user-a', accounts.userIdA, '--user-b', accounts.userIdB, '--account', 'both', '--since', since, '--expect', 'inspector', '--once', '--run', id], {
+    env, cwd: state.repo, onLine: (line) => { lines.push(line); return false; },
+  });
+  for (const line of watcherVerdict(lines)) say(line);
+  const ok = code === 0 && watchCode === 0;
+  say(`tier0 ${id}: ${ok ? 'PASS' : 'FAIL'} (protocol ${summary ?? `exit ${code}`}; watcher exit ${watchCode})`);
+  process.exit(ok ? 0 : 1);
+}
+
+async function tier1({ name, runId, scenario, client, account }) {
+  const { env, state } = loadStack(name);
+  const id = runId ?? defaultRunId(name, 't1');
+  if (!RUN_ID.test(id)) fail('--run must match [A-Za-z0-9][A-Za-z0-9._-]{0,63}');
+  say(`tier1 run ${id}`);
+  const code = await runChild(process.execPath, ['scripts/acceptance/client-runners.mjs', '--target', 'local', '--issuer', env.CADENCE_ACCEPT_ISSUER,
+    '--ca-file', env.CADENCE_ACCEPT_CA_FILE, '--db-url', env.CADENCE_ACCEPT_DB_URL, '--client', client, '--account', account, '--scenario', scenario, '--run', id], { env, cwd: state.repo });
+  say(`tier1 ${id}: ${code === 0 ? 'PASS' : 'FAIL'} (exit ${code})`);
+  process.exit(code === 0 ? 0 : 1);
+}
+
+/** Read-only count of active grants and token families on the stack. */
+export const CHECK_SQL = "begin transaction read only; select json_build_object('grants', (select count(*) from cadence_oauth_private.grants), "
+  + "'activeGrants', (select count(*) from cadence_oauth_private.grants where revoked_at is null), "
+  + "'activeFamilies', (select count(*) from cadence_oauth_private.token_families where revoked_at is null and absolute_expires_at > now())); rollback;";
+
+function activeCounts(dbUrl) {
+  if (!/^postgresql:\/\/[^@]+@127\.0\.0\.1:56\d{3}\//.test(dbUrl)) fail('refusing a database that is not this loopback stack');
+  const out = execFileSync('psql', ['-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', CHECK_SQL, dbUrl], {
+    encoding: 'utf8', env: { ...process.env, PGOPTIONS: '-c default_transaction_read_only=on', PGCONNECT_TIMEOUT: '5' }, stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return JSON.parse(out.split('\n').find((l) => l.startsWith('{')));
+}
+
+function check({ name, exit = true }) {
+  const { env } = loadStack(name);
+  let counts;
+  try { counts = activeCounts(env.CADENCE_ACCEPT_DB_URL); } catch { say(`${name} check: database unreadable`); if (exit) process.exit(1); return false; }
+  const clean = counts.activeGrants === 0 && counts.activeFamilies === 0;
+  say(`${name} check: ${counts.activeGrants} active of ${counts.grants} grants, ${counts.activeFamilies} active token families · ${clean ? 'all revoked' : 'NOT all revoked: a runner did not clean up; report it'}`);
+  if (exit) process.exit(clean ? 0 : 1);
+  return clean;
+}
+
+async function exec({ name, argv }) {
+  const { env } = loadStack(name);
+  if (!argv.length) fail('exec needs a command after --');
+  const child = spawn(argv[0], argv.slice(1), { cwd: process.cwd(), env: { ...process.env, ...env }, stdio: 'inherit' });
+  child.once('error', () => fail(`could not start ${argv[0]}`));
+  child.once('close', (code) => process.exit(code ?? 1));
+}
+
 async function up({ name, dbBase, appPort, repo }) {
   if (existsSync(stateFile(name))) fail(`${name} is already up (${stateFile(name)}); run down first`);
   if (!existsSync(join(repo, 'supabase', 'config.toml')) || !existsSync(join(repo, 'node_modules', 'next'))) fail('run from a worktree root that has supabase/ and node_modules (npm ci)');
@@ -224,7 +358,7 @@ async function up({ name, dbBase, appPort, repo }) {
   for (let i = 0; i < 60 && code !== 200; i += 1) { await sleep(3_000); code = await httpsStatus(`${issuer}/.well-known/oauth-authorization-server`, ca); }
   if (code !== 200) fail(`app did not answer discovery on ${issuer} (last status ${code}); see app.log in the workdir`);
   say(`app ${issuer} (MCP on, test login on)`);
-  say(`load the runner env: set -a; . ${join(work, 'runner.env')}; set +a`);
+  say(`next: node .claude/skills/mcp-acceptance/local-stack.mjs tier0 --name ${name} (then tier1, check, down)`);
 }
 
 const killGroup = (pidFile) => {
@@ -239,6 +373,7 @@ async function down({ name, quiet = false }) {
   const work = readFileSync(stateFile(name), 'utf8').trim();
   if (!work.startsWith(`/tmp/${name}.`)) fail(`unexpected workdir in ${stateFile(name)}`);
   const state = JSON.parse(readFileSync(join(work, 'state.json'), 'utf8'));
+  if (!quiet && existsSync(join(work, 'runner.env'))) check({ name, exit: false });
   killGroup(join(work, 'app.pid'));
   await sleep(2_000);
   try { execFileSync(SUPABASE, ['stop', '--no-backup', '--workdir', work], { cwd: '/tmp', stdio: 'ignore', timeout: 5 * 60_000 }); } catch { /* checked below */ }
@@ -273,8 +408,9 @@ async function status({ name }) {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
   const { positionals, values } = parseArgs({ allowPositionals: true, options: {
     name: { type: 'string', default: 'cadence-accept-run' }, 'db-base': { type: 'string', default: '56150' }, 'app-port': { type: 'string', default: '4450' },
+    run: { type: 'string' }, scenario: { type: 'string', default: 'read-write' }, client: { type: 'string', default: 'all' }, account: { type: 'string', default: 'A' },
   } });
-  const [command] = positionals;
+  const [command, ...rest] = positionals;
   const name = values.name;
   if (!NAME.test(name)) fail('--name must look like cadence-accept-<letters, digits, ->');
   const dbBase = Number(values['db-base']);
@@ -284,5 +420,9 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.
   if (command === 'up') await up({ name, dbBase, appPort, repo: process.cwd() });
   else if (command === 'down') await down({ name });
   else if (command === 'status') await status({ name });
-  else fail('usage: local-stack.mjs up|status|down [--name cadence-accept-…] [--db-base 56150] [--app-port 4450]');
+  else if (command === 'check') check({ name });
+  else if (command === 'tier0') await tier0({ name, runId: values.run ?? null });
+  else if (command === 'tier1') await tier1({ name, runId: values.run ?? null, scenario: values.scenario, client: values.client, account: values.account });
+  else if (command === 'exec') await exec({ name, argv: rest });
+  else fail('usage: local-stack.mjs up|status|tier0|tier1|check|exec|down [--name cadence-accept-…] (see the header comment)');
 }

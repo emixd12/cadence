@@ -129,43 +129,49 @@ only after Ticket 232 releases those ports.
 ### Local rehearsal (Tier 0 and Tier 1)
 
 Needs Docker, the Homebrew Supabase CLI (`/opt/homebrew/bin/supabase`), `psql`,
-`openssl`, a worktree with `npm ci` done and no `.env.local`.
+`openssl`, a worktree with `npm ci` done and no `.env.local`. Run every command from
+the worktree root. Each command loads the stack's `runner.env` itself, so it works
+in a fresh shell (Bash-tool agents get one per call); there is nothing to source.
 
 ```bash
-node .claude/skills/mcp-acceptance/local-stack.mjs up --name cadence-accept-<you> [--db-base 56150] [--app-port 4450]
-set -a; . "$(cat /tmp/cadence-accept-<you>.workdir)/runner.env"; set +a
+S=.claude/skills/mcp-acceptance/local-stack.mjs; N=cadence-accept-<you>
+node $S up --name $N [--db-base 56150] [--app-port 4450]   # a few minutes
+node $S tier0 --name $N                                     # protocol suite, then the watcher over the same run
+node $S tier1 --name $N [--scenario read-write|step-up]     # headless clients
+node $S check --name $N                                     # every grant and token family revoked?
+node $S down --name $N
 ```
 
-`up` builds a private stack on 127.0.0.1 only (DB base+2, API base+1), starts the
-app with HTTPS on the app port, and waits for discovery. Keep the app port in
-4450–4459: the Tier 1 runner accepts only those issuers. Pick a free 10-port block
-in 56000–56990 (avoid 57xxx and 553xx).
-
-Tier 0, then the watcher over the same run:
-
-```bash
-npm run mcp:accept:protocol -- --target local --issuer "$CADENCE_ACCEPT_ISSUER" --ca-file "$CADENCE_ACCEPT_CA_FILE" --callback-port 4458 --run <run-id> | tee /tmp/<run-id>.out
-UA=$(node -e 'for (const l of require("fs").readFileSync(process.argv[1],"utf8").split("\n")) { try { const j = JSON.parse(l); if (j.result === "accounts") console.log(j.userIdA); } catch {} }' /tmp/<run-id>.out)
-UB=$(node -e 'for (const l of require("fs").readFileSync(process.argv[1],"utf8").split("\n")) { try { const j = JSON.parse(l); if (j.result === "accounts") console.log(j.userIdB); } catch {} }' /tmp/<run-id>.out)
-npm run mcp:watch -- --target local --db-url "$CADENCE_ACCEPT_DB_URL" --user-a "$UA" --user-b "$UB" --account both --since 30m --expect inspector --once --run <run-id>
-```
-
-Pass: the protocol run ends `{"result":"pass",…}` (96 checks) and the watcher exits 0.
-Use separate variables: zsh does not split `$A` into words.
-
-Tier 1:
-
-```bash
-npm run mcp:accept:clients -- --target local --issuer "$CADENCE_ACCEPT_ISSUER" --ca-file "$CADENCE_ACCEPT_CA_FILE" --db-url "$CADENCE_ACCEPT_DB_URL" --client all --account A --scenario read-write --run <run-id>
-```
-
-Add `--check` first to see readiness. Locally, claude-code and inspector must pass;
-claude-ai, anthropic-api and openai-api skip with a named reason (they need a public
-server or keys). Also run `--scenario step-up` when the change touches scopes.
-
-Finish with `node .claude/skills/mcp-acceptance/local-stack.mjs down --name cadence-accept-<you>`.
-It stops the stack, deletes containers, volumes and the workdir (local keys and
-TLS files), and restores `AGENTS.md` and `next-env.d.ts`, which `next dev` rewrites.
+- **Names and ports:** `<you>` is your ticket or agent tag (for example
+  `cadence-accept-256`). Pick a free 10-port block for `--db-base` in 56000–56990
+  (API base+1, DB base+2; avoid 57xxx and 553xx) and an app port in 4450–4459, the
+  only issuers the Tier 1 runner accepts. `up` stops on any port in use.
+- **Run IDs:** one run ID per command. The default is
+  `local-<you>-t0|t1-<UTC yyyymmddThhmmss>`, printed on the first line; pass
+  `--run <id>` only to resume that run. Tier 0 and Tier 1 never share a run ID.
+- **Callback ports:** the OAuth redirect is caught inside the driver's browser and
+  never bound on the host. `tier0` still picks a free ephemeral port per run; the
+  Tier 1 runner's fixed 4459 cannot clash for the same reason.
+- **Tier 0 pass:** the last line reads
+  `tier0 <id>: PASS (protocol 96/96 checks passed · PASS; watcher exit 0)`. The count
+  comes from the run's `report.md`; the watcher's verdict block is printed above it,
+  and its full event timeline stays in the run's `events.jsonl`.
+- **Tier 1 pass:** `tier1 <id>: PASS`. claude-code and inspector must pass;
+  claude-ai, anthropic-api and openai-api skip with a named reason (they need a
+  public server or keys). Run `--scenario step-up` too when a change touches scopes.
+  For readiness only, `node $S exec --name $N -- sh -c 'npm run -s mcp:accept:clients -- --target local --issuer "$CADENCE_ACCEPT_ISSUER" --check --client all'`;
+  `--check` starts nothing and creates no run folder.
+- **Cleanup check:** `check` exits 0 with `all revoked`. Anything else means a
+  runner did not clean up: report it with the run ID before `down`. `down` repeats the
+  check, then deletes containers, volumes and the workdir (local keys and TLS files)
+  and restores `AGENTS.md` and `next-env.d.ts`, which `next dev` rewrites. Nothing is
+  written to `/tmp` outside the workdir.
+- **Other commands against the stack:** `node $S exec --name $N -- <command>` runs
+  any command with the stack's variables (`CADENCE_ACCEPT_ISSUER`,
+  `CADENCE_ACCEPT_CA_FILE`, `CADENCE_ACCEPT_DB_URL`,
+  `CADENCE_LOCAL_SUPABASE_URL`, `CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY`); wrap it in
+  `sh -c '…'` to use them in flags.
+- Don't edit `AGENTS.md` while a stack is up: `down` restores the copy taken at `up`.
 
 ### Production (Ticket 256 onward)
 
@@ -216,7 +222,9 @@ step is marked `seen:` when the records show it; you do not ask her anything.
 It checkpoints the grant and the created Behavior, then revokes the grant
 (`--keep-grant` keeps it). `--print-only` previews the list without starting
 anything. Exit 0 all steps seen; 1 a step was not seen (it prints the resume
-command); 2 usage. Local rehearsal: `--target local --db-url "$CADENCE_ACCEPT_DB_URL"`.
+command); 2 usage. Local rehearsal of the plumbing:
+`node $S exec --name $N -- sh -c 'npm run -s mcp:accept:guided -- --client chatgpt --target local --db-url "$CADENCE_ACCEPT_DB_URL" --timeout 1m'`
+(no verified ChatGPT client exists locally, so it stops with `step-not-seen`).
 
 ## Resume
 
@@ -264,8 +272,9 @@ folder alone:
   (`ws.agent.wakeOrCreate(taskNoteId, context)`) or start a replacement pointed at the
   same worktree and run folder. Never redo a done ledger step by hand.
 - **Docker restarts** stop local stacks (seen about 6 hours in). `local-stack.mjs status`
-  reports `containers are gone`; run `down`, then `up`, then resume. Local runs sign
-  in fresh test-login users on resume.
+  reports `containers are gone`; run `down`, then `up`, then start new runs (a fresh
+  stack has none of the old run's users or grants). On a stack that is still up, a
+  resumed local run signs in fresh test-login users.
 - **Local limits:** test login allows 10 users per app process (each Tier 0 run uses
   2, each Tier 1 process 1) and DCR allows 10 registrations an hour. On
   `test-login-quota-reached`, run `down` and `up`.
@@ -275,9 +284,12 @@ folder alone:
   `desktop-release-acceptance`, `briefing-sequence` and the ledger SIGKILL test can
   time out. Re-run the file alone before calling it a failure. On Node 26, Ticket 232
   tests fail by design; use Node 24.
+- **Reading output:** when you filter a runner's output, use one filter. `grep … ;
+  tail …` on the same file prints the last lines twice, which looks like a runner bug.
 
 ## Reporting
 
 Report the run IDs, each tier's pass, fail or skip with its named reason, the
-watcher verdicts, cleanup results (`ledger.mjs ids`, grants revoked) and any finding.
+watcher verdicts, cleanup results (`local-stack.mjs check` locally; `ledger.mjs ids`
+and a `--once` watcher read in production) and any finding.
 Put long evidence in the run folder or the task note, never secrets.

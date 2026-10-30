@@ -20,14 +20,15 @@ owner steps, client quirks and recovery live in the project skill
 - Every run writes `.intent/acceptance/<run-id>/`; `STATE.md` there is enough to
   resume (`node scripts/acceptance/ledger.mjs state <run-id>`).
 - Local rehearsals use an isolated loopback stack from
-  `.claude/skills/mcp-acceptance/local-stack.mjs up|status|down`, never
-  `habit-tracking-app`.
+  `.claude/skills/mcp-acceptance/local-stack.mjs` (`up`, `tier0`, `tier1`, `check`,
+  `exec`, `status`, `down`), never `habit-tracking-app`.
 - Production runs start with Ticket 256 and the owner's go-ahead, never while
   Ticket 232's cleanup runs, and touch only test accounts A and B.
 - No command prints or stores tokens, codes, cookies, API keys or note text.
-- Local evidence (2026-10-30, Ticket 252, stack `cadence-accept-252`): protocol run
-  96/96 checks with the watcher satisfied; Tier 1 claude-code and inspector pass,
-  claude-ai, anthropic-api and openai-api skipped with named reasons.
+- Local evidence (2026-10-30, Ticket 252, stack `cadence-accept-252`): `tier0`
+  96/96 checks with the watcher satisfied; `tier1` claude-code and inspector pass,
+  claude-ai, anthropic-api and openai-api skipped with named reasons; `check` 0 of 8
+  grants active. A fresh agent given only the skill repeated Tier 0 and Tier 1.
 
 ## Bounded hosted isolation preparation — Ticket 232 (October 28)
 
