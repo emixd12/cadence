@@ -1300,3 +1300,29 @@ which listed it among the area checks.
 
 Platform impact: desktop release process only; web, marketing and future mobile are not
 affected. Messaging impact: none.
+
+## 2026-10-29: Claude cloud sessions with provider keys as network secrets
+
+The owner created a personal `cadence` Claude Code cloud environment to start and
+steer work from a phone. The owner's words: "I want to enable the setup that
+maximizes the capabilities that we can run on the cloud environment. I want to be
+able to do as much work as possible from my phone."
+
+- The environment uses Trusted network access.
+- The committed SessionStart hook `scripts/claude-cloud-session.sh` installs Node 24
+  and dependencies in each cloud session. Local sessions skip it.
+- Provider API keys are stored only as the environment's network secrets, so they
+  never enter the session VM. Environment variables hold no secrets.
+- The Supabase service-role key, app runtime secrets and Apple or Tauri signing
+  material stay out of cloud environments.
+- A network secret grants no new authority. Hosted writes, deploys, restarts and
+  real sends still need the owner's instruction each time.
+- Cloud sessions run the required checks as npm commands, not Dagger. The Dagger
+  CLI and engine images are outside the Trusted allowlist, and each session would
+  start with an empty cache. GitHub Actions `CI` stays the merge gate.
+- macOS-only work stays on the owner's Mac.
+
+Procedure and limits: `docs/OPERATIONS.md`, "Claude cloud sessions".
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile
+behavior is unchanged. Messaging impact: none.

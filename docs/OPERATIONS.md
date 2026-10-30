@@ -271,6 +271,128 @@ For UI changes, also run the app and inspect at least:
 - a desktop viewport
 - a narrow mobile viewport around 390px wide
 
+### Claude cloud sessions
+
+Claude Code cloud sessions run in the owner's personal `cadence` cloud
+environment on claude.ai. Each session gets a fresh clone on an Anthropic-hosted
+Ubuntu 24.04 x86_64 VM with about 4 vCPUs, 16 GB of RAM and 30 GB of disk.
+The environment uses **Trusted** network access, which reaches npm, nodejs.org,
+GitHub, Google Fonts and the Docker registries. Its environment variables
+should hold only `BASH_DEFAULT_TIMEOUT_MS=600000` and
+`BASH_MAX_TIMEOUT_MS=1800000`.
+Decision: `docs/DECISIONS.md`, 2026-10-29.
+
+`.claude/settings.json` runs `scripts/claude-cloud-session.sh` at every session
+start. The script exits at once unless `CLAUDE_CODE_REMOTE` is `true`, so local
+sessions are unaffected. In a cloud session it:
+
+- installs the latest Node 24 from nodejs.org into `/opt/node24` after checking
+  its SHA-256 sum, and puts it first on `PATH` for later commands. The image's
+  default is Node 22.
+- sets `NODE_USE_ENV_PROXY=1` for the install and later commands, so Node
+  requests use the session proxy. Without it, the AgentMail CLI postinstall
+  downloads its binary but never exits, and `npm ci` hangs.
+- runs `npm ci` when a `package.json`, the lockfile or the script changed. If
+  the install fails or runs past 240 seconds, it retries with
+  `--ignore-scripts`, which skips the AgentMail CLI binary download. The
+  retry has the same limit, so the hook ends inside its 900-second timeout.
+- prints the Node version, the install result and the limits below into the
+  session's context.
+
+Dagger is not installed in cloud sessions. Run the checks in "Required
+commands" as npm commands. `public-source:check` needs full history; run
+`git fetch --unshallow` first when the clone is shallow.
+
+Cloud sessions cover web, resolver, marketing and docs work, the Vite desktop
+frontend build, and pull requests. Tauri native builds, dev-signed installs,
+installed acceptance, Apple signing and notarization, test-device driving and
+any interactive provider sign-in stay on the owner's Mac.
+
+The GitHub proxy authenticates git and REST requests for the attached
+repository. It refuses GraphQL, so `gh pr` and `gh issue` fail; use Claude's
+GitHub tools or `gh api repos/emixd12/cadence/...`. It also refuses branch
+deletion and tag pushes. Branch protection on `main` limits every other push.
+
+Provider API keys go into the environment's **Network secrets**, never its
+environment variables. Anthropic's proxy adds a network secret to requests for
+the secret's hosts after they leave the VM, so the key never enters the
+session. Every command in the session can read an environment variable.
+
+| Provider | Network secret host | Header | Cloud use |
+| --- | --- | --- | --- |
+| Supabase Management API | `api.supabase.com` | `Authorization: Bearer` | Read-only diagnostics and migration inventory (see `docs/SUPABASE_WORKFLOW.md`) |
+| Vercel | `api.vercel.com` | `Authorization: Bearer` | Deployments, logs and the Trust refresh after a `main` merge |
+| Sequenzy | `api.sequenzy.com` | `Authorization: Bearer` | Template inspection; real sends follow `docs/SEQUENZY_WORKFLOW.md` |
+| Cloudflare | `api.cloudflare.com` | `Authorization: Bearer` | DNS reads and verification |
+| OpenAI | `api.openai.com` | `Authorization: Bearer` | Briefing bench runs, billed as `docs/COSTS.md` describes |
+
+The proxy replaces any `Authorization` header a request already carries. A CLI
+that refuses to start without a local token therefore works with a
+placeholder. For the Supabase CLI, set `SUPABASE_ACCESS_TOKEN` to `sbp_`
+followed by 40 zeros.
+
+A secret authorizes nothing new: hosted writes, deploys, restarts and real
+sends still need the owner's instruction each time. Supabase, Vercel and
+AgentMail connectors enabled on the owner's claude.ai account also work in a
+cloud session, because their traffic goes through Anthropic's servers.
+
+Never put these in a cloud environment: `SUPABASE_SERVICE_ROLE_KEY`, app
+runtime secrets (VAPID private key, cron and reminder secrets, connector
+encryption keys, OAuth client secrets, the integration JWT signing key), and
+Apple or Tauri signing material. No cloud workflow needs them.
+
+Verified in a cloud session on 2026-10-29:
+
+- The first hook version hung. The AgentMail CLI postinstall downloaded its
+  binary on the direct route but never exited, so `npm ci` ran past the hook's
+  900-second timeout. With `NODE_USE_ENV_PROXY=1` the postinstall exits in
+  about 1 second.
+- The fixed hook, run by hand, took 22 to 29 seconds from an empty
+  `node_modules`. It installed Node 24.22.2 and the AgentMail CLI binary
+  without the `--ignore-scripts` fallback. A repeat run with no changes took
+  0.1 seconds.
+- The hook fired automatically when the session resumed, and its
+  `CLAUDE_ENV_FILE` lines applied: Node 24 and `NODE_USE_ENV_PROXY` were set
+  in later commands.
+- The `--ignore-scripts` fallback installed all packages in 20 seconds.
+- The `npm ci` time limit works. In a test copy with the postinstall forced to
+  hang and a 60-second limit, `timeout` stopped the first attempt and npm
+  exited within 4 seconds. The fallback then installed everything, and the
+  hook reported the timeout. No install process was left running.
+- All nine checks passed as npm commands: `agents:check` 5 s,
+  `interactions:check` 1 s, `resolvers:check` under 1 s, `lint` 36 s,
+  `typecheck` 6 s, `test` 104 s, `build` 70 s, `desktop:build` 3 s and
+  `marketing:build` 9 s.
+- The clone is shallow.
+- `gh api repos/emixd12/cadence` works. `gh pr list` fails with HTTP 403
+  because the proxy refuses GraphQL.
+- Before the owner added network secrets, the Supabase, Vercel, Cloudflare,
+  OpenAI and Sequenzy APIs returned 400, 401 or 403. After, all five returned
+  200, both without an `Authorization` header and with a placeholder one. The
+  Sequenzy root path returns 200 without authentication, so check Sequenzy on
+  `/api/v1/templates`.
+- `npm run supabase -- projects list` listed the hosted project with a
+  placeholder `SUPABASE_ACCESS_TOKEN`.
+- Raw TCP to the Supabase pooler on ports 5432 and 6543 timed out, so
+  `npm run supabase -- db push` cannot reach hosted Postgres. `db push` itself
+  was not run. Push hosted migrations from the Mac.
+- Docker is installed but not running. `service docker start` fails on
+  `ulimit`; `dockerd > /tmp/dockerd.log 2>&1 &` starts it.
+- `npm run supabase -- start` failed because `public.ecr.aws` answered every
+  pull with "Data limit exceeded". With `SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io`
+  the images pulled and the migrations applied in 86 seconds. Then the edge
+  runtime container failed, because the VM refuses to raise its open-file
+  limit.
+- `SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io npm run supabase -- start -x edge-runtime`
+  started the stack in 43 seconds with cached images. `db reset` took
+  31 seconds, `npm run smoke:rls:local` passed in 3 seconds, and
+  `stop --no-backup` took 12 seconds.
+
+Not yet verified in a cloud session:
+
+- the hook firing at a fresh session start, as opposed to a resume. The first
+  cloud session after this hook reaches `main` confirms it.
+
 ### Codex local timing QA action
 
 The project-local Codex environment includes **Run Local Timing App**. Stop any
