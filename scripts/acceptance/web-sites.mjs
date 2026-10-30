@@ -234,16 +234,72 @@ export function chatIdOf(site, url) {
   } catch { return null; }
 }
 
+// Where a conversation's own header and body live, and where other chats are
+// listed. The options control is looked up only inside the first and never
+// inside the second.
+const CONVERSATION = 'main, [role="main"], #page-header';
+const NOT_CONVERSATION = 'nav, aside, [role="navigation"], [role="complementary"]';
+
+/** Chat IDs linked anywhere on the page (the sidebar history), read from link targets only. */
+export async function listedChatIds(page, site) {
+  const hrefs = await page.locator('a[href]').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+  const ids = new Set();
+  for (const href of hrefs) {
+    const id = chatIdOf(site, new URL(href, page.url()).href);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+/** Visible elements named like the chat options control inside the conversation area, outside any navigation. */
+async function conversationOptions(page, site) {
+  const all = page.getByRole('button', { name: site.archiveMenu });
+  const found = [];
+  const count = await all.count().catch(() => 0);
+  for (let i = 0; i < count; i += 1) {
+    const item = all.nth(i);
+    if (!(await item.isVisible().catch(() => false))) continue;
+    const inside = await item.evaluate((el, [inner, outer]) => Boolean(el.closest(inner)) && !el.closest(outer), [CONVERSATION, NOT_CONVERSATION]).catch(() => false);
+    if (inside) found.push(item);
+  }
+  return found;
+}
+
 /**
- * Archives (ChatGPT) or deletes (Claude) the chat open in `page`, through that
- * chat's own header menu. Stops with page-changed at chat-archive when a
- * control is missing; it never searches or opens other chats.
+ * Archives (ChatGPT) or deletes (Claude) the run's own chat `chatId`, which
+ * must be the chat open in `page`. Before any click it stops with page-changed
+ * at chat-archive when the URL is not that chat or when the options control
+ * inside the conversation area is missing or ambiguous; nothing is touched.
+ * Afterwards it requires the chat to be gone (archive-unconfirmed otherwise)
+ * and every other chat listed before to still be listed
+ * (archive-touched-other-chat otherwise). It never searches or opens other chats.
  */
-export async function archiveChat(page, site) {
-  await clickNamed(page, site.archiveMenu, 'chat-archive', { timeoutMs: 5_000 });
-  await clickNamed(page, site.archiveItem, 'chat-archive', { timeoutMs: 5_000 });
+export async function archiveChat(page, site, chatId, { timeoutMs = 10_000 } = {}) {
+  if (!chatId || chatIdOf(site, page.url()) !== chatId) throw new WebStop('page-changed', 'chat-archive');
+  const deadline = Date.now() + timeoutMs;
+  let options = await conversationOptions(page, site);
+  while (options.length === 0 && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 200));
+    options = await conversationOptions(page, site);
+  }
+  if (options.length !== 1) throw new WebStop('page-changed', 'chat-archive');
+  if (chatIdOf(site, page.url()) !== chatId) throw new WebStop('page-changed', 'chat-archive');
+  const before = await listedChatIds(page, site);
+  before.delete(chatId);
+  await options[0].click({ timeout: 5_000 });
+  await clickNamed(page, site.archiveItem, 'chat-archive', { scope: page.getByRole('menu'), timeoutMs: 5_000 });
   await confirmIfAsked(page, site.archiveConfirm);
-  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  // Wait until the page has left the chat and the chat is no longer listed.
+  let after = null;
+  for (;;) {
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    const left = chatIdOf(site, page.url()) !== chatId;
+    const listed = left ? await listedChatIds(page, site).catch(() => null) : null;
+    if (listed && !listed.has(chatId)) { after = listed; break; }
+    if (Date.now() >= deadline + 5_000) throw new WebStop('archive-unconfirmed', 'chat-archive');
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  for (const id of before) if (!after.has(id)) throw new WebStop('archive-touched-other-chat', 'chat-archive');
 }
 
 /** A copy of a site whose pages live elsewhere (the stub pages in tests). */

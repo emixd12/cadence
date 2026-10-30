@@ -209,6 +209,12 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    `chatCount`, `unknownCount` 0). The archive controls are unverified on the real
    sites until this run: if `archive-chats` stops with `page-changed`, report the run
    ID and the chats left as a cleanup item. Never open other chats to find them.
+   The runner acts only on the run's own chat: it checks the URL carries the recorded
+   chat ID, uses the one options control inside the conversation (never the sidebar),
+   and stops with `page-changed` before clicking if that control is missing or
+   ambiguous. After clicking it stops with `archive-unconfirmed` if the chat is still
+   there, or `archive-touched-other-chat` if any other listed chat disappeared. Report
+   the last one to Emi at once: one of her own chats may have been archived or deleted.
 6. Cleanup: every runner revokes its grants. Check with
    `node scripts/acceptance/ledger.mjs ids <id>` and the watcher (`--once`).
    Archive created Behaviors through the run log (`Review practice …` titles), and

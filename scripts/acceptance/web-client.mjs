@@ -468,8 +468,11 @@ export async function runWebScenario({
         const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
         if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
         const chatId = chatIdOf(site, page.url());
-        // A failed archive here is retried in archive-chats; the reply is already captured.
-        const archived = archiveChats && chatId ? await archiveChat(page, site).then(() => true, () => false) : false;
+        // A stop before any click (page-changed) is retried in archive-chats; the
+        // reply is already captured. Anything after a click stops the run.
+        const archived = archiveChats && chatId
+          ? await archiveChat(page, site, chatId).then(() => true, (error) => { if (error instanceof WebStop && error.reason === 'page-changed') return false; throw error; })
+          : false;
         await page.close().catch(() => {});
         return { ...result, chatId, archived };
       });
@@ -502,7 +505,7 @@ export async function runWebScenario({
           await page.goto(`${site.origin}${site.chatPathFor(chat.chatId)}`, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => { throw new WebStop('site-unreachable', 'chat-archive'); });
           const pageState = await classifyPage(page, site);
           if (pageState !== 'ok') throw new WebStop(pageState, 'chat-archive');
-          await archiveChat(page, site);
+          await archiveChat(page, site, chat.chatId);
           archivedCount += 1;
           await page.close().catch(() => {});
         }

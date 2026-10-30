@@ -45,6 +45,10 @@ function resetState(overrides = {}) {
     requestScopes: ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'],
     approvalsPerTool: 1, stepUp: false, neverReply: false, endlessAfterApproval: false,
     consentCount: 0, pending: null, messages: [], chats: [], archiveInlineBroken: false, openedPaths: [],
+    // Emi's own chats in the sidebar, each with a same-named options button that
+    // comes before the conversation in DOM order. They must never change.
+    otherChats: [{ id: randomUUID(), archived: false }, { id: randomUUID(), archived: false }],
+    duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false,
     ...overrides,
   };
 }
@@ -162,19 +166,41 @@ function renderChat() {
   const log = el('div', { id: 'log' });
   root.append(log);
   // Real chats move to /c/<id> (ChatGPT) or /chat/<id> (Claude) after the first
-  // prompt; the header menu archives (ChatGPT) or deletes (Claude) that chat only.
+  // prompt. A sidebar lists other chats, each with a menu button that has the same
+  // name as the conversation's own; the conversation header sits inside <main>.
   const chatPrefix = flavor === 'chatgpt' ? '/c/' : '/chat/';
   const currentChat = () => (location.pathname.startsWith(chatPrefix) ? location.pathname.slice(chatPrefix.length) : null);
-  if (!(S.archiveInlineBroken && !currentChat())) {
-    root.append(el('button', { 'aria-label': flavor === 'chatgpt' ? 'Open conversation options' : 'Open chat options', onclick: () => {
-      const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: () => {
-        menu.remove();
-        const confirm = el('div', { role: 'alertdialog' }, el('button', { onclick: async () => { confirm.remove(); await post('/api/archive', { chatId: currentChat() }); } }, flavor === 'chatgpt' ? 'Archive' : 'Delete'));
-        document.body.append(confirm);
-      } }, flavor === 'chatgpt' ? 'Archive' : 'Delete'));
-      document.body.append(menu);
-    } }, '...'));
+  const optionsName = flavor === 'chatgpt' ? 'Open conversation options' : 'Open chat options';
+  const itemName = flavor === 'chatgpt' ? 'Archive' : 'Delete';
+  const optionsButton = (chatId, leave) => el('button', { 'aria-label': optionsName, onclick: () => {
+    const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: () => {
+      menu.remove();
+      const confirm = el('div', { role: 'alertdialog' }, el('button', { onclick: async () => {
+        confirm.remove();
+        await post('/api/archive', { chatId });
+        if (leave) location.href = flavor === 'chatgpt' ? '/' : '/new';
+        else location.reload();
+      } }, itemName));
+      document.body.append(confirm);
+    } }, itemName));
+    document.body.append(menu);
+  } }, '...');
+  const nav = el('nav', { 'aria-label': 'Chat history' });
+  for (const c of [...S.otherChats, ...S.chats].filter((x) => !x.archived)) {
+    nav.append(el('div', {}, el('a', { href: chatPrefix + c.id }, 'Chat ' + c.id.slice(0, 4)), optionsButton(c.id, false)));
   }
+  root.prepend(nav);
+  const main = el('main');
+  root.append(main);
+  // The header appears once the chat exists (at load for a reopened chat, after
+  // the first prompt for a new one). archiveInlineBroken hides it on the first visit.
+  const renderHeader = () => {
+    if (!currentChat() || main.querySelector('header')) return;
+    if (S.archiveInlineBroken && !location.search.includes('reopened')) return;
+    main.append(el('header', {}, optionsButton(currentChat(), true)));
+    if (S.duplicateOptions) main.append(optionsButton(currentChat(), true));
+  };
+  renderHeader();
   if (flavor === 'chatgpt') {
     const plus = el('button', { 'aria-label': 'Add files and more', onclick: () => {
       const menu = el('div', { role: 'menu' });
@@ -189,7 +215,7 @@ function renderChat() {
   root.append(composer);
   root.append(el('button', { 'aria-label': flavor === 'chatgpt' ? 'Send prompt' : 'Send message', onclick: async () => {
     const r = await post('/api/prompt', { text: composer.innerText, chatId: currentChat() });
-    if (r.chatId && !currentChat()) history.replaceState(null, '', chatPrefix + r.chatId);
+    if (r.chatId && !currentChat()) { history.replaceState(null, '', chatPrefix + r.chatId); renderHeader(); }
     show(r);
   } }));
   function assistant(text, streaming) {
@@ -235,8 +261,9 @@ function chatServer(flavor) {
       return send(200, 'text/html', html('Connected', '<p>done</p>', `if (window.opener) window.close(); else location.href = ${JSON.stringify(next)};`));
     }
     if (url.pathname === '/api/archive') {
-      const chat = state.chats.find((c) => c.id === input.chatId);
+      const chat = [...state.chats, ...state.otherChats].find((c) => c.id === input.chatId);
       if (chat) chat.archived = true;
+      if (state.archiveAlsoOther) state.otherChats[0].archived = true;
       return json({});
     }
     if (url.pathname === '/api/prompt') {
@@ -256,6 +283,11 @@ function chatServer(flavor) {
     }
     if (url.pathname === '/api/resume') return json(finish());
     if (!url.pathname.startsWith('/api/')) state.openedPaths.push(url.pathname);
+    const reopened = /^\/(c|chat)\/([0-9a-f-]{36})$/.exec(url.pathname);
+    if (reopened && state.chats.some((c) => c.id === reopened[2])) {
+      if (state.redirectOnOpen) { res.writeHead(302, { location: `/${reopened[1]}/${state.otherChats[0].id}` }); return res.end(); }
+      if (!url.search.includes('reopened')) { res.writeHead(302, { location: `${url.pathname}?reopened=1` }); return res.end(); }
+    }
     if (url.pathname === '/' || url.pathname === '/new' || /^\/(c|chat)\/[0-9a-f-]{36}$/.test(url.pathname) || url.pathname.startsWith('/settings/plugins-settings') || url.pathname.startsWith('/customize/connectors')) {
       return send(200, 'text/html', html(flavor === 'chatgpt' ? 'ChatGPT stub' : 'Claude stub', '<div id="root"></div>', chatScript(flavor)));
     }
@@ -424,6 +456,7 @@ describe('ChatGPT stub', () => {
     expect(parsed(out.lines).filter((e) => e.step.startsWith('prompt-')).map((e) => e.archived)).toEqual([true, true]);
     expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
     expect(state.openedPaths.filter((p) => /^\/c\//.test(p))).toEqual([]);
+    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
     const ledger = readFileSync(join(out.run.dir, 'checkpoints.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
     expect(ledger.find((r) => r.kind === 'step' && r.name === 'archive-chats' && r.state === 'done').result).toEqual({ chatCount: 2, archivedCount: 2, unknownCount: 0 });
     expect(ledger.filter((r) => r.kind === 'step' && r.name.startsWith('prompt-') && r.state === 'done').map((r) => [Boolean(r.result.chatId), r.result.archived])).toEqual([[true, true], [true, true]]);
@@ -496,6 +529,7 @@ describe('Claude web stub', () => {
     // The first attempt archived (deleted) both Claude chats before the watcher miss.
     expect(state.chats).toHaveLength(2);
     expect(state.chats.every((c) => c.archived)).toBe(true);
+    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
     expect(state.messages).toHaveLength(2);
     expect(activeGrants()).toHaveLength(0);
   }, 120_000);
@@ -510,8 +544,40 @@ describe('test chat cleanup', () => {
     expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2 });
     expect(state.chats.every((c) => c.archived)).toBe(true);
     // The only chat pages opened by URL are the run's own two chats.
-    expect(state.openedPaths.filter((p) => p.startsWith('/c/')).sort()).toEqual(state.chats.map((c) => `/c/${c.id}`).sort());
+    expect(state.openedPaths.filter((p) => p.startsWith('/c/')).sort()).toEqual(state.chats.flatMap((c) => [`/c/${c.id}`, `/c/${c.id}`]).sort());
+    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
     assertNoLeaks(out);
+  }, 120_000);
+
+  // Every case below has Emi's other chats in the sidebar with same-named buttons first in DOM order.
+  for (const client of ['chatgpt', 'claude-web']) {
+    it(`${client}: archives only the run's own chat when sidebar buttons share the name and come first`, async () => {
+      const out = await scenario(client, 'read-write');
+      expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+      expect(state.chats.every((c) => c.archived)).toBe(true);
+      expect(state.otherChats.every((c) => !c.archived)).toBe(true);
+    }, 120_000);
+  }
+
+  it('stops with page-changed and touches nothing when the conversation has two matching menus', async () => {
+    resetState({ duplicateOptions: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+    expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it("stops with page-changed and touches nothing when the reopened URL is not the run's chat", async () => {
+    resetState({ archiveInlineBroken: true, redirectOnOpen: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result).toMatchObject({ ok: false, reason: 'page-changed', step: 'chat-archive' });
+    expect([...state.chats, ...state.otherChats].some((c) => c.archived)).toBe(false);
+  }, 120_000);
+
+  it('stops when another chat disappears from the sidebar after the archive', async () => {
+    resetState({ archiveAlsoOther: true });
+    const out = await scenario('claude-web', 'read-write');
+    expect(out.result).toMatchObject({ ok: false, reason: 'archive-touched-other-chat', step: 'chat-archive' });
   }, 120_000);
 
   it('keeps the chats only when asked (archiveChats: false)', async () => {
