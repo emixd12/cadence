@@ -119,7 +119,7 @@ with a named reason.
 | 1Password service-account token | Keychain service `cadence-agent-1password`, account `service-account-token` | see below |
 | Anthropic key | 1Password "Cadence Agents" item `anthropic-api-key`, field `credential` | see below |
 | OpenAI key | 1Password "Cadence Agents" item `openai-api-key`, field `credential` | see below |
-| QA publishable key (public) | env `CADENCE_QA_SUPABASE_PUBLISHABLE_KEY` | runners stop with `publishable-key-required` (or `qa-publishable-key-missing`) |
+| Production project ref, Supabase URL and publishable key (all public) | committed in `scripts/acceptance/qa-config.mjs`; env `CADENCE_QA_SUPABASE_PUBLISHABLE_KEY` overrides the key when set | a bad override stops runners with `publishable-key-required` (watcher: `qa-publishable-key-missing`) |
 | ChatGPT and Claude sign-ins | Chrome profile `~/Library/Application Support/Cadence QA Chrome` | `npm run mcp:accept:web -- status` |
 
 Verify the 1Password setup:
@@ -204,22 +204,36 @@ node $S down --name $N
 Order, one run folder per command (`--run prod-<date>-<n>`):
 
 1. Preconditions: go-ahead recorded (first run only), Ticket 232 cleanup not running,
-   `agent:secret -- --check` passes, both sessions pass `mcp:oauth -- status`,
-   `export CADENCE_QA_SUPABASE_PUBLISHABLE_KEY=…` (a public key; ask the coordinator
-   once per session, and never look it up with an owner credential).
+   `agent:secret -- --check` passes, both sessions pass `mcp:oauth -- status`. The
+   publishable key needs no lookup: every runner, the watcher and the session store
+   read it from `scripts/acceptance/qa-config.mjs`. Set
+   `CADENCE_QA_SUPABASE_PUBLISHABLE_KEY` only to override it (for example after a
+   key rotation, until that file is updated). Never look it up with an owner
+   credential.
 2. Tier 0: `npm run mcp:accept:protocol -- --target production --confirm-production --run <id>`.
    Start the watcher first (`npm run mcp:watch -- --target production --confirm-production --account both --since 2m --expect inspector --run <id>`);
    the production watcher sees only active grants, so keep the default grant hold.
 3. Tier 1: `npm run agent:secret -- --run .intent/acceptance/<id> --caller client-runners --env ANTHROPIC_API_KEY=anthropic-api-key --env OPENAI_API_KEY=openai-api-key -- node scripts/acceptance/client-runners.mjs --target production --allow-production --run <id> --client claude-code,anthropic-api,openai-api,inspector`.
+   Both get the same `<id>`. agent:secret does not create a new run folder: it keeps
+   its access lines in `.intent/acceptance/<id>.secret-access.jsonl` while the runner
+   creates the folder, then moves them into `<id>/events.jsonl` when the runner exits.
+   A leftover `<id>.secret-access.jsonl` means the wrapper was killed; the next
+   agent:secret call with the same `--run` moves it. (Before Ticket 257 the runner
+   stopped with `run-exists` here.)
+   **Web runs (steps 4 and 5): omit `--run` to start a new run.** `mcp:accept:web`
+   names its own run (`<UTC time>-<hex>`) and prints it on the last line,
+   `{"step":"done",…,"runId":"<web-id>"}`. Pass `--run <web-id>` only to resume that
+   run or to `revoke` it; `run --run <new-id>` stops with `run-missing`.
 4. Claude web and the claude.ai runner **one after the other**: they share the
    claude.ai "Cadence QA" connector grant. Web's preflight refuses an active Claude
    grant, and the claude.ai runner needs exactly one. Run
-   `npm run mcp:accept:web -- run --client claude-web --account A --scenario read-write --allow-production --keep-grant --run <web-id>`,
+   `npm run mcp:accept:web -- run --client claude-web --account A --scenario read-write --allow-production --keep-grant`
+   (note `<web-id>` from its last line),
    then `node scripts/acceptance/client-runners.mjs --target production --allow-production --client claude-ai --run <id2>`,
    then `npm run mcp:accept:web -- revoke --run <web-id> --allow-production`.
-5. ChatGPT web: `npm run mcp:accept:web -- run --client chatgpt --account A --scenario read-write --allow-production --run <id>`,
-   then `--scenario step-up`. On a stop it prints `guided-fallback … reason=…`; use
-   guided mode below.
+5. ChatGPT web: `npm run mcp:accept:web -- run --client chatgpt --account A --scenario read-write --allow-production`,
+   then the same with `--scenario step-up` (a new run). On a stop it prints
+   `guided-fallback … reason=…`; use guided mode below.
    Privacy: both web runs open a new `[Cadence QA]` chat per prompt. ChatGPT archives
    it after the reply: check the `archive-chats` line (`archivedCount` equals
    `chatCount`, `unknownCount` 0). Claude keeps it (`keptCount` equals `chatCount`)
@@ -292,16 +306,39 @@ folder alone:
 
 ## Known client quirks
 
-- **Claude web metadata:** Cadence rejected Claude's client metadata document
-  (`invalid_client_metadata`, JWT-bearer grant listed). The fix is on
-  `fix/oauth-client-extra-grant-types` (4fb3ee6) under Ticket 232. Until it deploys,
-  Claude web stops and the claude.ai runner skips. The watcher cannot see failed
-  registrations.
-- **ChatGPT read-only, no step-up:** ChatGPT (and Inspector) link asking for
-  `cadence.read` only, so Cadence's consent shows no write boxes. ChatGPT then
-  refuses writes itself and never starts a step-up. The watcher shows
-  `create_behavior denied insufficient_scope` but cannot show whether ChatGPT tried
-  to re-authorize. Record it as a finding; do not work around it.
+Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
+
+- **Claude web metadata (fixed):** Cadence first rejected Claude's client metadata
+  document (`invalid_client_metadata`), then answered `/oauth/authorize` with 503
+  `server_error` because the database accepted the "claude" label only for
+  dynamically registered clients. PR #172 (7ff01a5, migration 20261031003000) fixed
+  it; the live Claude web run and the claude.ai runner passed. The watcher cannot see
+  failed registrations, so a repeat shows up only as a stop before the grant.
+- **ChatGPT step-up never starts (*live*):** on a read-only grant ChatGPT called no
+  write tool and started no step-up or re-authorization (run
+  `20261031T000553Z-1cde41`). The step-up scenario fails with this every time; record
+  it as known ChatGPT behaviour, not a Cadence defect, and do not work around it.
+  ChatGPT and Inspector link asking for `cadence.read` only unless all scopes are
+  requested; with a full request ChatGPT granted all three scopes.
+- **ChatGPT layout changes (*live*, fixed in 260bdd1):** the real site moved away
+  from what Ticket 255 was built against. Reconnect sits behind a "Connect Cadence
+  QA" data-sharing dialog or the "Actions for … Cadence QA account → Reconnect" menu;
+  the composer's plugin search inserts an inline app mention (the developer-mode
+  toggle is gone), so the prompt text goes after the mention; finished turns carry
+  `data-talvt-turn-state=complete` (`data-message-author-role` is gone); the chat
+  menu is "Chat actions". `tests/acceptance-web-client.test.mjs` stubs this layout.
+  When the site changes again the runner stops with `page-changed` or
+  `reply-timeout`; fix the selectors in `scripts/acceptance/web-sites.mjs` with a
+  stub test, never by opening other chats.
+- **`--setting-sources` hides claude.ai connectors (*live*, fixed in bd5b728):**
+  `claude -p --setting-sources project` loads no claude.ai connectors, so the
+  claude-ai runner saw no "Cadence QA" server. The claude-ai runner no longer passes
+  it; claude-code still does (it uses `--strict-mcp-config` and its own inline
+  server). Don't add `--setting-sources` back to the claude-ai runner.
+- **Unrecorded ChatGPT chats (*live*):** a run that stops after sending a prompt but
+  before `archive-chats` leaves a `[Cadence QA]` chat whose ID is not in the ledger.
+  Report it as a cleanup item; archive it only with the runner's own archiveChat
+  checks, never by browsing the chat list.
 - **Inspector scope request:** Inspector 2.13.0 asks for `cadence.read` and
   `offline_access` unless its OAuth scopes are set to all three tracking scopes. The
   Tier 1 runner uses its own DCR client and grant, so this matters only for manual
@@ -316,6 +353,18 @@ folder alone:
 
 ## Recovery
 
+- **`keychain-failed` / `keychain-write-conflict` (Ticket 257):** the kept A and B
+  sessions are one Keychain item each. A web or guided run starts the watcher as a
+  second process; both refresh the slot at start (the access token is never stored)
+  and write the rotation back at once. Two concurrent `security add-generic-password
+  -U` updates of one item make one exit 45 ("already exists"), reproduced with a
+  throwaway item. Ticket 256 saw this twice as `keychain-failed`. The store now
+  retries that write up to three times; both writers hold a fresh rotation of the
+  same session, so the last write wins. If a run still stops with
+  `keychain-write-conflict`, re-run it. Any other `keychain-failed` is a different
+  `security` failure (a locked Keychain, a denied prompt or a 20-second timeout):
+  check `npm run mcp:oauth -- status --target production --allow-production`, and
+  ask Emi only if the Keychain itself asks for her password.
 - **Usage limits:** a stopped or limit-hit agent keeps its uncommitted work in its
   worktree. Check `git -C <worktree> status`, then wake it
   (`ws.agent.wakeOrCreate(taskNoteId, context)`) or start a replacement pointed at the

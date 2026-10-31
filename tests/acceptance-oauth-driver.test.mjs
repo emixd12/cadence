@@ -104,6 +104,30 @@ describe('Keychain store', () => {
     expect(await store.get('production:A')).toEqual(record);
     expect(await store.get('production:A')).toBeNull();
   });
+  // Ticket 257: a web runner and its watcher child refresh the same slot at start and
+  // write back at once. Two concurrent `add-generic-password -U` updates of one item
+  // make one exit 45 (errSecDuplicateItem), reproduced on macOS 27 with a throwaway item.
+  const duplicate = () => Object.assign(new Error('duplicate'), { code: 45 });
+  const record = () => recordFromSession(fakeSession(ACCOUNTS.A, 'refresh-race'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } });
+  it('retries a write that lost a race with another process (exit 45), then succeeds', async () => {
+    const { calls, execImpl } = fakeSecurity([{ error: duplicate() }, { stdout: '' }]);
+    const store = createKeychainSessionStore({ execImpl, conflictDelayMs: 0 });
+    await expect(store.set('production:A', record())).resolves.toBeUndefined();
+    expect(calls.map((c) => c.args)).toEqual([['-i'], ['-i']]);
+    expect(calls[1].stdin).toBe(calls[0].stdin);
+  });
+  it('stops with keychain-write-conflict when every retry loses the race', async () => {
+    const { calls, execImpl } = fakeSecurity([{ error: duplicate() }, { error: duplicate() }, { error: duplicate() }, { error: duplicate() }, { error: duplicate() }]);
+    const store = createKeychainSessionStore({ execImpl, conflictDelayMs: 0 });
+    await expect(store.set('production:A', record())).rejects.toMatchObject({ code: 'keychain-write-conflict' });
+    expect(calls).toHaveLength(4);
+  });
+  it('does not retry other Keychain failures', async () => {
+    const { calls, execImpl } = fakeSecurity([{ error: Object.assign(new Error('auth'), { code: 51 }) }, { stdout: '' }]);
+    const store = createKeychainSessionStore({ execImpl, conflictDelayMs: 0 });
+    await expect(store.set('production:A', record())).rejects.toMatchObject({ code: 'keychain-failed', details: { exit: 51 } });
+    expect(calls).toHaveLength(1);
+  });
   // `security -i` rejects command lines over 4,088 bytes. This fake enforces that limit and keeps items in memory.
   const limitedSecurity = () => {
     const items = new Map();

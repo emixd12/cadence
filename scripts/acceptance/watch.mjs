@@ -20,11 +20,12 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { isCliEntry } from './cli-entry.mjs';
+import { PRODUCTION_QA, qaPublishableKey } from './qa-config.mjs';
 import { SCENARIOS } from './scenarios/index.mjs';
 
 export { SCENARIOS };
 
-export const PRODUCTION_SUPABASE_ORIGIN = 'https://qjodzutjxtmtzczbloxa.supabase.co';
+export const PRODUCTION_SUPABASE_ORIGIN = PRODUCTION_QA.supabaseUrl;
 export const TEST_ACCOUNTS = Object.freeze({
   A: Object.freeze({ userId: 'caefd1b8-ea46-485f-8869-119a715fb092', email: 'cadence.testing.is@gmail.com' }),
   B: Object.freeze({ userId: 'c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b', email: 'brittlebeliefs@gmail.com' }),
@@ -615,12 +616,12 @@ async function resolveLocalUsers(dbUrl, options) {
 }
 
 /**
- * Production publishable key from CADENCE_QA_SUPABASE_PUBLISHABLE_KEY, the same
- * variable Ticket 248 reads. Public, but the watcher never reaches for an owner
- * credential to look it up.
+ * Production publishable key from the committed QA config (qa-config.mjs), or
+ * CADENCE_QA_SUPABASE_PUBLISHABLE_KEY when set. Public, but the watcher never
+ * reaches for an owner credential to look it up.
  */
 export function publishableKeyFrom(env) {
-  const key = env?.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const key = qaPublishableKey(env ?? {});
   return /^sb_publishable_[A-Za-z0-9_-]+$/.test(key ?? '') ? key : fail('qa-publishable-key-missing');
 }
 

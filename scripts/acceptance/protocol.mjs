@@ -8,7 +8,7 @@
 // Local needs an isolated stack and a Next dev server with CADENCE_MCP_ENABLED=true,
 // CADENCE_ENABLE_TEST_LOGIN=1 and an HTTPS loopback issuer, plus
 // CADENCE_LOCAL_SUPABASE_URL and CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY for that
-// stack. Production needs CADENCE_QA_SUPABASE_PUBLISHABLE_KEY and Ticket 248's
+// stack. Production reads its publishable key from qa-config.mjs and needs Ticket 248's
 // kept Keychain sessions for accounts A and B.
 //
 // Tokens come from Ticket 248's driver (one DCR client per run, a fresh grant per
@@ -29,6 +29,7 @@ import { GRANTS, launchChrome, READ_SCOPE } from './consent-page.mjs';
 import { createOAuthDriver, parseMcpBody } from './oauth-driver.mjs';
 import { AcceptanceError, PRODUCTION, createKeychainSessionStore, createMemorySessionStore, createSessionManager } from './test-account-sessions.mjs';
 import { createRest, revokeCaptured } from '../mcp-acceptance-cleanup.mjs';
+import { qaPublishableKey } from './qa-config.mjs';
 
 // Mirrors INTEGRATION_OPERATIONS in packages/core/src/integration/operations.ts
 // (tools/list order); tests/acceptance-protocol.test.mjs keeps them equal.
@@ -480,7 +481,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   const local = options.target === 'local';
   const issuer = local ? options.issuer : PRODUCTION.issuer;
   if (local && options.caFile) trustLocalCertificate(options.caFile);
-  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : env.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : qaPublishableKey(env);
   const supabaseUrl = local ? env.CADENCE_LOCAL_SUPABASE_URL : PRODUCTION.supabaseUrl;
   const sessions = createSessionManager({ target: options.target, supabaseUrl, publishableKey, store: local ? createMemorySessionStore() : createKeychainSessionStore() });
   const run = options.resume

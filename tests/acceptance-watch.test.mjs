@@ -8,6 +8,7 @@ import {
   createLedgerSink, createRpcSource, main, matchScenario, parseSince, parseWatchArgs, psqlQuery, publishableKeyFrom, watch,
 } from '../scripts/acceptance/watch.mjs';
 import { USERS } from '../scripts/mcp-acceptance-cleanup.mjs';
+import { PRODUCTION_QA } from '../scripts/acceptance/qa-config.mjs';
 
 const T0 = Date.parse('2026-10-30T02:00:00.000Z');
 const SINCE = new Date(T0 - 60_000).toISOString();
@@ -428,13 +429,15 @@ describe('arguments, ledger and CLI', () => {
     expect(errors.at(-1)).toBe('watch-stopped db-url-not-loopback');
   });
 
-  it('production reads the QA publishable key from the environment and never an owner credential', async () => {
+  it('production reads the QA publishable key from the committed QA config or its override, never an owner credential', async () => {
     expect(publishableKeyFrom({ CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc_123' })).toBe('sb_publishable_abc_123');
-    for (const env of [{}, { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc' }, { CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }]) {
+    // Ticket 257: with no override the committed key is used; NEXT_PUBLIC_ is never read.
+    for (const env of [{}, { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc' }]) expect(publishableKeyFrom(env)).toBe(PRODUCTION_QA.publishableKey);
+    for (const env of [{ CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' }, { CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'not a key' }]) {
       expect(() => publishableKeyFrom(env)).toThrow('qa-publishable-key-missing');
     }
     const lines = [];
-    expect(await main(['--target', 'production', '--confirm-production'], (l) => lines.push(l), {})).toBe(2);
+    expect(await main(['--target', 'production', '--confirm-production'], (l) => lines.push(l), { CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc' })).toBe(2);
     expect(lines).toEqual(['watch-stopped qa-publishable-key-missing']);
     const source = readFileSync(new URL('../scripts/acceptance/watch.mjs', import.meta.url), 'utf8');
     for (const banned of ['api.supabase.com', 'Supabase CLI', 'find-generic-password', '/usr/bin/security']) expect(source).not.toContain(banned);

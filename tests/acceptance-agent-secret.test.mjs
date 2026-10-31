@@ -272,6 +272,66 @@ describe('agent-secret wrapper', () => {
     expectNoLeak(result);
   });
 
+  // Ticket 257: the skill's Tier 1 command gives agent:secret and the runner the same
+  // --run folder. The runner creates that folder itself (Ticket 247's createRun) and
+  // stops with run-exists if it is already there.
+  const LEDGER = fileURLToPath(new URL('../scripts/acceptance/ledger.mjs', import.meta.url));
+  const runnerChild = () => {
+    const path = join(fakebin, 'runner.mjs');
+    writeFileSync(path, `
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const { createRun, resumeRun } = await import(${JSON.stringify(LEDGER)});
+const [report, root, runId, mode] = process.argv.slice(2);
+const dir = join(root, runId);
+const seen = { folderBefore: existsSync(dir), pendingBefore: existsSync(dir + '.secret-access.jsonl') };
+let run;
+try { run = mode === 'resume' ? resumeRun({ runId, root }) : createRun({ target: 'local', runId, root, gitSha: null }); } catch (error) {
+  writeFileSync(report, JSON.stringify({ ...seen, stop: error.reason ?? error.code ?? error.message })); process.exit(9);
+}
+const before = existsSync(join(dir, 'events.jsonl')) ? readFileSync(join(dir, 'events.jsonl'), 'utf8') : '';
+seen.secretLinesWhileRunning = before.split('\\n').filter((l) => l.includes('secret_access')).length;
+run.appendEvent({ type: 'runner_event', step: 'one' });
+run.close();
+writeFileSync(report, JSON.stringify(seen));
+`);
+    return path;
+  };
+
+  it('leaves a new --run folder for the runner to create, then files its access lines there', () => {
+    const report = join(work, 'runner.json');
+    const result = run(['--run', 'runs/t1-new', '--caller', 'client-runners', '--env', 'ANTHROPIC_API_KEY=anthropic-api-key', '--env', 'OPENAI_API_KEY=openai-api-key', '--',
+      process.execPath, runnerChild(), report, join(work, 'runs'), 't1-new']);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(readFileSync(report, 'utf8'))).toEqual({ folderBefore: false, pendingBefore: true, secretLinesWhileRunning: 0 });
+    const lines = ledgerLines(join(work, 'runs/t1-new/events.jsonl'));
+    expect(lines.map((l) => l.type)).toEqual(['runner_event', 'secret_access', 'secret_access']);
+    expect(lines.filter((l) => l.type === 'secret_access').map((l) => [l.env, l.outcome, l.caller])).toEqual([['ANTHROPIC_API_KEY', 'ok', 'client-runners'], ['OPENAI_API_KEY', 'ok', 'client-runners']]);
+    expect(existsSync(join(work, 'runs/t1-new.secret-access.jsonl'))).toBe(false);
+    expect(statSync(join(work, 'runs/t1-new/events.jsonl')).mode & 0o777).toBe(0o600);
+    expectNoLeak(result);
+  });
+
+  it('appends straight to an existing run folder, as on a resume', () => {
+    const report = join(work, 'runner.json');
+    const setupRun = spawnSync(process.execPath, ['--input-type=module', '-e', `const { createRun } = await import(${JSON.stringify(LEDGER)}); createRun({ target: 'local', runId: 't1-old', root: ${JSON.stringify(join(work, 'runs'))}, gitSha: null }).close();`]);
+    expect(setupRun.status).toBe(0);
+    const result = run(['--run', 'runs/t1-old', '--env', 'ANTHROPIC_API_KEY=anthropic-api-key', '--', process.execPath, runnerChild(), report, join(work, 'runs'), 't1-old', 'resume']);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(readFileSync(report, 'utf8'))).toEqual({ folderBefore: true, pendingBefore: false, secretLinesWhileRunning: 1 });
+    expect(ledgerLines(join(work, 'runs/t1-old/events.jsonl')).map((l) => l.type)).toEqual(['secret_access', 'runner_event']);
+    expect(existsSync(join(work, 'runs/t1-old.secret-access.jsonl'))).toBe(false);
+    expectNoLeak(result);
+  });
+
+  it('keeps the access lines in the run folder when the child fails before creating it', () => {
+    const result = run(['--run', 'runs/t1-crash', '--env', 'ANTHROPIC_API_KEY=anthropic-api-key', '--', process.execPath, '-e', 'process.exit(3)']);
+    expect(result.code).toBe(3);
+    expect(ledgerLines(join(work, 'runs/t1-crash/events.jsonl'))).toMatchObject([{ type: 'secret_access', outcome: 'ok', env: 'ANTHROPIC_API_KEY' }]);
+    expect(existsSync(join(work, 'runs/t1-crash.secret-access.jsonl'))).toBe(false);
+    expectNoLeak(result);
+  });
+
   it('--check prints vault and item names only and needs no item value', () => {
     const result = run(['--check', '--env', 'ANTHROPIC_API_KEY=anthropic-api-key']);
     expect(result.code).toBe(0);

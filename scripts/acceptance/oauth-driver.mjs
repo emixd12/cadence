@@ -13,7 +13,7 @@
 //     [--client-metadata-url https://claude.ai/oauth/claude-code-client-metadata]
 // Each local run creates two test-login users; the app allows ten per process.
 //
-// Production (Ticket 256 onward only; needs CADENCE_QA_SUPABASE_PUBLISHABLE_KEY):
+// Production (Ticket 256 onward only; publishable key from qa-config.mjs):
 //   npm run mcp:oauth -- enroll --target production --allow-production --slot A --port <4321-4330>
 //   npm run mcp:oauth -- status --target production --allow-production
 //   npm run mcp:oauth -- --target production --allow-production
@@ -28,6 +28,7 @@ import {
   AcceptanceError, PRODUCTION, Secret, createKeychainSessionStore, createMemorySessionStore, createSessionManager, enrollProduction,
 } from './test-account-sessions.mjs';
 import { GRANTS, captureRedirect, checkConsentView, launchChrome, readConsentView, submitConsent } from './consent-page.mjs';
+import { qaPublishableKey } from './qa-config.mjs';
 
 export const ALL_SCOPES = Object.freeze([...GRANTS.full, 'offline_access']);
 export const DEFAULT_CLIENT_NAME = 'Cadence acceptance driver';
@@ -410,7 +411,7 @@ function trustLocalCertificate(caFile) {
 export async function main(argv = process.argv.slice(2), env = process.env, out = (line) => process.stdout.write(`${line}\n`)) {
   const options = parseArgs(argv);
   const local = options.target === 'local';
-  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : env.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : qaPublishableKey(env);
   if (options.command === 'enroll') {
     if (local) throw new AcceptanceError('enroll-production-only');
     await enrollProduction({ slot: options.slot, port: options.port, publishableKey, out });

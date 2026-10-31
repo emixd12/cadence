@@ -8,8 +8,8 @@
 // settings: the records are the evidence.
 //
 //   npm run mcp:accept:guided -- --client chatgpt|claude-web [--scenario read-write|step-up] [--account A|B]
-//     --target production --confirm-production      (Ticket 256 onward; kept Ticket 248 sessions,
-//                                                    CADENCE_QA_SUPABASE_PUBLISHABLE_KEY)
+//     --target production --confirm-production      (Ticket 256 onward; kept Ticket 248 sessions;
+//                                                    key from qa-config.mjs)
 //     --target local --db-url <loopback url> [--user-a <uuid>] [--user-b <uuid>]   (rehearsal)
 //   [--run <id> [--resume]] [--timeout 30m] [--keep-grant] [--print-only]
 //
@@ -34,6 +34,7 @@ import { isCliEntry } from './cli-entry.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { SCENARIOS as WATCH_SCENARIOS, SOURCE_KINDS, matchScenario } from './watch.mjs';
 import { CONNECTOR_NAME, PRODUCTION_MCP_URL, PROMPTS, SITES, TICKET_232_GRANT_PREFIXES } from './web-client.mjs';
+import { qaPublishableKey } from './qa-config.mjs';
 
 export const CLIENTS = Object.freeze(['chatgpt', 'claude-web']);
 export const GUIDED_SCENARIOS = Object.freeze(['read-write', 'step-up']);
@@ -314,7 +315,7 @@ export async function runGuided({ options, run, watcher, rest = null, cleanup = 
 }
 
 async function productionDeps(env) {
-  const key = env.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const key = qaPublishableKey(env);
   if (!/^sb_publishable_/.test(key ?? '')) stop('publishable-key-required', 'setup');
   const sessionsModule = await import('./test-account-sessions.mjs');
   const cleanup = await import('../mcp-acceptance-cleanup.mjs');

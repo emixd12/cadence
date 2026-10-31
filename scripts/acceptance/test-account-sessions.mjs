@@ -10,12 +10,13 @@ import { inspect } from 'node:util';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { ACCOUNTS, googleSignIn } from '../mcp-session-broker.mjs';
+import { PRODUCTION_QA } from './qa-config.mjs';
 
 export const SESSION_FORMAT = 'cadence-qa-session/1';
 export const KEYCHAIN_SERVICE = 'cadence-qa-oauth-session';
 export const PRODUCTION = Object.freeze({
   issuer: 'https://app.cadence-me.com',
-  supabaseUrl: 'https://qjodzutjxtmtzczbloxa.supabase.co',
+  supabaseUrl: PRODUCTION_QA.supabaseUrl,
   accounts: Object.freeze({
     A: Object.freeze({ userId: ACCOUNTS.A, email: 'cadence.testing.is@gmail.com' }),
     B: Object.freeze({ userId: ACCOUNTS.B, email: 'brittlebeliefs@gmail.com' }),
@@ -100,9 +101,13 @@ export function createMemorySessionStore() {
   };
 }
 
+// `security` exits with the low byte of the OSStatus: 44 is errSecItemNotFound
+// (-25300) and 45 errSecDuplicateItem (-25299). A timeout or signal gives exit null.
+const SECURITY_ITEM_MISSING = 44;
+const SECURITY_DUPLICATE_ITEM = 45;
 const runSecurity = (args, input, execImpl) => new Promise((resolve, reject) => {
   const child = execImpl('/usr/bin/security', args, { encoding: 'utf8', maxBuffer: 1 << 20, timeout: 20_000 }, (error, stdout) => {
-    if (error) reject(new AcceptanceError(error.code === 44 ? 'keychain-item-missing' : 'keychain-failed', { exit: typeof error.code === 'number' ? error.code : null }));
+    if (error) reject(new AcceptanceError(error.code === SECURITY_ITEM_MISSING ? 'keychain-item-missing' : 'keychain-failed', { exit: typeof error.code === 'number' ? error.code : null }));
     else resolve(stdout);
   });
   if (input !== undefined) child.stdin.end(input); else child.stdin?.end();
@@ -112,9 +117,15 @@ const runSecurity = (args, input, execImpl) => new Promise((resolve, reject) => 
  * macOS Keychain store. Writes go through `security -i` on stdin, so the value
  * never appears in a process argument list. Values are base64 JSON of
  * persistedRecord(): the access token is never stored.
+ *
+ * Ticket 257: two processes that update the same item at once (a web runner and
+ * its watcher child both refresh a slot when they start) make one
+ * `add-generic-password -U` exit 45. Both hold a fresh rotation of the same
+ * session, so the loser writes again after a short pause; last write wins.
  */
 const SECURITY_LINE_LIMIT = 4088;
-export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImpl = execFile } = {}) {
+const CONFLICT_RETRIES = 3;
+export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImpl = execFile, conflictDelayMs = 150 } = {}) {
   if (!/^[a-z0-9-]+$/.test(service)) throw new AcceptanceError('keychain-service-invalid');
   const account = (key) => {
     if (!/^[a-z]+:[AB]$/.test(key)) throw new AcceptanceError('keychain-account-invalid');
@@ -134,7 +145,13 @@ export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImp
       const value = Buffer.from(JSON.stringify(persistedRecord(record)), 'utf8').toString('base64');
       const line = `add-generic-password -U -s ${service} -a ${account(key)} -l "Cadence QA session ${account(key)}" -w ${value}`;
       if (Buffer.byteLength(line) > SECURITY_LINE_LIMIT) throw new AcceptanceError('keychain-record-too-large');
-      await runSecurity(['-i'], `${line}\n`, execImpl);
+      for (let attempt = 0; ; attempt += 1) {
+        try { await runSecurity(['-i'], `${line}\n`, execImpl); return; } catch (error) {
+          if (error.details?.exit !== SECURITY_DUPLICATE_ITEM) throw error;
+          if (attempt >= CONFLICT_RETRIES) throw new AcceptanceError('keychain-write-conflict', { exit: SECURITY_DUPLICATE_ITEM });
+          await new Promise((resolve) => setTimeout(resolve, conflictDelayMs * (attempt + 1)));
+        }
+      }
     },
     async delete(key) {
       try { await runSecurity(['delete-generic-password', '-s', service, '-a', account(key)], undefined, execImpl); } catch (error) {

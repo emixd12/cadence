@@ -112,6 +112,12 @@ npm run agent:secret -- --check --env ANTHROPIC_API_KEY=anthropic-api-key --env 
   command's name. Fields:
   `type`, `at`, `caller`, `vault`, `item`, `field`, `env`, `outcome`
   (`ok`, `refused` or `failed`) and a fixed `reason` on failure. Never a value.
+- Give the wrapper and the runner the same `--run`. If that folder does not exist
+  yet, the wrapper leaves it for the runner to create (a runner stops with
+  `run-exists` on an existing folder): the lines wait in
+  `<run-dir>.secret-access.jsonl` and move into `<run-dir>/events.jsonl` when the
+  child exits, creating the folder if the child did not. An existing folder is
+  appended to directly (Ticket 257).
 - The wrapper prints no value or token. op's error text is classified into a
   fixed reason and never relayed. What the child prints is the child's
   responsibility: runners must not log the keys they receive.

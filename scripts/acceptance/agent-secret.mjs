@@ -24,6 +24,12 @@
 // 4. Appends one line per access to `<run-dir>/events.jsonl` (with --run) or
 //    `.intent/acceptance/secret-access.jsonl`: item, field, variable name, time,
 //    caller and outcome. Never a value.
+//    When <run-dir> does not exist yet, the wrapper does not create it: the runner
+//    it starts creates its own run folder and stops with run-exists if one is
+//    there. The lines go to `<run-dir>.secret-access.jsonl` first and move into
+//    `<run-dir>/events.jsonl` once the child exits (Ticket 257). If the wrapper
+//    itself is killed, they stay in that file and the next call with the same
+//    --run moves them.
 //
 // The wrapper never prints, logs or writes a value or the token. Its own
 // messages are fixed templates that name items only. op's stderr is classified,
@@ -41,7 +47,7 @@
 //
 // Setup (Emi, once): docs/qa/agent-secrets.md.
 import { spawn } from 'node:child_process';
-import { appendFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { constants as osConstants } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { isCliEntry } from './cli-entry.mjs';
@@ -201,6 +207,21 @@ export function ledgerPathFor({ run, cwd = process.cwd() }) {
   return run ? resolve(cwd, run, 'events.jsonl') : resolve(cwd, DEFAULT_LEDGER);
 }
 
+/** Where lines wait while the child creates a new run folder: next to it, never inside. */
+export function pendingLedgerPathFor({ run, cwd = process.cwd() }) {
+  return `${resolve(cwd, run)}.secret-access.jsonl`;
+}
+
+/** Moves waiting lines into the run folder's events.jsonl, creating the folder if the child did not. */
+function fileWaitingLines(pending, ledger) {
+  if (!existsSync(pending)) return;
+  const text = readFileSync(pending, 'utf8');
+  mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
+  if (text) appendFileSync(ledger, text.endsWith('\n') ? text : `${text}\n`, { mode: 0o600 });
+  try { chmodSync(ledger, 0o600); } catch { /* best effort on existing files */ }
+  unlinkSync(pending);
+}
+
 /** Runs a helper process and captures its output in memory only. */
 function capture(command, args, { env, timeoutMs = OP_TIMEOUT_MS, input = undefined }) {
   return new Promise((resolvePromise) => {
@@ -327,6 +348,19 @@ export async function runAgentSecret(argv, { env = process.env, cwd = process.cw
   }
   if (parsed.storeToken) return storeToken({ service: parsed.keychainService ?? KEYCHAIN_SERVICE, env, io, stdin });
   const ledger = ledgerPathFor({ run: parsed.run, cwd });
+  if (!parsed.run || existsSync(resolve(cwd, parsed.run))) {
+    if (parsed.run) fileWaitingLines(pendingLedgerPathFor({ run: parsed.run, cwd }), ledger);
+    return accessAndRun(parsed, { ledger, env, cwd, io });
+  }
+  const pending = pendingLedgerPathFor({ run: parsed.run, cwd });
+  try {
+    return await accessAndRun(parsed, { ledger: pending, env, cwd, io });
+  } finally {
+    fileWaitingLines(pending, ledger);
+  }
+}
+
+async function accessAndRun(parsed, { ledger, env, cwd, io }) {
   const caller = safeCaller(parsed.caller ?? (parsed.command ? basename(parsed.command) : 'check'));
   const log = (entry) => recordAccess(ledger, { caller, vault: AGENT_VAULT, ...entry });
 

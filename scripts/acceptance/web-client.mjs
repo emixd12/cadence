@@ -31,6 +31,7 @@ import { GRANTS, checkConsentView, readConsentView, submitConsent } from './cons
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
 import { CONVERSATION, NOT_CONVERSATION, SITES, WebStop, archiveChat, chatIdOf, classifyPage, clickable, waitVisible } from './web-sites.mjs';
+import { qaPublishableKey } from './qa-config.mjs';
 
 export { SITES, WebStop };
 
@@ -592,7 +593,7 @@ export function spawnWatcher({ target = 'production', spawnImpl = spawn, timeout
 }
 
 async function productionDeps(env) {
-  const key = env.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const key = qaPublishableKey(env);
   if (!/^sb_publishable_/.test(key ?? '')) throw new WebStop('publishable-key-required', 'setup');
   const sessionsModule = await import('./test-account-sessions.mjs');
   const cleanup = await import('../mcp-acceptance-cleanup.mjs');

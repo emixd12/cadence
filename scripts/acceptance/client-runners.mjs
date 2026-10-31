@@ -22,7 +22,7 @@
 // Local (isolated stack, HTTPS issuer on 4450-4459, loopback database):
 //   CADENCE_LOCAL_SUPABASE_URL=… CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY=… \
 //   npm run mcp:accept:clients -- --target local --issuer https://127.0.0.1:4450 --ca-file <ca.pem> --db-url <loopback url> --client claude-code,inspector
-// Production (Ticket 256 onward; needs CADENCE_QA_SUPABASE_PUBLISHABLE_KEY and kept Ticket 248 sessions):
+// Production (Ticket 256 onward; key from qa-config.mjs; needs kept Ticket 248 sessions):
 //   npm run agent:secret -- --run .intent/acceptance/<run-id> --caller client-runners \
 //     --env ANTHROPIC_API_KEY=anthropic-api-key --env OPENAI_API_KEY=openai-api-key -- \
 //     node scripts/acceptance/client-runners.mjs --target production --allow-production --run <run-id> --client all
@@ -44,6 +44,7 @@ import {
 } from './clients.mjs';
 import { DEFAULT_ROOT, LedgerStop, createRun, resumeRun } from './ledger.mjs';
 import { OPERATION_ACCESS, TEST_ACCOUNTS, PRODUCTION_SUPABASE_ORIGIN, assertLocalDbUrl, createDbSource, createDiffer, createRpcSource, ledgerRecord, matchScenario, psqlQuery } from './watch.mjs';
+import { qaPublishableKey } from './qa-config.mjs';
 
 export const CLIENTS = Object.freeze(['claude-code', 'claude-ai', 'anthropic-api', 'openai-api', 'inspector']);
 const SHORT = Object.freeze({ 'claude-code': 'cc', 'claude-ai': 'cai', 'anthropic-api': 'aapi', 'openai-api': 'oapi', inspector: 'insp' });
@@ -385,7 +386,7 @@ export async function createHarness(options, env) {
   const local = options.target === 'local';
   const issuer = local ? options.issuer : PRODUCTION.issuer;
   if (local) trustLocalCertificate(options.caFile);
-  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : env.CADENCE_QA_SUPABASE_PUBLISHABLE_KEY;
+  const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : qaPublishableKey(env);
   if (!publishableKey) stop(local ? 'missing-local-publishable-key' : 'missing-qa-publishable-key');
   const sessions = createSessionManager({
     target: options.target, publishableKey, supabaseUrl: local ? env.CADENCE_LOCAL_SUPABASE_URL : PRODUCTION.supabaseUrl,

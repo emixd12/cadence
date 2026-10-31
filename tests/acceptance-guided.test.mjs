@@ -298,7 +298,8 @@ describe('CLI', () => {
     expect(await main(['--client', 'chatgpt', '--target', 'production'], {}, (l) => bad.push(l))).toBe(2);
     expect(bad).toEqual(['guided-stopped confirm-production-required']);
     const nokey = [];
-    expect(await main(['--client', 'chatgpt', '--target', 'production', '--confirm-production'], {}, (l) => nokey.push(l))).toBe(2);
+    // Ticket 257: the committed key is the default, so only a bad override stops here.
+    expect(await main(['--client', 'chatgpt', '--target', 'production', '--confirm-production'], { CADENCE_QA_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_x' }, (l) => nokey.push(l))).toBe(2);
     expect(nokey).toEqual(['guided-stopped publishable-key-required']);
   });
 
