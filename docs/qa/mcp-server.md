@@ -466,7 +466,7 @@ ran:
 | Activation and signer gate (`scripts/mcp-activation.mjs`, `scripts/mcp-activation-gate.mjs`) | `b6c9a09` |
 | Acceptance cleanup (`scripts/mcp-acceptance-cleanup.mjs`) | `52ec0af` |
 
-These commits are on the Ticket 232 branch `mcp-create`. Receipts for the October
+These commits are on branch `mcp-create` in the Ticket 232 workspace. Receipts for the October
 29–30 run are in `.intent/artifacts/trust232/extension-execution/` in the Ticket 232
 workspace. They are not committed to the repository and hold no tokens, key
 material, emails or note text.
@@ -512,11 +512,18 @@ A read-only hosted readback on October 31 lists both migrations; the latest is
 `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` (Ready, source `7ff01a5`). Ticket 256 below
 verified each fix against production (Deployed behavior).
 
+Trust refresh after #172 (Source check): snapshot `20261031T005211Z-7ff01a5eb167`
+binds app `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` and marketing
+`dpl_7pCxZs9seC1qT855BZhgwUK3hHNs` at `7ff01a5`. Two checks did not pass:
+`secret_scanning` reported unavailable, and `cross_account_rls_isolation` did not
+run. Every other check passed, including `code_scanning`. The hosted migration boundary was 96 migrations ending at `20261031003000`.
+
 ### Ticket 256 automated client retest — October 30–31, 2026
 
 The runs used production with A and B, with a watcher recording every step. Emi's
-only actions were the two Google sign-ins. The runner is on branch
-`mcp-accept/256` (base `e65c9e8`; runner fixes `260bdd1`, `cb29007`, `bd5b728`). Each
+only actions were the two Google sign-ins. The runner fixes `260bdd1`, `cb29007` and
+`bd5b728` are local commits on branch `mcp-accept/256` (base `e65c9e8`). They will be
+published with the MCP acceptance automation PR. Each
 run's receipts (`STATE.md`, `checkpoints.jsonl`, `events.jsonl`, `run.json`) are
 in `.intent/acceptance/<run ID>/` in that worktree.
 

@@ -19,6 +19,8 @@ October 29–31, 2026 (Ticket 232)".
   Their migrations `20261030230000` and `20261031003000` are on the hosted database.
 - Ticket 256's automated retest passed every client on production. The exception
   is ChatGPT step-up, a known ChatGPT behavior.
+- Trust refresh after #172: snapshot `20261031T005211Z-7ff01a5eb167` passed every
+  check except `secret_scanning` (unavailable) and cross-account RLS (not run).
 - Known limits: ChatGPT never steps up; the Trust refresh does not run cross-account
   RLS isolation; Trust's secret scanning is unavailable; backend timeout
   cancellation is unproven; consent write switches default to on by owner decision.
@@ -120,7 +122,8 @@ here).
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
 Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
-source. The hosted push is not done and needs the owner's explicit authorization.
+source. Migration `20261027221625` is applied on the hosted database (read-only
+ledger readback, October 31, 2026).
 
 - Bug: a profile timezone change on a linked Mac failed every sync when the account
   had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
@@ -152,7 +155,7 @@ source. The hosted push is not done and needs the owner's explicit authorization
   `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
   named volumes are kept. `habit-tracking-app` was not touched. Type generation was
   refused by the proxy; no function signature changed.
-- Not verified: hosted push and readback, and a timezone change synced from an
+- Not verified: a timezone change synced from an
   installed Mac after the push.
 
 Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
@@ -195,7 +198,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
   Behavior stalls sync, because the server requires every Behavior and both clients
   update only active ones. Fixed in source by migration
-  `20261027221625` (entry above); the hosted push needs the owner's authorization.
+  `20261027221625` (entry above), now applied on the hosted database (ledger
+  readback, October 31, 2026).
 
 Platform impact: desktop release only; web, marketing and future mobile have no change.
 Messaging impact: none; the packet holds draft release notes for the owner.
