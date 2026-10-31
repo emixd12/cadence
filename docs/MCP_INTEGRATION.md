@@ -365,7 +365,7 @@ Focused tests preserve both observed metadata shapes.
 
 ## 13. MCP endpoint implementation (Ticket 228)
 
-Local implementation uses pinned `@modelcontextprotocol/server@2.3.1` at runtime
+Local implementation uses pinned `@modelcontextprotocol/server@2.4.0` at runtime
 and `@modelcontextprotocol/client@2.3.1` for development tests. The official stable
 v2 SDK split replaces the legacy `@modelcontextprotocol/sdk` package. Its
 `createMcpHandler` provides native 2026-07-28 and `legacy: "stateless"` support;
