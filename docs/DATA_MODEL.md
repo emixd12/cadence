@@ -2462,7 +2462,8 @@ consent with the signed-in user's database client.
 `oauth_create_pending` is service-role-only. Authenticated
 `oauth_read_pending` and `oauth_finish_pending` require the browser-secret hash.
 The finish function locks and consumes the request in the same transaction as
-`oauth_approve_consent`; it accepts only a subset of requested tracking scopes.
+`oauth_approve_consent`. Since Ticket 259 it accepts any valid advertised scope
+set (see below); before that it accepted only a subset of requested scopes.
 A null scope list denies and consumes without creating a grant.
 
 Migration `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` (Ticket 232
@@ -2475,6 +2476,22 @@ No table or signature changes; both functions keep their grants. Local
 verification: `tests/sql/ticket-232-oauth-reconsent-scopes.sql`. The server
 also requires a same-origin POST and a matching HttpOnly cookie. Neither the
 browser secret nor the client state appears in the consent URL.
+
+Migration `20261031210000_oauth_consent_offers_advertised_scopes.sql` (Ticket
+259) lets the user approve scopes the client did not request. The consent screen
+offers all three tracking scopes with every write selected (owner decision,
+October 31, 2026). `oauth_finish_pending` now checks only `scopes_valid`:
+`cadence.read` is required, only the three advertised scopes are allowed, and
+duplicates are rejected. The removed check limited approval to requested or
+already granted scopes. `oauth_approve_consent` still stores exactly the
+submitted set, so the grant and the code (and the token response) hold what the
+user left on, and an explicit narrowing still narrows. Step-up keeps earlier
+scopes because `oauth_read_pending` still returns `granted_scopes` and the
+screen submits them selected. No table or signature changes; the function keeps
+its grants (authenticated only). Local verification:
+`tests/sql/ticket-259-consent-offers-advertised-scopes.sql` and the updated
+`tests/sql/ticket-232-oauth-reconsent-scopes.sql`. The hosted push needs the
+owner's explicit go.
 
 Codes and token families gain an `offline_access` boolean, separate from the
 three data-access scopes. Token responses include that permission when approved.

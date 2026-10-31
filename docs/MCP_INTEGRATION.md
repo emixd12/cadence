@@ -98,7 +98,9 @@ One request:
    identifies itself (CIMD, or DCR as a fallback), and starts an authorization
    code flow with PKCE S256 and `resource`.
 3. The user signs in with Google as today and approves on Cadence's consent
-   screen. Read is required; each write scope can be switched off.
+   screen. Read is required. The screen offers every advertised write scope,
+   including ones the client did not request; each starts on and can be
+   switched off (Ticket 259).
 4. Cadence issues an opaque access token (about 1 hour) and a rotating refresh
    token. Both are bound to the MCP URL and stored only as SHA-256 hashes.
 5. Each tool call runs: token check → grant still active → scope check → per-grant
@@ -339,8 +341,9 @@ secret. The HttpOnly cookie carries the secret; the consent URL carries only a
 request UUID. Ticket 227 uses `getOAuthConsent(request, id, userClient)` for
 display and `completeOAuthConsent(request, id, scopesOrNull, userClient)` on an
 explicit same-origin Allow/Deny POST. The database atomically consumes the
-request and creates its grant/code under the authenticated user. Scopes can
-only narrow. Render client text as text, identify unverified clients, and show
+request and creates its grant/code under the authenticated user. The user may
+approve any valid advertised scope set, whatever the client requested; the grant
+holds exactly what the user left on (Ticket 259). Render client text as text, identify unverified clients, and show
 the redirect host. Preserve the cookie through the existing Google login flow.
 
 Ticket 228 uses `verifyMcpAccessToken` to resolve a SHA-256 hash, check token
@@ -430,6 +433,25 @@ earlier permissions on re-consent is in `docs/DATA_MODEL.md` (migration
 `20261030230000`). Not verified: that ChatGPT now requests the write scopes. OpenAI's
 plugin authentication page does not state ChatGPT's selection order; Ticket 256
 verifies the live link after deployment.
+
+**Consent offers advertised scopes (Ticket 259, October 31, 2026).** Ticket 256
+found that ChatGPT web, given a read-only grant, makes no write attempt and starts
+no step-up, so its write tools stay unusable. Owner decision (October 31): the
+consent screen offers every scope the server advertises, even when the client
+requested only some, and every write switch starts on. One Allow therefore grants
+all three tracking scopes; the user can switch either write off first. The grant
+holds exactly the submitted set, and the token response's `scope` reports it, so
+a client learns it received more than it asked for. RFC 6749 §3.3 permits an
+issued scope that differs from the request when the response says so. Step-up
+re-consent still keeps already granted scopes, which are marked "(already
+granted)". Reconnecting after the user switched a write off shows that write on
+again. Migration `20261031210000` removes the database check that limited
+approval to requested or already granted scopes; `scopes_valid` still requires
+`cadence.read` and allows only the three advertised scopes. Evidence:
+`tests/sql/ticket-259-consent-offers-advertised-scopes.sql`,
+`tests/oauth-ui-actions.test.ts`, `tests/oauth-ui.dom.test.tsx`,
+`tests/oauth-server.test.ts`. Not verified: the live ChatGPT web write after
+deployment, which needs the hosted migration push and a Tier 2 run.
 
 Origins are limited to the configured issuer, `https://claude.ai` and
 `https://chatgpt.com`. Development additionally permits localhost/127.0.0.1 HTTP

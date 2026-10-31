@@ -44,6 +44,22 @@ it("shows step-up scopes already granted as selected, and lets the user clear th
     expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read", "cadence.behaviors.write"]);
   } finally { await act(() => root.unmount()); container.remove(); }
 });
+it("Ticket 259: a read-only request shows all three permissions with both writes on, and a switched-off write is not submitted", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  // The view getConsentPageData builds for a client that requested only cadence.read.
+  const readOnlyRequest: ConsentView = { ...consent, clientName: "ChatGPT", verified: true, redirectHost: "chatgpt.com" };
+  const html = renderToStaticMarkup(<ConsentForm consent={readOnlyRequest} action={action} />);
+  for (const text of ["Read tracking data", "Change Occurrence statuses and notes", "Create, edit, archive, and restore Behaviors"]) expect(html).toContain(text);
+  const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(() => root.render(<ConsentForm consent={readOnlyRequest} action={action} />));
+    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    expect([...inputs].map((input) => [input.value, input.checked])).toEqual([["cadence.occurrences.write", true], ["cadence.behaviors.write", true]]);
+    expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"]);
+    await act(() => inputs[1].click());
+    expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read", "cadence.occurrences.write"]);
+  } finally { await act(() => root.unmount()); container.remove(); }
+});
 it("shows grant metadata, accessible Disconnect and activity without payloads", () => {
   const html = renderToStaticMarkup(<ConnectedAppsPanel timezone="UTC" action={action} view={{ error: null, grants: [{ grantId: "grant", clientId: "client", clientName: "Fixture app", clientUri: null, logoUri: null, verifiedClient: null, scopes: ["cadence.read"], createdAt: "2026-10-18T12:00:00Z", lastUsedAt: null }], activity: [{ activityId: 1, grantId: "grant", clientName: "Fixture app", operation: "get_timeline", outcome: "success", errorCode: null, occurredAt: "2026-10-18T12:00:00Z" }] }} />);
   for (const text of ["Read tracking data", "Connected:", "Not used yet", 'aria-label="Disconnect Fixture app"', "Recent activity", "get timeline", "success"]) expect(html).toContain(text);

@@ -1175,8 +1175,10 @@ finish capture remains unsupported and no generation occurs when toggling.
 `/oauth/consent` page. The page uses a single narrow column, native checkboxes,
 and existing underlined Allow and Deny actions. It displays the client name,
 browser-loaded logo when supplied, verified/unverified label, redirect host,
-and signed-in account. Read is required; each requested write permission can
-be switched off independently. Read disclosure includes sensitive notes and
+and signed-in account. Read is required. The page offers every advertised write
+permission, including writes the client did not request; each starts on and can
+be switched off independently (Ticket 259). Permissions the client already holds
+are marked "(already granted)". Read disclosure includes sensitive notes and
 names excluded Calendar, travel, Daily Brief, and email data. Persistent access
 is disclosed when requested. Errors ask the user to restart from the client.
 

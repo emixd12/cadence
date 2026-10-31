@@ -96,6 +96,11 @@ describe("OAuth HTTP routes", () => {
     expect(body.expires_in).toBeGreaterThan(3500);
     expect(rpc).toHaveBeenCalledWith("oauth_exchange_authorization_code", expect.objectContaining({ p_code_hash: hashToken("code"), p_access_token_hash: hashToken(body.access_token) }));
   });
+  it("Ticket 259: returns write scopes the user granted at consent even when the client asked only for read", async () => {
+    overrides.oauth_exchange_authorization_code = { ...issue, scopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"] };
+    const body = await (await token(exchange())).json();
+    expect(body.scope).toBe("cadence.read cadence.occurrences.write cadence.behaviors.write offline_access");
+  });
   it.each(["pkce mismatch", "expired code", "reused code", "wrong redirect", "revoked grant"])("maps %s to invalid_grant", async () => {
     overrides.oauth_exchange_authorization_code = { ok: false, error: "invalid_grant" };
     expect(await (await token(exchange())).json()).toEqual({ error: "invalid_grant" });
