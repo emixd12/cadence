@@ -36,7 +36,7 @@ const CLIENTS = {
  * write: 'success' | 'denied' | null (no write at all).
  */
 function makeWorld(name, { stepUp = false, write = 'success', user = A, extraGrant = false } = {}) {
-  const c = CLIENTS[name];
+  const c = CLIENTS[name] ?? CLIENTS[name.replace(/-(partial|read)$/, '')];
   const clients = [{ client_ref: id(1), ...c, application_type: 'web', t: 5 }];
   const grants = [{ grant_id: id(3), client_ref: id(1), user, scopes: stepUp ? ['cadence.read'] : FULL, t: 10,
     reconsent: stepUp ? { t: 40, scopes: FULL } : null, revokeT: null }];
@@ -50,6 +50,8 @@ function makeWorld(name, { stepUp = false, write = 'success', user = A, extraGra
   if (extraGrant) activity.push({ id: 9, grant_id: id(30), client_ref: id(2), user, operation: 'create_behavior', outcome: 'success', error_code: null, t: 21 });
   if (stepUp) activity.push({ id: 2, grant_id: id(3), client_ref: id(1), user, operation: 'create_behavior', outcome: 'denied', error_code: 'insufficient_scope', t: 30 });
   if (write === 'success') activity.push({ id: 3, grant_id: id(3), client_ref: id(1), user, operation: 'create_behavior', outcome: 'success', error_code: null, t: 50 });
+  if (write === 'both') activity.push({ id: 3, grant_id: id(3), client_ref: id(1), user, operation: 'create_behavior', outcome: 'success', error_code: null, t: 50 },
+    { id: 4, grant_id: id(3), client_ref: id(1), user, operation: 'set_occurrence_status', outcome: 'denied', error_code: 'insufficient_scope', t: 60 });
   if (write === 'denied') activity.push({ id: 3, grant_id: id(3), client_ref: id(1), user, operation: 'set_occurrence_status', outcome: 'denied', error_code: 'insufficient_scope', t: 50 });
   return { clients, grants, families, refreshes, activity };
 }
@@ -136,8 +138,27 @@ describe('registry parity', () => {
   });
 });
 
+const WEB_VARIANT = /-(partial|read)$/;
+
+describe('Ticket 256 web variants on the local db source', () => {
+  it('claude-web-partial: needs the Behavior write and then a scope-refused Occurrence write', async () => {
+    const ok = await runWatch({ world: makeWorld('claude-web-partial', { write: 'both' }), opts: { expect: 'claude-web-partial' }, root: mkdtempSync(join(tmpdir(), 'watch256-')) });
+    expect(ok.code).toBe(0);
+    expect(ok.out).toMatch(/ok {4}occurrence-write-denied/);
+    const miss = await runWatch({ world: makeWorld('claude-web-partial'), opts: { expect: 'claude-web-partial', timeoutMs: 60_000 }, root: mkdtempSync(join(tmpdir(), 'watch256-')) });
+    expect(miss.code).toBe(1);
+    expect(miss.out).toMatch(/MISS {2}occurrence-write-denied/);
+  });
+  it('claude-web-read: a consent and one read are enough', async () => {
+    const r = await runWatch({ world: makeWorld('claude-web-read', { write: 'none' }), opts: { expect: 'claude-web-read' }, root: mkdtempSync(join(tmpdir(), 'watch256-')) });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('scenario claude-web-read: satisfied');
+    expect(r.out).not.toContain('write-succeeded');
+  });
+});
+
 describe('scenarios on the local db source', () => {
-  for (const name of Object.keys(SCENARIOS)) {
+  for (const name of Object.keys(SCENARIOS).filter((n) => !WEB_VARIANT.test(n))) {
     const api = name.endsWith('-api');
     it(`${name}: passes on a full run`, async () => {
       const root = mkdtempSync(join(tmpdir(), 'watch250-'));

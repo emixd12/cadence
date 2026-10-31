@@ -221,7 +221,7 @@ const claudeWeb = Object.freeze({
     const deadline = Date.now() + timeoutMs;
     const row = page.getByRole('row', { name: exact(`View ${name}`) });
     for (;;) {
-      const yours = await waitVisible(page.getByRole('radio', { name: exact('Yours') }), Math.max(0, deadline - Date.now()));
+      const yours = await waitVisible(page.getByRole('radio', { name: /^\s*Yours\b/ }), Math.max(0, deadline - Date.now()));
       if (!yours) throw new WebStop('page-changed', 'connector-list');
       if (await yours.getAttribute('aria-checked').catch(() => null) !== 'true') await yours.click({ timeout: 5_000 }).catch(() => {});
       const found = await waitVisible(row, 1_000);
@@ -244,10 +244,16 @@ const claudeWeb = Object.freeze({
   },
   async reconnect(page, entry, name) {
     await entry.click();
-    const connect = await waitVisible(clickable(page.getByRole('main'), exact('Connect')), 10_000);
+    // A connector whose grant was revoked shows Reconnect next to Disconnect (Ticket 256).
+    const connect = await waitVisible(clickable(page.getByRole('main'), exact('Connect', 'Reconnect')), 10_000);
     if (connect) { await connect.click(); return; }
-    await clickNamed(page, exact(`More options for ${name}`), 'connector-reconnect');
-    await clickNamed(page, exact('Disconnect'), 'connector-reconnect');
+    // Live layout (Ticket 256): Disconnect sits in the page and the options menu holds only Remove.
+    const direct = await waitVisible(clickable(page.getByRole('main'), exact('Disconnect')), 0);
+    if (direct) await direct.click();
+    else {
+      await clickNamed(page, exact(`More options for ${name}`), 'connector-reconnect');
+      await clickNamed(page, exact('Disconnect'), 'connector-reconnect');
+    }
     await confirmIfAsked(page, exact('Disconnect', 'Confirm'));
     await clickNamed(page, exact('Connect'), 'connector-reconnect', { scope: page.getByRole('main') });
   },

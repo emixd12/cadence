@@ -63,7 +63,8 @@ const activeGrants = () => state.grants.filter((g) => !g.revokedAt);
 const grantFor = (client) => activeGrants().find((g) => g.client_name === client);
 
 function toolCall(op, outcome) {
-  const grant = grantFor(state.flavor === 'chatgpt' ? 'ChatGPT' : 'Claude');
+  const client = state.flavor === 'chatgpt' ? 'ChatGPT' : 'Claude';
+  const grant = grantFor(client) ?? (state.ignoreRevocation ? state.grants.filter((g) => g.client_name === client).at(-1) : undefined);
   state.activity.unshift({ activity_id: randomUUID(), grant_id: grant?.grant_id ?? null, operation: op, outcome, occurred_at: iso() });
 }
 
@@ -148,10 +149,15 @@ function renderSettings() {
       document.body.append(menu);
     } }, '...'));
     if (!c.connected) main.append(el('p', {}, 'You started connecting but did not finish.'), el('button', { onclick: () => window.open(authorizeUrl(S.requestScopes), 'oauth', 'popup') }, 'Connect'));
+    // Live layout (Ticket 256): a connector whose grant was revoked needs attention and shows
+    // Disconnect and Reconnect directly; its More options menu holds only Remove.
+    else if (S.needsAttention) main.append(el('button', {}, 'Disconnect'), el('button', { onclick: () => window.open(authorizeUrl(S.requestScopes), 'oauth', 'popup') }, 'Reconnect'));
+    // A connected connector in the live layout: Disconnect in the page, Connect after it.
+    else if (S.directDisconnect) main.append(el('button', { onclick: async () => { await post('/api/disconnect'); location.reload(); } }, 'Disconnect'));
     return;
   }
   main.append(el('div', { role: 'tablist' }, el('button', { role: 'tab', 'aria-selected': 'true' }, 'Connectors')));
-  const yours = el('button', { role: 'radio', 'aria-checked': 'false' }, 'Yours');
+  const yours = el('button', { role: 'radio', 'aria-checked': 'false' }, 'Yours', ...(S.needsAttention ? [el('span', {}, ', 1 needs attention')] : []));
   main.append(el('div', { role: 'radiogroup', 'aria-label': 'Connectors' }, yours, el('button', { role: 'radio', 'aria-checked': 'true' }, 'Discover')));
   main.append(el('button', { 'aria-label': 'Add connector', onclick: () => {
     const menu = el('div', { role: 'menu', 'aria-label': 'Add connector' });
@@ -278,7 +284,8 @@ function renderChat() {
       m.append(el('button', { onclick: async () => { m.remove(); stop.remove(); show(await post('/api/approve')); } }, flavor === 'chatgpt' ? 'Confirm' : 'Allow once'));
     } else if (r.kind === 'reauth') {
       const m = assistant('Cadence needs more access.', false);
-      m.append(el('button', { onclick: () => window.open(authorizeUrl(['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write']), 'oauth', 'popup') }, 'Connect'));
+      // Live Claude web (Ticket 256) renders the reconnect card outside the reply element.
+      (S.reauthOutsideReply ? main : m).append(el('button', { onclick: () => window.open(authorizeUrl(['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write']), 'oauth', 'popup') }, 'Connect'));
       const poll = setInterval(async () => { const s = await (await fetch('/api/state')).json(); if (s.stepUpDone) { clearInterval(poll); show(await post('/api/resume')); } }, 200);
     } else if (r.kind === 'streaming') {
       assistant('Working', true);
@@ -598,6 +605,52 @@ describe('Claude web stub', () => {
     expect(state.messages.every((m) => m.startsWith('[Cadence QA] '))).toBe(true);
     expect(state.messages).toHaveLength(2);
     expect(activeGrants()).toHaveLength(0);
+  }, 120_000);
+});
+
+describe('Ticket 256 Claude web scenarios', () => {
+  it('partial-consent: grants read and Behavior writes only, runs every prompt and keeps the chats', async () => {
+    // The live "Yours" filter reads "Yours, 1 needs attention" when any connector needs attention.
+    resetState({ connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }], needsAttention: true });
+    const out = await scenario('claude-web', 'partial-consent');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    const steps = parsed(out.lines).map((e) => e.step);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(parsed(out.lines).find((e) => e.step === 'connect').grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.read']);
+    expect(parsed(out.lines).find((e) => e.step === 'watcher').watcherScenario).toBe('claude-web-partial');
+    expect(state.messages.map((m) => m.slice(0, 12))).toEqual(['[Cadence QA]', '[Cadence QA]', '[Cadence QA]']);
+    expect(state.messages[0]).toContain('get_adherence_summary');
+    expect(state.chats.every((c) => !c.archived)).toBe(true);
+    expect(activeGrants()).toHaveLength(0);
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it('step-up: finds the reconnect card outside the reply element', async () => {
+    resetState({ requestScopes: ['cadence.read'], stepUp: true, reauthOutsideReply: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    const out = await scenario('claude-web', 'step-up');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).find((e) => e.step === 'prompt-write').consentCount).toBe(1);
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it('full-disconnect: revokes as the user between prompts and proves nothing succeeds afterwards', async () => {
+    resetState({ connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }], directDisconnect: true });
+    const out = await scenario('claude-web', 'full-disconnect');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    const steps = parsed(out.lines).map((e) => e.step);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'revoke-as-user', 'prompt-read', 'post-revoke-check', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(parsed(out.lines).find((e) => e.step === 'revoke-as-user').outcome).toBe('revoked');
+    expect(parsed(out.lines).find((e) => e.step === 'post-revoke-check')).toMatchObject({ grantActive: false, successAfterCount: 0 });
+    expect(activeGrants()).toHaveLength(0);
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it('full-disconnect: stops when a call on the revoked grant still succeeds', async () => {
+    resetState({ connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    // A server that ignores revocation: later calls are attributed to the revoked grant.
+    state.ignoreRevocation = true;
+    const out = await scenario('claude-web', 'full-disconnect');
+    expect(out.result).toMatchObject({ ok: false, reason: 'revoked-grant-still-works', step: 'post-revoke-check' });
   }, 120_000);
 });
 
