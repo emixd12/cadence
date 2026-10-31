@@ -3,10 +3,6 @@ name: Public Trust evidence
 on:
   workflow_dispatch:
     inputs:
-      prepare_only:
-        description: Run the reviewed one-off Preview access diagnostic without collecting evidence
-        type: boolean
-        default: false
       target:
         description: Protected Actions environment
         type: choice
@@ -50,67 +46,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  diagnose-preview-access:
-    if: >-
-      github.event_name == 'workflow_dispatch' && inputs.prepare_only &&
-      inputs.target == 'preview' && github.repository == 'emixd12/cadence' &&
-      github.ref == 'refs/tags/trust-preview-diagnostic-232'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: public-trust-preview
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout reviewed diagnostic code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: 8892fc4b377f864d4573f4fdabba042e782f5446
-          persist-credentials: false
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24.x
-      - name: Diagnose temporary Preview access once
-        env:
-          TRUST_SOURCE_COMMIT: f92268549739f3056c4770d742b3da6255d875a3
-          TRUST_APPLICATION_DEPLOYMENT_ID: dpl_3SEh4BRFBuZFszCX3dLs1pDzZJQ2
-          TRUST_APPLICATION_DEPLOYMENT_URL: https://cadence-5hemp3ze0-emis-projects-4c886aeb.vercel.app
-          TRUST_MARKETING_DEPLOYMENT_ID: dpl_3J5Giod6WZbSGU2dHpSEiGmTngCv
-          TRUST_MARKETING_DEPLOYMENT_URL: https://cadence-marketing-hrhkbp4x5-emis-projects-4c886aeb.vercel.app
-          TRUST_PAGES_ORIGIN: https://emixd12.github.io/cadence/
-          VERCEL_APPLICATION_PROJECT_ID: prj_9tZKRXZ6IdT56ZLKVSmoJH5AAYhs
-          VERCEL_MARKETING_PROJECT_ID: prj_BLlsxoaz1wSvWuK7xcZLLkHglQcR
-          VERCEL_TEAM_ID: team_BxWfRYU1gqrl6Ba6t7Vm3wp1
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          TRUST_TARGET: preview
-        shell: bash
-        run: |
-          umask 077
-          diagnostic_dir="$RUNNER_TEMP/cadence-trust-diagnostic-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          mkdir -m 700 -- "$diagnostic_dir"
-          trap 'rm -rf -- "$diagnostic_dir"' EXIT
-          set +e
-          node scripts/prepare-public-trust-input.mjs --output "$diagnostic_dir/input.json" >"$diagnostic_dir/stdout" 2>"$diagnostic_dir/stderr"
-          diagnostic_exit=$?
-          set -e
-          if [ "$diagnostic_exit" -eq 0 ]; then
-            printf '%s\n' 'Preview access diagnostic succeeded; private input removed.'
-          else
-            diagnostic_error=$(<"$diagnostic_dir/stderr")
-            if [[ "$diagnostic_error" =~ ^Unable\ to\ create\ a\ temporary\ Preview\ access\ boundary\ for\ (application|marketing)\ \(HTTP\ ([345][0-9][0-9])\)\.$ ]]; then
-              printf '%s\n' "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-            else
-              printf '%s\n' 'Preview access diagnostic failed without an HTTP status.'
-            fi
-          fi
-          exit "$diagnostic_exit"
-      - name: Remove private diagnostic files
-        if: always()
-        shell: bash
-        run: rm -rf -- "$RUNNER_TEMP/cadence-trust-diagnostic-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-
   collect:
-    if: ${{ !inputs.prepare_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: public-trust-${{ inputs.target || 'production' }}
@@ -189,7 +125,7 @@ jobs:
 
   publish:
     needs: collect
-    if: ${{ !inputs.prepare_only && (github.event_name == 'schedule' || inputs.target == 'production') }}
+    if: github.event_name == 'schedule' || inputs.target == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
