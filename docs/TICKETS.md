@@ -14715,15 +14715,19 @@ Scope and acceptance:
 
 ## Ticket 232: Production deployment and live client acceptance
 
-Status: in progress. The disabled release deployed October 18, 2026 through PR #108
-(main `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`). Six approved migrations reached
-hosted production, both Node 24 sites were Ready, and the final app deployment
-bound the matching marketing deployment. MCP/OAuth/discovery remained disabled
-(503); the unconfigured challenge returned 404. Scheduled maintenance observation,
-public activation and live-client acceptance remain open. Evidence:
-`docs/qa/mcp-server.md`, "Disabled production release — October 18, 2026", and
-`STATUS.md`, "Tickets 220–232: Cadence MCP server and AI plugins — October 18, 2026".
-Reconciled October 27, 2026. Earlier status: production preparation only (wave 5).
+Status: live acceptance complete October 31, 2026. MCP is live on production since
+October 29 (enabled on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE`, source `eb5afa5`). The
+live-acceptance items below have evidence: the October 29 manual run, the October 30
+cleanup, the fixes in #170, #171 and #172, and Ticket 256's automated retest. Claude
+web's write-scope-off and Disconnect checks were proven with other clients; see
+"Known limits". Test grants and data were cleaned up and read back; synthetic
+accounts A and B are kept for later acceptance runs. Remaining: a Trust marketing-ID refresh and Trust Preview → Production run
+after the evidence merge. Observing the scheduled 00:05 UTC OAuth expiry maintenance
+is still not recorded. Evidence: `docs/qa/mcp-server.md`, "Production activation
+and live client acceptance — October 29–31, 2026 (Ticket 232)", and `STATUS.md`,
+"Ticket 232 live acceptance complete — October 31, 2026".
+Earlier status: the disabled release deployed October 18, 2026 through PR #108
+(main `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`); reconciled October 27, 2026.
 Dependencies: 226–231 and explicit owner authorization for every provider step.
 
 Goal: prove the deployed server works in real Claude and ChatGPT clients.

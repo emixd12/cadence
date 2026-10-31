@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Ticket 232 live acceptance complete — October 31, 2026
+
+MCP is live on production (`https://app.cadence-me.com/mcp`). It was enabled
+October 29 at 20:43 UTC on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE` (source `eb5afa5`), and
+production now serves `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` from `7ff01a5`. The evidence
+record, with playbook labels, run IDs and receipt paths, is in
+`docs/qa/mcp-server.md`, "Production activation and live client acceptance —
+October 29–31, 2026 (Ticket 232)".
+
+- October 29 manual run with synthetic accounts A and B: fixtures, signing-key
+  custody and rotation to `e5d7f0dd` with session continuity, hosted isolation,
+  activation and the signer gate, Claude Code (B), ChatGPT developer mode (A: reads,
+  write refused by ChatGPT, revocation), MCP Inspector (A: consent narrowing,
+  step-up, writes), and linked-desktop sync on the test Mac. Cleanup ran October 30
+  at 23:03 UTC and was read back: 0 active grants, all fixture Behaviors archived.
+- Defects found and fixed: #170 (`b43e0d6`), #171 (`239034b`) and #172 (`7ff01a5`).
+  Their migrations `20261030230000` and `20261031003000` are on the hosted database.
+- Ticket 256's automated retest passed every client on production. The exception
+  is ChatGPT step-up, a known ChatGPT behavior.
+- Known limits: ChatGPT never steps up; the Trust refresh does not run cross-account
+  RLS isolation; Trust's secret scanning is unavailable; backend timeout
+  cancellation is unproven; consent write switches default to on by owner decision.
+- Remaining: one Trust marketing-ID refresh and a Trust Preview → Production run
+  after this record merges. Observing the scheduled 00:05 UTC OAuth expiry
+  maintenance is still not recorded. Directory submission is out of scope.
+
+Platform impact: deployed web MCP and OAuth server. Desktop: linked sync check only,
+no code change. Marketing and future mobile: not applicable. Messaging impact: none.
+
 ## Claude web verified label for its metadata client — October 31, 2026
 
 Ticket 256 found that Claude web's connection returned `503 server_error` on
@@ -22,7 +51,10 @@ UTC): keep the label and widen the rule.
   registers Claude web's exact document through `/oauth/authorize` and reaches the
   consent redirect. Under the previous rule it returns the production
   `503 server_error`. `habit-tracking-app` was not touched.
-- Not verified: hosted push and readback, and the live Claude web connection.
+- Hosted: PR #172 merged as `7ff01a5`, and migration `20261031003000` is on the
+  hosted database (read back October 31). Ticket 256 run `20261031T004536Z-2199d9`
+  connected Claude web on production with the verified `claude` label (Deployed
+  behavior).
 
 Platform impact: deployed web OAuth server only. Desktop, marketing and future
 mobile: not applicable. Messaging impact: none.
@@ -35,8 +67,8 @@ connector and the OpenAI Responses MCP tool pass only text to the model, so they
 could not read results. `lib/mcp/server.ts` now also returns the same data
 serialized as JSON in one text block, as the MCP tools spec recommends.
 `structuredContent` and error results are unchanged. Tests cover every registry
-tool. Merge waits until Ticket 256's browser phase finishes. Not verified: the two
-API clients against production after deploy.
+tool. Merged as PR #171 (`239034b`). Ticket 256 run `prod-20261031-t1b` passed both
+API clients against production.
 
 Platform impact: deployed web MCP server only. Desktop, marketing and future mobile:
 not applicable. Messaging impact: none.
@@ -45,7 +77,8 @@ not applicable. Messaging impact: none.
 
 One PR on `fix/oauth-client-extra-grant-types` fixes the October 29 live-acceptance
 defects. The owner decided (October 30) to merge and deploy after independent review
-and green CI. The hosted migration push is not done and needs the owner's explicit go.
+and green CI. Merged as PR #170 (`b43e0d6`); migration `20261030230000` is on the
+hosted database (read back October 31).
 
 - Claude web metadata (`4fb3ee6`): Claude web's CIMD
   (`https://claude.ai/oauth/mcp-oauth-client-metadata`) also lists the JWT-bearer
@@ -58,8 +91,6 @@ and green CI. The hosted migration push is not done and needs the owner's explic
   `oauth_finish_pending` (accepts requested plus already granted scopes). The
   consent screen marks those **already granted** and keeps them selected; clearing
   one still narrows. Fixture `tests/sql/ticket-232-oauth-reconsent-scopes.sql`.
-  Until the hosted push, the deployed app reads no `granted_scopes` and behaves as
-  before.
 - ChatGPT write scopes: the initial 401 challenged only `cadence.read`, and MCP
   clients request a challenged scope set. Challenged scopes mean required, and the
   writes are optional, so the initial 401 now omits `scope`; clients fall back to
@@ -78,7 +109,8 @@ and green CI. The hosted migration push is not done and needs the owner's explic
   An earlier direct start of `cadence-reconsent-232` without the proxy published
   ports on all interfaces; it was stopped within a minute, before any fixture ran.
   `habit-tracking-app` was not touched.
-- Not verified: hosted push and readback, Claude web and ChatGPT links after deploy.
+- Ticket 256 verified on production: ChatGPT web linked with all three scopes
+  (`20261030T234917Z-205816`); Claude web passed after #172.
 
 Platform impact: web OAuth server and MCP (deployed web). Desktop, marketing and
 future mobile: not applicable; the CodeQL fix is developer tooling only. Messaging
@@ -2280,7 +2312,7 @@ superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets
 - Ticket 229 (developer documentation): review corrections implemented October 18, 2026; awaiting independent wave-4 re-review. Literal constraint rendering and nullable nested tables now have rendered-DOM regressions. Marketing `/developers` includes guides, generated references for all 16 tools, fixture-validated examples, Markdown mirrors and discovery outputs. Web Settings links to the docs; desktop and future mobile add no interface. Node 26 repository and marketing checks pass. Hosted launch and live-client acceptance remain pending.
 - Ticket 230 (Claude and ChatGPT plugin packages): implemented locally October 18, 2026; awaiting independent wave-4 review. Three shared skills, standalone Claude/OpenAI packages, root marketplace and reproducible ignored ZIPs. Claude strict validation, manifest/schema checks, registry-reference tests and all repository gates pass on Node 26. Distribution only; marketing links in Ticket 229; web, desktop and mobile not applicable. OpenAI portal scans, legal approval, publication and live installation remain unverified/owner-gated.
 - Ticket 231 (privacy disclosure and directory submission packet): review correction implemented October 18, 2026; awaiting independent re-review. Reviewer instructions now separate identical-input replay, changed-input key reuse rejection, and new-key stale-revision conflict; focused integration-write tests pass. `docs/qa/mcp-directory-submission.md` contains unpublished Privacy/Terms drafts, listing copy, reviewer-account options, test cases, recording script and owner release steps. OpenAI challenge route returns exact plain text or 404; focused tests, full tests, build, lint and drift checks pass. Typecheck passes after Ticket 230's shared-file correction; independent compiler recheck passes. Served legal pages unchanged. Web route and marketing listing copy; desktop/mobile not applicable. Legal approval, health-data eligibility, reviewer access and hosted acceptance remain owner gates; no hosted actions.
-- Ticket 232 (production deployment and live client acceptance): disabled release deployed October 18, 2026 from PR108 merge 280b6eacc9ebcabbd9c5b675c67adf1c01870c8d (reviewed tree 81eface). Six approved migrations are deployed; hosted history is 86 and the family-deadline function hashes/permissions match review. Both Node24 production sites are Ready; final web redeploy binds the Ready marketing deployment. MCP/OAuth/discovery return 503, challenge returns 404, and approved Privacy/Terms/marketing text and October18 dates match. Public Trust correctly marks prior-release evidence Stale; its Preview refresh exposed a validator collision with a public tool-reference path. A local field-scoped correction is under review; publication remains paused. Scheduled maintenance and live-client acceptance remain unverified. No public activation, signing-key change, manual scheduler invocation or live account test occurred. Web/marketing released; desktop sync acceptance remains separately gated and future mobile deferred.
+- Ticket 232 (production deployment and live client acceptance): live acceptance complete October 31, 2026; MCP live on production since October 29 (enabled on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE`, source `eb5afa5`; now `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` from `7ff01a5`). The October 29 manual run (fixtures, key rotation to `e5d7f0dd` with continuity, isolation, activation and signer gate, Claude Code, ChatGPT, Inspector, linked desktop) and the October 30 cleanup are recorded with evidence labels in `docs/qa/mcp-server.md`. Defects fixed in #170, #171 and #172; their migrations are on the hosted database. Ticket 256 passed every client on production except ChatGPT step-up (known ChatGPT behavior). Remaining: a Trust marketing-ID refresh and Trust Preview → Production run after the evidence merge; scheduled 00:05 UTC maintenance observation is not recorded. Earlier: the disabled release deployed October 18 from PR108 merge `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`. Web live; desktop sync check only; marketing unchanged; future mobile deferred.
 
 ## Ticket 215: Three-input travel Settings and Behavior Where — October 19, 2026
 
