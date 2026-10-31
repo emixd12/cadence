@@ -451,20 +451,27 @@ Current state lives in `STATUS.md`.
 All live runs used two synthetic test accounts, A and B, and no real user data.
 The hosted fixture run started 2026-10-28T02:17:18.882Z; its cleanup deadline was
 2026-11-04T02:17:18.882Z. Sessions came from a loopback PKCE sign-in broker that
-kept tokens in memory only. No service role, admin link or stored token was used.
+kept tokens in memory only. Ordinary account flows used only the test accounts'
+own sessions, with no service role, admin link or stored token. Two kinds of step
+used privileged access: the cleanup archive transaction ran as `postgres`, and
+provider operations (Supabase Management API, Vercel, 1Password) used the operator's
+credentials.
 Mutating steps used one-attempt transports, and ambiguous outcomes were reconciled
 by reading back, never by sending the request again. Receipts differ by tool:
 
 - Acceptance cleanup and the archive execution reserve their receipt with exclusive
   creation (`wx`, 0600) before the first write.
-- Key custody writes its receipt with mode 0600 but without exclusive creation.
+- Key custody and activation write their receipts with mode 0600 but without
+  exclusive creation.
 - The signer gate writes its receipt after client registration and the token
   exchange.
 
-Reviewed tooling. Each commit was approved by the independent verifier before it
-ran:
+Reviewed tooling. The independent verifier approved each tool at the commit listed
+last in its row before it ran. Earlier commits in a row are lineage, not separate
+approvals; for example, `b30381d` was not approved, and its corrections end at the
+approved `f07ebca`.
 
-| Tool | Approved commit |
+| Tool | Lineage, ending at the approved commit |
 |---|---|
 | Fixture creation and archive SQL generator | `4841394`, `1fc0448`, `b30381d`, `f07ebca` |
 | Session broker (`scripts/mcp-session-broker.mjs`) | `39d779d` |
@@ -489,7 +496,7 @@ material, emails or note text.
 | 3. Function timeout metadata | Live provider | A read-only capture of owners, security mode, `search_path` and ACLs for the MCP write and OAuth functions. | `step3-timeout-metadata.json` |
 | 3. Activation | Deployed behavior | At 20:43, `CADENCE_MCP_ENABLED` was set to true with one variable change. One same-source redeploy followed: `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE` from `dpl_AE8GhYkk265Ek9tYdYTEc4bD8EgL`, source `eb5afa5`, Ready at 20:45. Readbacks passed: the 401 challenge, issuer, resource and marketing binding (`dpl_FxBP12vZPRz3mrdytwCNWrjdXwhj`). | `step3-activation-enable.json` |
 | 3. Signer gate | Deployed behavior | Passed at 20:58 as A with `cadence.read` (client `ad2a3c5e…`, grant `5d764426`). It saw A's 6 Behaviors and none of B's. | `step3-activation-gate.json` |
-| 3. Trust Preview | Source check | Run `40954263452` at `eb5afa5` validated its evidence. The gate failed on the adverse CodeQL `code_scanning` result (alert #21). Production was not dispatched, no waiver was given and nothing was published. | `trust-preview-40954263452/` |
+| 3. Trust Preview | Source check (code scanning, provenance); Live provider (hosted migration boundary); Deployed behavior (routes) | Run `40954263452` at `eb5afa5` validated its evidence. The gate failed on the adverse CodeQL `code_scanning` result (alert #21). Production was not dispatched, no waiver was given and nothing was published. | `trust-preview-40954263452/` |
 | 4. Claude Code as B | Deployed behavior | Connected. Grant `d3b99bcc` received all three tracking scopes in one consent, because the write switches default to on. It saw only B's Behaviors. It wrote two status events on B's Occurrence `fe91c08e`, which ended Unresolved. | `acceptance-grant-checkpoints.json` |
 | 5. ChatGPT developer mode as A | Deployed behavior | Linked asking for `cadence.read` only (grant `59e3ae31`). `search`, `fetch` and `list_behaviors` passed. ChatGPT refused a write on its own side without calling Cadence. Revoking the grant in Settings → Connected apps at 22:26:34 UTC stopped access. | `acceptance-grant-checkpoints.json` |
 | 6. MCP Inspector 2.13.0 as A | Deployed behavior | Consent narrowing held: the cleared Occurrences switch was not granted, so grant `9919ddc7` got `[read, behaviors.write]`. An Occurrence write returned `insufficient_scope` with a `WWW-Authenticate` step-up, which Inspector parsed. After step-up, the Occurrence write (`471a3766` → Completed) succeeded. Inspector created, renamed, archived and restored "Review practice" `d7b30845`. Defect: re-consent replaced the earlier scopes, and `behaviors.write` was lost at 22:49 (fixed in #170). | `acceptance-grant-checkpoints.json`, `acceptance-creations.json` |
@@ -514,12 +521,24 @@ material, emails or note text.
 | #171 | `239034b` (2026-10-31 00:13 UTC) | Successful tool results also return their data as JSON text. | None |
 | #172 | `7ff01a5` (2026-10-31 00:42 UTC) | Claude web's metadata-document client may carry the verified `claude` label. | Migration `20261031003000_allow_claude_web_cimd_label` |
 
-A read-only hosted readback on October 31 lists both migrations; the latest is
+A read-only hosted readback on October 31 (Live provider) lists both migrations; the latest is
 `20261031003000`. Production `app.cadence-me.com` serves
-`dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` (Ready, source `7ff01a5`). Ticket 256 below
-verified each fix against production (Deployed behavior).
+`dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` (Ready, source `7ff01a5`).
 
-Trust refresh after #172 (Source check): snapshot `20261031T005211Z-7ff01a5eb167`
+Verification is split by kind:
+
+- Client flows (Deployed behavior): Ticket 256 below verified the Claude web link
+  (#170, #172), ChatGPT's three-scope link (#170 challenge change), and the API
+  clients reading tool results (#171).
+- CodeQL (Source check): alert #21 was fixed at 2026-10-30 23:32 UTC, and main has
+  0 open code-scanning alerts (GitHub API readback, October 31).
+- Re-consent and label SQL boundaries (Fixture or contract check): the verifier
+  replayed all migrations on isolated local databases and ran the SQL fixtures for
+  #170 (`.intent/artifacts/verify-pr170/`, approved at `afd6704`) and #172 (approved
+  at `ac9c98d`). These are not production proofs of every SQL boundary.
+
+Trust refresh after #172 (Source check for code scanning and provenance; Live
+provider for the hosted migration boundary; Deployed behavior for routes): snapshot `20261031T005211Z-7ff01a5eb167`
 binds app `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` and marketing
 `dpl_7pCxZs9seC1qT855BZhgwUK3hHNs` at `7ff01a5`. Two checks did not pass:
 `secret_scanning` reported unavailable, and `cross_account_rls_isolation` did not
@@ -552,7 +571,7 @@ in `.intent/acceptance/<run ID>/` in that worktree.
 
 | Tier | Client and scenario | Evidence class | Result | Run ID |
 |---|---|---|---|---|
-| 0 | Protocol suite (SDK client) | Deployed behavior | Pass, 92/92. Covers discovery, tool list equals the registry (16), every read tool, step-up 403 for every write on a read grant, writes, refresh rotation, wrong-resource and revoked-token refusals, and B-to-A isolation (not_found for every by-ID tool). | `prod-20261030-t0` |
+| 0 | Protocol suite (SDK client) | Deployed behavior | Pass, 92/92, of which one check is a deliberate skip of rate-limit exhaustion on production. Covers discovery, tool list equals the registry (16), every read tool, step-up 403 for every write on a read grant, writes, refresh rotation, wrong-resource and revoked-token refusals, and B-to-A isolation (not_found for every by-ID tool). | `prod-20261030-t0` |
 | 1 | Claude Code, read-write | Deployed behavior | Pass | `prod-20261030-t1` |
 | 1 | Inspector CLI, read-write | Deployed behavior | Pass | `prod-20261030-t1` |
 | 1 | Anthropic API MCP connector, read-write | Deployed behavior | Failed on the first run (data only in `structuredContent`). Passed after #171. | `prod-20261030-t1`, `prod-20261031-t1b` |
@@ -580,8 +599,14 @@ records were not touched.
   but no live run showed a database call being cancelled at its deadline.
 - The consent write switches default to on by owner decision (October 30, 00:57
   UTC). One click grants writes unless the user clears them.
-- Pending: Claude web with a write switch cleared, and Claude web Disconnect in
-  Cadence followed by a failed call. Ticket 256 is running both. Meanwhile,
+- Pending: Claude web with a write switch cleared, Claude web Disconnect in Cadence
+  followed by a failed call, and Claude web's tool coverage. Ticket 256 is running
+  them. Tool coverage is split: the Tier 0 SDK client exercised all 16 tools
+  against the same production server, while Claude web's own coverage so far is the
+  read-write scenario (a read, a create and an archive). The scope's per-Claude
+  "every tool" requirement is not yet proven for Claude web.
+- Rate-limit exhaustion was not exercised on production; Tier 0 skips it by
+  design. Meanwhile,
   Inspector proved consent narrowing, ChatGPT and Settings → Connected apps proved
   revocation, and the protocol suite proved revoked-token refusal.
 - Directory submission is out of scope.
