@@ -14394,7 +14394,7 @@
         }
       ],
       "availability": "Signed in; consent also requires a valid browser-bound pending request.",
-      "success_result": "Issue a single-use authorization code for only the selected permissions. On re-consent, permissions the app already holds appear as already granted and stay selected unless the user clears them.",
+      "success_result": "Issue a single-use authorization code for only the selected permissions. The screen offers every advertised permission, including writes the app did not request, and each write starts selected (Ticket 259). On re-consent, permissions the app already holds appear as already granted and stay selected unless the user clears them.",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "oauth_grant"
@@ -14418,7 +14418,7 @@
           "tests/oauth-ui.dom.test.tsx",
           "tests/oauth-ui-actions.test.ts"
         ],
-        "notes": "Consent controls, safe view projections, server-action validation, step-up re-consent with already granted permissions, and revocation tested; tests/sql/ticket-232-oauth-reconsent-scopes.sql covers the database rule."
+        "notes": "Consent controls, safe view projections, server-action validation, step-up re-consent with already granted permissions, unrequested write permissions offered and granted only when left on (Ticket 259), and revocation tested; tests/sql/ticket-232-oauth-reconsent-scopes.sql and tests/sql/ticket-259-consent-offers-advertised-scopes.sql cover the database rule."
       },
       "platforms": {
         "web": {
@@ -14550,7 +14550,7 @@
         }
       ],
       "availability": "Signed in; consent also requires a valid browser-bound pending request.",
-      "success_result": "Change the permission draft; required read remains selected.",
+      "success_result": "Change the permission draft; required read remains selected. Every advertised write is offered and starts on, so switching one off removes it from the grant even when the app did not request it (Ticket 259).",
       "failure_result": "A failed request shows a recoverable error without exposing private details.",
       "effects": [
         "form_draft"

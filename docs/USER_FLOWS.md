@@ -961,7 +961,8 @@ setup (Ticket 212) links to the same Home and usual travel controls at
 2. Cadence validates the request. If signed out, use the existing Google login;
    Cadence returns to the same browser-bound consent request.
 3. Check the client name, verified/unverified label, redirect host, and Cadence
-   account. Read is required. Switch off either requested write permission to
+   account. Read is required. Both write permissions are offered and start on,
+   even if the client asked only to read (Ticket 259). Switch either off to
    narrow access. Notes may contain sensitive information.
 4. Choose Allow to issue a single-use code for the approved permissions, or Deny
    to return `access_denied` with the issuer. Both consume the pending request.

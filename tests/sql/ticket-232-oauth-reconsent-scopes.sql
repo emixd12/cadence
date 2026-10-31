@@ -30,7 +30,6 @@ declare
   v_id uuid;
   v_read jsonb;
   v_scopes text[];
-  v_rejected boolean;
 begin
   -- First consent: no prior grant, so nothing is shown as already granted.
   v_id := public.oauth_create_pending(repeat('d', 64), 'reconsent-fixture', 'https://client.example/callback',
@@ -81,19 +80,17 @@ begin
     raise exception 'Explicit narrowing did not narrow: %', v_scopes;
   end if;
 
-  -- A scope neither requested nor already granted is still rejected.
+  -- Ticket 259: consent offers every advertised scope, so the user may grant
+  -- a scope that was neither requested nor already granted.
   v_id := public.oauth_create_pending(repeat('d', 64), 'reconsent-fixture', 'https://client.example/callback',
     'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'https://app.cadence-me.com/mcp',
     array['cadence.read'], true, 'widen');
-  v_rejected := false;
-  begin
-    perform public.oauth_finish_pending(v_id, repeat('d', 64),
-      array['cadence.read', 'cadence.occurrences.write'], repeat('4', 64));
-  exception when sqlstate '22023' then
-    v_rejected := sqlerrm = 'oauth_invalid_scope';
-  end;
-  if not v_rejected then
-    raise exception 'An unrequested, ungranted scope was accepted';
+  perform public.oauth_finish_pending(v_id, repeat('d', 64),
+    array['cadence.read', 'cadence.occurrences.write'], repeat('4', 64));
+  select grant_row.scopes into v_scopes from cadence_oauth_private.grants grant_row
+  where grant_row.user_id = '23200000-0000-4000-8000-0000000002a1' and grant_row.revoked_at is null;
+  if v_scopes is distinct from array['cadence.occurrences.write', 'cadence.read'] then
+    raise exception 'The user''s consent choice was not stored exactly: %', v_scopes;
   end if;
 
   -- Another user sees none of user A's grant and cannot borrow its scopes.
@@ -105,15 +102,13 @@ begin
   if v_read -> 'granted_scopes' <> '[]'::jsonb then
     raise exception 'Another user saw granted scopes: %', v_read -> 'granted_scopes';
   end if;
-  v_rejected := false;
-  begin
-    perform public.oauth_finish_pending(v_id, repeat('d', 64),
-      array['cadence.read', 'cadence.behaviors.write'], repeat('5', 64));
-  exception when sqlstate '22023' then
-    v_rejected := sqlerrm = 'oauth_invalid_scope';
-  end;
-  if not v_rejected then
-    raise exception 'Another user borrowed scopes from a different account''s grant';
+  -- User B's own approval creates B's own grant and leaves user A's untouched.
+  perform public.oauth_finish_pending(v_id, repeat('d', 64),
+    array['cadence.read', 'cadence.behaviors.write'], repeat('5', 64));
+  select grant_row.scopes into v_scopes from cadence_oauth_private.grants grant_row
+  where grant_row.user_id = '23200000-0000-4000-8000-0000000002a1' and grant_row.revoked_at is null;
+  if v_scopes is distinct from array['cadence.occurrences.write', 'cadence.read'] then
+    raise exception 'Another user''s consent changed this grant: %', v_scopes;
   end if;
 
   -- A revoked grant no longer counts as already granted.
