@@ -1,5 +1,32 @@
 # Implementation Status
 
+## Claude web verified label for its metadata client — October 31, 2026
+
+Ticket 256 found that Claude web's connection returned `503 server_error` on
+production. Commit `4fb3ee6` labels Claude web's CIMD client
+(`https://claude.ai/oauth/mcp-oauth-client-metadata`) as verified `claude`, but
+`cadence_oauth_private.verified_client_matches` allowed `claude` only for DCR, so
+storing the client failed the `clients` check. Owner decision (October 31, 00:23
+UTC): keep the label and widen the rule.
+
+- Migration `20261031003000_allow_claude_web_cimd_label.sql` replaces only that
+  function. `claude` is now also valid for that exact CIMD client_id with exactly
+  `https://claude.ai/api/mcp/auth_callback`. The other label rules are unchanged.
+- `lib/services/oauth/clients.ts` applies the same condition, so Claude web's
+  client_id with any other redirect list registers unverified instead of failing.
+- Local verification on October 31 in the separate project `cadence-claude-cimd-232`
+  through the reviewed Docker proxy with only its project identity changed: start
+  replayed all 96 migrations, every published port on `127.0.0.1`. The new fixture
+  `tests/sql/ticket-232-claude-web-cimd-label.sql` and the 222/232 OAuth fixtures
+  pass. The new real-database test `tests/oauth-claude-web.local-integration.test.ts`
+  registers Claude web's exact document through `/oauth/authorize` and reaches the
+  consent redirect. Under the previous rule it returns the production
+  `503 server_error`. `habit-tracking-app` was not touched.
+- Not verified: hosted push and readback, and the live Claude web connection.
+
+Platform impact: deployed web OAuth server only. Desktop, marketing and future
+mobile: not applicable. Messaging impact: none.
+
 ## MCP tool results include their JSON as text — October 30, 2026
 
 Ticket 256 found that successful MCP tool results carried data only in

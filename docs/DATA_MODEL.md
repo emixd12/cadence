@@ -2297,7 +2297,15 @@ Scopes are exactly `cadence.read` (always required), `cadence.occurrences.write`
 and `cadence.behaviors.write`. `verified_client` (`claude`, `claude_code`,
 `chatgpt`) is accepted only for the exact known identity. A check constraint
 enforces it: Claude Code's CIMD URL, ChatGPT's CIMD URL or `chatgpt.com`
-connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback.
+connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback for
+DCR. Migration `20261031003000_allow_claude_web_cimd_label.sql` also accepts
+`claude` for Claude web's CIMD URL
+(`https://claude.ai/oauth/mcp-oauth-client-metadata`) with exactly the
+`https://claude.ai/api/mcp/auth_callback` redirect; before it, storing that client
+failed the check and `/oauth/authorize` returned 503. The app applies the same
+condition before labelling, so any other redirect list registers unverified.
+Local verification: `tests/sql/ticket-232-claude-web-cimd-label.sql` and
+`tests/oauth-claude-web.local-integration.test.ts`.
 
 `launch_rate_limits` is not reused. It is keyed by account and requires a user,
 while client registration happens before sign-in and MCP limits apply per grant.

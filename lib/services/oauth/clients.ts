@@ -100,7 +100,11 @@ export async function fetchClientMetadata(clientId: string, hop = fetchMetadataH
 function verifiedClient(clientId: string, type: "cimd" | "dcr", redirects: string[]): OAuthVerifiedClient | null {
   if (type === "cimd") {
     if (clientId === "https://claude.ai/oauth/claude-code-client-metadata") return "claude_code";
-    if (clientId === "https://claude.ai/oauth/mcp-oauth-client-metadata") return "claude";
+    // Mirrors cadence_oauth_private.verified_client_matches: Claude web's CIMD is
+    // verified only with exactly its callback; otherwise it registers unverified.
+    if (clientId === "https://claude.ai/oauth/mcp-oauth-client-metadata") {
+      return redirects.length === 1 && redirects[0] === "https://claude.ai/api/mcp/auth_callback" ? "claude" : null;
+    }
     if (clientId === "https://chatgpt.com/oauth/client.json") return "chatgpt";
     return null;
   }

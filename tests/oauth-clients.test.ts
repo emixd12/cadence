@@ -105,6 +105,9 @@ describe("client metadata and redirect validation", () => {
     expect(registration).toMatchObject({ applicationType: "web", verifiedClient: "claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] });
     expect(JSON.stringify(registration)).not.toContain("jwt-bearer");
     expect(validateClientMetadata(claudeWeb, "https://example.com/claude-lookalike", "cimd").verifiedClient).toBeNull();
+    // The database allows the CIMD 'claude' label only with exactly Claude web's callback.
+    expect(validateClientMetadata({ ...claudeWeb, redirect_uris: ["https://claude.com/api/mcp/auth_callback"] }, claudeWeb.client_id, "cimd").verifiedClient).toBeNull();
+    expect(validateClientMetadata({ ...claudeWeb, redirect_uris: ["https://claude.ai/api/mcp/auth_callback", "https://claude.com/api/mcp/auth_callback"] }, claudeWeb.client_id, "cimd").verifiedClient).toBeNull();
     expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["urn:ietf:params:oauth:grant-type:jwt-bearer"] }, claudeWeb.client_id, "cimd")).toThrow();
     expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["refresh_token", "client_credentials"] }, claudeWeb.client_id, "cimd")).toThrow();
     expect(() => validateClientMetadata({ ...claudeWeb, grant_types: ["authorization_code", 7] }, claudeWeb.client_id, "cimd")).toThrow();
