@@ -66,8 +66,12 @@ describe("consent actions", () => {
     expect(result.status).toBe("error"); expect(result.message).not.toContain("private"); expect(m.setCookie).not.toHaveBeenCalled();
   });
   it("projects the consent view without request state or redirect path", async () => {
-    m.getConsent.mockResolvedValue({ clientName: "App", logoUri: "https://client.example/logo.png", verifiedClient: null, redirectUri: "https://client.example/callback?private=1", scopes: ["cadence.read"], offlineAccess: true, state: "private-state" });
-    expect(await getConsentPageData(id)).toEqual({ requestId: id, accountId: m.user.id, email: m.user.email, clientName: "App", logoUri: "https://client.example/logo.png", verified: false, redirectHost: "client.example", scopes: ["cadence.read"], offlineAccess: true });
+    m.getConsent.mockResolvedValue({ clientName: "App", logoUri: "https://client.example/logo.png", verifiedClient: null, redirectUri: "https://client.example/callback?private=1", scopes: ["cadence.read"], grantedScopes: [], offlineAccess: true, state: "private-state" });
+    expect(await getConsentPageData(id)).toEqual({ requestId: id, accountId: m.user.id, email: m.user.email, clientName: "App", logoUri: "https://client.example/logo.png", verified: false, redirectHost: "client.example", scopes: ["cadence.read"], grantedScopes: [], offlineAccess: true });
+  });
+  it("shows a step-up request with the active grant's scopes, in canonical order", async () => {
+    m.getConsent.mockResolvedValue({ clientName: "App", logoUri: null, verifiedClient: "claude", redirectUri: "https://claude.ai/api/mcp/auth_callback", scopes: ["cadence.read", "cadence.behaviors.write"], grantedScopes: ["cadence.read", "cadence.occurrences.write"], offlineAccess: true, state: null });
+    expect(await getConsentPageData(id)).toMatchObject({ scopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"], grantedScopes: ["cadence.read", "cadence.occurrences.write"] });
   });
 });
 

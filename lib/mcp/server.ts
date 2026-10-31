@@ -1,6 +1,6 @@
 import { createMcpHandler, Server, type Tool } from "@modelcontextprotocol/server";
 import {
-  createIntegrationError, getIntegrationOperation, INTEGRATION_CONTRACT_VERSION,
+  createIntegrationError, getIntegrationOperation, INTEGRATION_CONTRACT_VERSION, INTEGRATION_SCOPE_LIST,
   listIntegrationToolDescriptors, resolveOperationName, type IntegrationError,
 } from "@cadence/core/integration";
 import { createIntegrationContext } from "@/lib/integrations/request-context";
@@ -21,9 +21,24 @@ export function mcpTools(): Tool[] {
   });
 }
 
+/**
+ * Challenged scopes are required for the current request (MCP authorization,
+ * "Scope Selection Strategy"; RFC 6750 section 3). Writes are optional, so the
+ * initial or invalid-token 401 names no scope: clients then request every scope
+ * in protected-resource scopes_supported, and consent keeps each write optional.
+ * A step-up challenge names read plus the missing scope, because every MCP
+ * request needs read and authorization requests without read are rejected.
+ */
+export function challengeScopes(error: IntegrationError): string[] | null {
+  if (error.code !== "insufficient_scope") return null;
+  const needed = new Set<string>(["cadence.read", ...(error.required_scopes ?? [])]);
+  return INTEGRATION_SCOPE_LIST.filter((scope) => needed.has(scope));
+}
+
 function challenge(error: IntegrationError, issuer: string) {
   const code = error.code === "insufficient_scope" ? "insufficient_scope" : "invalid_token";
-  return `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp", error="${code}", scope="${(error.required_scopes ?? ["cadence.read"]).join(" ")}"`;
+  const scopes = challengeScopes(error);
+  return `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp", error="${code}"${scopes ? `, scope="${scopes.join(" ")}"` : ""}`;
 }
 
 function toolError(error: IntegrationError, issuer: string) {
@@ -115,7 +130,9 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           if (code === "rate_limited") { status = 429; responseHeaders.set("Retry-After", String(result.error.retry_after_seconds)); }
           return toolError(result.error, issuer);
         }
-        return { structuredContent: result.value, content: [{ type: "text", text: `${getIntegrationOperation(resolved.value).title} succeeded.` }] };
+        // MCP tools: a structured result SHOULD also carry its serialized JSON as text,
+        // for clients that pass only text content to the model. Same data, no extras.
+        return { structuredContent: result.value, content: [{ type: "text", text: JSON.stringify(result.value) }] };
       });
       return server;
     }, { legacy: "stateless", maxRequestBodySize: MCP_BODY_LIMIT, maxSubscriptions: 0, keepAliveMs: 0 });

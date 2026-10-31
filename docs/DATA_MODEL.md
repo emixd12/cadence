@@ -2297,7 +2297,15 @@ Scopes are exactly `cadence.read` (always required), `cadence.occurrences.write`
 and `cadence.behaviors.write`. `verified_client` (`claude`, `claude_code`,
 `chatgpt`) is accepted only for the exact known identity. A check constraint
 enforces it: Claude Code's CIMD URL, ChatGPT's CIMD URL or `chatgpt.com`
-connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback.
+connector redirects, and Claude's `claude.ai` or `claude.com` MCP callback for
+DCR. Migration `20261031003000_allow_claude_web_cimd_label.sql` also accepts
+`claude` for Claude web's CIMD URL
+(`https://claude.ai/oauth/mcp-oauth-client-metadata`) with exactly the
+`https://claude.ai/api/mcp/auth_callback` redirect; before it, storing that client
+failed the check and `/oauth/authorize` returned 503. The app applies the same
+condition before labelling, so any other redirect list registers unverified.
+Local verification: `tests/sql/ticket-232-claude-web-cimd-label.sql` and
+`tests/oauth-claude-web.local-integration.test.ts`.
 
 `launch_rate_limits` is not reused. It is keyed by account and requires a user,
 while client registration happens before sign-in and MCP limits apply per grant.
@@ -2401,7 +2409,9 @@ raising. Raising would roll back the reuse revocation.
 - `oauth_approve_consent(...)` validates the client, the redirect URI (exact, or
   port-agnostic for loopback), the scopes, and the resource. It creates or
   updates the caller's grant, clears the client's unused-registration expiry,
-  and stores a 10-minute code hash. Re-consent replaces the grant's scopes.
+  and stores a 10-minute code hash. Re-consent stores exactly the approved
+  scopes, so an explicit narrowing applies immediately. Step-up keeps earlier
+  scopes through `oauth_finish_pending` (below).
 - `oauth_list_grants()` lists the caller's active grants for Connected apps.
 - `oauth_revoke_grant(grant_id)` revokes the caller's grant, all of its tokens,
   and its pending codes. The next token check fails.
@@ -2453,7 +2463,16 @@ consent with the signed-in user's database client.
 `oauth_read_pending` and `oauth_finish_pending` require the browser-secret hash.
 The finish function locks and consumes the request in the same transaction as
 `oauth_approve_consent`; it accepts only a subset of requested tracking scopes.
-A null scope list denies and consumes without creating a grant. The server
+A null scope list denies and consumes without creating a grant.
+
+Migration `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` (Ticket 232
+follow-up) keeps earlier permissions on step-up re-consent. `oauth_read_pending`
+also returns `granted_scopes`: the caller's active grant scopes for the same
+client and resource, or an empty list. The consent screen shows them as already
+granted and selected. `oauth_finish_pending` accepts any subset of requested plus
+already granted scopes. Another account's grant and revoked grants never count.
+No table or signature changes; both functions keep their grants. Local
+verification: `tests/sql/ticket-232-oauth-reconsent-scopes.sql`. The server
 also requires a same-origin POST and a matching HttpOnly cookie. Neither the
 browser secret nor the client state appears in the consent URL.
 

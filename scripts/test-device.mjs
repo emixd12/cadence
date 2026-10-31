@@ -202,7 +202,9 @@ if (command === "list") {
   if (!["read", "find", "press"].includes(action)) fail(USAGE);
   if ((action === "read" && (args.length > 1 || (args[0] !== undefined && !/^[1-9]\d{0,3}$/.test(args[0]))))
     || (action === "find" && args.length !== 1) || (action === "press" && args.length !== 2)) fail(USAGE);
-  if (action === "find") { try { new RegExp(args[0]); } catch { fail("Invalid find regular expression."); } }
+  // The pattern is compiled only on the device by find.js. Bound it here instead of
+  // building a RegExp from the command line (CodeQL js/regex-injection, alert #21).
+  if (action === "find" && (!args[0] || args[0].length > 200 || /[\u0000-\u001f\u007f]/.test(args[0]))) fail("Invalid find pattern: use 1-200 printable characters.");
   syncAxHelpers(target);
   run(target, `osascript -l JavaScript "$HOME/${REMOTE_AX_DIR}/${action}.js" ${[target.process ?? "cadence-desktop-spike", ...args].map(quote).join(" ")}`);
 } else if (command === "click") {
