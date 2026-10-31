@@ -89,10 +89,12 @@ export const SCENARIOS = Object.freeze({
 export const PROMPTS = Object.freeze({
   // Every test prompt starts with [Cadence QA] so Emi can find (and remove) test chats.
   read: () => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to list my Cadence behaviors. Reply with only the number of behaviors.`,
-  write: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to create a new daily behavior titled "Review practice ${label}". Do not change anything else. Reply with the word DONE when it is created.`,
+  write: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to create a new daily behavior titled "Review practice ${label}" with browser and email reminders off. Do not change anything else. Reply with the word DONE when it is created.`,
   // Ticket 256 prompts. Each names only the run's own test Behavior.
   'read-all': () => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to call each of these read tools once, in order, using IDs from earlier results where one is needed: ${READ_TOOLS.join(', ')}. Change nothing. Reply with one line per tool: its name and OK or the Cadence error code.`,
   lifecycle: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to: 1. create a new daily behavior titled "Review practice ${label}" at 18:00 with browser and email reminders off; 2. rename that behavior to "Review practice ${label} edited"; 3. archive it; 4. restore it. Change nothing else. Reply with DONE, or FAILED followed by the Cadence error code.`,
+  // Sent only when the created Behavior reads back with a reminder on.
+  'reminders-off': (title) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to find the behavior titled "${title}" and turn off its browser and email reminders. Change nothing else. Reply with DONE, or FAILED followed by the Cadence error code.`,
   occurrence: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to find the behavior titled "Review practice ${label} edited", mark its earliest occurrence as completed, then set that occurrence's note to "Review sample note". Do not touch any other behavior or occurrence. Reply with DONE, or FAILED followed by the Cadence error code.`,
 });
 export const READ_TOOLS = Object.freeze(['get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences', 'get_occurrence', 'get_adherence_summary', 'search', 'fetch']);
@@ -499,6 +501,52 @@ export async function runWebScenario({
     const cleanChats = archiveChats && (site.chatCleanup === 'archive' || deleteClaudeChats);
     const chats = [];
     let revokedAt = null;
+    // One prompt in a new chat, as its own resumable step.
+    const promptTurn = (kind, stepName, text) => run.step(stepName, async ({ interrupted }) => {
+      if ((kind === 'write' || kind === 'lifecycle') && interrupted) {
+        const prior = await cleanup.checkpointCreation({ rest, slot, label: `${label}-create`, grantId: grant.grantId, windowStart: pre.windowStartAt, recorded: [] }).catch(() => null);
+        if (prior) return { approvalCount: 0, consentCount: 0, resumed: true };
+      }
+      const page = await context.newPage();
+      track(page);
+      await page.goto(`${site.origin}${site.chatPath}`, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => { throw new WebStop('site-unreachable', stepName); });
+      const state = await classifyPage(page, site);
+      if (state !== 'ok') throw new WebStop(state, stepName);
+      await site.enableInChat(page, CONNECTOR_NAME);
+      // A step-up or reconnect opens Cadence mid-turn. A resumed run has no Cadence
+      // cookies (each run clears them), so set the account's session before sending (Ticket 256).
+      if ((kind === 'write' && scenario.stepUpGrant) || scenario.consentDuringTurn) {
+        // A Cadence tab left by an earlier attempt would be mistaken for this turn's consent page.
+        for (const stale of context.pages()) if (stale !== page && stale.url().startsWith(new URL(issuer).origin)) await stale.close().catch(() => {});
+        await context.addCookies(await sessions.browserCookies(slot, issuer));
+      }
+      // Count turns before sending, so a fast reply is not mistaken for an old one.
+      const before = await page.locator(site.assistant).count().catch(() => 0);
+      await sendPrompt(page, site, text);
+      const stepUp = kind === 'write' && scenario.stepUpGrant
+        ? async () => {
+          await context.addCookies(await sessions.browserCookies(slot, issuer));
+          await consentAnswer('allow', scenario.stepUpGrant)();
+        }
+        : null;
+      // Ticket 256: a consent page mid-turn is a step-up or reconnect attempt; count it and deny.
+      const observe = !stepUp && scenario.consentDuringTurn === 'deny'
+        ? async () => {
+          await context.addCookies(await sessions.browserCookies(slot, issuer));
+          await consentAnswer('deny', 'read')();
+        }
+        : null;
+      const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp ?? observe, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
+      if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
+      const chatId = chatIdOf(site, page.url());
+      // A stop before any click (page-changed) is retried in archive-chats; the
+      // reply is already captured. Anything after a click stops the run.
+      const archived = cleanChats && chatId
+        ? await archiveChat(page, site, chatId).then(() => true, (error) => { if (error instanceof WebStop && error.reason === 'page-changed') return false; throw error; })
+        : false;
+      await page.close().catch(() => {});
+      return { ...result, chatId, archived };
+    });
     for (const kind of scenario.prompts) {
       if (kind === 'revoke') {
         // Ticket 256: the user disconnects. Same RPC as Settings → Connected apps, as the account itself.
@@ -512,51 +560,7 @@ export async function runWebScenario({
         continue;
       }
       const stepName = `prompt-${kind}`;
-      const turn = await run.step(stepName, async ({ interrupted }) => {
-        if ((kind === 'write' || kind === 'lifecycle') && interrupted) {
-          const prior = await cleanup.checkpointCreation({ rest, slot, label: `${label}-create`, grantId: grant.grantId, windowStart: pre.windowStartAt, recorded: [] }).catch(() => null);
-          if (prior) return { approvalCount: 0, consentCount: 0, resumed: true };
-        }
-        const page = await context.newPage();
-        track(page);
-        await page.goto(`${site.origin}${site.chatPath}`, { waitUntil: 'domcontentloaded', timeout: 45_000 }).catch(() => { throw new WebStop('site-unreachable', stepName); });
-        const state = await classifyPage(page, site);
-        if (state !== 'ok') throw new WebStop(state, stepName);
-        await site.enableInChat(page, CONNECTOR_NAME);
-        // A step-up or reconnect opens Cadence mid-turn. A resumed run has no Cadence
-        // cookies (each run clears them), so set the account's session before sending (Ticket 256).
-        if ((kind === 'write' && scenario.stepUpGrant) || scenario.consentDuringTurn) {
-          // A Cadence tab left by an earlier attempt would be mistaken for this turn's consent page.
-          for (const stale of context.pages()) if (stale !== page && stale.url().startsWith(new URL(issuer).origin)) await stale.close().catch(() => {});
-          await context.addCookies(await sessions.browserCookies(slot, issuer));
-        }
-        // Count turns before sending, so a fast reply is not mistaken for an old one.
-        const before = await page.locator(site.assistant).count().catch(() => 0);
-        await sendPrompt(page, site, PROMPTS[kind](label));
-        const stepUp = kind === 'write' && scenario.stepUpGrant
-          ? async () => {
-            await context.addCookies(await sessions.browserCookies(slot, issuer));
-            await consentAnswer('allow', scenario.stepUpGrant)();
-          }
-          : null;
-        // Ticket 256: a consent page mid-turn is a step-up or reconnect attempt; count it and deny.
-        const observe = !stepUp && scenario.consentDuringTurn === 'deny'
-          ? async () => {
-            await context.addCookies(await sessions.browserCookies(slot, issuer));
-            await consentAnswer('deny', 'read')();
-          }
-          : null;
-        const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp ?? observe, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
-        if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
-        const chatId = chatIdOf(site, page.url());
-        // A stop before any click (page-changed) is retried in archive-chats; the
-        // reply is already captured. Anything after a click stops the run.
-        const archived = cleanChats && chatId
-          ? await archiveChat(page, site, chatId).then(() => true, (error) => { if (error instanceof WebStop && error.reason === 'page-changed') return false; throw error; })
-          : false;
-        await page.close().catch(() => {});
-        return { ...result, chatId, archived };
-      });
+      const turn = await promptTurn(kind, stepName, PROMPTS[kind](label));
       chats.push({ chatId: turn.chatId ?? null, archived: Boolean(turn.archived) });
       emit({ step: stepName, ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null, archived: Boolean(turn.archived),
         ...(turn.failedSeen === undefined ? {} : { failedSeen: turn.failedSeen }) });
@@ -585,6 +589,29 @@ export async function runWebScenario({
         return cp;
       });
       emit({ step: 'creation-checkpoint', ok: true, behaviorId: creation.behaviorId });
+      // The write passes only with reminders off: the archive cleanup refuses a test
+      // Behavior with a reminder on. If the model ignored the prompt, ask the same
+      // client (same grant) to turn them off, then read back again.
+      const readReminders = async (at) => {
+        const r = await rest(slot, 'GET', `/rest/v1/behaviors?id=eq.${creation.behaviorId}&select=id,title,browser_reminder_enabled,email_reminder_enabled`);
+        if (r.status !== 200 || !Array.isArray(r.json) || r.json.length !== 1) throw new WebStop('behavior-unreadable', at);
+        const [b] = r.json;
+        return { title: b.title, off: b.browser_reminder_enabled === false && b.email_reminder_enabled === false };
+      };
+      const first = await run.step('creation-reminders-read', async () => ({ remindersOff: (await readReminders('creation-reminders')).off }));
+      let updated = false;
+      if (!first.remindersOff) {
+        if (revokedAt) throw new WebStop('behavior-reminders-on', 'creation-reminders');
+        const { title } = await readReminders('creation-reminders');
+        if (!/^Review practice [a-z0-9-]{1,40}( edited)?$/.test(title ?? '')) throw new WebStop('behavior-title-unexpected', 'creation-reminders');
+        const turn = await promptTurn('reminders-off', 'prompt-reminders-off', PROMPTS['reminders-off'](title));
+        chats.push({ chatId: turn.chatId ?? null, archived: Boolean(turn.archived) });
+        emit({ step: 'prompt-reminders-off', ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null, archived: Boolean(turn.archived) });
+        const again = await run.step('creation-reminders-recheck', async () => ({ remindersOff: (await readReminders('creation-reminders')).off }));
+        if (!again.remindersOff) throw new WebStop('behavior-reminders-on', 'creation-reminders');
+        updated = true;
+      }
+      emit({ step: 'creation-reminders', ok: true, remindersOff: true, updated });
     }
 
     if (archiveChats && chats.length) {

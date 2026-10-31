@@ -14,7 +14,7 @@ import * as cleanupModule from '../scripts/mcp-acceptance-cleanup.mjs';
 import { createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { launchChrome } from '../scripts/acceptance/consent-page.mjs';
 import {
-  DEFAULT_PROFILE_DIR, SCENARIOS, assertProfileDir, attachProfile, dryRunSite, guidedFallback, main,
+  DEFAULT_PROFILE_DIR, PROMPTS, SCENARIOS, assertProfileDir, attachProfile, dryRunSite, guidedFallback, main,
   openProfile, parseCli, profileOwnsPort, runWebScenario, signInStatus,
 } from '../scripts/acceptance/web-client.mjs';
 import { SITES, WebStop, withOrigin } from '../scripts/acceptance/web-sites.mjs';
@@ -78,6 +78,10 @@ const rest = async (slot, method, path, body) => {
     return { status: 204, json: null };
   }
   if (path === '/rest/v1/rpc/oauth_list_activity') return { status: 200, json: state.activity.slice(0, body?.p_limit ?? 50) };
+  if (method === 'GET' && path.startsWith('/rest/v1/behaviors?id=eq.')) {
+    const id = /id=eq\.([0-9a-f-]{36})/.exec(path)[1];
+    return { status: 200, json: state.behaviors.filter((b) => b.id === id) };
+  }
   if (method === 'GET' && path.startsWith('/rest/v1/behaviors?')) {
     const since = decodeURIComponent(/created_at=gte\.([^&]+)/.exec(path)[1]);
     return { status: 200, json: state.behaviors.filter((b) => b.created_at >= since) };
@@ -325,8 +329,10 @@ function chatServer(flavor) {
       if (!chatId) { chatId = randomUUID(); state.chats.push({ id: chatId, archived: false }); }
       if (state.neverReply) return json({ kind: 'none', chatId });
       const write = /create a new daily behavior/.test(input.text);
-      state.pending = { op: write ? 'create_behavior' : 'list_behaviors', write, title: /"([^"]+)"/.exec(input.text)?.[1] ?? null, approvals: 0 };
-      return json({ ...(write || state.approvalsPerTool > 1 ? { kind: 'approve', op: state.pending.op } : finish()), chatId });
+      const update = /turn off its browser and email reminders/.test(input.text);
+      state.pending = { op: write ? 'create_behavior' : update ? 'update_behavior' : 'list_behaviors', write, update, title: /"([^"]+)"/.exec(input.text)?.[1] ?? null,
+        remindersOff: /with browser and email reminders off/.test(input.text), approvals: 0 };
+      return json({ ...(write || update || state.approvalsPerTool > 1 ? { kind: 'approve', op: state.pending.op } : finish()), chatId });
     }
     if (url.pathname === '/api/approve') {
       state.pending.approvals += 1;
@@ -357,8 +363,20 @@ function finish() {
       if (state.stepUp) return { kind: 'reauth' };
       return { kind: 'reply', text: `I could not create it. ${REPLY_SECRET}` };
     }
-    state.behaviors.push({ id: randomUUID(), user_id: USER_A, title: p.title, created_at: iso() });
+    // A model may drop the prompt's reminders-off instruction (ignoreRemindersOff).
+    const off = p.remindersOff && !state.ignoreRemindersOff;
+    state.behaviors.push({ id: randomUUID(), user_id: USER_A, title: p.title, created_at: iso(), browser_reminder_enabled: !off, email_reminder_enabled: false });
     toolCall('create_behavior', 'success');
+    return { kind: 'reply', text: `DONE ${REPLY_SECRET}` };
+  }
+  if (p.update) {
+    const b = state.behaviors.find((x) => x.title === p.title);
+    if (!b || !grant?.scopes.includes('cadence.behaviors.write') || state.ignoreReminderUpdate) {
+      toolCall('update_behavior', 'denied');
+      return { kind: 'reply', text: `FAILED ${REPLY_SECRET}` };
+    }
+    Object.assign(b, { browser_reminder_enabled: false, email_reminder_enabled: false });
+    toolCall('update_behavior', 'success');
     return { kind: 'reply', text: `DONE ${REPLY_SECRET}` };
   }
   toolCall('list_behaviors', 'success');
@@ -508,7 +526,7 @@ describe('ChatGPT stub', () => {
     const out = await scenario('chatgpt', 'read-write');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
-    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
     // Privacy: each prompt opened a new chat, the run archived both right after
     // their replies, and it never opened any chat it did not create.
     expect(state.chats).toHaveLength(2);
@@ -542,7 +560,7 @@ describe('ChatGPT stub', () => {
     resetState({ layout2026: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
     const out = await scenario('chatgpt', 'read-write');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
-    expect(parsed(out.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(parsed(out.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
     expect(state.enabled).toBe(true);
     // The mention survived: every prompt starts with it and still carries the canned text.
     expect(state.messages).toHaveLength(2);
@@ -602,7 +620,7 @@ describe('Claude web stub', () => {
     const again = await scenario('claude-web', 'read-write', { runId: first.result.runId });
     expect(again.result.ok).toBe(true);
     expect(state.consentCount).toBe(consents);
-    expect(parsed(again.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(parsed(again.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
     // Claude test chats are kept by default (deletion cannot be undone); the
     // ledger records them as kept, and every prompt carries the [Cadence QA] marker.
     expect(state.chats).toHaveLength(2);
@@ -621,7 +639,7 @@ describe('Ticket 256 Claude web scenarios', () => {
     const out = await scenario('claude-web', 'partial-consent');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
-    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'creation-checkpoint', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
     expect(parsed(out.lines).find((e) => e.step === 'connect').grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.read']);
     expect(parsed(out.lines).find((e) => e.step === 'watcher').watcherScenario).toBe('claude-web-partial');
     expect(state.messages.map((m) => m.slice(0, 12))).toEqual(['[Cadence QA]', '[Cadence QA]', '[Cadence QA]']);
@@ -644,7 +662,7 @@ describe('Ticket 256 Claude web scenarios', () => {
     const out = await scenario('claude-web', 'full-disconnect');
     expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
     const steps = parsed(out.lines).map((e) => e.step);
-    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'revoke-as-user', 'prompt-read', 'post-revoke-check', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read-all', 'prompt-lifecycle', 'prompt-occurrence', 'revoke-as-user', 'prompt-read', 'post-revoke-check', 'creation-checkpoint', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
     expect(parsed(out.lines).find((e) => e.step === 'revoke-as-user').outcome).toBe('revoked');
     expect(parsed(out.lines).find((e) => e.step === 'post-revoke-check')).toMatchObject({ grantActive: false, successAfterCount: 0 });
     expect(activeGrants()).toHaveLength(0);
@@ -1014,5 +1032,37 @@ describe('Ticket 259 consent offers every advertised scope', () => {
     const out = await scenario('claude-web', 'partial-consent');
     expect(out.result).toMatchObject({ ok: false, reason: 'grant-scope-mismatch', step: 'grant-checkpoint' });
     expect(state.behaviors).toHaveLength(0);
+  }, 120_000);
+});
+
+describe('created test Behavior has reminders off', () => {
+  it('asks for reminders off in every create prompt', () => {
+    expect(PROMPTS.write('x1')).toContain('with browser and email reminders off');
+    expect(PROMPTS.lifecycle('x1')).toContain('with browser and email reminders off');
+  });
+  it('passes the write only after reading the Behavior back with reminders off', async () => {
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).find((e) => e.step === 'creation-reminders')).toMatchObject({ ok: true, remindersOff: true, updated: false });
+    expect(state.behaviors[0]).toMatchObject({ browser_reminder_enabled: false, email_reminder_enabled: false });
+  }, 120_000);
+  it('asks the client to turn reminders off through the same grant when the model ignored the prompt', async () => {
+    resetState({ ignoreRemindersOff: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    const steps = parsed(out.lines).map((e) => e.step);
+    expect(steps).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'prompt-reminders-off', 'creation-reminders', 'archive-chats', 'watcher', 'revoke']);
+    expect(parsed(out.lines).find((e) => e.step === 'creation-reminders')).toMatchObject({ ok: true, remindersOff: true, updated: true });
+    expect(state.behaviors[0]).toMatchObject({ browser_reminder_enabled: false, email_reminder_enabled: false });
+    const grantId = out.run.cleanupInputs().grants[0].grantId;
+    expect(state.activity.find((a) => a.operation === 'update_behavior')).toMatchObject({ outcome: 'success', grant_id: grantId });
+    expect(state.chats).toHaveLength(3);
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+  }, 120_000);
+  it('stops before cleanup when reminders stay on, keeping the creation for cleanup', async () => {
+    resetState({ ignoreRemindersOff: true, ignoreReminderUpdate: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result).toMatchObject({ ok: false, reason: 'behavior-reminders-on', step: 'creation-reminders' });
+    expect(out.run.cleanupInputs().creations).toHaveLength(1);
   }, 120_000);
 });

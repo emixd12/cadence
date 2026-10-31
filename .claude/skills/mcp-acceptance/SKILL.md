@@ -366,6 +366,13 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   the driver compares the token's `scope`, and the web runner stops with
   `grant-scope-mismatch` at `grant-checkpoint`. After #175, a ChatGPT run that asks
   for read only can still get writes with one Allow.
+- **Test Behavior reminders:** the archive cleanup refuses a test Behavior with a
+  reminder on. Every canned create prompt asks for browser and email reminders off.
+  After `creation-checkpoint` the web runner reads the Behavior back. If a reminder
+  is on, it sends `prompt-reminders-off` in a new chat with the same client and grant,
+  then reads back again. It stops with `behavior-reminders-on` if a reminder is still
+  on, or if the scenario already revoked the grant. The creation stays checkpointed, so
+  report the Behavior for a manual reminders-off update before cleanup.
 - **Consent before hydration:** clicking Allow or Deny before the page hydrates
   returns 500 (`Origin: null`). The drivers wait for hydration; a slow human may hit it.
 - **Claude Code CIMD grant:** a grant made with Claude Code's public metadata shows
