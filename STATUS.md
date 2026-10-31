@@ -169,9 +169,32 @@ here).
 
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
-Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
-source. Migration `20261027221625` is applied on the hosted database (read-only
-ledger readback, October 31, 2026).
+Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`).
+PR #159 merged on October 28 as `021c95eb`. The owner authorized the hosted push, and
+migration `20261027221625` was applied to `qjodzutjxtmtzczbloxa` on October 28 at
+01:19:57Z. A read-only ledger readback on October 31 confirmed it again.
+
+- Before the push: `migration list --linked` matched 93 entries through
+  `20261027120000`, with nothing hosted-only. The dry run listed only
+  `20261027221625`. Its SQL SHA-256 is `c2f1dc43…464b`, the same file as PR head
+  `4b27f9da`, where the CI rehearsal passed. The push used the Homebrew Supabase CLI
+  2.109.1.
+- Ledger readback: 94 matched entries ending at `20261027221625`. Nothing is
+  local-only or hosted-only.
+- Function: the hosted body of `cadence_private.apply_account_sync_plan` equals the
+  migration's function text (MD5 `1573e2da…`, 37,116 characters; before the push
+  `41a03270…`, 36,408) and carries the new error text. The other seven
+  `cadence_private` account-sync functions, `public.apply_account_sync_plan` and both
+  `public.read_account_sync_snapshot` signatures have the same bodies as before the
+  push.
+- Grants: unchanged. All eleven functions are owned by `postgres` with an empty
+  `search_path`; only `authenticated` can execute them, and `anon` and `service_role`
+  cannot. The private apply function stays security definer.
+- Data API: an anonymous call to `public.apply_account_sync_plan` returns 42501.
+  Types: no function signature changed, so `lib/db/database.types.ts` needs no update.
+- Deployment: main `eb5afa5b` (PRs #157, #159 and #160) deployed on October 28. The
+  Trust variable now names marketing deployment `dpl_FxBP12vZ…`, and the app was
+  redeployed as `dpl_AE8GhYkk…` on `app.cadence-me.com`.
 
 - Bug: a profile timezone change on a linked Mac failed every sync when the account
   had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
@@ -203,8 +226,8 @@ ledger readback, October 31, 2026).
   `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
   named volumes are kept. `habit-tracking-app` was not touched. Type generation was
   refused by the proxy; no function signature changed.
-- Not verified: a timezone change synced from an
-  installed Mac after the push.
+- Not verified: a timezone change synced from an installed Mac after the push, and an
+  authenticated sync against the new rule on hosted.
 
 Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
 timezone change after the push, with no desktop code change. Web: no change; its
@@ -245,9 +268,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
   Behavior stalls sync, because the server requires every Behavior and both clients
-  update only active ones. Fixed in source by migration
-  `20261027221625` (entry above), now applied on the hosted database (ledger
-  readback, October 31, 2026).
+  update only active ones. Fixed by migration `20261027221625`, applied to hosted on
+  October 28 (entry above); not yet confirmed from an installed Mac.
 
 Platform impact: desktop release only; web, marketing and future mobile have no change.
 Messaging impact: none; the packet holds draft release notes for the owner.
