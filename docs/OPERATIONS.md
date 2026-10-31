@@ -1415,54 +1415,6 @@ and HTTP status, never provider response bodies, headers, or access values. The
 label and status do not prove the cause. If the second request fails, the first
 share may remain active for its one-hour TTL; removing private runner files does
 not revoke that share.
-For an explicitly approved diagnostic access window, use the local cleanup tick
-in `scripts/watch-public-trust-window.py` and the hook source returned by
-`publicTrustWindowHook(directory)` from `scripts/public-trust-window-hook.mjs`.
-This is operator tooling, not application code or a workflow dispatch command.
-It is pinned to diagnostic revision `fe2af7e`; changing that
-revision requires review. Keep each window's baseline, control and restoration
-receipt in its own `.intent/artifacts/trust232/<window>` directory. Reuse the
-existing `one-run-control.json` and `one-run-policy-baseline.json` formats,
-including the exact run ID, tag SHA, owner/environment IDs, deadline and created
-rule IDs. Do not overwrite a previous window's receipts.
-
-Arm a **non-perpetual**, 60-second hook with the returned source before expanding
-access, with a 45-minute window and 15-minute cleanup margin. The immediate
-validation tick must return `lastState.phase=waiting`; a retry/busy result is not
-a successful preflight and must not precede access expansion. Before dispatch, the control file has no run ID;
-this is a waiting state, not cleanup proof. Record the exact dispatched run ID
-immediately. A missing run ID at cleanup fails closed for manual reconciliation.
-The hook executes cleanup directly and stays quiet through waiting, transient
-errors and partial cleanup. Only verified restoration dispatches an agent wake
-and retires the hook. Exceptions are caught; neither CLI output nor arbitrary
-provider/exception strings enter notifications. Do not use the old progress
-hook: waking an agent is best-effort notification, not a cleanup mechanism.
-
-Each tick has a 40-second aggregate API budget and six-second per-call timeout,
-below the 50-second host timeout and 60-second hook limit. A local lock prevents
-overlapping ticks. Atomic control writes retain cleanup intent and rejected run
-IDs. Cleanup rejects/cancels affected runs, confirms terminal states, removes only
-recorded rules, restores protected-main mode before removing the owner reviewer,
-and deletes only the unchanged diagnostic tag. Later ticks resume partial cleanup;
-a failed mutation response requires readback rather than assuming failure or
-success. Unexpected environment/rule/tag changes stop the affected mutation.
-The operator must hold exclusive ownership of this window; GitHub environment
-updates have no transaction spanning queue checks and policy writes.
-
-**Hard limit:** a hook cannot restore access while its daemon/host is unavailable,
-GitHub access fails, or after hook expiry. TTL expiry sends a notification; it does
-not execute restoration. The October22 watcher stopped recording ticks after a
-failed GitHub read at13:05UTC; its wake hit three agent initialization timeouts.
-The scheduler's internal reason for the missing later ticks is not verified.
-The quiet hook removes this wake dependency but is not hosted reliability proof.
-Keep the owner and operator available through the deadline. At deadline, inspect
-receipts and GitHub state; if needed, run the same cleanup tick manually without
-opening another window. Never remove the gate until terminal runs and restoration
-readbacks pass. A queue larger than100 requires manual reconciliation; it never
-permits gate removal from a truncated inventory. No cleanup retries create shares
-or approve deployments. Existing shares, if created by a diagnostic, can persist
-for their one-hour TTL; policy restoration is not share revocation.
-
 Fix the release or provider outage, then dispatch a new run. Do not edit old
 evidence. A provider outage becomes Unavailable only when collection can still
 produce valid sanitized evidence. Otherwise the prior Pages deployment stays

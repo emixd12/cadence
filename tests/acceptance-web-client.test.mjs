@@ -367,15 +367,16 @@ function finish() {
 
 // ---- Stub Cadence issuer (consent page DOM follows app/oauth/consent) -------------
 
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const consentPage = (rid, client, scopes) => html('Cadence consent', `
 <form method="post" action="/oauth/decide">
-  <h1>Connect ${client}</h1>
+  <h1>Connect ${escapeHtml(client)}</h1>
   <p>Verified client</p>
-  <input type="hidden" name="request_id" value="${rid}">
-  <input type="hidden" name="account_id" value="${state.consentAccountId}">
-  <dl><dt>Cadence account</dt><dd>${state.consentEmail}</dd></dl>
+  <input type="hidden" name="request_id" value="${escapeHtml(rid)}">
+  <input type="hidden" name="account_id" value="${escapeHtml(state.consentAccountId)}">
+  <dl><dt>Cadence account</dt><dd>${escapeHtml(state.consentEmail)}</dd></dl>
   <input type="hidden" name="scope" value="cadence.read">
-  ${scopes.filter((s) => s !== 'cadence.read').map((s) => `<label><input type="checkbox" name="scope" value="${s}" checked> ${s}</label>`).join('')}
+  ${scopes.filter((s) => s !== 'cadence.read').map((s) => `<label><input type="checkbox" name="scope" value="${escapeHtml(s)}" checked> ${escapeHtml(s)}</label>`).join('')}
   <button name="decision" value="allow">Allow</button>
   <button name="decision" value="deny">Deny</button>
 </form>`, `
@@ -398,14 +399,15 @@ function issuerServer() {
     if (url.pathname === '/oauth/authorize') {
       if (!(req.headers.cookie ?? '').includes(`sb-stub-auth-token=${FAKE_COOKIE}`)) { res.writeHead(302, { location: '/login' }); return res.end(); }
       const rid = randomUUID();
-      requests.set(rid, { client: url.searchParams.get('client'), ret: url.searchParams.get('return'), scopes: url.searchParams.get('scope').split(' ') });
+      requests.set(rid, { rid, client: url.searchParams.get('client'), ret: url.searchParams.get('return'), scopes: url.searchParams.get('scope').split(' ') });
       res.writeHead(302, { location: `/oauth/consent?request_id=${rid}` });
       return res.end();
     }
     if (url.pathname === '/oauth/consent') {
       const r = requests.get(url.searchParams.get('request_id'));
+      if (!r) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('unknown request'); }
       res.writeHead(200, { 'content-type': 'text/html' });
-      return res.end(consentPage(url.searchParams.get('request_id'), r.client, r.scopes));
+      return res.end(consentPage(r.rid, r.client, r.scopes));
     }
     if (url.pathname === '/oauth/decide') {
       const input = JSON.parse(body);
