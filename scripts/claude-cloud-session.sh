@@ -72,30 +72,37 @@ fi
 # Reinstall only when a manifest, the lockfile or this script changed.
 install_inputs=(scripts/claude-cloud-session.sh package.json package-lock.json apps/*/package.json packages/*/package.json)
 install_hash=node_modules/.cadence-cloud-install.sha256
+install_mode=node_modules/.cadence-cloud-install.mode
 install_log="${TMPDIR:-/tmp}/cadence-npm-ci.log"
 # A clean install takes about 25 s. npm can spend 30 s rolling back after
 # SIGTERM, so SIGKILL follows 10 s later. Two attempts and the Node download
 # stay inside the 900 s hook timeout in .claude/settings.json.
 npm_ci_timeout=240
 
-if ! sha256sum --check --status "$install_hash" 2>/dev/null; then
-  rm -f "$install_hash"
+if ! sha256sum --check --status "$install_hash" 2>/dev/null || ! grep -qxE 'full|ignore-scripts' "$install_mode" 2>/dev/null; then
+  rm -f "$install_hash" "$install_mode"
   timeout -k 10 "$npm_ci_timeout" npm ci --no-audit --no-fund >"$install_log" 2>&1
   npm_ci_status=$?
   if [ "$npm_ci_status" -eq 0 ]; then
+    printf 'full\n' >"$install_mode"
     sha256sum "${install_inputs[@]}" >"$install_hash"
   # A failed or hung install script, such as the agentmail-cli binary
   # download, must not block the install.
   elif timeout -k 10 "$npm_ci_timeout" npm ci --no-audit --no-fund --ignore-scripts >>"$install_log" 2>&1; then
+    printf 'ignore-scripts\n' >"$install_mode"
     sha256sum "${install_inputs[@]}" >"$install_hash"
     case "$npm_ci_status" in
       124 | 137) npm_ci_result="timed out after ${npm_ci_timeout} s" ;;
       *) npm_ci_result="failed" ;;
     esac
-    notes+=("npm ci ${npm_ci_result} and succeeded only with --ignore-scripts, so install scripts did not run and the AgentMail CLI binary is missing. Log: $install_log")
+    notes+=("npm ci ${npm_ci_result} and succeeded only with --ignore-scripts. Log: $install_log")
   else
     notes+=("npm ci failed. Read $install_log before running checks.")
   fi
+fi
+
+if [ -f "$install_hash" ] && [ "$(cat "$install_mode" 2>/dev/null)" = "ignore-scripts" ]; then
+  notes+=("Dependencies were installed with --ignore-scripts: install scripts did not run and the AgentMail CLI binary is missing. This remains true on cached resumes until a full install succeeds.")
 fi
 
 if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then

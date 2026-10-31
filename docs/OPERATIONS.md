@@ -296,6 +296,8 @@ sessions are unaffected. In a cloud session it:
   the install fails or runs past 240 seconds, it retries with
   `--ignore-scripts`, which skips the AgentMail CLI binary download. The
   retry has the same limit, so the hook ends inside its 900-second timeout.
+  The cache records whether install scripts ran. Every cached resume repeats
+  the `--ignore-scripts` warning until a complete install succeeds.
 - prints the Node version, the install result and the limits below into the
   session's context.
 
