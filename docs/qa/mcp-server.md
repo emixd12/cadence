@@ -480,7 +480,8 @@ approved `f07ebca`.
 | Activation and signer gate (`scripts/mcp-activation.mjs`, `scripts/mcp-activation-gate.mjs`) | `b6c9a09` |
 | Acceptance cleanup (`scripts/mcp-acceptance-cleanup.mjs`) | `52ec0af` |
 
-These commits are on branch `mcp-create` in the Ticket 232 workspace. Receipts for the October
+These commits are on branch `mcp-create` in the Ticket 232 workspace, published as
+the reference branch `origin/mcp-create` (no PR or merge). Receipts for the October
 29–30 run are in `.intent/artifacts/trust232/extension-execution/` in the Ticket 232
 workspace. They are not committed to the repository and hold no tokens, key
 material, emails or note text.
