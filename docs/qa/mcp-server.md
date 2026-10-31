@@ -440,9 +440,11 @@ separately gated; Ticket232 is not complete.
 
 ## Production activation and live client acceptance — October 29–31, 2026 (Ticket 232)
 
-MCP is live on production at `https://app.cadence-me.com/mcp`. Every client in
-scope completed a read-write run on production. The one exception is ChatGPT
-step-up, which is a known ChatGPT behavior (see "Known limits"). Each claim below
+MCP is live on production at `https://app.cadence-me.com/mcp`. Live acceptance is
+complete except two Claude web scenarios, which are pending in Ticket 256: partial
+consent with a write switch cleared, and Disconnect in Cadence followed by a failed
+call. Every client in scope completed a read-write run on production. ChatGPT did
+not step up in these runs (see "Known limits"). Each claim below
 names its evidence class from `docs/INTEGRATION_PLAYBOOK.md#evidence-labels`.
 Current state lives in `STATUS.md`.
 
@@ -450,9 +452,14 @@ All live runs used two synthetic test accounts, A and B, and no real user data.
 The hosted fixture run started 2026-10-28T02:17:18.882Z; its cleanup deadline was
 2026-11-04T02:17:18.882Z. Sessions came from a loopback PKCE sign-in broker that
 kept tokens in memory only. No service role, admin link or stored token was used.
-Every mutating step used a one-attempt transport and wrote an exclusive (`wx`, 0600)
-receipt before its first write. Ambiguous outcomes were reconciled by reading back,
-never by sending the request again.
+Mutating steps used one-attempt transports, and ambiguous outcomes were reconciled
+by reading back, never by sending the request again. Receipts differ by tool:
+
+- Acceptance cleanup and the archive execution reserve their receipt with exclusive
+  creation (`wx`, 0600) before the first write.
+- Key custody writes its receipt with mode 0600 but without exclusive creation.
+- The signer gate writes its receipt after client registration and the token
+  exchange.
 
 Reviewed tooling. Each commit was approved by the independent verifier before it
 ran:
@@ -476,10 +483,10 @@ material, emails or note text.
 | Step | Evidence class | Result | Receipt |
 |---|---|---|---|
 | 1. Fixtures | Live provider | As A and B: 2 categories, 6 Behaviors, 52 Occurrences, 4 status events, 2 time sessions, in 58 requests. Manifest sha256 `34689ab9…8a2f`. | `step1-result.json` |
-| 2. Key custody | Live provider | A new ES256 signing key `e5d7f0dd` was stored in 1Password and imported to Supabase as standby. It was set as the production signer variable through one direct Vercel write. The first attempt stopped on a 1Password CLI stdin race before any key existed; `071b6cb` fixed it. | `step2-custody.json`, `step2-custody-attempt1.json` |
+| 2. Key custody | Live provider | A new ES256 signing key `e5d7f0dd` was stored in 1Password and imported to Supabase as standby. It was set as the production signer variable through one direct Vercel write. The first attempt stopped on a 1Password CLI stdin race before any custody, import or environment persistence; its receipt records the generated kid `097bf9d7`, which was never stored. `071b6cb` fixed the race. | `step2-custody.json`, `step2-custody-attempt1.json` |
 | 2. Rotation and continuity | Live provider | At 19:47 UTC, `e5d7f0dd` became `in_use`. `cb295840` (ES256) and `78be1780` (HS256) were kept as `previously_used`. Sessions issued under the old key stayed valid. In a verification-only pass at 20:07, A and B sessions under the new key read their own profile (1 row) and not the other account's (0 rows). | `step2-rotation.json`, `step2-continuity-verify.json` |
 | 3. Isolation | Live provider | Passed on the new key in 37 requests. Checks: own fixtures, cross-account denied, expired token denied, untrusted key denied, note restored. Source `c813629`. | `step3-isolation.json` |
-| 3. Function timeout metadata | Source check | A read-only capture of owners, security mode, `search_path` and ACLs for the MCP write and OAuth functions. | `step3-timeout-metadata.json` |
+| 3. Function timeout metadata | Live provider | A read-only capture of owners, security mode, `search_path` and ACLs for the MCP write and OAuth functions. | `step3-timeout-metadata.json` |
 | 3. Activation | Deployed behavior | At 20:43, `CADENCE_MCP_ENABLED` was set to true with one variable change. One same-source redeploy followed: `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE` from `dpl_AE8GhYkk265Ek9tYdYTEc4bD8EgL`, source `eb5afa5`, Ready at 20:45. Readbacks passed: the 401 challenge, issuer, resource and marketing binding (`dpl_FxBP12vZPRz3mrdytwCNWrjdXwhj`). | `step3-activation-enable.json` |
 | 3. Signer gate | Deployed behavior | Passed at 20:58 as A with `cadence.read` (client `ad2a3c5e…`, grant `5d764426`). It saw A's 6 Behaviors and none of B's. | `step3-activation-gate.json` |
 | 3. Trust Preview | Source check | Run `40954263452` at `eb5afa5` validated its evidence. The gate failed on the adverse CodeQL `code_scanning` result (alert #21). Production was not dispatched, no waiver was given and nothing was published. | `trust-preview-40954263452/` |
@@ -552,7 +559,7 @@ in `.intent/acceptance/<run ID>/` in that worktree.
 | 1 | OpenAI Responses MCP tool, read-write | Deployed behavior | Failed on the first run (same cause). Passed after #171. | `prod-20261030-t1`, `prod-20261031-t1b` |
 | 1 | claude.ai connector through Claude Code, read-write | Deployed behavior | Pass after a runner fix (`bd5b728`) | `prod-20261031-cai2` |
 | 2 | ChatGPT web, read-write | Deployed behavior | Pass. All three scopes were granted, confirming #170's challenge change. | `20261030T234917Z-205816` |
-| 2 | ChatGPT web, step-up | Deployed behavior | Fail, known ChatGPT behavior. On a read-only grant ChatGPT made no write attempt and started no step-up. | `20261031T000553Z-1cde41` |
+| 2 | ChatGPT web, step-up | Deployed behavior | Fail; ChatGPT did not step up. On a read-only grant ChatGPT made no write attempt and started no step-up. | `20261031T000553Z-1cde41` |
 | 2 | Claude web, read-write | Deployed behavior | Blocked first: `/oauth/authorize` returned 503 (run `20261031T000937Z-8f31f3`). Passed after #172, with a grant labeled verified `claude` and all three scopes. | `20261031T004536Z-2199d9` |
 
 Ticket 256 cleanup ran as `prod-20261031-cleanup3` and `prod-20261031-cleanup4`.
@@ -563,8 +570,8 @@ records were not touched.
 
 ### Known limits
 
-- ChatGPT never steps up. On a read-only grant it refuses writes on its own side
-  and never calls Cadence, so it receives no step-up challenge. ChatGPT web gets
+- ChatGPT did not step up in these runs. On a read-only grant it refused writes on
+  its own side and did not call Cadence, so it received no step-up challenge. ChatGPT web gets
   writes only when its first consent grants them, which #170 enables.
 - The Trust refresh does not run cross-account RLS isolation. Isolation evidence
   comes from the October 29 isolation run and Ticket 256's `isolation-b` scenario.
@@ -573,9 +580,10 @@ records were not touched.
   but no live run showed a database call being cancelled at its deadline.
 - The consent write switches default to on by owner decision (October 30, 00:57
   UTC). One click grants writes unless the user clears them.
-- Claude web was not run with a write switch cleared or with Disconnect then
-  failure. Inspector proved consent narrowing, ChatGPT and Settings → Connected apps
-  proved revocation, and the protocol suite proved revoked-token refusal.
+- Pending: Claude web with a write switch cleared, and Claude web Disconnect in
+  Cadence followed by a failed call. Ticket 256 is running both. Meanwhile,
+  Inspector proved consent narrowing, ChatGPT and Settings → Connected apps proved
+  revocation, and the protocol suite proved revoked-token refusal.
 - Directory submission is out of scope.
 
 Platform impact: deployed web MCP and OAuth server (live). Desktop: the linked
