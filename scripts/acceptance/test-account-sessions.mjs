@@ -5,7 +5,10 @@
 // Supabase rotates refresh tokens: every rotation is written back at once.
 // Never log, print or write tokens, cookies or codes anywhere else.
 import { execFile } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { inspect } from 'node:util';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
@@ -90,13 +93,65 @@ export function validRecord(value, { target, slot }) {
     (value.accessToken === undefined || (typeof value.accessToken === 'string' && Number.isFinite(Date.parse(value.expiresAt)))));
 }
 
-export function createMemorySessionStore() {
+export function createMemorySessionStore({ lock = createMemoryLock() } = {}) {
   const items = new Map();
   return {
     kind: 'memory',
+    withLock: (key, fn) => lock.withLock(`memory-${key}`, fn),
     async get(key) { return items.has(key) ? structuredClone(items.get(key)) : null; },
     async set(key, record) { items.set(key, structuredClone(record)); },
     async delete(key) { items.delete(key); },
+  };
+}
+
+/**
+ * Cross-process lock for one session item. The runner and its watcher child
+ * both refresh and write the same Keychain item; two concurrent
+ * `add-generic-password -U` calls fail with exit 45 ("already exists"), and a
+ * read during a write can find no item (Ticket 256). A lock directory holds the
+ * owner's pid; a dead owner or a lock older than `staleMs` is taken over.
+ */
+export function createFileLock({ dir = join(tmpdir(), 'cadence-qa-session-locks'), staleMs = 60_000, waitMs = 30_000, pollMs = 50 } = {}) {
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
+  return {
+    async withLock(name, fn) {
+      if (!/^[A-Za-z0-9._:-]+$/.test(name)) throw new AcceptanceError('session-lock-name-invalid');
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      const path = join(dir, `${name.replace(/:/g, '_')}.lock`);
+      const deadline = Date.now() + waitMs;
+      for (;;) {
+        try {
+          mkdirSync(path, { mode: 0o700 });
+          writeFileSync(join(path, 'pid'), String(process.pid), { mode: 0o600 });
+          break;
+        } catch (error) {
+          if (error.code !== 'EEXIST') throw new AcceptanceError('session-lock-failed');
+          let pid = null;
+          let age = 0;
+          try { pid = Number(readFileSync(join(path, 'pid'), 'utf8')); } catch { pid = null; }
+          try { age = Date.now() - statSync(path).mtimeMs; } catch { continue; }
+          if ((Number.isInteger(pid) && pid > 0 && !alive(pid)) || age > staleMs) { rmSync(path, { recursive: true, force: true }); continue; }
+          if (Date.now() >= deadline) throw new AcceptanceError('session-lock-timeout');
+          await new Promise((resolve) => setTimeout(resolve, pollMs));
+        }
+      }
+      try { return await fn(); } finally { rmSync(path, { recursive: true, force: true }); }
+    },
+  };
+}
+
+/** In-process lock for the memory store (local runs and tests). */
+function createMemoryLock() {
+  const tails = new Map();
+  return {
+    async withLock(name, fn) {
+      const previous = tails.get(name) ?? Promise.resolve();
+      let release;
+      const mine = new Promise((resolve) => { release = resolve; });
+      tails.set(name, previous.then(() => mine));
+      await previous;
+      try { return await fn(); } finally { release(); if (tails.get(name) === mine) tails.delete(name); }
+    },
   };
 }
 
@@ -114,7 +169,7 @@ const runSecurity = (args, input, execImpl) => new Promise((resolve, reject) => 
  * persistedRecord(): the access token is never stored.
  */
 const SECURITY_LINE_LIMIT = 4088;
-export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImpl = execFile } = {}) {
+export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImpl = execFile, lock = createFileLock(), retryDelayMs = 200 } = {}) {
   if (!/^[a-z0-9-]+$/.test(service)) throw new AcceptanceError('keychain-service-invalid');
   const account = (key) => {
     if (!/^[a-z]+:[AB]$/.test(key)) throw new AcceptanceError('keychain-account-invalid');
@@ -122,6 +177,8 @@ export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImp
   };
   return {
     kind: 'keychain',
+    /** Serialize read-refresh-write for one item across this machine's processes. */
+    withLock: (key, fn) => lock.withLock(`${service}-${account(key)}`, fn),
     async get(key) {
       let out;
       try { out = await runSecurity(['find-generic-password', '-s', service, '-a', account(key), '-w'], undefined, execImpl); } catch (error) {
@@ -134,7 +191,13 @@ export function createKeychainSessionStore({ service = KEYCHAIN_SERVICE, execImp
       const value = Buffer.from(JSON.stringify(persistedRecord(record)), 'utf8').toString('base64');
       const line = `add-generic-password -U -s ${service} -a ${account(key)} -l "Cadence QA session ${account(key)}" -w ${value}`;
       if (Buffer.byteLength(line) > SECURITY_LINE_LIMIT) throw new AcceptanceError('keychain-record-too-large');
-      await runSecurity(['-i'], `${line}\n`, execImpl);
+      // Exit 45 is a concurrent writer outside the lock (an older checkout's runner); retry briefly.
+      for (let attempt = 1; ; attempt += 1) {
+        try { await runSecurity(['-i'], `${line}\n`, execImpl); return; } catch (error) {
+          if (error.details?.exit !== 45 || attempt >= 3) throw error;
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
+        }
+      }
     },
     async delete(key) {
       try { await runSecurity(['delete-generic-password', '-s', service, '-a', account(key)], undefined, execImpl); } catch (error) {
@@ -161,6 +224,8 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
     if (!SLOTS.includes(slot)) throw new AcceptanceError('slot-invalid');
     return `${target}:${slot}`;
   };
+  // Every read-refresh-write of an item runs under the store's lock (Ticket 256 keychain race).
+  const locked = (key, fn) => (typeof store.withLock === 'function' ? store.withLock(key, fn) : fn());
   const boundedFetch = (input, init = {}) => fetchImpl(input, { ...init, signal: init.signal ?? AbortSignal.timeout(15_000) });
   const authClient = () => createClient(supabaseUrl, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { fetch: boundedFetch },
@@ -190,22 +255,26 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   const current = async (slot, { expectUserId } = {}) => {
     const want = expectUserId ?? expected[slot]?.userId;
     if (!want) throw new AcceptanceError('account-unknown');
-    let record = await store.get(keyFor(slot));
-    if (!record) throw new AcceptanceError('session-missing');
-    if (!validRecord(record, { target, slot })) throw new AcceptanceError('session-invalid');
-    if (record.userId !== want) throw new AcceptanceError('wrong-account');
-    // The refresh token always comes from the store, which holds the latest rotation.
-    const access = live.get(slot) ?? (record.accessToken ? { accessToken: record.accessToken, expiresAt: record.expiresAt, kid: record.kid } : null);
-    if (!access || Date.parse(access.expiresAt) - now() < refreshMarginMs) {
-      const { data, error } = await authClient().auth.refreshSession({ refresh_token: record.refreshToken });
-      if (error || !data?.session) throw new AcceptanceError('session-refresh-failed');
-      const user = await verifiedUser(data.session.access_token);
-      record = await save(slot, data.session, user);
-      if (user.id !== want) throw new AcceptanceError('wrong-account');
-      return record;
-    }
-    if ((await verifiedUser(access.accessToken)).id !== want) throw new AcceptanceError('wrong-account');
-    return { ...record, ...access };
+    const result = await locked(keyFor(slot), async () => {
+      let record = await store.get(keyFor(slot));
+      if (!record) throw new AcceptanceError('session-missing');
+      if (!validRecord(record, { target, slot })) throw new AcceptanceError('session-invalid');
+      if (record.userId !== want) throw new AcceptanceError('wrong-account');
+      // The refresh token always comes from the store, which holds the latest rotation.
+      const access = live.get(slot) ?? (record.accessToken ? { accessToken: record.accessToken, expiresAt: record.expiresAt, kid: record.kid } : null);
+      if (!access || Date.parse(access.expiresAt) - now() < refreshMarginMs) {
+        const { data, error } = await authClient().auth.refreshSession({ refresh_token: record.refreshToken });
+        if (error || !data?.session) throw new AcceptanceError('session-refresh-failed');
+        const user = await verifiedUser(data.session.access_token);
+        record = await save(slot, data.session, user);
+        if (user.id !== want) throw new AcceptanceError('wrong-account');
+        return { record, refreshed: true };
+      }
+      return { record, access, refreshed: false };
+    });
+    if (result.refreshed) return result.record;
+    if ((await verifiedUser(result.access.accessToken)).id !== want) throw new AcceptanceError('wrong-account');
+    return { ...result.record, ...result.access };
   };
 
   /** Supabase SSR auth cookies for the app origin, in Playwright's cookie shape. */
@@ -231,12 +300,14 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   const absorbBrowserCookies = async (slot, cookies) => {
     const session = await sessionFromCookies(cookies);
     if (!session) return { rotated: false };
-    const stored = await store.get(keyFor(slot));
-    if (stored?.refreshToken === session.refresh_token) return { rotated: false };
-    const user = await verifiedUser(session.access_token);
-    if (user.id !== expected[slot]?.userId) throw new AcceptanceError('wrong-account');
-    await save(slot, session, user);
-    return { rotated: true };
+    return locked(keyFor(slot), async () => {
+      const stored = await store.get(keyFor(slot));
+      if (stored?.refreshToken === session.refresh_token) return { rotated: false };
+      const user = await verifiedUser(session.access_token);
+      if (user.id !== expected[slot]?.userId) throw new AcceptanceError('wrong-account');
+      await save(slot, session, user);
+      return { rotated: true };
+    });
   };
 
   /** Local only: sign in through /auth/test-login in a fresh browser context and keep the session in memory. */
@@ -278,7 +349,7 @@ export function createSessionManager({ target, supabaseUrl, publishableKey, stor
   return {
     target, current, browserCookies, absorbBrowserCookies, enrollLocalTestLogin, userRpc,
     account: (slot) => (expected[slot] ? { ...expected[slot] } : null),
-    forget: (slot) => { live.delete(slot); return store.delete(keyFor(slot)); },
+    forget: (slot) => { live.delete(slot); return locked(keyFor(slot), () => store.delete(keyFor(slot))); },
   };
 }
 
@@ -324,7 +395,9 @@ export async function enrollProduction({ slot, port, publishableKey, store = cre
         await client.auth.signOut({ scope: 'local' }).catch(() => {});
         result = 'wrong-account';
       } else {
-        await store.set(`production:${slot}`, recordFromSession(data.session, { target: 'production', slot, user: { id: user.id, email: user.email ?? null } }));
+        const key = `production:${slot}`;
+        const write = () => store.set(key, recordFromSession(data.session, { target: 'production', slot, user: { id: user.id, email: user.email ?? null } }));
+        await (typeof store.withLock === 'function' ? store.withLock(key, write) : write());
         result = 'stored';
       }
     } catch { result = 'failed'; }
