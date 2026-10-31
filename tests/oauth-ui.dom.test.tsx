@@ -7,7 +7,7 @@ import { ConsentForm } from "@/components/oauth/ConsentForm";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
 import type { ConsentView } from "@/lib/types/oauth-ui";
 
-const consent: ConsentView = { requestId: "request", accountId: "account", email: "fixture@example.test", clientName: "Fixture app", logoUri: "https://client.example/logo.png", verified: false, redirectHost: "client.example", scopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"], offlineAccess: true };
+const consent: ConsentView = { requestId: "request", accountId: "account", email: "fixture@example.test", clientName: "Fixture app", logoUri: "https://client.example/logo.png", verified: false, redirectHost: "client.example", scopes: ["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"], grantedScopes: [], offlineAccess: true };
 const action = vi.fn(async () => ({ status: "error" as const, message: "Try again." }));
 it("discloses account, redirect host, verification and sensitive read permissions", () => {
   const html = renderToStaticMarkup(<ConsentForm consent={consent} action={action} />);
@@ -27,6 +27,21 @@ it("lets each optional write permission change independently while read remains 
     await act(() => inputs[1].click());
     expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read"]);
     expect(container.querySelector('button[value="deny"]')).not.toBeNull();
+  } finally { await act(() => root.unmount()); container.remove(); }
+});
+it("shows step-up scopes already granted as selected, and lets the user clear them", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const stepUp: ConsentView = { ...consent, grantedScopes: ["cadence.read", "cadence.occurrences.write"] };
+  expect(renderToStaticMarkup(<ConsentForm consent={stepUp} action={action} />)).toContain("(already granted)");
+  const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
+  try {
+    await act(() => root.render(<ConsentForm consent={stepUp} action={action} />));
+    const inputs = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    expect(inputs[0].closest("label")!.textContent).toContain("already granted");
+    expect(inputs[1].closest("label")!.textContent).not.toContain("already granted");
+    expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read", "cadence.occurrences.write", "cadence.behaviors.write"]);
+    await act(() => inputs[0].click());
+    expect(new FormData(container.querySelector("form")!).getAll("scope")).toEqual(["cadence.read", "cadence.behaviors.write"]);
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 it("shows grant metadata, accessible Disconnect and activity without payloads", () => {

@@ -1,11 +1,139 @@
 # Implementation Status
 
-## Automated MCP client acceptance: Tickets 247–256 — October 30, 2026
+## Ticket 232 live acceptance complete — October 31, 2026
 
-QA tooling for MCP and AI-client acceptance, on the unpushed branch
-`mcp-acceptance-automation`. Plan and platform impact: `docs/TICKETS.md` (Tickets
-247–256). No production calls; Ticket 232's live run, scripts and captured records
-are untouched.
+MCP is live on production (`https://app.cadence-me.com/mcp`). It was enabled
+October 29 at 20:43 UTC on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE` (source `eb5afa5`), and
+production now serves `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` from `7ff01a5`. Live
+acceptance is complete. The evidence
+record, with playbook labels, run IDs and receipt paths, is in
+`docs/qa/mcp-server.md`, "Production activation and live client acceptance —
+October 29–31, 2026 (Ticket 232)".
+
+- October 29 manual run with synthetic accounts A and B: fixtures, signing-key
+  custody and rotation to `e5d7f0dd` with session continuity, hosted isolation,
+  activation and the signer gate, Claude Code (B), ChatGPT developer mode (A: reads,
+  write refused by ChatGPT, revocation), MCP Inspector (A: consent narrowing,
+  step-up, writes), and linked-desktop sync on the test Mac. Cleanup ran October 30
+  at 23:03 UTC and was read back: 0 active grants, all fixture Behaviors archived.
+- Defects found and fixed: #170 (`b43e0d6`), #171 (`239034b`) and #172 (`7ff01a5`).
+  Their migrations `20261030230000` and `20261031003000` are on the hosted database.
+- Ticket 256's automated retest passed every client on production. The exception
+  is ChatGPT step-up: ChatGPT did not step up in these runs. Claude web exercised all
+  16 tools, partial consent with step-up (`20261031T010135Z-e0a95b`), and access
+  ending after revocation (`20261031T011323Z-0ca2f5`).
+- Trust refresh after #172: snapshot `20261031T005211Z-7ff01a5eb167` passed every
+  check except `secret_scanning` (unavailable) and cross-account RLS (not run).
+- Known limits: ChatGPT did not step up in these runs; the Trust refresh does not run cross-account
+  RLS isolation; Trust's secret scanning is unavailable; backend timeout
+  cancellation is unproven; consent write switches default to on by owner decision;
+  Claude web's Disconnect used the Connected-apps RPC by API, an accepted coverage
+  substitution, and the UI Disconnect path was proven with ChatGPT on October 29; Tier 0 counts its skipped production
+  rate-limit scenario as one passing row.
+- Remaining: one Trust marketing-ID refresh and a Trust Preview → Production run
+  after this record merges. Directory submission is out of scope.
+- Scheduled OAuth maintenance: the October 31 00:05 UTC run was observed read-only
+  with one `oauth_maintenance_completed` event and no failure or timeout events.
+- The reviewed Ticket 232 tooling commits are published as the reference branch
+  `origin/mcp-create` (no PR or merge).
+
+Platform impact: deployed web MCP and OAuth server. Desktop: linked sync check only,
+no code change. Marketing and future mobile: not applicable. Messaging impact: none.
+
+## Claude web verified label for its metadata client — October 31, 2026
+
+Ticket 256 found that Claude web's connection returned `503 server_error` on
+production. Commit `4fb3ee6` labels Claude web's CIMD client
+(`https://claude.ai/oauth/mcp-oauth-client-metadata`) as verified `claude`, but
+`cadence_oauth_private.verified_client_matches` allowed `claude` only for DCR, so
+storing the client failed the `clients` check. Owner decision (October 31, 00:23
+UTC): keep the label and widen the rule.
+
+- Migration `20261031003000_allow_claude_web_cimd_label.sql` replaces only that
+  function. `claude` is now also valid for that exact CIMD client_id with exactly
+  `https://claude.ai/api/mcp/auth_callback`. The other label rules are unchanged.
+- `lib/services/oauth/clients.ts` applies the same condition, so Claude web's
+  client_id with any other redirect list registers unverified instead of failing.
+- Local verification on October 31 in the separate project `cadence-claude-cimd-232`
+  through the reviewed Docker proxy with only its project identity changed: start
+  replayed all 96 migrations, every published port on `127.0.0.1`. The new fixture
+  `tests/sql/ticket-232-claude-web-cimd-label.sql` and the 222/232 OAuth fixtures
+  pass. The new real-database test `tests/oauth-claude-web.local-integration.test.ts`
+  registers Claude web's exact document through `/oauth/authorize` and reaches the
+  consent redirect. Under the previous rule it returns the production
+  `503 server_error`. `habit-tracking-app` was not touched.
+- Hosted: PR #172 merged as `7ff01a5`, and migration `20261031003000` is on the
+  hosted database (read back October 31). Ticket 256 run `20261031T004536Z-2199d9`
+  connected Claude web on production with the verified `claude` label (Deployed
+  behavior).
+
+Platform impact: deployed web OAuth server only. Desktop, marketing and future
+mobile: not applicable. Messaging impact: none.
+
+## MCP tool results include their JSON as text — October 30, 2026
+
+Ticket 256 found that successful MCP tool results carried data only in
+`structuredContent`, with the text "<Tool> succeeded.". The Anthropic API MCP
+connector and the OpenAI Responses MCP tool pass only text to the model, so they
+could not read results. `lib/mcp/server.ts` now also returns the same data
+serialized as JSON in one text block, as the MCP tools spec recommends.
+`structuredContent` and error results are unchanged. Tests cover every registry
+tool. Merged as PR #171 (`239034b`). Ticket 256 run `prod-20261031-t1b` passed both
+API clients against production.
+
+Platform impact: deployed web MCP server only. Desktop, marketing and future mobile:
+not applicable. Messaging impact: none.
+
+## Ticket 232 follow-up fixes — October 30, 2026
+
+One PR on `fix/oauth-client-extra-grant-types` fixes the October 29 live-acceptance
+defects. The owner decided (October 30) to merge and deploy after independent review
+and green CI. Merged as PR #170 (`b43e0d6`); migration `20261030230000` is on the
+hosted database (read back October 31).
+
+- Claude web metadata (`4fb3ee6`): Claude web's CIMD
+  (`https://claude.ai/oauth/mcp-oauth-client-metadata`) also lists the JWT-bearer
+  grant, so Cadence rejected it with `invalid_client_metadata`. Metadata may now list
+  unsupported grant types if `authorization_code` is present; nothing beyond
+  `authorization_code` and `refresh_token` is stored or issued.
+- Re-consent keeps earlier permissions: migration
+  `20261030230000_oauth_reconsent_keeps_granted_scopes.sql` replaces
+  `oauth_read_pending` (adds the caller's active `granted_scopes`) and
+  `oauth_finish_pending` (accepts requested plus already granted scopes). The
+  consent screen marks those **already granted** and keeps them selected; clearing
+  one still narrows. Fixture `tests/sql/ticket-232-oauth-reconsent-scopes.sql`.
+- ChatGPT write scopes: the initial 401 challenged only `cadence.read`, and MCP
+  clients request a challenged scope set. Challenged scopes mean required, and the
+  writes are optional, so the initial 401 now omits `scope`; clients fall back to
+  protected-resource `scopes_supported` (all three). Step-up challenges name read
+  plus the missing write scope. Details in `docs/MCP_INTEGRATION.md` §13. Consent
+  defaults are unchanged. Ticket 256 verifies the live ChatGPT link.
+- CodeQL alert #21 (`js/regex-injection`, `scripts/test-device.mjs`): `ax find` no
+  longer compiles the operator's pattern locally; it bounds it to 1–200 printable
+  characters, and the device's `find.js` compiles it as before.
+- Local verification on October 30 in the separate project `cadence-reconsent-232b`
+  through the reviewed Docker proxy with only its project identity changed: start
+  replayed all 95 migrations (ledger equal), every published port on `127.0.0.1`.
+  The new fixture and the OAuth persistence, family-deadline, maintenance and
+  write-replay fixtures passed. The new fixture fails against the previous
+  functions. Type generation was not run; no table or function signature changed.
+  An earlier direct start of `cadence-reconsent-232` without the proxy published
+  ports on all interfaces; it was stopped within a minute, before any fixture ran.
+  `habit-tracking-app` was not touched.
+- Ticket 256 verified on production: ChatGPT web linked with all three scopes
+  (`20261030T234917Z-205816`); Claude web passed after #172.
+
+Platform impact: web OAuth server and MCP (deployed web). Desktop, marketing and
+future mobile: not applicable; the CodeQL fix is developer tooling only. Messaging
+impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
+here).
+
+## Automated MCP client acceptance: Tickets 247–258 — October 31, 2026
+
+QA tooling for MCP and AI-client acceptance, on branch `mcp-acceptance-automation`,
+in a PR into `main` (not merged; a merge needs the coordinator's Trust refresh). Plan
+and platform impact: `docs/TICKETS.md` (Tickets 247–256). Ticket 232's captured
+records are untouched.
 
 - Complete (waves 1 and 2, integrated and independently verified): Ticket 247 run
   ledger (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
@@ -14,29 +142,25 @@ are untouched.
   (`npm run mcp:watch`), Ticket 251 headless real-client runners
   (`npm run mcp:accept:clients`), Ticket 254 agent-scoped secrets
   (`npm run agent:secret`) and Ticket 255 browser-driven ChatGPT web and Claude web
-  runs (`npm run mcp:accept:web`). 249 and 251 passed local isolated-stack runs;
-  their production paths are built but not run (Ticket 256). 255 passed its
-  stub-page tests and a real-site dry run that reached the connector settings in
-  both apps, with no prompts sent.
-- In review (wave 3, integrated): Ticket 252 acceptance skill
+  runs (`npm run mcp:accept:web`).
+- Complete (wave 3, independently verified): Ticket 252 acceptance skill
   (`.claude/skills/mcp-acceptance`, with a local loopback stack helper) and the
-  guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`). A local
-  Tier 0 and Tier 1 run passed with the skill's commands; the guided runner was
-  checked against the real local watcher and fixture tests.
+  guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`).
+- Complete: Ticket 256, the production client retest. Results are in the Ticket 232
+  section above and `docs/qa/mcp-server.md`. Its runner support for the Claude web
+  partial-consent and disconnect scenarios is merged here.
+- Complete (independently verified): Ticket 257 follow-ups from 256 (agent:secret
+  shares the runner's `--run` folder, committed public production QA config in
+  `scripts/acceptance/qa-config.mjs`, bounded retry on concurrent Keychain writes)
+  and Ticket 258 (production's skipped rate-limit scenario is reported as SKIPPED,
+  not as a passing row; skill retry and Keychain notes).
 - On hold: conditional Ticket 253. Ticket 250's gap report found it not required
   for the six scenarios.
-- Planned: Ticket 256, the production client retest (wave 4, needs the owner's
-  go-ahead).
 - Known local test timeout, not caused by this branch:
   `tests/desktop-release-cli.test.ts` times out (5 s) on 7–9 of 27 tests on both
   this branch and `origin/main` `eb5afa5`, and passes 27/27 with a 30 s timeout. On
   this Mac the first run of each newly written executable takes about 0.8 s, and
   each test writes eight fresh stub tools.
-- Owner step pending for Ticket 254: create the "Cadence Agents" vault, the
-  spend-limited Anthropic and OpenAI keys and a read-only service account
-  (`docs/qa/agent-secrets.md`). Ticket 251's readiness check found the current
-  service account reads "Cadence" instead of "Cadence Agents", so the API runners
-  stay skipped until that is redone.
 - Product finding from Ticket 248, not fixed here: clicking Allow or Deny before the
   consent page hydrates sends a native form POST with `Origin: null`, and the Server
   Action CSRF check returns 500.
@@ -48,7 +172,8 @@ tooling tests only the hosted MCP server. Messaging impact: none.
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
 Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
-source. The hosted push is not done and needs the owner's explicit authorization.
+source. Migration `20261027221625` is applied on the hosted database (read-only
+ledger readback, October 31, 2026).
 
 - Bug: a profile timezone change on a linked Mac failed every sync when the account
   had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
@@ -80,7 +205,7 @@ source. The hosted push is not done and needs the owner's explicit authorization
   `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
   named volumes are kept. `habit-tracking-app` was not touched. Type generation was
   refused by the proxy; no function signature changed.
-- Not verified: hosted push and readback, and a timezone change synced from an
+- Not verified: a timezone change synced from an
   installed Mac after the push.
 
 Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
@@ -123,7 +248,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
   Behavior stalls sync, because the server requires every Behavior and both clients
   update only active ones. Fixed in source by migration
-  `20261027221625` (entry above); the hosted push needs the owner's authorization.
+  `20261027221625` (entry above), now applied on the hosted database (ledger
+  readback, October 31, 2026).
 
 Platform impact: desktop release only; web, marketing and future mobile have no change.
 Messaging impact: none; the packet holds draft release notes for the owner.
@@ -2240,7 +2366,7 @@ superseded lines: `docs/DECISIONS.md`; brief: `docs/MCP_INTEGRATION.md`; tickets
 - Ticket 229 (developer documentation): review corrections implemented October 18, 2026; awaiting independent wave-4 re-review. Literal constraint rendering and nullable nested tables now have rendered-DOM regressions. Marketing `/developers` includes guides, generated references for all 16 tools, fixture-validated examples, Markdown mirrors and discovery outputs. Web Settings links to the docs; desktop and future mobile add no interface. Node 26 repository and marketing checks pass. Hosted launch and live-client acceptance remain pending.
 - Ticket 230 (Claude and ChatGPT plugin packages): implemented locally October 18, 2026; awaiting independent wave-4 review. Three shared skills, standalone Claude/OpenAI packages, root marketplace and reproducible ignored ZIPs. Claude strict validation, manifest/schema checks, registry-reference tests and all repository gates pass on Node 26. Distribution only; marketing links in Ticket 229; web, desktop and mobile not applicable. OpenAI portal scans, legal approval, publication and live installation remain unverified/owner-gated.
 - Ticket 231 (privacy disclosure and directory submission packet): review correction implemented October 18, 2026; awaiting independent re-review. Reviewer instructions now separate identical-input replay, changed-input key reuse rejection, and new-key stale-revision conflict; focused integration-write tests pass. `docs/qa/mcp-directory-submission.md` contains unpublished Privacy/Terms drafts, listing copy, reviewer-account options, test cases, recording script and owner release steps. OpenAI challenge route returns exact plain text or 404; focused tests, full tests, build, lint and drift checks pass. Typecheck passes after Ticket 230's shared-file correction; independent compiler recheck passes. Served legal pages unchanged. Web route and marketing listing copy; desktop/mobile not applicable. Legal approval, health-data eligibility, reviewer access and hosted acceptance remain owner gates; no hosted actions.
-- Ticket 232 (production deployment and live client acceptance): incomplete; the owner-approved extension of the interrupted October28 run is prepared locally for independent review. The abort-only component is locally approved. The combined package adds explicit execution dates, a seven-day original-run boundary, validated app-generated Occurrences and session-refresh evidence. The full isolated eb5afa5 rehearsal, session-refresh checks, eleven mutation kills and required Node24 gates pass. A follow-up pins all 30 previously captured generated Occurrences before resume writes; deletion and same-count replacement must stop before any write. Independent review and a fresh coordinator relay are required before hosted writes. MCP remains disabled; key rotation, activation, client/test-Mac acceptance and final Trust remain unverified. PR161 stays held. October 29: the extension package is approved through f07ebca. The owner chose a local loopback sign-in broker for the A/B sessions (`scripts/mcp-session-broker.mjs`), which awaits narrow review. Web/marketing/desktop product code is unchanged; future mobile remains deferred.
+- Ticket 232 (production deployment and live client acceptance): live acceptance complete October 31, 2026; MCP live on production since October 29 (enabled on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE`, source `eb5afa5`; now `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` from `7ff01a5`). The October 29 manual run (fixtures, key rotation to `e5d7f0dd` with continuity, isolation, activation and signer gate, Claude Code, ChatGPT, Inspector, linked desktop) and the October 30 cleanup are recorded with evidence labels in `docs/qa/mcp-server.md`. Defects fixed in #170, #171 and #172; their migrations are on the hosted database. Ticket 256 passed every client on production except ChatGPT step-up (ChatGPT did not step up); Claude web exercised all 16 tools, partial consent and revocation. Remaining: a Trust marketing-ID refresh and Trust Preview → Production run after the evidence merge. Scheduled OAuth maintenance observed completing on October 31 at 00:05 UTC. Earlier: the disabled release deployed October 18 from PR108 merge `280b6eacc9ebcabbd9c5b675c67adf1c01870c8d`. Web live; desktop sync check only; marketing unchanged; future mobile deferred.
 
 ## Ticket 215: Three-input travel Settings and Behavior Where — October 19, 2026
 
