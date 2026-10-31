@@ -440,11 +440,11 @@ separately gated; Ticket232 is not complete.
 
 ## Production activation and live client acceptance — October 29–31, 2026 (Ticket 232)
 
-MCP is live on production at `https://app.cadence-me.com/mcp`. Live acceptance
-remains in progress. Pending for Claude web: partial consent with a write switch cleared, Disconnect in
-Cadence followed by a failed call, and Claude per-tool coverage (or an explicitly
-accepted coverage split). Every client in scope completed a read-write run on production. ChatGPT did
-not step up in these runs (see "Known limits"). Each claim below
+MCP is live on production at `https://app.cadence-me.com/mcp`. Live acceptance is
+complete. Every client in scope completed a read-write run on production. Claude web
+exercised all 16 tools, partial consent with step-up, and access ending after the
+grant was revoked. ChatGPT did not step up in these runs (see "Known limits"). Each
+claim below
 names its evidence class from `docs/INTEGRATION_PLAYBOOK.md#evidence-labels`.
 Current state lives in `STATUS.md`.
 
@@ -564,15 +564,15 @@ Only those counts were kept; raw logs were discarded. Receipt:
 ### Ticket 256 automated client retest — October 30–31, 2026
 
 The runs used production with A and B, with a watcher recording every step. Emi's
-only actions were the two Google sign-ins. The runner fixes `260bdd1`, `cb29007` and
-`bd5b728` are local commits on branch `mcp-accept/256` (base `e65c9e8`). They will be
+only actions were the two Google sign-ins. The runner fixes `260bdd1`, `cb29007`,
+`bd5b728` and `48279a6` are local commits on branch `mcp-accept/256` (base `e65c9e8`). They will be
 published with the MCP acceptance automation PR. Each
 run's receipts (`STATE.md`, `checkpoints.jsonl`, `events.jsonl`, `run.json`) are
 in `.intent/acceptance/<run ID>/` in that worktree.
 
 | Tier | Client and scenario | Evidence class | Result | Run ID |
 |---|---|---|---|---|
-| 0 | Protocol suite (SDK client) | Deployed behavior | Pass, 92/92, of which one check is a deliberate skip of rate-limit exhaustion on production. Covers discovery, tool list equals the registry (16), every read tool, step-up 403 for every write on a read grant, writes, refresh rotation, wrong-resource and revoked-token refusals, and B-to-A isolation (not_found for every by-ID tool). | `prod-20261030-t0` |
+| 0 | Protocol suite (SDK client) | Deployed behavior | Pass, 92/92. Production replaces the 5 local `ratelimit-a` checks with one `ratelimit-a / skipped` row, counted as passing (96 − 5 + 1 = 92). Covers discovery, tool list equals the registry (16), every read tool, step-up 403 for every write on a read grant, writes, refresh rotation, wrong-resource and revoked-token refusals, and B-to-A isolation (not_found for every by-ID tool). | `prod-20261030-t0` |
 | 1 | Claude Code, read-write | Deployed behavior | Pass | `prod-20261030-t1` |
 | 1 | Inspector CLI, read-write | Deployed behavior | Pass | `prod-20261030-t1` |
 | 1 | Anthropic API MCP connector, read-write | Deployed behavior | Failed on the first run (data only in `structuredContent`). Passed after #171. | `prod-20261030-t1`, `prod-20261031-t1b` |
@@ -580,12 +580,17 @@ in `.intent/acceptance/<run ID>/` in that worktree.
 | 1 | claude.ai connector through Claude Code, read-write | Deployed behavior | Pass after a runner fix (`bd5b728`) | `prod-20261031-cai2` |
 | 2 | ChatGPT web, read-write | Deployed behavior | Pass. All three scopes were granted, confirming #170's challenge change. | `20261030T234917Z-205816` |
 | 2 | ChatGPT web, step-up | Deployed behavior | Fail; ChatGPT did not step up. On a read-only grant ChatGPT made no write attempt and started no step-up. | `20261031T000553Z-1cde41` |
-| 2 | Claude web, read-write | Deployed behavior | Blocked first: `/oauth/authorize` returned 503 (run `20261031T000937Z-8f31f3`). Passed after #172, with a grant labeled verified `claude` and all three scopes. | `20261031T004536Z-2199d9` |
+| 2 | Claude web, read-write | Deployed behavior | Blocked first: `/oauth/authorize` returned 503 (run `20261031T000937Z-8f31f3`). Passed after #172, with a grant labeled verified `claude` and all three scopes. It called `list_behaviors`, `get_account_context` and `create_behavior`. | `20261031T004536Z-2199d9` |
+| 2 | Claude web, partial consent | Deployed behavior | Pass. The runner cleared "Mark Occurrences and edit notes", so grant `d00652eb` got `cadence.read` and `cadence.behaviors.write`. All 10 read tools and `create_behavior`, `update_behavior`, `archive_behavior` and `restore_behavior` succeeded. `set_occurrence_status` was refused with `insufficient_scope`. Claude web then stepped up: it showed a Connect card and opened Cadence consent, where the runner chose Deny, so no new grant was created. | `20261031T010135Z-e0a95b` |
+| 2 | Claude web, full scope and Disconnect | Deployed behavior | Pass. Grant `99d9e6ce` got all three scopes. All 10 read tools, the 4 Behavior writes, `set_occurrence_status` and `update_occurrence_note` succeeded. The runner then revoked the grant as A through `oauth_revoke_grant`, the RPC that Settings → Connected apps uses, called by API rather than through the UI. The next Claude web read did not succeed: Cadence recorded 0 tool calls on the grant, and Claude offered Connect, which the runner denied. | `20261031T011323Z-0ca2f5` |
 
-Ticket 256 cleanup ran as `prod-20261031-cleanup3` and `prod-20261031-cleanup4`.
-At 00:53 UTC, A and B had 0 active grants. All 10 "Review practice" Behaviors
-created in A were archived, and B had none. All 5 ChatGPT test chats were
-archived; 2 Claude test chats were kept by instruction. Ticket 232's captured
+Across the two Claude web runs above, Claude web called all 16 tools.
+
+Ticket 256 cleanup ran as `prod-20261031-cleanup3` through `prod-20261031-cleanup6`.
+The Occurrence written in the Disconnect run (`c62f7456`) is back to Unresolved
+with no note. At 07:35 UTC, A and B had 0 active grants. All 12 test Behaviors
+created in A since 23:44 UTC were archived, and B had none. All 5 ChatGPT test chats
+were archived. Claude test chats were kept by instruction, titled `[Cadence QA]`. Ticket 232's captured
 records were not touched.
 
 ### Known limits
@@ -600,18 +605,11 @@ records were not touched.
   but no live run showed a database call being cancelled at its deadline.
 - The consent write switches default to on by owner decision (October 30, 00:57
   UTC). One click grants writes unless the user clears them.
-- Pending: Claude web with a write switch cleared, Claude web Disconnect in Cadence
-  followed by a failed call, and Claude web's tool coverage. Ticket 256 is running
-  them. Tool coverage is split: the Tier 0 SDK client exercised all 16 tools
-  against the same production server, while Claude web's own coverage so far is the
-  read-write run `20261031T004536Z-2199d9`, which called `list_behaviors`,
-  `get_account_context` and `create_behavior`. Its Behavior `9ff46395` was archived
-  later by cleanup run `prod-20261031-cleanup4`, not by Claude web. The scope's per-Claude
-  "every tool" requirement is not yet proven for Claude web.
-- Rate-limit exhaustion was not exercised on production; Tier 0 skips it by
-  design. Meanwhile,
-  Inspector proved consent narrowing, ChatGPT and Settings → Connected apps proved
-  revocation, and the protocol suite proved revoked-token refusal.
+- Claude web's Disconnect used the Connected-apps RPC (`oauth_revoke_grant`) by API.
+  The UI Disconnect path (Settings → Connected apps) was proven with ChatGPT on
+  October 29.
+- Rate-limit exhaustion was not exercised on production. Tier 0 counts its skipped
+  scenario as one passing row in place of the 5 local `ratelimit-a` checks.
 - Directory submission is out of scope.
 
 Platform impact: deployed web MCP and OAuth server (live). Desktop: the linked
