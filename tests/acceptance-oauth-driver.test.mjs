@@ -199,6 +199,68 @@ describe('Keychain store', () => {
     expect(refreshes).toBe(1);
   });
 
+  // Ticket 258: Ticket 256's resumed Claude web run stopped with keychain-failed on its first
+  // session call, right after the watcher child started. Both processes refresh slot A on
+  // their first call (no access token in memory) and again on the first call after a pause
+  // past expiry (both tokens expire together), so both write the rotation back at once.
+  it('a runner and its watcher both survive concurrent writes on the first call and on the first call after a pause', async () => {
+    const items = new Map();
+    const writing = new Set();
+    const events = [];
+    const execImpl = (file, args, _options, callback) => {
+      const child = new EventEmitter();
+      let stdin = '';
+      const finish = () => {
+        if (args[0] === '-i') {
+          const m = /^add-generic-password -U -s (\S+) -a (\S+) -l "[^"]*" -w (\S+)\n$/.exec(stdin);
+          const key = `${m[1]}|${m[2]}`;
+          // macOS: a second -U update of an item that another process is updating exits 45.
+          if (writing.has(key)) { events.push('conflict'); return setImmediate(() => callback(Object.assign(new Error('duplicate'), { code: 45 }), '')); }
+          writing.add(key);
+          return setTimeout(() => { items.set(key, m[3]); writing.delete(key); events.push('write'); callback(null, ''); }, 5);
+        }
+        const value = items.get(`${args[args.indexOf('-s') + 1]}|${args[args.indexOf('-a') + 1]}`);
+        return setImmediate(() => (value ? callback(null, `${value}\n`) : callback(Object.assign(new Error('missing'), { code: 44 }), '')));
+      };
+      child.stdin = { end: (input) => { stdin = input ?? ''; finish(); } };
+      return child;
+    };
+    let clock = Date.parse('2026-10-31T01:13:00Z');
+    let rotation = 1;
+    const fetchImpl = vi.fn(async (input, init = {}) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/auth/v1/token') {
+        rotation += 1;
+        return json(fakeSession(ACCOUNTS.A, `refresh-${rotation}`, TOKEN, Math.floor(clock / 1000) + 3600));
+      }
+      if (url.pathname === '/auth/v1/user') return new Headers(init.headers).get('Authorization') === `Bearer ${TOKEN}` ? json({ id: ACCOUNTS.A }) : json({}, 401);
+      return json({}, 404);
+    });
+    const startProcess = () => createSessionManager({
+      target: 'production', supabaseUrl: PRODUCTION.supabaseUrl, publishableKey: KEY, fetchImpl, now: () => clock,
+      store: createKeychainSessionStore({ execImpl, conflictDelayMs: 10 }),
+    });
+    await createKeychainSessionStore({ execImpl }).set('production:A', recordFromSession(fakeSession(ACCOUNTS.A, 'refresh-1'), { target: 'production', slot: 'A', user: { id: ACCOUNTS.A } }));
+    const runner = startProcess();
+    const watcher = startProcess();
+    const stored = async () => (await createKeychainSessionStore({ execImpl }).get('production:A')).refreshToken;
+
+    events.length = 0;
+    const first = await Promise.all([runner.current('A'), watcher.current('A')]);
+    expect(first.map((r) => r.userId)).toEqual([ACCOUNTS.A, ACCOUNTS.A]);
+    expect(events).toContain('conflict');
+    expect(['refresh-2', 'refresh-3']).toContain(await stored());
+
+    clock += 2 * 60 * 60 * 1000;
+    events.length = 0;
+    const afterPause = await Promise.all([runner.current('A'), watcher.current('A')]);
+    expect(afterPause.map((r) => r.userId)).toEqual([ACCOUNTS.A, ACCOUNTS.A]);
+    expect(events).toContain('conflict');
+    expect(events.filter((e) => e === 'write')).toHaveLength(2);
+    expect(['refresh-4', 'refresh-5']).toContain(await stored());
+    expect(fetchImpl.mock.calls.filter(([input]) => new URL(String(input)).pathname === '/auth/v1/token')).toHaveLength(4);
+  });
+
   it('rejects unexpected account names', async () => {
     const store = createKeychainSessionStore({ execImpl: fakeSecurity().execImpl });
     await expect(store.get('production:C')).rejects.toMatchObject({ code: 'keychain-account-invalid' });

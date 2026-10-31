@@ -178,7 +178,7 @@ async function runFake({ target = 'local', fake = createFakeCadence(), root = te
     return { ...result, report, lines, dir: run.dir, fake, root };
   } finally { run.close(); }
 }
-const failed = (checks) => checks.filter((c) => !c.ok).map((c) => `${c.scenario}/${c.check}`);
+const failed = (checks) => checks.filter((c) => !c.ok && !c.skipped).map((c) => `${c.scenario}/${c.check}`);
 
 describe('Ticket 249 protocol acceptance suite', () => {
   it('keeps the tool list and write scopes equal to the integration registry', () => {
@@ -215,11 +215,18 @@ describe('Ticket 249 protocol acceptance suite', () => {
     expect(failed(leaks.checks)).toEqual(expect.arrayContaining(['isolation-b/get_behavior-not-found', 'isolation-b/archive_behavior-not-found']));
   });
 
-  it('skips rate-limit exhaustion in production', async () => {
-    const { ok, checks, fake } = await runFake({ target: 'production' });
+  it('skips rate-limit exhaustion in production and reports it as SKIPPED, not as a pass', async () => {
+    const { ok, checks, fake, report, dir } = await runFake({ target: 'production' });
     expect(ok).toBe(true);
-    expect(checks.filter((c) => c.scenario === 'ratelimit-a')).toEqual([{ scenario: 'ratelimit-a', check: 'skipped', ok: true, detail: 'production-skips-rate-limit-exhaustion' }]);
+    expect(checks.filter((c) => c.scenario === 'ratelimit-a')).toEqual([
+      { scenario: 'ratelimit-a', check: 'rate-limits', ok: null, skipped: true, detail: 'production-skips-rate-limit-exhaustion' },
+    ]);
     expect(fake.grants).toHaveLength(5);
+    const counted = checks.length - 1;
+    expect(report).toContain('| ratelimit-a | rate-limits | SKIPPED | production-skips-rate-limit-exhaustion |');
+    expect(report).toContain(`Target: production · ${counted}/${counted} checks passed · 1 skipped · PASS`);
+    const evidence = JSON.parse(readFileSync(join(dir, 'evidence.json'), 'utf8'));
+    expect(evidence).toMatchObject({ ok: true, total: counted, passed: counted, skipped: 1 });
   });
 
   it('writes no token, session JWT or note text to stdout or the run folder', async () => {
@@ -246,6 +253,16 @@ describe('Ticket 249 protocol acceptance suite', () => {
     const text = renderReport({ runId: 'r', target: 'local', checks: [{ scenario: 's', check: 'c', ok: false, detail: 'status=500' }] });
     expect(text).toContain('| s | c | FAIL | status=500 |');
     expect(text).toContain('0/1 checks passed · FAIL');
+  });
+
+  it('counts a skipped row as neither passed nor failed', () => {
+    const checks = [{ scenario: 's', check: 'a', ok: true }, { scenario: 's', check: 'b', ok: null, skipped: true, detail: 'why' }];
+    const text = renderReport({ runId: 'r', target: 'production', checks });
+    expect(text).toContain('| s | a | pass |  |');
+    expect(text).toContain('| s | b | SKIPPED | why |');
+    expect(text).toContain('1/1 checks passed · 1 skipped · PASS');
+    const onlySkipped = renderReport({ runId: 'r', target: 'production', checks: checks.slice(1) });
+    expect(onlySkipped).toContain('0/0 checks passed · 1 skipped · FAIL');
   });
 
   it('guards production and local targets', () => {

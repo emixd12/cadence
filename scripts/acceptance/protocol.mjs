@@ -149,8 +149,13 @@ export async function runProtocolSuite({
         checks.push(row); emit(row);
         return Boolean(ok);
       };
+      // A skipped check is neither a pass nor a failure; the report lists it as SKIPPED with its reason.
+      const skip = (id, reason) => {
+        const row = { scenario: name, check: id, ok: null, skipped: true, detail: safeDetail(reason) };
+        checks.push(row); emit(row);
+      };
       let data = {};
-      try { data = (await fn({ check, ...context })) ?? {}; } catch (error) { check('completed', false, codeOf(error)); }
+      try { data = (await fn({ check, skip, ...context })) ?? {}; } catch (error) { check('completed', false, codeOf(error)); }
       return { ...data, checks };
     });
     all.push(...(result.checks ?? []));
@@ -351,7 +356,7 @@ export async function runProtocolSuite({
 
   // ratelimit-a: durable read and write limits, enforced independently. Local only.
   if (target === 'production') {
-    await scenario('ratelimit-a', ({ check }) => { check('skipped', true, 'production-skips-rate-limit-exhaustion'); return { skipped: true }; });
+    await scenario('ratelimit-a', ({ skip }) => { skip('rate-limits', 'production-skips-rate-limit-exhaustion'); return { skipped: true }; });
   } else if (ready) {
     await scenario('ratelimit-a', async (ctx) => withGrant(ctx, { label: 'ratelimit-a', slot: 'A', grant: 'occurrences' }, async ({ tokens }) => {
       const { check } = ctx;
@@ -408,24 +413,31 @@ export async function runProtocolSuite({
     return { revoked: results.filter((r) => r.outcome === 'revoked').length, alreadyRevoked: results.filter((r) => r.outcome === 'already-revoked').length };
   });
 
-  return { ok: all.length > 0 && all.every((row) => row.ok), checks: all };
+  return { ok: suitePassed(all), checks: all };
 }
 
 // ---- Report ----------------------------------------------------------------
 
+/** Pass, fail and skip counts. Skipped rows count toward neither total nor passed. */
+export function tally(checks) {
+  const counted = checks.filter((c) => !c.skipped);
+  return { total: counted.length, passed: counted.filter((c) => c.ok).length, skipped: checks.length - counted.length };
+}
+const suitePassed = (checks) => { const t = tally(checks); return t.total > 0 && t.passed === t.total; };
+
 export function renderReport({ runId, target, checks }) {
-  const passed = checks.filter((c) => c.ok).length;
+  const { total, passed, skipped } = tally(checks);
   const lines = [
     `# Protocol acceptance ${runId}`, '',
-    `Target: ${target} · ${passed}/${checks.length} checks passed · ${checks.length === passed && checks.length > 0 ? 'PASS' : 'FAIL'}`, '',
+    `Target: ${target} · ${passed}/${total} checks passed${skipped ? ` · ${skipped} skipped` : ''} · ${suitePassed(checks) ? 'PASS' : 'FAIL'}`, '',
     '| Scenario | Check | Result | Detail |', '|---|---|---|---|',
-    ...checks.map((c) => `| ${c.scenario} | ${c.check} | ${c.ok ? 'pass' : 'FAIL'} | ${c.detail ?? ''} |`),
+    ...checks.map((c) => `| ${c.scenario} | ${c.check} | ${c.skipped ? 'SKIPPED' : c.ok ? 'pass' : 'FAIL'} | ${c.detail ?? ''} |`),
   ];
   return `${lines.join('\n')}\n`;
 }
 
 export function writeReport(run, { target, checks, ok }) {
-  const evidence = assertSafe({ runId: run.runId, target, ok, total: checks.length, passed: checks.filter((c) => c.ok).length, checks });
+  const evidence = assertSafe({ runId: run.runId, target, ok, ...tally(checks), checks });
   writeFileSync(join(run.dir, 'evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
   const report = renderReport({ runId: run.runId, target, checks });
   writeFileSync(join(run.dir, 'report.md'), report, { mode: 0o600 });
@@ -504,7 +516,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       run, target: options.target, issuer, driver, sessions, protocol, rest, runTag, grantHoldMs: options.grantHoldMs,
       emit: (row) => out(JSON.stringify(row)),
     });
-    await run.step('report', async () => ({ total: checks.length, passed: checks.filter((c) => c.ok).length }));
+    await run.step('report', async () => tally(checks));
     out(writeReport(run, { target: options.target, checks, ok }).trimEnd());
     out(JSON.stringify({ result: ok ? 'pass' : 'fail', runId: run.runId, report: join(run.dir, 'report.md') }));
     return ok ? 0 : 1;

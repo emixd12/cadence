@@ -213,6 +213,9 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
 2. Tier 0: `npm run mcp:accept:protocol -- --target production --confirm-production --run <id>`.
    Start the watcher first (`npm run mcp:watch -- --target production --confirm-production --account both --since 2m --expect inspector --run <id>`);
    the production watcher sees only active grants, so keep the default grant hold.
+   Production never exhausts the rate limits: `report.md` lists `ratelimit-a` as
+   `SKIPPED` (`production-skips-rate-limit-exhaustion`) and leaves it out of the
+   count, so a pass reads `<n>/<n> checks passed · 1 skipped · PASS`.
 3. Tier 1: `npm run agent:secret -- --run .intent/acceptance/<id> --caller client-runners --env ANTHROPIC_API_KEY=anthropic-api-key --env OPENAI_API_KEY=openai-api-key -- node scripts/acceptance/client-runners.mjs --target production --allow-production --run <id> --client claude-code,anthropic-api,openai-api,inspector`.
    Both get the same `<id>`. agent:secret does not create a new run folder: it keeps
    its access lines in `.intent/acceptance/<id>.secret-access.jsonl` while the runner
@@ -220,6 +223,12 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    A leftover `<id>.secret-access.jsonl` means the wrapper was killed; the next
    agent:secret call with the same `--run` moves it. (Before Ticket 257 the runner
    stopped with `run-exists` here.)
+   **After a failed attempt, use a new `<id>`.** If agent:secret stops before the
+   runner starts (exit 3, 4 or 5: a refused mapping, no token, or an `op read`
+   failure) or the runner fails during setup before it creates `run.json`, the
+   wrapper still creates `<id>/` holding only `events.jsonl`. A retry with the same
+   `<id>` stops with `run-exists`. Fix the cause, then run both commands again with a
+   new `<id>`; leave the old folder as the record of the failed attempt.
    **Web runs (steps 4 and 5): omit `--run` to start a new run.** `mcp:accept:web`
    names its own run (`<UTC time>-<hex>`) and prints it on the last line,
    `{"step":"done",…,"runId":"<web-id>"}`. Pass `--run <web-id>` only to resume that
@@ -358,13 +367,19 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   second process; both refresh the slot at start (the access token is never stored)
   and write the rotation back at once. Two concurrent `security add-generic-password
   -U` updates of one item make one exit 45 ("already exists"), reproduced with a
-  throwaway item. Ticket 256 saw this twice as `keychain-failed`. The store now
-  retries that write up to three times; both writers hold a fresh rotation of the
-  same session, so the last write wins. If a run still stops with
+  throwaway item. Ticket 256 saw this three times as `keychain-failed`, the last on
+  the first call of a resumed Claude web run after a pause. The store now retries
+  that write up to three times; both writers hold a fresh rotation of the same
+  session, so the last write wins. Ticket 258 confirmed by test that the retry also
+  covers the first call after a pause past token expiry: both processes' tokens
+  expire together, so both refresh and write again at once. If a run still stops with
   `keychain-write-conflict`, re-run it. Any other `keychain-failed` is a different
   `security` failure (a locked Keychain, a denied prompt or a 20-second timeout):
   check `npm run mcp:oauth -- status --target production --allow-production`, and
   ask Emi only if the Keychain itself asks for her password.
+- **`run-exists` on a Tier 1 retry:** an earlier attempt with that `<id>` stopped
+  before the runner created `run.json` (agent:secret exit 3, 4 or 5, or a runner
+  setup failure). Fix the cause and retry with a new `<id>` (production step 3).
 - **Usage limits:** a stopped or limit-hit agent keeps its uncommitted work in its
   worktree. Check `git -C <worktree> status`, then wake it
   (`ws.agent.wakeOrCreate(taskNoteId, context)`) or start a replacement pointed at the
