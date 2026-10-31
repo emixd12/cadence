@@ -116,6 +116,25 @@ describe("MCP route with official SDK", () => {
     expect(called.status).toBe(200);
     expect((await called.json()).result).toMatchObject({ structuredContent: { categories: [] } });
   });
+  it.each(listIntegrationToolDescriptors().map(tool => tool.name))("returns %s success data as JSON text too", async name => {
+    const value = { items: [{ id: "00000000-0000-4000-8000-000000000001", note: "Line one\nCafé \"quoted\" ✓", count: 3, done: null }], next_cursor: null };
+    vi.mocked(executeMcpOperation).mockResolvedValue({ ok: true, value } as unknown as Awaited<ReturnType<typeof executeMcpOperation>>);
+    const response = await POST(request("tools/call", { name, arguments: {} }, { "Mcp-Name": name }));
+    expect(response.status).toBe(200);
+    const { result } = await response.json();
+    expect(result.structuredContent).toEqual(value);
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].type).toBe("text");
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    expect(result.isError).toBeUndefined();
+  });
+  it("keeps error results as short text with structured errors", async () => {
+    vi.mocked(executeMcpOperation).mockResolvedValue({ ok: false, error: createIntegrationError("insufficient_scope", "Reconnect and grant permission.", { requiredScopes: ["cadence.behaviors.write"] }) });
+    const { result } = await (await POST(request("tools/call", { name: "list_categories", arguments: {} }))).json();
+    expect(result.content).toEqual([{ type: "text", text: "Reconnect and grant permission." }]);
+    expect(result.structuredContent.error.code).toBe("insufficient_scope");
+    expect(result._meta["mcp/www_authenticate"]).toHaveLength(1);
+  });
   it("returns HTTP 429 with stable error and Retry-After", async () => {
     vi.mocked(executeMcpOperation).mockResolvedValue({ ok: false, error: createIntegrationError("rate_limited", "Retry later.", { retryAfterSeconds: 12 }) });
     const response = await POST(request("tools/call", { name: "list_categories", arguments: {} }));

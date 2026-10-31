@@ -130,7 +130,9 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           if (code === "rate_limited") { status = 429; responseHeaders.set("Retry-After", String(result.error.retry_after_seconds)); }
           return toolError(result.error, issuer);
         }
-        return { structuredContent: result.value, content: [{ type: "text", text: `${getIntegrationOperation(resolved.value).title} succeeded.` }] };
+        // MCP tools: a structured result SHOULD also carry its serialized JSON as text,
+        // for clients that pass only text content to the model. Same data, no extras.
+        return { structuredContent: result.value, content: [{ type: "text", text: JSON.stringify(result.value) }] };
       });
       return server;
     }, { legacy: "stateless", maxRequestBodySize: MCP_BODY_LIMIT, maxSubscriptions: 0, keepAliveMs: 0 });
