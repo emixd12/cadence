@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { inspect } from 'node:util';
 import { EventEmitter } from 'node:events';
+import { JSDOM } from 'jsdom';
 import {
   AcceptanceError, PRODUCTION, Secret, SESSION_FORMAT, createKeychainSessionStore, createMemorySessionStore,
   createSessionManager, enrollProduction, recordFromSession, toBrokerSession,
@@ -66,6 +67,10 @@ describe('checkConsentView', () => {
   it('accepts a screen that shows every advertised scope for a narrower request (Ticket 259)', () => {
     expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.read })).toEqual([]);
     expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.behaviors })).toEqual([]);
+  });
+  it('checks offered scopes against discovery when the driver supplies it', () => {
+    expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.read, advertisedScopes: GRANTS.read })).toEqual(['scopes']);
+    expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.read, advertisedScopes: GRANTS.full })).toEqual([]);
   });
   it('flags a screen that shows an unadvertised or repeated scope, or makes read optional', () => {
     expect(checkConsentView({ ...view, optionalScopes: [...view.optionalScopes, 'cadence.admin'] }, expected)).toEqual(['scopes']);
@@ -419,6 +424,81 @@ describe('AcceptanceError', () => {
 });
 
 describe('driver grant choice (Ticket 259)', () => {
+  const harness = ({ advertisedScopes = GRANTS.full, tokenScopes = null } = {}) => {
+    const issuer = 'https://127.0.0.1:4410';
+    const document = new JSDOM(`<form>
+      <h1>Connect Cadence acceptance driver</h1><dt>Cadence account</dt><dd>a@example.test</dd>
+      <input name="request_id" value="request-a"><input name="account_id" value="user-a">
+      <input type="hidden" name="scope" value="cadence.read">
+      <input type="checkbox" name="scope" value="cadence.occurrences.write" checked>
+      <input type="checkbox" name="scope" value="cadence.behaviors.write" checked>
+      <button name="decision" value="allow">Allow</button><button name="decision" value="deny">Deny</button>
+    </form>`).window.document;
+    let authorization;
+    let redirectHandler;
+    const selected = () => [...document.querySelectorAll('input[name="scope"]')]
+      .filter((input) => input.type === 'hidden' || input.checked).map((input) => input.value);
+    const click = vi.fn(async () => {
+      const callback = new URL(authorization.searchParams.get('redirect_uri'));
+      callback.searchParams.set('state', authorization.searchParams.get('state'));
+      callback.searchParams.set('iss', issuer);
+      callback.searchParams.set('code', 'test-code');
+      await redirectHandler({ request: () => ({ url: () => callback.href }), fulfill: async () => {} });
+    });
+    const page = {
+      goto: async (url) => { authorization = new URL(url); }, url: () => `${issuer}/oauth/consent`,
+      waitForFunction: async () => {},
+      locator: (selector) => {
+        const nodes = [...document.querySelectorAll(selector)];
+        return { waitFor: async () => {}, evaluate: async (fn) => fn(nodes[0]), count: async () => nodes.length,
+          setChecked: async (checked) => { nodes[0].checked = checked; }, click };
+      },
+    };
+    const context = { addCookies: async () => {}, newPage: async () => page, cookies: async () => [],
+      route: async (_matches, handler) => { redirectHandler = handler; }, unroute: async () => {}, close: vi.fn(async () => {}) };
+    const sessions = { target: 'local', account: () => ({ userId: 'user-a', email: 'a@example.test' }),
+      current: async () => ({ userId: 'user-a', email: 'a@example.test' }), browserCookies: async () => [], absorbBrowserCookies: async () => {} };
+    const fetchImpl = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/.well-known/oauth-protected-resource/mcp')) return json({ resource: `${issuer}/mcp`, authorization_servers: [issuer], scopes_supported: advertisedScopes });
+      if (url.endsWith('/.well-known/oauth-authorization-server')) return json({
+        issuer, authorization_endpoint: `${issuer}/oauth/authorize`, token_endpoint: `${issuer}/oauth/token`, registration_endpoint: `${issuer}/oauth/register`,
+        revocation_endpoint: `${issuer}/oauth/revoke`, code_challenge_methods_supported: ['S256'], authorization_response_iss_parameter_supported: true,
+      });
+      if (url.endsWith('/oauth/token')) return json({ token_type: 'Bearer', access_token: 'test-access', scope: (tokenScopes ?? selected()).join(' '), expires_in: 3600 });
+      throw new Error('unexpected test request');
+    });
+    const driver = createOAuthDriver({ target: 'local', issuer, sessions, browser: { newContext: async () => context }, fetchImpl });
+    const authorize = () => driver.authorize({ slot: 'A', client: { type: 'dcr', clientId: 'client-a', clientName: 'Cadence acceptance driver' }, grant: 'read', requestScopes: GRANTS.read });
+    return { authorize, selected, click, context, fetchImpl, requested: () => authorization.searchParams.get('scope') };
+  };
+
+  it('keeps a read-only scenario read-only when both advertised write toggles start on', async () => {
+    const h = harness();
+    expect(h.selected()).toEqual(GRANTS.full);
+    const tokens = await h.authorize();
+    expect(h.requested()).toBe('cadence.read');
+    expect(h.selected()).toEqual(GRANTS.read);
+    expect(tokens.scopes).toEqual(GRANTS.read);
+    expect(h.click).toHaveBeenCalledOnce();
+    expect(h.context.close).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a token wider than the read-only scenario selected', async () => {
+    const h = harness({ tokenScopes: GRANTS.full });
+    await expect(h.authorize()).rejects.toMatchObject({ code: 'granted-scope-mismatch' });
+    expect(h.selected()).toEqual(GRANTS.read);
+    expect(h.context.close).toHaveBeenCalledOnce();
+  });
+
+  it('refuses unadvertised write toggles before clicking consent or exchanging a code', async () => {
+    const h = harness({ advertisedScopes: GRANTS.read });
+    await expect(h.authorize()).rejects.toMatchObject({ code: 'consent-mismatch', details: { problems: ['scopes'] } });
+    expect(h.click).not.toHaveBeenCalled();
+    expect(h.fetchImpl.mock.calls.some(([url]) => String(url).endsWith('/oauth/token'))).toBe(false);
+    expect(h.context.close).toHaveBeenCalledOnce();
+  });
+
   // After Ticket 259 the screen offers writes the client did not request, so the run
   // may leave on more than it asked for. The driver checks the offer on the page
   // (scope-not-offered) and the token's scope, not the request.

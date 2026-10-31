@@ -290,6 +290,22 @@ describe('watcher child', () => {
 });
 
 describe('CLI', () => {
+  it('refuses another client scenario before starting the watcher or printing owner steps', async () => {
+    const root = tmp();
+    const prior = createRun({ root, runId: 'wrong-client', target: 'local', accounts: ['A'], scenarios: ['guided:claude-web:read-write'], gitSha: null });
+    prior.close();
+    const out = [];
+    let watcherStarts = 0;
+    const code = await main(['--client', 'chatgpt', '--target', 'local', '--db-url', LOCAL.dbUrl,
+      '--run', 'wrong-client', '--resume'], {}, (line) => out.push(line), {
+      root, watcher: { start() { watcherStarts += 1; throw new Error('unexpected watcher'); } },
+    });
+    expect(code).toBe(2);
+    expect(watcherStarts).toBe(0);
+    expect(out).toEqual(['guided-stopped run-scenario-mismatch']);
+    expect(readdirSync(prior.dir)).not.toContain('lock');
+  });
+
   it('prints a preview without starting anything, and refuses bad usage with exit 2', async () => {
     const out = [];
     expect(await main(['--client', 'claude-web', '--print-only'], {}, (l) => out.push(l))).toBe(0);

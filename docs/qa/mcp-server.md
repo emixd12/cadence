@@ -19,6 +19,11 @@ owner steps, client quirks and recovery live in the project skill
 
 - Every run writes `.intent/acceptance/<run-id>/`; `STATE.md` there is enough to
   resume (`node scripts/acceptance/ledger.mjs state <run-id>`).
+- Resuming requires the same target, account slots and scenario. A mismatch
+  stops before locking or changing the run, with `run-target-mismatch`,
+  `run-account-mismatch` or `run-scenario-mismatch`. Start a new run when those
+  inputs change; cached local or read-only evidence cannot establish production
+  or write acceptance.
 - Local rehearsals use an isolated loopback stack from
   `.claude/skills/mcp-acceptance/local-stack.mjs` (`up`, `tier0`, `tier1`, `check`,
   `exec`, `status`, `down`), never `habit-tracking-app`.

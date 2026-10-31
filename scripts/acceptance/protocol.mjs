@@ -493,12 +493,11 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   try { options = parseArgs(argv); } catch (error) { out(JSON.stringify({ result: 'usage', error: codeOf(error) })); return 2; }
   const local = options.target === 'local';
   const issuer = local ? options.issuer : PRODUCTION.issuer;
-  if (local && options.caFile) trustLocalCertificate(options.caFile);
   const publishableKey = local ? env.CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY : qaPublishableKey(env);
   const supabaseUrl = local ? env.CADENCE_LOCAL_SUPABASE_URL : PRODUCTION.supabaseUrl;
   const sessions = createSessionManager({ target: options.target, supabaseUrl, publishableKey, store: local ? createMemorySessionStore() : createKeychainSessionStore() });
   const run = options.resume
-    ? resumeRun({ runId: options.runId, root: options.root })
+    ? resumeRun({ runId: options.runId, root: options.root, expected: { target: options.target, accounts: ['A', 'B'], scenarios: ['protocol'] } })
     : createRun({ target: options.target, accounts: ['A', 'B'], scenarios: ['protocol'], steps: [...SCENARIOS, 'report'], runId: options.runId ?? undefined, root: options.root });
   out(JSON.stringify({ result: 'run', runId: run.runId, target: options.target }));
   if (local && options.resume && run.checkpoints.length) {
@@ -509,8 +508,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     run.close();
     return 1;
   }
-  const browser = await launchChrome();
+  let browser;
   try {
+    if (local && options.caFile) trustLocalCertificate(options.caFile);
+    browser = await launchChrome();
     if (local) {
       // Local test-login sessions live in this process. Only a run with no recorded work gets here on --resume.
       for (const slot of ['A', 'B']) await sessions.enrollLocalTestLogin(slot, { browser, issuer, contextOptions: { ignoreHTTPSErrors: true } });
@@ -534,7 +535,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     return 1;
   } finally {
     run.close();
-    await browser.close().catch(() => {});
+    await browser?.close().catch(() => {});
   }
 }
 

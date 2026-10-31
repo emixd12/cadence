@@ -776,7 +776,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     }
     const deps = await productionDeps(env);
     if (opts.command === 'revoke') {
-      const run = resumeRun({ runId: opts.runId });
+      const run = resumeRun({ runId: opts.runId, expected: { target: 'production' } });
       try {
         const results = await deps.cleanup.revokeCaptured({ rest: deps.rest, captured: run.cleanupInputs().grants });
         out(summary({ step: 'revoke', ok: true, revokedCount: results.length }));
@@ -785,7 +785,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     }
     const site = SITES[opts.client];
     const label = `web-${opts.client === 'chatgpt' ? 'gpt' : 'claude'}-${opts.slot.toLowerCase()}-${randomBytes(3).toString('hex')}`;
-    const run = opts.runId ? resumeRun({ runId: opts.runId }) : createRun({
+    const run = opts.runId ? resumeRun({ runId: opts.runId, expected: { target: 'production', accounts: [opts.slot], scenarios: [`${opts.client}:${opts.scenario}`] } }) : createRun({
       target: 'production', accounts: [opts.slot], scenarios: [`${opts.client}:${opts.scenario}`],
       steps: ['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', ...(opts.keepChats ? [] : ['archive-chats']), 'revoke'],
     });

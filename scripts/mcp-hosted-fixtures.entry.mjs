@@ -381,7 +381,7 @@ export function assertPartialGraph(graph, now = new Date()) {
     graph = { ...graph, occurrences: graph.occurrences.filter(r => captured.has(r.id)) };
     const order = rows => [...rows].sort((a, b) => a.id.localeCompare(b.id));
     for (const table of TABLES) {
-        const expected = PARTIAL_ROWS.filter(row => row.table === table).map(({ table: _, ...row }) => row);
+        const expected = PARTIAL_ROWS.filter(row => row.table === table).map(({ id, user_id, created_at }) => ({ id, user_id, created_at }));
         const actual = graph[table].map(({ id, user_id, created_at }) => ({ id, user_id, created_at }));
         assert.deepEqual(order(actual), order(expected), 'partial-state-mismatch');
     }

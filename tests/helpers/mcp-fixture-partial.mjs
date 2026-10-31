@@ -2,7 +2,7 @@ import { Temporal } from '@js-temporal/polyfill';
 // Synthetic replica of the captured graph. No hosted rows or session material are loaded.
 export function partialGraph({ PARTIAL_ROWS, PARTIAL_STATUSES, PARTIAL_IDS }) {
   const tables = ['categories', 'behaviors', 'behavior_schedules', 'behavior_schedule_slots', 'occurrences', 'occurrence_status_events', 'behavior_definition_events', 'behavior_configuration_events', 'occurrence_time_sessions'];
-  const graph = Object.fromEntries(tables.map(table => [table, PARTIAL_ROWS.filter(r => r.table === table).map(({ table: _, ...r }) => ({ ...r }))]));
+  const graph = Object.fromEntries(tables.map(table => [table, PARTIAL_ROWS.filter(r => r.table === table).map(({ id, user_id, created_at }) => ({ id, user_id, created_at }))]));
   const b = graph.behaviors[0], schedule = graph.behavior_schedules[0];
   Object.assign(graph.categories[0], { name: 'Review examples', updated_at: graph.categories[0].created_at });
   Object.assign(b, { title: 'Review walk', category_id: PARTIAL_IDS.a.category, timezone: 'America/New_York', active: true, archived_at: null, description: null, browser_reminder_enabled: false, email_reminder_enabled: false });

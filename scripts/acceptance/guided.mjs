@@ -346,7 +346,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   try {
     const production = options.target === 'production';
     const { rest = null, cleanup = null } = production ? (deps.production ?? await productionDeps(env)) : {};
-    run = options.resume ? resumeRun({ runId: options.runId, ...(deps.root ? { root: deps.root } : {}) }) : createRun({
+    run = options.resume ? resumeRun({ runId: options.runId, expected: { target: options.target, accounts: [options.slot], scenarios: [`guided:${options.client}:${options.scenario}`] }, ...(deps.root ? { root: deps.root } : {}) }) : createRun({
       target: options.target, accounts: [options.slot], scenarios: [`guided:${options.client}:${options.scenario}`],
       steps: ['preflight', 'human-connect', ...(production ? ['grant-checkpoint'] : []), 'human-read', 'human-write',
         ...(production ? ['creation-checkpoint'] : []), ...(production && !options.keepGrant ? ['revoke'] : [])],

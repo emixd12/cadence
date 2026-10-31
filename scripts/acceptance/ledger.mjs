@@ -381,10 +381,26 @@ export function createRun({ target, accounts = [], scenarios = [], steps = [], r
   return run;
 }
 
-/** Reopen a run for writing. A lock held by a live process stops with 'run-locked'. */
-export function resumeRun({ runId, root = DEFAULT_ROOT, now = () => new Date() }) {
+/** Refuse cached evidence for another target, account or scenario. Values never enter diagnostics. */
+export function assertRunContext(meta, expected) {
+  const sameMembers = (actual, wanted, member = (value) => value) => {
+    if (!Array.isArray(actual) || !Array.isArray(wanted)) return false;
+    const left = actual.map(member);
+    const right = wanted.map(member);
+    return left.every((value) => typeof value === 'string') && right.every((value) => typeof value === 'string')
+      && JSON.stringify(left.sort()) === JSON.stringify(right.sort());
+  };
+  if (expected.target !== undefined && meta?.target !== expected.target) throw new LedgerStop('run-target-mismatch');
+  const slotOf = (account) => typeof account === 'string' ? account : account?.slot;
+  if (expected.accounts !== undefined && !sameMembers(meta?.accounts, expected.accounts, slotOf)) throw new LedgerStop('run-account-mismatch');
+  if (expected.scenarios !== undefined && !sameMembers(meta?.scenarios, expected.scenarios)) throw new LedgerStop('run-scenario-mismatch');
+}
+
+/** Reopen a matching run for writing. Context is checked before taking a lock or repairing files. */
+export function resumeRun({ runId, root = DEFAULT_ROOT, now = () => new Date(), expected } = {}) {
   const dir = runDir(root, runId);
   if (!existsSync(join(dir, 'run.json'))) throw new LedgerStop('run-missing');
+  if (expected !== undefined) assertRunContext(JSON.parse(readFileSync(join(dir, 'run.json'), 'utf8')), expected);
   takeLock(dir, now);
   const run = new Run({ dir, now, writable: true });
   run.renderState();

@@ -287,6 +287,15 @@ describe('Ticket 249 protocol acceptance suite', () => {
 
 const LOCAL_ENV = { CADENCE_LOCAL_SUPABASE_URL: 'http://127.0.0.1:9', CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_local-test' };
 describe('Ticket 249 local resume', () => {
+  it('rejects a production run before local certificate setup or sign-in', async () => {
+    const root = tempRoot();
+    const first = createRun({ target: 'production', accounts: ['A', 'B'], scenarios: ['protocol'], runId: 'wrong-target', root, gitSha: null });
+    first.close();
+    await expect(main(['--target', 'local', '--run', 'wrong-target', '--resume', '--root', root,
+      '--ca-file', '/nonexistent/acceptance-ca.pem'], LOCAL_ENV, () => {})).rejects.toMatchObject({ reason: 'run-target-mismatch' });
+    expect(readdirSync(first.dir)).not.toContain('lock');
+  });
+
   // Local test-login creates a new Auth user per sign-in, so a resumed local run
   // cannot get its A and B accounts back. Recorded IDs belong to those accounts.
   it('refuses to resume a local run that recorded work, before any sign-in', async () => {

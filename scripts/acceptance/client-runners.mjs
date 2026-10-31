@@ -488,7 +488,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
 }
 
 function openRun(options, steps, root) {
-  try { return resumeRun({ runId: options.runId, root }); } catch (error) {
+  try { return resumeRun({ runId: options.runId, root, expected: { target: options.target, accounts: [options.slot], scenarios: [options.scenario] } }); } catch (error) {
     if (error instanceof LedgerStop && error.reason === 'run-missing') {
       return createRun({ target: options.target, accounts: [options.slot], scenarios: [options.scenario], steps, runId: options.runId, root });
     }

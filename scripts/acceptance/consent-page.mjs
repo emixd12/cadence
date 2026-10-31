@@ -52,7 +52,7 @@ export async function readConsentView(page) {
  * advertised scope with the writes on. Both pass; the caller then sets the
  * switches for the grant it chose.
  */
-export function checkConsentView(view, { userId, email = null, clientName, requestedScopes }) {
+export function checkConsentView(view, { userId, email = null, clientName, requestedScopes, advertisedScopes = ADVERTISED_SCOPES }) {
   const problems = [];
   if (!view || view.accountId !== userId) problems.push('account');
   if (email !== null && view?.email?.toLowerCase() !== email.toLowerCase()) problems.push('email');
@@ -60,7 +60,8 @@ export function checkConsentView(view, { userId, email = null, clientName, reque
   const shown = [...(view?.fixedScopes ?? []), ...(view?.optionalScopes ?? [])];
   const wanted = requestedScopes.filter((scope) => scope !== 'offline_access');
   if (JSON.stringify(view?.fixedScopes ?? []) !== JSON.stringify([READ_SCOPE]) || new Set(shown).size !== shown.length
-    || !shown.every((scope) => ADVERTISED_SCOPES.includes(scope)) || !wanted.every((scope) => shown.includes(scope))) problems.push('scopes');
+    || !Array.isArray(advertisedScopes) || !advertisedScopes.every((scope) => ADVERTISED_SCOPES.includes(scope))
+    || !shown.every((scope) => advertisedScopes.includes(scope)) || !wanted.every((scope) => shown.includes(scope))) problems.push('scopes');
   if (!view?.hasAllow || !view?.hasDeny) problems.push('buttons');
   return problems;
 }

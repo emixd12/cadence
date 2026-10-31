@@ -101,6 +101,31 @@ describe('acceptance run ledger', () => {
     stops(() => resumeRun({ root, runId: 'missing' }), 'run-missing');
   });
 
+  it.each([
+    ['target', { target: 'production' }, 'run-target-mismatch'],
+    ['account', { accounts: ['A'] }, 'run-account-mismatch'],
+    ['scenario', { scenarios: ['read-write'] }, 'run-scenario-mismatch'],
+  ])('refuses a different %s before locking or repairing evidence', (_field, expected, reason) => {
+    const root = tmpRoot();
+    const run = createRun(base(root, { runId: 'context' }));
+    run.close();
+    const path = join(run.dir, 'checkpoints.jsonl');
+    appendFileSync(path, '{"seq":1,"kind":"step');
+    const before = readAll(run.dir);
+    stops(() => resumeRun({ root, runId: 'context', expected }), reason);
+    expect(readdirSync(run.dir)).not.toContain('lock');
+    expect(readAll(run.dir)).toBe(before);
+  });
+
+  it('resumes the same account and scenario sets regardless of ordering', () => {
+    const root = tmpRoot();
+    const run = createRun(base(root, { runId: 'context' }));
+    run.close();
+    const again = resumeRun({ root, runId: 'context', expected: { target: 'local', accounts: ['B', 'A'], scenarios: ['protocol'] } });
+    expect(again.meta.accounts).toEqual(base(root).accounts);
+    again.close();
+  });
+
   it('records a failed step as stopped with a reason only, and runs it again', async () => {
     const root = tmpRoot();
     const token = randomBytes(32).toString('base64url');

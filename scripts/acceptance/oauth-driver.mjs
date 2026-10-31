@@ -193,7 +193,7 @@ export function createOAuthDriver({
     const account = sessions.account(slot);
     const userId = expectUserId ?? account?.userId;
     if (!userId) throw new AcceptanceError('account-unknown');
-    const { server, resource } = await discover();
+    const { server, resource, scopes: advertisedScopes } = await discover();
     const record = await sessions.current(slot, { expectUserId: userId });
     const cookies = await sessions.browserCookies(slot, issuer, { expectUserId: userId });
     const pkce = createPkce();
@@ -218,7 +218,7 @@ export function createOAuthDriver({
       const view = await readConsentView(page);
       const problems = checkConsentView(view, {
         userId, email: target === 'production' ? account?.email ?? null : record.email ?? null,
-        clientName: client.clientName, requestedScopes: requestScopes,
+        clientName: client.clientName, requestedScopes: requestScopes, advertisedScopes: advertisedScopes ?? [],
       });
       if (problems.includes('account')) throw new AcceptanceError('wrong-account', { at: 'consent-page' });
       if (problems.length) throw new AcceptanceError('consent-mismatch', { problems });

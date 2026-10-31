@@ -335,7 +335,20 @@ describe('Ticket 232 activation gate', () => {
 
   it('binds before registering and skips a port that is taken', async () => {
     const blocker = createServer();
-    const taken = await new Promise((resolve) => { const tryPort = (i) => { blocker.once('error', () => tryPort(i + 1)); blocker.listen(GATE.ports[i], '127.0.0.1', () => resolve(GATE.ports[i])); }; tryPort(9); });
+    const taken = await new Promise((resolve, reject) => {
+      const tryPort = (i) => {
+        const onListening = () => { blocker.off('error', onError); resolve(GATE.ports[i]); };
+        const onError = (error) => {
+          blocker.off('listening', onListening);
+          if (error.code === 'EADDRINUSE' && i > 0) tryPort(i - 1);
+          else reject(error);
+        };
+        blocker.once('error', onError);
+        blocker.once('listening', onListening);
+        blocker.listen(GATE.ports[i], '127.0.0.1');
+      };
+      tryPort(GATE.ports.length - 1);
+    });
     try {
       const only = harness({ ports: [taken], isFree: async () => true });
       expect(await only.promise).toMatchObject({ result: 'failed', reason: 'no-free-port', clientId: null });

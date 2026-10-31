@@ -32,7 +32,8 @@ function world(overrides = {}) {
     if (init.method === 'POST') {
       if (o.postThrows) throw new Error(`request failed: ${init.body}`, { cause: init.body });
       const { private_jwk: p, status, algorithm } = JSON.parse(init.body);
-      const { d: _d, ...pub } = p;
+      const pub = { ...p };
+      delete pub.d;
       keys.push({ id: o.importKid ?? p.kid, algorithm, status, public_jwk: o.importKid ? { ...pub, kid: o.importKid } : pub });
       if (o.flipOld) keys[0].status = 'revoked';
       if (o.flipAlg) keys[1].algorithm = 'RS256';

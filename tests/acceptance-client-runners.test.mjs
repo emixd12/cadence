@@ -395,6 +395,30 @@ describe('CLI', () => {
     expect(lines.filter((l) => l.client).map((l) => l.outcome)).toEqual(['fail', 'skipped']);
   });
 
+  it.each([
+    [{ target: 'local' }, 'run-target-mismatch'],
+    [{ accounts: ['B'] }, 'run-account-mismatch'],
+    [{ scenarios: ['read-only'] }, 'run-scenario-mismatch'],
+  ])('never passes cached acceptance from a different run context (%j)', async (priorContext, reason) => {
+    const root = tmp();
+    const prior = createRun({ root, runId: 'context', target: 'production', accounts: ['A'], scenarios: ['read-write'],
+      steps: ['client:openai-api'], gitSha: null, ...priorContext });
+    await prior.step('client:openai-api', async () => ({ client: 'openai-api', outcome: 'pass' }));
+    prior.close();
+    const before = readTree(prior.dir);
+    const lines = [];
+    let harnessCalls = 0;
+    const code = await main(['--target', 'production', '--allow-production', '--client', 'openai-api', '--run', 'context'], {
+      root, env: { PATH: '/nonexistent' }, out: (line) => lines.push(JSON.parse(line)),
+      harnessFactory: async () => { harnessCalls += 1; throw new Error('unexpected harness'); },
+    });
+    expect(code).toBe(2);
+    expect(harnessCalls).toBe(0);
+    expect(lines).toEqual([{ step: 'ledger', ok: false, error: reason }]);
+    expect(readTree(prior.dir)).toBe(before);
+    expect(readdirSync(prior.dir)).not.toContain('lock');
+  });
+
   it('--check reports readiness without starting anything, and runs through a symlinked path', () => {
     const link = join(tmp(), 'runner.mjs');
     symlinkSync(RUNNER, link);
