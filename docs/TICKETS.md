@@ -14722,8 +14722,8 @@ cleanup, the fixes in #170, #171 and #172, and Ticket 256's automated retest. Cl
 web's write-scope-off and Disconnect checks were proven with other clients; see
 "Known limits". Test grants and data were cleaned up and read back; synthetic
 accounts A and B are kept for later acceptance runs. Remaining: a Trust marketing-ID refresh and Trust Preview → Production run
-after the evidence merge. Observing the scheduled 00:05 UTC OAuth expiry maintenance
-is still not recorded. Evidence: `docs/qa/mcp-server.md`, "Production activation
+after the evidence merge. Scheduled OAuth maintenance was observed completing on
+October 31 at 00:05 UTC. Evidence: `docs/qa/mcp-server.md`, "Production activation
 and live client acceptance — October 29–31, 2026 (Ticket 232)", and `STATUS.md`,
 "Ticket 232 live acceptance complete — October 31, 2026".
 Earlier status: the disabled release deployed October 18, 2026 through PR #108

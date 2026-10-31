@@ -518,6 +518,22 @@ binds app `dpl_nqzqBqsqX6gaf7nNezUCmhfhAN4g` and marketing
 `secret_scanning` reported unavailable, and `cross_account_rls_isolation` did not
 run. Every other check passed, including `code_scanning`. The hosted migration boundary was 96 migrations ending at `20261031003000`.
 
+### Scheduled OAuth maintenance — October 31, 2026
+
+Deployed behavior. The scheduled 00:05 UTC run on October 31 was observed read-only
+with the bounded Vercel log observer used on October 22. There was no manual
+invocation. The observer searched the production deployment
+`dpl_3avgnJDYxzZwuTi3ecBP37Wuwbq4` (source `b43e0d6`) from 00:04:30 to 00:07:00
+UTC. It found one `oauth_maintenance_completed` event and no
+`oauth_maintenance_failed` or `oauth_maintenance_timed_out` events. Deleted counts:
+
+| codes | access | families | clients | retries | activity | counters |
+|---|---|---|---|---|---|---|
+| 9 | 1 | 0 | 1 | 2 | 0 | 7 |
+
+Only those counts were kept; raw logs were discarded. Receipt:
+`.intent/artifacts/trust232/maintenance-oct31/observation-dpl_3avgnJDYxzZwuTi3ecBP37Wuwbq4.json`.
+
 ### Ticket 256 automated client retest — October 30–31, 2026
 
 The runs used production with A and B, with a watcher recording every step. Emi's
@@ -560,8 +576,6 @@ records were not touched.
 - Claude web was not run with a write switch cleared or with Disconnect then
   failure. Inspector proved consent narrowing, ChatGPT and Settings → Connected apps
   proved revocation, and the protocol suite proved revoked-token refusal.
-- Scheduled 00:05 UTC OAuth expiry maintenance has not been observed in this
-  record.
 - Directory submission is out of scope.
 
 Platform impact: deployed web MCP and OAuth server (live). Desktop: the linked
