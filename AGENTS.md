@@ -99,6 +99,18 @@ than the owner's Mac are driven over Tailscale SSH with `scripts/test-device.mjs
 (`docs/TEST_DEVICES.md`). Procedure:
 `docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance".
 
+MCP and AI-client acceptance follows the same rule. Agents run every tier from the
+command line: the protocol suite, headless clients, and ChatGPT web and Claude web
+in the dedicated QA Chrome profile. They check each step against Cadence's own
+records with `npm run mcp:watch`, and resume from the run ledger in
+`.intent/acceptance/<run-id>/`. Agents sign in as test accounts A and B from kept
+sessions, click consent for them and read agent-scoped keys through
+`npm run agent:secret`. The owner keeps sign-ins, creating keys, vaults and service
+accounts, owner-secret approvals and release decisions. Run the testing agent as a
+top-level agent so it can ask the owner directly, one numbered list per batch, and
+never ask the owner to report outputs. Procedure: the project skill
+`.claude/skills/mcp-acceptance` and `docs/qa/mcp-server.md`, "Automated acceptance".
+
 ## Source-of-truth documents
 
 Product and implementation docs:

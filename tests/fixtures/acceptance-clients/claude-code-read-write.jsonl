@@ -1,0 +1,10 @@
+{"type":"system","subtype":"init","model":"claude-opus-5-5","apiKeySource":"none","mcp_servers":[{"name":"cadence","status":"connected"}],"tools":["mcp__cadence__archive_behavior","mcp__cadence__create_behavior","mcp__cadence__fetch","mcp__cadence__get_account_context","mcp__cadence__get_adherence_summary","mcp__cadence__get_behavior","mcp__cadence__get_occurrence","mcp__cadence__get_timeline","mcp__cadence__list_behaviors","mcp__cadence__list_categories","mcp__cadence__list_occurrences","mcp__cadence__restore_behavior","mcp__cadence__search","mcp__cadence__set_occurrence_status","mcp__cadence__update_behavior","mcp__cadence__update_occurrence_note"]}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_01Pvq6qyz5z18QDoeWyh85AW","name":"mcp__cadence__get_timeline","input":{}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01Pvq6qyz5z18QDoeWyh85AW","is_error":false,"content":[{"type":"text","text":"{\"ok\":true}"}]}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_01MxBrjpzVeknEH3o6ZjksUt","name":"mcp__cadence__create_behavior","input":{}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01MxBrjpzVeknEH3o6ZjksUt","is_error":false,"content":[{"type":"text","text":"{\"behavior\":{\"id\":\"92412b6e-4c80-4570-8ded-058efef35457\"}}"}]}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_011iRo6AnV7CKte3hXTCMZwq","name":"mcp__cadence__archive_behavior","input":{}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_011iRo6AnV7CKte3hXTCMZwq","is_error":false,"content":[{"type":"text","text":"{\"behavior\":{\"id\":\"92412b6e-4c80-4570-8ded-058efef35457\"}}"}]}]}}
+{"type":"assistant","message":{"content":[]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"[text]"}]}}
+{"type":"result","subtype":"success","num_turns":4,"total_cost_usd":0.0525944,"usage":{"input_tokens":6,"output_tokens":548},"permission_denials":[],"result":"DONE"}

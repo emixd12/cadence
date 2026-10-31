@@ -167,6 +167,47 @@ future mobile: not applicable; the CodeQL fix is developer tooling only. Messagi
 impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
 here).
 
+## Automated MCP client acceptance: Tickets 247–258 — October 31, 2026
+
+QA tooling for MCP and AI-client acceptance, on branch `mcp-acceptance-automation`,
+in a PR into `main` (not merged; a merge needs the coordinator's Trust refresh). Plan
+and platform impact: `docs/TICKETS.md` (Tickets 247–256). Ticket 232's captured
+records are untouched.
+
+- Complete (waves 1 and 2, integrated and independently verified): Ticket 247 run
+  ledger (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
+  (`npm run mcp:oauth`), Ticket 249 protocol acceptance suite
+  (`npm run mcp:accept:protocol`), Ticket 250 server-side watcher
+  (`npm run mcp:watch`), Ticket 251 headless real-client runners
+  (`npm run mcp:accept:clients`), Ticket 254 agent-scoped secrets
+  (`npm run agent:secret`) and Ticket 255 browser-driven ChatGPT web and Claude web
+  runs (`npm run mcp:accept:web`).
+- Complete (wave 3, independently verified): Ticket 252 acceptance skill
+  (`.claude/skills/mcp-acceptance`, with a local loopback stack helper) and the
+  guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`).
+- Complete: Ticket 256, the production client retest. Results are in the Ticket 232
+  section above and `docs/qa/mcp-server.md`. Its runner support for the Claude web
+  partial-consent and disconnect scenarios is merged here.
+- Complete (independently verified): Ticket 257 follow-ups from 256 (agent:secret
+  shares the runner's `--run` folder, committed public production QA config in
+  `scripts/acceptance/qa-config.mjs`, bounded retry on concurrent Keychain writes)
+  and Ticket 258 (production's skipped rate-limit scenario is reported as SKIPPED,
+  not as a passing row; skill retry and Keychain notes).
+- On hold: conditional Ticket 253. Ticket 250's gap report found it not required
+  for the six scenarios.
+- Known local test timeout, not caused by this branch:
+  `tests/desktop-release-cli.test.ts` times out (5 s) on 7–9 of 27 tests on both
+  this branch and `origin/main` `eb5afa5`, and passes 27/27 with a 30 s timeout. On
+  this Mac the first run of each newly written executable takes about 0.8 s, and
+  each test writes eight fresh stub tools.
+- Product finding from Ticket 248, not fixed here: clicking Allow or Deny before the
+  consent page hydrates sends a native form POST with `Origin: null`, and the Server
+  Action CSRF check returns 500.
+
+Platform impact: web QA tooling only (scripts, tests, docs); Ticket 253 would touch
+the MCP server. Desktop, marketing and future mobile: not applicable, because the
+tooling tests only the hosted MCP server. Messaging impact: none.
+
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
 Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`).

@@ -1,0 +1,18 @@
+{
+  "_source": "Constructed from the documented Responses API remote MCP shapes (mcp_list_tools, mcp_call with output or error). Replace with a recorded, reduced response after the first keyed run (Ticket 256).",
+  "response": {
+    "id": "resp_fixture_1", "object": "response", "status": "completed", "model": "gpt-6-luna",
+    "usage": { "input_tokens": 2100, "output_tokens": 260 },
+    "output": [
+      { "id": "mcpl_fixture", "type": "mcp_list_tools", "server_label": "cadence", "tools": [
+        { "name": "get_account_context" }, { "name": "list_behaviors" }, { "name": "get_behavior" }, { "name": "list_categories" },
+        { "name": "get_timeline" }, { "name": "list_occurrences" }, { "name": "get_occurrence" }, { "name": "get_adherence_summary" },
+        { "name": "search" }, { "name": "fetch" }, { "name": "set_occurrence_status" }, { "name": "update_occurrence_note" },
+        { "name": "create_behavior" }, { "name": "update_behavior" }, { "name": "archive_behavior" }, { "name": "restore_behavior" } ] },
+      { "id": "mcp_fixture_1", "type": "mcp_call", "server_label": "cadence", "name": "get_timeline", "arguments": "{}", "output": "Get Timeline succeeded.", "error": null },
+      { "id": "mcp_fixture_2", "type": "mcp_call", "server_label": "cadence", "name": "create_behavior", "arguments": "{}", "output": "{\"behavior\":{\"id\":\"6d3f1a7e-0b2c-4f5e-8a91-3c2d1e0f9a87\"}}", "error": null },
+      { "id": "mcp_fixture_3", "type": "mcp_call", "server_label": "cadence", "name": "archive_behavior", "arguments": "{}", "output": "Archive Behavior succeeded.", "error": null },
+      { "id": "msg_fixture", "type": "message", "role": "assistant", "content": [ { "type": "output_text", "text": "DONE" } ] }
+    ]
+  }
+}
