@@ -222,6 +222,28 @@ estimated brief, or US$0.015 / US$0.030 / US$0.060 monthly. Tokens and billed co
 remain unmeasured. Recheck provider rates and measure both calls before promoting
 the candidate or treating these assumptions as a budget limit.
 
+## QA-only acceptance model calls
+
+The MCP acceptance runners (`npm run mcp:accept:clients`, Tickets 251 and 256)
+call paid models on the owner's QA API keys. These are test costs, not product
+usage. They are excluded from the per-user totals above. Prices checked
+2026-10-31: [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+and [OpenAI GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+| Client | Model and billing | List price per million tokens | Limits in `scripts/acceptance/clients.mjs` | Cost per scenario run |
+| --- | --- | --- | --- | --- |
+| `anthropic-api` | Anthropic `claude-opus-5-5`, Messages API with the MCP connector | US$4 input, US$20 output | At most 12 requests, each with `max_tokens` 4,096 | Output at most US$0.98. Input assumed at 15,000 tokens per request, about US$0.72. About US$1.70 at most (assumed) |
+| `openai-api` | OpenAI `gpt-6-luna`, Responses API `mcp` tool | US$0.10 input, US$0.50 output | One request, `max_output_tokens` 4,096, `max_tool_calls` 12 | Input assumed at 30,000 tokens. About US$0.005 at most (assumed) |
+| `claude-code` with `--claude-auth api-key` | Anthropic `claude-opus-5-5` through Claude Code | As above | `--max-budget-usd 1`, `--max-turns 12` | At most US$1 |
+| `claude-code` on a subscription, `claude-ai`, `inspector`, web and guided runs | Owner's Claude or ChatGPT subscription, or no model | No API charge | — | US$0 |
+
+Each runner run covers one scenario (`read-write`, `read-only` or `step-up`) per
+client. Running all three scenarios on both API clients and `claude-code` with an
+API key costs at most about US$8.10 (assumed). The runners record input tokens,
+output tokens and Claude Code's reported cost in each run's evidence; none of
+those measurements are copied here yet. Replace the input assumptions with measured
+figures from a run's `evidence.json`.
+
 ## Weather
 
 Provider: Open-Meteo, selected 2026-10-18 (Ticket 218). On 2026-10-22 the owner
@@ -303,6 +325,8 @@ arrives, fees reduce the US$5:
   for development and testing, and backlog Ticket 243 for six-leg speed.
 - 2026-10-24: Recorded Ticket 188's optional second model request and incremental
   candidate cost assumptions. Production-default totals remain unchanged.
+- 2026-10-31: Recorded the QA-only Anthropic and OpenAI calls made by the MCP
+  acceptance runners. They are excluded from the per-user totals.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

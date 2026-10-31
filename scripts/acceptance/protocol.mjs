@@ -4,6 +4,7 @@
 //   npm run mcp:accept:protocol -- --target local [--run <id>] [--issuer https://127.0.0.1:4440] [--ca-file <ca.pem>]
 //   npm run mcp:accept:protocol -- --target production --confirm-production [--run <id>]   (Ticket 256 onward)
 //   npm run mcp:accept:protocol -- --target <t> --run <id> --resume
+//     (a local run resumes only if it recorded nothing; otherwise start a new run)
 //
 // Local needs an isolated stack and a Next dev server with CADENCE_MCP_ENABLED=true,
 // CADENCE_ENABLE_TEST_LOGIN=1 and an HTTPS loopback issuer, plus
@@ -500,10 +501,18 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     ? resumeRun({ runId: options.runId, root: options.root })
     : createRun({ target: options.target, accounts: ['A', 'B'], scenarios: ['protocol'], steps: [...SCENARIOS, 'report'], runId: options.runId ?? undefined, root: options.root });
   out(JSON.stringify({ result: 'run', runId: run.runId, target: options.target }));
+  if (local && options.resume && run.checkpoints.length) {
+    // Local test-login creates a new Auth user per sign-in, so a resumed run cannot
+    // sign the original A and B accounts back in. Recorded steps, grants and
+    // Behaviors belong to those accounts; start a new run instead of mixing them.
+    out(JSON.stringify({ result: 'stopped', runId: run.runId, error: 'local-resume-needs-new-run' }));
+    run.close();
+    return 1;
+  }
   const browser = await launchChrome();
   try {
     if (local) {
-      // Local test-login sessions live in this process; a resumed local run signs in fresh users.
+      // Local test-login sessions live in this process. Only a run with no recorded work gets here on --resume.
       for (const slot of ['A', 'B']) await sessions.enrollLocalTestLogin(slot, { browser, issuer, contextOptions: { ignoreHTTPSErrors: true } });
     }
     // User IDs only, so a watcher (npm run mcp:watch -- --user-a/--user-b) can follow this run.

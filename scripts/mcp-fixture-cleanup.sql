@@ -57,7 +57,10 @@ BEGIN
     IF relation='categories' THEN
       SELECT array_agg(id ORDER BY id) INTO actual_ids FROM public.categories WHERE id=ANY(category_ids);
     ELSIF relation='behaviors' THEN
-      SELECT array_agg(id ORDER BY id) INTO actual_ids FROM public.behaviors WHERE category_id=ANY(category_ids);
+      -- Fixture categories must hold only captured Behaviors. Acceptance clients create
+      -- uncategorized Behaviors, so a captured uncategorized row counts only as itself.
+      SELECT array_agg(id ORDER BY id) INTO actual_ids FROM public.behaviors
+        WHERE category_id=ANY(category_ids) OR (id=ANY(behavior_ids) AND category_id IS NULL);
     ELSE
       EXECUTE format('SELECT array_agg(id ORDER BY id) FROM public.%I WHERE behavior_id=ANY($1)', relation)
         INTO actual_ids USING behavior_ids;
@@ -66,7 +69,8 @@ BEGIN
       OR cardinality(expected_ids) <> (manifest->'counts'->>relation)::integer THEN RAISE EXCEPTION 'cleanup-refused'; END IF;
   END LOOP;
   IF EXISTS(SELECT 1 FROM public.behaviors WHERE id=ANY(behavior_ids) AND
-    (title NOT IN ('Review walk','Review reading','Review stretch','Review practice')
+    ((category_id IS NOT NULL AND title NOT IN ('Review walk','Review reading','Review stretch','Review practice'))
+      OR (category_id IS NULL AND title !~ '^Review practice [a-z0-9-]{1,40}( edited)?$')
       OR browser_reminder_enabled OR email_reminder_enabled OR timezone <> 'America/New_York'))
     OR EXISTS(SELECT 1 FROM public.categories WHERE id=ANY(category_ids) AND name <> 'Review examples')
     OR EXISTS(SELECT 1 FROM public.occurrence_time_sessions WHERE behavior_id=ANY(behavior_ids) AND stopped_at IS NULL)

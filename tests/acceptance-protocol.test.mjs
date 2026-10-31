@@ -13,7 +13,7 @@ import { assertSafe, createRun, resumeRun } from '../scripts/acceptance/ledger.m
 import { GRANTS } from '../scripts/acceptance/consent-page.mjs';
 import { Secret } from '../scripts/acceptance/test-account-sessions.mjs';
 import {
-  READ_LIMIT, READ_TOOLS, REGISTRY_TOOLS, SAMPLE_NOTE, WRITE_LIMIT, WRITE_SCOPE, parseArgs, renderReport, runProtocolSuite, writeReport,
+  READ_LIMIT, READ_TOOLS, REGISTRY_TOOLS, SAMPLE_NOTE, WRITE_LIMIT, WRITE_SCOPE, main, parseArgs, renderReport, runProtocolSuite, writeReport,
 } from '../scripts/acceptance/protocol.mjs';
 
 const ISSUER = 'https://127.0.0.1:4440';
@@ -283,4 +283,28 @@ describe('Ticket 249 protocol acceptance suite', () => {
     expect(result.status).toBe(2);
     expect(JSON.parse(result.stdout.trim())).toEqual({ result: 'usage', error: 'target-required' });
   });
+});
+
+const LOCAL_ENV = { CADENCE_LOCAL_SUPABASE_URL: 'http://127.0.0.1:9', CADENCE_LOCAL_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_local-test' };
+describe('Ticket 249 local resume', () => {
+  // Local test-login creates a new Auth user per sign-in, so a resumed local run
+  // cannot get its A and B accounts back. Recorded IDs belong to those accounts.
+  it('refuses to resume a local run that recorded work, before any sign-in', async () => {
+    const root = tempRoot();
+    const first = createRun({ target: 'local', accounts: ['A', 'B'], scenarios: ['protocol'], steps: ['preflight', 'behaviors-a'], runId: 'local-resume', root, gitSha: null });
+    await first.step('preflight', async () => ({ ok: true }));
+    await first.step('behaviors-a', async () => ({ behaviorId: randomUUID() }));
+    first.close();
+    const lines = [];
+    const code = await main(['--target', 'local', '--run', 'local-resume', '--resume', '--root', root], LOCAL_ENV, (line) => lines.push(JSON.parse(line)));
+    expect(code).toBe(1);
+    expect(lines).toEqual([
+      { result: 'run', runId: 'local-resume', target: 'local' },
+      { result: 'stopped', runId: 'local-resume', error: 'local-resume-needs-new-run' },
+    ]);
+    // The lock is released, so a read-only cleanup view still works.
+    const again = resumeRun({ runId: 'local-resume', root });
+    expect(again.cleanupInputs()).toEqual({ grants: [], creations: [] });
+    again.close();
+  }, 90_000);
 });

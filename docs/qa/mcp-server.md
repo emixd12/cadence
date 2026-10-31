@@ -418,6 +418,11 @@ Include every row derived from the captured original Behaviors and client-create
 refresh separately. Never adopt a pre-existing Behavior or an unattributable
 row; refuse on missing lineage or an exhausted row bound. The archive transaction
 still enforces exact closure and preserves categories, Occurrences and history.
+Client-created Behaviors are uncategorized. The transaction accepts a captured
+uncategorized Behavior only as itself and only with the title
+`Review practice <label>` or `Review practice <label> edited`. Fixture
+categories still must contain exactly the captured Behaviors, with the four
+reviewed titles.
 
 Before resume writes, `assertPartialGraph` also pins the 30 generated rows
 from the retained October28 capture by ID, owner, Behavior, creation time, date
