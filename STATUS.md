@@ -1,5 +1,44 @@
 # Implementation Status
 
+## Ticket 259: consent offers advertised write permissions — October 31, 2026
+
+In review: [PR #175](https://github.com/emixd12/cadence/pull/175). Owner decision (Emi, October 31): the consent screen
+offers every scope the server advertises, even when the client requested only
+some, and every write switch starts on. This addresses Ticket 256's finding that
+ChatGPT web links read-only and never steps up.
+
+- `getConsentPageData` now offers all three tracking scopes for every request.
+  The grant holds exactly what the user leaves on; the token response reports it.
+  Step-up re-consent still keeps already granted scopes.
+- Migration `20261031210000_oauth_consent_offers_advertised_scopes.sql` drops the
+  requested-or-granted subset check in `oauth_finish_pending`. **Hosted push not
+  done; it needs Emi's explicit go.** Deploy order matters: push the migration
+  before the app deploys. Otherwise the old check rejects the default selection
+  for a read-only client, and consent fails unless the user switches both writes
+  off.
+- Local verification in the separate project `cadence-consent-259` through the
+  reviewed Docker proxy with only its project identity changed: reset replayed
+  all 97 migrations with every published port on `127.0.0.1`. The new fixture
+  `tests/sql/ticket-259-consent-offers-advertised-scopes.sql` and the updated
+  `ticket-232-oauth-reconsent-scopes.sql` fail on the old function and pass on
+  the new one; the 222, 225 and other 232 OAuth fixtures pass.
+  `habit-tracking-app` was not touched.
+- MCP acceptance, local only, on a throwaway merge of this commit into
+  `mcp-acceptance-automation` (stack `cadence-accept-259`): Tier 0
+  `local-259-t0-1031t205736` passed 96/96 with watcher exit 0; Tier 1 read-write
+  `local-259-t1-1031t205756` and step-up `local-259-t1-1031t205812` passed
+  (claude-code and inspector; the three keyed or public clients skipped by
+  design). Cleanup check: all 10 grants revoked. Follow-up for that branch: its
+  consent check expects the shown scopes to equal the requested ones, so a
+  read-only request through the OAuth driver would now stop with
+  `consent-mismatch`; today's scenarios all request every scope.
+- Remaining: hosted migration push (owner), deployment, and a live Tier 2
+  ChatGPT web run that completes a write.
+
+Platform impact: web OAuth consent and database function only. Desktop,
+marketing and future mobile: not applicable. Messaging impact: P-014 in
+`docs/MESSAGING_CHANGES.md` (marketing developer docs); no marketing copy changed here.
+
 ## Ticket 232 live acceptance complete — October 31, 2026
 
 MCP is live on production (`https://app.cadence-me.com/mcp`). It was enabled

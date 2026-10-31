@@ -15274,3 +15274,38 @@ resolved with file, deployment and date.
 
 Messaging impact: resolves all open entries. Platform impact: web legal and copy,
 desktop in-app copy, marketing site; future mobile not applicable.
+
+## Ticket 259: Consent offers advertised write permissions
+
+Status: implemented October 31, 2026; in review as PR #175. Product change.
+Dependencies: Tickets 226–227 (OAuth and consent), the Ticket 232 follow-up
+re-consent union (migration `20261030230000`), and the Ticket 256 finding.
+
+Ticket 256 found that ChatGPT web links with `cadence.read` only and, on a
+read-only grant, makes no write attempt and starts no step-up. Owner decision
+(Emi, October 31, 2026): the consent screen offers every scope the server
+advertises, even when the client requested only some, and every write switch
+starts on.
+
+- `/oauth/consent` shows read (required) and both write permissions for every
+  request. Each write starts on and can be switched off.
+- The grant holds exactly what the user leaves on. The token response's `scope`
+  reports the granted set, which may exceed the request (RFC 6749 §3.3).
+- Step-up re-consent keeps already granted scopes, marked "(already granted)".
+- Migration `20261031210000_oauth_consent_offers_advertised_scopes.sql` removes
+  the requested-or-granted subset check from `oauth_finish_pending`;
+  `scopes_valid` still applies. The hosted push needs the owner's explicit go and
+  must precede the app deployment; the old check rejects the default selection
+  for a read-only client.
+- Docs: `docs/MCP_INTEGRATION.md`, `docs/DATA_MODEL.md`, `docs/UI_SPEC.md`,
+  `docs/USER_FLOWS.md`, `interaction-registry.json` (INT-OAUTH-001, INT-OAUTH-003).
+
+Done when tests show an unrequested write is offered, is granted only when left
+on, and a ChatGPT-style read-only request can be upgraded at consent; then, after
+deployment, a live Tier 2 ChatGPT web run completes a write.
+
+Platform impact: web only (OAuth consent and the database function). Desktop:
+not applicable (hosted grants are managed on the web). Marketing: not applicable
+(developer docs already tell clients to read granted scopes). Future mobile: not
+applicable. Messaging impact: P-014 in `docs/MESSAGING_CHANGES.md` (developer
+docs copy); the messaging track owns the text change.

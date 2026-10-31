@@ -17,9 +17,10 @@ export async function getConsentPageData(requestId: string): Promise<ConsentView
   const { user, error } = await getCurrentUser();
   if (error || !user) return null;
   const consent = await getOAuthConsent(await consentRequest("GET"), requestId, await createClient());
-  // Step-up re-consent shows the active grant's scopes as already granted and selected,
-  // so approving a new request keeps them unless the user clears one.
-  const shown = SCOPE_ORDER.filter((scope) => consent.scopes.includes(scope) || consent.grantedScopes.includes(scope));
+  // Ticket 259: consent offers every advertised scope, even ones the client did not
+  // request, and each write starts selected. Step-up re-consent also marks the active
+  // grant's scopes as already granted, so approving keeps them unless the user clears one.
+  const shown = [...SCOPE_ORDER];
   return {
     requestId, accountId: user.id, email: user.email ?? "Signed-in account",
     clientName: consent.clientName, logoUri: consent.logoUri,

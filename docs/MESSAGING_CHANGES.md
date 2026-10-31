@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-014` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-015` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -83,6 +83,7 @@ Status values:
 | [P-011](#p-011-behavior-descriptions-sent-for-duration-estimates) | Behavior descriptions sent for duration estimates | logged | 188, 184 | Privacy, Daily Brief Settings |
 | [P-012](#p-012-daily-brief-trip-conclusions-come-from-the-timeline-calendar-connection) | Daily Brief trip conclusions come from the Timeline Calendar connection | logged | 219, 187 | Privacy |
 | [P-013](#p-013-ai-client-re-consent-keeps-already-granted-permissions) | AI client re-consent keeps already granted permissions | logged | 232 | In-app consent copy, user guide |
+| [P-014](#p-014-ai-client-consent-offers-every-write-permission-switched-on) | AI client consent offers every write permission, switched on | logged | 259 | Marketing (developer docs), user guide, provider submissions |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -510,3 +511,28 @@ cite has not changed.
   already has are marked already granted and stay on unless the user switches them
   off. Directory submission text that describes consent should match.
 - **Status:** logged.
+
+## P-014: AI client consent offers every write permission, switched on
+
+- **Change:** the consent screen now offers read and both write permissions for
+  every connection request, even when the AI client asked only to read, and both
+  write switches start on (owner decision, October 31, 2026). One click on Allow
+  grants all three; the grant holds exactly what the user leaves on, and the client
+  may receive more scopes than it requested. Code: `lib/services/oauth-ui.service.ts`,
+  migration `20261031210000_oauth_consent_offers_advertised_scopes.sql`.
+- **Affected:** Ticket 259 (PR #175). Files: `apps/marketing/src/data/developers.ts`
+  ("Claude connector" and "Scopes and consent"), `docs/user-guide/privacy-and-account.md`
+  ("Connect and disconnect an AI client"), and directory submission text that
+  describes consent.
+- **Conflicting current text:** developers.ts, "Claude connector": "Leave both write
+  permissions off for a read-only trial." The writes now start on, so a reader must
+  switch them off rather than leave them. "Scopes and consent": "Consent can remove
+  either write scope." It does not say that consent may also grant writes the client
+  did not request. The user guide's "Switch off either write permission to narrow
+  access" stays accurate but does not say both start on.
+- **Update needed:** say that both write permissions start on and must be switched
+  off for a read-only trial; tell integrators the granted scopes (token response
+  `scope`, `get_account_context` `granted_scopes`) may exceed the request; add to
+  the user guide that writes start on even for read-only requests.
+- **Status:** logged.
+
