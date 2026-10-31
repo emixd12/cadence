@@ -584,7 +584,12 @@ in `.intent/acceptance/<run ID>/` in that worktree.
 | 2 | Claude web, partial consent | Deployed behavior | Pass. The runner cleared "Mark Occurrences and edit notes", so grant `d00652eb` got `cadence.read` and `cadence.behaviors.write`. All 10 read tools and `create_behavior`, `update_behavior`, `archive_behavior` and `restore_behavior` succeeded. `set_occurrence_status` was refused with `insufficient_scope`. Claude web then stepped up: it showed a Connect card and opened Cadence consent, where the runner chose Deny, so no new grant was created. | `20261031T010135Z-e0a95b` |
 | 2 | Claude web, full scope and Disconnect | Deployed behavior | Pass. Grant `99d9e6ce` got all three scopes. All 10 read tools, the 4 Behavior writes, `set_occurrence_status` and `update_occurrence_note` succeeded. The runner then revoked the grant as A through `oauth_revoke_grant`, the RPC that Settings → Connected apps uses, called by API rather than through the UI. The next Claude web read did not succeed: Cadence recorded 0 tool calls on the grant, and Claude offered Connect, which the runner denied. | `20261031T011323Z-0ca2f5` |
 
-Across the two Claude web runs above, Claude web called all 16 tools.
+Across the two Claude web runs above, Claude web called all 16 tools. A read-only
+hosted activity readback on October 31 (Live provider) for grants `d00652eb` and
+`99d9e6ce` confirms this. It found 55 rows, all 16 tools succeeding, and 4
+`insufficient_scope` denials of `set_occurrence_status` on `d00652eb`. Neither
+grant has activity after its revocation (01:13:14 and 01:17:56 UTC). Receipt:
+`.intent/artifacts/trust232/claude-web-activity/readback.md`.
 
 Ticket 256 cleanup ran as `prod-20261031-cleanup3` through `prod-20261031-cleanup6`.
 The Occurrence written in the Disconnect run (`c62f7456`) is back to Unresolved
@@ -605,9 +610,10 @@ records were not touched.
   but no live run showed a database call being cancelled at its deadline.
 - The consent write switches default to on by owner decision (October 30, 00:57
   UTC). One click grants writes unless the user clears them.
-- Claude web's Disconnect used the Connected-apps RPC (`oauth_revoke_grant`) by API.
-  The UI Disconnect path (Settings → Connected apps) was proven with ChatGPT on
-  October 29.
+- Claude web's Disconnect used the Connected-apps RPC (`oauth_revoke_grant`) by API,
+  not the Settings button. The coordinator accepted this as a coverage substitution
+  on October 31. The UI Disconnect path (Settings → Connected apps) was proven with
+  ChatGPT on October 29.
 - Rate-limit exhaustion was not exercised on production. Tier 0 counts its skipped
   scenario as one passing row in place of the 5 local `ratelimit-a` checks.
 - Directory submission is out of scope.

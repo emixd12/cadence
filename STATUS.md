@@ -27,8 +27,8 @@ October 29–31, 2026 (Ticket 232)".
 - Known limits: ChatGPT did not step up in these runs; the Trust refresh does not run cross-account
   RLS isolation; Trust's secret scanning is unavailable; backend timeout
   cancellation is unproven; consent write switches default to on by owner decision;
-  Claude web's Disconnect used the Connected-apps RPC by API, and the UI Disconnect
-  path was proven with ChatGPT on October 29; Tier 0 counts its skipped production
+  Claude web's Disconnect used the Connected-apps RPC by API, an accepted coverage
+  substitution, and the UI Disconnect path was proven with ChatGPT on October 29; Tier 0 counts its skipped production
   rate-limit scenario as one passing row.
 - Remaining: one Trust marketing-ID refresh and a Trust Preview → Production run
   after this record merges. Directory submission is out of scope.
