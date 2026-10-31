@@ -440,10 +440,10 @@ separately gated; Ticket232 is not complete.
 
 ## Production activation and live client acceptance — October 29–31, 2026 (Ticket 232)
 
-MCP is live on production at `https://app.cadence-me.com/mcp`. Live acceptance is
-complete except two Claude web scenarios, which are pending in Ticket 256: partial
-consent with a write switch cleared, and Disconnect in Cadence followed by a failed
-call. Every client in scope completed a read-write run on production. ChatGPT did
+MCP is live on production at `https://app.cadence-me.com/mcp`. Live acceptance
+remains in progress. Pending for Claude web: partial consent with a write switch cleared, Disconnect in
+Cadence followed by a failed call, and Claude per-tool coverage (or an explicitly
+accepted coverage split). Every client in scope completed a read-write run on production. ChatGPT did
 not step up in these runs (see "Known limits"). Each claim below
 names its evidence class from `docs/INTEGRATION_PLAYBOOK.md#evidence-labels`.
 Current state lives in `STATUS.md`.
@@ -603,7 +603,9 @@ records were not touched.
   followed by a failed call, and Claude web's tool coverage. Ticket 256 is running
   them. Tool coverage is split: the Tier 0 SDK client exercised all 16 tools
   against the same production server, while Claude web's own coverage so far is the
-  read-write scenario (a read, a create and an archive). The scope's per-Claude
+  read-write run `20261031T004536Z-2199d9`, which called `list_behaviors`,
+  `get_account_context` and `create_behavior`. Its Behavior `9ff46395` was archived
+  later by cleanup run `prod-20261031-cleanup4`, not by Claude web. The scope's per-Claude
   "every tool" requirement is not yet proven for Claude web.
 - Rate-limit exhaustion was not exercised on production; Tier 0 skips it by
   design. Meanwhile,

@@ -14715,14 +14715,15 @@ Scope and acceptance:
 
 ## Ticket 232: Production deployment and live client acceptance
 
-Status: live acceptance complete October 31, 2026, except two Claude web scenarios
-pending in Ticket 256: partial consent with a write switch cleared, and Disconnect
-in Cadence followed by a failed call. MCP is live on production since
+Status: in progress (October 31, 2026). Pending for Claude web in Ticket 256:
+partial consent with a write switch cleared, Disconnect in
+Cadence followed by a failed call, and Claude per-tool coverage (or an explicitly
+accepted coverage split). MCP is live on production since
 October 29 (enabled on `dpl_6wx7xm8Mjpjg2aweuoshXNy9cYCE`, source `eb5afa5`). The
 live-acceptance items below have evidence: the October 29 manual run, the October 30
 cleanup, the fixes in #170, #171 and #172, and Ticket 256's automated retest. Test grants and data were cleaned up and read back; synthetic
-accounts A and B are kept for later acceptance runs. Remaining: the two Claude web
-scenarios, then a Trust marketing-ID refresh and Trust Preview → Production run
+accounts A and B are kept for later acceptance runs. Remaining: the pending Claude
+web items, then a Trust marketing-ID refresh and Trust Preview → Production run
 after the evidence merge. Scheduled OAuth maintenance was observed completing on
 October 31 at 00:05 UTC. Evidence: `docs/qa/mcp-server.md`, "Production activation
 and live client acceptance — October 29–31, 2026 (Ticket 232)", and `STATUS.md`,
