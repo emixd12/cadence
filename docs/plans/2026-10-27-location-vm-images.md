@@ -92,6 +92,20 @@ with anything that looks like a coordinate removed. Results go to
 `location-vm/runs/<copy>.json` (mode 600). `--keep` keeps a failed copy for
 inspection; a passing copy is always deleted. One copy runs at a time.
 
+The runner stages only the selected DMG in its read-only share, under a fixed
+name. A failed copy, Gatekeeper assessment, mount, install, signature check or
+accessibility action fails the run. Gatekeeper must report Notarized Developer
+ID with assessments enabled, and the installed version must match the candidate.
+The permission after the request and after **Check again** must match the chosen
+image. Never-asked and denied images must show both recovery buttons; an allowed
+image may omit them. When **Open Location Services** appears, it must bring
+System Settings to the front. A cleanup failure also exits unsuccessfully and
+records the remaining copy.
+
+October 31 review added synthetic guest-sequence regression tests for these
+failure paths. These tests do not establish a new installed macOS run; the
+October 27–29 evidence above belongs to the original spike.
+
 Use published, notarized DMGs in guests. Dev-signed builds go only to the owner's
 Mac (`docs/DESKTOP_RELEASE.md`, "Dev-signed builds").
 
