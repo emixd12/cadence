@@ -57,9 +57,11 @@ supabase/signing_keys*.json
 .local/
 
 # Claude Code local state (codex-bridge runs, launch config, worktrees).
-# Project skills under .claude/skills/ are tracked.
+# Project skills under .claude/skills/ and the cloud-session hook in
+# .claude/settings.json are tracked.
 .claude/*
 !.claude/skills/
+!.claude/settings.json
 .vercel
 .env*
 .env.*
