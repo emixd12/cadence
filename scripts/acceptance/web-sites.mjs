@@ -119,7 +119,7 @@ const chatgpt = Object.freeze({
   chatIdPattern: /^\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
   chatPathFor: (id) => `/c/${id}`,
   // Archive this chat from its header menu. Not yet seen on the real site (Ticket 256).
-  archiveMenu: exact('Open conversation options', 'Conversation options'),
+  archiveMenu: exact('Open conversation options', 'Conversation options', 'Chat actions'),
   archiveItem: exact('Archive'),
   archiveConfirm: exact('Archive', 'Confirm'),
   // Archiving can be undone, so runs archive ChatGPT test chats by default.
@@ -133,7 +133,8 @@ const chatgpt = Object.freeze({
   approve: exact('Allow once', 'Confirm', 'Allow', 'Approve'),
   reauthorize: exact('Connect', 'Reconnect', 'Sign in', 'Authorize'),
   stop: /^\s*Stop( generating| streaming| response)?\s*$/i,
-  assistant: '[data-message-author-role="assistant"]',
+  // Ticket 256: the real site now marks a finished turn (prompt plus reply) with data-talvt-turn-state.
+  assistant: '[data-message-author-role="assistant"], [data-talvt-turn-state="complete"]',
   settingsMarker(page) { return page.getByRole('searchbox', { name: 'Search installed plugins' }); },
   async findConnector(page, name, timeoutMs = 3_000) {
     return waitVisible(page.getByRole('main').getByRole('link', { name: startsWithName(name) }), timeoutMs);
@@ -144,10 +145,35 @@ const chatgpt = Object.freeze({
   async reconnect(page, entry, name) {
     await entry.click();
     await waitVisible(page.getByRole('heading', { name: exact(name) }), 15_000);
-    await clickNamed(page, new RegExp(`^\\s*Reconnect\\b.*${escape(name)}`), 'connector-reconnect');
+    // A disconnected app shows a plain "Connect" button instead (seen in Ticket 256).
+    // A still-linked account keeps Reconnect in its "Actions for … account" menu (Ticket 256).
+    const main = page.getByRole('main');
+    const reconnect = await waitVisible(clickable(page, new RegExp(`^\\s*Reconnect\\b.*${escape(name)}`)), 5_000);
+    const accountMenu = reconnect ? null : await waitVisible(main.getByRole('button', { name: new RegExp(`^Actions for .*${escape(name)} account`) }), 8_000);
+    if (reconnect) await reconnect.click();
+    else if (accountMenu) {
+      await accountMenu.click();
+      await clickNamed(page, exact('Reconnect'), 'connector-reconnect', { scope: page.getByRole('menu') });
+    } else await clickNamed(page, exact('Connect'), 'connector-reconnect', { scope: main });
+    // Seen on the real site (Ticket 256): a data-sharing dialog asks to confirm.
+    await confirmIfAsked(page, exact(`Connect ${name}`), 5_000);
   },
   async enableInChat(page, name) {
     await clickNamed(page, this.composerTools, 'chat-tools');
+    // Seen in Ticket 256: the menu lists plugins as "<name> <description>"
+    // buttons plus a "Type to search plugins" button; picking one inserts an
+    // inline app mention into the composer.
+    const search = await waitVisible(page.getByRole('button', { name: /^Type to search plugins/ }), 3_000);
+    if (search) {
+      const pick = page.locator('button:not(nav button):not(aside button)').filter({ hasText: new RegExp(`^\\s*${escape(name)}`) });
+      let item = await waitVisible(pick, 1_000);
+      if (!item) { await search.click(); await page.keyboard.type(name); item = await waitVisible(pick, 5_000); }
+      if (!item) throw new WebStop('connector-not-in-chat', 'chat-enable');
+      await item.click();
+      const mention = await waitVisible(page.locator(this.composer).locator(`[app-mention-display-name="${name}"]`), 5_000);
+      if (!mention) throw new WebStop('connector-not-in-chat', 'chat-enable');
+      return;
+    }
     const developer = await waitVisible(clickable(page, this.composerDeveloper), 5_000);
     if (developer) await developer.click();
     const item = await waitVisible(clickable(page, exact(name)), 5_000);

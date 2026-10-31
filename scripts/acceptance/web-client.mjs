@@ -300,7 +300,13 @@ export async function sendPrompt(page, site, text) {
   const composer = await waitVisible(page.locator(site.composer), 20_000);
   if (!composer) throw new WebStop('page-changed', 'chat-composer');
   await composer.click();
-  await composer.fill(text);
+  // Keep an inline app mention (ChatGPT plugins, Ticket 256): append instead of replacing.
+  if (await composer.locator('[app-mention-name]').count().catch(() => 0)) {
+    await composer.press('End');
+    await page.keyboard.insertText(text);
+  } else {
+    await composer.fill(text);
+  }
   const send = await waitVisible(clickable(page, site.send), 3_000);
   if (send) await send.click(); else await composer.press('Enter');
 }

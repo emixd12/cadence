@@ -52,6 +52,8 @@ function resetState(overrides = {}) {
     // comes before the conversation in DOM order. They must never change.
     otherChats: [{ id: randomUUID(), archived: false }, { id: randomUUID(), archived: false }],
     duplicateOptions: false, redirectOnOpen: false, archiveAlsoOther: false, historyInMain: false, noHeaderControl: false, stayAfterArchive: false, otherLinkInMain: false,
+    // The live ChatGPT layout seen in Ticket 256 (account menu, plugin mention, turn state, "Chat actions").
+    layout2026: false,
     ...overrides,
   };
 }
@@ -112,6 +114,19 @@ function renderSettings() {
   if (flavor === 'chatgpt') {
     if (detail) {
       main.append(el('h1', {}, c.name), el('a', { href: '#' }, 'View details'), el('button', {}, 'Uninstall'));
+      if (S.layout2026) {
+        const confirmConnect = () => document.body.append(el('div', { role: 'dialog' }, el('p', {}, 'ChatGPT may share relevant chats with this app.'),
+          el('button', { onclick: () => { location.href = authorizeUrl(S.requestScopes); } }, 'Connect ' + c.name), el('button', {}, 'Cancel')));
+        if (c.connected) {
+          main.append(el('button', { 'aria-label': "Actions for Emiliano's " + c.name + ' account', 'aria-describedby': 'acct-kind', onclick: () => {
+            const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem' }, 'Rename account'),
+              el('div', { role: 'menuitem', onclick: () => { menu.remove(); confirmConnect(); } }, 'Reconnect'), el('div', { role: 'menuitem' }, 'Disconnect'));
+            document.body.append(menu);
+          } }, '...'), el('span', { id: 'acct-kind' }, 'Primary'));
+        } else main.append(el('button', { onclick: confirmConnect }, 'Connect'));
+        main.append(el('button', {}, 'Connect another account'));
+        return;
+      }
       if (!c.connected) main.append(el('button', { 'aria-label': "Reconnect Emiliano's " + c.name + ' account Primary', onclick: () => { location.href = authorizeUrl(S.requestScopes); } }, 'Reconnect'));
       main.append(el('button', {}, 'Connect another account'));
       return;
@@ -174,7 +189,7 @@ function renderChat() {
   // name as the conversation's own; the conversation header sits inside <main>.
   const chatPrefix = flavor === 'chatgpt' ? '/c/' : '/chat/';
   const currentChat = () => (location.pathname.startsWith(chatPrefix) ? location.pathname.slice(chatPrefix.length) : null);
-  const optionsName = flavor === 'chatgpt' ? 'Open conversation options' : 'Open chat options';
+  const optionsName = flavor === 'chatgpt' ? (S.layout2026 ? 'Chat actions' : 'Open conversation options') : 'Open chat options';
   const itemName = flavor === 'chatgpt' ? 'Archive' : 'Delete';
   const optionsButton = (chatId, leave) => el('button', { 'aria-label': optionsName, onclick: () => {
     const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: () => {
@@ -212,7 +227,25 @@ function renderChat() {
   renderHeader();
   // A link to another chat elsewhere in the conversation root (not near the control).
   if (S.otherLinkInMain && S.otherChats.length) main.append(el('div', { class: 'related' }, el('a', { href: chatPrefix + S.otherChats[S.otherChats.length - 1].id }, 'Related')));
-  if (flavor === 'chatgpt') {
+  if (flavor === 'chatgpt' && S.layout2026) {
+    // Plugins are buttons named "<name> <description>"; search reveals the rest and
+    // picking one replaces the typed search text with an inline app mention.
+    const plus = el('button', { 'aria-label': 'Add files and more', onclick: () => {
+      const pop = el('div', {});
+      pop.append(el('button', {}, 'Add photos & files Upload from computer'), el('button', {}, 'Gmail Read and manage Gmail'));
+      pop.append(el('button', { onclick: () => {
+        composer.focus();
+        pop.append(el('button', { onclick: () => {
+          composer.textContent = '';
+          composer.append(el('span', { 'app-mention-name': 'cadence-qa', 'app-mention-display-name': 'Cadence QA', contenteditable: 'false' }, 'Cadence QA'), ' ');
+          pop.remove();
+          post('/api/enable');
+        } }, 'Cadence QA', el('span', {}, 'Cadence QA')));
+      } }, 'Type to search plugins'));
+      document.body.append(pop);
+    } }, '+');
+    root.append(plus);
+  } else if (flavor === 'chatgpt') {
     const plus = el('button', { 'aria-label': 'Add files and more', onclick: () => {
       const menu = el('div', { role: 'menu' });
       menu.append(el('div', { role: 'menuitem', onclick: () => {
@@ -230,7 +263,9 @@ function renderChat() {
     show(r);
   } }));
   function assistant(text, streaming) {
-    const attrs = flavor === 'chatgpt' ? { 'data-message-author-role': 'assistant' } : { 'data-is-streaming': String(streaming) };
+    const attrs = flavor === 'chatgpt'
+      ? (S.layout2026 ? { 'data-talvt-turn-state': streaming ? 'streaming' : 'complete' } : { 'data-message-author-role': 'assistant' })
+      : { 'data-is-streaming': String(streaming) };
     const m = el('div', attrs, text);
     log.append(m);
     return m;
@@ -487,6 +522,23 @@ describe('ChatGPT stub', () => {
     expect(inputs.creations[0].behaviorId).toBe(state.behaviors[0].id);
     expect(out.cookiesLeft).toBe(0);
     expect(runFiles(out.run).some((f) => f.endsWith('.png'))).toBe(false);
+    assertNoLeaks(out);
+  }, 120_000);
+
+  it('follows the live layout seen in Ticket 256: account-menu reconnect, plugin mention, turn state, "Chat actions"', async () => {
+    resetState({ layout2026: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).map((e) => e.step)).toEqual(['preflight', 'connect', 'grant-checkpoint', 'prompt-read', 'prompt-write', 'creation-checkpoint', 'archive-chats', 'watcher', 'revoke']);
+    expect(state.enabled).toBe(true);
+    // The mention survived: every prompt starts with it and still carries the canned text.
+    expect(state.messages).toHaveLength(2);
+    expect(state.messages.every((m) => m.startsWith('Cadence QA') && m.includes('[Cadence QA]'))).toBe(true);
+    expect(state.chats).toHaveLength(2);
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
+    expect(state.behaviors).toHaveLength(1);
+    expect(activeGrants()).toHaveLength(0);
     assertNoLeaks(out);
   }, 120_000);
 
