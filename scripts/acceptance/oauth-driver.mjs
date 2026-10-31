@@ -27,7 +27,7 @@ import { isCliEntry } from './cli-entry.mjs';
 import {
   AcceptanceError, PRODUCTION, Secret, createKeychainSessionStore, createMemorySessionStore, createSessionManager, enrollProduction,
 } from './test-account-sessions.mjs';
-import { GRANTS, captureRedirect, checkConsentView, launchChrome, readConsentView, submitConsent } from './consent-page.mjs';
+import { GRANTS, captureRedirect, checkConsentView, consentRecord, launchChrome, readConsentView, requestedScopesFrom, submitConsent } from './consent-page.mjs';
 import { qaPublishableKey } from './qa-config.mjs';
 
 export const ALL_SCOPES = Object.freeze([...GRANTS.full, 'offline_access']);
@@ -69,7 +69,7 @@ export function parseMcpBody(text, contentType = '') {
  */
 export function createOAuthDriver({
   target, issuer, sessions, browser, fetchImpl = fetch, callbackPort = DEFAULT_CALLBACK_PORT, clientName = DEFAULT_CLIENT_NAME,
-  ignoreLocalCertificate = false, consentTimeoutMs = 60_000,
+  ignoreLocalCertificate = false, consentTimeoutMs = 60_000, onConsentView = () => {},
 }) {
   if (target === 'production' && issuer !== PRODUCTION.issuer) throw new AcceptanceError('production-issuer-mismatch');
   if (target === 'local' && !isLoopbackOrigin(issuer)) throw new AcceptanceError('local-issuer-not-loopback');
@@ -222,6 +222,9 @@ export function createOAuthDriver({
       });
       if (problems.includes('account')) throw new AcceptanceError('wrong-account', { at: 'consent-page' });
       if (problems.length) throw new AcceptanceError('consent-mismatch', { problems });
+      // Evidence before the click: the requested scope parameter and each switch's start.
+      await onConsentView({ slot, clientId: client.clientId,
+        ...consentRecord({ view, requestedScopes: requestedScopesFrom(`${server.authorization_endpoint}?${params}`), decision, grantScopes }) });
       await submitConsent(page, { decision, grantScopes });
       const returned = await capture.wait();
       if (returned.searchParams.get('iss') !== issuer) throw new AcceptanceError('authorization-response-issuer-mismatch');

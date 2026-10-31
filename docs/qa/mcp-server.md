@@ -1490,6 +1490,30 @@ created in A since 23:44 UTC were archived, and B had none. All 5 ChatGPT test c
 were archived. Claude test chats were kept by instruction, titled `[Cadence QA]`. Ticket 232's captured
 records were not touched.
 
+### Ticket 259 deploy and live check — October 31, 2026
+
+Emi authorized the sequence at 22:44 UTC: push the hosted migration, then merge and
+deploy PR #175. Evidence is in `cadence-consent-259/.intent/artifacts/ship-259/` and in
+the run folders under `cadence-accept-integration/.intent/acceptance/` named below.
+
+| Step | Result | Evidence |
+| --- | --- | --- |
+| Hosted migration, project `qjodzutjxtmtzczbloxa` | Before the push, all 96 earlier migrations matched and none was hosted-only. The dry run listed only `20261031210000_oauth_consent_offers_advertised_scopes.sql`. Pushed at 22:46 UTC. Readback at 22:47 UTC: the ledger has 97 rows, latest `20261031210000`. `oauth_finish_pending` is owned by `postgres`, is `SECURITY DEFINER` with `search_path=""` and execute for `authenticated` only. Its body MD5 `e2eb40e7…` (1,160 bytes) equals the file's. The npm-pinned CLI 2.105.0 is killed at launch on this Mac (exit 137), so the push used Homebrew CLI 2.109.1 through `SUPABASE_CLI_BINARY_OVERRIDE`. | `migration-list-before.txt`, `db-push-dry-run.txt`, `db-push.txt`, `hosted-readback.json` |
+| Merge | PR #175 merged with a merge commit as `f1392365` at 22:47:06 UTC. App `dpl_3BbEMqVSQGqz5MScRX3L9JGeF6GY` and marketing `dpl_5eXFt2Cg3UZKmKCkPRrk6jMoMf9K` reached READY. | GitHub, Vercel |
+| Trust refresh | `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` set to the new marketing deployment and read back. The app was redeployed as `dpl_7mFEnfmM45ueWuND6ypay6EYnXuv` (`f139236`, aliased to `app.cadence-me.com`). Preview run 41250015963 and Production run 41250187363 succeeded and published snapshot `20261031T225545Z-f1392365b7e3`. Seven checks passed, including `hosted_migration_boundary=20261031210000`. Secret scanning reports unavailable and cross-account RLS isolation not run, as at the #172 refresh. | [snapshot](https://emixd12.github.io/cadence/trust/41250187363/dpl_7mFEnfmM45ueWuND6ypay6EYnXuv/dpl_5eXFt2Cg3UZKmKCkPRrk6jMoMf9K/20261031T225545Z-f1392365b7e3.json) |
+| Tier 0, production | `prod-20261031-259t0`: 91/91 checks passed, 1 skipped (`ratelimit-a`, by design). Watcher exit 0. Cleanup revoked all 5 grants and archived the run's Behavior `1a6a1f35`. | `prod-20261031-259t0/report.md` |
+| Tier 2 ChatGPT web, account A, read-write | `20261031T230336Z-cf9e6e`: Cadence's consent offered all three scopes and the runner allowed them. Grant `e1b45487` (verified ChatGPT client metadata) holds all three. ChatGPT called `list_behaviors` and `get_account_context`, then `create_behavior` succeeded at 23:06:39 UTC (Behavior `5b69c8c5`) with reminders off; no fix-up was needed. Both test chats were archived, none unknown. The watcher was satisfied and the grant revoked. | `20261031T230336Z-cf9e6e/checkpoints.jsonl` |
+| Ledger cleanup | `prod-20261031-259cleanup`: a one-off script on the driver and ledger granted A read plus Behavior writes and archived `5b69c8c5` (readback `archived_at` set). It revoked its grant and found 0 active grants for A and B. A one-shot watcher read agrees. `npm run mcp:accept:archive` now does this. | `prod-20261031-259cleanup/checkpoints.jsonl` |
+
+Not verified in this run: that ChatGPT requested only `cadence.read`, and that the
+switches started on in the live page. Cadence keeps the requested scopes only in the
+pending row, which consent deletes, and Vercel logs no `/oauth/authorize` lines.
+The run proves the offer and the grant. The read-only request rests on Ticket 256's
+live finding; the switch default rests on `ConsentForm` (`defaultChecked`) at
+`f139236`. From PR #174 on, the runners record both before clicking Allow: a
+`consent.view` event holds the authorize URL's `scope` parameter and each switch's
+starting state.
+
 ### Known limits
 
 - ChatGPT did not step up in these runs. On a read-only grant it refused writes on

@@ -393,7 +393,7 @@ async function claudeConnectorServers(env) {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-export async function createHarness(options, env) {
+export async function createHarness(options, env, { onConsentView = () => {} } = {}) {
   const [{ createOAuthDriver }, sessionsModule, { launchChrome }] = await Promise.all([
     import('./oauth-driver.mjs'), import('./test-account-sessions.mjs'), import('./consent-page.mjs'),
   ]);
@@ -411,7 +411,7 @@ export async function createHarness(options, env) {
   const slot = options.slot;
   if (local) await sessions.enrollLocalTestLogin(slot, { browser, issuer, contextOptions: { ignoreHTTPSErrors: true } });
   const userIdOf = (s) => (local ? sessions.account(s)?.userId : TEST_ACCOUNTS[s].userId) ?? stop('account-unknown');
-  const driver = createOAuthDriver({ target: options.target, issuer, sessions, browser, callbackPort: CALLBACK_PORT, ignoreLocalCertificate: local });
+  const driver = createOAuthDriver({ target: options.target, issuer, sessions, browser, callbackPort: CALLBACK_PORT, ignoreLocalCertificate: local, onConsentView });
   let source;
   let behaviors;
   let rest = null;
@@ -487,7 +487,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
       try {
         result = await run.step(`client:${client}`, async ({ attempt, interrupted, checkpoint }) => {
           if (ready[client]) return { client, scenario: scenario.name, slot: options.slot, outcome: 'skipped', reason: ready[client] };
-          harness ??= await harnessFactory(options, env);
+          harness ??= await harnessFactory(options, env, { onConsentView: (view) => run.appendEvent({ type: 'consent.view', ...view }) });
           if (client === 'claude-ai') {
             const status = await harness.connectorStatus();
             if (status !== 'connected') return { client, scenario: scenario.name, slot: options.slot, outcome: 'skipped', reason: `missing claude.ai connector authorization (status ${status})` };

@@ -6,7 +6,7 @@ import {
   AcceptanceError, PRODUCTION, Secret, SESSION_FORMAT, createKeychainSessionStore, createMemorySessionStore,
   createSessionManager, enrollProduction, recordFromSession, toBrokerSession,
 } from '../scripts/acceptance/test-account-sessions.mjs';
-import { GRANTS, checkConsentView } from '../scripts/acceptance/consent-page.mjs';
+import { GRANTS, checkConsentView, consentRecord, requestedScopesFrom } from '../scripts/acceptance/consent-page.mjs';
 import { createOAuthDriver, createPkce, main, parseMcpBody, summaryLine } from '../scripts/acceptance/oauth-driver.mjs';
 import { ACCOUNTS } from '../scripts/mcp-session-broker.mjs';
 
@@ -546,5 +546,26 @@ describe('driver grant choice (Ticket 259)', () => {
     const driver = createOAuthDriver({ target: 'local', issuer: 'https://127.0.0.1:4410', sessions, browser: null, fetchImpl: async () => { throw new Error('no network'); } });
     await expect(driver.authorize({ slot: 'A', client: { clientId: 'c', clientName: 'n' }, grant: 'full', requestScopes: ['cadence.read'] }))
       .rejects.toMatchObject({ code: 'account-unknown' });
+  });
+});
+
+describe('consent evidence (Ticket 259 live check)', () => {
+  it('keeps only the scope parameter of an authorize URL', () => {
+    const url = 'https://app.example.test/oauth/authorize?response_type=code&client_id=c1&code_challenge=abc&state=s3cret&scope=cadence.read%20offline_access&redirect_uri=https%3A%2F%2Fx';
+    expect(requestedScopesFrom(url)).toEqual(['cadence.read', 'offline_access']);
+    expect(requestedScopesFrom('https://app.example.test/oauth/authorize?client_id=c1')).toEqual([]);
+    expect(requestedScopesFrom('https://app.example.test/oauth/authorize?scope=cadence.read%20%3Cscript%3E')).toEqual(['cadence.read']);
+  });
+  it('builds the record from the view before any click', () => {
+    const view = { fixedScopes: ['cadence.read'], optionalScopes: ['cadence.occurrences.write', 'cadence.behaviors.write'], switches: { 'cadence.occurrences.write': true, 'cadence.behaviors.write': false } };
+    expect(consentRecord({ view, requestedScopes: ['cadence.read'], decision: 'allow', grantScopes: GRANTS.behaviors })).toEqual({
+      decision: 'allow', requestedScopes: ['cadence.read'],
+      offeredScopes: ['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read'],
+      initialSwitches: [{ scope: 'cadence.behaviors.write', on: false }, { scope: 'cadence.occurrences.write', on: true }],
+      chosenScopes: ['cadence.behaviors.write', 'cadence.read'],
+    });
+  });
+  it('lets the driver report each consent view to the caller', () => {
+    expect(() => createOAuthDriver({ target: 'local', issuer: 'https://127.0.0.1:4410', sessions: { target: 'local' }, onConsentView: () => {} })).not.toThrow();
   });
 });
