@@ -15277,7 +15277,7 @@ desktop in-app copy, marketing site; future mobile not applicable.
 
 ## Ticket 259: Consent offers advertised write permissions
 
-Status: implemented October 31, 2026 (PR pending review). Product change.
+Status: implemented October 31, 2026; in review as PR #175. Product change.
 Dependencies: Tickets 226–227 (OAuth and consent), the Ticket 232 follow-up
 re-consent union (migration `20261030230000`), and the Ticket 256 finding.
 
@@ -15307,4 +15307,5 @@ deployment, a live Tier 2 ChatGPT web run completes a write.
 Platform impact: web only (OAuth consent and the database function). Desktop:
 not applicable (hosted grants are managed on the web). Marketing: not applicable
 (developer docs already tell clients to read granted scopes). Future mobile: not
-applicable. Messaging impact: none.
+applicable. Messaging impact: P-014 in `docs/MESSAGING_CHANGES.md` (developer
+docs copy); the messaging track owns the text change.

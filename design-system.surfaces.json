@@ -1127,7 +1127,7 @@
       "tier": "flow",
       "definition": "Consent permissions and Connected apps grant review and revocation.",
       "sharedContract": [
-        "Read is required; requested write permissions are individually optional.",
+        "Read is required. Every advertised write permission is offered, even when the client did not request it, and each write switch starts on; the grant equals what the user leaves on (Ticket 259).",
         "Show the client identity, redirect host, and signed-in account.",
         "Disconnect revokes the grant immediately; activity contains no payloads."
       ],

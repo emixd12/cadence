@@ -2,7 +2,7 @@
 
 ## Ticket 259: consent offers advertised write permissions — October 31, 2026
 
-In review (PR pending). Owner decision (Emi, October 31): the consent screen
+In review: [PR #175](https://github.com/emixd12/cadence/pull/175). Owner decision (Emi, October 31): the consent screen
 offers every scope the server advertises, even when the client requested only
 some, and every write switch starts on. This addresses Ticket 256's finding that
 ChatGPT web links read-only and never steps up.
@@ -36,7 +36,8 @@ ChatGPT web links read-only and never steps up.
   ChatGPT web run that completes a write.
 
 Platform impact: web OAuth consent and database function only. Desktop,
-marketing and future mobile: not applicable. Messaging impact: none.
+marketing and future mobile: not applicable. Messaging impact: P-014 in
+`docs/MESSAGING_CHANGES.md` (marketing developer docs); no marketing copy changed here.
 
 ## Ticket 232 live acceptance complete — October 31, 2026
 
