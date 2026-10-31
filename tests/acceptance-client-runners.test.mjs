@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CLIENT_SCENARIOS, behaviorTitle } from '../scripts/acceptance/client-prompts.mjs';
 import {
-  ANTHROPIC_MCP_BETA, ANTHROPIC_VERSION, CLAUDE_AI_CONNECTOR, CLAUDE_MODEL, ClientStop, TOKEN_ENV, parseAnthropicResponses,
+  ANTHROPIC_MCP_BETA, ANTHROPIC_VERSION, CLAUDE_AI_CONNECTOR, CLAUDE_MODEL, ClientStop, TOKEN_ENV, claudeCodeArgs, parseAnthropicResponses,
   parseClaudeStream, parseInspectorResult, parseOpenaiResponse, runAnthropicApi, runOpenaiApi, toolOutcome,
 } from '../scripts/acceptance/clients.mjs';
 import { compareCalls, createAdapters, evaluate, localIssuer, main, parseClientArgs, readiness, runOneClient } from '../scripts/acceptance/client-runners.mjs';
@@ -29,6 +29,19 @@ const tmp = (prefix = 'cadence-251-') => { const d = mkdtempSync(join(tmpdir(), 
 afterEach(() => { while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true }); });
 const readTree = (dir) => readdirSync(dir).map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
 const strip = ({ tool, ok, errorCode }) => ({ tool, ok, errorCode });
+
+describe('Claude Code arguments', () => {
+  // Ticket 256: `--setting-sources project` hid the claude.ai connector on production.
+  it('narrows setting sources only for the self-contained claude-code mode', () => {
+    const code = claudeCodeArgs({ mode: 'claude-code', issuer: 'https://app.cadence-me.com' });
+    expect(code.join(' ')).toContain('--setting-sources project');
+    expect(code).toContain('--strict-mcp-config');
+    const connector = claudeCodeArgs({ mode: 'claude-ai' });
+    expect(connector).not.toContain('--setting-sources');
+    expect(connector).not.toContain('--strict-mcp-config');
+    expect(connector[connector.indexOf('--allowedTools') + 1]).toBe(`mcp__${CLAUDE_AI_CONNECTOR.replace(/[^A-Za-z0-9_-]/g, '_')}`);
+  });
+});
 
 describe('recorded Claude Code streams', () => {
   it('read-write: the canned scenario reads, creates and archives, and finishes DONE', () => {

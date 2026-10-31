@@ -127,7 +127,11 @@ export const claudeCodeMcpConfig = (issuer) => JSON.stringify({
  */
 export function claudeCodeArgs({ mode, issuer = null, model = CLAUDE_MODEL, limits = LIMITS, apiKeyAuth = false, denyServers = [] }) {
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--model', model, '--max-turns', String(limits.maxTurns),
-    '--max-budget-usd', String(limits.maxBudgetUsd), '--no-session-persistence', '--setting-sources', 'project'];
+    '--max-budget-usd', String(limits.maxBudgetUsd), '--no-session-persistence'];
+  // claude.ai connectors come from the user's claude.ai sign-in; `--setting-sources
+  // project` hid them on the first production run (Ticket 256), so only the
+  // self-contained claude-code mode narrows setting sources.
+  if (mode === 'claude-code') args.push('--setting-sources', 'project');
   if (mode === 'claude-code') {
     if (!issuer) throw new ClientStop('issuer-required');
     if (apiKeyAuth) args.push('--bare');
