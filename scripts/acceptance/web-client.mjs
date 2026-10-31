@@ -62,6 +62,23 @@ export const SCENARIOS = Object.freeze({
     description: 'Connect read-only, then a write prompt. The client must ask again for write access; the agent allows the full grant.',
     decision: 'allow', grant: 'read', stepUpGrant: 'full', prompts: Object.freeze(['read', 'write']), watch: true,
   }),
+  // Ticket 256. Occurrence writes switched off at consent: every read tool, a
+  // Behavior create → edit → archive → restore, then an Occurrence write that
+  // Cadence must refuse. A consent page during that turn is a step-up attempt:
+  // it is counted and answered with Deny.
+  'partial-consent': Object.freeze({
+    description: 'Consent with Occurrence writes off; read every tool, run a Behavior lifecycle, then a refused Occurrence write. Step-up attempts are denied and counted.',
+    decision: 'allow', grant: 'behaviors', stepUpGrant: null, prompts: Object.freeze(['read-all', 'lifecycle', 'occurrence']), watch: true,
+    watcherSuffix: 'partial', consentDuringTurn: 'deny',
+  }),
+  // Ticket 256. Full grant: every read tool, a Behavior lifecycle, Occurrence
+  // status and note writes on the test Behavior, then the user revokes the
+  // grant (the Connected apps RPC) and the next tool call must not succeed.
+  'full-disconnect': Object.freeze({
+    description: 'Full consent; read every tool, run a Behavior lifecycle and Occurrence writes, revoke as the user, then check a later read fails.',
+    decision: 'allow', grant: 'full', stepUpGrant: null, prompts: Object.freeze(['read-all', 'lifecycle', 'occurrence', 'revoke', 'read']), watch: true,
+    consentDuringTurn: 'deny',
+  }),
   deny: Object.freeze({
     description: 'Click Deny on the consent screen. No grant may appear.',
     decision: 'deny', grant: 'read', stepUpGrant: null, prompts: Object.freeze([]), watch: false,
@@ -72,7 +89,12 @@ export const PROMPTS = Object.freeze({
   // Every test prompt starts with [Cadence QA] so Emi can find (and remove) test chats.
   read: () => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to list my Cadence behaviors. Reply with only the number of behaviors.`,
   write: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to create a new daily behavior titled "Review practice ${label}". Do not change anything else. Reply with the word DONE when it is created.`,
+  // Ticket 256 prompts. Each names only the run's own test Behavior.
+  'read-all': () => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to call each of these read tools once, in order, using IDs from earlier results where one is needed: ${READ_TOOLS.join(', ')}. Change nothing. Reply with one line per tool: its name and OK or the Cadence error code.`,
+  lifecycle: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to: 1. create a new daily behavior titled "Review practice ${label}" at 18:00 with browser and email reminders off; 2. rename that behavior to "Review practice ${label} edited"; 3. archive it; 4. restore it. Change nothing else. Reply with DONE, or FAILED followed by the Cadence error code.`,
+  occurrence: (label) => `[Cadence QA] Use the ${CONNECTOR_NAME} connector to find the behavior titled "Review practice ${label} edited", mark its earliest occurrence as completed, then set that occurrence's note to "Review sample note". Do not touch any other behavior or occurrence. Reply with DONE, or FAILED followed by the Cadence error code.`,
 });
+export const READ_TOOLS = Object.freeze(['get_account_context', 'list_behaviors', 'get_behavior', 'list_categories', 'get_timeline', 'list_occurrences', 'get_occurrence', 'get_adherence_summary', 'search', 'fetch']);
 
 const SLOTS = ['A', 'B'];
 const LABEL = /^[a-z0-9-]{1,40}$/;
@@ -269,7 +291,9 @@ export async function driveTurn({ page, site, context, issuer, onConsent = null,
     if (onConsent) {
       const consent = await waitForCadencePage(context, issuer, 0);
       if (consent) { await onConsent(); consents += 1; track(page); quietSince = null; continue; }
-      const reauth = await waitVisible(clickable(assistant.last(), site.reauthorize), 0);
+      // Claude web shows its reconnect card outside the reply element (Ticket 256), so look in main too.
+      const reauth = await waitVisible(clickable(assistant.last(), site.reauthorize), 0)
+        ?? await waitVisible(clickable(page.getByRole('main'), site.reauthorize), 0);
       if (reauth && consents === 0) { await reauth.click(); quietSince = null; continue; }
     }
     const approve = await waitVisible(clickable(page, site.approve), 0);
@@ -288,7 +312,7 @@ export async function driveTurn({ page, site, context, issuer, onConsent = null,
       if (Date.now() - quietSince >= quietMs) {
         const text = (await assistant.last().innerText().catch(() => '')).trim();
         if (!text) throw new WebStop('reply-empty', 'chat-reply');
-        return { approvalCount: approvals, consentCount: consents, replyHash: sha256(text), replyLength: text.length, doneSeen: /\bDONE\b/.test(text) };
+        return { approvalCount: approvals, consentCount: consents, replyHash: sha256(text), replyLength: text.length, doneSeen: /\bDONE\b/.test(text), failedSeen: /\bFAILED\b/.test(text) };
       }
     } else quietSince = null;
     await sleep(250);
@@ -418,7 +442,8 @@ export async function runWebScenario({
     label = pre.runLabel;
     emit({ step: 'preflight', ok: true, knownCount: pre.knownGrantIds.length });
 
-    if (scenario.watch) watch = watcher.start({ scenario: site.watcherScenario, slot, sinceIso: pre.windowStartAt, runId: run.runId });
+    const watcherScenario = scenario.watcherSuffix ? `${site.watcherScenario}-${scenario.watcherSuffix}` : site.watcherScenario;
+    if (scenario.watch) watch = watcher.start({ scenario: watcherScenario, slot, sinceIso: pre.windowStartAt, runId: run.runId });
 
     const consentAnswer = (decision, grant) => () => completeConsent({
       context, issuer, account, site, decision, grant, timeoutMs: timeouts.consentMs, track,
@@ -470,10 +495,22 @@ export async function runWebScenario({
     // chats are kept unless the caller opts in (deleteClaudeChats).
     const cleanChats = archiveChats && (site.chatCleanup === 'archive' || deleteClaudeChats);
     const chats = [];
+    let revokedAt = null;
     for (const kind of scenario.prompts) {
+      if (kind === 'revoke') {
+        // Ticket 256: the user disconnects. Same RPC as Settings → Connected apps, as the account itself.
+        const done = await run.step('revoke-as-user', async () => {
+          const at = now().toISOString();
+          const [res] = await cleanup.revokeCaptured({ rest, captured: [{ slot, grantId: grant.grantId }] });
+          return { revokedAt: at, outcome: res.outcome };
+        });
+        revokedAt = done.revokedAt;
+        emit({ step: 'revoke-as-user', ok: true, outcome: done.outcome });
+        continue;
+      }
       const stepName = `prompt-${kind}`;
       const turn = await run.step(stepName, async ({ interrupted }) => {
-        if (kind === 'write' && interrupted) {
+        if ((kind === 'write' || kind === 'lifecycle') && interrupted) {
           const prior = await cleanup.checkpointCreation({ rest, slot, label: `${label}-create`, grantId: grant.grantId, windowStart: pre.windowStartAt, recorded: [] }).catch(() => null);
           if (prior) return { approvalCount: 0, consentCount: 0, resumed: true };
         }
@@ -483,16 +520,30 @@ export async function runWebScenario({
         const state = await classifyPage(page, site);
         if (state !== 'ok') throw new WebStop(state, stepName);
         await site.enableInChat(page, CONNECTOR_NAME);
+        // A step-up or reconnect opens Cadence mid-turn. A resumed run has no Cadence
+        // cookies (each run clears them), so set the account's session before sending (Ticket 256).
+        if ((kind === 'write' && scenario.stepUpGrant) || scenario.consentDuringTurn) {
+          // A Cadence tab left by an earlier attempt would be mistaken for this turn's consent page.
+          for (const stale of context.pages()) if (stale !== page && stale.url().startsWith(new URL(issuer).origin)) await stale.close().catch(() => {});
+          await context.addCookies(await sessions.browserCookies(slot, issuer));
+        }
         // Count turns before sending, so a fast reply is not mistaken for an old one.
         const before = await page.locator(site.assistant).count().catch(() => 0);
-        await sendPrompt(page, site, kind === 'write' ? PROMPTS.write(label) : PROMPTS.read());
+        await sendPrompt(page, site, PROMPTS[kind](label));
         const stepUp = kind === 'write' && scenario.stepUpGrant
           ? async () => {
             await context.addCookies(await sessions.browserCookies(slot, issuer));
             await consentAnswer('allow', scenario.stepUpGrant)();
           }
           : null;
-        const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
+        // Ticket 256: a consent page mid-turn is a step-up or reconnect attempt; count it and deny.
+        const observe = !stepUp && scenario.consentDuringTurn === 'deny'
+          ? async () => {
+            await context.addCookies(await sessions.browserCookies(slot, issuer));
+            await consentAnswer('deny', 'read')();
+          }
+          : null;
+        const result = await driveTurn({ page, site, context, issuer, onConsent: stepUp ?? observe, timeoutMs: timeouts.turnMs, quietMs: timeouts.quietMs, track, before });
         if (stepUp && result.consentCount === 0) throw new WebStop('no-step-up', stepName);
         const chatId = chatIdOf(site, page.url());
         // A stop before any click (page-changed) is retried in archive-chats; the
@@ -504,10 +555,25 @@ export async function runWebScenario({
         return { ...result, chatId, archived };
       });
       chats.push({ chatId: turn.chatId ?? null, archived: Boolean(turn.archived) });
-      emit({ step: stepName, ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null, archived: Boolean(turn.archived) });
+      emit({ step: stepName, ok: true, approvalCount: turn.approvalCount, consentCount: turn.consentCount, replyHash: turn.replyHash ?? null, archived: Boolean(turn.archived),
+        ...(turn.failedSeen === undefined ? {} : { failedSeen: turn.failedSeen }) });
     }
 
-    if (scenario.prompts.includes('write')) {
+    if (revokedAt) {
+      // Ticket 256: after the user's revocation the grant is gone and no tool call on it succeeded.
+      const check = await run.step('post-revoke-check', async () => {
+        const grants = await cleanup.listGrants({ rest, slot });
+        const r = await rest(slot, 'POST', '/rest/v1/rpc/oauth_list_activity', { p_limit: 100 });
+        if (r.status !== 200 || !Array.isArray(r.json)) throw new WebStop('activity-unreadable', 'post-revoke-check');
+        const after = r.json.filter((a) => a.grant_id === grant.grantId && Date.parse(a.occurred_at) >= Date.parse(revokedAt));
+        const result = { grantActive: grants.some((g) => g.grant_id === grant.grantId), successAfterCount: after.filter((a) => a.outcome === 'success').length, callsAfterCount: after.length };
+        if (result.grantActive || result.successAfterCount) throw new WebStop('revoked-grant-still-works', 'post-revoke-check');
+        return result;
+      });
+      emit({ step: 'post-revoke-check', ok: true, ...check });
+    }
+
+    if (scenario.prompts.includes('write') || scenario.prompts.includes('lifecycle')) {
       const creation = await run.step('creation-checkpoint', async ({ checkpoint }) => {
         const existing = run.cleanupInputs().creations.find((c) => c.label === `${label}-create`);
         if (existing) return existing;
@@ -546,7 +612,7 @@ export async function runWebScenario({
       const code = await watch.result;
       watch = null;
       if (code !== 0) throw new WebStop(code === 1 ? 'watcher-unsatisfied' : 'watcher-failed', 'watcher');
-      emit({ step: 'watcher', ok: true, watcherScenario: site.watcherScenario });
+      emit({ step: 'watcher', ok: true, watcherScenario });
     }
 
     if (!keepGrant) {

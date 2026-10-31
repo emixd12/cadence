@@ -29,7 +29,24 @@ const apiScenario = (name, description) => Object.freeze({
   ]),
 });
 
+// Ticket 256 web variants. Partial consent: reads and Behavior writes work, an
+// Occurrence write is refused for scope. Disconnect: only the first read is
+// expected; the runner checks that nothing succeeds after the revocation.
+const webVariant = (name, description, verifiedClient, registrationType, extra) => {
+  const base = clientScenario(name, description, verifiedClient, registrationType).steps;
+  const steps = extra === 'read-only' ? base.filter((s) => s.id !== 'write-succeeded') : [...base,
+    Object.freeze({ id: 'occurrence-write-denied', kind: 'tool.call', sameGrant: true, access: 'write', where: { outcome: 'denied', errorCode: 'insufficient_scope' } })];
+  return Object.freeze({ name, description, steps: Object.freeze(steps) });
+};
+
 export const SCENARIOS = Object.freeze({
+  'claude-web-partial': webVariant('claude-web-partial',
+    'Claude web with Occurrence writes switched off at consent: one read, one Behavior write, then a refused Occurrence write.', 'claude', 'cimd', 'partial'),
+  'claude-web-read': webVariant('claude-web-read',
+    'Claude web before a disconnect: verified Claude client, consent and one read.', 'claude', 'cimd', 'read-only'),
+  'chatgpt-partial': webVariant('chatgpt-partial',
+    'ChatGPT with Occurrence writes switched off at consent: one read, one Behavior write, then a refused Occurrence write.', 'chatgpt', null, 'partial'),
+  'chatgpt-read': webVariant('chatgpt-read', 'ChatGPT before a disconnect: verified ChatGPT client, consent and one read.', 'chatgpt', null, 'read-only'),
   'claude-web': clientScenario('claude-web',
     'Claude web connector: verified Claude client (metadata document), consent, one read and one write.', 'claude', 'cimd'),
   'claude-code': clientScenario('claude-code',
