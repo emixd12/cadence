@@ -355,6 +355,17 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
 - **Consent write default:** both write boxes are ticked by default
   (`ConsentForm` `defaultChecked`), so one click grants writes. The product decision
   stays with Ticket 232. Read-only scenarios must untick them; the drivers do.
+- **Consent offers every advertised scope (Ticket 259, PR #175):** before #175 the
+  screen shows only the scopes the client requested; after it deploys, the screen
+  shows read plus both writes, writes on, even for a read-only request (ChatGPT,
+  Inspector). The tooling accepts both screens. `checkConsentView` requires read as
+  the fixed scope, every requested scope shown, and only advertised scopes, each
+  once. The driver no longer refuses a grant wider than the request
+  (`grant-not-requested` is gone); `submitConsent` stops with `scope-not-offered` if
+  the page lacks a box the grant needs. The grant must equal what the run left on:
+  the driver compares the token's `scope`, and the web runner stops with
+  `grant-scope-mismatch` at `grant-checkpoint`. After #175, a ChatGPT run that asks
+  for read only can still get writes with one Allow.
 - **Consent before hydration:** clicking Allow or Deny before the page hydrates
   returns 500 (`Origin: null`). The drivers wait for hydration; a slow human may hit it.
 - **Claude Code CIMD grant:** a grant made with Claude Code's public metadata shows

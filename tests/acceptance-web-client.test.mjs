@@ -407,11 +407,15 @@ function issuerServer() {
       const r = requests.get(url.searchParams.get('request_id'));
       if (!r) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('unknown request'); }
       res.writeHead(200, { 'content-type': 'text/html' });
-      return res.end(consentPage(r.rid, r.client, r.scopes));
+      // Ticket 259 (PR #175): the screen offers every advertised scope, writes on.
+      const shown = state.offerAllScopes ? ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'] : r.scopes;
+      return res.end(consentPage(r.rid, r.client, shown));
     }
     if (url.pathname === '/oauth/decide') {
       const input = JSON.parse(body);
       const r = requests.get(input.rid);
+      // A faulty server that ignores the switches the user cleared.
+      if (state.grantAllOnDecide) input.scopes = ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'];
       state.consentCount += 1;
       let redirect = `${r.ret}?error=access_denied`;
       if (input.decision === 'allow') {
@@ -987,4 +991,28 @@ describe('CLI', () => {
     expect(lines.join('\n')).toContain('test account B');
     expect(lines.join('\n')).toContain('--expect claude-web');
   });
+});
+
+describe('Ticket 259 consent offers every advertised scope', () => {
+  it('partial-consent: the screen offers all scopes for a read-only request; the grant holds what the run left on', async () => {
+    resetState({ requestScopes: ['cadence.read'], offerAllScopes: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    const out = await scenario('claude-web', 'partial-consent');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    const connect = parsed(out.lines).find((e) => e.step === 'connect');
+    expect(connect.offeredScopes).toEqual(['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read']);
+    expect(connect.grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.read']);
+    expect(parsed(out.lines).find((e) => e.step === 'grant-checkpoint').scopes.sort()).toEqual(['cadence.behaviors.write', 'cadence.read']);
+  }, 120_000);
+  it('read-write: one Allow grants writes the client did not request', async () => {
+    resetState({ requestScopes: ['cadence.read'], offerAllScopes: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).find((e) => e.step === 'connect').grantedScopes).toEqual(['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read']);
+  }, 120_000);
+  it('stops when the grant holds more than the run left on', async () => {
+    resetState({ requestScopes: ['cadence.read'], offerAllScopes: true, grantAllOnDecide: true, connectors: [{ name: 'Cadence QA', url: `${ISSUER}/mcp`, connected: true }] });
+    const out = await scenario('claude-web', 'partial-consent');
+    expect(out.result).toMatchObject({ ok: false, reason: 'grant-scope-mismatch', step: 'grant-checkpoint' });
+    expect(state.behaviors).toHaveLength(0);
+  }, 120_000);
 });

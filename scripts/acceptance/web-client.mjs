@@ -485,6 +485,8 @@ export async function runWebScenario({
       if (existing) return existing;
       const cp = await cleanup.checkpointGrant({ rest, slot, label: `${label}-grant`, known: pre.knownGrantIds, since: pre.windowStartAt });
       if (cp.clientName !== site.consentClient) throw new WebStop('grant-client-mismatch', 'grant-checkpoint');
+      // The grant must hold exactly what the run left on, whatever the screen offered.
+      if (JSON.stringify([...cp.scopes].sort()) !== JSON.stringify(connected.grantedScopes)) throw new WebStop('grant-scope-mismatch', 'grant-checkpoint');
       checkpoint('grant', cp);
       return cp;
     });

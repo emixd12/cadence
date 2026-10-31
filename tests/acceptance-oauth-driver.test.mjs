@@ -55,7 +55,22 @@ describe('checkConsentView', () => {
   it('flags a different client or scope list', () => {
     expect(checkConsentView({ ...view, clientName: 'Other' }, expected)).toEqual(['client']);
     expect(checkConsentView({ ...view, optionalScopes: ['cadence.occurrences.write'] }, expected)).toEqual(['scopes']);
-    expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.read })).toEqual(['scopes']);
+  });
+  // Ticket 259 (PR #175) shows every advertised scope whatever the client requested;
+  // before it, the screen shows only the requested scopes. Both must pass.
+  it('accepts a screen that shows only the requested scopes (before Ticket 259)', () => {
+    const readOnly = { ...view, optionalScopes: [] };
+    expect(checkConsentView(readOnly, { ...expected, requestedScopes: [...GRANTS.read, 'offline_access'] })).toEqual([]);
+    expect(checkConsentView({ ...view, optionalScopes: ['cadence.behaviors.write'] }, { ...expected, requestedScopes: GRANTS.behaviors })).toEqual([]);
+  });
+  it('accepts a screen that shows every advertised scope for a narrower request (Ticket 259)', () => {
+    expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.read })).toEqual([]);
+    expect(checkConsentView(view, { ...expected, requestedScopes: GRANTS.behaviors })).toEqual([]);
+  });
+  it('flags a screen that shows an unadvertised or repeated scope, or makes read optional', () => {
+    expect(checkConsentView({ ...view, optionalScopes: [...view.optionalScopes, 'cadence.admin'] }, expected)).toEqual(['scopes']);
+    expect(checkConsentView({ ...view, optionalScopes: ['cadence.behaviors.write', 'cadence.behaviors.write'] }, { ...expected, requestedScopes: GRANTS.behaviors })).toEqual(['scopes']);
+    expect(checkConsentView({ ...view, fixedScopes: [], optionalScopes: ['cadence.read', ...view.optionalScopes] }, expected)).toEqual(['scopes']);
   });
   it('flags a page without both buttons', () => {
     expect(checkConsentView({ ...view, hasDeny: false }, expected)).toEqual(['buttons']);
@@ -400,5 +415,17 @@ describe('AcceptanceError', () => {
     const error = new AcceptanceError('wrong-account', { at: 'consent-page' });
     expect(error.message).toBe('wrong-account');
     expect(error.details).toEqual({ at: 'consent-page' });
+  });
+});
+
+describe('driver grant choice (Ticket 259)', () => {
+  // After Ticket 259 the screen offers writes the client did not request, so the run
+  // may leave on more than it asked for. The driver checks the offer on the page
+  // (scope-not-offered) and the token's scope, not the request.
+  it('does not refuse a grant wider than the request before reaching the account check', async () => {
+    const sessions = { target: 'local', account: () => null };
+    const driver = createOAuthDriver({ target: 'local', issuer: 'https://127.0.0.1:4410', sessions, browser: null, fetchImpl: async () => { throw new Error('no network'); } });
+    await expect(driver.authorize({ slot: 'A', client: { clientId: 'c', clientName: 'n' }, grant: 'full', requestScopes: ['cadence.read'] }))
+      .rejects.toMatchObject({ code: 'account-unknown' });
   });
 });

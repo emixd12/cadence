@@ -187,7 +187,9 @@ export function createOAuthDriver({
   const authorize = async ({ slot, client, grant = 'full', decision = 'allow', requestScopes = ALL_SCOPES, expectUserId = undefined }) => {
     const grantScopes = GRANTS[grant];
     if (!grantScopes) throw new AcceptanceError('grant-invalid');
-    if (decision === 'allow' && !grantScopes.every((scope) => requestScopes.includes(scope))) throw new AcceptanceError('grant-not-requested');
+    // The grant may be wider than the request once the screen offers every advertised
+    // scope (Ticket 259). submitConsent refuses a scope the page does not offer, and the
+    // token response must report exactly the grant.
     const account = sessions.account(slot);
     const userId = expectUserId ?? account?.userId;
     if (!userId) throw new AcceptanceError('account-unknown');

@@ -5,6 +5,7 @@ import { AcceptanceError } from './test-account-sessions.mjs';
 
 export const READ_SCOPE = 'cadence.read';
 export const WRITE_SCOPES = Object.freeze(['cadence.occurrences.write', 'cadence.behaviors.write']);
+export const ADVERTISED_SCOPES = Object.freeze([READ_SCOPE, ...WRITE_SCOPES]);
 export const GRANTS = Object.freeze({
   read: Object.freeze([READ_SCOPE]),
   behaviors: Object.freeze([READ_SCOPE, 'cadence.behaviors.write']),
@@ -45,16 +46,21 @@ export async function readConsentView(page) {
 
 /**
  * Pure check. Returns mismatch codes; an empty list means the page shows the
- * expected account, client and requested scopes.
+ * expected account and client, read as the fixed scope, and every requested
+ * scope. Every scope shown must be advertised and appear once. Before Ticket 259
+ * (PR #175) the screen shows only the requested scopes; after it, every
+ * advertised scope with the writes on. Both pass; the caller then sets the
+ * switches for the grant it chose.
  */
 export function checkConsentView(view, { userId, email = null, clientName, requestedScopes }) {
   const problems = [];
   if (!view || view.accountId !== userId) problems.push('account');
   if (email !== null && view?.email?.toLowerCase() !== email.toLowerCase()) problems.push('email');
   if (clientName !== undefined && view?.clientName !== clientName) problems.push('client');
-  const shown = [...(view?.fixedScopes ?? []), ...(view?.optionalScopes ?? [])].sort();
-  const wanted = [...new Set(requestedScopes.filter((scope) => scope !== 'offline_access'))].sort();
-  if (JSON.stringify(view?.fixedScopes ?? []) !== JSON.stringify([READ_SCOPE]) || JSON.stringify(shown) !== JSON.stringify(wanted)) problems.push('scopes');
+  const shown = [...(view?.fixedScopes ?? []), ...(view?.optionalScopes ?? [])];
+  const wanted = requestedScopes.filter((scope) => scope !== 'offline_access');
+  if (JSON.stringify(view?.fixedScopes ?? []) !== JSON.stringify([READ_SCOPE]) || new Set(shown).size !== shown.length
+    || !shown.every((scope) => ADVERTISED_SCOPES.includes(scope)) || !wanted.every((scope) => shown.includes(scope))) problems.push('scopes');
   if (!view?.hasAllow || !view?.hasDeny) problems.push('buttons');
   return problems;
 }
