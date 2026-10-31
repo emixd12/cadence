@@ -23,6 +23,15 @@ ChatGPT web links read-only and never steps up.
   `ticket-232-oauth-reconsent-scopes.sql` fail on the old function and pass on
   the new one; the 222, 225 and other 232 OAuth fixtures pass.
   `habit-tracking-app` was not touched.
+- MCP acceptance, local only, on a throwaway merge of this commit into
+  `mcp-acceptance-automation` (stack `cadence-accept-259`): Tier 0
+  `local-259-t0-1031t205736` passed 96/96 with watcher exit 0; Tier 1 read-write
+  `local-259-t1-1031t205756` and step-up `local-259-t1-1031t205812` passed
+  (claude-code and inspector; the three keyed or public clients skipped by
+  design). Cleanup check: all 10 grants revoked. Follow-up for that branch: its
+  consent check expects the shown scopes to equal the requested ones, so a
+  read-only request through the OAuth driver would now stop with
+  `consent-mismatch`; today's scenarios all request every scope.
 - Remaining: hosted migration push (owner), deployment, and a live Tier 2
   ChatGPT web run that completes a write.
 
