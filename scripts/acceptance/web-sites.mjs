@@ -196,8 +196,9 @@ const claudeWeb = Object.freeze({
   chatIdPattern: /^\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
   chatPathFor: (id) => `/chat/${id}`,
   // Claude has no archive here; the test chat is deleted from its header menu.
-  // Not yet seen on the real site (Ticket 256).
-  archiveMenu: exact('Open chat options', 'Chat options', 'Chat menu'),
+  // Seen in Ticket 256: the header control is "More options for <chat title>";
+  // sidebar rows use the same name but sit in navigation and are excluded.
+  archiveMenu: /^\s*(?:Open chat options|Chat options|Chat menu|More options for \S.*)\s*$/i,
   archiveItem: exact('Delete'),
   archiveConfirm: exact('Delete', 'Confirm'),
   // Deleting cannot be undone, so runs keep Claude test chats unless asked
