@@ -195,7 +195,7 @@ function renderChat() {
   // name as the conversation's own; the conversation header sits inside <main>.
   const chatPrefix = flavor === 'chatgpt' ? '/c/' : '/chat/';
   const currentChat = () => (location.pathname.startsWith(chatPrefix) ? location.pathname.slice(chatPrefix.length) : null);
-  const optionsName = flavor === 'chatgpt' ? (S.layout2026 ? 'Chat actions' : 'Open conversation options') : 'Open chat options';
+  const optionsName = flavor === 'chatgpt' ? (S.layout2026 ? 'Chat actions' : 'Open conversation options') : (S.layout2026 ? 'More options for Cadence QA test chat' : 'Open chat options');
   const itemName = flavor === 'chatgpt' ? 'Archive' : 'Delete';
   const optionsButton = (chatId, leave) => el('button', { 'aria-label': optionsName, onclick: () => {
     const menu = el('div', { role: 'menu' }, el('div', { role: 'menuitem', onclick: () => {
@@ -746,6 +746,16 @@ describe('test chat cleanup', () => {
     expect(parsed(deleted.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, keptCount: 0 });
     expect(state.chats.every((c) => c.archived)).toBe(true);
   }, 240_000);
+
+  it('claude-web live layout: deletes only the run\'s chats through "More options for <title>"', async () => {
+    // Sidebar rows carry the same name; only the conversation header's control may match.
+    resetState({ layout2026: true });
+    const out = await scenario('claude-web', 'read-write', { deleteClaudeChats: true });
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(parsed(out.lines).find((e) => e.step === 'archive-chats')).toMatchObject({ chatCount: 2, archivedCount: 2, keptCount: 0 });
+    expect(state.chats.every((c) => c.archived)).toBe(true);
+    expect(state.otherChats.every((c) => !c.archived)).toBe(true);
+  }, 120_000);
 
   it('keeps the chats only when asked (archiveChats: false)', async () => {
     state.flavor = 'chatgpt';
