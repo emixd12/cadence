@@ -113,7 +113,8 @@ echo "Cadence cloud session: Node $(node -v 2>/dev/null || echo missing), depend
 echo "- Dagger is not installed here. Run the AGENTS.md checks as npm commands."
 echo "- macOS-only work (Tauri native builds, signing, installed acceptance) is unavailable."
 echo "- Provider access follows docs/OPERATIONS.md, \"Claude cloud sessions\"."
-for note in "${notes[@]}"; do
+# macOS bash 3.2 treats an empty array as unset under set -u.
+for note in ${notes[@]+"${notes[@]}"}; do
   echo "- $note"
 done
 exit 0
