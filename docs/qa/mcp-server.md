@@ -17,13 +17,19 @@ owner steps, client quirks and recovery live in the project skill
 | `npm run mcp:oauth` | OAuth and consent driver; production session enrollment and status (Ticket 248) |
 | `npm run agent:secret` | Agent-scoped keys from the "Cadence Agents" vault; `--check` reads no value (Ticket 254, `docs/qa/agent-secrets.md`) |
 
-- Every run writes `.intent/acceptance/<run-id>/`; `STATE.md` there is enough to
-  resume (`node scripts/acceptance/ledger.mjs state <run-id>`).
+- Every run writes `.intent/acceptance/<run-id>/`; inspect `STATE.md` there before
+  resuming (`node scripts/acceptance/ledger.mjs state <run-id>`).
 - Resuming requires the same target, account slots and scenario. A mismatch
   stops before locking or changing the run, with `run-target-mismatch`,
   `run-account-mismatch` or `run-scenario-mismatch`. Start a new run when those
   inputs change; cached local or read-only evidence cannot establish production
   or write acceptance.
+- Local protocol and headless-client runs with checkpoints cannot resume: local
+  test-login creates another Auth user whose RLS view cannot confirm the earlier
+  user's cleanup. They stop with `local-resume-needs-new-run` before enrollment.
+  Report unresolved cleanup before clearing the named disposable stack and
+  starting a fresh run. Production retries retain their registered-client IDs
+  and confirm revocation before creating another client.
 - Local rehearsals use an isolated loopback stack from
   `.claude/skills/mcp-acceptance/local-stack.mjs` (`up`, `tier0`, `tier1`, `check`,
   `exec`, `status`, `down`), never `habit-tracking-app`.

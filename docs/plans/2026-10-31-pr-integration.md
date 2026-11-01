@@ -50,6 +50,28 @@ Every runner supplies its expected context. Production revocation rejects local
 runs. OAuth tests also prove that a read-only scenario turns off both default-on
 write toggles and rejects a wider token response.
 
+The final review found two more acceptance gaps. Partial-consent watchers for
+Claude and ChatGPT now require a successful `create_behavior`, followed by
+`set_occurrence_status` refused with `insufficient_scope` on that grant. A denied
+Behavior operation or successful Occurrence operation cannot substitute for the
+expected boundary. Production-RPC fixtures reproduce the earlier false passes
+and verify both valid sequences and wrong-operation failures.
+
+Client authorization records its nonsecret registration before consent and cleans
+up registered-client grants even if token exchange fails. Retries reconcile prior
+registrations before starting another authorization; unconfirmed revocation cannot
+be cached as a successful run. The protocol runner applies the same cleanup
+boundary to authorization, connection, and session shutdown failures. Failure
+fixtures verify that these paths still attempt revocation and retain enough
+identity to retry cleanup safely.
+
+The grant-list reader rejects malformed RPC responses instead of treating them
+as an empty list. Local CLI resumes with recorded work stop before enrollment:
+a fresh disposable Auth user cannot verify the previous user's grants through
+RLS. Production resumes retain the original account identity and cleanup path.
+The acceptance guide now documents these limits and preserves unresolved local
+cleanup as a failure until the named disposable stack is cleared.
+
 The combined dependency run exposed two additional interactions. Supabase Auth
 2.118 clears its local session even when provider sign-out fails. The QA broker
 now preserves retryable state until a token-scoped provider logout succeeds and

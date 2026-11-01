@@ -34,8 +34,10 @@ const apiScenario = (name, description) => Object.freeze({
 // expected; the runner checks that nothing succeeds after the revocation.
 const webVariant = (name, description, verifiedClient, registrationType, extra) => {
   const base = clientScenario(name, description, verifiedClient, registrationType).steps;
-  const steps = extra === 'read-only' ? base.filter((s) => s.id !== 'write-succeeded') : [...base,
-    Object.freeze({ id: 'occurrence-write-denied', kind: 'tool.call', sameGrant: true, access: 'write', where: { outcome: 'denied', errorCode: 'insufficient_scope' } })];
+  const steps = extra === 'read-only' ? base.filter((s) => s.id !== 'write-succeeded') : [
+    ...base.map((s) => s.id === 'write-succeeded'
+      ? Object.freeze({ ...s, where: { ...s.where, operation: 'create_behavior' } }) : s),
+    Object.freeze({ id: 'occurrence-write-denied', kind: 'tool.call', sameGrant: true, access: 'write', where: { operation: 'set_occurrence_status', outcome: 'denied', errorCode: 'insufficient_scope' } })];
   return Object.freeze({ name, description, steps: Object.freeze(steps) });
 };
 

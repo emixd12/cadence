@@ -174,12 +174,15 @@ node $S down --name $N
 - **Run IDs:** one run ID per command. The default is
   `local-<you, first 10 characters>-t0|t1-<UTC mmdd't'hhmmss>` (under 32 characters,
   lowercase, so the ledger never mistakes it for a secret), printed on the first line; pass
-  `--run <id>` only to resume that run. Tier 0 and Tier 1 never share a run ID.
+  `--run <id>` only to resume an empty run. Once a local Tier 0 or Tier 1 run has
+  checkpoints, start a new run: test-login creates a new Auth user and cannot
+  confirm the earlier user's cleanup. Inspect and report the old run before
+  clearing its named disposable stack. Tier 0 and Tier 1 never share a run ID.
 - **Callback ports:** the OAuth redirect is caught inside the driver's browser and
   never bound on the host. `tier0` still picks a free ephemeral port per run; the
   Tier 1 runner's fixed 4459 cannot clash for the same reason.
 - **Tier 0 pass:** the last line reads
-  `tier0 <id>: PASS (protocol 96/96 checks passed · PASS; watcher exit 0)`. The count
+  `tier0 <id>: PASS (protocol <n>/<n> checks passed · PASS; watcher exit 0)`. The count
   comes from the run's `report.md`; the watcher's verdict block is printed above it,
   and its full event timeline stays in the run's `events.jsonl`.
 - **Tier 1 pass:** `tier1 <id>: PASS`. claude-code and inspector must pass;
@@ -223,12 +226,15 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    A leftover `<id>.secret-access.jsonl` means the wrapper was killed; the next
    agent:secret call with the same `--run` moves it. (Before Ticket 257 the runner
    stopped with `run-exists` here.)
-   **After a failed attempt, use a new `<id>`.** If agent:secret stops before the
+   **After a wrapper failure before `run.json` exists, use a new `<id>`.** If agent:secret stops before the
    runner starts (exit 3, 4 or 5: a refused mapping, no token, or an `op read`
    failure) or the runner fails during setup before it creates `run.json`, the
    wrapper still creates `<id>/` holding only `events.jsonl`. A retry with the same
    `<id>` stops with `run-exists`. Fix the cause, then run both commands again with a
-   new `<id>`; leave the old folder as the record of the failed attempt.
+   new `<id>`; leave the old folder as the record of the failed attempt. If the
+   production runner started and recorded checkpoints, resume its existing run
+   after fixing the cause so it can reconcile earlier registrations and grants.
+   Do not abandon unconfirmed cleanup by choosing another run ID.
    **Web runs (steps 4 and 5): omit `--run` to start a new run.** `mcp:accept:web`
    names its own run (`<UTC time>-<hex>`) and prints it on the last line,
    `{"step":"done",…,"runId":"<web-id>"}`. Pass `--run <web-id>` only to resume that
@@ -301,14 +307,20 @@ command); 2 usage. Local rehearsal of the plumbing:
 ## Resume
 
 Every runner writes `.intent/acceptance/<run-id>/` (run.json, checkpoints.jsonl,
-events.jsonl, STATE.md, report or evidence files). A new agent resumes from the
-folder alone:
+events.jsonl, STATE.md, report or evidence files). Inspect that folder before
+resuming. Local Tier 0 and Tier 1 runs with checkpoints stop with
+`local-resume-needs-new-run` before enrolling another test user; use a fresh run
+after reporting and clearing any unresolved grants in the named disposable stack.
+For resumable runs:
 
 1. `node scripts/acceptance/ledger.mjs state <run-id>` (or read `STATE.md`): status,
    blocked steps, pending human steps, next steps, granted and created IDs.
 2. Re-run the same command with `--run <run-id>` (`--resume` for
    `mcp:accept:protocol` and `mcp:accept:guided`). Done steps are skipped; an
-   interrupted step reads back before writing.
+   interrupted step reads back before writing. Production client runs reconcile
+   recorded registrations even when token exchange failed before a grant was
+   checkpointed; unresolved revocation stops the retry before another client is
+   registered.
 3. If the owner process died, the lock is taken over automatically. A live owner
    stops you with `run-locked`; find and stop that process first.
 4. Cleanup inputs: `node scripts/acceptance/ledger.mjs ids <run-id>`.
@@ -404,8 +416,9 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   same worktree and run folder. Never redo a done ledger step by hand.
 - **Docker restarts** stop local stacks (seen about 6 hours in). `local-stack.mjs status`
   reports `containers are gone`; run `down`, then `up`, then start new runs (a fresh
-  stack has none of the old run's users or grants). On a stack that is still up, a
-  resumed local run signs in fresh test-login users.
+  stack has none of the old run's users or grants). A local Tier 0 or Tier 1 run
+  with checkpoints cannot resume even if its stack is still up: a fresh test-login
+  user cannot read or revoke the earlier user's grants.
 - **Local limits:** test login allows 10 users per app process (each Tier 0 run uses
   2, each Tier 1 process 1) and DCR allows 10 registrations an hour. On
   `test-login-quota-reached`, run `down` and `up`.

@@ -242,18 +242,31 @@ const summarizeBehaviors = (rows) => ({
 
 export const runTag = (runId) => createHash('sha256').update(runId).digest('hex').slice(0, 6);
 
+/** A failed revoke request can still have succeeded; only the readback confirms cleanup. */
+async function revokeRegisteredGrants(driver, slot, clientId) {
+  await driver.revokeGrants(slot, clientId).catch(() => {});
+  const active = await driver.grantsFor(slot, clientId).catch(() => null);
+  if (!Array.isArray(active) || active.length !== 0) stop('grant-revocation-unconfirmed');
+}
+
 /**
  * Run one client inside its ledger step. `h` is the harness (driver, sessions,
  * source factory, behavior reader, adapters). Returns token-free evidence.
  */
-export async function runOneClient(client, { h, run, runId, slot, scenario, attempt, interrupted, checkpoint }) {
-  const label = `${runTag(runId)}-${SHORT[client]}-${attempt}`;
+export async function runOneClient(client, { h, run, runId, slot, scenario, attempt, checkpoint }) {
+  const prefix = `${runTag(runId)}-${SHORT[client]}-`;
+  const label = `${prefix}${attempt}`;
   const title = behaviorTitle(label);
   const userId = h.userIdOf(slot);
-  if (interrupted) {
-    // A previous attempt died after it may have created a grant: revoke what the ledger recorded for this client first.
-    for (const g of run.cleanupInputs().grants.filter((x) => x.label.startsWith(`${runTag(runId)}-${SHORT[client]}-`))) {
-      await h.driver.revokeGrants(g.slot, g.clientId).catch(() => 0);
+  if (client !== 'claude-ai') {
+    // Both interrupted and stopped attempts may have granted consent before a
+    // token or grant checkpoint existed. Reconcile their durable registrations
+    // before creating another client, including grants from older ledger versions.
+    const registrations = run.checkpoints.filter((r) => r.kind === 'step' && r.state === 'done' && r.name.startsWith(`registration:${prefix}`)).map((r) => r.result);
+    const prior = [...registrations, ...run.cleanupInputs().grants.filter((g) => g.label.startsWith(prefix))];
+    const clients = new Map(prior.map((r) => [`${r.slot}:${r.clientId}`, r]));
+    for (const previous of clients.values()) {
+      await revokeRegisteredGrants(h.driver, previous.slot, previous.clientId);
     }
   }
   const sinceIso = new Date(h.now() - 2000).toISOString();
@@ -266,7 +279,11 @@ export async function runOneClient(client, { h, run, runId, slot, scenario, atte
       grantId = await h.connectorGrant(slot);
       watcherScenario = boundGrantWatcherScenario(client, scenario);
     } else {
-      registration = await h.driver.registerDynamic({ name: `Cadence acceptance ${client}` });
+      // Persist only the nonsecret registration before consent can create a grant.
+      registration = await run.step(`registration:${label}`, async () => {
+        const registered = await h.driver.registerDynamic({ name: `Cadence acceptance ${client}` });
+        return { type: registered.type, clientId: registered.clientId, clientName: registered.clientName ?? null, slot, label };
+      });
       tokens = await h.driver.authorize({ slot, client: registration, grant: scenario.grant });
       const grants = await h.driver.grantsFor(slot, registration.clientId);
       if (grants.length !== 1) stop('expected-one-grant');
@@ -294,10 +311,8 @@ export async function runOneClient(client, { h, run, runId, slot, scenario, atte
       evidence, watcher: { satisfied: watcher.satisfied, error: watcher.error ?? null, steps: watcher.steps }, calls, behaviors,
     };
   } finally {
-    if (tokens) {
-      await tokens.revoke().catch(() => {});
-      await h.driver.revokeGrants(slot, registration.clientId).catch(() => 0);
-    }
+    if (tokens) await tokens.revoke().catch(() => {});
+    if (registration) await revokeRegisteredGrants(h.driver, slot, registration.clientId);
   }
 }
 
@@ -457,6 +472,13 @@ export async function main(argv = process.argv.slice(2), { env = process.env, ou
   } catch (error) { out(JSON.stringify({ step: 'ledger', ok: false, error: reasonOf(error) })); return 2; }
   const { runId } = run;
   out(JSON.stringify({ step: 'run', runId }));
+  if (options.target === 'local' && run.checkpoints.length) {
+    // Local test-login enrolls a new user; that user's empty RLS view cannot
+    // confirm cleanup of grants belonging to the original run's account.
+    out(JSON.stringify({ step: 'stopped', runId, error: 'local-resume-needs-new-run' }));
+    run.close();
+    return 1;
+  }
   const results = [];
   let harness = null;
   try {

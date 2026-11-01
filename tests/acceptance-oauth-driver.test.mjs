@@ -40,6 +40,45 @@ describe('summaryLine', () => {
   });
 });
 
+describe('grant cleanup readback', () => {
+  const grantId = '00000000-0000-4000-8000-000000000001';
+  const row = { grant_id: grantId, client_id: 'this-client', scopes: ['cadence.read'] };
+  const driver = (userRpc) => createOAuthDriver({ target: 'local', issuer: 'https://127.0.0.1:4410', sessions: { target: 'local', userRpc }, browser: null });
+
+  it.each([
+    { name: 'null', rows: null },
+    { name: 'undefined', rows: undefined },
+    { name: 'non-array', rows: {} },
+    { name: 'empty row', rows: [{}] },
+    { name: 'null row', rows: [null] },
+    { name: 'missing client ID', rows: [{ ...row, client_id: undefined }] },
+    { name: 'malformed grant ID', rows: [{ ...row, client_id: 'other-client', grant_id: TOKEN }] },
+    { name: 'missing scopes on another client', rows: [{ ...row, client_id: 'other-client', scopes: undefined }] },
+    { name: 'invalid scope value', rows: [{ ...row, scopes: ['cadence.read', null] }] },
+  ])('refuses $name instead of confirming no active grant', async ({ rows }) => {
+    const rpc = vi.fn(async () => rows), d = driver(rpc);
+    const error = await d.grantsFor('A', 'this-client').catch(e => e);
+    expect(error).toBeInstanceOf(AcceptanceError);
+    expect(error.code).toBe('grant-list-invalid');
+    expect(`${error.message}${JSON.stringify(error)}`).not.toContain(TOKEN);
+    await expect(d.revokeGrants('A', 'this-client')).rejects.toMatchObject({ code: 'grant-list-invalid' });
+    expect(rpc.mock.calls.every(([, name]) => name === 'oauth_list_grants')).toBe(true);
+  });
+
+  it('accepts a valid empty list and revokes only matching client grants from valid rows', async () => {
+    expect(await driver(async () => []).grantsFor('A', 'this-client')).toEqual([]);
+    const other = { ...row, grant_id: '00000000-0000-4000-8000-000000000002', client_id: 'other-client' };
+    const rpc = vi.fn(async (_slot, name) => name === 'oauth_list_grants' ? [other, row] : true);
+    const d = driver(rpc);
+    expect(await d.grantsFor('A', 'this-client')).toEqual([{ grantId, scopes: ['cadence.read'] }]);
+    expect(await d.grantsFor('A', 'absent-client')).toEqual([]);
+    expect(await d.revokeGrants('A', 'this-client')).toBe(1);
+    expect(rpc.mock.calls.filter(([, name]) => name === 'oauth_revoke_grant')).toEqual([
+      ['A', 'oauth_revoke_grant', { p_grant_id: grantId }],
+    ]);
+  });
+});
+
 describe('checkConsentView', () => {
   const view = {
     accountId: 'user-a', email: 'A@Example.test', clientName: 'Cadence acceptance driver', verified: false,

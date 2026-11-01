@@ -157,6 +157,39 @@ describe('Ticket 256 web variants on the local db source', () => {
   });
 });
 
+describe('Ticket 256 partial consent on the production rpc source', () => {
+  const partialWorld = (name) => {
+    const world = makeWorld(name, { write: 'both' });
+    world.grants[0].scopes = ['cadence.behaviors.write', 'cadence.read'];
+    return world;
+  };
+
+  for (const name of ['claude-web-partial', 'chatgpt-partial']) {
+    it.each(['archive_behavior', 'update_behavior'])(`${name}: a denied %s cannot substitute for the Occurrence attempt`, async (operation) => {
+      const world = partialWorld(name);
+      world.activity.at(-1).operation = operation;
+      const r = await runWatch({ world, source: 'rpc', opts: { expect: name, timeoutMs: 60_000 } });
+      expect(r.code).toBe(1);
+      expect(r.out).toMatch(/MISS {2}occurrence-write-denied .*operation=set_occurrence_status/);
+    });
+
+    it.each(['set_occurrence_status', 'update_occurrence_note'])(`${name}: a successful %s cannot substitute for creating the Behavior`, async (operation) => {
+      const world = partialWorld(name);
+      world.activity.find((event) => event.operation === 'create_behavior').operation = operation;
+      const r = await runWatch({ world, source: 'rpc', opts: { expect: name, timeoutMs: 60_000 } });
+      expect(r.code).toBe(1);
+      expect(r.out).toMatch(/MISS {2}write-succeeded .*operation=create_behavior/);
+    });
+
+    it(`${name}: passes a successful Behavior creation followed by a refused Occurrence status write`, async () => {
+      const r = await runWatch({ world: partialWorld(name), source: 'rpc', opts: { expect: name } });
+      expect(r.code).toBe(0);
+      expect(r.out).toMatch(/ok {4}write-succeeded .*create_behavior success/);
+      expect(r.out).toMatch(/ok {4}occurrence-write-denied .*set_occurrence_status denied insufficient_scope/);
+    });
+  }
+});
+
 describe('scenarios on the local db source', () => {
   for (const name of Object.keys(SCENARIOS).filter((n) => !WEB_VARIANT.test(n))) {
     const api = name.endsWith('-api');
