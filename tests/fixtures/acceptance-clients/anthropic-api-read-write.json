@@ -1,0 +1,29 @@
+{
+  "_source": "Constructed from the documented Messages API MCP connector shapes (beta mcp-client-2026-09-15: mcp_tool_listing, mcp_tool_use, mcp_tool_result, pause_turn). Replace with a recorded, reduced response after the first keyed run (Ticket 256).",
+  "responses": [
+    {
+      "id": "msg_fixture_1", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "stop_reason": "pause_turn",
+      "usage": { "input_tokens": 1800, "output_tokens": 220 },
+      "content": [
+        { "type": "mcp_tool_listing", "mcp_server_name": "cadence", "tools": [
+          { "name": "get_account_context" }, { "name": "list_behaviors" }, { "name": "get_behavior" }, { "name": "list_categories" },
+          { "name": "get_timeline" }, { "name": "list_occurrences" }, { "name": "get_occurrence" }, { "name": "get_adherence_summary" },
+          { "name": "search" }, { "name": "fetch" }, { "name": "set_occurrence_status" }, { "name": "update_occurrence_note" },
+          { "name": "create_behavior" }, { "name": "update_behavior" }, { "name": "archive_behavior" }, { "name": "restore_behavior" } ] },
+        { "type": "mcp_tool_use", "id": "mcptoolu_fixture_1", "name": "get_timeline", "server_name": "cadence", "input": {} },
+        { "type": "mcp_tool_result", "tool_use_id": "mcptoolu_fixture_1", "is_error": false, "content": [ { "type": "text", "text": "Get Timeline succeeded." } ] }
+      ]
+    },
+    {
+      "id": "msg_fixture_2", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "stop_reason": "end_turn",
+      "usage": { "input_tokens": 2400, "output_tokens": 310 },
+      "content": [
+        { "type": "mcp_tool_use", "id": "mcptoolu_fixture_2", "name": "create_behavior", "server_name": "cadence", "input": {} },
+        { "type": "mcp_tool_result", "tool_use_id": "mcptoolu_fixture_2", "is_error": false, "content": [ { "type": "text", "text": "{\"behavior\":{\"id\":\"2f0c6a39-3a51-4c9e-9a63-5a0f3f6e7b21\"}}" } ] },
+        { "type": "mcp_tool_use", "id": "mcptoolu_fixture_3", "name": "archive_behavior", "server_name": "cadence", "input": {} },
+        { "type": "mcp_tool_result", "tool_use_id": "mcptoolu_fixture_3", "is_error": false, "content": [ { "type": "text", "text": "Archive Behavior succeeded." } ] },
+        { "type": "text", "text": "DONE" }
+      ]
+    }
+  ]
+}

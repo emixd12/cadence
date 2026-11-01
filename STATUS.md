@@ -2,7 +2,8 @@
 
 ## Ticket 259: consent offers advertised write permissions — October 31, 2026
 
-In review: [PR #175](https://github.com/emixd12/cadence/pull/175). Owner decision (Emi, October 31): the consent screen
+Merged: [PR #175](https://github.com/emixd12/cadence/pull/175), `f1392365`.
+Owner decision (Emi, October 31): the consent screen
 offers every scope the server advertises, even when the client requested only
 some, and every write switch starts on. This addresses Ticket 256's finding that
 ChatGPT web links read-only and never steps up.
@@ -11,11 +12,10 @@ ChatGPT web links read-only and never steps up.
   The grant holds exactly what the user leaves on; the token response reports it.
   Step-up re-consent still keeps already granted scopes.
 - Migration `20261031210000_oauth_consent_offers_advertised_scopes.sql` drops the
-  requested-or-granted subset check in `oauth_finish_pending`. **Hosted push not
-  done; it needs Emi's explicit go.** Deploy order matters: push the migration
-  before the app deploys. Otherwise the old check rejects the default selection
-  for a read-only client, and consent fails unless the user switches both writes
-  off.
+  requested-or-granted subset check in `oauth_finish_pending`. The October 31
+  pre-integration readback confirms this migration in the hosted ledger, which
+  matches all 97 tracked migrations. Both Vercel projects are Ready on `f1392365`.
+  The migration must precede any app deployment that offers these scopes.
 - Local verification in the separate project `cadence-consent-259` through the
   reviewed Docker proxy with only its project identity changed: reset replayed
   all 97 migrations with every published port on `127.0.0.1`. The new fixture
@@ -28,12 +28,12 @@ ChatGPT web links read-only and never steps up.
   `local-259-t0-1031t205736` passed 96/96 with watcher exit 0; Tier 1 read-write
   `local-259-t1-1031t205756` and step-up `local-259-t1-1031t205812` passed
   (claude-code and inspector; the three keyed or public clients skipped by
-  design). Cleanup check: all 10 grants revoked. Follow-up for that branch: its
-  consent check expects the shown scopes to equal the requested ones, so a
-  read-only request through the OAuth driver would now stop with
-  `consent-mismatch`; today's scenarios all request every scope.
-- Remaining: hosted migration push (owner), deployment, and a live Tier 2
-  ChatGPT web run that completes a write.
+  design). Cleanup check: all 10 grants revoked. PR #174 already accepts all
+  advertised scopes for narrower requests. The integration review adds tests
+  proving a read-only scenario disables both default-on write switches and
+  rejects a token granting more than the scenario selected.
+- Remaining: a live Tier 2 ChatGPT web run that completes a write. The new
+  regression tests establish local driver behavior, not that live result.
 
 Platform impact: web OAuth consent and database function only. Desktop,
 marketing and future mobile: not applicable. Messaging impact: P-014 in
@@ -167,11 +167,75 @@ future mobile: not applicable; the CodeQL fix is developer tooling only. Messagi
 impact: `docs/MESSAGING_CHANGES.md` P-013 (user guide re-consent wording; not edited
 here).
 
+## Automated MCP client acceptance: Tickets 247–258 — October 31, 2026
+
+QA tooling for MCP and AI-client acceptance, on branch `mcp-acceptance-automation`,
+in a PR into `main` (not merged; a merge needs the coordinator's Trust refresh). Plan
+and platform impact: `docs/TICKETS.md` (Tickets 247–256). Ticket 232's captured
+records are untouched.
+
+- Complete (waves 1 and 2, integrated and independently verified): Ticket 247 run
+  ledger (`scripts/acceptance/ledger.mjs`), Ticket 248 OAuth and consent driver
+  (`npm run mcp:oauth`), Ticket 249 protocol acceptance suite
+  (`npm run mcp:accept:protocol`), Ticket 250 server-side watcher
+  (`npm run mcp:watch`), Ticket 251 headless real-client runners
+  (`npm run mcp:accept:clients`), Ticket 254 agent-scoped secrets
+  (`npm run agent:secret`) and Ticket 255 browser-driven ChatGPT web and Claude web
+  runs (`npm run mcp:accept:web`).
+- Complete (wave 3, independently verified): Ticket 252 acceptance skill
+  (`.claude/skills/mcp-acceptance`, with a local loopback stack helper) and the
+  guided ChatGPT web and Claude web fallback (`npm run mcp:accept:guided`).
+- Complete: Ticket 256, the production client retest. Results are in the Ticket 232
+  section above and `docs/qa/mcp-server.md`. Its runner support for the Claude web
+  partial-consent and disconnect scenarios is merged here.
+- Complete (independently verified): Ticket 257 follow-ups from 256 (agent:secret
+  shares the runner's `--run` folder, committed public production QA config in
+  `scripts/acceptance/qa-config.mjs`, bounded retry on concurrent Keychain writes)
+  and Ticket 258 (production's skipped rate-limit scenario is reported as SKIPPED,
+  not as a passing row; skill retry and Keychain notes).
+- On hold: conditional Ticket 253. Ticket 250's gap report found it not required
+  for the six scenarios.
+- Known local test timeout, not caused by this branch:
+  `tests/desktop-release-cli.test.ts` times out (5 s) on 7–9 of 27 tests on both
+  this branch and `origin/main` `eb5afa5`, and passes 27/27 with a 30 s timeout. On
+  this Mac the first run of each newly written executable takes about 0.8 s, and
+  each test writes eight fresh stub tools.
+- Product finding from Ticket 248, not fixed here: clicking Allow or Deny before the
+  consent page hydrates sends a native form POST with `Origin: null`, and the Server
+  Action CSRF check returns 500.
+
+Platform impact: web QA tooling only (scripts, tests, docs); Ticket 253 would touch
+the MCP server. Desktop, marketing and future mobile: not applicable, because the
+tooling tests only the hosted MCP server. Messaging impact: none.
+
 ## Account sync timezone rule for archived Behaviors — October 27, 2026
 
-Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`) in
-source. Migration `20261027221625` is applied on the hosted database (read-only
-ledger readback, October 31, 2026).
+Fixes 0.1.6 release finding F1 (`docs/qa/2026-10-27-desktop-0.1.6-acceptance.md`).
+PR #159 merged on October 28 as `021c95eb`. The owner authorized the hosted push, and
+migration `20261027221625` was applied to `qjodzutjxtmtzczbloxa` on October 28 at
+01:19:57Z. A read-only ledger readback on October 31 confirmed it again.
+
+- Before the push: `migration list --linked` matched 93 entries through
+  `20261027120000`, with nothing hosted-only. The dry run listed only
+  `20261027221625`. Its SQL SHA-256 is `c2f1dc43…464b`, the same file as PR head
+  `4b27f9da`, where the CI rehearsal passed. The push used the Homebrew Supabase CLI
+  2.109.1.
+- Ledger readback: 94 matched entries ending at `20261027221625`. Nothing is
+  local-only or hosted-only.
+- Function: the hosted body of `cadence_private.apply_account_sync_plan` equals the
+  migration's function text (MD5 `1573e2da…`, 37,116 characters; before the push
+  `41a03270…`, 36,408) and carries the new error text. The other seven
+  `cadence_private` account-sync functions, `public.apply_account_sync_plan` and both
+  `public.read_account_sync_snapshot` signatures have the same bodies as before the
+  push.
+- Grants: unchanged. All eleven functions are owned by `postgres` with an empty
+  `search_path`; only `authenticated` can execute them, and `anon` and `service_role`
+  cannot. The private apply function stays security definer.
+- Data API: an anonymous call to `public.apply_account_sync_plan` returns 42501.
+  Types: no function signature changed, so `lib/db/database.types.ts` needs no update.
+- Deployment: main `eb5afa5b` (PRs #157, #159 and #160) deployed on October 28. The
+  Trust variable now names marketing deployment `dpl_FxBP12vZ…`, and the app was
+  redeployed as `dpl_AE8GhYkk…` on `app.cadence-me.com`.
 
 - Bug: a profile timezone change on a linked Mac failed every sync when the account
   had an archived Behavior. `apply_account_sync_plan` required a timezone upsert for
@@ -203,8 +267,8 @@ ledger readback, October 31, 2026).
   `active` filter fails its archive-in-plan case. Containers and proxy are stopped;
   named volumes are kept. `habit-tracking-app` was not touched. Type generation was
   refused by the proxy; no function signature changed.
-- Not verified: a timezone change synced from an
-  installed Mac after the push.
+- Not verified: a timezone change synced from an installed Mac after the push, and an
+  authenticated sync against the new rule on hosted.
 
 Platform impact: hosted account sync. Linked desktop (0.1.5 and 0.1.6) can sync a
 timezone change after the push, with no desktop code change. Web: no change; its
@@ -245,9 +309,8 @@ Not required: removed by owner decision, October 27, 2026. Packet:
   no fix), installed receipt replay, and a contract-1 profile write that lands.
 - Known issue, not a regression: a timezone change on a linked Mac with an archived
   Behavior stalls sync, because the server requires every Behavior and both clients
-  update only active ones. Fixed in source by migration
-  `20261027221625` (entry above), now applied on the hosted database (ledger
-  readback, October 31, 2026).
+  update only active ones. Fixed by migration `20261027221625`, applied to hosted on
+  October 28 (entry above); not yet confirmed from an installed Mac.
 
 Platform impact: desktop release only; web, marketing and future mobile have no change.
 Messaging impact: none; the packet holds draft release notes for the owner.

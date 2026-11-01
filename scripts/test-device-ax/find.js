@@ -1,4 +1,5 @@
 // Usage: find.js <process> <regex>; prints role/name/description/value lines that match.
+// Numeric values are printed too, so a checkbox reads as 0 or 1.
 // JXA invokes this entry point.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function run(argv) {
@@ -15,7 +16,7 @@ function run(argv) {
     try { r = el.role(); } catch {}
     try { n = el.name() || ""; } catch {}
     try { d = el.description() || ""; } catch {}
-    try { const x = el.value(); v = typeof x === "string" ? x : ""; } catch {}
+    try { const x = el.value(); v = typeof x === "string" ? x : typeof x === "number" ? String(x) : ""; } catch {}
     const t = [...new Set([n, d, v].filter((s) => s && s !== "missing value"))].join(" | ");
     if (t && re.test(r + " " + t)) out.push(r + ": " + t);
     let kids = [];

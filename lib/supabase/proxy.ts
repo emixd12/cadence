@@ -17,6 +17,19 @@ type ClaimsAuthResult = {
 const LOGIN_PREVIEW_PARAM = "preview";
 const LOGIN_PREVIEW_VALUE = "1";
 
+function copySessionCookiesAndHeaders(source: NextResponse, target: NextResponse) {
+  source.cookies.getAll().forEach((cookie) => {
+    target.cookies.set(cookie);
+  });
+
+  for (const header of ["Cache-Control", "Expires", "Pragma"]) {
+    const value = source.headers.get(header);
+    if (value) {
+      target.headers.set(header, value);
+    }
+  }
+}
+
 function redirectWithSessionCookies(
   request: NextRequest,
   sessionResponse: NextResponse,
@@ -25,17 +38,7 @@ function redirectWithSessionCookies(
   const redirectResponse = NextResponse.redirect(
     new URL(path, authRequestUrl(request)),
   );
-
-  sessionResponse.cookies.getAll().forEach((cookie) => {
-    redirectResponse.cookies.set(cookie);
-  });
-
-  for (const header of ["Cache-Control", "Expires", "Pragma"]) {
-    const value = sessionResponse.headers.get(header);
-    if (value) {
-      redirectResponse.headers.set(header, value);
-    }
-  }
+  copySessionCookiesAndHeaders(sessionResponse, redirectResponse);
 
   return redirectResponse;
 }
@@ -147,7 +150,11 @@ export async function updateSession(request: NextRequest) {
           request.cookies.set(name, value);
         });
 
-        response = NextResponse.next({ request });
+        const nextResponse = NextResponse.next({ request });
+        // SSR can write several cookie batches and sends cache headers once.
+        // Keep earlier writes while forwarding the latest request cookies.
+        copySessionCookiesAndHeaders(response, nextResponse);
+        response = nextResponse;
 
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);

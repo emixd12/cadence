@@ -22,7 +22,11 @@ at another file. The format is in `docs/examples/test-devices.example.json`. Eac
 entry needs a unique `name`, the Tailscale `host` and an SSH `user`. These values
 start with a letter or digit. The app path must be absolute. Optional fields give
 the app path, the process name System Events reports, and an absolute Node path
-(non-interactive SSH does not load the shell profile).
+(non-interactive SSH does not load the shell profile). Disposable VM copies also
+set an absolute `identity` key, an absolute `knownHosts` file and a plain
+`hostKeyAlias`, so every copy's address matches one pinned host key while strict
+host-key checking stays on. `scripts/location-vm.mjs` writes those entries itself
+(`docs/plans/2026-10-27-location-vm-images.md`).
 
 ## Commands
 

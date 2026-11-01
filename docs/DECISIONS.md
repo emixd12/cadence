@@ -1300,3 +1300,54 @@ which listed it among the area checks.
 
 Platform impact: desktop release process only; web, marketing and future mobile are not
 affected. Messaging impact: none.
+
+## 2026-10-29: Google Maps support evidence and continued development
+
+The owner asked to preserve the Google Maps correspondence in the repository's legal
+documents and continue developing the feature set. Recorded from the owner's October
+29 instruction at 13:15 UTC:
+
+> I think this all should be saved in the repo’s legal documents as evidence that we
+> should not worry about this and just continue developing with our feature set
+
+[LEGAL.md L-001](LEGAL.md#l-001-google-maps-content-in-daily-brief-model-input) links
+[the sanitized case 76805292 record](legal/2026-10-29-google-maps-case-76805292.md).
+Google's support consultation ended without authoritative approval or a finding of
+noncompliance. This owner direction is separate from that outcome: it records
+continued development, not a legal finding that there is no risk.
+
+L-001 remains medium / accepted risk under the existing October 18 limits. The binary
+conclusion and Grounding Lite questions, including one-sided duration inference,
+remain unresolved. No existing model-input restriction, runtime gate, public-launch
+or provider-submission requirement is removed. The October 22 and October 27 rules
+separating development from messaging work are unchanged. No code, public policy
+text, deployment or new outreach is authorized by this documentation change.
+
+Platform impact: documentation only; web, desktop, marketing and future mobile
+behavior is unchanged. Messaging impact: none.
+
+## 2026-10-29: Claude cloud sessions with provider keys as network secrets
+
+The owner created a personal `cadence` Claude Code cloud environment to start and
+steer work from a phone. The owner's words: "I want to enable the setup that
+maximizes the capabilities that we can run on the cloud environment. I want to be
+able to do as much work as possible from my phone."
+
+- The environment uses Trusted network access.
+- The committed SessionStart hook `scripts/claude-cloud-session.sh` installs Node 24
+  and dependencies in each cloud session. Local sessions skip it.
+- Provider API keys are stored only as the environment's network secrets, so they
+  never enter the session VM. Environment variables hold no secrets.
+- The Supabase service-role key, app runtime secrets and Apple or Tauri signing
+  material stay out of cloud environments.
+- A network secret grants no new authority. Hosted writes, deploys, restarts and
+  real sends still need the owner's instruction each time.
+- Cloud sessions run the required checks as npm commands, not Dagger. The Dagger
+  CLI and engine images are outside the Trusted allowlist, and each session would
+  start with an empty cache. GitHub Actions `CI` stays the merge gate.
+- macOS-only work stays on the owner's Mac.
+
+Procedure and limits: `docs/OPERATIONS.md`, "Claude cloud sessions".
+
+Platform impact: development tooling only. Web, desktop, marketing and future mobile
+behavior is unchanged. Messaging impact: none.

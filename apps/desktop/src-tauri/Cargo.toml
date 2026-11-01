@@ -25,7 +25,7 @@ cc = "=1.4.0"
 [dependencies]
 tauri = { version = "=2.12.4", features = [] }
 tauri-plugin-updater = "=2.10.1"
-tauri-plugin-deep-link = "=2.4.9"
+tauri-plugin-deep-link = "=2.6.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
