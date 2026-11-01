@@ -61,7 +61,8 @@ export function createSessionBroker({
   const slots = new Map();
   const pinned = new Map();
   const inflight = new Set();
-  const cleanup = [];
+  const cleanup = new Set();
+  const clientState = new WeakMap();
   let reserved = 0;
   let httpServer = null, socketServer = null, timer = null, lifetime = null, closed = false, pinState = 'none', ownSocket = null;
   const track = (promise) => { inflight.add(promise); promise.finally(() => inflight.delete(promise)).catch(() => {}); return promise; };
@@ -71,10 +72,15 @@ export function createSessionBroker({
     appendFileSync(receiptPath, `${JSON.stringify({ at: new Date(now()).toISOString(), event, ...extra })}\n`, { mode: 0o600 });
   };
   const boundedFetch = (input, init = {}) => fetchImpl(input, { ...init, signal: AbortSignal.timeout(requestTimeoutMs) });
-  const newClient = () => createClient(supabaseUrl, publishableKey, {
-    auth: { flowType: 'pkce', storage: memoryStorage(), persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { fetch: boundedFetch },
-  });
+  const newClient = () => {
+    const storage = memoryStorage();
+    const client = createClient(supabaseUrl, publishableKey, {
+      auth: { flowType: 'pkce', storage, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: boundedFetch },
+    });
+    clientState.set(client, { storage, signedOut: false });
+    return client;
+  };
   const describe = (slot) => {
     const s = slots.get(slot);
     return s ? { userId: s.userId, expiresAt: new Date(s.expiresAt).toISOString(), kid: s.kid, state: s.state } : null;
@@ -82,34 +88,38 @@ export function createSessionBroker({
   const status = () => ({
     slots: { A: describe('A'), B: describe('B') },
     pinState,
-    cleanupPending: cleanup.length,
+    cleanupPending: cleanup.size,
     pinned: Object.fromEntries(['A', 'B'].map((slot) => [slot, pinned.has(slot) ? { expiresAt: new Date(pinned.get(slot).expiresAt).toISOString(), kid: pinned.get(slot).kid } : null])),
   });
   const store = (slot, client, session, userId) => {
     slots.set(slot, { client, userId, accessToken: session.access_token, expiresAt: session.expires_at * 1000, kid: decodeKid(session.access_token), state: 'ok' });
   };
   // Returns true only when the provider confirmed the local-scope sign-out.
-  // An expired access token would make logout answer 401, which the SDK treats as
-  // success, so load (and if needed refresh) the session first.
+  // auth.signOut removes local state even when logout fails. Revoke by token so
+  // failed calls remain retryable, then erase our in-memory storage on success.
   const signOutLocal = async (client) => {
     try {
+      const state = clientState.get(client);
+      if (state.signedOut) return true;
       const loaded = await client.auth.getSession();
-      if (loaded.error) return false;
-      if (!loaded.data?.session) return true;
-      const { error } = await client.auth.signOut({ scope: 'local' });
-      return !error;
+      if (loaded.error || !loaded.data?.session) return false;
+      const { error } = await client.auth.admin.signOut(loaded.data.session.access_token, 'local');
+      if (error) return false;
+      state.storage.clear();
+      state.signedOut = true;
+      return true;
     } catch { return false; }
   };
   const discard = async (client) => {
     if (await signOutLocal(client)) return true;
-    if (!cleanup.includes(client)) cleanup.push(client);
+    cleanup.add(client);
     log('cleanup-failed');
-    receipt('cleanup-failed', { cleanupPending: cleanup.length });
+    receipt('cleanup-failed', { cleanupPending: cleanup.size });
     return false;
   };
   const retryCleanup = async () => {
     for (const client of [...cleanup]) {
-      if (await signOutLocal(client)) { cleanup.splice(cleanup.indexOf(client), 1); log('cleanup-retried'); receipt('cleanup-retried', { cleanupPending: cleanup.length }); }
+      if (await signOutLocal(client) && cleanup.delete(client)) { log('cleanup-retried'); receipt('cleanup-retried', { cleanupPending: cleanup.size }); }
     }
   };
 
@@ -128,7 +138,7 @@ export function createSessionBroker({
 
   const startAttempt = async (slot, res) => {
     purgeExpired();
-    if (cleanup.length >= maxPendingCleanup) return reply(res, 503, page('<p>Sign-out cleanup pending. Tell the operator.</p>'));
+    if (cleanup.size >= maxPendingCleanup) return reply(res, 503, page('<p>Sign-out cleanup pending. Tell the operator.</p>'));
     if (attempts.size + reserved >= maxPendingAttempts) return reply(res, 429, page('<p>Too many pending sign-ins. Wait five minutes.</p>'));
     reserved += 1;
     const nonce = randomBytes(32).toString('base64url');
@@ -171,11 +181,14 @@ export function createSessionBroker({
       receipt('discarded', { slot: attempt.slot });
       return done(res, 'discarded');
     }
-    const previous = slots.get(attempt.slot);
-    if (previous) await discard(previous.client);
     if (closed) { await discard(attempt.client); log(`closing-discarded ${attempt.slot}`); return done(res, 'failed'); }
+    // Publish the replacement before awaiting cleanup, so another callback
+    // retires this session instead of overwriting it after the same old one.
+    const previous = slots.get(attempt.slot);
     if (pinState === 'pinned') { pinned.clear(); pinState = 'invalidated'; receipt('pin-invalidated', { slot: attempt.slot }); }
     store(attempt.slot, attempt.client, session, userId);
+    if (previous) await discard(previous.client);
+    if (closed) return done(res, 'failed');
     log(`match ${attempt.slot}`);
     receipt('signed-in', { slot: attempt.slot, ...describe(attempt.slot) });
     return done(res, `${attempt.slot}-match`);
@@ -339,12 +352,12 @@ export function createSessionBroker({
     while (inflight.size) await Promise.allSettled([...inflight]);
     for (const slot of ['A', 'B']) { const s = slots.get(slot); if (s) await discard(s.client); }
     attempts.clear();
-    for (let i = 0; i < teardownRetries && cleanup.length; i += 1) {
+    for (let i = 0; i < teardownRetries && cleanup.size; i += 1) {
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       await retryCleanup();
     }
-    const unconfirmed = cleanup.length;
-    slots.clear(); pinned.clear(); cleanup.length = 0; pinState = 'closed';
+    const unconfirmed = cleanup.size;
+    slots.clear(); pinned.clear(); cleanup.clear(); pinState = 'closed';
     httpServer?.closeAllConnections?.();
     await closing;
     if (ownSocket && existsSync(socketPath)) {
