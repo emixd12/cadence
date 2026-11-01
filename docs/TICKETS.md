@@ -15404,7 +15404,8 @@ web QA run only; desktop, marketing and future mobile not applicable.
 
 ## Ticket 259: Consent offers advertised write permissions
 
-Status: implemented October 31, 2026; in review as PR #175. Product change.
+Status: implemented and merged October 31, 2026 as PR #175 (`f1392365`);
+hosted migration and deployment verified. Live ChatGPT write acceptance remains.
 Dependencies: Tickets 226–227 (OAuth and consent), the Ticket 232 follow-up
 re-consent union (migration `20261030230000`), and the Ticket 256 finding.
 
@@ -15421,9 +15422,9 @@ starts on.
 - Step-up re-consent keeps already granted scopes, marked "(already granted)".
 - Migration `20261031210000_oauth_consent_offers_advertised_scopes.sql` removes
   the requested-or-granted subset check from `oauth_finish_pending`;
-  `scopes_valid` still applies. The hosted push needs the owner's explicit go and
-  must precede the app deployment; the old check rejects the default selection
-  for a read-only client.
+  `scopes_valid` still applies. The October 31 hosted ledger includes the
+  migration, and both Vercel projects are Ready on `f1392365`. A migration must
+  precede the matching app deployment.
 - Docs: `docs/MCP_INTEGRATION.md`, `docs/DATA_MODEL.md`, `docs/UI_SPEC.md`,
   `docs/USER_FLOWS.md`, `interaction-registry.json` (INT-OAUTH-001, INT-OAUTH-003).
 

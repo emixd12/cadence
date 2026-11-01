@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 import { request } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync, mkdirSync, chmodSync, readFileSync, statSync, existsSync, rmSync, writeFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ afterEach(async () => { while (cleanups.length) await cleanups.pop()(); });
 function fakeAuth() {
   const codes = new Map(), access = new Map(), refresh = new Map();
   const logouts = [], requests = [];
-  let kid = 'kid-old', refreshFails = false, gate = null, logoutFails = false;
+  let kid = 'kid-old', refreshFails = false, gate = null, logoutFails = false, logoutHook = null;
   const jwt = (userId) => `${Buffer.from(JSON.stringify({ alg: 'ES256', kid })).toString('base64url')}.${Buffer.from(JSON.stringify({ sub: userId, n: randomBytes(6).toString('hex') })).toString('base64url')}.sig`;
   const issue = (userId) => {
     const token = jwt(userId), rt = randomBytes(12).toString('hex');
@@ -49,9 +49,12 @@ function fakeAuth() {
       return userId ? json(200, { id: userId, aud: 'authenticated' }) : json(401, { code: 'bad_jwt', message: 'invalid' });
     }
     if (url.pathname === '/auth/v1/logout') {
-      if (logoutFails) return json(500, { message: 'synthetic-provider-failure' });
-      logouts.push({ scope: url.searchParams.get('scope'), userId: access.get((headers.get('authorization') ?? '').replace('Bearer ', '')) });
-      return new Response(null, { status: 204 });
+      const token = (headers.get('authorization') ?? '').replace('Bearer ', '');
+      const userId = access.get(token), scope = url.searchParams.get('scope');
+      const response = logoutHook ? await logoutHook({ token, userId, scope })
+        : logoutFails ? json(500, { message: 'synthetic-provider-failure' }) : new Response(null, { status: 204 });
+      if (response.status === 204) logouts.push({ scope, userId });
+      return response;
     }
     return json(404, { message: 'not found' });
   };
@@ -66,6 +69,7 @@ function fakeAuth() {
     rotate: () => { kid = 'kid-new'; },
     failRefresh: () => { refreshFails = true; },
     failLogout: (value) => { logoutFails = value; },
+    setLogout: (hook) => { logoutHook = hook; },
     holdExchange: () => {
       let reached, release;
       const reachedP = new Promise((r) => { reached = r; });
@@ -89,18 +93,30 @@ function get(port, path, { host = `127.0.0.1:${port}`, cookie, method = 'GET', a
 }
 
 async function setup(overrides = {}) {
-  const port = nextPort++;
   const dir = mkdtempSync(join(tmpdir(), 'qa232-'));
   const socketPath = join(dir, 'b.sock');
   const receiptPath = join(dir, 'receipt.jsonl');
   const auth = fakeAuth();
   const lines = [];
   let clock = Date.now();
-  const broker = createSessionBroker({
-    supabaseUrl: SUPABASE, publishableKey: KEY, port, socketPath, receiptPath, fetchImpl: auth.fetchImpl,
-    now: () => clock, log: (line) => lines.push(line), refreshIntervalMs: 3_600_000, ...overrides,
-  });
-  await broker.start();
+  let port, broker;
+  // Loopback clients can occupy a later fixture port. Retry only that collision,
+  // and close the failed start's private socket before trying another port.
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    port = nextPort++;
+    broker = createSessionBroker({
+      supabaseUrl: SUPABASE, publishableKey: KEY, port, socketPath, receiptPath, fetchImpl: auth.fetchImpl,
+      now: () => clock, log: (line) => lines.push(line), refreshIntervalMs: 3_600_000, ...overrides,
+    });
+    try { await broker.start(); break; }
+    catch (error) {
+      await broker.teardown('setup-failed');
+      if (error.code !== 'EADDRINUSE' || attempt === 19) {
+        rmSync(dir, { recursive: true, force: true });
+        throw error;
+      }
+    }
+  }
   cleanups.push(async () => { await broker.teardown('test'); rmSync(dir, { recursive: true, force: true }); });
   const signIn = async (slot, userId) => {
     const start = await get(port, `/start/${slot}`);
@@ -424,6 +440,10 @@ describe('Ticket 232 QA session broker', () => {
     expect(t.lines).not.toContain('discarded A');
     expect(t.lines).toContain('cleanup-failed');
     expect(t.broker.status().cleanupPending).toBe(1);
+    await t.broker.tick();
+    expect(t.broker.status().cleanupPending).toBe(1);
+    expect(t.lines).not.toContain('cleanup-retried');
+    expect(t.auth.logouts).toEqual([]);
     t.auth.failLogout(false);
     await t.broker.tick();
     expect(t.broker.status().cleanupPending).toBe(0);
@@ -435,6 +455,78 @@ describe('Ticket 232 QA session broker', () => {
     const last = readFileSync(t.receiptPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
     expect(last).toMatchObject({ event: 'teardown', unconfirmedSignOuts: 2 });
     expect(t.lines.at(-1)).toBe('teardown test unconfirmed-sign-outs 2');
+  });
+
+  it('keeps sign-out unconfirmed when a failed refresh removed the local session', async () => {
+    const t = await setup({ retryDelayMs: 1 });
+    await t.signIn('A', ACCOUNTS.A);
+    t.auth.failRefresh();
+    t.advance(60 * 60_000);
+    const wallClock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60 * 60_000);
+    try {
+      await t.broker.tick();
+      expect(t.broker.status().slots.A.state).toBe('refresh-failed');
+      expect(await t.broker.teardown('test')).toEqual({ unconfirmedSignOuts: 1 });
+      expect(t.auth.logouts).toEqual([]);
+      const last = readFileSync(t.receiptPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line)).at(-1);
+      expect(last).toMatchObject({ event: 'teardown', unconfirmedSignOuts: 1 });
+      expect(t.lines.at(-1)).toBe('teardown test unconfirmed-sign-outs 1');
+    } finally { wallClock.mockRestore(); }
+  });
+
+  it('preserves another unconfirmed session during overlapping cleanup passes', async () => {
+    const t = await setup({ retryDelayMs: 1 });
+    const otherUser = '22222222-2222-4333-8444-555555555555';
+    t.auth.failLogout(true);
+    await t.signIn('A', OTHER);
+    await t.signIn('A', otherUser);
+    expect(t.broker.status().cleanupPending).toBe(2);
+    const releases = [];
+    t.auth.setLogout(({ userId }) => userId === OTHER
+      ? new Promise((resolve) => releases.push(() => resolve(new Response(null, { status: 204 }))))
+      : new Response(JSON.stringify({ message: 'provider-failure' }), { status: 500 }));
+    const first = t.broker.tick(), second = t.broker.tick();
+    try {
+      await vi.waitFor(() => expect(releases).toHaveLength(2));
+      releases[0]();
+      await first;
+      expect(t.broker.status().cleanupPending).toBe(1);
+      releases[1]();
+      await second;
+      expect(t.broker.status().cleanupPending).toBe(1);
+      expect(t.lines.filter((line) => line === 'cleanup-retried')).toHaveLength(1);
+      expect(await t.broker.teardown('test')).toEqual({ unconfirmedSignOuts: 1 });
+    } finally {
+      for (const release of releases) release();
+      await Promise.allSettled([first, second]);
+    }
+  });
+
+  it('revokes every exchanged session after concurrent replacements of one slot', async () => {
+    const t = await setup({ retryDelayMs: 1 });
+    await t.signIn('A', ACCOUNTS.A);
+    const original = [...t.auth.access.keys()][0];
+    const revoked = new Set(), logoutAttempts = [];
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    t.auth.setLogout(async ({ token }) => {
+      logoutAttempts.push(token);
+      if (token === original) await held;
+      revoked.add(token);
+      return new Response(null, { status: 204 });
+    });
+    const replacements = [t.signIn('A', ACCOUNTS.A)];
+    try {
+      await vi.waitFor(() => expect(logoutAttempts).toHaveLength(1));
+      replacements.push(t.signIn('A', ACCOUNTS.A));
+      await vi.waitFor(() => expect(logoutAttempts).toHaveLength(2));
+    } finally {
+      release();
+      await Promise.all(replacements);
+    }
+    expect(await t.broker.teardown('test')).toEqual({ unconfirmedSignOuts: 0 });
+    expect(t.auth.access.size).toBe(3);
+    expect(revoked.size).toBe(t.auth.access.size);
   });
 
   it('prefers allowlisted free ports in ascending order from 4321', async () => {

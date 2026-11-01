@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { partialGraph, addGeneratedOccurrences } from "./helpers/mcp-fixture-partial.mjs";
-import { buildFixtureBundle, FIXTURE_SOURCE } from "../scripts/build-mcp-hosted-fixtures.mjs";
+import { buildFixtureBundle, FIXTURE_SOURCE, FIXTURE_RUNTIME_IMPORTS, verifyFixtureDependencies } from "../scripts/build-mcp-hosted-fixtures.mjs";
 
 const USERS = ["caefd1b8-ea46-485f-8869-119a715fb092", "c05b0d9d-dbdc-4f49-80d2-c55e211ebe7b"];
 const CATEGORY = { id: "a29dd2d0-5425-4180-a29a-01a026ebb8c0", user_id: USERS[0], created_at: "2026-10-28T02:17:19.262435+00:00" };
@@ -67,6 +67,56 @@ it("builds only frozen product inputs and checks installed runtime dependency ve
   expect(receipt.inputs.some(i => i.path === "packages/core/src/services/configuration-payload.ts")).toBe(true);
   expect(receipt.inputs.every(i => /^(lib|packages\/core)\//.test(i.path))).toBe(true);
   expect(receipt.dependencies["@supabase/supabase-js"]).toBe("2.107.0");
+  expect(receipt.dependencies["@supabase/phoenix"]).toBe("0.4.2");
+  expect(receipt.runtimeImports).toEqual(FIXTURE_RUNTIME_IMPORTS);
+  const built = readFileSync(join(buildRoot, "fixtures.mjs"), "utf8");
+  expect(built).toContain('from "@cadence-fixture/supabase-js"');
+  expect(built).not.toContain('from "@supabase/supabase-js"');
+});
+
+function runtimeGraph(change = () => {}) {
+  const directory = mkdtempSync(join(tmpdir(), "fixture-dependencies-test-"));
+  const lock = { packages: {} };
+  const install = (location, name, version, dependencies = {}) => {
+    const target = join(directory, "node_modules", location);
+    mkdirSync(target, { recursive: true });
+    writeFileSync(join(target, "package.json"), JSON.stringify({ name, version, dependencies, exports: "./index.js" }));
+    writeFileSync(join(target, "index.js"), "throw new Error('dependency verification must not execute packages');\n");
+    return target;
+  };
+  try {
+    install("@cadence-fixture/supabase-js", "@supabase/supabase-js", "2.107.0", { "@supabase/auth-js": "2.107.0" });
+    const nested = "@cadence-fixture/supabase-js/node_modules/@supabase/auth-js";
+    install(nested, "@supabase/auth-js", "2.107.0");
+    install("@supabase/supabase-js", "@supabase/supabase-js", "2.118.0");
+    install("@supabase/auth-js", "@supabase/auth-js", "2.118.0");
+    install("@js-temporal/polyfill", "@js-temporal/polyfill", "0.5.1");
+    lock.packages = {
+      "node_modules/@supabase/supabase-js": { version: "2.107.0", dependencies: { "@supabase/auth-js": "2.107.0" } },
+      "node_modules/@supabase/auth-js": { version: "2.107.0" },
+      "node_modules/@js-temporal/polyfill": { version: "0.5.1" },
+    };
+    change({ install, lock, directory, nested });
+    return verifyFixtureDependencies(lock, join(directory, "fixtures.mjs"));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+it("checks the nested frozen graph while newer application packages are hoisted", () => {
+  expect(runtimeGraph()).toEqual({
+    "@supabase/supabase-js": "2.107.0", "@supabase/auth-js": "2.107.0", "@js-temporal/polyfill": "0.5.1",
+  });
+});
+it("refuses a nested dependency with a different version", () => {
+  expect(() => runtimeGraph(({ install, nested }) => install(nested, "@supabase/auth-js", "2.118.0")))
+    .toThrow("fixture-dependency-drift");
+});
+it("refuses a missing nested dependency that would resolve to the newer application package", () => {
+  expect(() => runtimeGraph(({ directory, nested }) => rmSync(join(directory, "node_modules", nested), { recursive: true })))
+    .toThrow("fixture-dependency-drift");
+});
+it("refuses an installed dependency declaration that differs from the frozen lock", () => {
+  expect(() => runtimeGraph(({ install, nested }) => install(nested, "@supabase/auth-js", "2.107.0", { unexpected: "1.0.0" })))
+    .toThrow("fixture-dependency-drift");
 });
 it("reuses the exact partial graph and submits only the remaining status through the frozen planner", async () => {
   const { result, writes, persisted, second, bytesUnchanged, resumeReceipt } = await attempt();

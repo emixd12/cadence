@@ -349,6 +349,14 @@ and hash receipt. It does not connect to a provider. Under Node24:
 node scripts/build-mcp-hosted-fixtures.mjs /private/path/in/workspace/resume.mjs
 ```
 
+The frozen Supabase 2.107.0 runtime uses the dev-only
+`@cadence-fixture/supabase-js` npm alias. Its Phoenix dependency stays at 0.4.2
+through an override scoped to that alias. The normal application client can
+advance independently. The builder resolves every dependency from its actual
+importer, checks the nested graph against the frozen lock, and records the runtime
+imports and versions in the receipt. The generated bundle imports the alias
+explicitly; it cannot silently select the newer application client.
+
 The output must live under this workspace so Node resolves the checked runtime
 dependencies. Import its `runFixtures` export in a private Node24 child; pass
 `allowHostedProject: "qjodzutjxtmtzczbloxa"`, `mode: "preflight"` or `"resume"`,
