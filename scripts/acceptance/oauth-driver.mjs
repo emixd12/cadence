@@ -269,7 +269,14 @@ export function createOAuthDriver({
   /** Active grants for the account, read as that account under RLS. */
   const grantsFor = async (slot, clientId) => {
     const rows = await sessions.userRpc(slot, 'oauth_list_grants');
-    return (rows ?? []).filter((row) => row.client_id === clientId).map((row) => ({ grantId: row.grant_id, scopes: row.scopes }));
+    // Validate before filtering: malformed or missing rows cannot prove that this
+    // client's grant is absent, even if no row happens to match its client ID.
+    if (!Array.isArray(rows) || rows.some((row) => !row || typeof row.client_id !== 'string' || !row.client_id
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.grant_id ?? '')
+      || !Array.isArray(row.scopes) || !row.scopes.every((scope) => typeof scope === 'string' && scope.length > 0))) {
+      throw new AcceptanceError('grant-list-invalid');
+    }
+    return rows.filter((row) => row.client_id === clientId).map((row) => ({ grantId: row.grant_id, scopes: row.scopes }));
   };
   /** Cleanup: revoke this driver's grants for a client as the account itself. */
   const revokeGrants = async (slot, clientId) => {

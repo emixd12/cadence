@@ -14,8 +14,8 @@ import {
   parseClaudeStream, parseInspectorResult, parseOpenaiResponse, runAnthropicApi, runOpenaiApi, toolOutcome,
 } from '../scripts/acceptance/clients.mjs';
 import { compareCalls, createAdapters, evaluate, localIssuer, main, parseClientArgs, readiness, runOneClient } from '../scripts/acceptance/client-runners.mjs';
-import { assertSafe, createRun } from '../scripts/acceptance/ledger.mjs';
-import { Secret } from '../scripts/acceptance/test-account-sessions.mjs';
+import { assertSafe, createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
+import { AcceptanceError, Secret } from '../scripts/acceptance/test-account-sessions.mjs';
 import { KINDS, OPERATION_ACCESS } from '../scripts/acceptance/watch.mjs';
 
 const FIX = (name) => fileURLToPath(new URL(`./fixtures/acceptance-clients/${name}`, import.meta.url));
@@ -254,12 +254,13 @@ describe('scenarios and checks', () => {
 // One client end to end with a fake harness
 // ---------------------------------------------------------------------------
 
-function fakeHarness({ adapter, activity = null, behaviorRows = null }) {
+function fakeHarness({ adapter, activity = null, behaviorRows = null, clientId = id(1), grantId = id(2) }) {
   const at = (s) => new Date(Date.now() + s * 1000).toISOString();
-  const G = id(2);
+  const G = grantId;
+  let active = false;
   const revoked = [];
   const snapshot = {
-    grants: [{ account: 'A', grantId: G, clientId: id(1), clientName: 'Cadence acceptance inspector', verifiedClient: null, scopes: ['cadence.read', 'cadence.behaviors.write', 'cadence.occurrences.write'],
+    grants: [{ account: 'A', grantId: G, clientId, clientName: 'Cadence acceptance inspector', verifiedClient: null, scopes: ['cadence.read', 'cadence.behaviors.write', 'cadence.occurrences.write'],
       createdAt: at(1), lastUsedAt: null, updatedAt: null, revokedAt: null, revokedReason: null, registrationType: 'dcr' }],
     families: [{ account: 'A', familyId: id(3), grantId: G, createdAt: at(2), revokedAt: null, revokedReason: null, offlineAccess: true }],
     activity: (activity ?? ['get_account_context', 'get_timeline', 'create_behavior', 'archive_behavior']).map((operation, i) => ({
@@ -269,10 +270,10 @@ function fakeHarness({ adapter, activity = null, behaviorRows = null }) {
   return {
     revoked,
     driver: {
-      registerDynamic: async ({ name }) => ({ type: 'dcr', clientId: id(1), clientName: name }),
-      authorize: async () => ({ accessToken: new Secret(SECRET), revoke: async () => { revoked.push('token'); } }),
-      grantsFor: async () => [{ grantId: G, scopes: snapshot.grants[0].scopes }],
-      revokeGrants: async () => { revoked.push('grant'); return 1; },
+      registerDynamic: async ({ name }) => ({ type: 'dcr', clientId, clientName: name }),
+      authorize: async () => { active = true; return { accessToken: new Secret(SECRET), revoke: async () => { revoked.push('token'); } }; },
+      grantsFor: async () => active ? [{ grantId: G, scopes: snapshot.grants[0].scopes }] : [],
+      revokeGrants: async () => { revoked.push('grant'); const count = Number(active); active = false; return count; },
     },
     userIdOf: () => id(9),
     source: () => ({ name: 'db', kinds: KINDS, snapshot: async () => snapshot }),
@@ -328,6 +329,76 @@ describe('runOneClient', () => {
     expect(crashed).toMatchObject({ outcome: 'fail', failedChecks: ['client-run'], evidence: { error: 'missing-inspector' } });
     expect(crash.revoked).toEqual(['token', 'grant']);
     run2.close();
+  });
+
+  it.each(['token-request-failed', 'granted-scope-mismatch'])('revokes consent-created grants when authorization throws %s', async reason => {
+    const run = createRun({ root: tmp(), target: 'local', accounts: ['A'], scenarios: ['read-write'], runId: 'authorize-failure', gitSha: null });
+    const h = fakeHarness({ adapter: passingInspector });
+    const authorize = h.driver.authorize;
+    h.driver.authorize = async (...args) => { await authorize(...args); throw new AcceptanceError(reason); };
+    try {
+      await expect(run.step('client:inspector', ctx => runOneClient('inspector', {
+        h, run, runId: run.runId, slot: 'A', scenario: CLIENT_SCENARIOS['read-write'], ...ctx,
+      }))).rejects.toMatchObject({ code: reason });
+      expect(h.revoked).toEqual(['grant']);
+      expect(await h.driver.grantsFor('A', id(1))).toEqual([]);
+      expect(run.checkpoints.some(r => r.kind === 'step' && r.name.startsWith('registration:')
+        && r.state === 'done' && r.result.clientId === id(1) && r.result.slot === 'A')).toBe(true);
+      expect(run.checkpoints.filter(r => r.name === 'client:inspector').at(-1).state).toBe('stopped');
+      expect(readTree(run.dir)).not.toContain(SECRET);
+    } finally { run.close(); }
+  });
+
+  it('stops on unconfirmed cleanup and reconciles stopped attempts before registering another client', async () => {
+    const root = tmp(), runId = 'cleanup-retry';
+    let run = createRun({ root, target: 'local', accounts: ['A'], scenarios: ['read-write'], runId, gitSha: null });
+    const h = fakeHarness({ adapter: passingInspector });
+    const authorize = h.driver.authorize;
+    h.driver.authorize = async (...args) => { await authorize(...args); throw new AcceptanceError('granted-scope-mismatch'); };
+    const revoke = h.driver.revokeGrants;
+    const register = h.driver.registerDynamic;
+    let registrations = 0;
+    h.driver.registerDynamic = async (...args) => { registrations += 1; return register(...args); };
+    h.driver.revokeGrants = async () => { throw new Error(SECRET); };
+    const attempt = (harness) => run.step('client:inspector', ctx => runOneClient('inspector', {
+      h: harness, run, runId, slot: 'A', scenario: CLIENT_SCENARIOS['read-write'], ...ctx,
+    }));
+    await expect(attempt(h)).rejects.toMatchObject({ reason: 'grant-revocation-unconfirmed' });
+    expect(run.cleanupInputs().grants).toEqual([]);
+    expect(run.checkpoints.filter(r => r.name === 'client:inspector').at(-1).state).toBe('stopped');
+    run.close();
+    run = resumeRun({ root, runId });
+    try {
+      await expect(attempt(h)).rejects.toMatchObject({ reason: 'grant-revocation-unconfirmed' });
+      expect(registrations).toBe(1);
+      const next = fakeHarness({ adapter: passingInspector, clientId: id(11), grantId: id(12),
+        behaviorRows: [{ id: id(17), archived: true }] });
+      const nextRevoke = next.driver.revokeGrants, nextGrants = next.driver.grantsFor;
+      next.driver.revokeGrants = (slot, clientId) => clientId === id(1) ? revoke(slot, clientId) : nextRevoke(slot, clientId);
+      next.driver.grantsFor = (slot, clientId) => clientId === id(1) ? h.driver.grantsFor(slot, clientId) : nextGrants(slot, clientId);
+      const nextRegister = next.driver.registerDynamic;
+      next.driver.registerDynamic = async (...args) => {
+        expect(await h.driver.grantsFor('A', id(1))).toEqual([]);
+        return nextRegister(...args);
+      };
+      expect((await attempt(next)).outcome).toBe('pass');
+      expect(run.checkpoints.filter(r => r.name === 'client:inspector').at(-1).state).toBe('done');
+      expect(readTree(run.dir)).not.toContain(SECRET);
+    } finally { run.close(); }
+  });
+
+  it('does not pass when revocation returns normally but readback still finds the grant', async () => {
+    const run = createRun({ root: tmp(), target: 'local', accounts: ['A'], scenarios: ['read-write'], runId: 'cleanup-readback', gitSha: null });
+    const h = fakeHarness({ adapter: passingInspector });
+    h.driver.revokeGrants = async () => 0;
+    try {
+      await expect(run.step('client:inspector', ctx => runOneClient('inspector', {
+        h, run, runId: run.runId, slot: 'A', scenario: CLIENT_SCENARIOS['read-write'], ...ctx,
+      }))).rejects.toMatchObject({ reason: 'grant-revocation-unconfirmed' });
+      expect(await h.driver.grantsFor('A', id(1))).toHaveLength(1);
+      expect(run.checkpoints.filter(r => r.name === 'client:inspector').at(-1).state).toBe('stopped');
+      expect(readTree(run.dir)).not.toContain(SECRET);
+    } finally { run.close(); }
   });
 });
 
@@ -393,6 +464,25 @@ describe('CLI', () => {
       env: { PATH: '/nonexistent', CADENCE_INSPECTOR_CLI: RUNNER }, out: (l) => lines.push(JSON.parse(l)), harnessFactory, root });
     expect(code).toBe(1);
     expect(lines.filter((l) => l.client).map((l) => l.outcome)).toEqual(['fail', 'skipped']);
+  });
+
+  it('stops local resume before a fresh session or client can hide the prior account grants', async () => {
+    const root = tmp();
+    const prior = createRun({ root, runId: 'local-resume', target: 'local', accounts: ['A'], scenarios: ['read-write'], gitSha: null });
+    await expect(prior.step('client:inspector', async () => { throw new AcceptanceError('grant-revocation-unconfirmed'); })).rejects.toThrow();
+    prior.close();
+    const before = readFileSync(join(prior.dir, 'checkpoints.jsonl'), 'utf8');
+    const lines = [];
+    let harnessCalls = 0;
+    const code = await main([...localArgs, '--client', 'inspector', '--run', 'local-resume'], {
+      root, env: { PATH: '/nonexistent', CADENCE_INSPECTOR_CLI: RUNNER }, out: (line) => lines.push(JSON.parse(line)),
+      harnessFactory: async () => { harnessCalls += 1; throw new Error('must not enroll another user'); },
+    });
+    expect(code).toBe(1);
+    expect(harnessCalls).toBe(0);
+    expect(lines.at(-1)).toEqual({ step: 'stopped', runId: 'local-resume', error: 'local-resume-needs-new-run' });
+    expect(readFileSync(join(prior.dir, 'checkpoints.jsonl'), 'utf8')).toBe(before);
+    expect(readdirSync(prior.dir)).not.toContain('lock');
   });
 
   it.each([

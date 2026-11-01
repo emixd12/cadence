@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { INTEGRATION_OPERATION_NAMES, INTEGRATION_OPERATIONS } from '@cadence/core/integration';
 import { assertSafe, createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { GRANTS } from '../scripts/acceptance/consent-page.mjs';
-import { Secret } from '../scripts/acceptance/test-account-sessions.mjs';
+import { AcceptanceError, Secret } from '../scripts/acceptance/test-account-sessions.mjs';
 import {
   READ_LIMIT, READ_TOOLS, REGISTRY_TOOLS, SAMPLE_NOTE, WRITE_LIMIT, WRITE_SCOPE, main, parseArgs, renderReport, runProtocolSuite, writeReport,
 } from '../scripts/acceptance/protocol.mjs';
@@ -203,6 +203,67 @@ describe('Ticket 249 protocol acceptance suite', () => {
     for (const tool of REGISTRY_TOOLS) expect(checks.some((c) => c.check.startsWith(tool))).toBe(true);
     expect(report).toMatch(/\| ratelimit-a \| read-limit \| pass \| first-429=121 \|/);
     expect(report).toMatch(/PASS/);
+  });
+
+  it.each(['token-request-failed', 'granted-scope-mismatch'])('cleans the final consent-created grant after %s', async reason => {
+    const fake = createFakeCadence(), authorize = fake.driver.authorize;
+    fake.driver.authorize = async (...args) => {
+      const tokens = await authorize(...args);
+      if (fake.counts.authorize === 6) throw new AcceptanceError(reason);
+      return tokens;
+    };
+    const result = await runFake({ fake });
+    expect(result.ok).toBe(false);
+    expect(failed(result.checks)).toContain('cleanup-a/completed');
+    expect(fake.grants).toHaveLength(6);
+    expect(fake.grants.every(g => g.revoked)).toBe(true);
+    const saved = readFileSync(join(result.dir, 'checkpoints.jsonl'), 'utf8');
+    expect(saved).toContain(fake.grants.at(-1).grantId);
+    for (const secret of fake.secrets()) expect(saved).not.toContain(secret);
+  });
+
+  it.each(['connect', 'close'])('still revokes the token and grant when the final session %s throws', async failure => {
+    const fake = createFakeCadence(), authorize = fake.driver.authorize, connect = fake.protocol.connect;
+    let finalTokenRevocations = 0;
+    fake.driver.authorize = async (...args) => {
+      const tokens = await authorize(...args), revoke = tokens.revoke;
+      if (fake.counts.authorize === 6) tokens.revoke = async () => { finalTokenRevocations += 1; return revoke(); };
+      return tokens;
+    };
+    fake.protocol.connect = async (...args) => {
+      if (failure === 'connect' && fake.counts.authorize === 6) throw new Error('private-session-error');
+      const session = await connect(...args);
+      if (failure === 'close' && fake.counts.authorize === 6) session.close = async () => { throw new Error('private-session-error'); };
+      return session;
+    };
+    const result = await runFake({ fake });
+    expect(result.ok).toBe(false);
+    expect(finalTokenRevocations).toBe(1);
+    expect(fake.grants.every(g => g.revoked)).toBe(true);
+    expect(result.lines.join('\n')).not.toContain('private-session-error');
+  });
+
+  it('retains a stopped final cleanup for resume when client and captured-grant revocation are unconfirmed', async () => {
+    const root = tempRoot(), fake = createFakeCadence();
+    const revoke = fake.driver.revokeGrants, rest = fake.rest;
+    fake.driver.revokeGrants = async (...args) => {
+      if (fake.counts.authorize === 6) throw new Error('private-revocation-error');
+      return revoke(...args);
+    };
+    fake.rest = async (slot, method, path, body) => path === '/rest/v1/rpc/oauth_revoke_grant'
+      ? { status: 503, json: false } : rest(slot, method, path, body);
+    const first = await runFake({ root, fake, runId: 'cleanup-retry' });
+    expect(first.ok).toBe(false);
+    expect(fake.grants.at(-1).revoked).toBe(false);
+    const records = readFileSync(join(first.dir, 'checkpoints.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    expect(records.filter(r => r.name === 'cleanup-grants').at(-1).state).toBe('stopped');
+    const authorized = fake.counts.authorize;
+    fake.driver.revokeGrants = revoke; fake.rest = rest;
+    const resumed = await runFake({ root, fake, runId: 'cleanup-retry', resume: true });
+    expect(fake.counts.authorize).toBe(authorized);
+    expect(fake.grants.every(g => g.revoked)).toBe(true);
+    expect(resumed.checks.filter(c => c.scenario === 'cleanup-grants').every(c => c.ok)).toBe(true);
+    expect(resumed.lines.join('\n')).not.toContain('private-revocation-error');
   });
 
   it('fails, with named checks, when a read-only grant can write or B can read A', async () => {

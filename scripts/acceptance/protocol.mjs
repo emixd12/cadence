@@ -140,51 +140,83 @@ export async function runProtocolSuite({
   const schedules = [{ recurrence: { frequency: 'daily', interval: 1 }, time_entries: [{ kind: 'exact', start_time: '09:00' }] }];
   const createInput = { title: behaviorTitle, schedules, reminders: { browser_enabled: false, email_enabled: false }, idempotency_key: key('create') };
 
-  const scenario = async (name, fn) => {
-    const result = await run.step(name, async (context) => {
-      const checks = [];
-      const check = (id, ok, detail = null) => {
-        const row = { scenario: name, check: id, ok: Boolean(ok) };
-        const d = safeDetail(detail);
-        if (d) row.detail = d;
-        checks.push(row); emit(row);
-        return Boolean(ok);
-      };
-      // A skipped check is neither a pass nor a failure; the report lists it as SKIPPED with its reason.
-      const skip = (id, reason) => {
-        const row = { scenario: name, check: id, ok: null, skipped: true, detail: safeDetail(reason) };
-        checks.push(row); emit(row);
-      };
-      let data = {};
-      try { data = (await fn({ check, skip, ...context })) ?? {}; } catch (error) { check('completed', false, codeOf(error)); }
-      return { ...data, checks };
-    });
+  const scenario = async (name, fn, { retryFailed = false } = {}) => {
+    let stoppedResult;
+    let result;
+    try {
+      result = await run.step(name, async (context) => {
+        const checks = [];
+        const check = (id, ok, detail = null) => {
+          const row = { scenario: name, check: id, ok: Boolean(ok) };
+          const d = safeDetail(detail);
+          if (d) row.detail = d;
+          checks.push(row); emit(row);
+          return Boolean(ok);
+        };
+        // A skipped check is neither a pass nor a failure; the report lists it as SKIPPED with its reason.
+        const skip = (id, reason) => {
+          const row = { scenario: name, check: id, ok: null, skipped: true, detail: safeDetail(reason) };
+          checks.push(row); emit(row);
+        };
+        let data = {};
+        try { data = (await fn({ check, skip, ...context })) ?? {}; } catch (error) { check('completed', false, codeOf(error)); }
+        if (retryFailed && checks.some((c) => c.ok === false)) {
+          stoppedResult = { ...data, checks };
+          throw new AcceptanceError('grant-revocation-unconfirmed');
+        }
+        return { ...data, checks };
+      });
+    } catch (error) {
+      if (!stoppedResult || codeOf(error) !== 'grant-revocation-unconfirmed') throw error;
+      result = stoppedResult;
+    }
     all.push(...(result.checks ?? []));
     return result;
   };
 
+  const grantsRevoked = async (slot) => {
+    const active = await driver.grantsFor(slot, client.clientId).catch(() => null);
+    return Array.isArray(active) && active.length === 0;
+  };
+
   /** A fresh grant for one scenario, checkpointed before use and revoked at the end. */
   const withGrant = async ({ check, attempt, checkpoint }, { label, slot, grant }, body) => {
-    // A rerun after an interruption can find this scenario's earlier grant on our client.
-    await driver.revokeGrants(slot, client.clientId);
-    const tokens = await driver.authorize({ slot, client, grant });
-    const active = await driver.grantsFor(slot, client.clientId);
-    if (!check('grant-created', active.length === 1 && sameSet(active[0].scopes, GRANTS[grant]), `active=${active.length}`)) {
-      await driver.revokeGrants(slot, client.clientId);
-      throw new AcceptanceError('grant-not-created');
-    }
-    const grantId = active[0].grantId;
-    checkpoint('grant', { label: `${label}-${attempt}`, slot, grantId, clientId: client.clientId, clientName: client.clientName ?? null, scopes: active[0].scopes, createdAt: null });
-    const session = await protocol.connect(tokens);
+    let tokens = null;
+    let session = null;
+    let capturedCount = 0;
+    const capture = (active) => {
+      const known = new Set(run.cleanupInputs().grants.map((g) => g.grantId));
+      for (const g of active) {
+        if (known.has(g.grantId)) continue;
+        capturedCount += 1;
+        checkpoint('grant', { label: `${label}-${attempt}${capturedCount > 1 ? `-g${capturedCount}` : ''}`, slot,
+          grantId: g.grantId, clientId: client.clientId, clientName: client.clientName ?? null, scopes: g.scopes, createdAt: null });
+        known.add(g.grantId);
+      }
+    };
     try {
+      // Reconcile earlier attempts before consent, using the client persisted in preflight.
+      await driver.revokeGrants(slot, client.clientId).catch(() => {});
+      if (!(await grantsRevoked(slot))) throw new AcceptanceError('grant-revocation-unconfirmed');
+      tokens = await driver.authorize({ slot, client, grant });
+      const active = await driver.grantsFor(slot, client.clientId);
+      capture(active);
+      if (!check('grant-created', active.length === 1 && sameSet(active[0].scopes, GRANTS[grant]), `active=${active.length}`)) {
+        throw new AcceptanceError('grant-not-created');
+      }
+      const grantId = active[0].grantId;
+      session = await protocol.connect(tokens);
       const data = await body({ tokens, session, grantId });
       if (grantHoldMs > 0) await sleep(grantHoldMs);
       return { grantId, ...data };
     } finally {
-      await session.close();
-      await tokens.revoke().catch(() => {});
+      if (session) await session.close().catch((error) => check('session-closed', false, codeOf(error)));
+      if (tokens) await tokens.revoke().catch(() => {});
+      // Consent can create a grant even when token exchange or scope validation
+      // throws. Retain any discoverable IDs before attempting their revocation.
+      try { capture(await driver.grantsFor(slot, client.clientId)); } catch (error) { check('grant-captured', false, codeOf(error)); }
       await driver.revokeGrants(slot, client.clientId).catch(() => {});
-      check('grant-revoked', (await driver.grantsFor(slot, client.clientId).catch(() => [null])).length === 0);
+      check('grant-revoked', await grantsRevoked(slot));
     }
   };
   /** One successful SDK call; returns the structured output or null. */
@@ -406,13 +438,22 @@ export async function runProtocolSuite({
     });
   });
 
-  // cleanup-grants: every checkpointed grant is revoked, read back as its own account.
+  // cleanup-grants: reconcile the run's client even if an earlier grant lookup
+  // failed, then verify captured IDs and both accounts. Failed cleanup stays
+  // resumable without replaying any completed scenario that writes test data.
   await scenario('cleanup-grants', async ({ check }) => {
+    if (client.clientId) {
+      for (const slot of ['A', 'B']) await driver.revokeGrants(slot, client.clientId).catch(() => {});
+    }
     const { grants } = run.cleanupInputs();
-    const results = await revokeCaptured({ rest, captured: grants });
+    let results = [];
+    try { results = await revokeCaptured({ rest, captured: grants }); } catch (error) { check('captured-grants-revoked', false, codeOf(error)); }
     check('all-grants-revoked', results.length === grants.length && results.every((r) => ['revoked', 'already-revoked'].includes(r.outcome)), `grants=${grants.length}`);
+    if (client.clientId) {
+      for (const slot of ['A', 'B']) check(`client-${slot.toLowerCase()}-grants-revoked`, await grantsRevoked(slot));
+    }
     return { revoked: results.filter((r) => r.outcome === 'revoked').length, alreadyRevoked: results.filter((r) => r.outcome === 'already-revoked').length };
-  });
+  }, { retryFailed: true });
 
   return { ok: suitePassed(all), checks: all };
 }
