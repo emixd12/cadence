@@ -1351,3 +1351,52 @@ Procedure and limits: `docs/OPERATIONS.md`, "Claude cloud sessions".
 
 Platform impact: development tooling only. Web, desktop, marketing and future mobile
 behavior is unchanged. Messaging impact: none.
+
+## 2026-11-01: Dependabot dispositions for the desktop 0.1.7 release
+
+Emi's release brief for 0.1.7 authorized the agent to decide every Dependabot alert
+disposition under this rule: fix every alert a compatible update can fix; dismiss as
+`not_used` or `inaccurate` only with evidence of target platforms, features, call
+paths and input boundaries; dismiss as `tolerable_risk` only a development-scope
+package that is absent from every shipped artifact (the Next.js production build, the
+marketing build and the desktop bundle) when no compatible fix exists. An applicable
+production or desktop-runtime package without a compatible fix blocks the release.
+The Public Trust collector and its tests are unchanged: its dependency check still
+requires 0 production audit findings and 0 open Dependabot alerts.
+
+**Rust `zip` (#58 GHSA-m665-v7pm-7grj, #59 GHSA-q7v9-x93c-xqv3, #60
+GHSA-8hxf-qr8p-62x4): fixed.** `zip` 4.6.1 reached `Cargo.lock` only through
+`tauri-plugin-updater` 2.10.1, which declares it for `cfg(target_os = "windows")`
+alone. `cargo tree -i zip --target aarch64-apple-darwin --locked` printed nothing,
+so the shipped macOS binary never compiled it. The compatible fix is
+`tauri-plugin-updater` 2.14.1, the first release that requires `zip` ^9; it needs
+`tauri` ^2.12, which the pinned 2.12.4 satisfies. `Cargo.lock` pins `zip` 9.0.5, the
+first patched version, instead of 9.2.1 published the same day. The npm
+`@tauri-apps/plugin-updater` moves to exact 2.14.1, paired as in PR #164.
+
+Updater behavior changes from 2.10.1 to 2.14.1 that ship in the 0.1.7 client:
+macOS system proxy settings are honored (new default `system-proxy` feature); a failed
+install no longer removes the installed app; `minisign-verify` 0.3 rejects
+non-canonical signatures; `install()` re-verifies the downloaded bytes; and the
+signature's trusted-comment version is compared with the feed when present. Cadence
+calls only `Builder::new().build()`, `check`, `download` and `install`, which did not
+change. The 0.1.6 → 0.1.7 update still runs 0.1.6's updater, so "Release acceptance"
+check 4 does not apply to 0.1.7. It applies to the next release, whose installation
+runs this updater.
+
+**npm `minimatch` (#61 GHSA-g3hv-75wg-m249): dismissed as `tolerable_risk`.** The
+advisory covers every version below 11.0.1, with no 3.x or 10.x backport. The lock
+holds 3.1.5 (ESLint and `eslint-config-next` plugins) and 10.2.6 (`typescript-eslint`);
+both entries are `dev: true`. No compatible fix exists: the latest `eslint` 9 requires
+`^3.1.5`, `eslint` 10 and `@typescript-eslint/typescript-estree` 8.72 require `^10`, and
+an npm override to 11 would be a major override that ESLint's `require("minimatch")`
+call does not support. The vulnerable `firstPhasePreProcess()` path needs
+`optimizationLevel` 2 or higher; 3.1.5 does not contain it and 10.2.6 is called with the
+default level 1 on developer-written lint patterns. `npm ls minimatch --omit=dev` is
+empty, and `npm audit --omit=dev` reports 0. Fresh builds of the release source contain
+no `minimatch` code: the desktop frontend bundle, the Next.js production build and the
+marketing build were searched after building (evidence in the 0.1.7 release packet).
+Revisit when ESLint or `typescript-eslint` accepts `minimatch` 11.
+
+Platform impact: desktop dependency update shipped in 0.1.7; web, marketing and
+future mobile unchanged (development tooling only). Messaging impact: none.

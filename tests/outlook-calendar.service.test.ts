@@ -500,8 +500,8 @@ describe("disconnect and routes", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => fetcher(input instanceof Request ? input.url : input, init));
     await connectWeb();
     ms.validRefresh.clear();
-    const events = await eventsRoute.GET(new Request(`${ORIGIN}/api/outlook-calendar/events?start=2026-11-01&end=2026-11-01`, { headers: { authorization: `Bearer ${OWNER}` } }));
-    // No selection yet: rejected before the token endpoint.
+    const events = await eventsRoute.GET(new Request(`${ORIGIN}/api/outlook-calendar/events?start=2020-01-01&end=2020-01-01`, { headers: { authorization: `Bearer ${OWNER}` } }));
+    // The route uses the system clock, so a fixed date that is never today is rejected before the token endpoint.
     expect(events.status).toBe(400);
     expect(await events.json()).toEqual({ error: "invalid_request" });
 
