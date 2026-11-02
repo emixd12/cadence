@@ -1374,14 +1374,15 @@ so the shipped macOS binary never compiled it. The compatible fix is
 first patched version, instead of 9.2.1 published the same day. The npm
 `@tauri-apps/plugin-updater` moves to exact 2.14.1, paired as in PR #164.
 
-Updater behavior changes from 2.10.1 to 2.14.1 that ship in the 0.1.7 client:
+Updater behavior changes from 2.10.1 to 2.14.1 that ship in the next desktop client
+(0.1.8; the 0.1.7 candidate was withdrawn before publication, see STATUS.md):
 macOS system proxy settings are honored (new default `system-proxy` feature); a failed
 install no longer removes the installed app; `minisign-verify` 0.3 rejects
 non-canonical signatures; `install()` re-verifies the downloaded bytes; and the
 signature's trusted-comment version is compared with the feed when present. Cadence
 calls only `Builder::new().build()`, `check`, `download` and `install`, which did not
-change. The 0.1.6 → 0.1.7 update still runs 0.1.6's updater, so "Release acceptance"
-check 4 does not apply to 0.1.7. It applies to the next release, whose installation
+change. The 0.1.6 → 0.1.8 update still runs 0.1.6's updater, so "Release acceptance"
+check 4 does not apply to 0.1.8. It applies to the release after it, whose installation
 runs this updater.
 
 **npm `minimatch` (#61 GHSA-g3hv-75wg-m249): dismissed as `tolerable_risk`.** The
@@ -1395,8 +1396,9 @@ call does not support. The vulnerable `firstPhasePreProcess()` path needs
 default level 1 on developer-written lint patterns. `npm ls minimatch --omit=dev` is
 empty, and `npm audit --omit=dev` reports 0. Fresh builds of the release source contain
 no `minimatch` code: the desktop frontend bundle, the Next.js production build and the
-marketing build were searched after building (evidence in the 0.1.7 release packet).
+marketing build of `20c3ffd` were searched after building: 0 of 22, 469 and 159 files
+mention it (recorded in the desktop release packet).
 Revisit when ESLint or `typescript-eslint` accepts `minimatch` 11.
 
-Platform impact: desktop dependency update shipped in 0.1.7; web, marketing and
+Platform impact: desktop dependency update shipped in 0.1.8; web, marketing and
 future mobile unchanged (development tooling only). Messaging impact: none.
