@@ -2,7 +2,17 @@
 
 ## Cadence for Mac 0.1.8 release (0.1.7 withdrawn) — November 1, 2026
 
-**In progress.** The 0.1.7 candidate (`20c3ffd`, PR #177) was built and notarized but
+**Blocked on an owner step; nothing published.** 0.1.8 is built from `281d49d` (PR #178
+merge), notarized (app `6f966263…`, DMG `313e4cdc…`) and passes all 14 artifact checks
+and the local quarantined Gatekeeper check. On the test Mac, its first open shows
+Gatekeeper's "downloaded from the Internet" confirmation. Answering it is the owner's
+step, and while it is open macOS holds every Cadence launch there. So the upgrade
+comparison, sign-in callback replay, session renewal, revoked session and reconnect have
+not run on 0.1.8. The test Mac is back on published 0.1.6. Both feeds and the download
+still serve 0.1.6. Packets: `docs/qa/2026-11-01-desktop-0.1.8-release-packet.md` (with
+the steps to finish) and `docs/qa/2026-11-01-desktop-0.1.7-release-packet.md`.
+
+The 0.1.7 candidate (`20c3ffd`, PR #177) was built and notarized but
 **withdrawn before publication**. On the test Mac, **Reconnect account** never opened the
 browser. `@supabase/supabase-js` 2.118 stores a PKCE verifier slot per sign-in flow
 (`<storageKey>-flow-<id>-code-verifier`) and an index (`<storageKey>-flows-code-verifier`).
