@@ -1,5 +1,27 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.7 release — November 1, 2026
+
+**In progress.** Release source for desktop 0.1.7: `tauri.conf.json` 0.1.6 → 0.1.7,
+SQLite schema 20 unchanged. It ships the integrated dependency updates from PR #176
+(`tauri-plugin-deep-link` 2.6.2, `@supabase/supabase-js` 2.118.0) and the Dependabot
+fix below. Build, installed acceptance and publication follow the release packet.
+
+- Rust `zip` alerts #58–#60 fixed by `tauri-plugin-updater` 2.10.1 → 2.14.1 (npm
+  `@tauri-apps/plugin-updater` paired at 2.14.1) with `zip` 9.0.5 in `Cargo.lock`. `zip`
+  is Windows-only in both versions; the macOS binary never compiled it.
+- npm `minimatch` alert #61: development-only ESLint tooling with no compatible fix;
+  dismissed as tolerable risk (`docs/DECISIONS.md`, 2026-11-01).
+- The updater change edits the updater entries in `Cargo.toml`. 0.1.6's updater still
+  installs 0.1.7, so "Release acceptance" check 4 is not required for 0.1.7 and **is
+  required for the next release**.
+- `tests/outlook-calendar.service.test.ts` used a fixed request date against the system
+  clock and failed only when that date (November 1, 2026) was today in New York. It now
+  uses a date that is never today.
+
+Platform impact: desktop release (dependency and version change). Web: test-only
+change; marketing and future mobile: not applicable. Messaging impact: none.
+
 ## Ticket 259: consent offers advertised write permissions — October 31, 2026
 
 Merged: [PR #175](https://github.com/emixd12/cadence/pull/175), `f1392365`.
