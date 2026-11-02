@@ -1,16 +1,19 @@
 # Implementation Status
 
-## Cadence for Mac 0.1.8 release (0.1.7 withdrawn) — November 1, 2026
+## Cadence for Mac 0.1.8 release (0.1.7 withdrawn) — November 2, 2026
 
-**Blocked on an owner step; nothing published.** 0.1.8 is built from `281d49d` (PR #178
-merge), notarized (app `6f966263…`, DMG `313e4cdc…`) and passes all 14 artifact checks
-and the local quarantined Gatekeeper check. On the test Mac, its first open shows
-Gatekeeper's "downloaded from the Internet" confirmation. Answering it is the owner's
-step, and while it is open macOS holds every Cadence launch there. So the upgrade
-comparison, sign-in callback replay, session renewal, revoked session and reconnect have
-not run on 0.1.8. The test Mac is back on published 0.1.6. Both feeds and the download
-still serve 0.1.6. Packets: `docs/qa/2026-11-01-desktop-0.1.8-release-packet.md` (with
-the steps to finish) and `docs/qa/2026-11-01-desktop-0.1.7-release-packet.md`.
+**Published November 2, 2026, 08:32Z.** 0.1.8 is built from `281d49d` (PR #178 merge),
+notarized (app `6f966263…`, DMG `313e4cdc…`) and passes all 14 artifact checks. On the
+test Mac (macOS 27.0.1), the exact notarized artifacts installed from a quarantined DMG
+over published 0.1.6 passed every installed check. The owner answered Gatekeeper's
+first-open confirmation. The checks were the upgrade comparison (no lost rows; the strict
+checker's launch-sync limit is classified), sign-in callback replay, session renewal
+after 1 h 1 min, the revoked-session state, and **Reconnect account** through Google's
+chooser, the path that failed on 0.1.7. Both feeds serve 0.1.8; `Cadence_aarch64.dmg`
+is the 0.1.8 DMG (`b78c3e68…`). Public readback, the feed signature with the persistent
+key, and Gatekeeper on a quarantined public download pass. Packets:
+`docs/qa/2026-11-01-desktop-0.1.8-release-packet.md` and
+`docs/qa/2026-11-01-desktop-0.1.7-release-packet.md`.
 
 The 0.1.7 candidate (`20c3ffd`, PR #177) was built and notarized but
 **withdrawn before publication**. On the test Mac, **Reconnect account** never opened the
@@ -36,7 +39,8 @@ Dependabot fix below.
   dismissed as tolerable risk (`docs/DECISIONS.md`, 2026-11-01).
 - The updater change edits the updater entries in `Cargo.toml`. 0.1.6's updater still
   installs 0.1.8, so "Release acceptance" check 4 is not required for 0.1.8 and **is
-  required for the release after it**.
+  required for the release after it**. The 0.1.6 → 0.1.8 updater path itself was not
+  exercised before publication.
 - `tests/outlook-calendar.service.test.ts` used a fixed request date against the system
   clock and failed only when that date (November 1, 2026) was today in New York. It now
   uses a date that is never today.
