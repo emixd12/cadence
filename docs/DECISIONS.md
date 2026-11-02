@@ -1402,3 +1402,62 @@ Revisit when ESLint or `typescript-eslint` accepts `minimatch` 11.
 
 Platform impact: desktop dependency update shipped in 0.1.8; web, marketing and
 future mobile unchanged (development tooling only). Messaging impact: none.
+
+## 2026-11-01: 0.1.7 and 0.1.8 installed acceptance choices
+
+Emi's 0.1.7 release brief authorized the agent to run the release without owner answers.
+It said to take documented defaults, choose the most conservative option that still
+completes the release where none exists, and record each choice here. Evidence:
+`docs/qa/2026-11-01-desktop-0.1.7-release-packet.md` and
+`docs/qa/2026-11-01-desktop-0.1.8-release-packet.md`.
+
+- **Version.** 0.1.7 was the next unused stable version (no tag, asset or packet existed).
+  `0.1.7-dev.1` was a dev build of 0.1.6's source on the owner's Mac; stable 0.1.7 sorts
+  above it.
+- **0.1.7 withdrawn; fix ships as 0.1.8.** Installed 0.1.7 could not start Google sign-in
+  (PR #178). The agent withheld publication, fixed the adapter and bumped the version
+  instead of rebuilding 0.1.7. The notarized 0.1.7 bytes were installed on the test Mac,
+  and an updater never offers a second build with the same version. Dev builds after this
+  release are numbered `0.1.9-dev.N`.
+- **Gatekeeper first-open confirmation (0.1.8).** On the test Mac, the first open of the
+  quarantined 0.1.8 showed "“Cadence” is an app downloaded from the Internet. Are you sure
+  you want to open it?". The agent did not answer it: **Open** and **Cancel** are both the
+  owner's to choose. The quit event to the held process timed out. That process had not
+  run (0.01 s CPU, no database open), so the agent sent SIGTERM, not SIGKILL. This stopped
+  a later **Open** from starting a second copy. While the confirmation stays open, macOS
+  holds every launch of `app.cadence.desktop`, including an unquarantined copy of the same
+  bytes. The agent stopped that copy the same way and returned the test Mac to 0.1.6. It
+  did not remove the quarantine attribute to get past the confirmation. Installed
+  acceptance and publication of 0.1.8 wait for the owner to answer the dialog.
+- **Check 3 install path.** The candidate reached the test Mac by `scp`, not a browser,
+  because nothing was published yet. The agent added a Safari-style quarantine attribute
+  and let Gatekeeper assess the DMG and its app on the device. It copied the app out of
+  the mounted DMG and swapped it in by rename. The first open passed Gatekeeper with no
+  prompt. Because Finder did not move the bundle, macOS ran it under App Translocation.
+  A translocated copy cannot be updated in place, which would break the next release's
+  real-updater check on this Mac. Driving Finder would need a new Automation consent. So,
+  after the post-upgrade snapshot, the agent quit Cadence normally and removed the
+  quarantine attribute from the installed bundle only. This came after Gatekeeper had
+  already approved it, so no check was counted as passed by the removal. No Gatekeeper,
+  TCC or system setting changed.
+- **Upgrade comparison.** `desktop-release-acceptance.mjs --same-schema` cannot pass after
+  a launch sync. It has no bookkeeping exclusion for `account_sync_baselines` or
+  `sync_cursors`, and the brief requires the snapshot after the launch sync settles. The
+  agent did not change the tool or either database. A read-only per-table comparison
+  classified every changed row, and the packet records it. Teaching the checker to
+  classify launch-sync bookkeeping is tooling work for a later change.
+- **Callback replay variants.** While an account is linked, the app stores no pending
+  sign-in flow, so the expired and unexpired-pending callbacks reach the same "already
+  used or cancelled" rejection as a replay. The agent did not plant a pending flow,
+  because that means writing the app's Keychain items. Unit tests cover the parser's
+  expiry and state branches.
+- **Real updater.** Not required for 0.1.7 or 0.1.8. The schema is unchanged, and the
+  installing version (0.1.6) did not change its updater files. Check 4 applies to the
+  release after 0.1.8, because 0.1.8 changes `tauri-plugin-updater`.
+- **Local checks.** The Dagger `test` check fails on unchanged `main` for container
+  reasons: the module excludes `.claude/`, has no `.git`, and has no Chrome for PR #174's
+  acceptance tests. The release used Dagger for the other checks and the npm test suite
+  locally. GitHub CI stays the merge gate.
+
+Platform impact: desktop release process only; web, marketing and future mobile
+unchanged. Messaging impact: none.
