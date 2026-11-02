@@ -1461,3 +1461,30 @@ completes the release where none exists, and record each choice here. Evidence:
 
 Platform impact: desktop release process only; web, marketing and future mobile
 unchanged. Messaging impact: none.
+
+## 2026-11-02: Cadence for Mac 0.1.8 acceptance and publication choices
+
+Emi's November 2 message extended the 0.1.7 brief's authorizations to 0.1.8: publication
+of the exact accepted artifacts, a normal quit on the test Mac after 0 pending writes,
+deleting exactly one hosted Auth session, picking the listed test account in Google's
+chooser, release notes and these records. Evidence:
+`docs/qa/2026-11-01-desktop-0.1.8-release-packet.md`.
+
+- **Gatekeeper.** Emi chose **Cancel** on the first-open confirmation left from the first
+  attempt, and **Open** on the second. The agent answered neither.
+- **Translocation.** As for 0.1.7, the agent removed the quarantine attribute from the
+  installed bundle only. It did so after Gatekeeper had approved the bundle and after the
+  post-upgrade snapshot, so later in-place updates work on that Mac.
+- **Upgrade comparison.** The strict checker stopped at `account_sync_baselines` again.
+  The agent kept the classified per-table comparison recorded on 2026-11-01. The packet
+  classifies two new occurrences from the generation horizon and their synced outbox rows.
+- **Rebuild.** None. The published bytes are the ones built from `281d49d` and accepted
+  on the test Mac.
+- **Feed and release text.** The feed notes are the packet draft, unchanged. The
+  `desktop-stable` release title and body moved to 0.1.8 in 0.1.6's layout; the 0.1.6
+  body is kept with the rollback feeds. Both `latest.json` files were replaced with
+  `--clobber`; the publication steps forbid it only for the version-free DMG, which used
+  the temporary-name swap.
+
+Platform impact: desktop release only; web, marketing and future mobile unchanged.
+Messaging impact: none.
