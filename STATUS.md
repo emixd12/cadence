@@ -1,11 +1,23 @@
 # Implementation Status
 
-## Cadence for Mac 0.1.7 release — November 1, 2026
+## Cadence for Mac 0.1.8 release (0.1.7 withdrawn) — November 1, 2026
 
-**In progress.** Release source for desktop 0.1.7: `tauri.conf.json` 0.1.6 → 0.1.7,
-SQLite schema 20 unchanged. It ships the integrated dependency updates from PR #176
-(`tauri-plugin-deep-link` 2.6.2, `@supabase/supabase-js` 2.118.0) and the Dependabot
-fix below. Build, installed acceptance and publication follow the release packet.
+**In progress.** The 0.1.7 candidate (`20c3ffd`, PR #177) was built and notarized but
+**withdrawn before publication**. On the test Mac, **Reconnect account** never opened the
+browser. `@supabase/supabase-js` 2.118 stores a PKCE verifier slot per sign-in flow
+(`<storageKey>-flow-<id>-code-verifier`) and an index (`<storageKey>-flows-code-verifier`).
+The desktop Keychain adapter rejected those keys, so Google sign-in could not start,
+for a first link or a reconnect. 0.1.6 (supabase-js 2.107) used only the fixed keys.
+
+`apps/desktop/src/account/auth.ts` now keeps the slots and index in process memory. The
+fixed verifier key stays in the Keychain, and it is the only key the code exchange reads,
+because Cadence's redirect carries no flow id. `tests/desktop-auth-pkce-storage.test.ts`
+runs the real supabase-js sign-in start and code exchange through the adapter; it fails
+on the 0.1.7 adapter. The fixed source ships as **0.1.8** (`tauri.conf.json`), because the
+0.1.7 bytes are installed on the test Mac and an updater never offers a second 0.1.7.
+SQLite schema 20 is unchanged. Release 0.1.8 ships the integrated dependency updates from
+PR #176 (`tauri-plugin-deep-link` 2.6.2, `@supabase/supabase-js` 2.118.0) and the
+Dependabot fix below.
 
 - Rust `zip` alerts #58–#60 fixed by `tauri-plugin-updater` 2.10.1 → 2.14.1 (npm
   `@tauri-apps/plugin-updater` paired at 2.14.1) with `zip` 9.0.5 in `Cargo.lock`. `zip`
@@ -13,14 +25,15 @@ fix below. Build, installed acceptance and publication follow the release packet
 - npm `minimatch` alert #61: development-only ESLint tooling with no compatible fix;
   dismissed as tolerable risk (`docs/DECISIONS.md`, 2026-11-01).
 - The updater change edits the updater entries in `Cargo.toml`. 0.1.6's updater still
-  installs 0.1.7, so "Release acceptance" check 4 is not required for 0.1.7 and **is
-  required for the next release**.
+  installs 0.1.8, so "Release acceptance" check 4 is not required for 0.1.8 and **is
+  required for the release after it**.
 - `tests/outlook-calendar.service.test.ts` used a fixed request date against the system
   clock and failed only when that date (November 1, 2026) was today in New York. It now
   uses a date that is never today.
 
-Platform impact: desktop release (dependency and version change). Web: test-only
-change; marketing and future mobile: not applicable. Messaging impact: none.
+Platform impact: desktop release (dependency, sign-in storage fix and version change).
+Web: test-only change; the web client uses cookie storage and is unaffected. Marketing and
+future mobile: not applicable. Messaging impact: none.
 
 ## Ticket 259: consent offers advertised write permissions — October 31, 2026
 

@@ -28,16 +28,29 @@ type SecureStorage = {
 };
 
 const STORAGE_KEY = "cadence-desktop-auth";
+// Supabase Auth 2.118 also writes a verifier slot per PKCE flow and an index of those slots.
+// Cadence's redirect carries no flow id, so the code exchange reads only the fixed verifier key.
+// The slots and index stay in this process's memory and never reach the Keychain.
+const PKCE_FLOW_KEY = new RegExp(`^${STORAGE_KEY}-(?:flow-[A-Za-z0-9_-]{8,64}|flows)-code-verifier$`);
 export function createKeychainStorage(): SecureStorage {
+  const flowSlots = new Map<string, string>();
   const name = (key: string) => {
     if (key === STORAGE_KEY) return "supabase-session";
     if (key === `${STORAGE_KEY}-code-verifier`) return "supabase-pkce";
     throw new Error("Supabase requested an unknown secure storage key.");
   };
   return {
-    getItem: (key) => invoke("auth_secret_get", { name: name(key) }),
-    setItem: (key, value) => invoke("auth_secret_set", { name: name(key), value }),
-    removeItem: (key) => invoke("auth_secret_remove", { name: name(key) }),
+    getItem: (key) => PKCE_FLOW_KEY.test(key) ? Promise.resolve(flowSlots.get(key) ?? null) : invoke("auth_secret_get", { name: name(key) }),
+    setItem: (key, value) => {
+      if (!PKCE_FLOW_KEY.test(key)) return invoke("auth_secret_set", { name: name(key), value });
+      flowSlots.set(key, value);
+      return Promise.resolve();
+    },
+    removeItem: (key) => {
+      if (!PKCE_FLOW_KEY.test(key)) return invoke("auth_secret_remove", { name: name(key) });
+      flowSlots.delete(key);
+      return Promise.resolve();
+    },
   };
 }
 
