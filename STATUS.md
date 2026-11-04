@@ -9,8 +9,12 @@ notarization and publication still wait for the owner's instruction each time.
 
 PR #182 merged on November 4 as `1a369e4`, on the owner's instruction. It carries the
 travel departure review, the rule that provider-terms questions are logged and never
-gate work, and Tickets 260–262. Whether the Trust refresh and app redeploy that follow a
-merge have run for it: not verified in this change.
+gate work, and Tickets 260–262. Main `1a369e4` deployed on November 4: both Vercel
+projects built READY on that commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+marketing deployment `dpl_9qRsEuWVTsV7869VeHSfNiPCpeGw`. The app was redeployed as
+`dpl_EWhEbMXHhZVLbe1TYuXtWcXcJUiN` and aliased to app.cadence-me.com. Login, trust evidence
+and marketing pages returned 200. Trust checks may read stale until the next scheduled
+collection.
 
 - Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started,
   and amends Tickets 260–262, still not started.
