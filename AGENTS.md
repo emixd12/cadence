@@ -157,7 +157,11 @@ continue. These entries never block development, merges or deployments.
 - Only outward actions wait on open entries: provider submissions, public launch
   and public listings.
 
-Provider-terms and licence questions stay in `docs/LEGAL.md`.
+Provider-terms and licence questions stay in `docs/LEGAL.md`. Log a suspected
+terms or licence issue there and continue. Such entries never block development,
+merges, deployments or ongoing tasks, and no recommendation or ticket depends on a
+terms review. Only the owner decides whether an entry changes the work
+(`docs/DECISIONS.md`, 2026-11-04).
 
 ## Product constraints
 

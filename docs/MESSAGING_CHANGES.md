@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-015` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-016` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -84,6 +84,7 @@ Status values:
 | [P-012](#p-012-daily-brief-trip-conclusions-come-from-the-timeline-calendar-connection) | Daily Brief trip conclusions come from the Timeline Calendar connection | logged | 219, 187 | Privacy |
 | [P-013](#p-013-ai-client-re-consent-keeps-already-granted-permissions) | AI client re-consent keeps already granted permissions | logged | 232 | In-app consent copy, user guide |
 | [P-014](#p-014-ai-client-consent-offers-every-write-permission-switched-on) | AI client consent offers every write permission, switched on | logged | 259 | Marketing (developer docs), user guide, provider submissions |
+| [P-015](#p-015-plain-travel-timing-copy-and-development-only-weather-advice) | Plain travel timing copy and development-only weather advice | logged | 260, 261 | User guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -536,3 +537,24 @@ cite has not changed.
   the user guide that writes start on even for read-only requests.
 - **Status:** logged.
 
+## P-015: Plain travel timing copy and development-only weather advice
+
+- **Change:** Tickets 260 and 261 reword the travel lines ("Outbound · walking: leave
+  …" becomes "Leave by 1:15 PM · walking, arrive 2:20 PM"). They limit the weather mode
+  advice ("Consider transit or driving instead of walking.") to development builds and
+  replace "estimated within 3 hours of departure" with "Leave time appears 3 hours
+  before the trip." Owner direction, November 4, 2026
+  (`docs/plans/2026-11-04-travel-departure-ux-review.md`).
+- **Affected:** Tickets 260 and 261. Files: `docs/user-guide/travel.md`.
+- **Surfaces:** user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md`:
+  - "Refresh travel estimates": "Later trips say "estimated within 3 hours of
+    departure" until then."
+  - "Weather margin": the table's Suggestion column and "A suggestion appears only for
+    the modes its row names."
+  - "Inspect travel and correct a journey": "Text identifies travel-created overlap."
+    It does not show the new overlap wording.
+- **Update needed:** quote the new phrases. Say that production shows the weather
+  margin without a mode suggestion. Describe the overlap line as naming the trip and
+  its times.
+- **Status:** logged.

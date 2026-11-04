@@ -15437,3 +15437,188 @@ not applicable (hosted grants are managed on the web). Marketing: not applicable
 (developer docs already tell clients to read granted scopes). Future mobile: not
 applicable. Messaging impact: P-014 in `docs/MESSAGING_CHANGES.md` (developer
 docs copy); the messaging track owns the text change.
+
+## Travel copy and metadata pass: Tickets 260–262
+
+Filed November 4, 2026 from the owner's travel review
+(`docs/plans/2026-11-04-travel-departure-ux-review.md`, "Copy and metadata inventory").
+Owner direction, November 4: the travel text carries too much metadata for the launch
+product; internal text such as "Synthetic route. No provider call." and the weather
+mode advice should appear only in development builds; rigid labels such as
+"Outbound" become plain phrases such as "Leave by".
+
+| Ticket | Delivery slice | Dependencies |
+|---|---|---|
+| 260 | Development-only travel text and route warnings | None |
+| 261 | Plain travel timing copy | 260 for the development-only flag |
+| 262 | Calendar details dialog metadata | 260 for the development-only flag |
+
+These tickets change in-app text and the tests that assert it. They change no
+routing, refresh, quota, model input, schema or stored data. The user-guide wording
+they make stale is logged as `docs/MESSAGING_CHANGES.md` P-015 for the messaging
+track. Provider-terms questions are logged as `docs/LEGAL.md` L-013 and do not hold
+this work (`docs/DECISIONS.md`, 2026-11-04).
+
+Before editing UI, run the impeccable workflow and the design-system-bench skill
+(`AGENTS.md`, "UI and design rules"). Verify each ticket on the design-system bench
+at desktop width and 390 px, in both a production build and a development build.
+
+## Ticket 260: Development-only travel text and route warnings
+
+Status: filed November 4, 2026. Not started.
+Dependencies: none. Tickets 261 and 262 use its flag.
+
+Goal: text meant for developers never reaches a production user, and production
+shows only warnings a user can act on.
+
+Scope and acceptance:
+
+- Add one shared development-build flag. Web reads the Next.js build mode; desktop
+  reads Vite's `import.meta.env.DEV`. Each platform runtime supplies it to shared
+  components. Components do not read environment variables themselves, and
+  resolvers never see the flag.
+- Route warnings (`estimate.warnings`, rendered by `renderTravelTiming` in
+  `components/timeline/ExternalEventDetails.tsx`):
+  - Production shows no provider free-text warning.
+  - Cadence's own "Estimated arrival is after the planned arrival time." becomes
+    "You may arrive late: arrive {time}." and shows in every build.
+  - Development builds show every warning verbatim, under a "Development" label.
+- Bench fixtures stop putting fixture notes in `warnings`. "Synthetic route. No
+  provider call." (`app/design-system/TravelBench.tsx`) moves to a bench-only
+  caption.
+- The weather mode advice ("Consider transit or driving instead of walking.") shows
+  only in development builds. The weather margin itself stays (Ticket 261 rewords it).
+  This changes display only. Ticket 219's model input keeps its weather facts.
+- Tests: a DOM test renders the same evidence in production and development modes and
+  asserts which strings appear in each.
+
+References: `components/timeline/ExternalEventDetails.tsx`,
+`components/timeline/TravelWeather.tsx`, `components/briefing/DailyBriefBubble.tsx`,
+`app/design-system/TravelBench.tsx`, `lib/services/travel-provider.ts`,
+`packages/core/src/resolvers/travel.resolver.ts`, `docs/LEGAL.md` L-013.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared travel components; flag from the Next.js build mode. |
+| Desktop | Same shared components through `apps/desktop/src/product.tsx`; flag from Vite `DEV`. |
+| Marketing | Not applicable: no marketing page shows travel timing. |
+| Future mobile | Shared components; 390 px bench check. Native mobile is out of scope. |
+
+Messaging impact: P-015 (user guide, "Weather margin").
+
+Verification: required checks; the production/development DOM test; bench at desktop
+width and 390 px in both modes.
+
+## Ticket 261: Plain travel timing copy
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 260 (development-only flag).
+
+Goal: travel lines say what to do and when, in plain words, without internal terms
+or repeated dates.
+
+Scope and acceptance. Applies to the event drawer and dialog (`renderTravelTiming`),
+the expanded Behavior row and the Daily Brief travel block:
+
+- Outbound and onward legs: "Outbound · walking: leave Nov 1, 1:15 PM, arrive Nov 1,
+  2:20 PM." becomes "Leave by 1:15 PM · walking, arrive 2:20 PM."
+- Return leg: "Return home · walking: leave …, arrive …" becomes "Head home 4:40 PM ·
+  walking, home by 6:35 PM."
+- Show the date only when the trip falls on a different local date from the
+  Timeline's current day.
+- Remove the "Origin: …" provenance text. When the trip starts from Home, add "from
+  Home" to the leave line. Other origins show nothing.
+- Weather: show the margin once per event, as "15 min added for thunderstorms", not
+  on every leg. Ticket 260 limits the mode advice to development builds.
+- "Available again Nov 1, 6:45 PM." becomes "Free again 6:45 PM."
+- "Full-trip availability is unknown. Known travel spans still apply." becomes
+  "Return time unknown." Add "Add Home in Settings to estimate it." only when no Home
+  is saved.
+- "estimated within 3 hours of departure" becomes "Leave time appears 3 hours before
+  the trip."
+- "timing unavailable" becomes a line for each reason: `stale` → "Estimate expired.
+  Refresh travel"; `rejected_revision` → "Trip changed. Refresh travel";
+  `unavailable` → "No route found." "Refresh travel" uses the existing
+  `INT-TRAVEL-004` action. Update its registry entry with the new placement.
+- Provenance footer: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on
+  attendance and current conditions." becomes "Google Maps · checked 8:00 AM."
+- Weather credit: keep "Weather data by Open-Meteo.com (CC BY 4.0)" and its links.
+  Drop "Cadence derived travel margins from the forecast."
+- Expanded Behavior row: "Possible travel overlap" becomes "Overlaps your trip to
+  {event} ({start}–{end})", or "Overlaps your trip home ({start}–{end})". The label
+  comes from `overlapLabel` in `packages/core/src/resolvers/timeline-context.resolver.ts`.
+  Extend it there from the existing collisions and segments, with tests in
+  `tests/travel-timeline.test.ts`. The component does not derive the trip or span.
+- Daily Brief travel block: "Calculated by Cadence from travel estimates as of 9:00 AM,
+  Google Maps. Not written by the model." becomes "Calculated by Cadence · Google Maps ·
+  9:00 AM." The "Leave by …" line keeps its form, without the mode advice.
+- Update the DOM and resolver tests that assert the old strings, including
+  `tests/day-progress-timeline.dom.test.tsx`.
+
+References: `components/timeline/ExternalEventDetails.tsx`,
+`components/timeline/TravelWeather.tsx`, `components/timeline/OccurrenceRow.tsx`,
+`packages/core/src/resolvers/timeline-context.resolver.ts`,
+`components/briefing/DailyBriefBubble.tsx`,
+`packages/core/src/services/brief-travel-guidance.ts`, `interaction-registry.json`
+(`INT-TRAVEL-004`), review mockups P1 and P2.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared travel components and the core projection above. |
+| Desktop | Same shared components through `apps/desktop/src/product.tsx`. |
+| Marketing | Not applicable: no marketing page quotes these lines. P-015 covers the user guide. |
+| Future mobile | Shared components; 390 px bench check for line wrapping. |
+
+Messaging impact: P-015 (user guide, "Inspect travel and correct a journey",
+"Refresh travel estimates", "Weather margin").
+
+Verification: required checks, `npm run core:check` and resolver tests for the
+`overlapLabel` change,
+`npm run interactions:check`, `npm run design-system:check` on the owner's Mac, and
+the bench at desktop width and 390 px.
+
+## Ticket 262: Calendar details dialog metadata
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 260 (development-only flag).
+
+Goal: the Calendar details dialog leads with what the user needs (time, place and
+travel) and drops technical rows.
+
+Scope and acceptance. Applies to Google, Outlook and iCloud events, which share
+`ExternalEventDetails`:
+
+- Order: Time, Location, the travel lines, then "Google Calendar · Work" (source and
+  calendar on one line), then Attendees, Organizer, Conference and Attachments.
+- Hide any row with no value. Production never shows "No detail available."
+- Duration: hide when it equals the shown time span. Show it only when the end time is
+  unspecified.
+- State ("confirmed · busy"), Source timezone, Recurrence ("series-1 ·
+  2026-11-01T05:00:00Z") and Updated (a raw ISO instant) show only in development
+  builds.
+- Every time shown is formatted in the account timezone. The dialog shows no raw ISO
+  instants in any build.
+- "Open source event" and the navigation link keep their behavior and registry intents.
+- Update the DOM tests that assert the removed rows.
+
+References: `components/timeline/ExternalEventDetails.tsx`,
+`app/design-system/CalendarBench.tsx`, `interaction-registry.json`, review image
+`docs/design-exploration/travel-departure-review/current-02-calendar-details-dialog.png`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `ExternalEventDetails`. |
+| Desktop | Same component through `apps/desktop/src/product.tsx`. |
+| Marketing | Not applicable: no marketing page shows the dialog. |
+| Future mobile | Shared component; 390 px bench check. |
+
+Messaging impact: none. The user guide does not list the dialog's rows.
+
+Verification: required checks, a DOM test for production and development modes, and
+the bench at desktop width and 390 px.
