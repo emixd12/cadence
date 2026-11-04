@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
 import { AcceptanceError } from '../scripts/acceptance/test-account-sessions.mjs';
-import { archiveByLedger, collectCreations, parseArgs } from '../scripts/acceptance/archive-by-ledger.mjs';
+import { archiveByLedger, collectCreations, parseArgs, runsHoldingClients } from '../scripts/acceptance/archive-by-ledger.mjs';
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const TOKEN = 'cleanup-access-token-must-never-appear';
@@ -28,7 +28,7 @@ function fakeWorld(behaviors, faults = {}) {
     registerDynamic: async ({ name }) => ({ clientId: `client-${grants.length + 1}`, clientName: name, type: 'dcr' }),
     authorize: async ({ slot, client, grant, requestScopes }) => {
       calls.push({ op: 'authorize', slot, grant, requestScopes });
-      grants.push({ slot, clientId: client.clientId, grantId: id(900 + grants.length), scopes: ['cadence.read', 'cadence.behaviors.write'], active: true });
+      grants.push({ slot, clientId: client.clientId, clientName: client.clientName, grantId: id(900 + grants.length), scopes: ['cadence.read', 'cadence.behaviors.write'], active: true });
       // Consent can create a grant even when the token exchange then fails.
       if (faults.tokenExchangeFails) { faults.tokenExchangeFails = false; throw new AcceptanceError('token-exchange-failed'); }
       return { slot, scopes: ['cadence.read', 'cadence.behaviors.write'], authorization: () => `Bearer ${TOKEN}` };
@@ -55,7 +55,10 @@ function fakeWorld(behaviors, faults = {}) {
     const row = rows.get(match[1]);
     return { status: 200, json: row && row.user === slot ? [{ id: row.id, title: row.title, archived_at: row.archived_at }] : [] };
   };
-  const listGrants = async (slot) => grants.filter((g) => g.slot === slot && g.active).length;
+  const listGrants = async (slot) => {
+    if (faults.listNotArray) return null;
+    return grants.filter((g) => g.slot === slot && g.active).map((g) => ({ grant_id: g.grantId, client_id: g.clientId, client_name: g.clientName, scopes: g.scopes }));
+  };
   return { rows, grants, calls, driver, rest, listGrants, faults };
 }
 
@@ -148,6 +151,88 @@ describe('archiveByLedger recovery (same rules as a4239af)', () => {
     const events = readFileSync(join(root, 'cleanup-r', 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     expect(events.filter((e) => e.type === 'archive.result').map((e) => e.outcome)).toEqual(['archive-failed', 'archived']);
     second.close();
+  });
+});
+
+describe('active cleanup grants (reviewer repro on PR #188)', () => {
+  const start = (root, runId) => createRun({ target: 'production', accounts: ['A', 'B'], scenarios: ['archive-by-ledger'], runId, root, gitSha: null });
+  const go = (world, run, creations) => archiveByLedger({ creations, driver: world.driver, rest: world.rest, listGrants: world.listGrants, run, emit: () => {} });
+  const behaviors = [{ id: id(1), user: 'A', title: 'Review practice x' }];
+  const creations = [{ slot: 'A', behaviorId: id(1) }];
+
+  it('a new run stops before doing anything while an earlier cleanup grant is still active', async () => {
+    const root = tempRoot();
+    const world = fakeWorld(behaviors, { revokeFails: true });
+    const first = start(root, 'cleanup-first');
+    await expect(go(world, first, creations)).rejects.toMatchObject({ code: 'grant-revocation-unconfirmed' });
+    first.close();
+    expect(world.rows.get(id(1)).archived_at).not.toBeNull();
+    expect(world.grants.filter((g) => g.active)).toHaveLength(1);
+
+    const callsBefore = world.calls.length;
+    const reads = [];
+    const rest = async (...args) => { reads.push(args); return world.rest(...args); };
+    const second = start(root, 'cleanup-second');
+    await expect(archiveByLedger({ creations, driver: world.driver, rest, listGrants: world.listGrants, run: second, emit: () => {} })).rejects.toMatchObject({
+      code: 'cleanup-grant-active', details: { slot: 'A', clientIds: [world.grants[0].clientId] },
+    });
+    expect(reads).toEqual([]);
+    expect(world.calls).toHaveLength(callsBefore);
+    second.close();
+    // The stop can name the run whose --resume reconciles it.
+    expect(runsHoldingClients({ clientIds: [world.grants[0].clientId], root, exclude: 'cleanup-second' })).toEqual(['cleanup-first']);
+
+    // --resume on the run that saved the registration still reconciles and passes.
+    world.faults.revokeFails = false;
+    const resumed = resumeRun({ runId: 'cleanup-first', root });
+    await expect(go(world, resumed, creations)).resolves.toMatchObject({ ok: true, activeCleanupGrants: [] });
+    resumed.close();
+    expect(world.grants.every((g) => !g.active)).toBe(true);
+  });
+
+  it('checks every account before touching the first one', async () => {
+    const root = tempRoot();
+    const world = fakeWorld(behaviors);
+    world.grants.push({ slot: 'B', clientId: 'client-stale', clientName: 'Cadence acceptance cleanup', grantId: id(950), scopes: ['cadence.read'], active: true });
+    const run = start(root, 'cleanup-b');
+    await expect(go(world, run, creations)).rejects.toMatchObject({ code: 'cleanup-grant-active', details: { slot: 'B', clientIds: ['client-stale'] } });
+    expect(world.rows.get(id(1)).archived_at).toBeNull();
+    expect(world.calls).toEqual([]);
+    run.close();
+  });
+
+  it('does not stop for another client active on the account', async () => {
+    const root = tempRoot();
+    const world = fakeWorld(behaviors);
+    world.grants.push({ slot: 'A', clientId: 'https://chatgpt.com/oauth/client.json', clientName: 'ChatGPT', grantId: id(951), scopes: ['cadence.read'], active: true });
+    const run = start(root, 'cleanup-other');
+    await expect(go(world, run, creations)).resolves.toMatchObject({ ok: true, activeCleanupGrants: [] });
+    run.close();
+  });
+
+  it('fails the final result if a cleanup grant is active after the work', async () => {
+    const root = tempRoot();
+    const world = fakeWorld(behaviors);
+    const realProbe = world.driver.probe;
+    // Appears during the run, on a client this run did not register, so per-client readback misses it.
+    world.driver.probe = async (...args) => {
+      world.grants.push({ slot: 'B', clientId: 'client-late', clientName: 'Cadence acceptance cleanup', grantId: id(952), scopes: ['cadence.read'], active: true });
+      return realProbe(...args);
+    };
+    const run = start(root, 'cleanup-late');
+    const result = await go(world, run, creations);
+    expect(result.results).toEqual([{ slot: 'A', behaviorId: id(1), outcome: 'archived' }]);
+    expect(result).toMatchObject({ ok: false, activeCleanupGrants: [{ slot: 'B', clientId: 'client-late', grantId: id(952) }] });
+    run.close();
+  });
+
+  it('treats an unreadable grant list as a stop, not as no grants', async () => {
+    const root = tempRoot();
+    const world = fakeWorld(behaviors, { listNotArray: true });
+    const run = start(root, 'cleanup-unreadable');
+    await expect(go(world, run, creations)).rejects.toMatchObject({ code: 'grant-list-invalid' });
+    expect(world.calls).toEqual([]);
+    run.close();
   });
 });
 

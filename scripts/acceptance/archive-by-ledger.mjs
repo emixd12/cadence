@@ -13,11 +13,13 @@
 // Recovery follows the protocol and client runners: revocation counts only when a
 // readback shows no grant. If it cannot be confirmed the command stops, and
 // `--run <id> --resume` reconciles the saved registrations before registering
-// another client. Archived Behaviors are skipped, so a re-run is safe. Output and the
-// ledger hold IDs, outcomes and counts only, never tokens.
+// another client. Archived Behaviors are skipped, so a re-run is safe, but no run
+// starts or passes while any active grant is named "Cadence acceptance cleanup": a
+// new run stops with cleanup-grant-active and names the run to resume. Output and
+// the ledger hold IDs, outcomes and counts only, never tokens.
 import { randomUUID } from 'node:crypto';
 import { isCliEntry } from './cli-entry.mjs';
-import { assertRunContext, createRun, DEFAULT_ROOT, LedgerStop, readRun, resumeRun } from './ledger.mjs';
+import { assertRunContext, createRun, DEFAULT_ROOT, LedgerStop, listRuns, readRun, resumeRun } from './ledger.mjs';
 import { launchChrome } from './consent-page.mjs';
 import { createOAuthDriver } from './oauth-driver.mjs';
 import { AcceptanceError, PRODUCTION, createKeychainSessionStore, createSessionManager } from './test-account-sessions.mjs';
@@ -63,6 +65,24 @@ async function confirmRevoked(driver, slot, clientId) {
   return revoked;
 }
 
+/** This account's active cleanup grants. An unreadable list cannot prove there are none. */
+function activeCleanupGrants(slot, rows) {
+  if (!Array.isArray(rows) || rows.some((row) => typeof row?.client_name !== 'string')) throw new AcceptanceError('grant-list-invalid');
+  return rows.filter((row) => row.client_name === CLEANUP_CLIENT_NAME).map((row) => ({ slot, clientId: row.client_id, grantId: row.grant_id }));
+}
+
+/** Runs whose saved registrations include these clients, so --resume can reconcile them. */
+export function runsHoldingClients({ clientIds, root = DEFAULT_ROOT, exclude = null }) {
+  return listRuns({ root }).filter((runId) => {
+    if (runId === exclude) return false;
+    try {
+      const source = readRun({ runId, root });
+      return source.meta.scenarios?.includes(SCENARIO) && source.checkpoints.some((r) => r.kind === 'step' && r.state === 'done'
+        && r.name.startsWith('registration:') && clientIds.includes(r.result?.clientId));
+    } catch { return false; }
+  });
+}
+
 const skipOutcome = (row) => {
   if (!row) return 'missing';
   if (!TEST_TITLE.test(row.title ?? '')) return 'refused-title';
@@ -71,9 +91,11 @@ const skipOutcome = (row) => {
 
 /**
  * Archive the Behaviors, one cleanup grant per account. Returns
- * { ok, results: [{ slot, behaviorId, outcome }], grants }; ok means every Behavior
- * is archived, now or before. Unconfirmed revocation throws and stops the next
- * account, so a resumed run must reconcile it first.
+ * { ok, results: [{ slot, behaviorId, outcome }], grants, activeCleanupGrants }; ok
+ * means every Behavior is archived, now or before, and neither account has an active
+ * cleanup grant. Unconfirmed revocation throws and stops the next account, so a
+ * resumed run must reconcile it first. Before any Behavior read or consent, this run's
+ * saved registrations are reconciled, then any other cleanup grant stops the run.
  */
 export async function archiveByLedger({ creations, driver, rest, listGrants, run, emit = () => {}, newKey = randomUUID }) {
   const results = [];
@@ -83,11 +105,17 @@ export async function archiveByLedger({ creations, driver, rest, listGrants, run
     run.appendEvent({ type: 'archive.result', slot, behaviorId, outcome });
     emit({ step: 'archive', slot, behaviorId, outcome });
   };
-  for (const slot of ['A', 'B']) {
+  const SLOTS = ['A', 'B'];
+  const priorFor = (slot) => run.checkpoints.filter((r) => r.kind === 'step' && r.state === 'done' && r.name.startsWith(`registration:${slot.toLowerCase()}-`)).map((r) => r.result);
+  // Consent may have created a grant before an earlier attempt stopped.
+  for (const slot of SLOTS) for (const previous of priorFor(slot)) await confirmRevoked(driver, slot, previous.clientId);
+  for (const slot of SLOTS) {
+    const active = activeCleanupGrants(slot, await listGrants(slot));
+    if (active.length) throw new AcceptanceError('cleanup-grant-active', { slot, clientIds: active.map((g) => g.clientId) });
+  }
+  for (const slot of SLOTS) {
     const stepPrefix = `registration:${slot.toLowerCase()}-`;
-    const prior = run.checkpoints.filter((r) => r.kind === 'step' && r.state === 'done' && r.name.startsWith(stepPrefix)).map((r) => r.result);
-    // Consent may have created a grant before an earlier attempt stopped.
-    for (const previous of prior) await confirmRevoked(driver, slot, previous.clientId);
+    const prior = priorFor(slot);
     const pending = [];
     for (const behaviorId of [...new Set(creations.filter((c) => c.slot === slot).map((c) => c.behaviorId))]) {
       const outcome = skipOutcome(await readBehavior(rest, slot, behaviorId));
@@ -127,10 +155,13 @@ export async function archiveByLedger({ creations, driver, rest, listGrants, run
       // Consent can create a grant even when the token exchange throws: keep its ID first.
       try { capture(await driver.grantsFor(slot, client.clientId)); } catch { /* confirmRevoked reports it */ }
       const revoked = await confirmRevoked(driver, slot, client.clientId);
-      emit({ step: 'revoke', slot, revoked, remaining: 0, activeGrantCount: await listGrants(slot) });
+      const rows = await listGrants(slot).catch(() => null);
+      emit({ step: 'revoke', slot, revoked, remaining: 0, activeGrantCount: Array.isArray(rows) ? rows.length : null });
     }
   }
-  return { ok: results.every((r) => r.outcome === 'archived' || r.outcome === 'already-archived'), results, grants };
+  const stillActive = [];
+  for (const slot of SLOTS) stillActive.push(...activeCleanupGrants(slot, await listGrants(slot)));
+  return { ok: !stillActive.length && results.every((r) => r.outcome === 'archived' || r.outcome === 'already-archived'), results, grants, activeCleanupGrants: stillActive };
 }
 
 export function parseArgs(argv) {
@@ -178,14 +209,20 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     const driver = createOAuthDriver({ target: 'production', issuer: PRODUCTION.issuer, sessions, browser, clientName: CLEANUP_CLIENT_NAME,
       onConsentView: (view) => run.appendEvent({ type: 'consent.view', ...view }) });
     const rest = createRest({ origin: PRODUCTION.supabaseUrl, publishableKey, tokenFor: async (slot) => (await sessions.current(slot)).accessToken });
-    const listGrants = async (slot) => {
-      const rows = await sessions.userRpc(slot, 'oauth_list_grants');
-      return Array.isArray(rows) ? rows.length : null;
-    };
+    const listGrants = (slot) => sessions.userRpc(slot, 'oauth_list_grants');
     const result = await archiveByLedger({ creations, driver, rest, listGrants, run, emit: (e) => out(JSON.stringify(e)) });
-    out(JSON.stringify({ result: result.ok ? 'pass' : 'fail', runId: run.runId, archived: result.results.filter((r) => r.outcome === 'archived').length }));
+    out(JSON.stringify({ result: result.ok ? 'pass' : 'fail', runId: run.runId, archived: result.results.filter((r) => r.outcome === 'archived').length, activeCleanupGrants: result.activeCleanupGrants }));
     return result.ok ? 0 : 1;
   } catch (error) {
+    if (codeOf(error) === 'cleanup-grant-active') {
+      const { slot, clientIds } = error.details;
+      const resumeFrom = runsHoldingClients({ clientIds, root: options.root, exclude: run.runId });
+      out(JSON.stringify({ result: 'stopped', runId: run.runId, error: 'cleanup-grant-active', slot, clientIds, resumeFrom,
+        next: resumeFrom.length
+          ? `Re-run with the same --from and --run ${resumeFrom[0]} --resume, which reconciles that run's grant.`
+          : 'No ledger here holds this client. Revoke it in Settings, Connected apps, then re-run.' }));
+      return 1;
+    }
     out(JSON.stringify({ result: 'stopped', runId: run.runId, error: codeOf(error) }));
     return 1;
   } finally {

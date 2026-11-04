@@ -281,9 +281,12 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    screen, archives each `Review practice …` Behavior with `archive_behavior`, reads
    it back, and revokes that grant, confirmed by readback. It refuses any other title,
    and a re-run skips Behaviors already archived. `grant-revocation-unconfirmed` stops
-   it before the next account: fix the cause, then re-run with
-   `--run <cleanup-id> --resume` so it reconciles the saved registrations. Do not start
-   a new cleanup run instead. Use this command for routine runs;
+   it before the next account: fix the cause, then re-run with the same `--from` plus
+   `--run <cleanup-id> --resume` so it reconciles the saved registrations. A new
+   cleanup run stops with `cleanup-grant-active` before doing anything while either
+   account has an active "Cadence acceptance cleanup" grant, and prints the run to
+   resume (`resumeFrom`). A final result of `pass` means no such grant is active. Use
+   this command for routine runs;
    `scripts/mcp-fixture-cleanup.mjs` is the reviewed SQL transaction for a captured
    manifest and needs a hosted database connection. Then confirm every ChatGPT test
    chat was archived and every Claude test chat was kept (step 5).
