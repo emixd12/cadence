@@ -150,6 +150,9 @@ accepted the model-input risk under a conclusions-only regime (`docs/LEGAL.md` L
   departure. Use Essentials for later legs. Make one call per leg; the current
   code makes two.
 
+These describe today's model. Owner decision D1 replaces the three-hour and focus rules
+when Tickets 267 and 268 ship; see "Travel advisory revamp usage model" below.
+
 | Assumption | Light | Typical | Heavy |
 | --- | --- | --- | --- |
 | Travel days per month | 8 | 20 | 26 |
@@ -161,6 +164,57 @@ accepted the model-input risk under a conclusions-only regime (`docs/LEGAL.md` L
 
 Cost per leg: US$0.005 for walking, cycling and transit. About US$0.0085 for
 driving, assuming half the legs fall within an hour of departure and 10% of calls are retried.
+
+### Travel advisory revamp usage model, assumed
+
+Tickets 267, 268 and 277 (owner decisions D1 and D3, `docs/DECISIONS.md`, 2026-11-04). All
+figures are assumed, using the prices and profiles above. Ticket 284 replaces them with
+measured figures. This is a plan, not a shipped cost, so the summary tables above stay on
+today's model until the tickets ship.
+
+| Per month | Light | Typical | Heavy |
+| --- | --- | --- | --- |
+| Today's model, route legs | 40 | 240 | 650 |
+| Today's model, cost with lookups | US$0.23–0.37 | US$1.30–2.14 | US$3.45–5.73 |
+| Whole-day pass, legs | 16 | 60 | 130 |
+| Opens that still route, legs | 4 | 20 | 52 |
+| Near-departure refreshes, legs | 8 | 40 | 104 |
+| Reminder job, legs | 16 | 80 | 208 |
+| **Proposed, route legs** | **44** | **200** | **494** |
+| **Proposed, cost with lookups** | **US$0.25–0.40** | **US$1.10–1.80** | **US$2.67–4.40** |
+
+Showing last estimates removes most re-routing on opens, which pays for the new refreshes
+and reminders. Re-routing on Timeline opens is 180 of the 240 typical legs today.
+
+Assumptions and limits:
+
+- Near-departure refreshes assume about one refresh per trip, because the Timeline is not
+  always visible and focused at both refresh points. The plan allows up to two.
+- The reminder job assumes every trip's account opted in and uses both of its two route
+  calls.
+- Not counted yet: the extra late-transit call (Ticket 264), tomorrow's first trip
+  (Ticket 282) and Outlook and iCloud legs (Ticket 283). Each ticket adds its own count.
+- The code reserves transit at the higher US$0.010 rate until its SKU is confirmed, so a
+  heavy transit user may reach the US$5 ceiling near month end.
+- Automatic refreshes stop at 80% of the monthly ceiling. Refresh travel and reminder
+  checks continue (Ticket 267).
+
+### Production readback, November 4, 2026
+
+Read-only aggregate readback. No user IDs, places or event details were read.
+
+- Reserved route spend: October US$0.17, of which US$0.135 was the October 18 QA. November
+  so far US$0.03. Total US$0.20.
+- Travel estimates are on for 1 of the 7 accounts with a travel settings row. That account
+  has Home. Whether the others are test accounts: not checked.
+- Active push subscriptions: 1 account.
+- Vercel has `CADENCE_TRAVEL_PROVIDER_CLEARANCE`, `TRAVEL_CONCLUSIONS_SIGNING_SECRET`,
+  `CADENCE_PERF_LOG` and `CADENCE_INTEGRATION_JWT_SIGNING_KEY`. It has no
+  `CADENCE_WEATHER_PROVIDER_CLEARANCE`, so weather is still off. Values were not read.
+
+This means the summary table's "Disabled in production since 2026-09-25" status and the
+line "it is not deployed yet" above are out of date. They were not rewritten in this
+change, and the cost figures they sit beside are unchanged.
 
 ### Ticket 214 implementation, in source 2026-10-18
 
@@ -327,6 +381,8 @@ arrives, fees reduce the US$5:
   candidate cost assumptions. Production-default totals remain unchanged.
 - 2026-10-31: Recorded the QA-only Anthropic and OpenAI calls made by the MCP
   acceptance runners. They are excluded from the per-user totals.
+- 2026-11-04: Recorded the assumed usage model for the travel advisory revamp (Tickets
+  267, 268 and 277) and the November 4 production readback.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

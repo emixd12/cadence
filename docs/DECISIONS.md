@@ -1512,3 +1512,32 @@ force until the owner changes them.
 
 Platform impact: process only; web, desktop, marketing and future mobile behavior is
 unchanged. Messaging impact: none.
+
+## 2026-11-04: Travel advisory revamp
+
+The owner approved the travel advisory revamp on November 4, 2026. The quoted words are
+the owner's answers. Tickets 263–285 carry the work. The evidence is
+`docs/plans/2026-11-04-travel-departure-ux-review.md`.
+
+| # | Decision | Outcome | What it means |
+|---|---|---|---|
+| D1 | Leave times through the day (report decisions 3 and 4) | "Last estimate and per-trip refresh" | Older times stay, marked "Last estimate". Cadence refreshes a trip near its leave time. This changes parts of Tickets 164 and 214. L-014 stays logged. |
+| D2 | Travel marks without hovering | "Next trip only" | One line, one marker and one magenta span. No collapsed Daily Brief strip. This changes Ticket 164, `docs/UI_SPEC.md` and `DESIGN.md`. |
+| D3 | Leave reminders (report decision 5) | "Yes, even with Cadence closed" | Opt-in. Web uses a hosted job that starts from Home or the previous stop. Mac uses scheduled notifications from the last estimate. The text names the start. |
+| D4 | Wider coverage | "All of these should be covered" | Remembered places and attendance, tomorrow's first trip, and Outlook and iCloud events are all in scope. Outlook and iCloud stay last in Wave 5, because they need new connector reads. |
+| D6 | Go-ahead and PR #182 | "Merge PR #182 now, then start Wave 0" | This also approves the plan and its order. PR #182 merged on November 4 as `1a369e4`. Each merge to main is followed by a Trust refresh and app redeploy. |
+
+D5, the spend cap for Ticket 165's directions test, is still open. Ticket 284 asks the
+owner before that test runs.
+
+Merges, deployments, hosted migrations, provider spending, Mac notarization and
+publication still wait for the owner's instruction each time. The ban on storing device
+positions, route durations and Google event details on the server stays in force, and
+leave times still never reach the Daily Brief model (2026-10-17 and 2026-10-18). Ticket
+216's user-recorded place markers stay the one stored device position.
+
+Platform impact: see Tickets 263–285. Web: all waves. Desktop: shared components, plus
+native reminders that need a desktop release. Marketing: none until release (P-006).
+Future mobile: mobile web inherits shared UI and push; native mobile stays deferred.
+Messaging impact: P-015 corrected; P-016 to P-021 logged. Legal: L-014 updated; L-015 and
+L-016 logged.

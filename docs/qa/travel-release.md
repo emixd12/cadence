@@ -1130,10 +1130,14 @@ Mode checks: repeat one Apple row and the Google row with Transit and Driving
 cycling notice and open Apple Maps with no preselected mode; the Google row must
 open with bicycling. Negative checks:
 
-- Before any refresh, or after estimates expire, E1 says Search, not Directions.
+- Before any refresh, E1 says Search, not Directions.
+- After estimates expire, E1 keeps Directions while its route view stays in memory
+  (correction C2 in `docs/plans/2026-11-04-travel-departure-ux-review.md`). After Ticket
+  271, Directions depends on a resolved place, not on a 5-minute estimate.
 - With travel off, E1 says Search.
 - B1's expanded row shows its travel timing and no Search or Directions link.
-  Record this as current behavior; a Behavior navigation link would be new scope.
+  Record this as current behavior until Ticket 271 adds Directions to located Behavior
+  rows.
 
 Record each row's label, app, destination text and mode. Record no coordinates,
 route durations or provider responses.

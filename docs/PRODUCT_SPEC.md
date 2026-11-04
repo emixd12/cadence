@@ -459,6 +459,10 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
 - Incremental shared domain code and design tokens, with preserved web APIs
 - Read-only Outlook and iCloud Calendar context and Hevy workout timing under
   Tickets 233–241
+- Travel advisory revamp under Tickets 263–285: last estimates and per-trip refresh,
+  next-trip marks without hovering, opt-in leave reminders with Cadence closed,
+  remembered places and attendance, tomorrow's first trip, and Outlook and iCloud event
+  locations read for routing
 
 ## Day-progress timeline and gated Calendar context (Tickets 132–137)
 
@@ -559,6 +563,8 @@ Timeline presentation. Hevy workouts are recorded past intervals with derived
 duration. They use their own presentation, never count as Calendar events, and
 never complete or change a Behavior or Occurrence. Hevy exercise, title, routine,
 and note data is discarded. Hevy provides no location; Cadence shows it as unknown.
+Decision D4 adds event location reads from Outlook and iCloud for routing under Ticket
+283, with no event-detail storage. They read no location today.
 
 New provider identities bind to the current Cadence account and need not match
 the Google sign-in identity. One account per provider. Credentials stay sealed on
@@ -663,8 +669,35 @@ deployed-web and installed-desktop acceptance plus public disclosures. Marketing
 gains no capability claim before release evidence. Native mobile remains deferred.
 The repository implements deterministic travel behind a disabled deployment gate.
 Provider review, credentials, live acceptance and model projection remain unapproved.
-See `qa/travel-release.md`. Route expiry clears evidence; the next meaningful
-foreground change can refresh within quota. It never polls or regenerates Daily Brief.
+See `qa/travel-release.md`. Travel never regenerates Daily Brief. When a route estimate
+expires, the time stays visible. Tickets 267 and 268 change how it refreshes (below).
+
+### Travel advisory revamp (Tickets 263–285)
+
+The owner approved this on November 4, 2026 (`DECISIONS.md`). The tickets implement it;
+these rules are not yet shipped unless the ticket says so.
+
+- Last estimates and refresh (decision D1): an expired leave time stays, marked "Last
+  estimate", with its checked time. Cadence routes the whole day once on the first open of
+  a local date. While the Timeline is visible and focused, it refreshes a trip once within
+  3 hours of its known leave time and once within 30 minutes. A last estimate stops a
+  Timeline open from re-routing, unless a source changed or the device moved more than
+  500 m. Estimates stay in the browser session only.
+- Next-trip marks (decision D2): one line at the top of the Timeline, one marker and one
+  magenta span for the next trip only, without hovering. Other trips appear on inspection.
+  There is no collapsed Daily Brief strip.
+- Leave reminders (decision D3): opt-in, off by default, and able to reach the user with
+  Cadence closed. One reminder fires per trip at leave time minus get-ready time. On web a
+  hosted job acts as the user with no session, under Row Level Security, starting from Home
+  or the previous stop. On Mac a native scheduled notification uses the last estimate and
+  names its estimate time. A moved, cancelled, declined or remote event, or a resolved
+  Occurrence, sends no reminder.
+- Wider coverage (decision D4): remembered places and attendance, tomorrow's first trip,
+  and Outlook and iCloud events read for their location.
+- What stays banned: storing device positions, route durations or Google event details on
+  the server (Ticket 216's user-recorded place markers stay the one stored device
+  position); leave times in Daily Brief model input or MCP; background location tracking.
+- Cadence never changes a status, moves an event or moves a Behavior because of travel.
 
 Completion place labels (Ticket 216) are a separate opt-in, off by default. The user
 records each place's reference position on their own device ("I'm here"); Cadence
@@ -902,6 +935,10 @@ added. Existing live-data and release gates remain separate.
 - AI speech features in the launch web app
 - Marketing/product emails at launch
 - Intel desktop releases, desktop email delivery, and closed-app background synchronization
+- Background location tracking, a closed-app helper on the Mac, and leave times in Daily
+  Brief model input or MCP
+- Snooze, notification action buttons and email leave reminders
+- A new paid Google place search
 
 
 ## Retained archive notes (Ticket 125)

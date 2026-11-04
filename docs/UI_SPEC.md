@@ -248,6 +248,12 @@ text. Preserve hover/focus/tap/click behavior, keyboard access, 44px targets,
 left-side Calendar context and the right-side ledger. Add no separate travel lane
 or permanent duration fill. Unknown timing never creates a precise occupied span.
 
+Exception, owner decision D2, "Next trip only" (`docs/DECISIONS.md`, 2026-11-04; Tickets
+269 and 270): the next trip alone gets one line at the top of the Timeline, one marker and
+one magenta span without hovering. The owner picks the marker's form on the bench. A
+Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
+inspection-only. There is no collapsed Daily Brief strip.
+
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a

@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Travel advisory revamp filed: Tickets 263–285 — November 4, 2026
+
+**Documents only, on branch `us-work`. No runtime, schema or user-visible text change.**
+The owner approved the revamp on November 4, 2026 (`docs/DECISIONS.md`, 2026-11-04,
+"Travel advisory revamp"). Merges, deployments, hosted migrations, provider spending, Mac
+notarization and publication still wait for the owner's instruction each time.
+
+PR #182 merged on November 4 as `1a369e4`, on the owner's instruction. It carries the
+travel departure review, the rule that provider-terms questions are logged and never
+gate work, and Tickets 260–262. Whether the Trust refresh and app redeploy that follow a
+merge have run for it: not verified in this change.
+
+- Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started,
+  and amends Tickets 260–262, still not started.
+- Wave order: 1 is Tickets 264–266 and 260–262; 2 is 267–268; 3 is 269–274; 4 is 275–280;
+  5 is 281–283; 6 is 284–285.
+- Rule changes name decisions D1–D4: `AGENTS.md`, `docs/PRODUCT_SPEC.md`, `docs/UI_SPEC.md`,
+  `DESIGN.md`, `docs/USER_FLOWS.md`, and Tickets 164 and 214. The ban on storing device
+  positions, route durations and Google event details on the server stays.
+- `docs/NOTIFICATION_SPEC.md` is unchanged. Ticket 275 owns its change.
+- `docs/plans/2026-11-04-travel-departure-ux-review.md` now carries corrections C1–C9 and
+  gaps G1–G11. `docs/qa/travel-release.md` has the corrected directions check.
+- `docs/COSTS.md` records the assumed usage model and the November 4 readback.
+- New log entries: P-016 to P-021 and L-015 to L-016. P-015 and L-014 are updated.
+- Decision D5, the spend cap for Ticket 165's directions test, stays open until Ticket 284.
+
+Platform impact: documents only now. Tickets 264–285 state their own web, desktop,
+marketing and future mobile impact. Messaging impact: P-015 to P-021.
+
 ## Cadence for Mac 0.1.8 release (0.1.7 withdrawn) — November 2, 2026
 
 **Published November 2, 2026, 08:32Z.** 0.1.8 is built from `281d49d` (PR #178 merge),

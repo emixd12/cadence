@@ -17,7 +17,7 @@ Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHAN
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-015` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-017` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -61,7 +61,9 @@ Risk levels:
 | [L-011](#l-011-weather-privacy-disclosure-and-attribution) | Weather privacy disclosure and attribution | moved to P-003 | — | 218, 219 |
 | [L-012](#l-012-google-maps-notices-in-cadences-terms-and-privacy-content) | Google Maps notices in Cadence's terms and privacy content | closed | low | 213, 214, 165 |
 | [L-013](#l-013-google-route-warnings-in-the-travel-display) | Google route warnings in the travel display | open | low | 163, 164 |
-| [L-014](#l-014-last-known-leave-time-after-the-five-minute-window) | Last-known leave time after the five-minute window | open | medium | 163, 164, 170, 214 |
+| [L-014](#l-014-last-known-leave-time-after-the-five-minute-window) | Last-known leave time after the five-minute window | open | medium | 163, 164, 170, 214, 267, 268 |
+| [L-015](#l-015-leave-reminder-schedule-derived-from-a-route-estimate) | Leave reminder schedule derived from a route estimate | open | medium | 275, 277, 280 |
+| [L-016](#l-016-calendar-reads-with-no-user-session) | Calendar reads with no user session | open | medium | 276, 277 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -400,18 +402,63 @@ part of L-002.
 
 - **Question:** May Cadence keep showing a leave time derived from a Google route
   estimate after five minutes, marked as a last estimate, instead of withdrawing it?
-- **Affected:** Tickets 163, 164, 170 and 214. Files: `lib/services/travel-provider.ts`
-  (`boundedExpiry`, 300 seconds), `packages/core/src/services/brief-travel-guidance.ts`,
-  `components/timeline/ExternalEventDetails.tsx`. Plan:
-  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposals P2 and P4).
+- **Affected:** Tickets 163, 164, 170, 214, 267 and 268. Files:
+  `lib/services/travel-provider.ts` (`boundedExpiry`, 300 seconds),
+  `packages/core/src/services/brief-travel-guidance.ts`,
+  `components/timeline/ExternalEventDetails.tsx`, `lib/ui/travel.ts`. Plan:
+  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposals P2 and P4; correction
+  C1).
 - **Provider, clause, source and check date:** Google Maps Platform general terms and
   Routes Service Specific Terms on caching, as summarized in `docs/COSTS.md` ("caching
   terms"). Not rechecked for this entry.
 - **Current reading:** `docs/COSTS.md` calls the five-minute window "a conservative
   reading" and leaves open whether brief in-memory reuse during one viewing counts as
-  caching.
+  caching. This also describes shipped behavior, not only a proposal: the drawer and
+  dialog already keep the last times in memory after five minutes, with no mark
+  (`renderTravelTiming` has no clock or stale input; checked November 4, 2026). Only the
+  status line warns. Ticket 268 adds the label and keeps display data in `sessionStorage`
+  across a reload, in the browser session only.
 - **Risk level:** medium.
-- **Owner decision or risk acceptance:** none yet. Under the 2026-11-04 rule, this entry
-  does not hold proposals P2 or P4.
+- **Owner decision or risk acceptance:** owner decision D1, November 4, 2026: "Last
+  estimate and per-trip refresh" (`docs/DECISIONS.md`). That decides the product
+  behavior. It does not answer the terms question. Under the 2026-11-04 rule, this entry
+  holds nothing.
 - **Status:** open.
-- **Next action:** owner decides whether to change the five-minute window.
+- **Next action:** read the caching clauses again when convenient and record the reading.
+
+## L-015: Leave reminder schedule derived from a route estimate
+
+- **Question:** May Cadence store a next check time, derived in part from a Google route
+  estimate, with a leave reminder? May a Mac notification keep a time derived from an
+  estimate until it fires?
+- **Affected:** Tickets 275, 277 and 280. Files: planned hosted reminder record;
+  `apps/desktop/src/local-reminder.service.ts`. Plan:
+  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposal P3).
+- **Provider, clause, source and check date:** Google Maps Platform general terms and
+  Routes Service Specific Terms on caching, as summarized in `docs/COSTS.md` ("caching
+  terms"). Not rechecked for this entry.
+- **Current reading:** none. The hosted record stores no durations, titles, places or
+  positions. Its next check time and the Mac's scheduled time still depend on an estimate.
+- **Risk level:** medium.
+- **Owner decision or risk acceptance:** none on the terms question. Owner decision D3,
+  November 4, 2026: "Yes, even with Cadence closed" (`docs/DECISIONS.md`). Under the
+  2026-11-04 rule, this entry holds nothing.
+- **Status:** open.
+- **Next action:** read the caching clauses when convenient and record the reading.
+
+## L-016: Calendar reads with no user session
+
+- **Question:** Do Google's Calendar API terms and user data policy allow a hosted job to
+  read a user's Calendar with no user session, for a reminder the user opted into?
+- **Affected:** Tickets 276 and 277. Files: `lib/supabase/integration-token.ts`,
+  `lib/services/google-calendar.service.ts`, the planned reminder job. Related messaging
+  entry: P-017.
+- **Provider, clause, source and check date:** Google API Services User Data Policy and
+  the OAuth verification record. Not checked.
+- **Current reading:** none. Logged from the November 4 plan.
+- **Risk level:** medium.
+- **Owner decision or risk acceptance:** none on the terms question. Owner decision D3,
+  November 4, 2026: "Yes, even with Cadence closed" (`docs/DECISIONS.md`). Under the
+  2026-11-04 rule, this entry holds nothing.
+- **Status:** open.
+- **Next action:** read the policy when convenient and record the clause.

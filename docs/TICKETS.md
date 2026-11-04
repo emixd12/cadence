@@ -11889,6 +11889,12 @@ Filed September 21, 2026. Dependencies: Tickets 162–163; coordinate with Ticke
 
 Goal: display complete-trip effects through existing Timeline and briefing patterns.
 
+Changed November 4, 2026, by owner decision D2, "Next trip only" (`docs/DECISIONS.md`,
+2026-11-04): the next trip gets one line, one marker and one magenta span without
+hovering (Tickets 269 and 270). Other trips stay inspection-only, as below. There is no
+collapsed Daily Brief strip. Decision D1 also changes this ticket: an expired estimate
+stays visible, marked "Last estimate" (Ticket 268).
+
 Scope and acceptance:
 
 - Extend the existing temporary magenta span and Behavior overlap borders using
@@ -13608,6 +13614,18 @@ could not provide a successful baseline. Two-leg speed is confirmed; backlog Tic
 Dependencies: 213. The refresh-trigger change ships with 213.
 
 Goal: a refresh pays only for route legs that need travel and returns quickly.
+
+Changed November 4, 2026, by owner decision D1, "Last estimate and per-trip refresh"
+(`docs/DECISIONS.md`, 2026-11-04). The rules below describe what shipped. When Tickets
+267 and 268 ship, these replace them:
+
+- Window focus alone still makes no provider call. While the Timeline is visible and
+  focused, a due trip refreshes once within 3 hours of its known leave time and once
+  within 30 minutes. Returning to the window requests only when one of those is due.
+- The whole day routes once on the first open of a local date, with or without the Daily
+  Brief. The 3-hour window stays only as the fallback for a trip with no estimate yet.
+- A Timeline open no longer re-routes when a last estimate exists, unless a source changed
+  or the device moved more than 500 m.
 
 Scope and acceptance:
 
@@ -15450,7 +15468,7 @@ mode advice should appear only in development builds; rigid labels such as
 | Ticket | Delivery slice | Dependencies |
 |---|---|---|
 | 260 | Development-only travel text and route warnings | None |
-| 261 | Plain travel timing copy | 260 for the development-only flag |
+| 261 | Plain travel timing copy | 260 for the development-only flag; 265 for the departure model |
 | 262 | Calendar details dialog metadata | 260 for the development-only flag |
 
 These tickets change in-app text and the tests that assert it. They change no
@@ -15458,6 +15476,10 @@ routing, refresh, quota, model input, schema or stored data. The user-guide word
 they make stale is logged as `docs/MESSAGING_CHANGES.md` P-015 for the messaging
 track. Provider-terms questions are logged as `docs/LEGAL.md` L-013 and do not hold
 this work (`docs/DECISIONS.md`, 2026-11-04).
+
+Amended November 4, 2026, for the travel advisory revamp (Tickets 263–285). These three
+tickets are its Wave 1 copy work. Tickets 261 and 262 carry corrections C3 and C8 and gaps
+G9 and G11 from the report's section "Corrections and gaps, November 4, 2026".
 
 Before editing UI, run the impeccable workflow and the design-system-bench skill
 (`AGENTS.md`, "UI and design rules"). Verify each ticket on the design-system bench
@@ -15488,7 +15510,8 @@ Scope and acceptance:
   caption.
 - The weather mode advice ("Consider transit or driving instead of walking.") shows
   only in development builds. The weather margin itself stays (Ticket 261 rewords it).
-  This changes display only. Ticket 219's model input keeps its weather facts.
+  This changes display only. Ticket 219's model input keeps its weather facts. Weather
+  is off in production today (C5), so this part reaches users only when weather turns on.
 - Tests: a DOM test renders the same evidence in production and development modes and
   asserts which strings appear in each.
 
@@ -15513,8 +15536,9 @@ width and 390 px in both modes.
 
 ## Ticket 261: Plain travel timing copy
 
-Status: filed November 4, 2026. Not started.
-Dependencies: Ticket 260 (development-only flag).
+Status: filed November 4, 2026. Amended the same day. Not started.
+Dependencies: Ticket 260 (development-only flag) and Ticket 265 (departure model). All
+timing phrases come from core.
 
 Goal: travel lines say what to do and when, in plain words, without internal terms
 or repeated dates.
@@ -15536,12 +15560,27 @@ the expanded Behavior row and the Daily Brief travel block:
 - "Full-trip availability is unknown. Known travel spans still apply." becomes
   "Return time unknown." Add "Add Home in Settings to estimate it." only when no Home
   is saved.
-- "estimated within 3 hours of departure" becomes "Leave time appears 3 hours before
-  the trip."
-- "timing unavailable" becomes a line for each reason: `stale` → "Estimate expired.
-  Refresh travel"; `rejected_revision` → "Trip changed. Refresh travel";
-  `unavailable` → "No route found." "Refresh travel" uses the existing
+- "estimated within 3 hours of departure" becomes "Leave time appears by {time}." The
+  window counts back from the arrival target, not from the trip's start, so the earlier
+  wording "3 hours before the trip" was wrong (C3).
+- "timing unavailable" becomes a line for each reason: `stale` → "Last estimate: leave by
+  {time} · checked {time}. Refresh travel" when a leave time is known (decision D1), and
+  "Estimate expired. Refresh travel" only when none is; `rejected_revision` → "Trip
+  changed. Refresh travel"; `unavailable` → "No route found." A late trip shows its
+  estimated arrival instead (Ticket 264). "Refresh travel" uses the existing
   `INT-TRAVEL-004` action. Update its registry entry with the new placement.
+- Gap G11 strings:
+  - "Travel estimates await this deployment’s provider review." (`lib/ui/travel.ts`,
+    `TRAVEL_CLEARANCE_MESSAGE`) shows only in development builds. Production shows the
+    existing "Travel estimates are unavailable right now. Tracking and Calendar still
+    work."
+  - "Travel timing incomplete" (`overlapLabel` in
+    `packages/core/src/resolvers/timeline-context.resolver.ts`) becomes "Return time
+    unknown."
+  - "Applies only to this event revision while the Timeline is open." becomes "Applies
+    to this event until you close the Timeline." Ticket 281 replaces it when corrections
+    are remembered.
+- No travel status line on a day with no trips (G9). Ticket 269 then replaces the line.
 - Provenance footer: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on
   attendance and current conditions." becomes "Google Maps · checked 8:00 AM."
 - Weather credit: keep "Weather data by Open-Meteo.com (CC BY 4.0)" and its links.
@@ -15561,8 +15600,8 @@ References: `components/timeline/ExternalEventDetails.tsx`,
 `components/timeline/TravelWeather.tsx`, `components/timeline/OccurrenceRow.tsx`,
 `packages/core/src/resolvers/timeline-context.resolver.ts`,
 `components/briefing/DailyBriefBubble.tsx`,
-`packages/core/src/services/brief-travel-guidance.ts`, `interaction-registry.json`
-(`INT-TRAVEL-004`), review mockups P1 and P2.
+`packages/core/src/services/brief-travel-guidance.ts`, `lib/ui/travel.ts`,
+`interaction-registry.json` (`INT-TRAVEL-004`), review mockups P1 and P2.
 
 Platform impact:
 
@@ -15586,6 +15625,8 @@ the bench at desktop width and 390 px.
 Status: filed November 4, 2026. Not started.
 Dependencies: Ticket 260 (development-only flag).
 
+Amended November 4, 2026, with C8 and G11.
+
 Goal: the Calendar details dialog leads with what the user needs (time, place and
 travel) and drops technical rows.
 
@@ -15594,7 +15635,11 @@ Scope and acceptance. Applies to Google, Outlook and iCloud events, which share
 
 - Order: Time, Location, the travel lines, then "Google Calendar · Work" (source and
   calendar on one line), then Attendees, Organizer, Conference and Attachments.
-- Hide any row with no value. Production never shows "No detail available."
+- Hide any row with no value. Production shows none of the four empty-row strings: "No
+  detail available." (bench text), "Not provided.", "Restricted by the source." and "The
+  source omitted this detail." (C8).
+- Raw completeness lines, such as "attendees: restricted", show only in development
+  builds (G11).
 - Duration: hide when it equals the shown time span. Show it only when the end time is
   unspecified.
 - State ("confirmed · busy"), Source timezone, Recurrence ("series-1 ·
@@ -15622,3 +15667,906 @@ Messaging impact: none. The user guide does not list the dialog's rows.
 
 Verification: required checks, a DOM test for production and development modes, and
 the bench at desktop width and 390 px.
+
+## Travel advisory revamp: Tickets 263–285
+
+Filed November 4, 2026. The owner approved the plan that day (`docs/DECISIONS.md`,
+2026-11-04, "Travel advisory revamp"). Goal: Cadence tells you when to leave for every
+located Calendar event and Behavior, without you looking for it, on web and Mac.
+
+Evidence: `docs/plans/2026-11-04-travel-departure-ux-review.md`. Its section
+"Corrections and gaps, November 4, 2026" defines corrections C1–C9, gaps G1–G11 and
+scenarios A–H cited below. Decisions D1–D4 and D6 are the owner's. D5 stays open until
+Ticket 284.
+
+| Wave | Ticket | Delivery slice | Dependencies |
+|---|---|---|---|
+| 0 | 263 | File the revamp tickets and rule changes | PR #182 |
+| 1 | 264 | Report late trips, trips home and missing estimates | None |
+| 1 | 265 | One departure model in core | 264 |
+| 1 | 266 | Bench and tests show real timing | 265 |
+| 1 | 260 | Development-only travel text and route warnings | None |
+| 1 | 261 | Plain travel timing copy | 260, 265 |
+| 1 | 262 | Calendar details dialog metadata | 260 |
+| 2 | 267 | Trip refresh plan replaces the 3-hour window | 264 |
+| 2 | 268 | Keep last estimates and apply the refresh plan | 265, 267 |
+| 3 | 269 | Next-departure line | 261, 265, 268 |
+| 3 | 270 | Next trip's marker and span | 261, 265, 269 |
+| 3 | 271 | Drawer and dialog lead with the leave time | 261, 262, 265, 268 |
+| 3 | 272 | Daily Brief travel block stays useful | 265, 268 |
+| 3 | 273 | A next step for every missing estimate | 264, 265, 269 |
+| 3 | 274 | Leave-time question survives a reload | None |
+| 4 | 275 | Leave reminder specification and schema | None |
+| 4 | 276 | A background job acts as the user | 275 |
+| 4 | 277 | Leave reminder job | 265, 267, 275, 276 |
+| 4 | 278 | Leave reminders through web push | 277 |
+| 4 | 279 | Reminder setting and readiness list | 275, 278 |
+| 4 | 280 | Leave reminders on the Mac | 265, 268, 275, 279 |
+| 5 | 281 | Remember places and attendance | 264, 273 |
+| 5 | 282 | Tomorrow's first trip | 265, 267, 269 |
+| 5 | 283 | Route Outlook and iCloud events | 264, 277, 279 |
+| 6 | 284 | Web acceptance with the real clock | 260–262, 264–279, 281–283 |
+| 6 | 285 | Installed Mac acceptance | 280, 284 |
+
+Rules for every ticket below:
+
+- Core rules go in `packages/core` with an injected `now`. UI components never decide
+  timing.
+- UI work uses the impeccable workflow and the design-system-bench skill, and is checked
+  at desktop width and 390 px.
+- Hosted API changes keep the released Mac app working: add fields, do not change
+  existing meanings.
+- Never store device positions, route durations or Google event details on the server.
+  Ticket 216's user-recorded place markers stay the one stored device position. Never
+  send leave times to the Daily Brief model.
+- Merges, deployments, hosted migrations, provider spending, Mac notarization and
+  publication wait for the owner's instruction each time.
+- Provider-terms questions are logged and hold nothing (`docs/LEGAL.md` L-013 to L-016).
+
+Not in this revamp: background location tracking or a closed-app helper on the Mac;
+native mobile apps; changing a status, moving an event or moving a Behavior
+automatically; leave times in Daily Brief model input or MCP; snooze, notification action
+buttons and email leave reminders; a new paid Google place search; turning weather on.
+
+## Ticket 263: File the revamp tickets and rule changes
+
+Status: completed on branch `us-work`, November 4, 2026. Not merged. The merge waits for
+the owner.
+Dependencies: PR #182 (merged as `1a369e4`).
+
+Goal: record the agreed plan in the repository before any code changes.
+
+Scope and acceptance:
+
+- File Tickets 263–285 and amend Tickets 260–262 in place.
+- Record decisions D1–D4 and D6 in `docs/DECISIONS.md`, in the owner's words.
+- Change the rules the decisions override, naming the decision: `AGENTS.md`,
+  `docs/PRODUCT_SPEC.md`, `docs/UI_SPEC.md`, `DESIGN.md`, `docs/USER_FLOWS.md`, and
+  Tickets 164 and 214.
+- Correct Ticket 261 and P-015. Fix the directions plan in `docs/qa/travel-release.md`.
+- Add the assumed usage model and the November 4 readback to `docs/COSTS.md`.
+- Update L-014 and log L-015 and L-016. Log P-016 to P-021.
+- Add the corrections section to the report. No runtime file changes.
+
+References: `docs/plans/2026-11-04-travel-departure-ux-review.md`, Tickets 160, 164, 214
+and 260–262.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Documents only. Tickets 264–284 implement. |
+| Desktop | Documents only. Tickets 280 and 285 own the desktop-specific work. |
+| Marketing | Not applicable: no marketing text changes. P-006 keeps public travel claims. |
+| Future mobile | Not applicable: documents only. |
+
+Messaging impact: P-015 corrected; P-016, P-017, P-018, P-019, P-020 and P-021 logged.
+
+Verification: `npm run agents:check`, `npm run interactions:check` and
+`dagger check --progress=report`.
+
+## Ticket 264: Report late trips, trips home and missing estimates
+
+Status: filed November 4, 2026. Not started.
+Dependencies: none.
+
+Goal: the evidence stops going silent when the user needs it most (gaps G1–G4).
+
+Scope and acceptance:
+
+- Late legs stay usable. Departure becomes the ready time, arrival becomes ready time
+  plus route duration, and a `late` flag is set. Add no new `state` value.
+- Transit needs one more call with a departure time. Reserve spend first.
+- An event that has started but not ended stays the prior stop, so the trip home and
+  onward trips still plan.
+- Return endpoint-free unknown legs with their reason to the client.
+- Model conclusions keep their meaning, including `late_arrival`.
+- Scenarios B–G each have a test with the new result.
+- A released Mac build reads the response unchanged.
+- No device position, duration or place text enters any stored or logged value.
+- UI text and refresh timing are not in this ticket.
+
+References: `packages/core/src/resolvers/travel.resolver.ts`,
+`packages/core/src/types/travel.ts`, `lib/services/travel-route-refresh.service.ts`,
+`lib/services/travel-provider.ts`, `lib/services/travel-display.service.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted route service and shared core. |
+| Desktop | Shares the hosted route. Added fields stay readable by released builds. |
+| Marketing | Not applicable: no marketing page describes late trips. |
+| Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
+
+Messaging impact: none. Tickets 261 and 269 own the user-visible words.
+
+Verification: `npx vitest run tests/travel.resolver.test.ts
+tests/travel-route-refresh.service.test.ts tests/travel-model-projection.test.ts
+tests/travel-provider.test.ts`, `npm run resolvers:check`, `npm run core:check`.
+
+## Ticket 265: One departure model in core
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 264.
+
+Goal: every surface gives the same answer about what to do next.
+
+Scope and acceptance:
+
+- Add a new resolver in `packages/core/src/resolvers`, registered in
+  `docs/AGENT_RESOLVERS.md`, with tests.
+- Input: travel evidence, unknown legs, `now`, estimate times, labels, get-ready time and
+  budget state.
+- Output, per trip and for the next trip: upcoming, soon (30 minutes or less), leave now,
+  late, head home, last estimate, appears later (with its time), needs place, needs
+  attendance, needs origin, paused, none.
+- Phrase builders live here, so the line, drawer, bubble and reminders use the same words.
+- Each state has tests, including midnight and daylight-saving changes.
+- The resolver has no `new Date()` and no environment or browser reads.
+
+References: report sections "Copy and metadata inventory" and "Corrections and gaps";
+Tickets 260 and 261.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Read by the Timeline, drawer, dialog, Daily Brief block and reminder job. |
+| Desktop | Same core resolver. Ticket 280 reads it for native reminders. |
+| Marketing | Not applicable: no marketing surface reads it. |
+| Future mobile | Portable core module. Native mobile is deferred. |
+
+Messaging impact: none. Tickets 261 and 269 own the user-visible words.
+
+Verification: the new test file, `npm run resolvers:check`, `npm run core:check`.
+
+## Ticket 266: Bench and tests show real timing
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 265.
+
+Goal: the test page stops showing only the best case (report, "The two rules"; C6).
+
+Scope and acceptance:
+
+- Add a bench state switch with a movable clock: fresh, expired, appears later, soon,
+  leave now, late, during event, needs place, needs attendance, needs origin, no trips,
+  paused.
+- Move fixture notes out of `warnings`.
+- DOM tests render the drawer, dialog and bubble after expiry.
+- Every state renders on the bench at desktop width and 390 px.
+- The year-2999 expiry is gone from fixtures that claim to show production timing.
+
+References: `app/design-system/CalendarBench.tsx`, `app/design-system/TravelBench.tsx`,
+`app/design-system/DailyBriefBench.tsx`, `design-system.manifest.json`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Design-system bench and DOM tests. |
+| Desktop | Shared components are covered by the same bench. Ticket 285 checks the installed app. |
+| Marketing | Not applicable: the bench is not public. |
+| Future mobile | 390 px bench check. Native mobile is deferred. |
+
+Messaging impact: none. The bench is development-only.
+
+Verification: `npm run design-system:check`, `npx vitest run
+tests/day-progress-bench.dom.test.tsx tests/day-progress-timeline.dom.test.tsx`.
+
+## Ticket 267: Trip refresh plan replaces the 3-hour window
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 264.
+
+Goal: refresh when a trip needs it, not on every Timeline open (decision D1).
+
+Scope and acceptance:
+
+- Route the whole day once on the first open of a local date, with or without the Daily
+  Brief.
+- While the Timeline is visible and focused, refresh a trip once when it is within 3 hours
+  of its known leave time, and once within 30 minutes.
+- A trip with no estimate yet keeps today's rule, as the fallback.
+- A Timeline open no longer re-routes when a last estimate exists, unless a source changed
+  or the device moved more than 500 m.
+- The route response reports budget state. At 80% of the monthly ceiling, automatic
+  refreshes stop. Refresh travel and reminder checks continue.
+- A trip longer than 3 hours gets its leave time before it is due (C3).
+- Tests assert call counts for each trigger.
+- `docs/COSTS.md` records the new counts as assumed.
+
+References: `packages/core/src/services/travel-refresh-policy.ts`,
+`lib/services/travel-route-refresh.service.ts`, `app/api/travel/routes/route.ts`,
+`docs/COSTS.md`, Tickets 213 and 214, `docs/LEGAL.md` L-014.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted route and core refresh policy. |
+| Desktop | Shares the hosted route. The budget field is additive for released builds. |
+| Marketing | Not applicable: no marketing page describes refresh timing. |
+| Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
+
+Messaging impact: P-018.
+
+Verification: `npx vitest run tests/travel-refresh-policy.test.ts
+tests/travel-route-refresh.service.test.ts tests/travel-budget.contract.test.ts`.
+
+## Ticket 268: Keep last estimates and apply the refresh plan
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 265 and 267.
+
+Goal: Cadence never loses a leave time it already knows (C1, G8, decision D1).
+
+Scope and acceptance:
+
+- Merge estimates per trip. Key on role and commitment refs, because leg IDs change with
+  each device sample.
+- Each estimate carries current or last-estimate freshness.
+- Keep display data in `sessionStorage`, so a reload does not lose it. Clear it on sign-out,
+  account change, travel off, settings change and day change.
+- Withdraw a trip's times when its source changes or the trip has passed.
+- Apply the refresh plan. Returning to the window requests only when a trigger is due.
+- A later windowed refresh no longer replaces a known leave time.
+- Nothing is stored outside the browser session. Update the transient-data rule in
+  `docs/DATA_MODEL.md` to name the browser session.
+
+References: `lib/ui/travel.ts`, `apps/desktop/src/product.tsx`,
+`tests/travel-lifecycle.dom.test.tsx`, `docs/DATA_MODEL.md` (device samples and route
+results), `docs/LEGAL.md` L-014.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `useTravelContext` in `lib/ui/travel.ts`. |
+| Desktop | `apps/desktop/src/product.tsx` uses the same hook. Display data never enters SQLite, sync or backups. |
+| Marketing | Not applicable: P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits the hook. Native mobile is deferred. |
+
+Messaging impact: P-018.
+
+Verification: `npx vitest run tests/travel-lifecycle.dom.test.tsx` and
+`npm --workspace apps/desktop run build`.
+
+## Ticket 269: Next-departure line
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 261, 265 and 268.
+
+Goal: one line at the top of the Timeline answers "when do I leave next?" (proposal P1,
+decision D2).
+
+Scope and acceptance:
+
+- Show the departure model's next trip in every state, replacing "Travel as of".
+- Show no line when there are no trips (G9).
+- Announce only state changes to screen readers.
+- Refresh travel keeps `INT-TRAVEL-004`.
+- Regular weight only, per `DESIGN.md`. Emphasis comes from wording and the existing
+  magenta.
+- From first open to event start, a moving-clock test finds a correct line at every step.
+- Web and Mac use the same component.
+
+References: `components/timeline/DayProgressTimeline.tsx` (`TravelStatusLine`), its CSS,
+the bench, `interaction-registry.json`, mockup P1.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared `DayProgressTimeline`. |
+| Desktop | Same component. Ticket 285 checks the installed app. |
+| Marketing | Not applicable until release. P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-021.
+
+Verification: DOM test with a moving clock, bench at both widths,
+`npm run design-system:check`, `npm run interactions:check`.
+
+## Ticket 270: Next trip's marker and span
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 261, 265 and 269.
+
+Goal: the Timeline shows the next trip without hovering (decision D2).
+
+Scope and acceptance:
+
+- Add three bench variants for the owner to choose from: a label in the left rail, a slim
+  row among the Behaviors, or an axis tick only. The rail is 72 px wide at 390 px.
+- The owner picks a variant on the bench. Only that variant ships.
+- Show the magenta span for the next trip only. Other trips appear on inspection, as today.
+- A Behavior crowded by that trip shows one muted line while collapsed, using Ticket 261's
+  wording.
+- Keyboard, focus and touch behavior are unchanged.
+- This ticket changes the rule in Ticket 164, `docs/UI_SPEC.md` and `DESIGN.md`. Update
+  `DESIGN.md` from the code when the variant ships.
+
+References: `packages/core/src/resolvers/day-progress.resolver.ts`,
+`components/timeline/DayProgressTimeline.tsx` (`DayOverlay`),
+`components/timeline/OccurrenceRow.tsx`, mockup P1.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared Timeline components and the day-progress resolver. |
+| Desktop | Same components. Ticket 285 checks the installed app. |
+| Marketing | Not applicable until release. P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-021.
+
+Verification: `npx vitest run tests/day-progress.resolver.test.ts
+tests/day-progress-bench.dom.test.tsx`, bench at both widths,
+`npm run design-system:check`.
+
+## Ticket 271: Drawer and dialog lead with the leave time
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 261, 262, 265 and 268.
+
+Goal: the event views answer the question first, with directions one tap away (proposal
+P2).
+
+Scope and acceptance:
+
+- The leave line comes first, with a countdown within 30 minutes and the last-estimate
+  label after expiry.
+- Add Directions to the drawer and to located Behavior rows.
+- Directions depends on a resolved place, not on a 5-minute estimate (C2).
+- Move the correction form behind one short control.
+- Late, last-estimate and soon states render correctly.
+- Navigation links still use only source-authored text.
+- Do not use the mockup's weather advice or bold type.
+- Update `interaction-registry.json`.
+
+References: `components/timeline/ExternalEventDetails.tsx`,
+`components/timeline/OccurrenceRow.tsx`, `components/timeline/DayProgressTimeline.tsx`,
+`docs/qa/travel-release.md` (directions handoff plan), mockup P2.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared event views. |
+| Desktop | Same components through `apps/desktop/src/product.tsx`. |
+| Marketing | Not applicable until release. P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-018 and P-021.
+
+Verification: `npx vitest run tests/travel-navigation.test.ts
+tests/day-progress-timeline.dom.test.tsx`, bench at both widths,
+`npm run interactions:check`.
+
+## Ticket 272: Daily Brief travel block stays useful
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 265 and 268.
+
+Goal: the block stops vanishing after 5 minutes, and the first brief gets its trip facts
+(proposal P4, C7, decisions D1 and D2).
+
+Scope and acceptance:
+
+- The block uses the departure model and marks last estimates instead of disappearing.
+- The first brief of the day waits up to 5 seconds for the first travel result.
+- Do not add a collapsed strip (decision D2). Once-a-day and dismissal rules stay.
+- Tests prove leave times, durations and places still never reach model input.
+- A brief without travel still loads on time.
+
+References: `packages/core/src/services/brief-travel-guidance.ts`,
+`components/briefing/DailyBriefBubble.tsx`, `components/briefing/DailyBriefLauncher.tsx`,
+`docs/USER_FLOWS.md`, `docs/LEGAL.md` L-001, `docs/DECISIONS.md` 2026-10-18.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared bubble and core guidance. |
+| Desktop | Same bubble on a linked Mac. Ticket 285 checks the installed app. |
+| Marketing | Not applicable: P-006 keeps public AI and travel claims. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-018.
+
+Verification: `npx vitest run tests/brief-travel-guidance.test.ts
+tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
+
+## Ticket 273: A next step for every missing estimate
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 264, 265 and 269.
+
+Goal: replace silence with a reason and one action (G3, G4 and G10).
+
+Scope and acceptance:
+
+- Needs place: name the event and offer a place correction.
+- Needs attendance: ask In person or Remote in one tap.
+- Needs origin: link to Home and location settings.
+- When the blocking stop is a different event, name that event.
+- With travel off and a located event today, offer one dismissible line to turn it on. The
+  consent disclosure stays where it is.
+- The first-run row must not read Saved while Travel estimates is off. Update
+  `docs/USER_FLOWS.md` (Home and travel, Ticket 212) in the same change.
+- Each missing-estimate state shows one sentence and one action.
+- Consent still comes only from the Travel estimates toggle.
+
+References: next-departure line, drawer, `components/settings/TravelSettingsPanel.tsx`,
+first-run setup, `tests/onboarding-travel.dom.test.tsx`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared Timeline, Settings and first-run setup. |
+| Desktop | Shared Timeline and Settings. Linked accounts use the same hosted travel. |
+| Marketing | Not applicable: P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-021, and P-007 keeps the first-run wording.
+
+Verification: `npx vitest run tests/onboarding-travel.dom.test.tsx
+tests/travel-settings.dom.test.tsx`, bench at both widths, `npm run interactions:check`.
+
+## Ticket 274: Leave-time question survives a reload
+
+Status: filed November 4, 2026. Not started.
+Dependencies: none.
+
+Goal: the question that teaches Cadence survives a page reload (report image 6).
+
+Scope and acceptance:
+
+- Keep candidates in browser storage as digests and end times only, never titles.
+- Rebuild the title from the current Calendar read. With no match, skip the question.
+- A reload before the event ends still asks once that day.
+- No event text enters browser storage.
+
+References: `lib/ui/travel-habits.ts`, `packages/core/src/services/travel-habits.ts`,
+`components/timeline/DayProgressTimeline.tsx`, `components/settings/LegalContent.tsx`
+(learned travel habits), `docs/user-guide/travel.md` (Learned travel habits).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/ui/travel-habits.ts` and core habits service. |
+| Desktop | Same shared code in the app's web view. Digests never enter SQLite, sync or backups. |
+| Marketing | Not applicable: no marketing page describes the question. |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-021.
+
+Verification: `npx vitest run tests/travel-habits.test.ts
+tests/travel-habits.dom.test.tsx`.
+
+## Ticket 275: Leave reminder specification and schema
+
+Status: filed November 4, 2026. Not started.
+Dependencies: none. Decision D3.
+
+Goal: write the contract before building the job (proposal P3).
+
+Scope and acceptance:
+
+- Add the leave reminder rules to `docs/NOTIFICATION_SPEC.md`. Wave 0 left that file
+  unchanged, so this ticket owns the change. It adds a separate reminder kind with these
+  rules: off by default, fires at leave time minus get-ready time, one reminder per trip,
+  one update only if the leave time moves 10 minutes or more earlier.
+- Add a hosted-only preference, outside the synced profile, so older Mac builds keep
+  syncing (`docs/DATA_MODEL.md`, account-sync profile contract).
+- Add a hosted-only reminder record: owner, trip digest, local date, next check time,
+  status, sent time and error. Row Level Security on owner. No titles, places, positions or
+  durations. `reminder_deliveries` requires an Occurrence, so it cannot hold Calendar
+  trips.
+- One additive migration, with generated types and an updated `docs/DATA_MODEL.md`.
+- The migration passes a clean local reset. Owner-isolation tests pass.
+- Pushing to the hosted database waits for the owner.
+
+References: `docs/NOTIFICATION_SPEC.md`, `docs/DATA_MODEL.md`, report section "Corrections
+and gaps" (what P3 needs), `docs/LEGAL.md` L-015.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | New hosted tables and specification. |
+| Desktop | Stays outside the synced profile, so released builds keep syncing. Ticket 280 reads the preference. |
+| Marketing | Not applicable until release. P-016 logs the text changes. |
+| Future mobile | The hosted contract is portable. Native mobile is deferred. |
+
+Messaging impact: P-016.
+
+Verification: `npm run supabase -- db reset`, the new migration test, `npm run typecheck`.
+
+## Ticket 276: A background job acts as the user
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 275. Decision D3.
+
+Goal: a job reads Calendar and reserves spend under Row Level Security, with no user
+session.
+
+Scope and acceptance:
+
+- Add a separate token channel for leave reminders. Do not reuse MCP grants.
+- `connected()` needs the user's Google identity, and minted clients have no `auth`.
+  Resolve that with the smallest safe read.
+- `reserve_travel_provider_spend` must see the right `auth.uid()`.
+- Selecting which accounts are due reads only owner ID and next check time. All user data
+  goes through the minted client.
+- Confirm whether cron requests carry the Vercel OIDC token that hosted routing needs. If
+  not, report the fix before building on it.
+- A test proves the job's client reads only its own account's rows.
+- Tokens last 5 minutes or less and never reach logs.
+
+References: `lib/supabase/integration-token.ts`, `lib/services/google-calendar.service.ts`,
+`docs/MCP_INTEGRATION.md` section 2, `docs/AGENT_RESOLVERS.md`, `AGENTS.md` security rules,
+`docs/LEGAL.md` L-016.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Server-only caller builder. |
+| Desktop | Not applicable: desktop never holds this token. |
+| Marketing | Not applicable until release. P-017 logs the text changes. |
+| Future mobile | Not applicable: server-only. |
+
+Messaging impact: P-017.
+
+Verification: new tests, `npx vitest run tests/travel-spend.repo.test.ts`, local Supabase
+run, `npm run resolvers:check`.
+
+## Ticket 277: Leave reminder job
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 265, 267, 275 and 276. Decision D3.
+
+Goal: check each opted-in account and send a reminder at the right time.
+
+Scope and acceptance:
+
+- Add a pure planner in `packages/core`, a new service in `lib/services`, a new protected
+  route under `app/api/travel`, `vercel.json`, and a circuit breaker in
+  `lib/security/launch-circuit-breakers`.
+- Run every 5 minutes with a bounded batch. Look 5 minutes ahead so reminders are not late.
+- Start from Home or the previous stop. Never use a stored position.
+- Route at most twice per trip: once to set the check time, once when due. Store no
+  durations.
+- Re-read Calendar at least every 30 minutes. Drop a trip when its event moves, is
+  cancelled or declined, is marked remote, or its Occurrence is resolved.
+- Read the title only at send time, in memory.
+- Stay off until a new server flag is set. Add it to `.env.example`.
+- Tests cover no duplicate sends, overlapping runs, budget refusal, removed events and
+  daylight-saving changes.
+- Spend reserves first. Update `docs/COSTS.md`.
+
+References: `lib/services/reminder.service.ts` (claim pattern), Tickets 275 and 276,
+`docs/LEGAL.md` L-015 and L-016.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted cron job. |
+| Desktop | Not applicable: a Mac schedules its own notifications under Ticket 280. |
+| Marketing | Not applicable until release. P-016 and P-017 log the text changes. |
+| Future mobile | Web push reaches mobile web through Ticket 278. Native mobile is deferred. |
+
+Messaging impact: P-016 and P-017.
+
+Verification: new service and planner tests, `npm run resolvers:check`,
+`npm run agents:check`.
+
+## Ticket 278: Leave reminders through web push
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Ticket 277. Decision D3.
+
+Goal: the notification is short-lived, plain and able to open the right event.
+
+Scope and acceptance:
+
+- A leave reminder expires when the trip has started and sends at high urgency. Behavior
+  reminders stay unchanged.
+- Text: "Leave by 1:15 PM for Dentist", then "Walking, 65 min from Home. Arrive 2:20 PM."
+- Clicking opens the Timeline with that event's drawer.
+- No action buttons or snooze in this version.
+- The link carries a digest, never a title or place.
+- Existing Behavior reminders pass their tests unchanged.
+- A real send waits for an owner-approved test account.
+
+References: `lib/services/web-push.service.ts`, `public/push-service-worker.js`,
+`app/(app)/timeline/page.tsx`, `components/timeline/DayProgressTimeline.tsx`,
+`docs/NOTIFICATION_SPEC.md`, mockup P3 without its buttons.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Web push and service worker. |
+| Desktop | Not applicable: desktop uses native notifications under Ticket 280. |
+| Marketing | Not applicable until release. P-016 logs the text changes. |
+| Future mobile | Mobile web inherits web push. iPhone behavior is not verified. Native mobile is deferred. |
+
+Messaging impact: P-016.
+
+Verification: `npx vitest run` on the push and reminder service tests,
+`npm run agents:check`.
+
+## Ticket 279: Reminder setting and readiness list
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 275 and 278. Decision D3.
+
+Goal: the user gets one switch and sees what it still needs.
+
+Scope and acceptance:
+
+- One sentence in How you travel: "Remind me when it is time to get ready to leave." Off by
+  default.
+- Beside it: notifications on this device, Home saved, and where the estimate starts.
+- State that only Google Calendar events and Behaviors get reminders until Outlook and
+  iCloud are routed (Ticket 283).
+- Works on web and through a new hosted endpoint on a linked Mac.
+- Update `interaction-registry.json` and the design catalog.
+
+References: `components/settings/TravelSettingsPanel.tsx`,
+`components/settings/TravelHabitsSection.tsx`, `docs/NOTIFICATION_SPEC.md` (device states),
+`DESIGN.md` (settings rules).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Travel Settings and the hosted endpoint. |
+| Desktop | Same Settings component through the hosted endpoint on a linked Mac. |
+| Marketing | Not applicable until release. P-016 logs the text changes. |
+| Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
+
+Messaging impact: P-016.
+
+Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
+`npm run interactions:check`, `npm run design-system:check`, bench at both widths.
+
+## Ticket 280: Leave reminders on the Mac
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 265, 268, 275 and 279. Decision D3.
+
+Goal: a native reminder fires from the last estimate, even if the app has quit.
+
+Scope and acceptance:
+
+- Allow a new identifier for leave reminders in the Rust check.
+- Keep them out of the Behavior reminder coverage calculation. Behavior reminder coverage
+  results stay unchanged.
+- Reconcile on launch, resume, day change and each travel update. No background helper.
+- The text names the estimate time, because a quit app cannot re-route.
+- Activation opens the Timeline and that event's drawer.
+- Rust and desktop tests pass. A release waits for the owner.
+
+References: `apps/desktop/src-tauri/src/notifications.rs`,
+`apps/desktop/src/local-reminder.service.ts`, `apps/desktop/src/notification-activation.ts`,
+`apps/desktop/src/timeline-screen.tsx`, a planner in `packages/core`,
+`docs/DESKTOP_BUILD.md`, `docs/DESKTOP_PARITY.md`, `docs/NOTIFICATION_SPEC.md` (desktop
+rules), `.claude/skills/desktop-acceptance`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: web uses Tickets 277 and 278. The planner is shared core. |
+| Desktop | Native scheduled notifications. Needs a desktop release. |
+| Marketing | Not applicable until release. P-016 logs the text changes. |
+| Future mobile | Deferred with native mobile. |
+
+Messaging impact: P-016.
+
+Verification: `cargo test` in `apps/desktop/src-tauri`,
+`npm --workspace apps/desktop run build`, `npx vitest run` on the native reminder tests.
+
+## Ticket 281: Remember places and attendance
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 264 and 273. Decision D4.
+
+Goal: stop asking the same question after every reload (G5).
+
+Scope and acceptance:
+
+- A place correction stores the resolved place ID under the original text's key, so later
+  events with that text resolve too. No new paid Google product.
+- In-person or remote stays per event, keyed by a digest, in a small hosted-only attendance
+  record with owner Row Level Security.
+- Turning travel off deletes both.
+- A corrected place and attendance survive a reload.
+- No place text or event text is stored.
+
+References: `lib/services/travel-route-refresh.service.ts`,
+`lib/db/travelPlaceCache.repo.ts`, `components/timeline/ExternalEventDetails.tsx`,
+`docs/DATA_MODEL.md` (`travel_place_cache`), `docs/user-guide/travel.md` (Inspect travel and
+correct a journey).
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted route service and one additive migration. Pushing it waits for the owner. |
+| Desktop | Shares the hosted route on a linked Mac. Nothing is added to the synced profile. |
+| Marketing | Not applicable until release. P-020 logs the text changes. |
+| Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
+
+Messaging impact: P-020.
+
+Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
+`npm run supabase -- db reset`, a new owner-isolation test.
+
+## Ticket 282: Tomorrow's first trip
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 265, 267 and 269. Decision D4.
+
+Goal: warn the evening before an early start (G7).
+
+Scope and acceptance:
+
+- After 5 PM local time, or when today has no trips left, estimate tomorrow's first trip
+  once.
+- Keep this a separate request, because signed conclusions cover one day only. Today's
+  signed conclusions stay unchanged.
+- The line reads "Tomorrow: leave by 8:10 AM for Dentist".
+- Call count is tested. `docs/COSTS.md` adds this trip's legs, which the current model
+  excludes.
+
+References: `lib/ui/travel.ts`, `lib/services/travel-route-refresh.service.ts`, departure
+model, next-departure line, `docs/COSTS.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Shared hook and hosted route. |
+| Desktop | Same hook on a linked Mac. |
+| Marketing | Not applicable until release. P-006 keeps public travel claims. |
+| Future mobile | Mobile web inherits it. Native mobile is deferred. |
+
+Messaging impact: P-021.
+
+Verification: `npx vitest run tests/travel-route-refresh.service.test.ts
+tests/travel-lifecycle.dom.test.tsx`.
+
+## Ticket 283: Route Outlook and iCloud events
+
+Status: filed November 4, 2026. Not started. Planned last in Wave 5.
+Dependencies: Tickets 264, 277 and 279. Decision D4.
+
+Goal: people whose events are not in Google Calendar get leave times too (G6).
+
+Scope and acceptance:
+
+- Read event locations from both connectors, with no event-detail storage. Both connectors
+  list location as unsupported today.
+- Include those events in the travel plan and reminders. Remove the Ticket 279 sentence
+  that limits reminders to Google Calendar.
+- All three calendars route with the same rules.
+- Provider submissions stay on the messaging track.
+- Update `docs/COSTS.md` if the routed legs change the assumed counts.
+
+References: `lib/services/outlook-calendar-provider.ts`,
+`lib/services/icloud-calendar-provider.ts`, `lib/services/travel-route-refresh.service.ts`,
+`components/timeline/DayProgressTimeline.tsx`, `apps/desktop/src/product.tsx`,
+`components/settings/LegalContent.tsx` (Outlook Calendar, iCloud Calendar, and Hevy),
+Tickets 233–241.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Connector reads and the hosted route. |
+| Desktop | Same hosted reads on a linked Mac, through `apps/desktop/src/product.tsx`. |
+| Marketing | Not applicable until release. P-019 logs the text changes. |
+| Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
+
+Messaging impact: P-019.
+
+Verification: connector and route service tests, `npm run interactions:check`, local
+verification with fixtures.
+
+## Ticket 284: Web acceptance with the real clock
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 260–262, 264–279 and 281–283. Decision D5 is open.
+
+Goal: check the whole feature on production through a full day, including Ticket 165's
+directions matrix.
+
+Scope and acceptance:
+
+- Walk one located event from morning to event end: appears later, upcoming, soon, leave
+  now, late, last estimate and head home.
+- Run the directions matrix, Ticket 165's denied state and one real leave reminder under
+  the owner's spend cap.
+- Decision D5: the directions test spends real provider money. The proposed cap is
+  US$0.50. The coordinator asks the owner before it runs.
+- Record measured route calls and spend in `docs/COSTS.md`. Measured calls replace
+  assumptions.
+- Each state has evidence.
+- Owner steps are asked as one numbered list.
+
+References: `docs/qa/travel-release.md` (directions handoff plan), `AGENTS.md` "Installed
+and live acceptance", Ticket 165.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Production acceptance through the app's APIs and the in-app browser. |
+| Desktop | Ticket 285. |
+| Marketing | Not applicable: public claims stay on the messaging track (P-006). |
+| Future mobile | 390 px check on mobile web. Native mobile is deferred. |
+
+Messaging impact: none. Open entries still hold public launch and provider submissions.
+
+Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=report`.
+
+## Ticket 285: Installed Mac acceptance
+
+Status: filed November 4, 2026. Not started.
+Dependencies: Tickets 280 and 284.
+
+Goal: check the Mac app on a dev-signed build.
+
+Scope and acceptance:
+
+- Follow the `desktop-acceptance` skill.
+- Check travel states, the native reminder with the app running and after quitting,
+  activation, permission denied, and sync with an older contract.
+- Evidence is recorded.
+- Notarization and publication wait for the owner's instruction.
+
+References: `docs/DESKTOP_RELEASE.md` "Dev-signed builds" and "Agent-run installed
+acceptance", `.claude/skills/desktop-acceptance`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: Ticket 284 covers web. |
+| Desktop | Installed acceptance on a dev-signed build. |
+| Marketing | Not applicable: no publication in this ticket. |
+| Future mobile | Not applicable: desktop only. |
+
+Messaging impact: none.
+
+Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`.
