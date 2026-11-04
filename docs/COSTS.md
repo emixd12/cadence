@@ -178,24 +178,26 @@ today's model until the tickets ship.
 | Today's model, cost with lookups | US$0.23–0.37 | US$1.30–2.14 | US$3.45–5.73 |
 | Whole-day pass, legs | 16 | 60 | 130 |
 | Opens that still route, legs | 4 | 20 | 52 |
-| Near-departure refreshes, legs | 8 | 40 | 104 |
+| Near-departure refreshes, legs | 8–16 | 40–80 | 104–208 |
 | Reminder job, legs | 16 | 80 | 208 |
-| **Proposed, route legs** | **44** | **200** | **494** |
-| **Proposed, cost with lookups** | **US$0.25–0.40** | **US$1.10–1.80** | **US$2.67–4.40** |
+| **Proposed, route legs** | **44–52** | **200–240** | **494–598** |
+| **Proposed, cost with lookups** | **US$0.25–0.47** | **US$1.10–2.14** | **US$2.67–5.28** |
 
-Showing last estimates removes most re-routing on opens, which pays for the new refreshes
-and reminders. Re-routing on Timeline opens is 180 of the 240 typical legs today.
+Showing last estimates removes most re-routing on opens, which roughly offsets the new
+refreshes and reminders. Re-routing on Timeline opens is 180 of the 240 typical legs today.
 
 Assumptions and limits:
 
-- Near-departure refreshes assume about one refresh per trip, because the Timeline is not
-  always visible and focused at both refresh points. The plan allows up to two.
-- The reminder job assumes every trip's account opted in and uses both of its two route
-  calls.
+- The ranges cover one or two near-departure refreshes per trip.
+- Whole-day pass: 2, 3 and 5 legs per travel day.
+- Opens that still route: 0.5, 1 and 2 legs per travel day.
+- Outbound trips: 1, 2 and 4 per travel day.
+- Near-departure refreshes: one or two refreshes per trip.
+- Reminder job: two route calls per trip, with every trip's account opted in.
 - Not counted yet: the extra late-transit call (Ticket 264), tomorrow's first trip
   (Ticket 282) and Outlook and iCloud legs (Ticket 283). Each ticket adds its own count.
-- The code reserves transit at the higher US$0.010 rate until its SKU is confirmed, so a
-  heavy transit user may reach the US$5 ceiling near month end.
+- A heavy user can reach the US$5 ceiling near month end, especially by transit, which the
+  code reserves at the higher US$0.010 rate until its SKU is confirmed.
 - Automatic refreshes stop at 80% of the monthly ceiling. Refresh travel and reminder
   checks continue (Ticket 267).
 

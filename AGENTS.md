@@ -369,7 +369,8 @@ shorter OS-limited horizon; do not assume a universal request cap or add a
 background helper. Desktop email delivery remains inactive.
 
 Leave reminders (decision D3, Tickets 275–280) are a separate reminder kind:
-- Off by default. They fire at leave time minus get-ready time, once per trip.
+- Off by default. They fire at leave time minus get-ready time, once per trip, with one
+  update only if the leave time moves 10 minutes or more earlier.
 - They use their own hosted-only record, because `reminder_deliveries` requires an
   Occurrence and Calendar events have none. The preference stays outside the synced
   profile.
@@ -591,9 +592,12 @@ Do not expand scope to solve speculative future requirements.
   revocable. Integration operations reach user data only through RLS as the
   grant's user; the service role is limited to OAuth token-endpoint functions.
   Never log tokens or note text.
-- The leave reminder job (Ticket 276) may act as one user with no session. It uses its
-  own token channel, never an MCP grant. Tokens last 5 minutes or less, stay server-only
-  and never reach logs. All its user data goes through RLS as that user.
+- The leave reminder job (Ticket 276, decision D3) may act as one user with no session.
+  It uses its own token channel, never an MCP grant. Tokens last 5 minutes or less, stay
+  server-only and never reach logs. Selecting which accounts are due needs a cross-account
+  read, so this one selection uses the service role, as `lib/services/reminder.service.ts`
+  does, and reads only account IDs and next check times. All other user data goes through
+  RLS as that user.
 - Never store device positions, route durations or Google event details on the server.
   Ticket 216's user-recorded place markers stay the one stored device position. Read a
   Calendar title for a leave reminder only at send time, in memory. Never send leave

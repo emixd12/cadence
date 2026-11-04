@@ -177,7 +177,8 @@ scale; the presentation must disclose compressed spacing. A timed-event hover/
 focus preview shows duration as a temporary solid 1px magenta axis segment and can
 highlight overlapping Behavior rows. An overnight continuation starts at the
 next day section and ends at the event's mapped end. It adds no second marker or
-stem. No permanent duration bar appears. All-day events retain date-only meaning.
+stem. No permanent duration bar appears, except the next trip's span under decision D2
+(Ticket 270). All-day events retain date-only meaning.
 
 Optional Calendar context uses the same Google identity as the Cadence account.
 `components/settings/GoogleCalendarPanel.tsx` provides explicit connection,

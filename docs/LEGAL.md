@@ -407,7 +407,7 @@ part of L-002.
   `packages/core/src/services/brief-travel-guidance.ts`,
   `components/timeline/ExternalEventDetails.tsx`, `lib/ui/travel.ts`. Plan:
   `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposals P2 and P4; correction
-  C1).
+  C1). Related messaging entry: P-018.
 - **Provider, clause, source and check date:** Google Maps Platform general terms and
   Routes Service Specific Terms on caching, as summarized in `docs/COSTS.md` ("caching
   terms"). Not rechecked for this entry.
@@ -433,7 +433,8 @@ part of L-002.
   estimate until it fires?
 - **Affected:** Tickets 275, 277 and 280. Files: planned hosted reminder record;
   `apps/desktop/src/local-reminder.service.ts`. Plan:
-  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposal P3).
+  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposal P3). Related messaging
+  entry: P-016.
 - **Provider, clause, source and check date:** Google Maps Platform general terms and
   Routes Service Specific Terms on caching, as summarized in `docs/COSTS.md` ("caching
   terms"). Not rechecked for this entry.

@@ -15467,8 +15467,8 @@ mode advice should appear only in development builds; rigid labels such as
 
 | Ticket | Delivery slice | Dependencies |
 |---|---|---|
-| 260 | Development-only travel text and route warnings | None |
-| 261 | Plain travel timing copy | 260 for the development-only flag; 265 for the departure model |
+| 260 | Development-only travel text and route warnings | 263 |
+| 261 | Plain travel timing copy | 265 for the departure model; 260 for the development-only flag |
 | 262 | Calendar details dialog metadata | 260 for the development-only flag |
 
 These tickets change in-app text and the tests that assert it. They change no
@@ -15488,7 +15488,7 @@ at desktop width and 390 px, in both a production build and a development build.
 ## Ticket 260: Development-only travel text and route warnings
 
 Status: filed November 4, 2026. Not started.
-Dependencies: none. Tickets 261 and 262 use its flag.
+Dependencies: Ticket 263. Tickets 261 and 262 use its flag.
 
 Goal: text meant for developers never reaches a production user, and production
 shows only warnings a user can act on.
@@ -15537,7 +15537,7 @@ width and 390 px in both modes.
 ## Ticket 261: Plain travel timing copy
 
 Status: filed November 4, 2026. Amended the same day. Not started.
-Dependencies: Ticket 260 (development-only flag) and Ticket 265 (departure model). All
+Dependencies: Ticket 265 (departure model) and Ticket 260 (development-only flag). All
 timing phrases come from core.
 
 Goal: travel lines say what to do and when, in plain words, without internal terms
@@ -15580,7 +15580,12 @@ the expanded Behavior row and the Daily Brief travel block:
   - "Applies only to this event revision while the Timeline is open." becomes "Applies
     to this event until you close the Timeline." Ticket 281 replaces it when corrections
     are remembered.
+- Wording not yet approved by the owner: "Last estimate: leave by {time} · checked
+  {time}", "Return time unknown." as the replacement for "Travel timing incomplete",
+  "Applies to this event until you close the Timeline.", and the existing unavailable
+  message as the replacement for the provider-review text.
 - No travel status line on a day with no trips (G9). Ticket 269 then replaces the line.
+- `docs/MESSAGING_CHANGES.md` P-015 matches the shipped words.
 - Provenance footer: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on
   attendance and current conditions." becomes "Google Maps · checked 8:00 AM."
 - Weather credit: keep "Weather data by Open-Meteo.com (CC BY 4.0)" and its links.
@@ -15681,31 +15686,31 @@ Ticket 284.
 
 | Wave | Ticket | Delivery slice | Dependencies |
 |---|---|---|---|
-| 0 | 263 | File the revamp tickets and rule changes | PR #182 |
-| 1 | 264 | Report late trips, trips home and missing estimates | None |
+| 0 | 263 | File the revamp tickets and rule changes | None |
+| 1 | 264 | Report late trips, trips home and missing estimates | 263 |
 | 1 | 265 | One departure model in core | 264 |
 | 1 | 266 | Bench and tests show real timing | 265 |
-| 1 | 260 | Development-only travel text and route warnings | None |
-| 1 | 261 | Plain travel timing copy | 260, 265 |
+| 1 | 260 | Development-only travel text and route warnings | 263 |
+| 1 | 261 | Plain travel timing copy | 265, 260 |
 | 1 | 262 | Calendar details dialog metadata | 260 |
 | 2 | 267 | Trip refresh plan replaces the 3-hour window | 264 |
-| 2 | 268 | Keep last estimates and apply the refresh plan | 265, 267 |
-| 3 | 269 | Next-departure line | 261, 265, 268 |
-| 3 | 270 | Next trip's marker and span | 261, 265, 269 |
-| 3 | 271 | Drawer and dialog lead with the leave time | 261, 262, 265, 268 |
+| 2 | 268 | Keep last estimates and apply the refresh plan | 267 |
+| 3 | 269 | Next-departure line | 265, 268, 261 |
+| 3 | 270 | Next trip's marker and span | 269 |
+| 3 | 271 | Drawer and dialog lead with the leave time | 261, 262, 268 |
 | 3 | 272 | Daily Brief travel block stays useful | 265, 268 |
-| 3 | 273 | A next step for every missing estimate | 264, 265, 269 |
-| 3 | 274 | Leave-time question survives a reload | None |
-| 4 | 275 | Leave reminder specification and schema | None |
+| 3 | 273 | A next step for every missing estimate | 269 |
+| 3 | 274 | Leave-time question survives a reload | 263 |
+| 4 | 275 | Leave reminder specification and schema | 263 |
 | 4 | 276 | A background job acts as the user | 275 |
-| 4 | 277 | Leave reminder job | 265, 267, 275, 276 |
+| 4 | 277 | Leave reminder job | 276, 264, 265, 267 |
 | 4 | 278 | Leave reminders through web push | 277 |
-| 4 | 279 | Reminder setting and readiness list | 275, 278 |
-| 4 | 280 | Leave reminders on the Mac | 265, 268, 275, 279 |
-| 5 | 281 | Remember places and attendance | 264, 273 |
-| 5 | 282 | Tomorrow's first trip | 265, 267, 269 |
-| 5 | 283 | Route Outlook and iCloud events | 264, 277, 279 |
-| 6 | 284 | Web acceptance with the real clock | 260–262, 264–279, 281–283 |
+| 4 | 279 | Reminder setting and readiness list | 278 |
+| 4 | 280 | Leave reminders on the Mac | 265, 268, 279 |
+| 5 | 281 | Remember places and attendance | 273 |
+| 5 | 282 | Tomorrow's first trip | 268, 269 |
+| 5 | 283 | Route Outlook and iCloud events | 281, 277, 279 |
+| 6 | 284 | Web acceptance with the real clock | 266, 270, 271, 272, 273, 274, 279, 281, 282, 283 |
 | 6 | 285 | Installed Mac acceptance | 280, 284 |
 
 Rules for every ticket below:
@@ -15732,7 +15737,7 @@ buttons and email leave reminders; a new paid Google place search; turning weath
 
 Status: completed on branch `us-work`, November 4, 2026. Not merged. The merge waits for
 the owner.
-Dependencies: PR #182 (merged as `1a369e4`).
+Dependencies: none. PR #182 merged first, as `1a369e4`.
 
 Goal: record the agreed plan in the repository before any code changes.
 
@@ -15768,7 +15773,7 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 ## Ticket 264: Report late trips, trips home and missing estimates
 
 Status: filed November 4, 2026. Not started.
-Dependencies: none.
+Dependencies: Ticket 263.
 
 Goal: the evidence stops going silent when the user needs it most (gaps G1–G4).
 
@@ -15918,7 +15923,7 @@ tests/travel-route-refresh.service.test.ts tests/travel-budget.contract.test.ts`
 ## Ticket 268: Keep last estimates and apply the refresh plan
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 265 and 267.
+Dependencies: Ticket 267.
 
 Goal: Cadence never loses a leave time it already knows (C1, G8, decision D1).
 
@@ -15956,7 +15961,7 @@ Verification: `npx vitest run tests/travel-lifecycle.dom.test.tsx` and
 ## Ticket 269: Next-departure line
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 261, 265 and 268.
+Dependencies: Tickets 265, 268 and 261.
 
 Goal: one line at the top of the Timeline answers "when do I leave next?" (proposal P1,
 decision D2).
@@ -15992,7 +15997,7 @@ Verification: DOM test with a moving clock, bench at both widths,
 ## Ticket 270: Next trip's marker and span
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 261, 265 and 269.
+Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).
 
@@ -16030,7 +16035,7 @@ tests/day-progress-bench.dom.test.tsx`, bench at both widths,
 ## Ticket 271: Drawer and dialog lead with the leave time
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 261, 262, 265 and 268.
+Dependencies: Tickets 261, 262 and 268.
 
 Goal: the event views answer the question first, with directions one tap away (proposal
 P2).
@@ -16103,7 +16108,7 @@ tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
 ## Ticket 273: A next step for every missing estimate
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 264, 265 and 269.
+Dependencies: Ticket 269.
 
 Goal: replace silence with a reason and one action (G3, G4 and G10).
 
@@ -16140,7 +16145,7 @@ tests/travel-settings.dom.test.tsx`, bench at both widths, `npm run interactions
 ## Ticket 274: Leave-time question survives a reload
 
 Status: filed November 4, 2026. Not started.
-Dependencies: none.
+Dependencies: Ticket 263.
 
 Goal: the question that teaches Cadence survives a page reload (report image 6).
 
@@ -16172,7 +16177,7 @@ tests/travel-habits.dom.test.tsx`.
 ## Ticket 275: Leave reminder specification and schema
 
 Status: filed November 4, 2026. Not started.
-Dependencies: none. Decision D3.
+Dependencies: Ticket 263. Decision D3.
 
 Goal: write the contract before building the job (proposal P3).
 
@@ -16222,8 +16227,10 @@ Scope and acceptance:
 - `connected()` needs the user's Google identity, and minted clients have no `auth`.
   Resolve that with the smallest safe read.
 - `reserve_travel_provider_spend` must see the right `auth.uid()`.
-- Selecting which accounts are due reads only owner ID and next check time. All user data
-  goes through the minted client.
+- Selecting which accounts are due needs a cross-account read, which a per-user token
+  cannot do. This one selection uses the service role, as `lib/services/reminder.service.ts`
+  does, and reads only account IDs and next check times. All other user data goes through
+  Row Level Security as that user, on the minted client.
 - Confirm whether cron requests carry the Vercel OIDC token that hosted routing needs. If
   not, report the fix before building on it.
 - A test proves the job's client reads only its own account's rows.
@@ -16250,7 +16257,7 @@ run, `npm run resolvers:check`.
 ## Ticket 277: Leave reminder job
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 265, 267, 275 and 276. Decision D3.
+Dependencies: Tickets 276, 264, 265 and 267. Decision D3.
 
 Goal: check each opted-in account and send a reminder at the right time.
 
@@ -16260,6 +16267,7 @@ Scope and acceptance:
   route under `app/api/travel`, `vercel.json`, and a circuit breaker in
   `lib/security/launch-circuit-breakers`.
 - Run every 5 minutes with a bounded batch. Look 5 minutes ahead so reminders are not late.
+- Select due accounts as Ticket 276 states. Everything else runs as that user.
 - Start from Home or the previous stop. Never use a stored position.
 - Route at most twice per trip: once to set the check time, once when due. Store no
   durations.
@@ -16327,7 +16335,7 @@ Verification: `npx vitest run` on the push and reminder service tests,
 ## Ticket 279: Reminder setting and readiness list
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 275 and 278. Decision D3.
+Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
 
@@ -16362,7 +16370,7 @@ Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
 ## Ticket 280: Leave reminders on the Mac
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 265, 268, 275 and 279. Decision D3.
+Dependencies: Tickets 265, 268 and 279. Decision D3.
 
 Goal: a native reminder fires from the last estimate, even if the app has quit.
 
@@ -16399,7 +16407,7 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 ## Ticket 281: Remember places and attendance
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 264 and 273. Decision D4.
+Dependencies: Ticket 273. Decision D4.
 
 Goal: stop asking the same question after every reload (G5).
 
@@ -16435,7 +16443,7 @@ Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
 ## Ticket 282: Tomorrow's first trip
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 265, 267 and 269. Decision D4.
+Dependencies: Tickets 268 and 269. Decision D4.
 
 Goal: warn the evening before an early start (G7).
 
@@ -16469,7 +16477,7 @@ tests/travel-lifecycle.dom.test.tsx`.
 ## Ticket 283: Route Outlook and iCloud events
 
 Status: filed November 4, 2026. Not started. Planned last in Wave 5.
-Dependencies: Tickets 264, 277 and 279. Decision D4.
+Dependencies: Tickets 281, 277 and 279. Decision D4.
 
 Goal: people whose events are not in Google Calendar get leave times too (G6).
 
@@ -16506,7 +16514,7 @@ verification with fixtures.
 ## Ticket 284: Web acceptance with the real clock
 
 Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 260–262, 264–279 and 281–283. Decision D5 is open.
+Dependencies: Tickets 266, 270, 271, 272, 273, 274, 279, 281, 282 and 283. Decision D5 is open.
 
 Goal: check the whole feature on production through a full day, including Ticket 165's
 directions matrix.

@@ -29,6 +29,9 @@ collection.
 - `docs/COSTS.md` records the assumed usage model and the November 4 readback.
 - New log entries: P-016 to P-021 and L-015 to L-016. P-015 and L-014 are updated.
 - Decision D5, the spend cap for Ticket 165's directions test, stays open until Ticket 284.
+- `dagger check cadence/test` was reported failing on untouched `1a369e4` in five acceptance
+  test files, while main's CI passes. It is not caused by this change and was not
+  independently reproduced.
 
 Platform impact: documents only now. Tickets 264–285 state their own web, desktop,
 marketing and future mobile impact. Messaging impact: P-015 to P-021.

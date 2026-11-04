@@ -659,7 +659,7 @@ navigation link. Users open navigation themselves.
 Onboarding explains automatic routing, recipients, device permission and optional
 base. If device location is unavailable, request a base for the immediate origin;
 an unknown immediate origin does not block known event-to-event legs. Route expiry
-invalidates estimates, not saved configuration. No continuous/background tracking,
+affects estimates, not saved configuration. No continuous/background tracking,
 Calendar editing or automatic rescheduling follows from this feature.
 
 Web and linked online desktop share the routing and occupancy contract. Desktop
@@ -670,7 +670,8 @@ gains no capability claim before release evidence. Native mobile remains deferre
 The repository implements deterministic travel behind a disabled deployment gate.
 Provider review, credentials, live acceptance and model projection remain unapproved.
 See `qa/travel-release.md`. Travel never regenerates Daily Brief. When a route estimate
-expires, the time stays visible. Tickets 267 and 268 change how it refreshes (below).
+expires, the drawer and dialog keep the time; Daily Brief travel lines disappear until
+Ticket 272. Tickets 267 and 268 change how it refreshes (below).
 
 ### Travel advisory revamp (Tickets 263–285)
 
@@ -687,7 +688,8 @@ these rules are not yet shipped unless the ticket says so.
   magenta span for the next trip only, without hovering. Other trips appear on inspection.
   There is no collapsed Daily Brief strip.
 - Leave reminders (decision D3): opt-in, off by default, and able to reach the user with
-  Cadence closed. One reminder fires per trip at leave time minus get-ready time. On web a
+  Cadence closed. One reminder fires per trip at leave time minus get-ready time, with one
+  update only if the leave time moves 10 minutes or more earlier. On web a
   hosted job acts as the user with no session, under Row Level Security, starting from Home
   or the previous stop. On Mac a native scheduled notification uses the last estimate and
   names its estimate time. A moved, cancelled, declined or remote event, or a resolved
