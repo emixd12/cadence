@@ -200,7 +200,6 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       : createRun({ target: 'production', accounts: ['A', 'B'], scenarios: [SCENARIO], runId: options.runId ?? undefined, root: options.root });
   } catch (error) { out(JSON.stringify({ result: 'stopped', error: codeOf(error) })); return 1; }
   out(JSON.stringify({ result: 'run', runId: run.runId, from: options.from, behaviorCount: creations.length }));
-  if (!creations.length && !options.resume) { run.close(); out(JSON.stringify({ result: 'pass', runId: run.runId, archived: 0 })); return 0; }
   let browser;
   try {
     const publishableKey = qaPublishableKey(env);
@@ -219,7 +218,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       const resumeFrom = runsHoldingClients({ clientIds, root: options.root, exclude: run.runId });
       out(JSON.stringify({ result: 'stopped', runId: run.runId, error: 'cleanup-grant-active', slot, clientIds, resumeFrom,
         next: resumeFrom.length
-          ? `Re-run with the same --from and --run ${resumeFrom[0]} --resume, which reconciles that run's grant.`
+          ? `Re-run: npm run mcp:accept:archive -- --from ${options.from.join(',')} --confirm-production --run ${resumeFrom[0]} --resume${options.root === DEFAULT_ROOT ? '' : ` --root ${options.root}`}, which reconciles that run's grant.`
           : 'No ledger here holds this client. Revoke it in Settings, Connected apps, then re-run.' }));
       return 1;
     }
