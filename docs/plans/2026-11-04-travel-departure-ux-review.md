@@ -265,13 +265,14 @@ Open".
 
 ## Candidate follow-up tickets
 
-None of these is filed. Each one, when filed, needs its own platform-impact table and
-messaging entry. Copy changes alter `docs/user-guide/travel.md` and in-app text, so
+The copy and metadata pass is filed as Tickets 260–262 (`docs/TICKETS.md`), with
+messaging entry P-015. The other candidates are not filed. Each one, when filed, needs
+its own platform-impact table and messaging entry. Copy changes alter `docs/user-guide/travel.md` and in-app text, so
 each one logs a `docs/MESSAGING_CHANGES.md` entry.
 
 | Candidate | Web | Desktop | Marketing | Future mobile |
 |---|---|---|---|---|
-| Travel copy and metadata pass | `ExternalEventDetails`, `TravelWeather`, `DailyBriefBubble` | Same shared components | User guide wording only | Shared components; 390 px check |
+| Travel copy and metadata pass (Tickets 260–262) | `ExternalEventDetails`, `TravelWeather`, `DailyBriefBubble` | Same shared components | User guide wording only | Shared components; 390 px check |
 | Next-departure line (P1) | `DayProgressTimeline` status line | Shared Timeline | None until released | Mobile web inherits |
 | Window-boundary refresh | `lib/ui/travel.ts` | `apps/desktop/src/travel.ts` | None | Not applicable |
 | Leave reminder (P3) | Web Push and `docs/NOTIFICATION_SPEC.md` | Native notifications | Messaging entry | Deferred with native mobile |
