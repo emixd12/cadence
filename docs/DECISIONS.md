@@ -1488,3 +1488,27 @@ chooser, release notes and these records. Evidence:
 
 Platform impact: desktop release only; web, marketing and future mobile unchanged.
 Messaging impact: none.
+
+## 2026-11-04: Provider-terms questions are logged, never gating
+
+The owner set a standing rule for provider terms-of-service and licence questions.
+Recorded from the owner's November 4 instruction:
+
+> I want you to stop thinking through legal implication. As we have discussed before,
+> if you have an inkling that something like a service's TOS is being violated only
+> log it in our legal surface, do not stop development or interfere with ongoing tasks.
+
+- Log a suspected terms or licence issue as an entry in [`docs/LEGAL.md`](LEGAL.md)
+  and continue.
+- Never stop development, hold a merge or deployment, or interrupt an ongoing task
+  because of one.
+- Do not make a recommendation, proposal or ticket depend on a terms review. Plans
+  link the `L-` entry instead.
+- Only the owner decides whether an entry changes the work.
+
+This extends the October 27 rule for messaging to legal entries. Existing owner
+decisions recorded in `docs/LEGAL.md`, such as the L-001 model-input limits, stay in
+force until the owner changes them.
+
+Platform impact: process only; web, desktop, marketing and future mobile behavior is
+unchanged. Messaging impact: none.

@@ -10,11 +10,14 @@ until someone moves them here.
 
 ## How to add or update an entry
 
+Log a suspected terms or licence issue here and continue. Entries never stop
+development, merges, deployments or ongoing tasks (`docs/DECISIONS.md`, 2026-11-04).
+
 Privacy-text, disclosure and marketing-language items go to `docs/MESSAGING_CHANGES.md`,
 not here. Until the pre-launch privacy pass they never block development. Link the
 `P-` entry from the related `L-` entry when both exist.
 
-1. Give a new entry the next ID (`L-013` is next). Never reuse an ID.
+1. Give a new entry the next ID (`L-015` is next). Never reuse an ID.
 2. Fill in every field below. Quote the clause briefly and link the source.
 3. When someone rechecks a source, update its check date and the reading.
 4. Record an owner decision only from the owner's own words, with its date.
@@ -25,8 +28,8 @@ current reading; risk level; owner decision or risk acceptance; status; next act
 
 Status values:
 
-- **open**: unanswered. Work that depends on it waits or follows the conservative
-  reading.
+- **open**: unanswered. Development continues. Only the owner decides whether the
+  entry changes the work (`docs/DECISIONS.md`, 2026-11-04).
 - **accepted risk**: the owner accepted the risk under stated limits. The question may
   still be asked.
 - **resolved**: answered, or moot because the matter no longer applies. The entry says
@@ -57,6 +60,8 @@ Risk levels:
 | [L-010](#l-010-tomorrowio-contract-terms) | Tomorrow.io contract terms | resolved (moot) | none | 218 |
 | [L-011](#l-011-weather-privacy-disclosure-and-attribution) | Weather privacy disclosure and attribution | moved to P-003 | — | 218, 219 |
 | [L-012](#l-012-google-maps-notices-in-cadences-terms-and-privacy-content) | Google Maps notices in Cadence's terms and privacy content | closed | low | 213, 214, 165 |
+| [L-013](#l-013-google-route-warnings-in-the-travel-display) | Google route warnings in the travel display | open | low | 163, 164 |
+| [L-014](#l-014-last-known-leave-time-after-the-five-minute-window) | Last-known leave time after the five-minute window | open | medium | 163, 164, 170, 214 |
 
 L-004 to L-011 came from the open questions in
 `docs/plans/2026-10-17-weather-provider-comparison.md`. That plan's first question is
@@ -371,3 +376,42 @@ part of L-002.
 - **Next action:** retain the verified notices with future releases; this entry is resolved. The Privacy statement that Cadence does not send behavior data
   to an AI provider is a separate conflict under Ticket 187, logged as
   `docs/MESSAGING_CHANGES.md` P-005.
+
+## L-013: Google route warnings in the travel display
+
+- **Question:** Do the Maps Platform terms require Cadence to show the route warnings
+  Google returns, or may Cadence hide or reword them?
+- **Affected:** Tickets 163 and 164. Files:
+  `components/timeline/ExternalEventDetails.tsx` (`renderTravelTiming` prints every
+  `estimate.warnings` string), `lib/services/travel-provider.ts` (reads up to 10
+  `routes[0].warnings`). Plan: `docs/plans/2026-11-04-travel-departure-ux-review.md`.
+- **Provider, clause, source and check date:** Google Maps Platform, Routes API. Not
+  checked. Ticket 163 lists warnings among the provider obligations without citing a
+  clause.
+- **Current reading:** none. Logged from the November 4 review, which proposes showing
+  only warnings a user can act on.
+- **Risk level:** low.
+- **Owner decision or risk acceptance:** none yet. Under the 2026-11-04 rule, this entry
+  does not hold the copy work.
+- **Status:** open.
+- **Next action:** read the Routes API policies when convenient and record the clause.
+
+## L-014: Last-known leave time after the five-minute window
+
+- **Question:** May Cadence keep showing a leave time derived from a Google route
+  estimate after five minutes, marked as a last estimate, instead of withdrawing it?
+- **Affected:** Tickets 163, 164, 170 and 214. Files: `lib/services/travel-provider.ts`
+  (`boundedExpiry`, 300 seconds), `packages/core/src/services/brief-travel-guidance.ts`,
+  `components/timeline/ExternalEventDetails.tsx`. Plan:
+  `docs/plans/2026-11-04-travel-departure-ux-review.md` (proposals P2 and P4).
+- **Provider, clause, source and check date:** Google Maps Platform general terms and
+  Routes Service Specific Terms on caching, as summarized in `docs/COSTS.md` ("caching
+  terms"). Not rechecked for this entry.
+- **Current reading:** `docs/COSTS.md` calls the five-minute window "a conservative
+  reading" and leaves open whether brief in-memory reuse during one viewing counts as
+  caching.
+- **Risk level:** medium.
+- **Owner decision or risk acceptance:** none yet. Under the 2026-11-04 rule, this entry
+  does not hold proposals P2 or P4.
+- **Status:** open.
+- **Next action:** owner decides whether to change the five-minute window.

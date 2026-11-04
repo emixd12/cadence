@@ -69,11 +69,9 @@ Cadence stops treating the estimate as current:
 - The signed trip conclusions for the Daily Brief model expire at the same time
   (`lib/ui/travel.ts:173`).
 
-Why the rule exists: Google's terms forbid caching route durations
-(`docs/COSTS.md`, caching terms). `docs/COSTS.md` calls the 5-minute window "a
-conservative reading" and leaves open whether brief in-memory reuse counts as
-caching. Changing Rule 1 therefore needs a terms decision under `docs/LEGAL.md`
-L-001 first.
+Why the rule exists: Cadence chose 5 minutes as a conservative reading of Google's
+caching terms (`docs/COSTS.md`). Changing it is a product decision. The terms
+question is logged in `docs/LEGAL.md` as L-014 and does not hold this work.
 
 The test page hides this rule. It freezes its clock at 8:00 AM, and its Timeline
 status view expires in the year 2999 (`app/design-system/CalendarBench.tsx`). The
@@ -150,7 +148,7 @@ owner's decision, not an agreed change.
 | "Available again Nov 1, 6:45 PM." | Drawer, dialog | Acceptable; the date repeats | "Free again 6:45 PM" |
 | "Full-trip availability is unknown. Known travel spans still apply." | Drawer, dialog | Internal wording | "Return time unknown. Add Home in Settings to estimate it." |
 | "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on attendance and current conditions." | Drawer, dialog | The disclaimer adds nothing | "Google Maps · checked 8:00 AM". Keep the attribution. |
-| "Weather data by Open-Meteo.com (CC BY 4.0). Cadence derived travel margins from the forecast." | Drawer, dialog, bubble | The second sentence is internal | Keep the credit; drop the second sentence. CC BY requires the credit. |
+| "Weather data by Open-Meteo.com (CC BY 4.0). Cadence derived travel margins from the forecast." | Drawer, dialog, bubble | The second sentence is internal | Keep the credit; drop the second sentence. |
 | Route warnings, shown verbatim | Dialog | See below | Show only warnings a user can act on |
 | "estimated within 3 hours of departure" | Drawer, dialog | Rule 2 wording | "Leave time appears at 1:00 PM" |
 | "timing unavailable" | Drawer, dialog | Gives no reason or next step | Name the reason and offer Refresh travel |
@@ -163,9 +161,10 @@ route warnings, up to 10 per leg, plus Cadence's "Estimated arrival is after the
 planned arrival time.". "Synthetic route. No provider call." comes from the bench
 fixture (`app/design-system/TravelBench.tsx:107`). It cannot reach production because
 the bench route is disabled in production builds. The display path is the same,
-though. Before hiding Google's warnings, check whether the Routes API terms require
-showing them (Ticket 163 lists "warnings" among the provider obligations). Mark fixture
-text as development-only so nobody mistakes it for product copy.
+though, so production prints Google's warnings verbatim. Mark fixture text as
+development-only so nobody mistakes it for product copy. The terms question about
+hiding Google's warnings is logged in `docs/LEGAL.md` as L-013 and does not hold the
+copy work.
 
 ### Event dialog metadata rows
 
@@ -207,6 +206,8 @@ and the side panel states what it does and what is wrong with it.
 The mockups are generated concept images (OpenAI `gpt-image-2`, with the bench
 screenshots as style references). They show direction, not final copy or layout.
 Some generated times do not agree with each other. Read them as placeholders.
+Provider-terms questions from this review are logged in `docs/LEGAL.md` (L-013, L-014).
+Under the 2026-11-04 decision they do not hold any proposal.
 
 ### P1: Next departure on the Timeline
 
@@ -221,8 +222,7 @@ closed. Later trips show when their leave time will appear.
 
 Within 30 minutes of departure: "Leave in 12 minutes, by 1:15 PM". After expiry:
 "Last estimate: leave by 1:15 PM · Checked 12:41 PM, may have changed · Refresh
-travel" instead of no time. The fallback shows an expired estimate, so it depends on
-the Rule 1 terms decision.
+travel" instead of no time.
 
 ![P2](../design-exploration/travel-departure-review/proposal-P2-drawer-leave-now-and-stale.png)
 
@@ -239,7 +239,7 @@ change and a fresh route request when the reminder is due.
 
 The travel block survives a reload and updates when travel refreshes. After Close,
 the bubble collapses to one line: "Daily Brief · Leave by 2:05 PM for Dentist ·
-Open". Keeping a leave time visible after expiry depends on the Rule 1 decision.
+Open".
 
 ![P4](../design-exploration/travel-departure-review/proposal-P4-daily-brief-persistent-travel.png)
 
@@ -257,8 +257,8 @@ Open". Keeping a leave time visible after expiry depends on the Rule 1 decision.
    above, before launch.
 2. Keep or remove the weather mode advice ("Consider transit or driving instead of
    …"). Ticket 218 specifies it today.
-3. Rule 1: ask for a terms reading on showing a last-known leave time after 5 minutes
-   (`docs/LEGAL.md` L-001). P2 and P4 depend on it.
+3. Rule 1: allow a last-known leave time after 5 minutes, marked as a last estimate
+   (P2, P4).
 4. Rule 2: allow one automatic refresh when a trip enters the 3-hour window.
 5. P3: add the optional leave reminder to scope.
 6. Run the Ticket 165 directions handoff matrix under a spend cap.
@@ -274,8 +274,8 @@ each one logs a `docs/MESSAGING_CHANGES.md` entry.
 | Travel copy and metadata pass | `ExternalEventDetails`, `TravelWeather`, `DailyBriefBubble` | Same shared components | User guide wording only | Shared components; 390 px check |
 | Next-departure line (P1) | `DayProgressTimeline` status line | Shared Timeline | None until released | Mobile web inherits |
 | Window-boundary refresh | `lib/ui/travel.ts` | `apps/desktop/src/travel.ts` | None | Not applicable |
-| Leave reminder (P3) | Web Push and `docs/NOTIFICATION_SPEC.md` | Native notifications | Disclosure review | Deferred with native mobile |
-| Stale fallback (P2, P4) | Drawer and bubble | Shared | Disclosure review | Mobile web inherits |
+| Leave reminder (P3) | Web Push and `docs/NOTIFICATION_SPEC.md` | Native notifications | Messaging entry | Deferred with native mobile |
+| Stale fallback (P2, P4) | Drawer and bubble | Shared | Messaging entry | Mobile web inherits |
 | Bench and tests reflect Rules 1 and 2 | `app/design-system/CalendarBench.tsx`, resolver tests | Shared core tests | Not applicable | Not applicable |
 
 ## Method and limits
