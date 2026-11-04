@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createRun } from '../scripts/acceptance/ledger.mjs';
+import { createRun, resumeRun } from '../scripts/acceptance/ledger.mjs';
+import { AcceptanceError } from '../scripts/acceptance/test-account-sessions.mjs';
 import { archiveByLedger, collectCreations, parseArgs } from '../scripts/acceptance/archive-by-ledger.mjs';
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -12,14 +13,14 @@ afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, fo
 const tempRoot = () => { const dir = mkdtempSync(join(tmpdir(), 'archive-ledger-')); roots.push(dir); return dir; };
 
 /** A source run with creation checkpoints, as the runners record them. */
-function sourceRun(root, runId, creations) {
-  const run = createRun({ target: 'production', accounts: ['A', 'B'], scenarios: ['x'], runId, root, gitSha: null });
+function sourceRun(root, runId, creations, target = 'production') {
+  const run = createRun({ target, accounts: ['A', 'B'], scenarios: ['x'], runId, root, gitSha: null });
   for (const c of creations) run.recordCheckpoint('creation', { label: c.label, slot: c.slot, behaviorId: c.behaviorId, grantId: null, activityIds: [] });
   run.close();
 }
 
 /** Fake Cadence: Behaviors per account, a DCR client, one grant, MCP archive. */
-function fakeWorld(behaviors) {
+function fakeWorld(behaviors, faults = {}) {
   const rows = new Map(behaviors.map((b) => [b.id, { archived_at: null, ...b }]));
   const grants = [];
   const calls = [];
@@ -28,17 +29,21 @@ function fakeWorld(behaviors) {
     authorize: async ({ slot, client, grant, requestScopes }) => {
       calls.push({ op: 'authorize', slot, grant, requestScopes });
       grants.push({ slot, clientId: client.clientId, grantId: id(900 + grants.length), scopes: ['cadence.read', 'cadence.behaviors.write'], active: true });
+      // Consent can create a grant even when the token exchange then fails.
+      if (faults.tokenExchangeFails) { faults.tokenExchangeFails = false; throw new AcceptanceError('token-exchange-failed'); }
       return { slot, scopes: ['cadence.read', 'cadence.behaviors.write'], authorization: () => `Bearer ${TOKEN}` };
     },
     probe: async (tokens, { name, args }) => {
       calls.push({ op: name, slot: tokens.slot, behaviorId: args.behavior_id, keyed: typeof args.idempotency_key === 'string' });
       const row = rows.get(args.behavior_id);
+      if (faults.archiveFails) { faults.archiveFails = false; return { status: 503, ok: false, errorCode: null }; }
       if (name !== 'archive_behavior' || !row || row.user !== tokens.slot) return { status: 200, ok: false, errorCode: 'not_found' };
       row.archived_at = '2026-10-31T23:30:00Z';
       return { status: 200, ok: true, errorCode: null };
     },
-    grantsFor: async (slot, clientId) => grants.filter((g) => g.slot === slot && g.clientId === clientId && g.active).map((g) => ({ grantId: g.grantId, scopes: g.scopes })),
+    grantsFor: async (slot, clientId) => { if (faults.grantListInvalid) throw new AcceptanceError('grant-list-invalid'); return grants.filter((g) => g.slot === slot && g.clientId === clientId && g.active).map((g) => ({ grantId: g.grantId, scopes: g.scopes })); },
     revokeGrants: async (slot, clientId) => {
+      if (faults.revokeFails) throw new AcceptanceError('revoke-failed');
       let n = 0;
       for (const g of grants) if (g.slot === slot && g.clientId === clientId && g.active) { g.active = false; n += 1; }
       return n;
@@ -51,7 +56,7 @@ function fakeWorld(behaviors) {
     return { status: 200, json: row && row.user === slot ? [{ id: row.id, title: row.title, archived_at: row.archived_at }] : [] };
   };
   const listGrants = async (slot) => grants.filter((g) => g.slot === slot && g.active).length;
-  return { rows, grants, calls, driver, rest, listGrants };
+  return { rows, grants, calls, driver, rest, listGrants, faults };
 }
 
 describe('collectCreations', () => {
@@ -63,6 +68,86 @@ describe('collectCreations', () => {
       { slot: 'A', behaviorId: id(1), fromRun: 'run-one' },
       { slot: 'B', behaviorId: id(2), fromRun: 'run-one' },
     ]);
+  });
+});
+
+describe('collectCreations target', () => {
+  it('refuses a local run, whose accounts no longer exist', () => {
+    const root = tempRoot();
+    sourceRun(root, 'run-local', [{ label: 'one-create', slot: 'A', behaviorId: id(1) }], 'local');
+    expect(() => collectCreations({ runIds: ['run-local'], root })).toThrow('run-target-mismatch');
+  });
+});
+
+describe('archiveByLedger recovery (same rules as a4239af)', () => {
+  const start = (root, runId = 'cleanup-r') => createRun({ target: 'production', accounts: ['A', 'B'], scenarios: ['archive-by-ledger'], runId, root, gitSha: null });
+  const reopen = (root, runId = 'cleanup-r') => resumeRun({ runId, root });
+  const go = (world, run, creations) => archiveByLedger({ creations, driver: world.driver, rest: world.rest, listGrants: world.listGrants, run, emit: () => {} });
+  const steps = (run) => run.checkpoints.filter((r) => r.kind === 'step' && r.state === 'done').map((r) => r.name);
+
+  it('saves the registration before consent and captures a grant whose token exchange failed', async () => {
+    const root = tempRoot();
+    const world = fakeWorld([{ id: id(1), user: 'A', title: 'Review practice x' }], { tokenExchangeFails: true });
+    const run = start(root);
+    await expect(go(world, run, [{ slot: 'A', behaviorId: id(1) }])).rejects.toMatchObject({ code: 'token-exchange-failed' });
+    expect(steps(run)).toEqual(['registration:a-1']);
+    expect(run.cleanupInputs().grants.map((g) => g.grantId)).toEqual([world.grants[0].grantId]);
+    expect(world.grants.every((g) => !g.active)).toBe(true);
+    run.close();
+  });
+
+  it('stops before the next account when revocation cannot be confirmed, then reconciles on resume before registering again', async () => {
+    const root = tempRoot();
+    const world = fakeWorld([{ id: id(1), user: 'A', title: 'Review practice x' }, { id: id(2), user: 'B', title: 'Review practice y' }], { revokeFails: true });
+    const creations = [{ slot: 'A', behaviorId: id(1) }, { slot: 'B', behaviorId: id(2) }];
+    const first = start(root);
+    await expect(go(world, first, creations)).rejects.toMatchObject({ code: 'grant-revocation-unconfirmed' });
+    expect(world.calls.filter((c) => c.op === 'authorize').map((c) => c.slot)).toEqual(['A']);
+    first.close();
+
+    // Still unresolved: the retry stops before creating any new client or grant.
+    const second = reopen(root);
+    await expect(go(world, second, creations)).rejects.toMatchObject({ code: 'grant-revocation-unconfirmed' });
+    expect(world.calls.filter((c) => c.op === 'authorize')).toHaveLength(1);
+    second.close();
+
+    world.faults.revokeFails = false;
+    const third = reopen(root);
+    const result = await go(world, third, creations);
+    expect(result.ok).toBe(true);
+    expect(result.results).toEqual([
+      { slot: 'A', behaviorId: id(1), outcome: 'already-archived' },
+      { slot: 'B', behaviorId: id(2), outcome: 'archived' },
+    ]);
+    expect(world.grants.every((g) => !g.active)).toBe(true);
+    // A's Behavior is already archived, so the retry opens no new consent for A.
+    expect(steps(third)).toEqual(['registration:a-1', 'registration:b-1']);
+    third.close();
+  });
+
+  it('treats a malformed grant list as unconfirmed, not as no grants', async () => {
+    const root = tempRoot();
+    const world = fakeWorld([{ id: id(1), user: 'A', title: 'Review practice x' }]);
+    const realAuthorize = world.driver.authorize;
+    world.driver.authorize = async (args) => { const tokens = await realAuthorize(args); world.faults.grantListInvalid = true; return tokens; };
+    const run = start(root);
+    await expect(go(world, run, [{ slot: 'A', behaviorId: id(1) }])).rejects.toMatchObject({ code: 'grant-revocation-unconfirmed' });
+    run.close();
+  });
+
+  it('keeps a failed archive retryable in the same run', async () => {
+    const root = tempRoot();
+    const world = fakeWorld([{ id: id(1), user: 'A', title: 'Review practice x' }], { archiveFails: true });
+    const first = start(root);
+    const failed = await go(world, first, [{ slot: 'A', behaviorId: id(1) }]);
+    expect(failed).toMatchObject({ ok: false, results: [{ slot: 'A', behaviorId: id(1), outcome: 'archive-failed' }] });
+    first.close();
+    const second = reopen(root);
+    const retried = await go(world, second, [{ slot: 'A', behaviorId: id(1) }]);
+    expect(retried).toMatchObject({ ok: true, results: [{ slot: 'A', behaviorId: id(1), outcome: 'archived' }] });
+    const events = readFileSync(join(root, 'cleanup-r', 'events.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(events.filter((e) => e.type === 'archive.result').map((e) => e.outcome)).toEqual(['archive-failed', 'archived']);
+    second.close();
   });
 });
 
@@ -83,8 +168,8 @@ describe('archiveByLedger', () => {
     run.close();
     expect(result.ok).toBe(true);
     expect(result.results).toEqual([
-      { slot: 'A', behaviorId: id(1), outcome: 'archived' },
       { slot: 'A', behaviorId: id(2), outcome: 'already-archived' },
+      { slot: 'A', behaviorId: id(1), outcome: 'archived' },
       { slot: 'B', behaviorId: id(3), outcome: 'archived' },
     ]);
     expect(world.rows.get(id(1)).archived_at).not.toBeNull();
@@ -133,6 +218,8 @@ describe('parseArgs', () => {
     expect(() => parseArgs([])).toThrow('from-required');
     expect(() => parseArgs(['--from', 'run-one'])).toThrow('production-requires-confirm-production');
     expect(() => parseArgs(['--from', '../x', '--confirm-production'])).toThrow('from-invalid');
-    expect(parseArgs(['--from', 'run-one,run-two', '--confirm-production'])).toMatchObject({ from: ['run-one', 'run-two'], runId: null });
+    expect(parseArgs(['--from', 'run-one,run-two', '--confirm-production'])).toMatchObject({ from: ['run-one', 'run-two'], runId: null, resume: false });
+    expect(() => parseArgs(['--from', 'run-one', '--confirm-production', '--resume'])).toThrow('resume-needs-run');
+    expect(parseArgs(['--from', 'run-one', '--confirm-production', '--run', 'cleanup-1', '--resume'])).toMatchObject({ runId: 'cleanup-1', resume: true });
   });
 });

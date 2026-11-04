@@ -15,6 +15,7 @@ owner steps, client quirks and recovery live in the project skill
 | `npm run mcp:accept:guided` | Tier 2 fallback: prints the owner's numbered steps, runs the watcher with `--expect` and marks each step from the records (Ticket 252) |
 | `npm run mcp:watch` | Read-only watcher over accounts A and B; `--expect <scenario>` (Ticket 250) |
 | `npm run mcp:oauth` | OAuth and consent driver; production session enrollment and status (Ticket 248) |
+| `npm run mcp:accept:archive` | Archive test Behaviors a finished production run left active, from its ledger; refuses other titles and confirms grant revocation by readback |
 | `npm run agent:secret` | Agent-scoped keys from the "Cadence Agents" vault; `--check` reads no value (Ticket 254, `docs/qa/agent-secrets.md`) |
 
 - Every run writes `.intent/acceptance/<run-id>/`; inspect `STATE.md` there before
@@ -1492,9 +1493,11 @@ records were not touched.
 
 ### Ticket 259 deploy and live check — October 31, 2026
 
-Emi authorized the sequence at 22:44 UTC: push the hosted migration, then merge and
-deploy PR #175. Evidence is in `cadence-consent-259/.intent/artifacts/ship-259/` and in
-the run folders under `cadence-accept-integration/.intent/acceptance/` named below.
+This records the October 31 deployment. Later merges have moved production on, so
+none of these deployment IDs or results describe current production. Emi authorized
+the sequence at 22:44 UTC: push the hosted migration, then merge and deploy PR #175.
+Evidence is local and not committed: `cadence-consent-259/.intent/artifacts/ship-259/`
+and the run folders under `cadence-accept-integration/.intent/acceptance/` named below.
 
 | Step | Result | Evidence |
 | --- | --- | --- |
@@ -1503,16 +1506,16 @@ the run folders under `cadence-accept-integration/.intent/acceptance/` named bel
 | Trust refresh | `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` set to the new marketing deployment and read back. The app was redeployed as `dpl_7mFEnfmM45ueWuND6ypay6EYnXuv` (`f139236`, aliased to `app.cadence-me.com`). Preview run 41250015963 and Production run 41250187363 succeeded and published snapshot `20261031T225545Z-f1392365b7e3`. Seven checks passed, including `hosted_migration_boundary=20261031210000`. Secret scanning reports unavailable and cross-account RLS isolation not run, as at the #172 refresh. | [snapshot](https://emixd12.github.io/cadence/trust/41250187363/dpl_7mFEnfmM45ueWuND6ypay6EYnXuv/dpl_5eXFt2Cg3UZKmKCkPRrk6jMoMf9K/20261031T225545Z-f1392365b7e3.json) |
 | Tier 0, production | `prod-20261031-259t0`: 91/91 checks passed, 1 skipped (`ratelimit-a`, by design). Watcher exit 0. Cleanup revoked all 5 grants and archived the run's Behavior `1a6a1f35`. | `prod-20261031-259t0/report.md` |
 | Tier 2 ChatGPT web, account A, read-write | `20261031T230336Z-cf9e6e`: Cadence's consent offered all three scopes and the runner allowed them. Grant `e1b45487` (verified ChatGPT client metadata) holds all three. ChatGPT called `list_behaviors` and `get_account_context`, then `create_behavior` succeeded at 23:06:39 UTC (Behavior `5b69c8c5`) with reminders off; no fix-up was needed. Both test chats were archived, none unknown. The watcher was satisfied and the grant revoked. | `20261031T230336Z-cf9e6e/checkpoints.jsonl` |
-| Ledger cleanup | `prod-20261031-259cleanup`: a one-off script on the driver and ledger granted A read plus Behavior writes and archived `5b69c8c5` (readback `archived_at` set). It revoked its grant and found 0 active grants for A and B. A one-shot watcher read agrees. `npm run mcp:accept:archive` now does this. | `prod-20261031-259cleanup/checkpoints.jsonl` |
+| Ledger cleanup | `prod-20261031-259cleanup`: a one-off script on the driver and ledger granted A read plus Behavior writes and archived `5b69c8c5` (readback `archived_at` set). It revoked its grant and found 0 active grants for A and B. A one-shot watcher read agrees. `npm run mcp:accept:archive`, added afterwards, packages these steps; it has not run against production yet. | `prod-20261031-259cleanup/checkpoints.jsonl` |
 
 Not verified in this run: that ChatGPT requested only `cadence.read`, and that the
 switches started on in the live page. Cadence keeps the requested scopes only in the
 pending row, which consent deletes, and Vercel logs no `/oauth/authorize` lines.
 The run proves the offer and the grant. The read-only request rests on Ticket 256's
 live finding; the switch default rests on `ConsentForm` (`defaultChecked`) at
-`f139236`. From PR #174 on, the runners record both before clicking Allow: a
-`consent.view` event holds the authorize URL's `scope` parameter and each switch's
-starting state.
+`f139236`. The runners were changed afterwards to record both before clicking
+Allow: a `consent.view` event holds the authorize URL's `scope` parameter and each
+switch's starting state. No production run has used that recording yet.
 
 ### Known limits
 
