@@ -160,25 +160,22 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
         {event ? <div className="grid gap-4 p-4">
           {linkError ? <p role="alert">The link could not open. Try again.</p> : null}
           <article className="grid min-w-0 gap-2 text-sm leading-6">
-            <p className="break-words">{event.description || unavailable(event, "description")}</p>
-            <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3">
-              <dt className="font-bold">Source</dt><dd>{externalEventSourceName(event.source)}</dd>
-              <dt className="font-bold">Calendar</dt><dd>{event.calendarName}</dd>
-              <dt className="font-bold">Time</dt><dd>{eventTimeLabel(event, timezone)}</dd>
-              <dt className="font-bold">Duration</dt><dd>{event.duration.kind === "known" ? `${event.duration.seconds / 60} minutes` : event.duration.kind === "calendar_days" ? `${event.duration.days} calendar days` : "Unknown"}</dd>
-              <dt className="font-bold">Location</dt><dd className="break-words">{event.location || unavailable(event, "location")}</dd>
-              <dt className="font-bold">Organizer</dt><dd className="break-words">{event.organizer ? [event.organizer.displayName, event.organizer.email].filter(Boolean).join(" · ") : unavailable(event, "organizer")}</dd>
-              <dt className="font-bold">Attendees</dt><dd className="break-words">{event.attendees?.map((item) => `${item.displayName ?? item.email ?? "Unnamed attendee"} (${item.responseStatus.replaceAll("_", " ")})`).join(", ") || unavailable(event, "attendees")}</dd>
-              <dt className="font-bold">Conference</dt><dd className="break-words">{event.conference?.name ?? unavailable(event, "conference")}</dd>
-              <dt className="font-bold">Attachments</dt><dd className="break-words">{event.attachments?.map((item) => item.title ?? "Untitled attachment").join(", ") || unavailable(event, "attachments")}</dd>
-              <dt>State</dt><dd>{event.state} · {event.availability}</dd>
-              <dt>Source timezone</dt><dd>{event.sourceTimezone}</dd>
-              <dt>Recurrence</dt><dd className="break-words">{event.recurrence ? `${event.recurrence.seriesId} · ${event.recurrence.originalStart.kind === "timed" ? event.recurrence.originalStart.startAt : event.recurrence.originalStart.startLocalDate}` : "Not recurring or unavailable"}</dd>
-              <dt>Updated</dt><dd>{event.revision.providerUpdatedAt ?? "Not provided"}</dd>
+            <dl className={DETAIL_ROWS}>
+              <DetailRow label="Time" value={eventTimeLabel(event, timezone)} />
+              <DetailRow label="Duration" value={durationOnlyWhenEndUnknown(event)} />
+              <DetailRow label="Location" value={event.location} />
             </dl>
-            {navigation ? <><a href={navigation.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline" onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(navigation.href); } : undefined}>{navigation.label}</a>{navigation.modeNotice ? <p>{navigation.modeNotice}</p> : null}</> : null}
             {renderTravelTiming({ eventId: event.id, travel, timezone, onOpenExternal })}
+            {navigation ? <><a href={navigation.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline" onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(navigation.href); } : undefined}>{navigation.label}</a>{navigation.modeNotice ? <p>{navigation.modeNotice}</p> : null}</> : null}
             <TravelModeChoice eventId={event.id} travel={travel} habits={travelHabits} usualMode={travelMode} />
+            <dl className={DETAIL_ROWS}>
+              <DetailRow label="Calendar" value={[externalEventSourceName(event.source), event.calendarName].filter(hasText).join(" · ")} />
+              <DetailRow label="Attendees" value={event.attendees?.map((item) => `${item.displayName ?? item.email ?? "Unnamed attendee"} (${item.responseStatus.replaceAll("_", " ")})`).join(", ")} />
+              <DetailRow label="Organizer" value={event.organizer ? [event.organizer.displayName, event.organizer.email].filter(hasText).join(" · ") : null} />
+              <DetailRow label="Conference" value={event.conference?.name} />
+              <DetailRow label="Attachments" value={event.attachments?.map((item) => item.title ?? "Untitled attachment").join(", ")} />
+            </dl>
+            {hasText(event.description) ? <p className="break-words">{event.description}</p> : null}
             {onTravelCorrection && event.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt) ? <form key={`${event.id}-${event.revision.providerEtag ?? event.revision.providerUpdatedAt}`} className="grid gap-2 border-t border-line pt-3" onSubmit={(submit) => {
               submit.preventDefault();
               const data = new FormData(submit.currentTarget);
@@ -193,12 +190,12 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
               <p className="text-muted-readable">Applies only to this event revision while the Timeline is open. Calendar and saved locations stay unchanged.</p>
               <button type="submit" className="product-action product-action-secondary min-h-11 w-fit">Use for this journey</button>
             </form> : null}
-            {Object.entries(event.detailCompleteness).filter(([, state]) => state !== "complete").map(([field, state]) => <p key={field} className="text-muted-readable">{field.replaceAll("_", " ")}: {state?.replaceAll("_", " ")}</p>)}
             {event.conference?.notes ? <p className="break-words">{event.conference.notes}</p> : null}
             {event.conference?.entryPoints.map((entry, index) => safeHref(entry.uri) ? <a key={index} href={safeHref(entry.uri)!} onClick={onOpenExternal ? (event) => { event.preventDefault(); openExternal(safeHref(entry.uri)!); } : undefined} target="_blank" rel="noreferrer" className="min-h-11 underline">{entry.label ?? entry.type}</a> : <p key={index} className="break-words">{entry.label ?? entry.type}: {entry.uri}</p>)}
             {event.attachments?.map((attachment, index) => safeHref(attachment.url) ? <a key={index} href={safeHref(attachment.url)!} onClick={onOpenExternal ? (event) => { event.preventDefault(); openExternal(safeHref(attachment.url)!); } : undefined} target="_blank" rel="noreferrer" className="min-h-11 underline">{attachment.title ?? "Open attachment"}</a> : null)}
             {event.kind === "all_day" ? <button type="button" onClick={() => onDismissAllDay(event.id)} className="min-h-11 text-left font-bold underline underline-offset-4" aria-label={`Dismiss all-day event: ${event.title || "Untitled event"}`}>Dismiss from timeline</button> : null}
             {safeHref(event.sourceUrl) ? <a href={safeHref(event.sourceUrl)!} onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(safeHref(event.sourceUrl)!); } : undefined} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold underline underline-offset-4">Open source event <ExternalLink size={14} aria-hidden="true" /></a> : null}
+            <CalendarDevelopmentDetails event={event} timezone={timezone} />
           </article>
         </div> : null}
       </dialog>
@@ -258,12 +255,51 @@ export function eventTimeLabel(event: NormalizedExternalEvent, timezone: string)
   return `${start.toLocaleString("en-US", options)}–${end.toLocaleString("en-US", options)}`;
 }
 
-function unavailable(event: NormalizedExternalEvent, field: "description" | "location" | "organizer" | "attendees" | "conference" | "attachments"): string {
-  const reason = event.fieldAvailability[field];
-  if (reason === "restricted") return "Restricted by the source.";
-  if (reason === "provider_omitted") return "The source omitted this detail.";
-  if (reason === "not_provided") return "Not provided.";
-  return "No detail available.";
+// A fixed label column keeps the rows above and below the travel lines aligned.
+const DETAIL_ROWS = "grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3";
+
+function hasText(value: string | null | undefined): value is string {
+  return Boolean(value?.trim());
+}
+
+/** A row with no value renders nothing, so the grid closes up with no gap. */
+function DetailRow({ label, value }: Readonly<{ label: string; value: string | null | undefined }>) {
+  if (!hasText(value)) return null;
+  return <><dt className="font-bold">{label}</dt><dd className="break-words">{value}</dd></>;
+}
+
+/** The time row already shows any known span, so Duration appears only for an unspecified end. */
+function durationOnlyWhenEndUnknown(event: NormalizedExternalEvent): string | null {
+  if (event.kind !== "timed" || !event.endUnspecified) return null;
+  return event.duration.kind === "known" ? `${event.duration.seconds / 60} minutes` : "Unknown";
+}
+
+function instantLabel(value: string, timezone: string): string {
+  return Temporal.Instant.from(value).toZonedDateTimeISO(timezone).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function recurrenceLabel(recurrence: NonNullable<NormalizedExternalEvent["recurrence"]>, timezone: string): string {
+  const start = recurrence.originalStart;
+  const label = start.kind === "timed" ? instantLabel(start.startAt, timezone)
+    : Temporal.PlainDate.from(start.startLocalDate).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return `${recurrence.seriesId} · ${label}`;
+}
+
+/** Technical event fields for development builds. Production shows none of them. */
+function CalendarDevelopmentDetails({ event, timezone }: Readonly<{ event: NormalizedExternalEvent; timezone: string }>) {
+  const developmentBuild = useDevelopmentBuild();
+  if (!developmentBuild) return null;
+  const updatedAt = event.revision.providerUpdatedAt;
+  return <div className="grid gap-1 text-xs leading-5" data-calendar-development-details>
+    <p className="font-bold text-muted-readable">Development</p>
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3">
+      <DetailRow label="State" value={`${event.state} · ${event.availability}`} />
+      <DetailRow label="Source timezone" value={event.sourceTimezone} />
+      <DetailRow label="Recurrence" value={event.recurrence ? recurrenceLabel(event.recurrence, timezone) : null} />
+      <DetailRow label="Updated" value={updatedAt ? instantLabel(updatedAt, timezone) : null} />
+    </dl>
+    {Object.entries(event.detailCompleteness).filter(([, state]) => state !== "complete").map(([field, state]) => <p key={field} className="text-muted-readable">{field.replaceAll("_", " ")}: {state?.replaceAll("_", " ")}</p>)}
+  </div>;
 }
 
 function safeHref(value: string | null): string | null {

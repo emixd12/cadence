@@ -1,5 +1,24 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 262 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar details
+dialog now leads with what the user needs, for Google, Outlook and iCloud events.
+
+- Order: Time, Location, the travel lines, Directions, the journey mode choice, "Google Calendar ·
+  Work" on one row, Attendees, Organizer, Conference, Attachments, then the description.
+- A row with no value disappears in every build, so none of the four empty-row strings remain.
+- Duration shows only when the end is unspecified. Providers always report that duration as unknown,
+  so the row reads "Unknown".
+- State, Source timezone, Recurrence, Updated and raw completeness lines show only in development
+  builds, under a "Development" label. Times use the account timezone. No build shows a raw ISO instant.
+- The correction form, Open source event, navigation and "Dismiss from timeline" keep their behavior and
+  registry intents. Ticket 271 moves the form, and Ticket 261 rewords the travel lines.
+
+Platform impact: web and desktop through the shared component. Marketing: not applicable. Future
+mobile: shared component, checked at 390 px. Messaging impact: none; the user guide does not list these
+rows.
+
 ## Travel advisory revamp Wave 1: Ticket 265 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** One departure model

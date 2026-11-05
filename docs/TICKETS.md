@@ -15627,7 +15627,7 @@ the bench at desktop width and 390 px.
 
 ## Ticket 262: Calendar details dialog metadata
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
 Dependencies: Ticket 260 (development-only flag).
 
 Amended November 4, 2026, with C8 and G11.

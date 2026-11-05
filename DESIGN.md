@@ -572,6 +572,14 @@ across web and desktop. `ExternalEventDetails` owns persistent preview and nativ
 dialog presentation. `GoogleCalendarPanel` reuses SettingsPanel and native form
 controls. Synthetic Calendar bench adapters perform no provider or account reads.
 
+Calendar details lead with Time and Location, then the travel lines, Directions and
+the journey mode choice. The source and calendar share one row, followed by Attendees,
+Organizer, Conference and Attachments, then the description. A row with no value is
+removed from the grid. State, Source timezone, Recurrence, Updated and completeness
+lines appear only in development builds, under a "Development" label, with times in
+the account timezone. The bench switches between Google, Outlook and iCloud events
+and both build modes.
+
 The production current-time dot updates on visible minute boundaries without an
 SVG position transition. This avoids an animation continuing after minimization.
 

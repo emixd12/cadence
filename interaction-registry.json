@@ -824,7 +824,7 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 14,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
