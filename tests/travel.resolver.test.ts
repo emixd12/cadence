@@ -1,3 +1,4 @@
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -556,5 +557,212 @@ describe("Ticket 217 learned buffers", () => {
     expect(evidence.legs.map(({ leg }) => leg.destinationPlaceKey)).toEqual([placeKey, null]);
     expect(() => resolveTravelPlan(planningInput({ commitments: [{ ...remembered, placeKey: "Main Street" }] })))
       .toThrow("Travel commitment place key must be a place key.");
+  });
+});
+
+describe("Ticket 264: late trips, trips home and missing estimates", () => {
+  const WALK = { arrivalSeconds: 300, exitSeconds: 0, settlingSeconds: 0 };
+  const LATE_WARNING = "Estimated arrival is after the planned arrival time.";
+  const place = (ref: string, coordinate: number) => endpoint(ref, "calendar", `${ref}-r1`, coordinate);
+  const home = endpoint("base", "saved_base", "base-r1", 9);
+  const walking = (overrides: Partial<TravelPlanningInput>) => planningInput({ defaultMode: "walking", device: null, base: home, buffers: WALK, ...overrides });
+  /** What the provider returns for a schedule-free arrive-by leg: it counts back from the target. */
+  const countedBack = (target: string, seconds: number) => estimate(
+    Temporal.Instant.from(target).subtract({ seconds }).toString(), target, seconds);
+  const unknownReasons = (input: Parameters<typeof resolveTravelPlan>[0]) => {
+    const plan = resolveTravelPlan(input);
+    const evidence = resolveTravelEvidence(evidenceInput(plan, plan.legs.map((leg) => resultFor(leg, null)), []));
+    return { plan, evidence };
+  };
+
+  it.each(["walking", "cycling", "driving"] as const)("scenario B: an event too soon keeps a usable late %s leg", (mode) => {
+    const plan = resolveTravelPlan(walking({ defaultMode: mode, commitments: [
+      commitment("event-1", "2026-09-16T16:15:00Z", "2026-09-16T17:15:00Z", place("near", 2)),
+    ] }));
+    const outbound = plan.legs.find((leg) => leg.role === "outbound")!;
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(outbound, countedBack("2026-09-16T16:10:00Z", 1800))], []), buffers: WALK });
+    expect(evidence.legs.find((entry) => entry.leg.id === outbound.id)).toMatchObject({
+      state: "current", late: true, reason: null,
+      estimate: { departureAt: NOW, arrivalAt: "2026-09-16T16:30:00Z", durationSeconds: 1800 },
+    });
+    expect(evidence.legs[0]?.estimate?.warnings).toContain(LATE_WARNING);
+    expect(evidence.segments.find((segment) => segment.kind === "route")).toMatchObject({ startAt: NOW, endAt: "2026-09-16T16:30:00Z" });
+  });
+
+  it("scenario C: two events too close keep a usable late onward leg", () => {
+    const plan = resolveTravelPlan(walking({ now: "2026-09-16T12:00:00Z", commitments: [
+      commitment("event-1", "2026-09-16T14:00:00Z", "2026-09-16T15:00:00Z", place("first", 2)),
+      commitment("event-2", "2026-09-16T15:10:00Z", "2026-09-16T16:00:00Z", place("second", 3)),
+    ] }));
+    const onward = plan.legs.find((leg) => leg.role === "onward")!;
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(onward, countedBack("2026-09-16T15:05:00Z", 1800))], []), now: "2026-09-16T12:00:00Z", buffers: WALK });
+    expect(evidence.legs.find((entry) => entry.leg.role === "onward")).toMatchObject({
+      state: "current", late: true,
+      estimate: { departureAt: "2026-09-16T15:00:00Z", arrivalAt: "2026-09-16T15:30:00Z" },
+    });
+  });
+
+  it("marks a traffic-aware late arrival the same way and leaves an on-time leg unflagged", () => {
+    const plan = resolveTravelPlan(planningInput({ now: "2026-09-16T12:00:00Z" }));
+    const leg = plan.legs[0]!;
+    const late = resolveTravelEvidence(evidenceInput(plan, [resultFor(leg, estimate("2026-09-16T18:10:00Z", "2026-09-16T18:40:00Z", 1800))], [])).legs[0]!;
+    expect(late).toMatchObject({ state: "current", late: true, estimate: { departureAt: "2026-09-16T18:10:00Z", arrivalAt: "2026-09-16T18:40:00Z" } });
+    const onTime = resolveTravelEvidence(evidenceInput(plan, [resultFor(leg, estimate("2026-09-16T17:00:00Z", "2026-09-16T17:30:00Z", 1800))], [])).legs[0]!;
+    expect(onTime).not.toHaveProperty("late");
+    expect(onTime.estimate?.warnings).toEqual([]);
+  });
+
+  it("does not move a transit timetable: an estimate before the ready time stays unavailable", () => {
+    const plan = resolveTravelPlan(walking({ defaultMode: "transit", commitments: [
+      commitment("event-1", "2026-09-16T16:15:00Z", "2026-09-16T17:15:00Z", place("near", 2)),
+    ] }));
+    const outbound = plan.legs[0]!;
+    const entry = resolveTravelEvidence(evidenceInput(plan, [resultFor(outbound, countedBack("2026-09-16T16:10:00Z", 1800))], [])).legs[0]!;
+    expect(entry).toMatchObject({ state: "unavailable", estimate: null, reason: "Route departs before its ready time." });
+    expect(entry).not.toHaveProperty("late");
+  });
+
+  it("never moves a late departure before its ready time for a weather margin", () => {
+    const plan = resolveTravelPlan(walking({ commitments: [commitment("event-1", "2026-09-16T16:15:00Z", "2026-09-16T17:15:00Z", place("near", 2))] }));
+    const outbound = plan.legs[0]!;
+    const hours = Array.from({ length: 6 }, (_, index) => ({ time: Temporal.Instant.from("2026-09-16T14:00:00Z").add({ hours: index }).toString(), weatherCode: 61,
+      rainMillimeters: 1.2, snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 }));
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(outbound, countedBack("2026-09-16T16:10:00Z", 1800))], []), now: NOW, buffers: WALK,
+      weather: { state: "forecast", forecast: { provider: "open-meteo", areaKey: "x", hourStart: "2026-09-16T16:00:00Z", fetchedAt: NOW, expiresAt: "2026-09-16T17:00:00Z", hours } } });
+    expect(evidence.legs[0]?.weather).toMatchObject({ marginSeconds: 600, departureAt: NOW, arrivalAt: "2026-09-16T16:40:00Z" });
+    expect(evidence.segments.find((segment) => segment.kind === "weather_margin")).toMatchObject({ startAt: "2026-09-16T16:30:00Z", endAt: "2026-09-16T16:40:00Z" });
+  });
+
+  describe("scenario D: an event under way", () => {
+    const ongoing = commitment("event-now", "2026-09-16T15:30:00Z", "2026-09-16T16:30:00Z", place("here", 2));
+    const later = commitment("event-later", "2026-09-16T18:00:00Z", "2026-09-16T19:00:00Z", place("there", 3));
+    const fresh = endpoint("device", "device", "device-r1", 1, { observedAt: NOW, accuracyMeters: 10, grantRevision: "grant-1" });
+
+    it("keeps the trip home from the event, ready at its end", () => {
+      const plan = resolveTravelPlan(walking({ commitments: [ongoing] }));
+      expect(plan.unknownLegs).toEqual([]);
+      expect(plan.legs).toHaveLength(1);
+      expect(plan.legs[0]).toMatchObject({ role: "return", originCommitmentRef: "event-now", destinationCommitmentRef: null, readyAt: "2026-09-16T16:30:00Z",
+        request: { timing: { kind: "depart_at", at: "2026-09-16T16:30:00Z" } }, provenance: { originRef: "here", destinationRef: "base" } });
+    });
+
+    it("plans the onward trip from the event, and the trip home after that", () => {
+      const plan = resolveTravelPlan(walking({ commitments: [ongoing, later] }));
+      expect(plan.legs.map((leg) => [leg.role, leg.originCommitmentRef, leg.destinationCommitmentRef, leg.readyAt])).toEqual([
+        ["onward", "event-now", "event-later", "2026-09-16T16:30:00Z"],
+        ["return", "event-later", null, "2026-09-16T19:00:00Z"],
+      ]);
+    });
+
+    it("lets a fresh device name the next departure, which still waits for the known end", () => {
+      const onward = resolveTravelPlan(walking({ device: fresh, commitments: [ongoing, later] })).legs[0]!;
+      expect(onward).toMatchObject({ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-later",
+        readyAt: "2026-09-16T16:30:00Z", provenance: { originRef: "device", originSource: "device" } });
+      const home = resolveTravelPlan(walking({ device: fresh, commitments: [ongoing] })).legs;
+      expect(home).toHaveLength(1);
+      expect(home[0]).toMatchObject({ role: "return", originCommitmentRef: "event-now", readyAt: "2026-09-16T16:30:00Z",
+        provenance: { originRef: "device", originSource: "device", destinationRef: "base" } });
+    });
+
+    it("does not let a stale device replace the event as the origin", () => {
+      const stale = endpoint("device", "device", "device-r1", 1, { observedAt: "2026-09-16T15:00:00Z", accuracyMeters: 10, grantRevision: "grant-1" });
+      expect(resolveTravelPlan(walking({ device: stale, commitments: [ongoing] })).legs[0]?.provenance.originRef).toBe("here");
+    });
+
+    it("invents no end for an event without one", () => {
+      const open = { ...ongoing, endAt: null };
+      const alone = resolveTravelPlan(walking({ commitments: [open] }));
+      expect(alone.legs).toEqual([]);
+      expect(alone.unknownLegs).toEqual([{ role: "return", originCommitmentRef: "event-now", destinationCommitmentRef: null, reason: "timing_unknown" }]);
+      const onward = resolveTravelPlan(walking({ commitments: [open, later] }));
+      expect(onward.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "event-now", destinationCommitmentRef: "event-later", reason: "timing_unknown" }]);
+      expect(onward.legs.map((leg) => leg.role)).toEqual(["return"]);
+      const device = resolveTravelPlan(walking({ device: fresh, commitments: [open, later] }));
+      expect(device.legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "device" } });
+      const deviceAlone = resolveTravelPlan(walking({ device: fresh, commitments: [open] }));
+      expect(deviceAlone.legs).toEqual([]);
+      expect(deviceAlone.unknownLegs[0]?.reason).toBe("timing_unknown");
+    });
+
+    it("stops treating an event with no known end as the prior stop once a later stop has started", () => {
+      const open = commitment("event-open", "2026-09-16T08:00:00Z", null, place("old", 4));
+      const ended = commitment("event-ended", "2026-09-16T12:00:00Z", "2026-09-16T13:00:00Z", place("mid", 5));
+      expect(resolveTravelPlan(walking({ commitments: [open, ended, later] })).legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "base" } });
+      expect(resolveTravelPlan(walking({ commitments: [open, ongoing, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-now" });
+      const long = commitment("event-long", "2026-09-16T12:00:00Z", "2026-09-16T17:00:00Z", place("long", 6));
+      expect(resolveTravelPlan(walking({ commitments: [long, ended, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-long" });
+    });
+
+    it("treats an ended event, a remote one and one with no place as no prior stop", () => {
+      const ended = { ...ongoing, endAt: NOW };
+      const remote = { ...ongoing, attendance: "remote" as const };
+      const hybrid = { ...ongoing, attendance: "hybrid" as const };
+      const nowhere = { ...ongoing, endpoint: null };
+      for (const value of [ended, remote, hybrid, nowhere]) {
+        const plan = resolveTravelPlan(walking({ commitments: [value, later] }));
+        expect(plan.legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "base" } });
+        expect(plan.unknownLegs).toEqual([]);
+      }
+      expect(resolveTravelPlan(walking({ commitments: [ended] })).legs).toEqual([]);
+    });
+
+    it("plans no trip home from a stop already at Home", () => {
+      const placed = { ...home, point: { kind: "place_id" as const, placeId: "home" } };
+      expect(resolveTravelPlan(walking({ base: placed, commitments: [{ ...ongoing, endpoint: { ...placed, ref: "event-now" } }] }))).toMatchObject({ legs: [], unknownLegs: [] });
+    });
+
+    it("names the missing Home instead of going silent", () => {
+      const plan = resolveTravelPlan(walking({ base: null, commitments: [ongoing] }));
+      expect(plan.legs).toEqual([]);
+      expect(plan.unknownLegs).toEqual([{ role: "return", originCommitmentRef: "event-now", destinationCommitmentRef: null, reason: "return_base_missing" }]);
+    });
+  });
+
+  it("scenario E: no Home and no device reaches the client as reasons", () => {
+    const { evidence } = unknownReasons(walking({ base: null }));
+    expect(evidence.legs).toEqual([]);
+    expect(evidence.unknownLegs).toEqual([
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-1", reason: "origin_unknown" },
+      { role: "return", originCommitmentRef: "event-1", destinationCommitmentRef: null, reason: "return_base_missing" },
+    ]);
+  });
+
+  it("scenario F: an unresolved stop keeps the chaining rule and names both unknown legs", () => {
+    const { evidence } = unknownReasons(walking({ commitments: [
+      { ...commitment("event-vague", "2026-09-16T17:00:00Z", "2026-09-16T18:00:00Z", place("vague", 2)), endpoint: null },
+      commitment("event-clear", "2026-09-16T18:30:00Z", "2026-09-16T19:30:00Z", place("clear", 3)),
+    ] }));
+    expect(evidence.legs.map((entry) => entry.leg.role)).toEqual(["return"]);
+    expect(evidence.unknownLegs).toEqual([
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-vague", reason: "destination_unknown" },
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-clear", reason: "origin_unknown" },
+    ]);
+  });
+
+  it("scenario G: a location plus a video link keeps the chaining rule and names both unknown legs", () => {
+    const { evidence } = unknownReasons(walking({ commitments: [
+      { ...commitment("event-hybrid", "2026-09-16T17:00:00Z", "2026-09-16T18:00:00Z", place("hybrid", 2)), attendance: "hybrid" },
+      commitment("event-clear", "2026-09-16T18:30:00Z", "2026-09-16T19:30:00Z", place("clear", 3)),
+    ] }));
+    expect(evidence.legs.map((entry) => entry.leg.role)).toEqual(["return"]);
+    expect(evidence.unknownLegs).toEqual([
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-hybrid", reason: "attendance_unknown" },
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-clear", reason: "origin_unknown" },
+    ]);
+  });
+
+  it("gives unknown legs only commitment refs and a reason, and drops them when the plan changed", () => {
+    const { plan, evidence } = unknownReasons(walking({ base: null }));
+    for (const leg of evidence.unknownLegs!) expect(Object.keys(leg).sort()).toEqual(["destinationCommitmentRef", "originCommitmentRef", "reason", "role"]);
+    expect(JSON.stringify(evidence.unknownLegs)).not.toMatch(/latitude|longitude|placeId|point|\d{4}-\d{2}/);
+    expect(resolveTravelEvidence({ ...evidenceInput(plan, [], []), expectedJourneyRevision: "other" }).unknownLegs).toEqual([]);
+  });
+
+  it("removes unknown legs of a resolved stop after a decision", () => {
+    const { evidence } = unknownReasons(walking({ base: null }));
+    const after = resolveTravelAfterDecisions(evidence, [{ id: "event-1", status: "completed" }]);
+    expect(after?.unknownLegs).toEqual([]);
+    const released = Object.fromEntries(Object.entries(evidence).filter(([key]) => key !== "unknownLegs")) as typeof evidence;
+    expect(resolveTravelAfterDecisions(released, [{ id: "event-1", status: "completed" }])).not.toHaveProperty("unknownLegs");
   });
 });

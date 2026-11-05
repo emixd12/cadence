@@ -105,6 +105,61 @@ describe("travel model projection", () => {
     expect(maybeRemote.fits[0]).toMatchObject({ conclusion: "unknown", basis: "travel_unknown" });
   });
 
+  it("Ticket 264: a late trip on foot keeps the same late_arrival conclusion as driving", () => {
+    const stop = commitment("stretch", "2026-09-16T12:15:00Z", "2026-09-16T12:45:00Z", place("studio"));
+    // The provider counts back from the arrival target, to before the ready time.
+    const counted = { departureAt: "2026-09-16T11:45:00Z", arrivalAt: "2026-09-16T12:15:00Z", seconds: 1_807 };
+    const walking = project({ commitments: [stop] }, [], (role) => role === "outbound" ? counted : HOME);
+    expect(walking.fits).toEqual([{ ref: "stretch", conclusion: "does_not_fit", basis: "late_arrival",
+      trip: { destinationRef: "stretch", role: "outbound" }, position: null }]);
+    expect(walking.trips[0]).toEqual({ destinationRef: "stretch", role: "outbound", mode: "cycling", estimate: "current" });
+    const evaluated = project({ commitments: [stop], defaultMode: "driving" }, [],
+      (role) => role === "outbound" ? { departureAt: NOW, arrivalAt: "2026-09-16T12:30:07Z", seconds: 1_807 } : HOME);
+    expect(evaluated.fits).toEqual(walking.fits);
+    const serialized = JSON.stringify(walking);
+    for (const leaked of ["12:30", "1807", "studio-place", "11:45"]) expect(serialized).not.toContain(leaked);
+    assertNoTiming(walking);
+  });
+
+  it("Ticket 264: transit that cannot start in time stays unknown, never late", () => {
+    const stop = commitment("stretch", "2026-09-16T12:15:00Z", "2026-09-16T12:45:00Z", place("studio"));
+    const counted = { departureAt: "2026-09-16T11:45:00Z", arrivalAt: "2026-09-16T12:15:00Z", seconds: 1_807 };
+    const projection = project({ commitments: [stop], defaultMode: "transit" }, [], (role) => role === "outbound" ? counted : HOME);
+    expect(projection.fits).toEqual([{ ref: "stretch", conclusion: "unknown", basis: "travel_unknown",
+      trip: { destinationRef: "stretch", role: "outbound" }, position: null }]);
+  });
+
+  it("Ticket 264: an event under way adds its trip home, and no conclusion about the past", () => {
+    const projection = project({ commitments: [
+      commitment("event-now", "2026-09-16T11:30:00Z", "2026-09-16T13:00:00Z", place("dentist")),
+    ] }, [
+      candidate("run", "2026-09-16T12:30:00Z", "2026-09-16T12:45:00Z"),
+      candidate("started", "2026-09-16T11:45:00Z", "2026-09-16T12:30:00Z"),
+      candidate("tea", "2026-09-16T13:10:00Z", "2026-09-16T13:30:00Z"),
+      candidate("journal", "2026-09-16T22:00:00Z", "2026-09-16T22:30:00Z"),
+    ], () => ({ departureAt: "2026-09-16T13:00:00Z", arrivalAt: "2026-09-16T13:43:07Z", seconds: 2_587 }));
+    expect(projection.travelDay).toBe("yes");
+    expect(projection.calendarEvents).toBe(true);
+    expect(projection.trips).toEqual([{ destinationRef: null, role: "return", mode: "cycling", estimate: "current" }]);
+    expect(projection.fits.map((fit) => [fit.ref, fit.conclusion, fit.basis, fit.trip?.role ?? null, fit.position])).toEqual([
+      ["run", "fits", "travel_known", "return", "before"],
+      ["tea", "does_not_fit", "travel_overlap", "return", null],
+      ["journal", "fits", "travel_known", "return", "after"],
+    ]);
+    assertNoTiming(projection);
+    expect(JSON.stringify(projection)).not.toContain("13:43");
+  });
+
+  it("Ticket 264: an event under way with no known end keeps later fits unknown, never free", () => {
+    const projection = project({ commitments: [
+      { ...commitment("event-now", "2026-09-16T11:30:00Z", "2026-09-16T13:00:00Z", place("dentist")), endAt: null },
+    ] }, [candidate("journal", "2026-09-16T22:00:00Z", "2026-09-16T22:30:00Z")]);
+    expect(projection.travelDay).toBe("unknown");
+    expect(projection.trips).toEqual([{ destinationRef: null, role: "return", mode: null, estimate: "unknown" }]);
+    expect(projection.fits).toEqual([{ ref: "journal", conclusion: "unknown", basis: "travel_unknown",
+      trip: { destinationRef: null, role: "return" }, position: "after" }]);
+  });
+
   it("projects nothing while disabled or after a revision change", () => {
     const plan = resolveTravelPlan(planning({}));
     const input = evidence(plan, []);

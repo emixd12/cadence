@@ -161,7 +161,8 @@ export async function computeGoogleRoute(
   assertTravelProviderReady(options.config);
   const timingAt = instantString(request.timing.at);
   const trafficAware = drivingTrafficAware(request, options.now);
-  // One call per leg (Ticket 214). Routes API accepts arrivalTime for TRANSIT only.
+  // One call per leg (Ticket 214); a late transit leg alone gets a second one from
+  // routeTravelLegs (Ticket 264). Routes API accepts arrivalTime for TRANSIT only.
   // Traffic-aware driving evaluates departure from the earliest possible start; later
   // driving, walking and cycling use static durations without an arrivalTime request.
   const drivingAt = request.mode !== "driving" ? timingAt

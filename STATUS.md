@@ -1,5 +1,28 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 264 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The hosted
+route now reports what used to go silent. Evidence version stays `1.0`: no client compares
+it, and every change adds a field.
+
+- A late leg stays usable. Walking, cycling and static driving depart at the ready time and
+  arrive one route duration later. A new `late` flag marks every late leg, including
+  traffic-aware driving.
+- A late transit leg makes one more call from its ready time, with spend reserved first.
+  If the budget refuses that call, only that leg is lost.
+- A physical event under way with a usable place stays the prior stop until its end. A fresh
+  device still names the next departure's origin, and that departure waits for the known end.
+  An event with no known end gets none: the next leg reports `timing_unknown` until a later
+  stop starts.
+- `unknownLegs` reaches the client with commitment refs and a reason only.
+- Signed conclusions keep their meaning, including `late_arrival`. Started Behaviors get no
+  fit conclusion. A weather margin never moves a late departure before its ready time.
+
+Platform impact: web and desktop share the hosted route; released Mac 0.1.8 ignores the new
+fields. Marketing: not applicable. Future mobile: inherits the hosted behavior. Messaging
+impact: none; Tickets 261 and 269 own the words. `docs/COSTS.md` records the new route calls.
+
 ## Travel advisory revamp filed: Tickets 263–285 — November 4, 2026
 
 **Documents only, on branch `us-work`. No runtime, schema or user-visible text change.**
@@ -16,7 +39,8 @@ marketing deployment `dpl_9qRsEuWVTsV7869VeHSfNiPCpeGw`. The app was redeployed 
 and marketing pages returned 200. Trust checks may read stale until the next scheduled
 collection.
 
-- Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started,
+- Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started
+  when filed,
   and amends Tickets 260–262, still not started.
 - Wave order: 1 is Tickets 264–266 and 260–262; 2 is 267–268; 3 is 269–274; 4 is 275–280;
   5 is 281–283; 6 is 284–285.

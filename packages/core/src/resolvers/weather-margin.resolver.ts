@@ -205,7 +205,9 @@ export function resolveTravelWeather(input: Readonly<{
     if (!planned || entry.state === "rejected_revision") return entry;
     const margin = resolveWeatherMargin({ hours: forecast.hours, period: weatherDeparturePeriod(planned), mode: planned.mode });
     const estimate = entry.state === "current" ? entry.estimate : null;
-    const fixedDeparture = planned.request.timing.kind === "depart_at";
+    // Ticket 264: a margin never moves a late leg's departure before its ready time; it follows the arrival.
+    const fixedDeparture = planned.request.timing.kind === "depart_at" || (!!estimate && entry.late === true &&
+      Temporal.Instant.compare(instant(shift(estimate.departureAt, -margin.marginSeconds), "Weather-adjusted time"), instant(entry.leg.readyAt, "Route ready time")) < 0);
     const departureAt = estimate
       ? fixedDeparture ? estimate.departureAt : shift(estimate.departureAt, -margin.marginSeconds)
       : null;

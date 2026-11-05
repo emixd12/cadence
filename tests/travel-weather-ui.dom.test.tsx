@@ -140,3 +140,23 @@ describe("Daily Brief travel block with weather", () => {
     expect(container.querySelector("[data-weather-credit]")).toBeNull();
   });
 });
+
+describe("travel timing with the Ticket 264 fields", () => {
+  it("renders a late leg as a normal leave and arrive line, and ignores unknown legs", async () => {
+    const base = evidence(undefined, undefined);
+    const late: Omit<TravelEvidenceResult, "modelProjection"> = { ...base,
+      unknownLegs: [{ role: "return", originCommitmentRef: "event-1", destinationCommitmentRef: null, reason: "return_base_missing" }],
+      legs: base.legs.map((entry) => ({ ...entry, late: true, estimate: { ...entry.estimate!, warnings: ["Estimated arrival is after the planned arrival time."] } })) };
+    await act(() => root.render(renderTravelTiming({ eventId: "event-1", travel: late, timezone: "America/New_York" })));
+    expect(container.textContent).toContain("Outbound · cycling: leave");
+    expect(container.textContent).toContain("Estimated arrival is after the planned arrival time.");
+    expect(container.textContent).not.toContain("timing unavailable");
+    expect(container.textContent).not.toContain("return_base_missing");
+  });
+
+  it("shows nothing new for an event with only unknown legs", async () => {
+    const only: Omit<TravelEvidenceResult, "modelProjection"> = { ...evidence(undefined, undefined), legs: [],
+      unknownLegs: [{ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-1", reason: "origin_unknown" }] };
+    expect(renderTravelTiming({ eventId: "event-1", travel: only, timezone: "America/New_York" })).toBeNull();
+  });
+});

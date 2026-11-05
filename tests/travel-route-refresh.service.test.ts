@@ -393,6 +393,113 @@ describe("refreshTravelRoutes", () => {
   });
 });
 
+describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
+  const withEvents = (events: readonly Record<string, unknown>[], settings: Readonly<{ baseLocationText?: string | null }> = {}) => {
+    mocks.source.mockResolvedValue({ ...source, behaviors: [], settings: { ...source.settings, ...settings } });
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+    mocks.behaviors.mockResolvedValue([]);
+    mocks.occurrences.mockResolvedValue([]);
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events });
+  };
+  const event = (id: string, startAt: string, endAt: string, location = `${id} St`, extra: Record<string, unknown> = {}) => ({
+    id, kind: "timed", state: "confirmed", currentUserResponse: "accepted", calendarId: "primary", providerEventId: id, startAt, endAt,
+    endUnspecified: false, location, conference: null, revision: { providerEtag: id, providerUpdatedAt: null }, ...extra,
+  });
+  const ongoing = event("ongoing", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z");
+  const fromReady = (leg: { id: string; request: { readyAt: string } }) => ({ id: leg.id, failure: null, estimate: { ...estimate,
+    departureAt: leg.request.readyAt, arrivalAt: Temporal.Instant.from(leg.request.readyAt).add({ seconds: 600 }).toString(), durationSeconds: 600 } });
+  const secret = "s".repeat(64);
+
+  it("scenario D: keeps the trip home for an event under way", async () => {
+    withEvents([ongoing]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(mocks.route.mock.calls[0]![0].routes).toHaveLength(1);
+    expect(result.evidence?.legs).toHaveLength(1);
+    expect(result.evidence?.legs[0]).toMatchObject({ state: "current", leg: { role: "return", originCommitmentRef: "ongoing", destinationCommitmentRef: null } });
+    expect(result.evidence?.unknownLegs).toEqual([]);
+  });
+
+  it("scenario D: passes an end-unspecified event through without inventing an end", async () => {
+    withEvents([event("ongoing", "2026-09-22T07:30:00Z", "2026-09-22T07:30:00Z", "ongoing St", { endUnspecified: true })]);
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(mocks.route).not.toHaveBeenCalled();
+    expect(result.evidence?.legs).toEqual([]);
+    expect(result.evidence?.unknownLegs).toEqual([{ role: "return", originCommitmentRef: "ongoing", destinationCommitmentRef: null, reason: "timing_unknown" }]);
+  });
+
+  it("leaves ended, remote-looking and unplaced events under way out of the plan", async () => {
+    withEvents([
+      event("ended", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z"),
+      event("video", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", "video St", { conference: { url: "https://example.test" } }),
+      event("blank", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", ""),
+    ]);
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence).toMatchObject({ legs: [], unknownLegs: [], segments: [] });
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).toEqual([]);
+  });
+
+  it("keeps a Behavior under way until its end, and its source for later decisions", async () => {
+    located("2026-09-22T07:50:00Z");
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence?.legs[0]).toMatchObject({ leg: { role: "return", originCommitmentRef: "occurrence-1" } });
+    expect(result.evidence?.behaviorSources?.map((item) => item.ref)).toEqual(["occurrence-1"]);
+  });
+
+  it("drops a Behavior once it has ended", async () => {
+    located("2026-09-22T07:00:00Z");
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence).toMatchObject({ legs: [], unknownLegs: [] });
+    expect(result.evidence?.behaviorSources).toEqual([]);
+  });
+
+  it("scenarios E to G: returns the reasons, and no place text, to the client", async () => {
+    withEvents([
+      event("vague", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Somewhere vague"),
+      event("hybrid", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "Hybrid Hall", { conference: { url: "https://example.test" } }),
+      event("clear", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z", "Clear Hall"),
+    ], { baseLocationText: null });
+    mocks.geocode.mockImplementation(async (text: string) => text === "Somewhere vague"
+      ? { kind: "ambiguous" } : { kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } });
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence?.legs).toEqual([]);
+    expect(result.evidence?.unknownLegs).toEqual([
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "vague", reason: "destination_unknown" },
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "hybrid", reason: "attendance_unknown" },
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "clear", reason: "origin_unknown" },
+      { role: "return", originCommitmentRef: "clear", destinationCommitmentRef: null, reason: "return_base_missing" },
+    ]);
+    expect(JSON.stringify(result.evidence?.unknownLegs)).not.toMatch(/Hall|vague St|Somewhere|place:/);
+  });
+
+  it("scenario B through the service: a usable late leg, and late_arrival in the signed conclusions", async () => {
+    located("2026-09-22T08:15:00Z");
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { timing: { at: string } } }[] }) => routes.map((route, index) => ({ id: route.id, failure: null, estimate: index === 0
+      ? { ...estimate, durationSeconds: 1800, departureAt: "2026-09-22T07:40:00Z", arrivalAt: "2026-09-22T08:10:00Z" }
+      : { ...estimate, departureAt: route.request.timing.at, arrivalAt: Temporal.Instant.from(route.request.timing.at).add({ seconds: 600 }).toString() } })));
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    expect(result.evidence?.legs[0]).toMatchObject({ state: "current", late: true, estimate: { departureAt: now.toString(), arrivalAt: "2026-09-22T08:30:00Z" } });
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+    expect(payload?.conclusions.fits).toEqual([{ ref: "occurrence:occurrence-1", conclusion: "does_not_fit", basis: "late_arrival",
+      trip: { destinationRef: "occurrence:occurrence-1", role: "outbound" }, position: null }]);
+    const body = result.conclusionsToken!.split(".")[0]!;
+    const text = Buffer.from(body, "base64url").toString("utf8");
+    expect(JSON.parse(text).conclusions).not.toHaveProperty("late");
+    for (const leaked of ["08:30", "07:40", "1800", "Habit St", "Base St"]) expect(JSON.stringify(payload?.conclusions)).not.toContain(leaked);
+  });
+
+  it("signs the trip home from an event under way, named by its Calendar identity", async () => {
+    withEvents([ongoing]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const result = await refreshTravelRoutes(caller, day, config, now, undefined, secret);
+    const payload = verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+    expect(payload?.conclusions).toMatchObject({ travelDay: "yes", calendarEvents: true,
+      trips: [{ destinationRef: null, role: "return", mode: "walking", estimate: "current" }], fits: [] });
+    expect(JSON.stringify(payload?.conclusions)).not.toMatch(/08:30|ongoing St/);
+  });
+});
+
 describe("refreshTravelRoutes weather (Ticket 218)", () => {
   const ready = { status: "ready" as const, baseUrl: "https://api.open-meteo.com/v1/forecast", apiKey: null };
   // Synthetic sample near a public landmark; never a real user position.

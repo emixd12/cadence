@@ -64,18 +64,25 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
   }
 
   const corrections = validCorrections(input.corrections, input.journeyRef);
-  const initialOrigin = selectImmediateOrigin({
+  const observedOrigin = selectObservedOrigin({
     input,
     corrections,
     now,
     maxDeviceAge,
     maxDeviceAccuracy,
   });
+  const initialOrigin = observedOrigin ?? input.base;
+  const currentStop = selectCurrentStop(commitments, corrections, input.base, now);
+  // Ticket 264: a stop in progress is the prior stop. A fresh device or an explicit
+  // correction still names the origin of the next departure, which then waits for the
+  // stop's known end. A stop with no known end gets none: the wait is simply unknown.
+  const overriddenStop = currentStop && observedOrigin ? currentStop.commitment : null;
+  const immediateReadyAt = (overriddenStop && readyAfter(overriddenStop, input.buffers.exitSeconds)) ?? now.toString();
   const legs: TravelPlannedLeg[] = [];
   const unknownLegs: TravelUnknownLeg[] = [];
-  let priorEndpoint: TravelEndpoint | null = initialOrigin;
-  let priorCommitment: TravelCommitment | null = null;
-  let chained = Boolean(initialOrigin);
+  let priorEndpoint: TravelEndpoint | null = overriddenStop ? observedOrigin : currentStop?.endpoint ?? initialOrigin;
+  let priorCommitment: TravelCommitment | null = overriddenStop ? null : currentStop?.commitment ?? null;
+  let chained = Boolean(priorEndpoint);
 
   for (const commitment of futureCommitments) {
     if (commitment.attendance === "remote") continue;
@@ -118,7 +125,7 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
     } else {
       const readyAt = priorCommitment
         ? readyAfter(priorCommitment, input.buffers.exitSeconds)
-        : now.toString();
+        : immediateReadyAt;
       if (!readyAt) {
         unknownLegs.push(unknownLeg(role, priorCommitment?.ref ?? null, commitment.ref, "timing_unknown"));
       } else {
@@ -144,29 +151,30 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
     chained = true;
   }
 
-  if (priorCommitment && priorEndpoint) {
+  const lastStop = priorCommitment ?? overriddenStop;
+  if (lastStop && priorEndpoint) {
     if (!input.base) {
-      unknownLegs.push(unknownLeg("return", priorCommitment.ref, null, "return_base_missing"));
+      unknownLegs.push(unknownLeg("return", lastStop.ref, null, "return_base_missing"));
     } else if (legs.length >= maxLegs) {
-      unknownLegs.push(unknownLeg("return", priorCommitment.ref, null, "leg_limit"));
+      unknownLegs.push(unknownLeg("return", lastStop.ref, null, "leg_limit"));
     } else {
       validateEndpoint(input.base);
-      const readyAt = readyAfter(priorCommitment, input.buffers.exitSeconds);
+      const readyAt = readyAfter(lastStop, input.buffers.exitSeconds);
       if (!readyAt) {
-        unknownLegs.push(unknownLeg("return", priorCommitment.ref, null, "timing_unknown"));
+        unknownLegs.push(unknownLeg("return", lastStop.ref, null, "timing_unknown"));
       } else {
         legs.push(plannedLeg({
           input,
           role: "return",
           origin: priorEndpoint,
           destination: input.base,
-          originCommitmentRef: priorCommitment.ref,
+          originCommitmentRef: lastStop.ref,
           destinationCommitmentRef: null,
           readyAt,
           timing: { kind: "depart_at", at: readyAt },
-          mode: priorCommitment.mode ?? input.defaultMode,
+          mode: lastStop.mode ?? input.defaultMode,
           // The trip home follows the last stop's mode; it offers no place choice.
-          destinationPlaceKey: priorCommitment.placeKey === undefined ? undefined : null,
+          destinationPlaceKey: lastStop.placeKey === undefined ? undefined : null,
         }));
       }
     }
@@ -211,18 +219,14 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     if (Temporal.Instant.compare(instant(result.estimate.observedAt, "Route observation"), now) > 0) {
       return rejected(publicLeg(leg), "rejected_revision", "Route observation is in the future.");
     }
-    if (Temporal.Instant.compare(
-      instant(result.estimate.departureAt, "Route departure"),
-      instant(leg.readyAt, "Route ready time"),
-    ) < 0) {
-      return rejected(publicLeg(leg), "unavailable", "Route departs before its ready time.");
-    }
+    const timed = fromReadyTime(leg, result.estimate);
+    if (!timed) return rejected(publicLeg(leg), "unavailable", "Route departs before its ready time.");
     const late = leg.request.timing.kind === "arrive_by" && Temporal.Instant.compare(
-      instant(result.estimate.arrivalAt, "Route arrival"), instant(leg.request.timing.at, "Arrival target"),
+      instant(timed.arrivalAt, "Route arrival"), instant(leg.request.timing.at, "Arrival target"),
     ) > 0;
-    const estimate = late ? { ...result.estimate, warnings: [...result.estimate.warnings,
-      "Estimated arrival is after the planned arrival time."] } : result.estimate;
-    return { leg: publicLeg(leg), state: "current", estimate, reason: null };
+    const estimate = late ? { ...timed, warnings: [...timed.warnings,
+      "Estimated arrival is after the planned arrival time."] } : timed;
+    return { leg: publicLeg(leg), state: "current", estimate, reason: null, ...(late ? { late: true } : {}) };
   });
   // Ticket 218: the weather margin is its own input beside the buffers, never a share of the route.
   const weather = resolveTravelWeather({ weather: input.weather, plannedLegs: input.plan.legs, legs: routedLegs,
@@ -245,13 +249,14 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
         .toString()
     : null;
   const modelProjection = input.modelProjection === "enabled" && planRevisionCurrent && grantCurrent
-    ? resolveTravelModelProjection(input.plan, legs, segments, input.collisionCandidates)
+    ? resolveTravelModelProjection(input.plan, legs, segments, input.collisionCandidates, now)
     : null;
 
   return {
     version: TRAVEL_EVIDENCE_VERSION,
     journeyRef: input.plan.journeyRef,
     legs,
+    unknownLegs: planRevisionCurrent && grantCurrent ? input.plan.unknownLegs : [],
     segments,
     occupiedSpans,
     collisions,
@@ -292,6 +297,8 @@ export function resolveTravelAfterDecisions(
   });
   const changed = legs.length !== evidence.legs.length || segments.length !== evidence.segments.length;
   return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
+    ...(evidence.unknownLegs ? { unknownLegs: evidence.unknownLegs.filter((leg) =>
+      !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? "")) } : {}),
     completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
 }
 
@@ -317,6 +324,7 @@ function resolveTravelModelProjection(
   legs: readonly TravelResolvedLegEvidence[],
   segments: readonly TravelOccupiedSegment[],
   candidates: TravelEvidenceInput["collisionCandidates"],
+  now: Temporal.Instant,
 ): TravelTimingModelProjection {
   const travelDay = plan.legs.length > 0 ? "yes" as const : plan.unknownLegs.length > 0 ? "unknown" as const : "no" as const;
   const calendarEvents = plan.commitments.some((commitment) => commitment.kind === "calendar");
@@ -349,9 +357,7 @@ function resolveTravelModelProjection(
     };
     tripByLegId.set(leg.id, value);
     anchors.push(value);
-    const late = estimate && leg.request.timing.kind === "arrive_by" &&
-      Temporal.Instant.compare(instant(estimate.arrivalAt, "Route arrival"), instant(leg.request.timing.at, "Arrival target")) > 0;
-    if (late && leg.destinationCommitmentRef) lateArrivals.set(leg.destinationCommitmentRef, leg.role);
+    if (entry?.late && leg.destinationCommitmentRef) lateArrivals.set(leg.destinationCommitmentRef, leg.role);
   }
   for (const unknown of plan.unknownLegs) {
     anchors.push({
@@ -374,7 +380,9 @@ function resolveTravelModelProjection(
   const nearest = (subject: Temporal.Instant) =>
     trips.find((item) => item.anchor && Temporal.Instant.compare(item.anchor, subject) > 0) ?? trips.at(-1);
 
-  const behaviors = [...new Map(candidates.filter((candidate) => candidate.kind === "behavior").map((candidate) => [candidate.ref, candidate])).values()]
+  // A fit is about an occurrence's scheduled start, so one already under way has no conclusion.
+  const behaviors = [...new Map(candidates.filter((candidate) => candidate.kind === "behavior" &&
+    Temporal.Instant.compare(instant(candidate.startAt, "Fit start"), now) > 0).map((candidate) => [candidate.ref, candidate])).values()]
     .sort((left, right) => Temporal.Instant.compare(instant(left.startAt, "Fit start"), instant(right.startAt, "Fit start")) || left.ref.localeCompare(right.ref));
   const fits = behaviors.map((candidate): TravelModelFit => {
     const ref = candidate.ref;
@@ -411,7 +419,47 @@ function compareOptionalInstants(left: Temporal.Instant | null, right: Temporal.
   return Temporal.Instant.compare(left, right);
 }
 
-function selectImmediateOrigin(args: Readonly<{
+/**
+ * Ticket 264: the most recently started stop still under way. Only a physical stop with
+ * a usable place qualifies; anything else cannot name where the user is, so planning
+ * falls back to the immediate origin. A stop at Home needs no trip home.
+ */
+function selectCurrentStop(
+  commitments: readonly TravelCommitment[],
+  corrections: TravelJourneyCorrection[],
+  base: TravelEndpoint | null,
+  now: Temporal.Instant,
+): Readonly<{ commitment: TravelCommitment; endpoint: TravelEndpoint }> | null {
+  // A later stop that has started shows the user moved on from a stop with no known end.
+  let laterStopStarted = false;
+  for (const commitment of [...commitments].reverse()) {
+    if (commitment.attendance !== "physical" ||
+      Temporal.Instant.compare(instant(commitment.startAt, "Commitment start"), now) > 0) continue;
+    const endpoint = correctionFor(corrections, commitment.ref, commitment.revision)?.endpoint ?? commitment.endpoint;
+    if (!endpoint) continue;
+    validateEndpoint(endpoint);
+    const underWay = commitment.endAt
+      ? Temporal.Instant.compare(instant(commitment.endAt, "Commitment end"), now) > 0
+      : !laterStopStarted;
+    laterStopStarted = true;
+    if (underWay) return base && samePlace(endpoint.point, base.point) ? null : { commitment, endpoint };
+  }
+  return null;
+}
+
+/**
+ * Ticket 264: a route that would have to start before the leg's ready time cannot be taken.
+ * Durations that do not depend on a schedule move to the ready time. A transit estimate
+ * follows a timetable, so it is rejected here and routed again from the ready time.
+ */
+function fromReadyTime(leg: TravelPlannedLeg, estimate: TravelRouteEstimate): TravelRouteEstimate | null {
+  const readyAt = instant(leg.readyAt, "Route ready time");
+  if (Temporal.Instant.compare(instant(estimate.departureAt, "Route departure"), readyAt) >= 0) return estimate;
+  if (leg.mode === "transit" || leg.request.timing.kind !== "arrive_by") return null;
+  return { ...estimate, departureAt: readyAt.toString(), arrivalAt: readyAt.add({ seconds: estimate.durationSeconds }).toString() };
+}
+
+function selectObservedOrigin(args: Readonly<{
   input: TravelPlanningInput;
   corrections: TravelJourneyCorrection[];
   now: Temporal.Instant;
@@ -430,7 +478,7 @@ function selectImmediateOrigin(args: Readonly<{
     args.maxDeviceAge,
     args.maxDeviceAccuracy,
   )) return args.input.device;
-  return args.input.base;
+  return null;
 }
 
 function deviceIsFresh(

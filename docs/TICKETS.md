@@ -15772,7 +15772,7 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 264: Report late trips, trips home and missing estimates
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 263.
 
 Goal: the evidence stops going silent when the user needs it most (gaps G1–G4).

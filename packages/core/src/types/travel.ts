@@ -276,6 +276,11 @@ export type TravelResolvedLegEvidence = Readonly<{
   state: "current" | "unavailable" | "stale" | "rejected_revision";
   estimate: TravelRouteEstimate | null;
   reason: string | null;
+  /**
+   * Ticket 264: the estimated arrival is after the leg's arrival target. Only set when
+   * true, and only on a `current` leg. A late leg departs no earlier than its ready time.
+   */
+  late?: boolean;
   /** Ticket 218: present when weather is on and the leg's revision is current. */
   weather?: TravelLegWeather;
 }>;
@@ -332,6 +337,11 @@ export type TravelEvidenceResult = Readonly<{
   version: typeof TRAVEL_EVIDENCE_VERSION;
   journeyRef: string;
   legs: TravelResolvedLegEvidence[];
+  /**
+   * Ticket 264: trips Cadence could not plan, with the reason. Commitment refs only:
+   * no endpoints, times or place text. Empty when the plan's revision is no longer current.
+   */
+  unknownLegs?: readonly TravelUnknownLeg[];
   segments: TravelOccupiedSegment[];
   occupiedSpans: TravelOccupiedSpan[];
   collisions: TravelCollisionEvidence[];

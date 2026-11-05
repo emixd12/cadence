@@ -194,8 +194,15 @@ Assumptions and limits:
 - Outbound trips: 1, 2 and 4 per travel day.
 - Near-departure refreshes: one or two refreshes per trip.
 - Reminder job: two route calls per trip, with every trip's account opted in.
-- Not counted yet: the extra late-transit call (Ticket 264), tomorrow's first trip
-  (Ticket 282) and Outlook and iCloud legs (Ticket 283). Each ticket adds its own count.
+- Not counted yet: tomorrow's first trip (Ticket 282) and Outlook and iCloud legs
+  (Ticket 283). Each ticket adds its own count.
+- Ticket 264 adds two kinds of route call, both assumed and not in the table:
+  - A late transit leg makes one more call, from the ready time, reserved first at
+    US$0.010. Other modes make no extra call. Assumed: rare, at most a few a month.
+  - A trip home or onward trip from an event under way now routes during that event, when
+    it falls inside the routing window. Before, those legs stopped at the event's start.
+    Assumed: one extra leg per routing open during an event, at the leg's usual rate.
+    Not measured. Ticket 284 measures it.
 - A heavy user can reach the US$5 ceiling near month end, especially by transit, which the
   code reserves at the higher US$0.010 rate until its SKU is confirmed.
 - Automatic refreshes stop at 80% of the monthly ceiling. Refresh travel and reminder

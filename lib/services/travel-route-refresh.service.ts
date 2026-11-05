@@ -185,7 +185,9 @@ export async function refreshTravelRoutes(
       calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
   return response(caller.user.id, source, conclusionsToken, { ...projectTravelRouteDisplay(evidence),
-    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now)).map(occurrence => {
+    behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now) ||
+      (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
+        notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
       const duration = durationEstimates.get(occurrence.behavior_id);
       return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
         ...(occurrence.schedule_kind === "exact" ? { durationSeconds: duration?.kind === "known" ? duration.seconds : null } : {}) };
@@ -253,15 +255,21 @@ function calendarCommitmentDrafts(
     const event = allTimed.find((candidate) => candidate.id === correction.eventId);
     if (!event || eventRevision(event) !== correction.revision) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
   }
+  const attendanceOf = (event: (typeof allTimed)[number]): TravelCommitment["attendance"] => {
+    const correction = correctionById.get(event.id);
+    return correction?.attendance ?? ((correction?.locationText ?? event.location) ? (event.conference ? "hybrid" : "physical") : "unknown");
+  };
+  // Ticket 264: a physical event under way stays the prior stop until its end.
   const prospective = allTimed
-    .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && afterNow(event.startAt, now) && correctionById.get(event.id)?.attendance !== "remote")
+    .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && correctionById.get(event.id)?.attendance !== "remote" &&
+      (afterNow(event.startAt, now) || (attendanceOf(event) === "physical" && notEnded(event.endUnspecified ? null : event.endAt, now))))
     .sort((left, right) => compareInstants(left.startAt, right.startAt));
   const timed = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
   return timed.map((event, index) => {
     const correction = correctionById.get(event.id);
     const locationText = correction?.locationText ?? (event.location || null);
     const overflow = prospective.length > 9 && index === 8;
-    const attendance = overflow ? "unknown" : correction?.attendance ?? (locationText ? (event.conference ? "hybrid" : "physical") : "unknown");
+    const attendance = overflow ? "unknown" : attendanceOf(event);
     return {
       commitment: {
         ref: event.id,
@@ -299,7 +307,8 @@ function behaviorCommitmentDrafts(
 ): CommitmentDraft[] {
   const behaviorById = new Map(behaviors.map((behavior) => [behavior.id, behavior]));
   const prospective = occurrences
-    .filter((occurrence) => occurrence.status === "unresolved" && afterNow(occurrence.scheduled_for, now) && !!behaviorDestination(behaviorById.get(occurrence.behavior_id), homeText))
+    .filter((occurrence) => occurrence.status === "unresolved" && !!behaviorDestination(behaviorById.get(occurrence.behavior_id), homeText) &&
+      (afterNow(occurrence.scheduled_for, now) || notEnded(behaviorEndAt(occurrence, durations.get(occurrence.behavior_id), timezone), now)))
     .sort((left, right) => compareInstants(left.scheduled_for, right.scheduled_for));
   const candidates = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
   return candidates.flatMap((occurrence, index) => {
@@ -420,6 +429,11 @@ function behaviorDurationEstimates(
 function afterNow(value: string, now: Temporal.Instant): boolean {
   try { return Temporal.Instant.compare(Temporal.Instant.from(value), now) > 0; }
   catch { return false; }
+}
+
+/** A commitment with no known end cannot be shown to have ended. Its end is never invented. */
+function notEnded(endAt: string | null, now: Temporal.Instant): boolean {
+  return endAt === null || afterNow(endAt, now);
 }
 
 function compareInstants(left: string, right: string): number {
