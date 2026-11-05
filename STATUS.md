@@ -267,6 +267,11 @@ ChatGPT web links read-only and never steps up.
   rejects a token granting more than the scenario selected.
 - Remaining: a live Tier 2 ChatGPT web run that completes a write. The new
   regression tests establish local driver behavior, not that live result.
+- October 31 deployment record: the hosted push, merge `f1392365`, Trust snapshot
+  `20261031T225545Z-f1392365b7e3` and the live runs are in `docs/qa/mcp-server.md`,
+  "Ticket 259 deploy and live check". That evening's Tier 2 ChatGPT web run
+  `20261031T230336Z-cf9e6e` completed the write named above. It describes that
+  deployment, not current production.
 
 Platform impact: web OAuth consent and database function only. Desktop,
 marketing and future mobile: not applicable. Messaging impact: P-014 in

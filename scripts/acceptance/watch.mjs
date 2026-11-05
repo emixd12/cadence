@@ -16,7 +16,7 @@
 // error codes and timestamps only. Never tokens, codes, cookies, response
 // bodies or note text. Source errors are reported by fixed labels only.
 import { execFile } from 'node:child_process';
-import { appendFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { isCliEntry } from './cli-entry.mjs';
@@ -465,19 +465,26 @@ export const ledgerRecord = (event, runId) => {
   return { type: 'watcher.event', run: runId, ...rest };
 };
 
-/** Append-only JSONL sink in the Ticket 247 run folder layout. */
+/**
+ * Append-only JSONL sink in the Ticket 247 run folder layout. The runner owns
+ * the folder: the sink never creates it, so the watcher may start first. Records
+ * wait in memory until the runner has written run.json, then flush in order.
+ */
 export function createLedgerSink({ root = '.intent/acceptance', runId }) {
   if (!RUN_ID.test(runId ?? '')) fail('invalid-run-id');
   const dir = join(root, runId);
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = join(dir, 'events.jsonl');
-  const created = !existsSync(file);
+  let pending = [];
   return {
     file,
+    get pending() { return pending.length; },
     append(records) {
-      if (!records.length) return;
-      appendFileSync(file, records.map((r) => `${JSON.stringify(r)}\n`).join(''), { mode: 0o600 });
+      pending.push(...records);
+      if (!pending.length || !existsSync(join(dir, 'run.json'))) return;
+      const created = !existsSync(file);
+      appendFileSync(file, pending.map((r) => `${JSON.stringify(r)}\n`).join(''), { mode: 0o600 });
       if (created) chmodSync(file, 0o600);
+      pending = [];
     },
   };
 }
@@ -572,11 +579,15 @@ export async function watch({ options, source, sinceIso, print, sink = null, now
     await sleep(Math.min(options.intervalMs, Math.max(0, deadline - now())));
     if (signal?.aborted) break;
   }
-  if (!scenario) return 0;
+  const reportPending = () => {
+    if (sink?.pending) print(`ledger-pending ${sink.pending} records: run folder ${options.runId} not found; events are in this output only`);
+  };
+  if (!scenario) { sink?.append([]); reportPending(); return 0; }
   print(formatDiff(result, { source: source.name }));
   sink?.append([{ type: 'watcher.result', run: options.runId, at: new Date(now()).toISOString(), scenario: scenario.name,
     result: result.satisfied ? 'satisfied' : 'timeout', grantId: result.grantId,
     steps: result.steps.map((s) => ({ id: s.id, status: s.status, ...(s.event ? { at: s.event.at, kind: s.event.kind } : {}) })) }]);
+  reportPending();
   return result.satisfied ? 0 : 1;
 }
 

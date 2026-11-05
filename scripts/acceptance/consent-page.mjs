@@ -38,6 +38,8 @@ export async function readConsentView(page) {
       verified: /Verified client/.test(node.textContent ?? '') && !/Unverified client/.test(node.textContent ?? ''),
       fixedScopes: [...node.querySelectorAll('input[type="hidden"][name="scope"]')].map((input) => input.getAttribute('value')),
       optionalScopes: [...node.querySelectorAll('input[type="checkbox"][name="scope"]')].map((input) => input.getAttribute('value')),
+      // Each switch's state as the page first shows it, before any click.
+      switches: Object.fromEntries([...node.querySelectorAll('input[type="checkbox"][name="scope"]')].map((input) => [input.getAttribute('value'), input.checked])),
       hasAllow: Boolean(node.querySelector('button[name="decision"][value="allow"]')),
       hasDeny: Boolean(node.querySelector('button[name="decision"][value="deny"]')),
     };
@@ -64,6 +66,37 @@ export function checkConsentView(view, { userId, email = null, clientName, reque
     || !shown.every((scope) => advertisedScopes.includes(scope)) || !wanted.every((scope) => shown.includes(scope))) problems.push('scopes');
   if (!view?.hasAllow || !view?.hasDeny) problems.push('buttons');
   return problems;
+}
+
+const SCOPE_NAME = /^[a-z][a-z_.]{0,63}$/;
+const sorted = (values) => [...values].sort();
+
+/**
+ * The scopes a client asked for, from the `scope` parameter of its authorize
+ * URL. Every other parameter (client, state, PKCE, redirect) is dropped, and
+ * only scope-shaped words are kept.
+ */
+export function requestedScopesFrom(url) {
+  let value = null;
+  try { value = new URL(url).searchParams.get('scope'); } catch { value = null; }
+  return (value ?? '').split(/\s+/).filter((scope) => SCOPE_NAME.test(scope));
+}
+
+/**
+ * Evidence for one consent screen, recorded before Allow or Deny: what the
+ * client requested, what the page offered, each switch's starting state and
+ * what the run will leave on. IDs and scope names only.
+ */
+export function consentRecord({ view, requestedScopes, decision, grantScopes = [] }) {
+  const offered = [...(view?.fixedScopes ?? []), ...(view?.optionalScopes ?? [])];
+  const switches = view?.switches ?? {};
+  return {
+    decision, requestedScopes: requestedScopes === null ? null : [...requestedScopes],
+    offeredScopes: sorted(offered),
+    // A list, not an object: ledger keys cannot hold the scope names' dots.
+    initialSwitches: sorted(Object.keys(switches)).map((scope) => ({ scope, on: switches[scope] === true })),
+    chosenScopes: decision === 'allow' ? sorted(grantScopes.filter((scope) => offered.includes(scope))) : [],
+  };
 }
 
 /** Set the write-scope checkboxes for the grant, then click Allow or Deny. */

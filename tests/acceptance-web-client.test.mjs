@@ -394,7 +394,7 @@ const consentPage = (rid, client, scopes) => html('Cadence consent', `
   <input type="hidden" name="account_id" value="${escapeHtml(state.consentAccountId)}">
   <dl><dt>Cadence account</dt><dd>${escapeHtml(state.consentEmail)}</dd></dl>
   <input type="hidden" name="scope" value="cadence.read">
-  ${scopes.filter((s) => s !== 'cadence.read').map((s) => `<label><input type="checkbox" name="scope" value="${escapeHtml(s)}" checked> ${escapeHtml(s)}</label>`).join('')}
+  ${scopes.filter((s) => s !== 'cadence.read').map((s) => `<label><input type="checkbox" name="scope" value="${escapeHtml(s)}"${state.writesStartOff ? '' : ' checked'}> ${escapeHtml(s)}</label>`).join('')}
   <button name="decision" value="allow">Allow</button>
   <button name="decision" value="deny">Deny</button>
 </form>`, `
@@ -1064,5 +1064,34 @@ describe('created test Behavior has reminders off', () => {
     const out = await scenario('chatgpt', 'read-write');
     expect(out.result).toMatchObject({ ok: false, reason: 'behavior-reminders-on', step: 'creation-reminders' });
     expect(out.run.cleanupInputs().creations).toHaveLength(1);
+  }, 120_000);
+});
+
+describe('consent evidence recorded before Allow (Ticket 259 live check)', () => {
+  const events = (out) => readFileSync(join(out.run.dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  it('records the requested scope parameter and each switch starting on, before the grant exists', async () => {
+    resetState({ requestScopes: ['cadence.read'], offerAllScopes: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    const view = events(out).find((e) => e.type === 'consent.view');
+    expect(view).toMatchObject({
+      decision: 'allow', requestedScopes: ['cadence.read'],
+      offeredScopes: ['cadence.behaviors.write', 'cadence.occurrences.write', 'cadence.read'],
+      initialSwitches: [{ scope: 'cadence.behaviors.write', on: true }, { scope: 'cadence.occurrences.write', on: true }],
+    });
+    expect(Date.parse(view.at)).toBeLessThanOrEqual(Date.parse(state.grants[0].created_at));
+    expect(parsed(out.lines).find((e) => e.step === 'connect')).toMatchObject({ requestedScopes: ['cadence.read'], initialSwitches: [{ scope: 'cadence.behaviors.write', on: true }, { scope: 'cadence.occurrences.write', on: true }] });
+    // Only the scope parameter is kept from the authorize URL.
+    const text = readFileSync(join(out.run.dir, 'events.jsonl'), 'utf8');
+    for (const word of ['oauth-cb', 'return=', 'client=', 'request_id']) expect(text).not.toContain(word);
+  }, 120_000);
+  it('records switches that start off', async () => {
+    resetState({ writesStartOff: true });
+    const out = await scenario('chatgpt', 'read-write');
+    expect(out.result, out.lines.join('\n')).toMatchObject({ ok: true });
+    expect(events(out).find((e) => e.type === 'consent.view')).toMatchObject({
+      requestedScopes: ['cadence.read', 'cadence.occurrences.write', 'cadence.behaviors.write'],
+      initialSwitches: [{ scope: 'cadence.behaviors.write', on: false }, { scope: 'cadence.occurrences.write', on: false }],
+    });
   }, 120_000);
 });

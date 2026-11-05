@@ -214,8 +214,11 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    key rotation, until that file is updated). Never look it up with an owner
    credential.
 2. Tier 0: `npm run mcp:accept:protocol -- --target production --confirm-production --run <id>`.
-   Start the watcher first (`npm run mcp:watch -- --target production --confirm-production --account both --since 2m --expect inspector --run <id>`);
-   the production watcher sees only active grants, so keep the default grant hold.
+   Then start the watcher on the same `<id>` (`npm run mcp:watch -- --target production --confirm-production --account both --since 2m --expect inspector --run <id>`);
+   `--since 2m` covers the seconds before it starts. The protocol suite creates the
+   run folder; the watcher never does. A watcher started first holds its records in
+   memory until the folder appears, and prints `ledger-pending` if it never does.
+   The production watcher sees only active grants, so keep the default grant hold.
    Production never exhausts the rate limits: `report.md` lists `ratelimit-a` as
    `SKIPPED` (`production-skips-rate-limit-exhaustion`) and leaves it out of the
    count, so a pass reads `<n>/<n> checks passed · 1 skipped · PASS`.
@@ -269,9 +272,24 @@ Order, one run folder per command (`--run prod-<date>-<n>`):
    (Hard rules, Privacy).
 6. Cleanup: every runner revokes its grants. Check with
    `node scripts/acceptance/ledger.mjs ids <id>` and the watcher (`--once`).
-   Archive created Behaviors through the run log (`Review practice …` titles), and
-   confirm every ChatGPT test chat was archived and every Claude test chat was kept
-   (step 5).
+   The protocol suite and client runners archive what they create; web and guided
+   runs do not. Archive what those runs left active through the run log:
+   `npm run mcp:accept:archive -- --from <id>[,<id>...] --confirm-production`.
+   It reads each run's creation checkpoints and opens no consent for an account with
+   nothing to archive. Otherwise it saves a registration for its own DCR client
+   ("Cadence acceptance cleanup"), grants read plus Behavior writes on the consent
+   screen, archives each `Review practice …` Behavior with `archive_behavior`, reads
+   it back, and revokes that grant, confirmed by readback. It refuses any other title,
+   and a re-run skips Behaviors already archived. `grant-revocation-unconfirmed` stops
+   it before the next account: fix the cause, then re-run with the same `--from` plus
+   `--run <cleanup-id> --resume` so it reconciles the saved registrations. A new
+   cleanup run stops with `cleanup-grant-active` before doing anything while either
+   account has an active "Cadence acceptance cleanup" grant, and prints the run to
+   resume (`resumeFrom`). A final result of `pass` means no such grant is active. Use
+   this command for routine runs;
+   `scripts/mcp-fixture-cleanup.mjs` is the reviewed SQL transaction for a captured
+   manifest and needs a hosted database connection. Then confirm every ChatGPT test
+   chat was archived and every Claude test chat was kept (step 5).
 
 ### Anthropic MCP connector header
 
@@ -378,8 +396,15 @@ Live findings from Ticket 256 (production, 2026-10-30/31) are marked *live*.
   the driver compares the token's `scope`, and the web runner stops with
   `grant-scope-mismatch` at `grant-checkpoint`. After #175, a ChatGPT run that asks
   for read only can still get writes with one Allow.
-- **Test Behavior reminders:** the archive cleanup refuses a test Behavior with a
-  reminder on. Every canned create prompt asks for browser and email reminders off.
+  Before clicking Allow or Deny, the driver and the web runner append a
+  `consent.view` event to the run's `events.jsonl`. It holds `requestedScopes` (the
+  authorize URL's `scope` parameter only; `null` if the web runner did not see the
+  request), `offeredScopes`, `initialSwitches` (`[{ scope, on }]` as the page first
+  showed them) and `chosenScopes`. The web runner's `connect` line repeats
+  `requestedScopes` and `initialSwitches`. Use it as the evidence that a client asked for read only and the writes
+  started on.
+- **Test Behavior reminders:** the reviewed SQL archive transaction refuses a test
+  Behavior with a reminder on, and a run should not leave a reminder active. Every canned create prompt asks for browser and email reminders off.
   After `creation-checkpoint` the web runner reads the Behavior back. If a reminder
   is on, it sends `prompt-reminders-off` in a new chat with the same client and grant,
   then reads back again. It stops with `behavior-reminders-on` if a reminder is still
