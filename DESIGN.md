@@ -162,7 +162,9 @@ only. Use centered perpendicular stems without axis nodes for Calendar events;
 group only identical original start instants in one event lane. Nearby starts remain separate. Timed-event hover/focus previews show actual
 duration as a solid 1px magenta axis segment from the displayed original-day perpendicular-stem contact. It preserves mapped
 length to the day body bottom. An overnight continuation starts at the next section top above its heading, continues to the event end without another marker or stem; details retain actual times. No
-permanent duration bars appear. The current-time dot uses brand blue without a
+permanent duration bars appear, with one planned exception: owner decision D2, "Next trip
+only" (`docs/DECISIONS.md`, 2026-11-04; Ticket 270), keeps the next trip's magenta span and
+one marker visible without hover. Ticket 270 records the final form here from the code. The current-time dot uses brand blue without a
 row tint. No persistent overlap fill or edge appears. Hover/focus changes only overlapping Behavior borders to the owner-selected Poline facet `#DA3278`. Point
 overlap uses `start <= activation < end`; estimated-duration overlap is half-open.
 Completed and Not Completed fills remain unchanged. Preserve all other layout, colors, and

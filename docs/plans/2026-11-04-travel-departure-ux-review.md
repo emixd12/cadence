@@ -21,6 +21,110 @@ Cadence does not meet that goal today:
 Evidence: main `0044b8f`, read November 4, 2026. No production data was read. The
 screenshots come from the local design-system bench (see "Method and limits").
 
+## Corrections and gaps, November 4, 2026
+
+Added after an independent check of this report, the same day, against main `0044b8f`. The
+check read the travel code, specifications, tests, report text and images. It ran a copy
+of the shipped resolvers on eight scenarios. It read production state without changing
+it: Vercel variable names and aggregate database counts. It read no user IDs, places or
+event details. It did not run browser views, real route calls or the installed Mac app, so
+its UI findings come from reading the code.
+
+**Verdict:** the main findings hold. Leave times are hard to find, and no warning exists.
+The report needs nine corrections, and it missed eleven gaps that change the plan. The
+most serious gap: when you are already late on foot, by bike or by transit, Cadence says
+"timing unavailable".
+
+The owner then decided the open questions (`docs/DECISIONS.md`, 2026-11-04, "Travel
+advisory revamp"). Tickets 263–285 replace the "Candidate follow-up tickets" section below.
+The report's text below is otherwise unchanged. Where it disagrees with this section, this
+section is right. Line numbers below are as of `0044b8f`.
+
+### Corrections to the report
+
+| # | The report says | The code shows | Evidence | What changes |
+|---|---|---|---|---|
+| C1 | Not verified: do drawer and dialog lines change after expiry? | They keep the last times, with no mark. Only the status line warns. | `renderTravelTiming` has no clock or stale input (`ExternalEventDetails.tsx:207`). `useTravelContext` keeps the view (`lib/ui/travel.ts:237`). `docs/user-guide/travel.md:173` says the same. | P2 must label the time, not restore it. L-014 describes shipped behavior, not a proposal. |
+| C2 | Directions falls back to Search after expiry (also image 2) | The link stays Directions while the view is in memory. | `ExternalEventDetails.tsx:135` checks `state`, not expiry. Scenario H. The QA plan check in `docs/qa/travel-release.md` would have failed. | Directions depends on a resolved place, not on a 5-minute estimate (Ticket 271). |
+| C3 | "Leave time appears 3 hours before the trip" (Ticket 261, P-015, mockup P1) | The window counts back from the arrival target. A 2:30 PM event enters at 11:25 AM for any trip length. A trip over about 3 hours is first estimated after you should have left. | `travel-refresh-policy.ts:43` | Fix the rule (Ticket 267) and the copy (Ticket 261, P-015). |
+| C4 | Decisions 1 and 2 are open | Tickets 260–262 already record the owner's direction. | Tickets 260 and 261 | Decisions 3–6 remained. |
+| C5 | Weather text is treated as a live problem, checked October 27 | Weather is still off. No production user sees weather text. | No `CADENCE_WEATHER_PROVIDER_CLEARANCE` in Vercel, November 4 | Ticket 260's weather part matters only when weather turns on. |
+| C6 | No test renders travel UI under the 5-minute cap | Narrower. Some tests use 5-minute fixtures, and hook expiry is tested. None renders the drawer, dialog or bubble after expiry. | `tests/travel-weather-ui.dom.test.tsx:43`, `tests/travel-lifecycle.dom.test.tsx:148` | The test work stays, and it is smaller (Ticket 266). |
+| C7 | Not verified: order of the first brief and travel requests | The brief reads its token as soon as its request starts. Measured travel requests take about 3.4 s. So the first brief of the day normally has no trip facts. Timing not measured. | `DailyBriefLauncher.tsx:126`, `docs/COSTS.md` | Wait briefly for the first travel result (Ticket 272). |
+| C8 | "No detail available." repeats in the dialog | That is the bench text. Production prints "Not provided.", "Restricted by the source." or "The source omitted this detail." | `ExternalEventDetails.tsx:241` | Ticket 262 hides all four. |
+| C9 | Line citation `brief-travel-guidance.ts:85` | The expiry filter is at lines 78–80. | Source | None. |
+
+### Gaps the report missed
+
+| # | Gap | What the user sees | Evidence | Ticket |
+|---|---|---|---|---|
+| G1 | Late trips go silent | A 30-minute walk to an event 15 minutes away reads "timing unavailable", and the bubble shows nothing. Two events too close together do the same. Only near-term driving reports a late arrival. | Scenarios B and C. `travel.resolver.ts:214`, `travel-provider.ts:184` | 264 |
+| G2 | The trip home disappears when the event starts | During the event there is no "Head home" line, which is when it matters most. | Scenario D. `travel.resolver.ts:59`, `travel-route-refresh.service.ts:257` | 264 |
+| G3 | No estimate, no reason | With no origin, an address Google cannot pin down, or a location plus a video link, the event shows no travel line at all. Unknown legs never reach the client. | Scenarios E–G. `travel-display.service.ts`, `travel-provider.ts:131`, `travel-route-refresh.service.ts:264` | 264, 273 |
+| G4 | One unknown stop hides the next trip | With Home saved, a vague 1 PM event leaves a well-addressed 2:30 PM event with no leave time until 1 PM passes. | Scenarios F and G | 264, 273 |
+| G5 | Corrections vanish | In-person or remote and the corrected destination last only while the Timeline stays open. | `ExternalEventDetails.tsx:191`, `docs/user-guide/travel.md:153` | 281 |
+| G6 | Google Calendar only | Outlook and iCloud events never route. Their connectors read no location. Nothing explains this. | `DayProgressTimeline.tsx:170`, `outlook-calendar-provider.ts:52`, `icloud-calendar-provider.ts:469` | 283 |
+| G7 | Today only | Tomorrow's 8:30 AM trip has no leave time. Mockup P1's Tomorrow line cannot work today. | `DayProgressTimeline.tsx:174`, `lib/ui/travel.ts:291` | 282 |
+| G8 | Whole-day estimates need the Daily Brief and then get lost | With the brief off, no whole-day estimate ever runs. With it on, the next refresh replaces later trips with "outside window". | `lib/ui/travel.ts:136`, `travel-route-refresh.service.ts:161` | 267, 268 |
+| G9 | The status line is noise on days with no trips | It reads "Travel as of 8:00 AM", then "may be stale", with no trip to talk about. | `lib/ui/travel.ts:188`, `travel-route-refresh.service.ts:444`, `DayProgressTimeline.tsx:726` | 261, 269 |
+| G10 | Setup trap | The first-run row reads Saved while Travel estimates stays off, so nothing appears. | `docs/USER_FLOWS.md:205` | 273 |
+| G11 | Internal text outside the inventory | "Travel estimates await this deployment's provider review.", "Travel timing incomplete", raw completeness lines, "Applies only to this event revision while the Timeline is open." | `lib/ui/travel.ts:76`, `timeline-context.resolver.ts:293`, `ExternalEventDetails.tsx:191` and `:194` | 261, 262 |
+
+### Mockups against the code and written rules
+
+| Proposal | Verdict | What it really needs |
+|---|---|---|
+| P1 Next departure on the Timeline | The best single change | An always-visible span and marker override written rules: Ticket 164, `docs/UI_SPEC.md`, `DESIGN.md`. The left rail is 72 px wide below 576 px, so a "Leave 1:15 PM" label will not fit at 390 px. The Tomorrow line needs G7. |
+| P2 Drawer emphasis and last estimate | Right, with a changed premise | The time already shows, so it needs a label (C1). The late state needs G1. The mockup's bold type breaks the no-bold rule in `DESIGN.md`. Its weather advice is what Ticket 260 removes. |
+| P3 Leave reminder | Right goal, understated | See the list below. It is the largest item in the plan. |
+| P4 Daily Brief travel block | Half right | Keep the block from vanishing. The collapsed strip repeats P1. `docs/USER_FLOWS.md` must change. |
+
+What P3 needs that this report does not list:
+
+- `reminder_deliveries` requires an Occurrence. Calendar events have none.
+- Nothing on the server can read Calendar or reserve spend without a user session.
+  `reserve_travel_provider_spend` uses `auth.uid()`. The MCP's minted user token is a usable
+  base (`lib/supabase/integration-token.ts`), and its signing key is set in production.
+- A closed app gives no device position. The start point must be Home or the previous stop,
+  unless Cadence starts storing a position.
+- The Privacy text says Cadence stores no Google event details and processes them "while
+  serving a refresh or preparing a briefing". So the title must be read at send time, and a
+  messaging entry is needed.
+- The push sender fixes a 24-hour lifetime and normal urgency. The service worker has no
+  action buttons. Pushes open plain `/timeline`.
+- On the Mac, the Rust check accepts only `cadence.local.<occurrence UUID>` identifiers. No
+  notification categories exist, so no Directions or Snooze button. Activation opens
+  Occurrences only. A quit app cannot re-route. Shipping needs a desktop release.
+- A setting in the synced profile forces an account-sync contract change. The last one
+  stopped older Mac builds from syncing. A hosted-only preference avoids that.
+- The 5-minute cron makes reminders up to 5 minutes late unless the job looks ahead.
+- "10 minutes before departure" can land inside the get-ready span.
+
+### Scenarios run on a copy of the shipped resolvers
+
+Each uses a saved Home, walking and a 5-minute arrival buffer, unless stated.
+
+| # | Scenario | Result |
+|---|---|---|
+| A | Event in 2.5 hours, 30-minute walk | Outbound `current` |
+| B | Event in 15 minutes, 30-minute walk | Outbound `unavailable`, "Route departs before its ready time." Bubble items empty. `completeTrip` false. |
+| C | Two events 10 minutes apart, 30-minute walk | Onward `unavailable` |
+| D | 30 minutes into the event | No legs and no unknown legs |
+| E | No Home and no device | No legs. Unknown: `origin_unknown`, `return_base_missing` |
+| F | Unresolved 1 PM event, then resolved 2:30 PM event | Only a return leg. Unknown: `destination_unknown`, then `origin_unknown` for the 2:30 PM event |
+| G | Location plus video link at 1 PM, then resolved 2:30 PM event | Only a return leg. Unknown: `attendance_unknown`, then `origin_unknown` |
+| H | 10 minutes after the estimate | Bubble guidance null. Leg state still `current`. Link label "Directions in Google Maps". |
+
+### Still not verified
+
+- How these states look in a live browser or the installed Mac app.
+- Real timing of the first brief and first travel request.
+- Whether cron requests carry the Vercel OIDC token that hosted routing needs.
+- Web push behavior on iPhone. Based on memory, it needs the site on the Home Screen.
+- Which Google price applies to transit. The code reserves the higher rate.
+
+The November 4 production readback is in `docs/COSTS.md`.
+
 ## Owner concerns
 
 1. **Too much metadata.** The event dialog and travel lines show too many labels. This

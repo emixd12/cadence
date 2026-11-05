@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-016` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-022` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -85,6 +85,12 @@ Status values:
 | [P-013](#p-013-ai-client-re-consent-keeps-already-granted-permissions) | AI client re-consent keeps already granted permissions | logged | 232 | In-app consent copy, user guide |
 | [P-014](#p-014-ai-client-consent-offers-every-write-permission-switched-on) | AI client consent offers every write permission, switched on | logged | 259 | Marketing (developer docs), user guide, provider submissions |
 | [P-015](#p-015-plain-travel-timing-copy-and-development-only-weather-advice) | Plain travel timing copy and development-only weather advice | logged | 260, 261 | User guide |
+| [P-016](#p-016-opt-in-leave-reminders) | Opt-in leave reminders | logged | 275, 277–280 | Privacy, Travel Settings, user guide, marketing |
+| [P-017](#p-017-calendar-reads-with-no-user-session) | Calendar reads with no user session | logged | 276, 277 | Privacy, provider submissions |
+| [P-018](#p-018-last-estimates-and-per-trip-refresh) | Last estimates and per-trip refresh | logged | 267, 268, 271, 272 | Privacy, user guide |
+| [P-019](#p-019-outlook-and-icloud-event-locations-read-for-routing) | Outlook and iCloud event locations read for routing | logged | 283 | Privacy, user guide, provider submissions |
+| [P-020](#p-020-remembered-places-and-attendance) | Remembered places and attendance | logged | 281 | Privacy, user guide |
+| [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -542,9 +548,11 @@ cite has not changed.
 - **Change:** Tickets 260 and 261 reword the travel lines ("Outbound · walking: leave
   …" becomes "Leave by 1:15 PM · walking, arrive 2:20 PM"). They limit the weather mode
   advice ("Consider transit or driving instead of walking.") to development builds and
-  replace "estimated within 3 hours of departure" with "Leave time appears 3 hours
-  before the trip." Owner direction, November 4, 2026
-  (`docs/plans/2026-11-04-travel-departure-ux-review.md`).
+  replace "estimated within 3 hours of departure" with "Leave time appears by {time}."
+  Owner direction, November 4, 2026
+  (`docs/plans/2026-11-04-travel-departure-ux-review.md`). Corrected the same day: an
+  earlier draft of this entry and Ticket 261 said "3 hours before the trip", but the
+  window counts back from the arrival target (correction C3).
 - **Affected:** Tickets 260 and 261. Files: `docs/user-guide/travel.md`.
 - **Surfaces:** user guide.
 - **Conflicting current text:** `docs/user-guide/travel.md`:
@@ -557,4 +565,123 @@ cite has not changed.
 - **Update needed:** quote the new phrases. Say that production shows the weather
   margin without a mode suggestion. Describe the overlap line as naming the trip and
   its times.
+- **Status:** logged.
+
+## P-016: Opt-in leave reminders
+
+- **Change:** owner decision D3, November 4, 2026 ("Yes, even with Cadence closed").
+  Tickets 275 and 277–280 add an opt-in reminder to get ready to leave, off by default. Web
+  sends it by web push from a hosted job. Mac schedules a native notification from the last
+  estimate. Cadence stores a hosted preference and a reminder record: owner, trip digest,
+  local date, next check time, status, sent time and error. It holds no titles, places,
+  positions or durations. The notification text shows the event title, leave time, mode,
+  duration, start and arrival.
+- **Affected:** Tickets 275 and 277–280. Files: `components/settings/LegalContent.tsx`,
+  `components/settings/TravelSettingsPanel.tsx`, `docs/user-guide/travel.md`, marketing
+  travel claims (P-006). Related legal entry: L-015.
+- **Surfaces:** Privacy, Travel Settings, user guide, marketing.
+- **Conflicting current text:**
+  - Privacy, retention table, has no row for a leave reminder preference or record.
+  - Privacy: "Device locations and route estimates stay in temporary memory". A Mac
+    notification keeps a time derived from an estimate until it fires.
+  - `docs/user-guide/travel.md` has no reminder section.
+- **Update needed:** describe the setting, what it stores, when it sends, where the
+  estimate starts, and that a Mac notification names its estimate time. Add a retention
+  row. Say which calendars get reminders.
+- **Status:** logged.
+
+## P-017: Calendar reads with no user session
+
+- **Change:** owner decision D3, November 4, 2026. Tickets 276 and 277 let a hosted job read
+  Calendar and route trips for an opted-in account with no user session. It reads the
+  title only at send time, in memory.
+- **Affected:** Tickets 276 and 277. Files: `components/settings/LegalContent.tsx`, Google
+  OAuth verification materials. Related legal entry: L-016.
+- **Surfaces:** Privacy, provider submissions.
+- **Conflicting current text:**
+  - Privacy, Google Calendar: "Vercel runtime processes Calendar API requests and returned
+    event details while serving a refresh or preparing a briefing." A leave reminder check
+    is a new processing moment.
+  - Google OAuth verification text, if it describes reads only while the user is active.
+    Not checked.
+- **Update needed:** add the reminder check as a processing moment. State that it happens
+  only for accounts that turned the reminder on, and that Cadence still stores no Google
+  event details. Update the verification materials before the next submission.
+- **Status:** logged.
+
+## P-018: Last estimates and per-trip refresh
+
+- **Change:** owner decision D1, November 4, 2026 ("Last estimate and per-trip refresh").
+  Ticket 268 keeps route results in `sessionStorage` across a reload, in the browser session
+  only, and labels older times "Last estimate". Ticket 267 replaces the 3-hour rule with a
+  whole-day pass and refreshes near a trip's leave time. Ticket 272 keeps the Daily Brief
+  travel block visible after expiry. Related legal entry: L-014.
+- **Affected:** Tickets 267, 268, 271 and 272. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/travel.md`.
+- **Surfaces:** Privacy, user guide.
+- **Conflicting current text:**
+  - Privacy, "Travel routing": "Device locations and route estimates stay in temporary
+    memory". Privacy, retention table: "Memory for the current app session".
+    `sessionStorage` is browser storage, though it still ends with the session.
+  - `docs/user-guide/travel.md`, "Refresh travel estimates": "Marking a Behavior, editing a
+    Note or returning to the window does not request again." and "Each refresh estimates
+    trips that leave, or must arrive, within the next three hours."
+  - `docs/user-guide/travel.md`, same section: "marks it as possibly stale after five
+    minutes" and "the line says they may be stale".
+- **Update needed:** say that estimates stay in browser session storage until the session
+  ends or the listed events clear them. Describe the whole-day pass, the near-departure
+  refresh, and the "Last estimate" label.
+- **Status:** logged.
+
+## P-019: Outlook and iCloud event locations read for routing
+
+- **Change:** owner decision D4, November 4, 2026 ("All of these should be covered"). Ticket
+  283 reads event locations from Outlook and iCloud and sends them to Google Maps to route.
+  Cadence stores no event details.
+- **Affected:** Ticket 283. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/travel.md`, Microsoft and Apple connector materials.
+- **Surfaces:** Privacy, user guide, provider submissions.
+- **Conflicting current text:**
+  - Privacy, "Outlook Calendar, iCloud Calendar, and Hevy": "Cadence requests only event
+    titles, times, timezone, availability, response, and calendar names." and "Cadence reads
+    selected calendars and normalizes event titles, times, timezone and availability. It
+    discards unsupported details."
+- **Update needed:** add locations to both connector descriptions and name Google Maps as
+  their recipient. Say that Outlook and iCloud events now get leave times.
+- **Status:** logged.
+
+## P-020: Remembered places and attendance
+
+- **Change:** owner decision D4, November 4, 2026. Ticket 281 stores a corrected place ID
+  under the original text's key, so later events with that text resolve too. It adds a
+  hosted-only per-event attendance record keyed by a digest. Turning travel off deletes both.
+- **Affected:** Ticket 281. Files: `components/settings/LegalContent.tsx`,
+  `docs/user-guide/travel.md`.
+- **Surfaces:** Privacy, user guide.
+- **Conflicting current text:**
+  - `docs/user-guide/travel.md`, "Inspect travel and correct a journey": "Use for this
+    journey changes temporary routing only." and "Leave and reopen the Timeline to discard
+    journey corrections."
+  - In-app text: "Applies only to this event revision while the Timeline is open."
+  - Privacy, retention table, has no row for attendance answers.
+- **Update needed:** say that corrections and attendance answers are remembered, what is
+  stored, and how to delete them. Add a retention row.
+- **Status:** logged.
+
+## P-021: Next-trip marks, wider Directions and other travel guide wording
+
+- **Change:** owner decisions D2 and D4, November 4, 2026. Ticket 269 replaces "Travel as of"
+  with a next-departure line. Ticket 270 adds a marker and span for the next trip. Ticket 271
+  adds Directions to the drawer and located Behavior rows. Ticket 273 adds next-step prompts.
+  Ticket 274 keeps the leave-time question through a reload, with digests and end times in
+  browser storage. Ticket 282 adds tomorrow's first trip.
+- **Affected:** Tickets 269–271, 273, 274 and 282. Files: `docs/user-guide/travel.md`.
+- **Surfaces:** user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md`:
+  - "Refresh travel estimates": "The status line shows Travel as of and the time the
+    estimates were observed."
+  - "Learned travel habits": "Cadence remembers such trips only while the app stays open,
+    so a reload before the event ends means no question that day."
+- **Update needed:** describe the line, the marker, Directions on rows and the drawer,
+  tomorrow's first trip, and the remembered question.
 - **Status:** logged.
