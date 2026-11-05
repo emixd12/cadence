@@ -2,7 +2,7 @@ import type { ExternalEventSchedulingFact } from "../types/external-event";
 import { Temporal } from "@js-temporal/polyfill";
 import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
-import { resolveTravelCollisions } from "./travel.resolver";
+import { resolveTravelCollisions, travelUnreliableSegments } from "./travel.resolver";
 import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
 
 import type {
@@ -277,10 +277,12 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
           Temporal.Instant.compare(scheduledFor, eventEnd) < 0;
     if (overlaps) overlappingEventIds.push(event.id);
   }
-  const travelCollision = input.travel && (input.occurrenceStatus === undefined || input.occurrenceStatus === "unresolved") ? resolveTravelCollisions(input.travel.segments, [{
+  // Ticket 268: a trip after a late arrival occupies its whole unreliable span, as in the Daily Brief.
+  const travelSegments = input.travel ? [...input.travel.segments, ...(input.travel.legs ? travelUnreliableSegments({ legs: input.travel.legs }) : [])] : [];
+  const travelCollision = input.travel && (input.occurrenceStatus === undefined || input.occurrenceStatus === "unresolved") ? resolveTravelCollisions(travelSegments, [{
     ref: input.occurrenceId, kind: "behavior", startAt: scheduledFor.toString(), endAt: estimatedEnd?.toString() ?? null,
   }])[0] : null;
-  const travelSourceRefs = travelCollision ? input.travel!.segments
+  const travelSourceRefs = travelCollision ? travelSegments
     .filter((segment) => travelCollision.segmentIds.includes(segment.id))
     .flatMap((segment) => segment.sourceRefs) : [];
   for (const ref of travelSourceRefs) if (!overlappingEventIds.includes(ref)) overlappingEventIds.push(ref);
@@ -300,7 +302,7 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     activitySignals,
     overlappingEventIds,
     overlapAssessment,
-    overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel(input, travelCollision.segmentIds)
+    overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel({ ...input, travel: { ...input.travel!, segments: travelSegments } }, travelCollision.segmentIds)
       : overlapAssessment === "unknown" && returnTimeUnknown(input.travel, input.departure) ? RETURN_TIME_UNKNOWN
       : overlapAssessment === "unknown" && hasUncertainTimedEvent
       ? `Event end unknown · ${input.freshness.label}`
@@ -339,8 +341,10 @@ function travelOverlapLabel(
   const legId = segments.find((segment) => segmentIds.includes(segment.id) && segment.kind !== "commitment" && segment.legId)?.legId ?? null;
   const entry = input.travel?.legs?.find((item) => item.leg.id === legId);
   const leg = entry?.leg;
+  // A trip after a late arrival names its unreliable span, not its route times (Ticket 268).
+  const unreliable = segments.find((segment) => segment.id === `unreliable:${legId}`);
   // The shown leave and arrival times, which include any weather margin.
-  const travelled = entry?.estimate
+  const travelled = unreliable ? [unreliable] : entry?.estimate
     ? [{ startAt: entry.weather?.departureAt ?? entry.estimate.departureAt, endAt: entry.weather?.arrivalAt ?? entry.estimate.arrivalAt }]
     : segments.filter((segment) => segment.legId === legId && segment.kind === "route");
   const span = travelled.length ? travelled : segments.filter((segment) => segmentIds.includes(segment.id));

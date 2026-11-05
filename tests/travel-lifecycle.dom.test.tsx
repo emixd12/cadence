@@ -2,24 +2,39 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { requestDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesView } from "@/lib/ui/travel";
+import { clearTravelSession, requestDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesInput, type TravelRoutesView } from "@/lib/ui/travel";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { travelTripMatches } from "@cadence/core/services/travel-refresh-policy";
+import type { TravelEvidenceLeg, TravelOccupiedSegment, TravelResolvedLegEvidence } from "@cadence/core/types/travel";
 
+/** 10:00 AM in New York on the Timeline's date, so the refresh plan sees the same day. */
+const TEST_NOW = new Date("2026-09-21T14:00:00Z");
 const settings = { enabled: true, mode: "walking" as const, baseLocationText: null, navigationPreference: "google_maps" as const,
   routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "revision" };
 const view = (accountId: string): TravelRoutesView => ({ accountId, mode: "walking", navigationPreference: "google_maps", settingsRevision: "revision",
   expiresAt: new Date(Date.now() + 300_000).toISOString(), evidence: { version: "1.0", journeyRef: accountId,
     legs: [], segments: [], occupiedSpans: [], collisions: [], completeTrip: false, finalAvailabilityAt: null } });
+/** A view with one outbound trip, which leaves from the device, so movement has a trip to refresh. */
+const movingView = (accountId: string): TravelRoutesView => {
+  const now = new Date().toISOString();
+  const leg = { id: `out-${Date.now()}`, role: "outbound" as const, journeyRef: accountId, originCommitmentRef: null, destinationCommitmentRef: "dentist",
+    mode: "walking" as const, readyAt: now, provenance: { originRef: "device", originSource: "device", originRevision: now, destinationRef: "dentist",
+      destinationSource: "calendar", destinationRevision: "r1", grantRevision: "revision" } as TravelEvidenceLeg["provenance"] };
+  const estimate = { durationSeconds: 1200, departureAt: "2026-09-21T23:00:00Z", arrivalAt: "2026-09-21T23:20:00Z", warnings: [], fallback: false,
+    attribution: "Google", observedAt: now, expiresAt: new Date(Date.now() + 300_000).toISOString() };
+  return { ...view(accountId), evidence: { ...view(accountId).evidence!, legs: [{ leg, state: "current", estimate, reason: null }] } };
+};
 const capture = vi.fn<(state: TravelState) => void>();
 const latest = () => capture.mock.lastCall![0];
-function Probe({ client, accountId, sourceKey = "source" }: { client: TravelClient; accountId: string; sourceKey?: string }) {
-  const state = useTravelContext({ enabled: true, accountId, sourceKey, localDate: "2026-09-21", client });
+function Probe({ client, accountId, sourceKey = "source", localDate = "2026-09-21", sourceReady }: { client: TravelClient; accountId: string; sourceKey?: string; localDate?: string; sourceReady?: boolean }) {
+  const state = useTravelContext({ enabled: true, accountId, sourceKey, localDate, client, timezone: "America/New_York", sourceReady });
   capture(state);
   return <p>{state.view?.evidence?.journeyRef ?? state.message ?? "empty"}</p>;
 }
 beforeEach(() => { resetTravelViewCacheForTest(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 it("gates device reads, shows provider review, and rejects late account responses", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   const focused = vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -43,7 +58,9 @@ it("gates device reads, shows provider review, and rejects late account response
     await act(async () => { resolveOld(view("account-a")); await vi.advanceTimersByTimeAsync(350); });
     expect(host.textContent).toBe("account-b");
     await act(() => root.render(<Probe client={client} accountId="account-b" sourceKey="changed" />));
-    expect(host.textContent).toBe("empty");
+    // Ticket 268: a changed source keeps today's last view, marked, until its response arrives.
+    expect(host.textContent).toBe("account-b");
+    expect(latest().stale).toBe(true);
     await act(async () => vi.advanceTimersByTimeAsync(350));
     expect(host.textContent).toBe("account-b");
     await act(() => window.dispatchEvent(new Event("offline")));
@@ -57,7 +74,7 @@ it("gates device reads, shows provider review, and rejects late account response
 });
 
 async function mount(routes: TravelClient["routes"]) {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -189,13 +206,13 @@ it("keeps the last plan, stops requests and carries the renewal time when the bu
 });
 
 it("requests again on open only when the device moved beyond the threshold", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
   const at = (latitude: number) => ({ state: "available" as const, latitude, longitude: -87.68, accuracyMeters: 10, sampledAt: Date.now() });
   const readLocation = vi.fn(async () => at(42.0500));
-  const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
+  const routes = vi.fn<TravelClient["routes"]>(async () => movingView("account-a"));
   const client: TravelClient = { settings: { load: async () => settings, save: async () => settings }, configured: async () => true, readLocation, routes };
   const host = document.createElement("div"); document.body.append(host);
   let root = createRoot(host);
@@ -215,7 +232,14 @@ it("requests again on open only when the device moved beyond the threshold", asy
     await act(() => root.unmount());
     readLocation.mockResolvedValue(at(42.0700)); // About 2.2 km: the estimate is out of date.
     await open();
+    // Ticket 268: movement waits 10 minutes from the last request that routed from the device.
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(() => root.unmount());
+    await act(async () => vi.advanceTimersByTimeAsync(600_000));
+    await open();
     expect(routes).toHaveBeenCalledTimes(2);
+    // Ticket 268: movement refreshes only the trip that leaves from the device.
+    expect(routes.mock.calls[1]![0].trips).toEqual([{ role: "outbound", originRef: null, destinationRef: "dentist" }]);
   } finally { await act(() => root.unmount()); host.remove(); }
 });
 
@@ -261,7 +285,7 @@ it("finishes an admitted request while hidden and does not request again on retu
 });
 
 it("cancels a request that has not reached the routes call when hidden, and restarts it on return", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -288,7 +312,7 @@ it("cancels a request that has not reached the routes call when hidden, and rest
 });
 
 it("caches an admitted request's view across unmount and reuses it on remount", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -312,7 +336,7 @@ it("caches an admitted request's view across unmount and reuses it on remount", 
 });
 
 it("joins an in-flight routes call on immediate remount instead of requesting again", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -340,7 +364,7 @@ it("joins an in-flight routes call on immediate remount instead of requesting ag
 });
 
 it("does not join or cache a routes call started before a settings change", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -376,7 +400,7 @@ it("does not join or cache a routes call started before a settings change", asyn
 });
 
 it("invalidates cached and in-flight travel when settings change while no Timeline is mounted", async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: TEST_NOW });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
@@ -467,7 +491,7 @@ it("honors a budget refusal across source changes and unlocks manual refresh at 
 
 
 it("checks foreground movement without refreshing stationary or background positions", async () => {
-  const routes = vi.fn(async () => view("account-a"));
+  const routes = vi.fn<TravelClient["routes"]>(async () => movingView("account-a"));
   const { client, unmount } = await mount(routes);
   try {
     const position = { state: "available" as const, latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: Date.now() };
@@ -483,7 +507,11 @@ it("checks foreground movement without refreshing stationary or background posit
     expect(routes).toHaveBeenCalledTimes(2);
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     await act(async () => vi.advanceTimersByTimeAsync(60_350));
+    // Ticket 268: within 10 minutes of the last request that routed from the device, movement waits.
+    expect(routes).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(8 * 60_000));
     expect(routes).toHaveBeenCalledTimes(3);
+    expect(routes.mock.lastCall![0].trips).toEqual([{ role: "outbound", originRef: null, destinationRef: "dentist" }]);
   } finally { await unmount(); }
 });
 
@@ -512,9 +540,283 @@ it("keeps the latest signed conclusions per account and day in page memory only 
     expect(travelConclusionsToken(null, "2026-09-21")).toBeNull();
     // An expired view's token is never offered.
     expect(travelConclusionsToken("account-a", "2026-09-21", Date.parse(signed.expiresAt!) + 1)).toBeNull();
-    expect(window.localStorage.length + window.sessionStorage.length).toBe(0);
+    // Ticket 268 keeps today's view in the browser session, never the token, and nothing in localStorage.
+    expect(window.localStorage.length).toBe(0);
+    expect(JSON.stringify({ ...window.sessionStorage })).not.toContain("signed.token");
     // A travel settings or location change forgets it.
     await act(() => window.dispatchEvent(new Event("cadence:travel-changed")));
     expect(travelConclusionsToken("account-a", "2026-09-21")).toBeNull();
+  } finally { await unmount(); }
+});
+
+
+/**
+ * Ticket 268: a typical day in New York. Dentist 9:00–10:00 AM, Gym 1:00–2:00 PM, then home.
+ * Leave 8:30 AM, 12:30 PM and 2:05 PM. Each response gives the legs new IDs, as a new device
+ * sample would, and routes only the trips a trip request names.
+ */
+const DAY_STOPS = [
+  { ref: "dentist", label: "Dentist", startAt: "2026-09-21T13:00:00Z", endAt: "2026-09-21T14:00:00Z" },
+  { ref: "gym", label: "Gym", startAt: "2026-09-21T17:00:00Z", endAt: "2026-09-21T18:00:00Z" },
+];
+const DAY_TRIPS = [
+  { role: "outbound" as const, originRef: null, destinationRef: "dentist", readyAt: "2026-09-21T10:00:00Z", leaveAt: "2026-09-21T12:30:00Z", arriveAt: "2026-09-21T12:50:00Z" },
+  { role: "onward" as const, originRef: "dentist", destinationRef: "gym", readyAt: "2026-09-21T14:05:00Z", leaveAt: "2026-09-21T16:30:00Z", arriveAt: "2026-09-21T16:50:00Z" },
+  { role: "return" as const, originRef: "gym", destinationRef: null, readyAt: "2026-09-21T18:05:00Z", leaveAt: "2026-09-21T18:05:00Z", arriveAt: "2026-09-21T18:25:00Z" },
+];
+function dayServer() {
+  let response = 0;
+  const routedLegs: number[] = [];
+  const routes = vi.fn(async (input: TravelRoutesInput): Promise<TravelRoutesView> => {
+    response++;
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 300_000).toISOString();
+    const legs = DAY_TRIPS.map((trip): TravelResolvedLegEvidence => {
+      const leg: TravelEvidenceLeg = { id: `${trip.role}-${response}`, role: trip.role, journeyRef: "journey",
+        originCommitmentRef: trip.originRef, destinationCommitmentRef: trip.destinationRef, mode: "walking", readyAt: trip.readyAt,
+        provenance: { originRef: trip.originRef ?? "base", originSource: trip.originRef ? "calendar" : "saved_base", originRevision: "r1",
+          destinationRef: trip.destinationRef ?? "base", destinationSource: trip.destinationRef ? "calendar" : "saved_base", destinationRevision: "r1", grantRevision: "revision" } as TravelEvidenceLeg["provenance"] };
+      const routed = !input.trips || input.trips.some((ref) => travelTripMatches(ref, leg));
+      return routed
+        ? { leg, state: "current", reason: null, estimate: { durationSeconds: 1200, departureAt: trip.leaveAt, arrivalAt: trip.arriveAt,
+            warnings: [], fallback: false, attribution: "Google", observedAt: now, expiresAt } }
+        : { leg, state: "unavailable", estimate: null, reason: "outside_route_window" };
+    });
+    routedLegs.push(legs.filter((entry) => entry.estimate).length);
+    const segments: TravelOccupiedSegment[] = [
+      ...DAY_STOPS.map((stop) => ({ id: `commitment:${stop.ref}`, kind: "commitment" as const, startAt: stop.startAt, endAt: stop.endAt!, sourceRefs: [stop.ref], legId: null })),
+      ...legs.flatMap((entry) => entry.estimate ? [{ id: `route:${entry.leg.id}`, kind: "route" as const, startAt: entry.estimate.departureAt,
+        endAt: entry.estimate.arrivalAt, sourceRefs: [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef].filter((ref): ref is string => !!ref), legId: entry.leg.id }] : []),
+    ];
+    return { accountId: "account-a", mode: "walking", navigationPreference: "google_maps", settingsRevision: "revision", expiresAt,
+      evidence: { version: "1.0", journeyRef: "journey", legs, unknownLegs: [], segments, occupiedSpans: [], collisions: [],
+        completeTrip: !input.trips, finalAvailabilityAt: null },
+      budget: { reservedMicrodollars: 100_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-10-01T04:00:00Z" } };
+  });
+  return { routes, routedLegs };
+}
+const departureAt = (view: TravelRoutesView | null) => resolveDepartureModel({ evidence: view?.evidence ?? null, stops: DAY_STOPS,
+  now: new Date().toISOString(), timezone: "America/New_York", arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null });
+async function openDay(routes: TravelClient["routes"], at = "2026-09-21T11:00:00Z", settingsValue: typeof settings = settings, first: { sourceKey?: string; sourceReady?: boolean } = {}) {
+  vi.useFakeTimers({ now: new Date(at) });
+  const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  const client: TravelClient = { settings: { load: async () => settingsValue, save: async () => settingsValue },
+    configured: async () => true, readLocation: async () => ({ state: "denied" as const }), routes };
+  const host = document.createElement("div"); document.body.append(host);
+  let root = createRoot(host);
+  type OpenProps = { accountId?: string; localDate?: string; sourceKey?: string; sourceReady?: boolean };
+  const render = (props: OpenProps = {}) => act(() => root.render(<Probe client={client} accountId={props.accountId ?? "account-a"} localDate={props.localDate}
+    sourceKey={props.sourceKey ?? "Dentist at 12 Main St"} sourceReady={props.sourceReady} />));
+  const open = async (props: OpenProps = {}) => {
+    root = createRoot(host);
+    await render(props);
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+  };
+  await open(first);
+  const close = () => act(() => root.unmount());
+  return { focus, open, close, render, reload: async (props: OpenProps = {}) => {
+    await close(); resetTravelViewCacheForTest({ keepSession: true }); await open(props);
+  }, done: async () => { await close(); host.remove(); } };
+}
+const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+const advanceTo = (at: string) => advance(Date.parse(at) - Date.now());
+const storedTravel = () => window.sessionStorage.getItem("cadence:travel-session");
+
+it("keeps last estimates through a reload, marked Last estimate, without another request (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    expect(routes).toHaveBeenCalledTimes(1);
+    expect(routes.mock.calls[0]![0]).toMatchObject({ scope: "day" });
+    expect(routes.mock.calls[0]![0]).not.toHaveProperty("trips");
+    expect(departureAt(latest().view).next).toMatchObject({ freshness: "current", leaveAt: "2026-09-21T12:30:00Z" });
+    await advance(10 * 60_000);
+    await day.reload();
+    expect(routes).toHaveBeenCalledTimes(1);
+    const model = departureAt(latest().view);
+    expect(model.next).toMatchObject({ freshness: "last_estimate", leaveAt: "2026-09-21T12:30:00Z", checkedAt: "2026-09-21T11:00:00.350Z" });
+    expect(model.phrase).toMatch(/^Last estimate:/);
+    expect(latest().stale).toBe(true);
+    // The source key holds event and place text; only its digest is stored.
+    expect(storedTravel()).not.toContain("Main St");
+    expect(storedTravel()).not.toContain("Dentist");
+  } finally { await day.done(); }
+});
+
+it("merges a trip response per trip, so other trips keep their times (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    await advanceTo("2026-09-21T12:00:00Z");
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(routes.mock.calls[1]![0]).toMatchObject({ scope: "day", trips: [{ role: "outbound", originRef: null, destinationRef: "dentist" }] });
+    const legs = latest().view!.evidence!.legs;
+    expect(legs.map((entry) => [entry.leg.id, entry.estimate?.observedAt])).toEqual([
+      ["outbound-2", "2026-09-21T12:00:00.350Z"], ["onward-2", "2026-09-21T11:00:00.350Z"], ["return-2", "2026-09-21T11:00:00.350Z"]]);
+    const trips = departureAt(latest().view).trips;
+    expect(trips.map((trip) => [trip.role, trip.freshness, trip.leaveAt])).toEqual([
+      ["outbound", "current", "2026-09-21T12:30:00Z"], ["onward", "last_estimate", "2026-09-21T16:30:00Z"], ["return", "last_estimate", "2026-09-21T18:05:00Z"]]);
+    expect(latest().view!.evidence!.segments.filter((segment) => segment.kind === "route").map((segment) => segment.legId)).toEqual(["outbound-2", "onward-2", "return-2"]);
+  } finally { await day.done(); }
+});
+
+it("follows the plan's timers, waits while the window is unfocused, and requests on return only when due", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    day.focus.mockReturnValue(false);
+    await act(() => window.dispatchEvent(new Event("blur")));
+    await advanceTo("2026-09-21T12:10:00Z");
+    expect(routes).toHaveBeenCalledTimes(1);
+    day.focus.mockReturnValue(true);
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(routes.mock.calls[1]![0].trips).toEqual([{ role: "outbound", originRef: null, destinationRef: "dentist" }]);
+    await focusAndWait();
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await vi.advanceTimersByTimeAsync(350); });
+    expect(routes).toHaveBeenCalledTimes(2);
+    // The onward trip falls due 3 hours before its 12:30 PM leave time, with no event.
+    await advanceTo("2026-09-21T13:30:00Z");
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(3);
+    expect(routes.mock.calls[2]![0].trips).toEqual([{ role: "onward", originRef: "dentist", destinationRef: "gym" }]);
+  } finally { await day.done(); }
+});
+
+it("keeps nothing after sign-out, account change, day change, travel off or a settings change", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    expect(storedTravel()).toContain("account-a");
+    await act(() => clearTravelSession());
+    expect(storedTravel()).toBeNull();
+    await day.reload();
+    expect(storedTravel()).toContain("account-a");
+    await act(() => window.dispatchEvent(new Event("cadence:travel-changed")));
+    expect(storedTravel()).toBeNull();
+    await advance(350);
+    expect(storedTravel()).toContain("account-a");
+    await day.close(); resetTravelViewCacheForTest({ keepSession: true });
+    await act(() => day.open({ accountId: "account-b" }));
+    expect(storedTravel() ?? "").not.toContain("account-a");
+    await day.close(); resetTravelViewCacheForTest();
+    await day.open();
+    expect(storedTravel()).toContain("2026-09-21");
+    vi.setSystemTime(new Date("2026-09-22T11:00:00Z"));
+    await day.close(); resetTravelViewCacheForTest({ keepSession: true });
+    const reopened = createRoot(document.createElement("div"));
+    await act(() => reopened.render(<Probe client={{ settings: { load: async () => settings, save: async () => settings }, configured: async () => true,
+      readLocation: async () => ({ state: "denied" as const }), routes: async () => { throw new TravelClientError("provider_unavailable"); } }} accountId="account-a" localDate="2026-09-22" />));
+    await advance(350);
+    expect(storedTravel()).toBeNull();
+    await act(() => reopened.unmount());
+  } finally { await day.done(); }
+  const off = await openDay(dayServer().routes, "2026-09-21T11:00:00Z", { ...settings, enabled: false });
+  try { expect(storedTravel()).toBeNull(); } finally { await off.done(); }
+});
+
+it("keeps the known estimates when a trip refresh fails", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    routes.mockRejectedValueOnce(new TravelClientError("provider_unavailable"));
+    await advanceTo("2026-09-21T12:00:00Z");
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(latest().view!.evidence!.legs.every((entry) => !!entry.estimate)).toBe(true);
+    expect(latest().message).toBe("Travel estimates are unavailable right now. Tracking and Calendar still work.");
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(2);
+  } finally { await day.done(); }
+});
+
+it("spends the call counts docs/COSTS.md records for a typical day of normal use (Ticket 268)", async () => {
+  const { routes, routedLegs } = dayServer();
+  const day = await openDay(routes, "2026-09-21T11:00:00Z");
+  try {
+    // A day of normal use: hourly returns to the window, a break away, a remount and a reload.
+    for (let hour = 12; hour <= 22; hour++) {
+      await advanceTo(`2026-09-21T${String(hour).padStart(2, "0")}:00:00Z`);
+      await focusAndWait();
+      if (hour === 13) {
+        day.focus.mockReturnValue(false);
+        await act(() => window.dispatchEvent(new Event("blur")));
+        await advance(20 * 60_000);
+        day.focus.mockReturnValue(true);
+        await focusAndWait();
+      }
+      if (hour === 15) { await day.close(); await day.open(); }
+      if (hour === 19) await day.reload();
+    }
+    await advanceTo("2026-09-21T23:59:00Z");
+    // One whole-day pass (3 legs), the 30-minute refresh for the first trip (already inside
+    // 3 hours at first open), and the 3-hour and 30-minute refreshes for the other two.
+    expect(routes.mock.calls.map(([input]) => input.trips?.map((trip) => trip.role).join() ?? "day")).toEqual(
+      ["day", "outbound", "onward", "return", "onward", "return"]);
+    expect(routedLegs).toEqual([3, 1, 1, 1, 1, 1]);
+    expect(routedLegs.reduce((sum, legs) => sum + legs, 0)).toBe(8);
+  } finally { await day.done(); }
+});
+
+
+it("waits for the Calendar to settle, so a late Calendar costs one whole-day request, not two (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  // First open: Calendar events are still loading, so the source key has no events yet.
+  const day = await openDay(routes, "2026-09-21T11:00:00Z", settings, { sourceKey: "no events yet", sourceReady: false });
+  try {
+    await advance(3_000);
+    await focusAndWait();
+    expect(routes).not.toHaveBeenCalled();
+    // The settled load is the first source, not a source change.
+    await day.render({ sourceReady: true });
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(1);
+    await advance(20_000);
+    expect(routes).toHaveBeenCalledTimes(1);
+    // A reload: the Calendar again arrives late, and the kept view needs no request at all.
+    await day.reload({ sourceKey: "no events yet", sourceReady: false });
+    await advance(3_000);
+    await day.render({ sourceReady: true });
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(1);
+    expect(departureAt(latest().view).next).toMatchObject({ leaveAt: "2026-09-21T12:30:00Z" });
+  } finally { await day.done(); }
+});
+
+it("proceeds after 10 seconds when the Calendar never settles, and never delays Refresh travel (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes, "2026-09-21T11:00:00Z", settings, { sourceReady: false });
+  try {
+    await advance(9_000);
+    expect(routes).not.toHaveBeenCalled();
+    await advance(1_350);
+    expect(routes).toHaveBeenCalledTimes(1);
+  } finally { await day.done(); }
+  resetTravelViewCacheForTest();
+  const manualDay = await openDay(dayServer().routes, "2026-09-21T11:00:00Z", settings, { sourceReady: false });
+  try {
+    const before = Date.now();
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(Date.now() - before).toBe(350);
+    expect(latest().view?.evidence?.legs).toHaveLength(3);
+  } finally { await manualDay.done(); }
+});
+
+
+it("waits 5 minutes after a revision mismatch instead of requesting on every focus (O4)", async () => {
+  const routes = vi.fn(async () => ({ ...view("account-a"), settingsRevision: "older" }));
+  const { unmount } = await mount(routes);
+  try {
+    expect(routes).toHaveBeenCalledTimes(1);
+    await focusAndWait(); await focusAndWait();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(2);
   } finally { await unmount(); }
 });

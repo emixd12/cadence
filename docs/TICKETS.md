@@ -15916,7 +15916,10 @@ tests/day-progress-bench.dom.test.tsx tests/day-progress-timeline.dom.test.tsx`.
 
 ## Ticket 267: Trip refresh plan replaces the 3-hour window
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed. The plan is
+`resolveTravelRefreshPlan`; Ticket 268 makes the clients follow it. The route adds an optional
+`trips` request field and a `budget` response field, plans no trip home after a last stop at
+Home and routes no leg ready only after its destination ends.
 Dependencies: Ticket 264.
 
 Goal: refresh when a trip needs it, not on every Timeline open (decision D1).
@@ -15956,8 +15959,54 @@ tests/travel-route-refresh.service.test.ts tests/travel-budget.contract.test.ts`
 
 ## Ticket 268: Keep last estimates and apply the refresh plan
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 267.
+
+Implementation notes:
+
+- `useTravelContext` in `lib/ui/travel.ts` keeps a `TravelRefreshState` per account and asks
+  `resolveTravelRefreshPlan` on open, focus, return to the window, movement and the plan's
+  own timer. Trips come from the kept view (`travelRefreshTripsFromEvidence`). Trip requests
+  send `trips`; a Daily Brief still asks for the whole day, which alone carries the token.
+- `mergeTravelLastEstimates` (travel resolver) merges every response per trip, matched on the
+  stop each trip serves (the stop it goes to, or for the trip home the stop it leaves), so an
+  onward trip that becomes outbound keeps its time. An estimate carries over only from the
+  same origin stop, or from an onward trip whose earlier stop has left the plan after its
+  end (a deleted stop that has not ended does not count); a stop
+  inserted or reordered before a trip makes that trip read as changed (PR #191 review). A trip keeps its last estimate unless
+  anything it was planned from changed, the new plan rejects it, it cannot leave before its stop
+  ends, or it has arrived. A failed refresh keeps the view.
+- A changed source shows the last view with every time marked "Last estimate" until its
+  response arrives; at the 80% pause or after a failure it stays, with Refresh travel. Trips to
+  or from a stop that moved, changed place or is gone are withdrawn first and read "The trip to
+  {event} changed." (`travelStopRevisions`, `changedTravelStops`, `withdrawChangedTravelTrips`).
+- A revision mismatch counts as a failed request, so automatic requests wait 5 minutes.
+- A reload after a source change still restores the session view as a kept view, so the
+  withdrawal and "Last estimate" marks survive the reload at the 80% pause, after a failure
+  and on the quota path.
+- New wording, approved by the owner as written on November 5, 2026: "A planned trip changed." for a changed trip
+  whose stop has no title, such as a cancelled event (`line-changed-unnamed` in
+  `departure-phrases.ts`, shown on the bench wording review).
+- Movement over 500 m (Ticket 267's trigger, changed here) refreshes only the next outbound trip,
+  as a trip request, no sooner than 10 minutes after the last request that routed from the device.
+- `tests/travel-refresh-day.dom.test.tsx` runs whole days through the real hosted service: typical
+  6 requests and 8 legs, heavy 10 and 14, moving 45 minutes 5 and 7.
+- `sessionStorage` key `cadence:travel-session`: one account and date, no device sample,
+  token or place text, source keys as a digest. Sign-out (web and Mac), account change,
+  travel off, settings change and day change clear it (`docs/DATA_MODEL.md`). After a reload
+  the next device sample becomes the movement baseline.
+- Automatic requests wait until the Google Calendar read that feeds travel has settled (web
+  `live.state`, Mac `DESKTOP_CALENDAR_NOT_LOADED_LABEL`), at most 10 seconds
+  (`TRAVEL_SOURCE_WAIT_MS`). Refresh travel does not wait. A late Calendar no longer costs a
+  second whole-day request, and the first settled load is not a source change.
+- From review: resolving the last stop while an earlier one remains shows the trip home as
+  changed, with Refresh travel. Timeline collisions mark a Behavior inside a trip after a
+  late arrival (`travelUnreliableSegments`). A response reporting the whole budget used
+  shows the approved paused line; the 80% pause shows nothing new, as the owner decided
+  ("Nothing new", `docs/DECISIONS.md`, 2026-11-05).
+- Tests: `tests/travel-lifecycle.dom.test.tsx` (reload, per-trip merge, clearing, plan
+  timers with focus loss, a typical day: 6 requests, 8 legs), `tests/travel-timeline.test.ts`,
+  and a released Mac request in `tests/travel-route-refresh.service.test.ts`.
 
 Goal: Cadence never loses a leave time it already knows (C1, G8, decision D1).
 

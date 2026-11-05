@@ -13704,9 +13704,9 @@
           "control": "Refresh travel"
         }
       ],
-      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload. Ticket 261 also places it at the end of a travel line in the Calendar drawer, the Calendar details dialog and the expanded Behavior row when that trip shows a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival, under the same pending and budget rules.",
+      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213), including when a route response reports the whole month's ceiling reserved (Ticket 268); available again at renewal without a reload. Ticket 261 also places it at the end of a travel line in the Calendar drawer, the Calendar details dialog and the expanded Behavior row when that trip shows a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival, under the same pending and budget rules.",
       "success_result": "Replaces the travel estimates and shows the observation time.",
-      "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message. Tracking data is preserved; offline desktop shows the unavailable message without a request.",
+      "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message and keeps every leave time already known (Ticket 268). Tracking data is preserved; offline desktop shows the unavailable message without a request.",
       "effects": [
         "network_request",
         "ui_state"

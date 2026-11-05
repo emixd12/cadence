@@ -26,6 +26,7 @@ import {
 import { readCurrentBrowserPushEndpoint } from "@/lib/push/browser";
 import { WebRuntimeProvider } from "@/components/layout/WebRuntimeProvider";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
+import { clearTravelSession } from "@/lib/ui/travel";
 
 const navIcons: Record<AppNavHref, LucideIcon> = {
   "/timeline": CalendarDays,
@@ -267,6 +268,8 @@ export function SignOutControl({
       }
 
       onSubmit?.();
+      // Ticket 268: today's travel display leaves the browser session with the account.
+      clearTravelSession();
       form.submit();
     },
     [onSubmit],

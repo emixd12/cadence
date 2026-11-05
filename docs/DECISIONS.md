@@ -1564,3 +1564,17 @@ owner approves it. The bench at `/design-system?preview=departure-states` shows 
 Platform impact: web and desktop through the shared phrase module and components.
 Marketing: not applicable. Future mobile: shared module. Messaging impact: P-015 and P-022
 quote the final words.
+
+## 2026-11-05: Wave 2 wording and the 80% pause
+
+The owner answered two open items from Ticket 268 on November 5, 2026.
+
+- "A planned trip changed.", the line for a changed trip whose stop has no title, such as a
+  cancelled event: "Approve as written". `line-changed-unnamed` in `DEPARTURE_PHRASE_REVIEW`
+  carries the approval date.
+- The status line at the 80% automatic pause: "Nothing new". Automatic refreshes stop
+  silently and Refresh travel still works. A response reporting the whole budget used keeps
+  the approved line "Travel estimates resume on {date}."
+
+Platform impact: web and desktop through the shared phrase module and travel hook.
+Marketing: not applicable. Future mobile: shared module. Messaging impact: P-018 updated.

@@ -1,5 +1,73 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1 deployed — November 5, 2026
+
+PR #190 merged on November 5, 2026 as `c599d24`. Both Vercel projects built READY on that commit;
+the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+`dpl_F7zQrqAKvxDJYyCHaXQVVSSMXHWS`. The app was redeployed as `dpl_KApfWgWqkedC5kLkc3SFj9aihu68`
+and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
+coordinator reported; not rechecked here.
+
+## Travel advisory revamp Wave 2: Ticket 268 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Web and Mac now
+follow the trip refresh plan and keep every leave time they already know.
+
+- `useTravelContext` asks `resolveTravelRefreshPlan` on open, focus, return to the window,
+  movement and the plan's timer. Returning to the window requests only when a trip is due. Trip
+  refreshes send `trips`; a Daily Brief still asks for the whole day and its token.
+- Responses merge per trip (`mergeTravelLastEstimates`), keyed on role and commitment refs. A trip
+  keeps its last estimate, marked "Last estimate" once it expires, until its source changes, the
+  plan rejects it or it has arrived. A failed refresh keeps the known times.
+- Today's view stays in `sessionStorage` across a reload, with no device sample, token or place
+  text. Sign-out on web and Mac, account change, travel off, settings change and day change clear it.
+- From earlier reviews: resolving the last stop while an earlier stop remains shows the trip home as
+  changed with Refresh travel. Timeline collisions mark a Behavior inside a trip after a late arrival.
+- Automatic requests wait for the Google Calendar read that feeds travel to settle, at most 10
+  seconds, on web and Mac. Refresh travel does not wait. A reload with a late Calendar makes no
+  second whole-day request.
+- The 80% automatic pause shows nothing new, as the owner decided ("Nothing new"); a response
+  reporting the whole budget used shows the approved paused line.
+
+- Verifier fixes: trips merge on the stop they serve, so an onward trip that becomes outbound keeps
+  its time. A changed source, at the 80% pause or after a failed request, keeps the last view with
+  every time marked "Last estimate" and Refresh travel; trips to or from a moved, re-placed or
+  cancelled stop show as changed instead, and this survives a reload. A revision mismatch waits 5
+  minutes like a failure. The owner approved "A planned trip changed." as written. Movement refreshes only the next trip from the
+  device, at most every 10 minutes. Measured through the real service: typical day 6 requests and 8
+  legs, heavy day 10 and 14, moving 45 minutes 5 and 7 (`docs/COSTS.md`).
+- **Release order: ship the server before any new Mac build.** The deployed server (`c599d24`)
+  ignores `trips`, so a new Mac build against it routes the whole day on every trip refresh.
+
+Platform impact: web `lib/ui/travel.ts`; desktop uses the same hook in `apps/desktop/src/product.tsx`,
+and session data never enters SQLite. Marketing: not applicable. Future mobile: mobile web inherits
+the hook. Messaging impact: P-018 (note added).
+
+## Travel advisory revamp Wave 2: Ticket 267 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The trip refresh
+plan and the hosted route changes are in source. Ticket 268 makes the clients follow it.
+
+- `resolveTravelRefreshPlan` in `packages/core/src/services/travel-refresh-policy.ts` says which
+  request is due now (whole day, named trips or none) and when the next falls due. The first open of
+  a local date routes the whole day. An open with a last estimate requests nothing unless a source
+  changed or the device moved more than 500 m. While the Timeline is visible and focused, each trip
+  with a known leave time is refreshed once within 3 hours and once within 30 minutes. A trip with no
+  estimate is requested once at its "appears by" time. Refresh travel always routes the whole day.
+  At 80% of the monthly ceiling nothing else requests.
+- `POST /api/travel/routes` adds fields only: an optional `trips` list routes only those trips' legs,
+  and the response carries `budget` (reserved, ceiling, renewal). The ceiling stays in
+  `reserve_travel_provider_spend`.
+- The route no longer plans a trip home after a last stop at Home, and the day stays complete. It no
+  longer routes a leg ready only after its destination ends.
+- An onward trip falls due 3 hours before it can leave, so a trip longer than 3 hours gets its leave
+  time before it is due (C3). `travelEstimateAppearsAt` applies the same rule.
+- Tests assert route calls for each trigger. `docs/COSTS.md` records the plan's counts, assumed.
+
+Platform impact: web and desktop share the hosted route; released Mac builds ignore the new fields
+and keep the `timeline` scope. Marketing: not applicable. Future mobile: inherits the hosted route.
+Messaging impact: P-018 (note added for the budget pause).
+
 ## Travel advisory revamp Wave 1: Ticket 266 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The bench now shows
@@ -86,7 +154,7 @@ will.
   only the clock past the leave time, the line reads "If you haven't left yet, you'd arrive about
   {time}", because the user may already have left. `lateBasis` tells surfaces which case it is.
 - The time an estimate will appear comes from `travelEstimateAppearsAt` in
-  `travel-refresh-policy.ts`. Ticket 267 changes the rule there.
+  `travel-refresh-policy.ts`. Ticket 267 changed the rule there.
 - Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
   and `finalAvailabilityAt`. A weather margin can no longer move any departure before its ready time;
   it follows the arrival, and the leg is flagged `late` if that passes the arrival target.

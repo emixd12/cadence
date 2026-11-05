@@ -10,6 +10,8 @@ export type TravelRouteRefreshRequest = Readonly<{
     accuracyMeters: number;
     sampledAt: string;
   }> | null;
+  /** Ticket 267: route only these trips (`travelTripMatches`). Absent routes by scope. */
+  trips?: ReadonlyArray<Readonly<{ role: "outbound" | "onward" | "return"; originRef: string | null; destinationRef: string | null }>>;
   corrections: ReadonlyArray<Readonly<{
     eventId: string;
     revision: string;
@@ -27,7 +29,8 @@ export function parseTravelRouteRefreshRequest(value: unknown): TravelRouteRefre
   if (Temporal.PlainDate.compare(Temporal.PlainDate.from(endLocalDate), Temporal.PlainDate.from(startLocalDate)) < 0 ||
       Temporal.PlainDate.from(startLocalDate).until(Temporal.PlainDate.from(endLocalDate)).days > 1) throw new TypeError("Travel route range must cover one or two adjacent local days.");
   const corrections = value.corrections === undefined ? [] : correctionArray(value.corrections);
-  return { scope, startLocalDate, endLocalDate, device: device(value.device), corrections };
+  const trips = value.trips === undefined ? undefined : tripArray(value.trips);
+  return { scope, startLocalDate, endLocalDate, device: device(value.device), corrections, ...(trips ? { trips } : {}) };
 }
 
 function device(value: unknown): TravelRouteRefreshRequest["device"] {
@@ -44,6 +47,17 @@ function correctionArray(value: unknown): TravelRouteRefreshRequest["corrections
     if (!record(item) || !boundedText(item.eventId, 256) || !boundedText(item.revision, 512) || (item.attendance !== "physical" && item.attendance !== "remote") || !(item.locationText === null || boundedText(item.locationText, 512)) || ids.has(item.eventId)) throw new TypeError("Travel correction is invalid.");
     ids.add(item.eventId);
     return { eventId: item.eventId, revision: item.revision, attendance: item.attendance, locationText: item.locationText };
+  });
+}
+
+/** One plan has at most nine stops and a trip home. */
+function tripArray(value: unknown): NonNullable<TravelRouteRefreshRequest["trips"]> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 10) throw new TypeError("Travel trips are invalid.");
+  return value.map((item) => {
+    const ref = (text: unknown) => text === null || boundedText(text, 256);
+    if (!record(item) || (item.role !== "outbound" && item.role !== "onward" && item.role !== "return") || !ref(item.originRef) || !ref(item.destinationRef) ||
+      (item.role === "return" ? item.originRef === null : item.destinationRef === null)) throw new TypeError("Travel trip is invalid.");
+    return { role: item.role, originRef: item.originRef as string | null, destinationRef: item.destinationRef as string | null };
   });
 }
 

@@ -33,7 +33,7 @@ export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265";
+  ticket: "261" | "265" | "268";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -255,6 +255,10 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Line form, after a stop on the way was resolved or the plan changed.",
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "line-changed-unnamed", ticket: "268", template: "A planned trip changed.",
+    situation: "Line form, when a kept estimate's stop was cancelled or has no title. Refresh travel follows.",
+    replaces: "The trip to your next stop changed.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-time-unknown", ticket: "265", template: "No leave time for the trip to {event}.",
     situation: "Line form, when no leave time can be given.",
     replaces: null,
@@ -418,7 +422,8 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
       return named ? `No route found for ${destination}.` : "No route found.";
     case "trip_changed":
       if (!named) return "Trip changed.";
-      return input.role === "return" ? "The trip home changed." : `The trip to ${destination} changed.`;
+      // Ticket 268: a cancelled stop has no title to name.
+      return input.role === "return" ? "The trip home changed." : input.destinationLabel ? `The trip to ${destination} changed.` : "A planned trip changed.";
     case "estimate_expired":
       return named ? `The estimate for ${destination} expired.` : "Estimate expired.";
     case "paused":

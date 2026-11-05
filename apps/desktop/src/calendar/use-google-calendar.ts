@@ -32,6 +32,9 @@ export type DesktopGoogleCalendarHookResult = Readonly<{
   refresh(trigger?: CalendarRefreshTrigger): Promise<boolean>;
 }>;
 
+/** Ticket 268: the label until the first Calendar read settles. Travel waits while it shows. */
+export const DESKTOP_CALENDAR_NOT_LOADED_LABEL = "Calendar has not loaded.";
+
 export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptions): DesktopGoogleCalendarHookResult {
   const { client, accountId, timezone, range, enabled, screen } = options;
   const cache = useMemo(() => new DesktopCalendarCache(), []);
@@ -51,7 +54,7 @@ export function useDesktopGoogleCalendar(options: DesktopGoogleCalendarHookOptio
   timezoneRef.current = timezone;
   if (scopeRef.current !== scope) { scopeRef.current = scope; lease.current += 1; }
   const [state, setState] = useState<Omit<DesktopGoogleCalendarHookResult, "coordinator" | "agentCoordinator" | "refresh" | "panelVersion" | "wrongAccount" | "agentWrongAccount" | "agentCallbackMessage">>({
-    snapshot: null, preferences: null, stale: true, label: broker ? "Calendar has not loaded." : "Calendar is unavailable in this build.", error: null,
+    snapshot: null, preferences: null, stale: true, label: broker ? DESKTOP_CALENDAR_NOT_LOADED_LABEL : "Calendar is unavailable in this build.", error: null,
   });
   const panelChanged = useCallback((view: Awaited<ReturnType<DesktopGoogleCalendarPanelCoordinator["getConnection"]>> | null, snapshot?: ExternalEventSnapshotV1) => {
     lease.current += 1;

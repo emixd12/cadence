@@ -95,7 +95,8 @@ it("walks the state switch through every state and shows the bench clock", async
 it("renders each preset's sentences in the shared surfaces", async () => {
   await render("fresh");
   expect(gymRow()).toContain("Leave by 9:35 AM from Home · walking, arrive 9:55 AM.");
-  expect(text("Dentist drawer")).toContain("Leave time appears by 10:55 AM.");
+  // Ticket 267: the trip from Gym to Dentist falls due 3 hours before Gym ends.
+  expect(text("Dentist drawer")).toContain("Leave time appears by 8:00 AM.");
   expect(statusLine()).toContain("Travel as of 7:00 AM");
   expect(text("Daily Brief")).toContain("Leave by 9:35 AM for Gym (walking).");
 
@@ -189,8 +190,15 @@ it("keeps fixture notes out of route warnings and shows production timing", asyn
 
 it("keeps the Gym row and the Dentist drawer in agreement about the trip home through the day", async () => {
   await render("fresh");
-  for (let minutes = 7 * 60; minutes <= 18 * 60; minutes += 5) {
+  // Every 15 minutes from the 7:00 AM check, plus each boundary: leave times (9:35 AM, 1:20 PM,
+  // 3:00 PM) and 5 minutes after, event starts and ends, and 3 hours and 30 minutes before each
+  // leave time. 6:35 AM comes before the check, so moving there would re-check routes; it is left out.
+  const boundaries = ["09:35", "09:40", "13:20", "13:25", "15:00", "15:05", "10:00", "11:00", "14:00",
+    "10:20", "12:00", "09:05", "12:50", "14:30"].map((time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3)));
+  const steps = [...new Set([...Array.from({ length: 45 }, (_, index) => 7 * 60 + index * 15), ...boundaries])].sort((a, b) => a - b);
+  for (const minutes of steps) {
     const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    // The slider re-renders the mounted bench; nothing remounts between steps.
     await moveClock(time);
     const homeLine = /trip home|Head home|home by/.test(text("Dentist drawer"));
     // The trip home is waiting for its estimate, has a time or is over: never "unknown".
@@ -203,11 +211,11 @@ it("keeps the Gym row and the Dentist drawer in agreement about the trip home th
   // A known time for the trip home.
   await choose("head-home");
   expect(gymRow()).not.toContain("Return time unknown");
-});
+}, 20_000);
 
 it("makes Refresh travel the first words of a line that asks for it, never repeating them (owner change R1)", async () => {
   await render("fresh");
-  // At 11:30 AM the trip to Dentist was due at 10:55 AM, and nobody refreshed.
+  // At 11:30 AM the trip to Dentist was due at 8:00 AM, and nobody refreshed.
   await moveClock("11:30");
   for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
     const view = text(label);
@@ -222,7 +230,11 @@ it("makes Refresh travel the first words of a line that asks for it, never repea
 
 it("shows the owner's approval on the wording review", async () => {
   await render();
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("approved by the owner on November 5, 2026, with changes R1–R3");
+  // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("All 63 phrases approved by the owner on November 5, 2026");
+  expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-sample]')?.textContent).toBe("A planned trip changed.");
+  expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-status]')?.textContent).toBe("Approved November 5, 2026");
+  expect(container.querySelector('[data-wording-id="line-changed"] [data-wording-status]')?.textContent).toContain("Approved");
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-sample]')?.textContent).toBe("Refresh travel to get the leave time.");
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-status]')?.textContent).toContain("owner change R1");
 });

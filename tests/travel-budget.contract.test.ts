@@ -1,7 +1,10 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { expect, it } from "vitest";
+
+import { TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS } from "@/lib/db/travelSpend.repo";
 
 const exec = promisify(execFile);
 // Explicit opt-in; this uses only the disposable, loopback Cadence database.
@@ -55,4 +58,30 @@ it.skipIf(!enabled)("renews at local midnight across a DST month boundary", asyn
     select count(*) = 2 from public.travel_spend_owner_month;
     rollback;`);
   expect(result.split("\n").filter(line => line === "t")).toHaveLength(3);
+});
+
+it("reports the same monthly ceiling the reservation function enforces (Ticket 267)", () => {
+  // The latest migration that defines the function holds the enforced ceiling.
+  const definitions = readdirSync("supabase/migrations").sort()
+    .map((name) => readFileSync(`supabase/migrations/${name}`, "utf8"))
+    .filter((sql) => sql.includes("function public.reserve_travel_provider_spend("));
+  const ceiling = /owner_month_ceiling constant bigint := (\d+);/.exec(definitions.at(-1) ?? "")?.[1];
+  expect(Number(ceiling)).toBe(TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS);
+});
+
+it.skipIf(!enabled)("lets the owner read back its own reserved spend, and nobody else's (Ticket 267)", async () => {
+  const owners = [randomUUID(), randomUUID()];
+  const ids = owners.map(id => `'${id}'`).join(",");
+  const result = await sql(`begin;
+    insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data)
+    select id::uuid, 'authenticated', 'authenticated', id || '@example.invalid', '{"provider":"email","providers":["email"]}', '{}'
+    from unnest(array[${ids}]) id;
+    ${authenticate(owners[0]!)}
+    select allowed from public.reserve_travel_provider_spend(5000);
+    select coalesce(sum(reserved_microdollars), 0) from public.travel_spend_owner_month;
+    reset role;
+    ${authenticate(owners[1]!)}
+    select count(*) from public.travel_spend_owner_month;
+    rollback;`);
+  expect(result.split("\n").filter(Boolean).slice(-3)).toEqual(["t", "5000", "0"]);
 });

@@ -257,6 +257,16 @@ event revisions before and after provider work. It makes no tracking, Calendar, 
 Daily Brief mutation. A generated brief requests day scope once through the shared
 client; estimates remain display-only and never enter model input. Timeline scope
 routes only the next three hours. Both scopes retain the eight-leg safety bound.
+Ticket 267 adds fields only. An optional `trips` list of `{ role, originRef,
+destinationRef }` (at most ten) routes only those trips' legs: the trip to the same stop,
+or the trip home from the same stop. Other legs return `outside_route_window`, and the
+response carries no `conclusionsToken`. A leg ready only at or after its destination's
+end is never routed and returns the resolver's own unavailable reason. No trip home is
+planned from a last stop at Home. The response adds `budget`: `reservedMicrodollars`,
+`ceilingMicrodollars` and `resetsAt` for the owner's local month, read after the request
+through owner-only RLS. It is omitted when the read fails. The ceiling is enforced only by
+`reserve_travel_provider_spend`. Timeline scope also routes an onward trip 3 hours before
+it can leave, so a trip longer than 3 hours gets its leave time before it is due.
 Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
 state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
 leg may carry its fixed weather margin. The server derives the weather area from the

@@ -85,6 +85,7 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "line-expired": () => line({ state: "estimate_expired" }),
   "line-no-route": () => line({ state: "no_route" }),
   "line-changed": () => line({ state: "trip_changed" }),
+  "line-changed-unnamed": () => line({ state: "trip_changed", destinationLabel: null }),
   "line-time-unknown": () => line({ state: "time_unknown", timeUnknownCause: "leg_limit" }),
   "line-time-unknown-late": () => line({ state: "time_unknown", timeUnknownCause: "late_arrival", blockingLabel: "Gym" }),
   "home-appears-by": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: at("12:00") }),

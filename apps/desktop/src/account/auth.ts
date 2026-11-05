@@ -1,6 +1,7 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { clearTravelSession } from "@/lib/ui/travel";
 
 declare global {
   interface ImportMetaEnv {
@@ -235,6 +236,8 @@ export class DesktopAuth {
   }
 
   private async clearLocalSession(): Promise<void> {
+    // Ticket 268: today's travel display is session memory only; it leaves with the account.
+    clearTravelSession();
     await this.supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
     await Promise.all([
       invoke("auth_secret_remove", { name: "supabase-session" }),
