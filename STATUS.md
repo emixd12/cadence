@@ -12,7 +12,7 @@ what to do and when, in plain words, from the departure model.
 - The weather margin shows once per event as "15 min added for thunderstorms." The Open-Meteo credit
   keeps its links and drops its second sentence. "Google Maps · checked 8:00 AM." stays.
 - The Behavior overlap label names the trip and its times. The Daily Brief footer reads "Calculated by
-  Cadence · Google Maps · 9:00 AM." and its line drops the mode advice.
+  Cadence · Google Maps · 9:00 AM." Its line shows the mode advice in development builds only.
 - The travel status line is silent on a day with no trips. Production builds show the unavailable
   message instead of the provider-review text.
 - Calendar details: plain all-day ranges, "Tentative" or "Cancelled" beside the time, and "Applies to

@@ -105,12 +105,14 @@ describe.each([{ surface: "dialog" }, { surface: "drawer" }])("travel timing in 
 describe("Daily Brief travel line", () => {
   const bubble = <DailyBriefBubble state="ready" briefing={briefing} travel={guidance} onDismiss={() => undefined} />;
 
-  it("keeps the margin and drops the advice in every build (Ticket 261)", async () => {
-    for (const developmentBuild of [false, true]) {
-      const text = await renderIn(developmentBuild, bubble);
-      expect(text).toContain(`Leave by 6:05 PM for Dentist (cycling). ${MARGIN}`);
-      expect(text).not.toContain(ADVICE);
-    }
+  it("keeps the margin in production and drops the advice", async () => {
+    const text = await renderIn(false, bubble);
+    expect(text).toContain(`Leave by 6:05 PM for Dentist (cycling). ${MARGIN}`);
+    expect(text).not.toContain(ADVICE);
+  });
+
+  it("adds the advice in development", async () => {
+    expect(await renderIn(true, bubble)).toContain(`${MARGIN} ${ADVICE}`);
   });
 });
 

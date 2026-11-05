@@ -89,6 +89,17 @@ describe("Timeline travel status line", () => {
     expect(development).toContain("provider review");
     expect(development).not.toContain("Refresh travel");
   });
+  it("never shows the provider-review text in production, even beside a kept view", () => {
+    const kept = render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, message: TRAVEL_CLEARANCE_MESSAGE }));
+    expect(kept).not.toContain("provider review");
+    expect(kept).toContain("Travel estimates from 2:52 PM may be stale. Travel estimates are unavailable right now. Tracking and Calendar still work.");
+    const fallback = renderToStaticMarkup(createElement(TravelStatusLine, { status: null, message: TRAVEL_CLEARANCE_MESSAGE, timezone: "America/New_York" }));
+    expect(fallback).not.toContain("provider review");
+    expect(fallback).toContain("unavailable right now");
+    const development = renderToStaticMarkup(createElement(DevelopmentBuildProvider, { value: true } as Parameters<typeof DevelopmentBuildProvider>[0],
+      createElement(TravelStatusLine, { status: status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, message: TRAVEL_CLEARANCE_MESSAGE }), timezone: "America/New_York" })));
+    expect(development).toContain("provider review");
+  });
   it("says nothing on a day with no trips, unless there is a message (G9)", () => {
     const none = (value: TravelState) => renderToStaticMarkup(createElement(TravelStatusLine, { status: value, timezone: "America/New_York", hasTrips: false }));
     expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z" }))).toBe("");

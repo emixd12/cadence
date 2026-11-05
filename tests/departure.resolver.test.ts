@@ -641,6 +641,19 @@ describe("Ticket 261: a trip whose stop is missing from the input", () => {
   });
 });
 
+describe("Ticket 261: a plan with no routed legs", () => {
+  it("drops a trip whose stop is missing, before and after midnight and days later", () => {
+    const run = (now: string) => model(now, [], { stops: [], unknownLegs: [unknown("outbound", null, "gone", "attendance_unknown")] });
+    for (const now of [local("20:00"), local("23:59"), local("00:00", "2026-09-17"), local("12:00", "2026-09-17"), local("12:00", "2026-09-20")]) {
+      expect(run(now)).toMatchObject({ state: "none", next: null, trips: [] });
+    }
+  });
+
+  it("keeps a trip whose stop is in the input", () => {
+    expect(model(local("12:00"), [], { unknownLegs: [unknown("outbound", null, "dentist", "attendance_unknown")] }).next?.state).toBe("needs_attendance");
+  });
+});
+
 describe("Ticket 261: departure stops", () => {
   const estimate = { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 3, lookbackDays: 90, provenance: "completed_stopped_occurrence_mean" } as const;
 

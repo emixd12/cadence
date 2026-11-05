@@ -30,8 +30,9 @@ export function resolveDepartureModel(input: DepartureModelInput): DepartureMode
   const afterLate = input.evidence ? travelLegsAfterLateArrival(input.evidence.legs) : new Map<string, number>();
 
   // An unknown trip has no time of its own. Its plan's day is the day of the earliest routed leg.
+  // With no routed leg nothing dates the plan, so a trip whose stop is missing is dropped.
   const readyTimes = (input.evidence?.legs ?? []).map((entry) => Temporal.Instant.from(entry.leg.readyAt)).sort(Temporal.Instant.compare);
-  const unknownDayEnd = endOfLocalDay(readyTimes[0] ?? now, input.timezone);
+  const unknownDayEnd = readyTimes[0] ? endOfLocalDay(readyTimes[0], input.timezone) : now;
   const remaining = input.evidence
     ? tripsInOrder(input.evidence, stops).flatMap((trip, index, all): Candidate[] => {
         const candidate = "leg" in trip

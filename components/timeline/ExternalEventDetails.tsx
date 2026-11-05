@@ -237,11 +237,11 @@ export function renderTravelTiming({ eventId, travel, departure, now, timezone, 
 }>) {
   const trips = eventTrips(departure, eventId);
   if (!trips.length) return null;
-  return <TravelTiming trips={trips} travel={travel} context={departurePhraseContext(now, timezone)} onOpenExternal={onOpenExternal} refresh={refresh ?? null} />;
+  return <TravelTiming eventId={eventId} trips={trips} travel={travel} context={departurePhraseContext(now, timezone)} onOpenExternal={onOpenExternal} refresh={refresh ?? null} />;
 }
 
-function TravelTiming({ trips, travel, context, onOpenExternal, refresh }: Readonly<{
-  trips: readonly DepartureTrip[]; travel?: TravelTimingEvidence | null; context: DeparturePhraseContext;
+function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh }: Readonly<{
+  eventId: string; trips: readonly DepartureTrip[]; travel?: TravelTimingEvidence | null; context: DeparturePhraseContext;
   onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
 }>) {
   const developmentBuild = useDevelopmentBuild();
@@ -254,10 +254,13 @@ function TravelTiming({ trips, travel, context, onOpenExternal, refresh }: Reado
   const developmentWarnings = developmentBuild ? [...new Set(legs.flatMap((item) => item.estimate?.warnings ?? []))] : [];
   const checked = trips.find((trip) => trip.checkedAt);
   const attribution = legs.find((item) => item.estimate?.attribution)?.estimate?.attribution;
+  // One Refresh travel per view, on the first line that needs it.
+  const refreshKey = trips.find((trip) => trip.action === "refresh")?.key ?? null;
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
     {trips.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
-      {trip.phrase}
-      {trip.action === "refresh" && refresh ? <>{" "}<button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{DEPARTURE_REFRESH_LABEL}</button></> : null}
+      {/* A trip leaving this stop names where it goes. The trip arriving here does not need to. */}
+      {trip.originRef === eventId ? trip.linePhrase : trip.phrase}
+      {trip.key === refreshKey && refresh ? <>{" "}<button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{DEPARTURE_REFRESH_LABEL}</button></> : null}
     </p>)}
     {margin ? <p>{margin}</p> : null}
     {travel?.completeTrip && travel.finalAvailabilityAt ? <p>{departureFreeAgainPhrase(travel.finalAvailabilityAt, context)}</p> : null}

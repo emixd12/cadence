@@ -751,8 +751,11 @@ function travelDetails({ occurrenceId, travel, departure, now, timezone, habits,
  */
 export function TravelStatusLine({ status, message, timezone, hasTrips = true }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string; hasTrips?: boolean }>) {
   const developmentBuild = useDevelopmentBuild();
-  const raw = travelStatusText(status, message ?? null, timezone, { hasTrips });
-  const text = !developmentBuild && raw === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : raw;
+  // The provider-review text is for development builds. Swap it before the line is composed,
+  // so no composed line can carry it into production.
+  const productionMessage = (value: string | null) => !developmentBuild && value === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : value;
+  const shown = status && status.message !== productionMessage(status.message) ? { ...status, message: productionMessage(status.message) } : status;
+  const text = travelStatusText(shown, productionMessage(message ?? null), timezone, { hasTrips });
   if (!text) return null;
   const showRefresh = !!status && !status.resumesAt && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
   return (

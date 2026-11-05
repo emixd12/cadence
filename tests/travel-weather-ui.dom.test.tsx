@@ -214,3 +214,36 @@ describe("Ticket 261: lines that need a refresh, and finished trips", () => {
     expect(render(base, "2026-11-01T19:30:00Z")).toBeNull();
   });
 });
+
+describe("Ticket 261: a stop between two trips", () => {
+  const leg = (id: string, role: "outbound" | "onward", origin: string | null, destination: string, leaveAt: string, arriveAt: string, expiresAt = "2026-11-01T23:00:00Z") => ({
+    leg: { id, role, journeyRef: "journey", originCommitmentRef: origin, destinationCommitmentRef: destination, mode: "walking" as const, readyAt: "2026-11-01T08:00:00Z",
+      provenance: { ...provenance, originSource: origin ? "planned_stop" as const : "saved_base" as const, destinationRef: destination } },
+    state: "current" as const, reason: null,
+    estimate: { durationSeconds: 1200, departureAt: leaveAt, arrivalAt: arriveAt, warnings: [], fallback: false, attribution: "Google Maps", observedAt: "2026-11-01T08:00:00Z", expiresAt } });
+  const stops = [{ ref: "dentist", label: "Dentist", startAt: "2026-11-01T11:00:00Z", endAt: "2026-11-01T11:30:00Z" },
+    { ref: "gym", label: "Gym", startAt: "2026-11-01T13:00:00Z", endAt: "2026-11-01T14:00:00Z" }];
+  const two = (expiresAt?: string): Omit<TravelEvidenceResult, "modelProjection"> => ({ ...evidence(undefined, undefined),
+    legs: [leg("to-dentist", "outbound", null, "dentist", "2026-11-01T10:30:00Z", "2026-11-01T10:50:00Z", expiresAt),
+      leg("to-gym", "onward", "dentist", "gym", "2026-11-01T12:30:00Z", "2026-11-01T12:50:00Z", expiresAt)] });
+  const render = (travel: Omit<TravelEvidenceResult, "modelProjection">, eventId: string, now = "2026-11-01T09:00:00Z") => {
+    const departure = resolveDepartureModel({ evidence: travel, now, timezone: "UTC", arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null, stops });
+    return renderTravelTiming({ eventId, travel, departure, now, timezone: "UTC", refresh: { onRefresh: () => undefined, pending: false } });
+  };
+  const lines = () => [...container.querySelectorAll('[aria-label="Travel timing"] > p[data-departure-state]')].map((line) => line.textContent);
+
+  it("names where the trip leaving this stop goes", async () => {
+    await act(() => root.render(<>{render(two(), "dentist")}</>));
+    expect(lines()).toEqual(["Leave by 10:30 AM from Home · walking, arrive 10:50 AM.", "Leave by 12:30 PM for Gym · walking, arrive 12:50 PM."]);
+    await act(() => root.render(<>{render(two(), "gym")}</>));
+    expect(lines()).toEqual(["Leave by 12:30 PM · walking, arrive 12:50 PM."]);
+  });
+
+  it("shows each expired trip once, with one Refresh travel", async () => {
+    const expired = two("2026-11-01T08:05:00Z");
+    const stale = { ...expired, legs: expired.legs.map((entry) => ({ ...entry, state: "stale" as const, estimate: null, reason: "Route estimate expired." })) };
+    await act(() => root.render(<>{render(stale, "dentist")}</>));
+    expect(lines()).toEqual(["Estimate expired. Refresh travel", "The estimate for Gym expired."]);
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+  });
+});

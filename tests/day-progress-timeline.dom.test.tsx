@@ -126,7 +126,9 @@ describe("DayProgressTimeline", () => {
 
     await act(() => summary("occurrence-2").click());
     const later = container.querySelector('article[data-occurrence-id="occurrence-2"] [aria-label="Travel timing"]');
-    expect(later?.textContent).toContain("Leave by 2:00 PM · walking, arrive 2:20 PM.");
+    // The trip leaving this row names where it goes. The fixture's later stop is an all-day event,
+    // which is never a stop, so the plain fallback names it.
+    expect(later?.textContent).toContain("Leave by 2:00 PM for your next stop · walking, arrive 2:20 PM.");
     expect(later?.textContent).not.toContain("timing unavailable");
     expect(container.textContent).not.toContain("timing unavailable");
 

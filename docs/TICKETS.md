@@ -15552,7 +15552,7 @@ Implementation notes:
   local day of its plan.
 - Additions from Ticket 262: all-day events read "Nov 1 – Nov 2" (or "Nov 1"), and the
   dialog shows "Tentative" or "Cancelled" beside the time.
-- The Daily Brief line drops the mode advice in every build; Ticket 272 moves its lines
+- The Daily Brief line shows the mode advice in development builds only (Ticket 260); Ticket 272 moves its lines
   to the model.
 Dependencies: Ticket 265 (departure model) and Ticket 260 (development-only flag). All
 timing phrases come from core.
