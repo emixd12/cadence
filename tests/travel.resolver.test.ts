@@ -849,7 +849,7 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
     expect(resolveTravelEvidence({ ...evidenceInput(plan, [], []), expectedJourneyRevision: "other" }).unknownLegs).toEqual([]);
   });
 
-  it("removes unknown legs of a resolved stop after a decision", () => {
+  it("removes the unknown trip home from a resolved stop after a decision", () => {
     const { evidence } = unknownReasons(walking({ base: null }));
     const after = resolveTravelAfterDecisions(evidence, [{ id: "event-1", status: "completed" }]);
     expect(after?.unknownLegs).toEqual([]);

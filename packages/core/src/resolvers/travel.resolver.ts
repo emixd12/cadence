@@ -313,15 +313,9 @@ export function resolveTravelAfterDecisions(
       source.durationSeconds !== (duration?.kind === "known" ? duration.seconds : null));
   })) return null;
   if (!resolvedRefs.size) return evidence;
-  // Ticket 265: a leg from a resolved stop to a later stop stays known but withdrawn, so the
-  // next trip does not skip that stop. A leg to a resolved stop, or home from one, leaves.
-  const legs = evidence.legs.flatMap((entry): TravelResolvedLegEvidence[] => {
-    const { leg } = entry;
-    if (resolvedRefs.has(leg.destinationCommitmentRef ?? "")) return [];
-    if (!resolvedRefs.has(leg.originCommitmentRef ?? "")) return [entry];
-    return leg.destinationCommitmentRef ? [rejected(leg, "rejected_revision", "Route origin was resolved.")] : [];
-  });
-  const legIds = new Set(legs.filter(({ leg }) => !resolvedRefs.has(leg.originCommitmentRef ?? "")).map(({ leg }) => leg.id));
+  const legs = evidence.legs.filter(({ leg }) =>
+    !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? ""));
+  const legIds = new Set(legs.map(({ leg }) => leg.id));
   const segments = evidence.segments.filter(segment =>
     !segment.sourceRefs.some(ref => resolvedRefs.has(ref)) && (!segment.legId || legIds.has(segment.legId)));
   const segmentById = new Map(segments.map(segment => [segment.id, segment]));
@@ -331,9 +325,16 @@ export function resolveTravelAfterDecisions(
     return segmentIds.length ? [{ ...collision, segmentIds,
       travelCreated: segmentIds.some(id => segmentById.get(id)!.kind !== "commitment") }] : [];
   });
-  const changed = legIds.size !== evidence.legs.length || segments.length !== evidence.segments.length;
+  const changed = legs.length !== evidence.legs.length || segments.length !== evidence.segments.length;
+  // Ticket 265: a leg from a resolved stop to a later stop has no usable route now. It moves to
+  // the unknown legs, which only the departure model reads, so the next trip does not skip that stop.
+  const withdrawn = evidence.legs.flatMap(({ leg }): TravelUnknownLeg[] =>
+    resolvedRefs.has(leg.originCommitmentRef ?? "") && leg.destinationCommitmentRef && !resolvedRefs.has(leg.destinationCommitmentRef)
+      ? [{ role: leg.role, originCommitmentRef: leg.originCommitmentRef, destinationCommitmentRef: leg.destinationCommitmentRef, reason: "origin_unknown", blockerResolved: true }]
+      : []);
   return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
-    ...(evidence.unknownLegs ? { unknownLegs: unknownLegsAfterDecisions(evidence.unknownLegs, resolvedRefs) } : {}),
+    // Evidence from a released server may have no unknown legs. It gains the field only when one exists.
+    ...(evidence.unknownLegs || withdrawn.length ? { unknownLegs: [...unknownLegsAfterDecisions(evidence.unknownLegs ?? [], resolvedRefs), ...withdrawn] } : {}),
     completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
 }
 

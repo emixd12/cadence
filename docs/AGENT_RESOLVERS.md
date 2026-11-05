@@ -333,9 +333,14 @@ Ticket 219 section below for how conclusions reach model input.
 
 `resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
 affected by manual decisions, preserves unaffected estimates, and withholds a
-complete-trip claim until routing refreshes. A leg from a resolved stop to a later stop
-stays as `rejected_revision` with no estimate or occupancy, so the next trip does not
-skip that stop (Ticket 265). The shared Timeline calls it;
+complete-trip claim until routing refreshes. Ticket 265: `legs` and occupancy lose every
+leg to or from a resolved stop, so shipped rows and drawers change nothing. A leg from a
+resolved stop to a later stop moves to `unknownLegs` as `origin_unknown` with
+`blockerResolved`, so the departure model reports `trip_changed` and the next trip does not
+skip that stop. An unknown onward leg from a resolved stop stays, and an `origin_unknown` leg
+whose blocking stop was resolved gains `blockerResolved`. An unknown trip home from a
+resolved stop leaves. `blockerResolved` is set on the client only: the hosted route never
+sends it, and only the departure model reads it. The shared Timeline calls it;
 `tests/travel.resolver.test.ts` covers removal and restoration without mutation.
 
 `packages/core/src/resolvers/weather-margin.resolver.ts` (Ticket 218) owns the

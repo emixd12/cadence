@@ -408,17 +408,22 @@ describe("choosing the next trip", () => {
     expect(result.trips.some((trip) => trip.destinationRef === "lunch")).toBe(false);
     expect(result.next).toMatchObject({ role: "onward", destinationRef: "dentist", state: "trip_changed", action: "refresh", leaveAt: null, linePhrase: "The trip to Dentist changed." });
     expect(result.trips.map((trip) => trip.role)).toEqual(["onward", "return"]);
+    expect(after?.legs.map(({ leg }) => leg.role)).toEqual(["return"]);
     expect(after?.completeTrip).toBe(false);
   });
 
-  it("the withdrawn leg keeps no estimate and no occupancy", () => {
+  it("the withdrawn leg is no leg at all: no estimate, no occupancy, and no field on released evidence", () => {
     const lunchRoute = toLunch();
     const leaving = onward();
     const arrival = { id: `arrival:${leaving.leg.id}`, kind: "arrival_buffer" as const, startAt: local("14:20"), endAt: local("14:30"), sourceRefs: ["dentist"], legId: leaving.leg.id };
     const route = { id: `route:${leaving.leg.id}`, kind: "route" as const, startAt: local("13:55"), endAt: local("14:20"), sourceRefs: ["lunch", "dentist"], legId: leaving.leg.id };
-    const after = resolveTravelAfterDecisions({ version: "1.0" as const, journeyRef: "day", legs: [lunchRoute, leaving], unknownLegs: [], segments: [route, arrival], occupiedSpans: [], collisions: [], completeTrip: true, finalAvailabilityAt: null }, [{ id: "lunch", status: "completed" }]);
-    expect(after?.legs).toEqual([expect.objectContaining({ state: "rejected_revision", estimate: null })]);
+    const base = { version: "1.0" as const, journeyRef: "day", legs: [lunchRoute, leaving], segments: [route, arrival], occupiedSpans: [], collisions: [], completeTrip: true, finalAvailabilityAt: null };
+    const after = resolveTravelAfterDecisions(base, [{ id: "lunch", status: "completed" }]);
+    expect(after?.legs).toEqual([]);
     expect(after?.segments).toEqual([]);
+    expect(after?.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "lunch", destinationCommitmentRef: "dentist", reason: "origin_unknown", blockerResolved: true }]);
+    const nothingWithdrawn = resolveTravelAfterDecisions({ ...base, legs: [lunchRoute] }, [{ id: "lunch", status: "completed" }]);
+    expect(nothingWithdrawn).not.toHaveProperty("unknownLegs");
   });
 
   it("a stop whose blocker was resolved reads trip changed, not Add Home", () => {

@@ -16,8 +16,8 @@ will.
 - Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
   and `finalAvailabilityAt`. A weather margin can no longer move any departure before its ready time;
   it follows the arrival, and the leg is flagged `late` if that passes the arrival target.
-- Resolving an Occurrence no longer drops the leg from it to a later stop. That leg stays with no
-  estimate and reads as a changed trip, so the next trip does not skip the stop.
+- After an Occurrence is resolved, the departure model reads the trip from it to a later stop as a
+  changed trip, so the next trip does not skip that stop. Shipped rows and drawers show nothing new.
 - Most phrases are not yet approved by the owner. The list is at the top of the phrase module.
 
 Platform impact: web and desktop read the same core module from later tickets. Marketing: not

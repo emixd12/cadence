@@ -199,8 +199,9 @@ export type TravelUnknownLeg = Readonly<{
     | "return_base_missing"
     | "leg_limit";
   /**
-   * Ticket 265: set on the client only, after a decision. The unknown stop that held this
-   * trip's origin was resolved, so only a new plan can say where the trip starts.
+   * Ticket 265: set on the client only, by `resolveTravelAfterDecisions`, and read only by the
+   * departure model. The stop this trip started from, or the unknown stop that held its origin,
+   * was resolved, so only a new plan can say where the trip starts.
    */
   blockerResolved?: true;
 }>;
