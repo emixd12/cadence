@@ -53,8 +53,9 @@ export function departureStops(input: Readonly<{
 export type LocatedStopOccurrence = Readonly<{ id: string; title: string; scheduledFor: string; status: string; placeText?: string }>;
 
 /**
- * Ticket 273: the first stop with a place that is still ahead, for the line offering Travel
- * estimates while they are off. A Calendar event counts when it has a location and the user has
+ * Ticket 273: the first stop with a place that is still ahead today, for the line offering
+ * Travel estimates while they are off. The Timeline reads later days too, so a stop counts only
+ * when it starts on `localDate` in `timezone`. A Calendar event counts when it has a location and the user has
  * not declined or cancelled it; a Behavior counts when it is Unresolved and set to a place. Pure:
  * `now` is injected. Titles stay on the device.
  */
@@ -62,9 +63,16 @@ export function firstLocatedStopAhead(input: Readonly<{
   events: readonly NormalizedExternalEvent[];
   occurrences: readonly LocatedStopOccurrence[];
   now: string;
+  localDate: string;
+  timezone: string;
 }>): Readonly<{ ref: string; label: string }> | null {
   const now = Temporal.Instant.from(input.now);
-  const ahead = (startAt: string) => Temporal.Instant.compare(Temporal.Instant.from(startAt), now) > 0;
+  const today = Temporal.PlainDate.from(input.localDate);
+  const ahead = (startAt: string) => {
+    const start = Temporal.Instant.from(startAt);
+    return Temporal.Instant.compare(start, now) > 0
+      && Temporal.PlainDate.compare(start.toZonedDateTimeISO(input.timezone).toPlainDate(), today) === 0;
+  };
   const candidates = [
     ...input.events.flatMap((event) => event.kind === "timed" && event.location.trim() && event.state !== "cancelled" &&
       event.currentUserResponse !== "declined" && ahead(event.startAt)

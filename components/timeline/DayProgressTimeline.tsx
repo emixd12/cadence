@@ -214,8 +214,9 @@ export function DayProgressTimeline({
   // Ticket 273: with no travel evidence, a located event ahead today loads settings to learn whether estimates are off.
   const offerStop = useMemo(() => {
     const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
-    return firstLocatedStopAhead({ events: travelEvents, occurrences: today?.occurrences ?? [], now });
-  }, [travelEvents, timeline.daySections, timeline.todayLocalDate, now]);
+    return firstLocatedStopAhead({ events: travelEvents, occurrences: today?.occurrences ?? [], now,
+      localDate: timeline.todayLocalDate, timezone: timeline.timezone });
+  }, [travelEvents, timeline.daySections, timeline.todayLocalDate, timeline.timezone, now]);
   const [offerDismissed, setOfferDismissed] = useState(() => typeof window !== "undefined" && travelOfferDismissed());
   const offerTarget: TravelLinkTarget | null = context ? context.openTravelSettings ? { onOpen: context.openTravelSettings } : null : { href: "/settings#travel" };
   const offerWanted = !!offerStop && !!offerTarget && !offerDismissed && !routeEvidence;

@@ -230,13 +230,16 @@ describe("first located stop ahead", () => {
       { ...base, id: "past", location: "Somewhere", startAt: "2026-11-10T13:00:00Z" },
       { ...base, id: "declined", location: "Somewhere", currentUserResponse: "declined", startAt: "2026-11-10T14:10:00Z" },
       { ...base, id: "dentist", title: "Dentist", location: "Office", startAt: "2026-11-10T16:00:00Z" },
+      // Tomorrow in New York: the Timeline reads later days, but the offer is for today only.
+      { ...base, id: "tomorrow", title: "Tomorrow", location: "Office", startAt: "2026-11-11T06:00:00Z" },
     ] as unknown as NormalizedExternalEvent[];
+    const day = { localDate: "2026-11-10", timezone: "America/New_York" };
     const occurrences = [
       { id: "done", title: "Run", scheduledFor: "2026-11-10T14:20:00Z", status: "completed", placeText: "Park" },
       { id: "gym", title: "Gym", scheduledFor: "2026-11-10T15:30:00Z", status: "unresolved", placeText: "Gym" },
     ];
-    expect(firstLocatedStopAhead({ events, occurrences, now: "2026-11-10T14:00:00Z" })).toEqual({ ref: "gym", label: "Gym" });
-    expect(firstLocatedStopAhead({ events, occurrences: [], now: "2026-11-10T14:00:00Z" })).toEqual({ ref: "dentist", label: "Dentist" });
-    expect(firstLocatedStopAhead({ events, occurrences, now: "2026-11-10T17:00:00Z" })).toBeNull();
+    expect(firstLocatedStopAhead({ events, occurrences, now: "2026-11-10T14:00:00Z", ...day })).toEqual({ ref: "gym", label: "Gym" });
+    expect(firstLocatedStopAhead({ events, occurrences: [], now: "2026-11-10T14:00:00Z", ...day })).toEqual({ ref: "dentist", label: "Dentist" });
+    expect(firstLocatedStopAhead({ events, occurrences, now: "2026-11-10T17:00:00Z", ...day })).toBeNull();
   });
 });
