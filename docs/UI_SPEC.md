@@ -255,6 +255,18 @@ one magenta span without hovering. The owner picks the marker's form on the benc
 Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
 inspection-only. There is no collapsed Daily Brief strip.
 
+The next-departure line (Ticket 269) sits at the top of the Timeline, under the Calendar
+status lines, and replaces "Travel as of". It shows the departure model's line phrase for
+the next trip in every state; a day with no trips shows no travel text. While the travel
+budget is used up, the paused phrase follows a known time on the same line. Where the
+phrase starts with "Refresh travel", those words are the button (R1); otherwise Refresh
+travel ends the line only when the trip needs a new estimate. Steps that need a place,
+attendance or a start show their sentence with no action until Ticket 273. Below it, at
+most one muted note: the unavailable message, the development-only provider review, a
+changed-stop message or the weather state, in that order of preference. A polite live
+region announces the line only when the next trip or its state changes, never a
+countdown minute. Web and Mac share `TravelStatusLine` in `DayProgressTimeline`.
+
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a

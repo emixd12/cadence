@@ -2,6 +2,10 @@
 .timeline[data-drawer-open="true"] { padding-bottom: calc(var(--drawer-height) + 1rem); }
 .spine { position: absolute; top: 1rem; bottom: 1rem; width: 1px; background: var(--muted-readable); pointer-events: none; }
 .calendarState { margin: 0 0 0.5rem var(--timeline-gutter); color: var(--muted-readable); font-size: var(--text-xs); line-height: 1.25rem; }
+/* Ticket 269: the next-departure line. Regular weight; foreground text sets it above the muted notes. A trip with a time gets the 1px magenta rule shared with its span (D2). */
+.travelStatus { display: contents; }
+.departureLine { max-width: 40rem; margin: 0 0 0.5rem var(--timeline-gutter); color: var(--foreground); font-size: var(--text-sm); line-height: 1.25rem; overflow-wrap: anywhere; }
+.departureLine[data-departure-timed="true"] { border-left: 1px solid var(--calendar-overlap); padding-left: 0.5rem; }
 .day { position: relative; padding-block: 1.25rem; }
 .day:first-child { padding-top: 0; }
 .day:last-child { padding-bottom: 0; }

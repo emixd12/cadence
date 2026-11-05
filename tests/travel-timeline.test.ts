@@ -5,6 +5,7 @@ import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeli
 import { mergeTravelLastEstimates, resolveTravelAfterDecisions, resolveTravelEvidence, resolveTravelPlan, travelUnreliableSegments } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import type { TravelEvidenceResult, TravelOccupiedSegment } from "@cadence/core/types/travel";
+import type { DepartureModel, DepartureTrip } from "@cadence/core/types/departure";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TravelStatusLine } from "@/components/timeline/DayProgressTimeline";
@@ -92,64 +93,96 @@ describe("shared Timeline travel occupancy", () => {
   });
 });
 
-describe("Timeline travel status line", () => {
+describe("Timeline next-departure line (Ticket 269)", () => {
   const routesView: TravelRoutesView = { accountId: "a", mode: "walking", navigationPreference: "google_maps", settingsRevision: "r", expiresAt: null, evidence: { ...travel, modelProjection: undefined } as never };
   const status = (value: Partial<TravelState>): TravelState => ({ view: null, message: null, stale: false, pending: false, observedAt: null, resumesAt: null, refresh: () => undefined, ...value });
-  const render = (value: TravelState | null) => renderToStaticMarkup(createElement(TravelStatusLine, { status: value, timezone: "America/New_York" }));
-  it("shows the observation time with a refresh link", () => {
-    const html = render(status({ view: routesView, observedAt: "2026-09-21T18:52:30Z" }));
-    expect(html).toContain("Travel as of 2:52 PM");
+  const none: DepartureModel = { state: "none", next: null, phrase: null, trips: [], resumesAt: null, pausedPhrase: null };
+  const model = (linePhrase: string, trip: Partial<DepartureTrip> = {}, paused: string | null = null): DepartureModel => {
+    const next = { key: "outbound:base:gym", state: "upcoming", action: null, linePhrase, phrase: linePhrase, ...trip } as DepartureTrip;
+    return { state: next.state, next, phrase: linePhrase, trips: [next], resumesAt: paused, pausedPhrase: paused ? "Travel estimates resume on October 1." : null };
+  };
+  const leaveBy = model("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.");
+  const render = (departure: DepartureModel, value: TravelState | null, extra: { message?: string | null; hasEvidence?: boolean } = {}) =>
+    renderToStaticMarkup(createElement(TravelStatusLine, { departure, status: value, hasEvidence: extra.hasEvidence ?? !!value?.view?.evidence, message: extra.message ?? null }));
+  const development = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(createElement(DevelopmentBuildProvider, { value: true } as Parameters<typeof DevelopmentBuildProvider>[0], element));
+  it("shows the next trip's line in place of Travel as of, with no button while the estimate is current", () => {
+    const html = render(leaveBy, status({ view: routesView, observedAt: "2026-09-21T18:52:30Z" }));
+    expect(html).toContain("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.");
+    expect(html).not.toContain("Travel as of");
+    expect(html).not.toContain("Refresh travel");
+    expect(html).toContain('data-departure-timed="true"');
+  });
+  it("ends the line with Refresh travel when the trip's action is refresh, disabled while pending", () => {
+    const last = model("Last estimate: leave by 9:35 AM for Gym · checked 7:00 AM.", { action: "refresh", freshness: "last_estimate" });
+    const html = render(last, status({ view: routesView, stale: true }));
+    expect(html).toContain("Last estimate: leave by 9:35 AM for Gym · checked 7:00 AM. <button");
     expect(html).toContain(">Refresh travel</button>");
-    expect(html).toContain("class=\"text-link\"");
+    expect(html).toContain('class="text-link"');
+    expect(render(last, status({ view: routesView, stale: true, pending: true }))).toContain("disabled");
   });
-  it("marks an expired view as stale", () => {
-    expect(render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true }))).toContain("Travel estimates from 2:52 PM may be stale.");
+  it("makes the words Refresh travel the button when the phrase starts with them (R1)", () => {
+    const ready = model("Refresh travel to get the leave time for Dentist.", { state: "appears_later", action: "refresh" });
+    const html = render(ready, status({ view: routesView }));
+    expect(html).toContain(">Refresh travel</button> to get the leave time for Dentist.");
+    expect(html.split("Refresh travel").length - 1).toBe(1);
+    expect(html).not.toContain("data-departure-timed");
+    // Without a travel status there is nothing to refresh, so the words stay plain.
+    expect(render(ready, null, { hasEvidence: true })).not.toContain("<button");
   });
-  it("disables the link while pending", () => {
-    expect(render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", pending: true }))).toContain("disabled");
+  it("shows a needs step's sentence with no action (Ticket 273 adds them)", () => {
+    const html = render(model("Add a place for Dentist to get a leave time.", { state: "needs_place" }), status({ view: routesView }));
+    expect(html).toContain("Add a place for Dentist to get a leave time.");
+    expect(html).not.toContain("<button");
   });
-  it("shows a failure message with the link, and hides the link for provider review", () => {
-    const unavailable = render(status({ message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
+  it("shows a failure message with the button, and hides the button for provider review", () => {
+    const unavailable = render(none, status({ message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
     expect(unavailable).toContain("unavailable right now");
     expect(unavailable).toContain("Refresh travel");
     // Ticket 261: the provider-review text is for development builds. Production says estimates are unavailable.
-    const review = render(status({ message: TRAVEL_CLEARANCE_MESSAGE }));
+    const review = render(none, status({ message: TRAVEL_CLEARANCE_MESSAGE }));
     expect(review).not.toContain("provider review");
     expect(review).toContain("Travel estimates are unavailable right now. Tracking and Calendar still work.");
     expect(review).not.toContain("Refresh travel");
-    const development = renderToStaticMarkup(createElement(DevelopmentBuildProvider, { value: true } as Parameters<typeof DevelopmentBuildProvider>[0],
-      createElement(TravelStatusLine, { status: status({ message: TRAVEL_CLEARANCE_MESSAGE }), timezone: "America/New_York" })));
-    expect(development).toContain("provider review");
-    expect(development).not.toContain("Refresh travel");
+    const reviewDev = development(createElement(TravelStatusLine, { departure: none, status: status({ message: TRAVEL_CLEARANCE_MESSAGE }), hasEvidence: false }));
+    expect(reviewDev).toContain("provider review");
+    expect(reviewDev).not.toContain("Refresh travel");
   });
-  it("never shows the provider-review text in production, even beside a kept view", () => {
-    const kept = render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, message: TRAVEL_CLEARANCE_MESSAGE }));
+  it("puts a message on a second short line under a kept leave time, never the provider-review text in production", () => {
+    const kept = render(leaveBy, status({ view: routesView, stale: true, message: TRAVEL_CLEARANCE_MESSAGE }));
     expect(kept).not.toContain("provider review");
-    expect(kept).toContain("Travel estimates from 2:52 PM may be stale. Travel estimates are unavailable right now. Tracking and Calendar still work.");
-    const fallback = renderToStaticMarkup(createElement(TravelStatusLine, { status: null, message: TRAVEL_CLEARANCE_MESSAGE, timezone: "America/New_York" }));
+    expect(kept).toMatch(/Leave by 9:35 AM[^<]*<\/p><p[^>]*data-travel-note[^>]*>Travel estimates are unavailable right now\. Tracking and Calendar still work\.<\/p>/);
+    const fallback = render(none, null, { message: TRAVEL_CLEARANCE_MESSAGE });
     expect(fallback).not.toContain("provider review");
     expect(fallback).toContain("unavailable right now");
-    const development = renderToStaticMarkup(createElement(DevelopmentBuildProvider, { value: true } as Parameters<typeof DevelopmentBuildProvider>[0],
-      createElement(TravelStatusLine, { status: status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, message: TRAVEL_CLEARANCE_MESSAGE }), timezone: "America/New_York" })));
-    expect(development).toContain("provider review");
+    expect(development(createElement(TravelStatusLine, { departure: leaveBy, status: status({ view: routesView, message: TRAVEL_CLEARANCE_MESSAGE }), hasEvidence: true })))
+      .toContain("provider review");
+    // One Refresh travel at most: the line's button wins over the note's.
+    const both = render(model("Last estimate: leave by 9:35 AM for Gym · checked 7:00 AM.", { action: "refresh" }),
+      status({ view: routesView, message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
+    expect(both.split(">Refresh travel</button>").length - 1).toBe(1);
   });
-  it("says nothing on a day with no trips, unless there is a message (G9)", () => {
-    const none = (value: TravelState) => renderToStaticMarkup(createElement(TravelStatusLine, { status: value, timezone: "America/New_York", hasTrips: false }));
-    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z" }))).toBe("");
-    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true }))).toBe("");
-    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", resumesAt: "2026-10-01T04:00:00Z" }))).toContain("Travel estimates resume on October 1.");
+  it("says nothing on a day with no trips, even while paused or with a message (G9)", () => {
+    expect(render(none, status({ view: routesView, observedAt: "2026-09-21T18:52:00Z" }))).not.toContain("<p");
+    expect(render(none, status({ view: routesView, stale: true, resumesAt: "2026-10-01T04:00:00Z" }))).not.toContain("<p");
+    expect(render(none, status({ view: routesView, message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }))).not.toContain("<p");
   });
-  it("names the renewal date in the user's timezone and hides the link while the budget is used up", () => {
-    const resumes = render(status({ resumesAt: "2026-10-01T04:00:00Z" }));
-    expect(resumes).toContain("Travel estimates resume on October 1.");
-    expect(resumes).not.toContain("Refresh travel");
-    const kept = render(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true, resumesAt: "2026-10-01T04:00:00Z" }));
-    expect(kept).toContain("Travel estimates from 2:52 PM may be stale. Travel estimates resume on October 1.");
-    expect(kept).not.toContain("tomorrow");
+  it("shows the paused phrase beside a known time with no button (D11)", () => {
+    const paused = render(model("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.", {}, "2026-10-01T04:00:00Z"),
+      status({ view: routesView, stale: true, resumesAt: "2026-10-01T04:00:00Z" }));
+    expect(paused).toContain("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM. Travel estimates resume on October 1.");
+    expect(paused).not.toContain("Refresh travel");
+    const alone = render(model("Travel estimates resume on October 1.", { state: "paused" }, "2026-10-01T04:00:00Z"), status({ resumesAt: "2026-10-01T04:00:00Z" }));
+    expect(alone.split("Travel estimates resume on October 1.").length - 1).toBe(1);
   });
-  it("renders nothing without a view or message", () => {
-    expect(render(status({}))).toBe("");
-    expect(render(null)).toBe("");
+  it("adds the weather state as the note only when there is no message", () => {
+    const weatherView = { ...routesView, evidence: { ...routesView.evidence!, weather: { state: "no_position" } } } as never;
+    expect(render(leaveBy, status({ view: weatherView }))).toContain("No weather margin: device location is unavailable.");
+    const failed = render(leaveBy, status({ view: weatherView, message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
+    expect(failed).not.toContain("No weather margin");
+  });
+  it("renders no visible text without a trip or message", () => {
+    expect(render(none, status({}))).not.toContain("<p");
+    expect(render(none, null)).not.toContain("<p");
   });
 });
 

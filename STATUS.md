@@ -8,6 +8,33 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 269 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** One line at the top
+of the Timeline now says when to leave next.
+
+- `TravelStatusLine` shows the departure model's line phrase for the next trip in every state and
+  replaces "Travel as of" and "may be stale". A day with no trips shows no travel text, paused or not.
+- Refresh travel follows R1: where the phrase starts with "Refresh travel", those words are the
+  button. Otherwise the button ends the line only when the trip's action is refresh. `INT-TRAVEL-004`
+  is kept. Place, attendance and start steps show their sentence with no action (Ticket 273).
+- While the budget is used up, the paused phrase follows a known time on the same line (D11).
+- At most one muted note follows: a message (unavailable, development-only provider review, changed
+  stops) or else the weather state. One Refresh travel at most.
+- A visually hidden polite region speaks only when the next trip's state or key, the pause or the
+  note changes. A countdown minute is silent. A fresh estimate for the same state is also silent.
+- Weight 400. A trip with a time gets a 1px magenta left rule, the color of its span (D2).
+- No new wording: the line uses approved phrases only. The bench's model-line note now says the
+  Timeline shows the line.
+- Evidence: `tests/next-departure-line.dom.test.tsx` walks the bench day from 6:00 AM to 6:00 PM in
+  5-minute steps and asserts the exact line at each step. Screenshots at 1440 and 390 px are in
+  `.intent/artifacts/t269/` (local, not committed).
+
+Platform impact: web `components/timeline/DayProgressTimeline.tsx`; desktop renders the same
+component through `apps/desktop/src/product.tsx`, and Ticket 285 checks the installed app.
+Marketing: not applicable. Future mobile: mobile web inherits it, checked at 390 px. Messaging
+impact: P-021 (stale user-guide sentences added).
+
 ## Travel advisory revamp Wave 2: Ticket 268 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** Web and Mac now

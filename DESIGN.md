@@ -693,6 +693,18 @@ the existing 1px magenta Timeline axis and overlap borders; markers remain at
 scheduled starts. Known gaps remain unfilled. Unknown returns cannot claim full
 availability. Live provider and installed native acceptance remain separate.
 
+### Next-departure line (Ticket 269)
+
+`TravelStatusLine` in `components/timeline/DayProgressTimeline.tsx` is one paragraph at
+the Timeline gutter: `--text-sm`, line height 1.25rem, weight 400, `--foreground`, at most
+40rem wide, wrapping anywhere. Emphasis comes from the wording, not weight. A trip with a
+time (upcoming, soon, leave now, late, head home) adds a 1px `--calendar-overlap` left
+rule with 0.5rem padding, the magenta of the next trip's span (D2). Other states have no
+rule. Refresh travel is the shared `text-link`, leading the sentence when the phrase
+starts with it (R1) or ending it. At most one muted `calendarState` note follows. A
+visually hidden polite status region carries the announcement. At 390 px the longest
+phrases wrap to three rows with no horizontal overflow (`.intent/artifacts/t269/`).
+
 ## Historical completion timing control
 
 The briefing workbench reuses its native checkbox/Definition-link row for

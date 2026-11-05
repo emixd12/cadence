@@ -19,6 +19,7 @@ import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.reso
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
+import { DEPARTURE_REFRESH_LABEL } from "@cadence/core/services/departure-phrases";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
 import type {
@@ -345,7 +346,7 @@ export function DayProgressTimeline({
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
-      <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} hasTrips={departure.trips.length > 0} />
+      <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel} />
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
@@ -750,42 +751,75 @@ function travelDetails({ occurrenceId, travel, departure, now, timezone, habits,
 }
 
 /**
- * One status line for travel: observation time or failure copy, plus a manual refresh link.
- * Ticket 261: no line on a day with no trips unless there is a message to give. Production
- * builds show the plain unavailable message in place of the provider-review text.
+ * Ticket 269: the next-departure line. It answers "when do I leave next?" with the departure
+ * model's line phrase for the next trip, and replaces "Travel as of". Below it, at most one short
+ * status note: unavailable, development-only provider review, or the weather state. A day with
+ * no trips shows nothing. Web and Mac share this component.
  */
-export function TravelStatusLine({ status, message, timezone, hasTrips = true }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string; hasTrips?: boolean }>) {
-  const developmentBuild = useDevelopmentBuild();
-  // The provider-review text is for development builds. Swap it before the line is composed,
-  // so no composed line can carry it into production.
-  const productionMessage = (value: string | null) => !developmentBuild && value === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : value;
-  const shown = status && status.message !== productionMessage(status.message) ? { ...status, message: productionMessage(status.message) } : status;
-  const text = travelStatusText(shown, productionMessage(message ?? null), timezone, { hasTrips });
-  if (!text) return null;
-  const showRefresh = !!status && !status.resumesAt && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
-  return (
-    <p className={styles.calendarState} role="status">
-      {text}
-      {showRefresh ? <>{" "}<button type="button" className="text-link" disabled={status.pending} onClick={status.refresh}>Refresh travel</button></> : null}
-    </p>
-  );
+export type TravelStatusLines = Readonly<{
+  /** The next trip's line phrase, with the paused phrase beside a known time. Null: no line. */
+  line: string | null;
+  /** "lead": the phrase starts with Refresh travel and those words are the button (R1). "end": a button after the line. */
+  lineRefresh: "lead" | "end" | null;
+  /** One status message or the weather state. Null: none. */
+  note: string | null;
+  noteRefresh: boolean;
+  /** Changes only when the next trip's state or key, the pause or the note changes. Never on a countdown minute. */
+  signature: string;
+}>;
+
+const NO_STATUS_LINES: TravelStatusLines = { line: null, lineRefresh: null, note: null, noteRefresh: false, signature: "none" };
+
+export function travelStatusLines({ departure, status, message = null, hasEvidence, developmentBuild }: Readonly<{
+  departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean; developmentBuild: boolean;
+}>): TravelStatusLines {
+  // Evidence with no trips: nothing to time, so nothing to say (G9).
+  if (!departure.phrase && hasEvidence) return NO_STATUS_LINES;
+  const next = departure.next;
+  // D11: the paused line appears beside a known time only when the budget is used up.
+  const line = departure.phrase && next && next.state !== "paused" && departure.pausedPhrase
+    ? `${departure.phrase} ${departure.pausedPhrase}` : departure.phrase;
+  const canRefresh = !!status && !status.resumesAt;
+  const lineRefresh = !line || !canRefresh ? null
+    : line.startsWith(DEPARTURE_REFRESH_LABEL) ? "lead" : next?.action === "refresh" ? "end" : null;
+  // The provider-review text is for development builds. Swap it before the note is composed.
+  const raw = status ? status.message : message;
+  const shown = !developmentBuild && raw === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : raw;
+  // Ticket 218: say plainly when no weather margin could be added. A message comes first.
+  const note = shown ?? (line ? travelWeatherStateText(status?.view?.evidence?.weather?.state) : null);
+  const noteRefresh = !!shown && canRefresh && raw !== TRAVEL_CLEARANCE_MESSAGE && lineRefresh === null;
+  const signature = [next?.state ?? departure.state, next?.key ?? "", departure.resumesAt ?? "", note ?? ""].join("|");
+  return { line, lineRefresh, note, noteRefresh, signature };
 }
 
-export function travelStatusText(status: TravelState | null, fallbackMessage: string | null, timezone: string,
-  { hasTrips = true }: Readonly<{ hasTrips?: boolean }> = {}): string | null {
-  if (!status) return fallbackMessage;
-  const resumes = status.resumesAt
-    ? `Travel estimates resume on ${Temporal.Instant.from(status.resumesAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "long", day: "numeric" })}.`
-    : null;
-  const message = resumes ?? status.message;
-  // A day with no trips has nothing to time, so only a message can be said.
-  if (status.view?.evidence && status.observedAt && hasTrips) {
-    const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
-    const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
-    const text = message ? `${prefix} ${message}` : prefix;
-    // Ticket 218: say plainly when no weather margin could be added.
-    const weather = travelWeatherStateText(status.view.evidence.weather?.state);
-    return weather ? `${text.endsWith(".") ? text : `${text}.`} ${weather}` : text;
-  }
-  return message;
+const TIMED_DEPARTURE_STATES: ReadonlySet<string> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
+
+export function TravelStatusLine({ departure, status, message = null, hasEvidence }: Readonly<{
+  departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean;
+}>) {
+  const developmentBuild = useDevelopmentBuild();
+  const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild });
+  const announcement = [lines.line, lines.note].filter(Boolean).join(" ");
+  // The polite region speaks only when the signature changes, so a countdown minute is silent.
+  const [announced, setAnnounced] = useState({ signature: lines.signature, text: "" });
+  if (announced.signature !== lines.signature) setAnnounced({ signature: lines.signature, text: announcement });
+  const refreshButton = (label: string) => status
+    ? <button type="button" className="text-link" disabled={status.pending} onClick={status.refresh}>{label}</button> : label;
+  const nextState = departure.next?.state ?? departure.state;
+  return (
+    <div className={styles.travelStatus} data-travel-status>
+      {lines.line ? <p className={styles.departureLine} data-departure-line={nextState}
+        data-departure-timed={TIMED_DEPARTURE_STATES.has(nextState) ? "true" : undefined}>
+        {lines.lineRefresh === "lead"
+          ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{lines.line.slice(DEPARTURE_REFRESH_LABEL.length)}</>
+          : lines.line}
+        {lines.lineRefresh === "end" ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
+      </p> : null}
+      {lines.note ? <p className={styles.calendarState} data-travel-note>
+        {lines.note}
+        {lines.noteRefresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
+      </p> : null}
+      <span className="sr-only" role="status" aria-live="polite" data-departure-announcement>{announced.text}</span>
+    </div>
+  );
 }

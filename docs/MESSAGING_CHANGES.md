@@ -724,7 +724,10 @@ cite has not changed.
 - **Surfaces:** user guide.
 - **Conflicting current text:** `docs/user-guide/travel.md`:
   - "Refresh travel estimates": "The status line shows Travel as of and the time the
-    estimates were observed."
+    estimates were observed." Also, from Ticket 269: "After the estimates expire, the line
+    says they may be stale", and "the Timeline keeps the last estimates, marked as possibly
+    stale". The line now shows the next trip, marked "Last estimate" with its check time, and
+    Refresh travel shows only when that trip needs it.
   - "Learned travel habits": "Cadence remembers such trips only while the app stays open,
     so a reload before the event ends means no question that day."
 - **Update needed:** describe the line, the marker, Directions on rows and the drawer,

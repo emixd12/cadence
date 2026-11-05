@@ -68,7 +68,8 @@ async function moveClock(localTime: string) {
 
 const surface = (label: string) => container.querySelector(`section[aria-label="${label}"]`)!;
 const text = (label: string) => surface(label).textContent ?? "";
-const statusLine = () => surface("Timeline").querySelector('[role="status"]')?.textContent ?? "";
+// Ticket 269: the visible next-departure line and its note, not the screen-reader region.
+const statusLine = () => [...surface("Timeline").querySelectorAll("[data-departure-line], [data-travel-note]")].map((line) => line.textContent).join(" ");
 const gymRow = () => surface("Timeline").querySelector('[data-occurrence-id="bench-gym"]')?.textContent ?? "";
 
 it("walks the state switch through every state and shows the bench clock", async () => {
@@ -97,7 +98,7 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(gymRow()).toContain("Leave by 9:35 AM from Home · walking, arrive 9:55 AM.");
   // Ticket 267: the trip from Gym to Dentist falls due 3 hours before Gym ends.
   expect(text("Dentist drawer")).toContain("Leave time appears by 8:00 AM.");
-  expect(statusLine()).toContain("Travel as of 7:00 AM");
+  expect(statusLine()).toBe("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.");
   expect(text("Daily Brief")).toContain("Leave by 9:35 AM for Gym (walking).");
 
   await choose("soon");
@@ -121,7 +122,8 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(container.querySelector("[data-departure-model-state]")?.textContent).toBe("Needs a start");
   expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Fix Gym's place or attendance to get a leave time for Dentist.");
   await choose("paused");
-  expect(statusLine()).toContain("Travel estimates resume on December 1.");
+  // The trip to Dentist waits for an estimate, so the pause is the whole line, said once.
+  expect(statusLine()).toBe("Travel estimates resume on December 1.");
   for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
     expect(text(label).split("Travel estimates resume on December 1.").length - 1, label).toBe(1);
   }
@@ -131,7 +133,7 @@ it("shows the drawer, dialog, Behavior row and bubble after the 5-minute expiry"
   await render("head-home");
   expect(text("Dentist Calendar details")).toContain("Head home 3:00 PM · walking, home by 3:30 PM.");
   await moveClock("14:20");
-  expect(statusLine()).toContain("Travel estimates from 2:15 PM may be stale.");
+  expect(statusLine()).toBe("Last estimate: head home 3:00 PM · checked 2:15 PM. Refresh travel");
   for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
     expect(text(label), label).toContain("Last estimate: head home 3:00 PM · checked 2:15 PM.");
     expect(text(label), label).not.toContain("Head home 3:00 PM · walking");

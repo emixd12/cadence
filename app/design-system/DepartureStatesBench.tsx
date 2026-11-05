@@ -301,7 +301,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
           <dd data-departure-model-state={departure.state}>{MODEL_STATE_WORDS[departure.state]}{lateBasis}{freshness}</dd>
           <dt className="font-bold">Next-departure line</dt>
           <dd data-bench-model-line>{departure.phrase ?? "None: no travel text."}
-            <span className="block text-xs leading-5 text-muted-readable">From the departure model. No screen shows this line until Ticket 269. The drawer and dialog show the place, attendance and start steps from Ticket 273.</span></dd>
+            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). Place, attendance and start steps get their actions in Ticket 273.</span></dd>
           <dt className="font-bold">This state</dt>
           <dd>{preset.description}</dd>
         </dl>
@@ -312,7 +312,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
       <p className="text-sm font-bold" data-bench-build={development ? "development" : "production"}>{development ? "Development build" : "Production build"}</p>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label="Timeline" className="grid min-w-0 content-start gap-2">
-          <h3 className="text-sm font-bold">Timeline: status line, markers and the expanded Gym row</h3>
+          <h3 className="text-sm font-bold">Timeline: next-departure line, markers and the expanded Gym row</h3>
           <div ref={gymRow} className="min-w-0 border border-line bg-background">
             <DayProgressTimeline timeline={timeline}
               context={{ events, freshness: { state: "current", refreshedAt: checkedAt, label: "Calendar current", canAssertNoOverlap: true },

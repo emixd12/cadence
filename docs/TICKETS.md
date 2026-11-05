@@ -16043,7 +16043,7 @@ Verification: `npx vitest run tests/travel-lifecycle.dom.test.tsx` and
 
 ## Ticket 269: Next-departure line
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed.
 Dependencies: Tickets 265, 268 and 261.
 
 Goal: one line at the top of the Timeline answers "when do I leave next?" (proposal P1,
