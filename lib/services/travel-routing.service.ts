@@ -62,23 +62,45 @@ export async function routeTravelLegs(
   const signal = input.signal ? AbortSignal.any([input.signal, deadline]) : deadline;
   await input.reserve(input.routes.reduce((sum, route) => sum + travelRouteMicrodollars(route.request, input.now), 0));
 
+  const compute = (request: TravelRouteRequest) => computeGoogleRoute(request, {
+    config: input.provider,
+    now: input.now,
+    fetch: input.fetch,
+    signal,
+    maxRetries: 0,
+  });
   let retried = false;
   return boundedMap(input.routes, TRAVEL_ROUTING_LIMITS.concurrency, async (route) => {
+    let first: TravelRouteEstimate | null = null;
+    let lateReserved = false;
     for (;;) {
       try {
-        const estimate = await computeGoogleRoute(route.request, {
-          config: input.provider,
-          now: input.now,
-          fetch: input.fetch,
-          signal,
-          maxRetries: 0,
-        });
-        return { id: route.id, estimate, failure: null };
+        first ??= await compute(route.request);
+        if (!transitTooEarly(route.request, first)) return { id: route.id, estimate: first, failure: null };
+        // Ticket 264: the timetable has no journey from the ready time that this estimate
+        // describes. One more paid call finds the next one. Its budget refusal costs only this leg.
+        const late = lateTransitRequest(route.request);
+        if (!lateReserved) {
+          try {
+            await input.reserve(travelRouteMicrodollars(late, input.now));
+          } catch (error) {
+            if (error instanceof TravelRoutingError) return { id: route.id, estimate: null, failure: error.failure };
+            throw error;
+          }
+          lateReserved = true;
+        }
+        return { id: route.id, estimate: fromReadyTime(await compute(late), route.request.readyAt), failure: null };
       } catch (error) {
         if (error instanceof TravelRoutingError) throw error;
         if (error instanceof TravelProviderError && error.retryable && !retried) {
           retried = true;
-          await input.reserve(travelRouteMicrodollars(route.request, input.now));
+          try {
+            await input.reserve(travelRouteMicrodollars(route.request, input.now));
+          } catch (refusal) {
+            // After the first call was paid for, a refusal costs only this leg (Ticket 264).
+            if (first && refusal instanceof TravelRoutingError) return { id: route.id, estimate: null, failure: refusal.failure };
+            throw refusal;
+          }
           continue;
         }
         if (error instanceof TravelProviderError) {
@@ -96,6 +118,23 @@ export async function routeTravelLegs(
       }
     }
   });
+}
+
+function transitTooEarly(request: TravelRouteRequest, estimate: TravelRouteEstimate): boolean {
+  return request.mode === "transit" && request.timing.kind === "arrive_by" &&
+    Temporal.Instant.compare(Temporal.Instant.from(estimate.departureAt), Temporal.Instant.from(request.readyAt)) < 0;
+}
+
+function lateTransitRequest(request: TravelRouteRequest): TravelRouteRequest {
+  return { ...request, timing: { kind: "depart_at", at: request.readyAt } };
+}
+
+/** A walk to the first stop can round to just before the ready time. The arrival stays the timetable's. */
+function fromReadyTime(estimate: TravelRouteEstimate, readyAt: string): TravelRouteEstimate {
+  const ready = Temporal.Instant.from(readyAt);
+  const arrival = Temporal.Instant.from(estimate.arrivalAt);
+  if (Temporal.Instant.compare(Temporal.Instant.from(estimate.departureAt), ready) >= 0 || Temporal.Instant.compare(arrival, ready) < 0) return estimate;
+  return { ...estimate, departureAt: ready.toString(), durationSeconds: Math.round(arrival.since(ready).total({ unit: "seconds" })) };
 }
 
 /** Maps values with at most `limit` in flight, preserving input order. */

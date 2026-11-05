@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment } from "react";
+import { useDevelopmentBuild } from "@cadence/ui/runtime";
 import type { DailyBriefing } from "@cadence/core/types/daily-brief";
 import { overlapsTravelSpans, type BriefTravelGuidance, type BriefTravelGuidanceItem } from "@cadence/core/services/brief-travel-guidance";
 import { briefingMoveText, briefingOptionText, briefingReferenceLabel, briefingSuggestionGroups, briefingTextSegments, briefingTipEvidence, briefingTipLabel, formatBriefingTime, isEmptyBriefing, isLaneBriefing, isPlainBriefing } from "@cadence/core/services/daily-brief-presentation";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
+import { departureBriefFooterPhrase, departurePhraseContext } from "@cadence/core/services/departure-phrases";
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 
 type DailyBriefBubbleProps = Readonly<{
@@ -30,6 +32,7 @@ export function DailyBriefBubble({
   retryDisabled = false,
   travel = null,
 }: DailyBriefBubbleProps) {
+  const developmentBuild = useDevelopmentBuild();
   const ready = state === "ready" && briefing;
   const travelToday = ready && travel && travel.localDate === briefing.localDate ? travel : null;
   const weatherShown = !!travelToday?.items.some((item) => item.kind === "departure" && item.weather);
@@ -85,9 +88,9 @@ export function DailyBriefBubble({
             {travelToday?.items.length ? <div className="mt-3 border-t border-line pt-2">
               <p className="text-xs font-bold text-muted-readable">Travel</p>
               <ul className="text-sm leading-6">
-                {travelToday.items.map((item, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">{travelLine(item, briefing.timezone)}</li>)}
+                {travelToday.items.map((item, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">{travelLine(item, briefing.timezone, developmentBuild)}</li>)}
               </ul>
-              <p className="text-xs leading-5 text-muted-readable">Calculated by Cadence from travel estimates as of <time dateTime={travelToday.observedAt}>{formatBriefingTime(travelToday.observedAt, briefing.timezone)}</time>{travelToday.attribution ? `, ${travelToday.attribution}` : ""}. Not written by the model.</p>
+              <p className="text-xs leading-5 text-muted-readable">{departureBriefFooterPhrase(travelToday.attribution, travelToday.observedAt, departurePhraseContext(travelToday.observedAt, briefing.timezone))}</p>
               {weatherShown && travelToday.weather?.attribution ? <div className="text-xs leading-5 text-muted-readable"><TravelWeatherCredit attribution={travelToday.weather.attribution} /></div> : null}
               {weatherState ? <p className="text-xs leading-5 text-muted-readable">{weatherState}</p> : null}
             </div> : null}
@@ -117,12 +120,13 @@ function NamedText({ text, names }: Readonly<{ text: string; names: readonly str
     : <Fragment key={index}>{segment.text}</Fragment>)}</>;
 }
 
-function travelLine(item: BriefTravelGuidanceItem, timezone: string): string {
+function travelLine(item: BriefTravelGuidanceItem, timezone: string, developmentBuild: boolean): string {
   switch (item.kind) {
     case "overlap": return `Travel to ${item.travelLabel} overlaps ${item.behaviorLabel}.`;
     case "departure": {
       const line = `Leave by ${formatBriefingTime(item.at, timezone)} for ${item.label} (${item.mode}).`;
-      return item.weather ? `${line} ${travelWeatherMarginText(item.weather)}` : line;
+      // The mode advice shows in development builds only (Ticket 260).
+      return item.weather ? `${line} ${travelWeatherMarginText(item.weather, { developmentBuild })}` : line;
     }
     case "return": return `Back around ${formatBriefingTime(item.at, timezone)}.`;
     case "return_unknown": return "Return time is unknown.";

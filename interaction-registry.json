@@ -396,7 +396,7 @@
     {
       "path": "app/design-system/page.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 29,
+      "interaction_marker_count": 30,
       "interaction_ids": [],
       "reason": "Local dev-only component bench, not a product surface."
     },
@@ -811,7 +811,7 @@
     {
       "path": "components/timeline/ExternalEventDetails.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 21,
+      "interaction_marker_count": 23,
       "interaction_ids": [
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
@@ -824,7 +824,7 @@
     {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 8,
+      "interaction_marker_count": 14,
       "interaction_ids": [],
       "reason": "Development-only synthetic Calendar bench; no provider or account access."
     },
@@ -1011,6 +1011,20 @@
       "interaction_ids": [
         "INT-WEATHER-001"
       ]
+    },
+    {
+      "path": "app/design-system/DepartureStatesBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 6,
+      "interaction_ids": [],
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. No provider call, account access or product write."
+    },
+    {
+      "path": "app/design-system/TravelBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only travel benches with bench-only habit saves and a caption link to the travel timing states bench. No provider call or account access."
     }
   ],
   "interactions": [
@@ -13683,14 +13697,14 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Request new travel estimates for today from the Timeline status line.",
+      "intent": "Request new travel estimates for today from the Timeline status line, or from a travel line that needs a new estimate (Ticket 261).",
       "triggers": [
         {
           "kind": "activate",
           "control": "Refresh travel"
         }
       ],
-      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload.",
+      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213); available again at renewal without a reload. Ticket 261 also places it at the end of a travel line in the Calendar drawer, the Calendar details dialog and the expanded Behavior row when that trip shows a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival, under the same pending and budget rules.",
       "success_result": "Replaces the travel estimates and shows the observation time.",
       "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message. Tracking data is preserved; offline desktop shows the unavailable message without a request.",
       "effects": [
@@ -13701,12 +13715,14 @@
       "confirmation": "none",
       "implementation": [
         "components/timeline/DayProgressTimeline.tsx",
-        "lib/ui/travel.ts"
+        "lib/ui/travel.ts",
+        "components/timeline/ExternalEventDetails.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-lifecycle.dom.test.tsx"
+          "tests/travel-lifecycle.dom.test.tsx",
+          "tests/travel-weather-ui.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Live provider acceptance remains open."
       },
@@ -13716,10 +13732,12 @@
           "status": "implemented",
           "implementation": [
             "components/timeline/DayProgressTimeline.tsx",
-            "lib/ui/travel.ts"
+            "lib/ui/travel.ts",
+            "components/timeline/ExternalEventDetails.tsx"
           ],
           "evidence": [
-            "tests/travel-lifecycle.dom.test.tsx"
+            "tests/travel-lifecycle.dom.test.tsx",
+            "tests/travel-weather-ui.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -13728,10 +13746,12 @@
           "status": "implemented",
           "implementation": [
             "components/timeline/DayProgressTimeline.tsx",
+            "components/timeline/ExternalEventDetails.tsx",
             "apps/desktop/src/product.tsx"
           ],
           "evidence": [
-            "tests/travel-lifecycle.dom.test.tsx"
+            "tests/travel-lifecycle.dom.test.tsx",
+            "tests/travel-weather-ui.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },

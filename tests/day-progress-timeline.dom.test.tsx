@@ -9,6 +9,7 @@ import { validateExternalEventSnapshot } from "@cadence/core/services/external-e
 import snapshotFixture from "./fixtures/external-event-snapshot.valid.json";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { travelBenchEvidence } from "@/app/design-system/TravelBench";
+import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import type { TimelineView } from "@/lib/types/timeline";
 
 const action = vi.fn(async () => ({ status: "idle" as const, message: "" }));
@@ -70,10 +71,12 @@ describe("DayProgressTimeline", () => {
     expect(toggle).not.toBeNull();
     await act(() => toggle!.click());
     const timing = container.querySelector('[aria-label="Travel timing"]');
-    expect(timing?.textContent).toContain("Outbound");
-    expect(timing?.textContent).toContain("Return home");
-    expect(timing?.textContent).toContain("Available again");
-    expect(timing?.textContent).toContain("Google Maps");
+    // Ticket 261: plain lines from the departure model, with no internal terms.
+    expect(timing?.textContent).toContain("Leave by Nov 1, 1:30 PM · walking, arrive Nov 1, 2:20 PM.");
+    expect(timing?.textContent).toContain("Head home Nov 1, 4:40 PM · walking, home by Nov 1, 6:20 PM.");
+    expect(timing?.textContent).toContain("Free again Nov 1, 6:30 PM.");
+    expect(timing?.textContent).toContain("Google Maps · checked Nov 1, 8:00 AM.");
+    for (const internal of ["Outbound", "Return home", "Origin:", "Available again", "Estimates depend on"]) expect(timing?.textContent).not.toContain(internal);
   });
   it("withdraws omitted-stop guidance and offers manual refresh after clearing a decision", async () => {
     const input = props();
@@ -92,6 +95,48 @@ describe("DayProgressTimeline", () => {
     expect(refresh).not.toHaveBeenCalled();
     await act(() => button("Refresh travel").click());
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("shows nothing new on the row or drawer after a stop is resolved (Ticket 265)", async () => {
+    const input = props();
+    const section = input.timeline.daySections[0]!;
+    const first = section.occurrences[0]!;
+    section.occurrences = [{ ...first, status: "completed", statusLabel: "Completed" }, { ...first, id: "occurrence-2", title: "Lunch", status: "unresolved" }];
+    section.occurrenceGroups = section.occurrences.map((occurrence) => ({ key: occurrence.id, behaviorId: occurrence.behaviorId, title: occurrence.title, occurrences: [], isGroupedStack: false }));
+    input.context.events[0]!.id = "event-later";
+    const point = (latitude: number) => ({ kind: "coordinates" as const, latitude, longitude: 0 });
+    const stop = (ref: string, startAt: string, endAt: string, latitude: number) => ({ ref, revision: "1", kind: "calendar" as const, attendance: "physical" as const, startAt, endAt, mode: null,
+      endpoint: { ref, point: point(latitude), source: "calendar" as const, sourceRevision: "1" } });
+    const buffers = { arrivalSeconds: 600, exitSeconds: 600, settlingSeconds: 600 };
+    const now = "2026-09-16T14:00:00Z";
+    const plan = resolveTravelPlan({ journeyRef: "day", journeyRevision: "1", grantRevision: "1", now, defaultMode: "walking", predictedOrigin: null, device: null, corrections: [], buffers,
+      base: { ref: "home", point: point(1), source: "saved_base", sourceRevision: "1" },
+      commitments: [stop("occurrence-1", "2026-09-16T15:00:00Z", "2026-09-16T15:30:00Z", 2), stop("occurrence-2", "2026-09-16T16:30:00Z", "2026-09-16T17:00:00Z", 3), stop("event-later", "2026-09-16T18:30:00Z", "2026-09-16T19:00:00Z", 4)] });
+    const evidence = resolveTravelEvidence({ plan, buffers, now, collisionCandidates: [], expectedJourneyRevision: "1", expectedGrantRevision: "1", modelProjection: "disabled",
+      results: plan.legs.map((leg) => {
+        const departureAt = leg.request.timing.kind === "depart_at" ? leg.request.timing.at : new Date(Date.parse(leg.request.timing.at) - 1_200_000).toISOString().replace(".000Z", "Z");
+        return { legId: leg.id, provenance: leg.provenance, estimate: { durationSeconds: 1200, departureAt, arrivalAt: new Date(Date.parse(departureAt) + 1_200_000).toISOString().replace(".000Z", "Z"), warnings: [], fallback: false, attribution: "Google Maps", observedAt: now, expiresAt: "2026-09-16T23:00:00Z" } };
+      }) });
+    expect(evidence.legs.filter(({ leg }) => leg.originCommitmentRef === "occurrence-1")).toHaveLength(1);
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{ ...input.context, travel: evidence }} /></RefreshProvider>));
+
+    const summary = (id: string) => container.querySelector<HTMLElement>(`article[data-occurrence-id="${id}"] summary`)!;
+    await act(() => summary("occurrence-1").click());
+    expect(container.querySelector('article[data-occurrence-id="occurrence-1"] [aria-label="Travel timing"]')).toBeNull();
+
+    await act(() => summary("occurrence-2").click());
+    const later = container.querySelector('article[data-occurrence-id="occurrence-2"] [aria-label="Travel timing"]');
+    // The trip leaving this row names where it goes. The fixture's later stop is an all-day event,
+    // which is never a stop, so the plain fallback names it.
+    expect(later?.textContent).toContain("Leave by 2:00 PM for your next stop · walking, arrive 2:20 PM.");
+    expect(later?.textContent).not.toContain("timing unavailable");
+    expect(container.textContent).not.toContain("timing unavailable");
+
+    await act(() => button("All day: Design offsite").click());
+    await act(() => button("View details: Design offsite").click());
+    const drawer = container.querySelector("dialog");
+    expect(drawer?.textContent).toContain("Head home");
+    expect(drawer?.textContent).not.toContain("timing unavailable");
   });
 
   it("names untitled events in accessible previews and details", async () => {

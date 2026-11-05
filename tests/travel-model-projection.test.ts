@@ -1,6 +1,9 @@
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 
 import { resolveTravelEvidence, resolveTravelPlan } from "../packages/core/src/resolvers/travel.resolver";
+import { briefingTravelOptionPolicy } from "../packages/core/src/services/briefing-travel";
+import type { BriefingModelTravelFacts } from "../packages/core/src/types/briefing-travel";
 import type {
   TravelCommitment,
   TravelEndpoint,
@@ -105,11 +108,116 @@ describe("travel model projection", () => {
     expect(maybeRemote.fits[0]).toMatchObject({ conclusion: "unknown", basis: "travel_unknown" });
   });
 
+  it("Ticket 264: a late trip on foot keeps the same late_arrival conclusion as driving", () => {
+    const stop = commitment("stretch", "2026-09-16T12:15:00Z", "2026-09-16T12:45:00Z", place("studio"));
+    // The provider counts back from the arrival target, to before the ready time.
+    const counted = { departureAt: "2026-09-16T11:45:00Z", arrivalAt: "2026-09-16T12:15:00Z", seconds: 1_807 };
+    const walking = project({ commitments: [stop] }, [], (role) => role === "outbound" ? counted : HOME);
+    expect(walking.fits).toEqual([{ ref: "stretch", conclusion: "does_not_fit", basis: "late_arrival",
+      trip: { destinationRef: "stretch", role: "outbound" }, position: null }]);
+    expect(walking.trips[0]).toEqual({ destinationRef: "stretch", role: "outbound", mode: "cycling", estimate: "current" });
+    const evaluated = project({ commitments: [stop], defaultMode: "driving" }, [],
+      (role) => role === "outbound" ? { departureAt: NOW, arrivalAt: "2026-09-16T12:30:07Z", seconds: 1_807 } : HOME);
+    expect(evaluated.fits).toEqual(walking.fits);
+    const serialized = JSON.stringify(walking);
+    for (const leaked of ["12:30", "1807", "studio-place", "11:45"]) expect(serialized).not.toContain(leaked);
+    assertNoTiming(walking);
+  });
+
+  it("Ticket 264: transit that cannot start in time stays unknown, never late", () => {
+    const stop = commitment("stretch", "2026-09-16T12:15:00Z", "2026-09-16T12:45:00Z", place("studio"));
+    const counted = { departureAt: "2026-09-16T11:45:00Z", arrivalAt: "2026-09-16T12:15:00Z", seconds: 1_807 };
+    const projection = project({ commitments: [stop], defaultMode: "transit" }, [], (role) => role === "outbound" ? counted : HOME);
+    expect(projection.fits).toEqual([{ ref: "stretch", conclusion: "unknown", basis: "travel_unknown",
+      trip: { destinationRef: "stretch", role: "outbound" }, position: null }]);
+  });
+
+  it("Ticket 264: an event under way adds its trip home, and no conclusion about the past", () => {
+    const projection = project({ commitments: [
+      commitment("event-now", "2026-09-16T11:30:00Z", "2026-09-16T13:00:00Z", place("dentist")),
+    ] }, [
+      candidate("run", "2026-09-16T12:30:00Z", "2026-09-16T12:45:00Z"),
+      candidate("started", "2026-09-16T11:45:00Z", "2026-09-16T12:30:00Z"),
+      candidate("tea", "2026-09-16T13:10:00Z", "2026-09-16T13:30:00Z"),
+      candidate("journal", "2026-09-16T22:00:00Z", "2026-09-16T22:30:00Z"),
+    ], () => ({ departureAt: "2026-09-16T13:00:00Z", arrivalAt: "2026-09-16T13:43:07Z", seconds: 2_587 }));
+    expect(projection.travelDay).toBe("yes");
+    expect(projection.calendarEvents).toBe(true);
+    expect(projection.trips).toEqual([{ destinationRef: null, role: "return", mode: "cycling", estimate: "current" }]);
+    expect(projection.fits.map((fit) => [fit.ref, fit.conclusion, fit.basis, fit.trip?.role ?? null, fit.position])).toEqual([
+      ["run", "fits", "travel_known", "return", "before"],
+      ["tea", "does_not_fit", "travel_overlap", "return", null],
+      ["journal", "fits", "travel_known", "return", "after"],
+    ]);
+    assertNoTiming(projection);
+    expect(JSON.stringify(projection)).not.toContain("13:43");
+  });
+
+  it("Ticket 264: a started stop with no known end adds no trip and no unknown trip", () => {
+    const projection = project({ commitments: [
+      { ...commitment("event-now", "2026-09-16T11:30:00Z", "2026-09-16T13:00:00Z", place("dentist")), endAt: null },
+    ] }, [candidate("journal", "2026-09-16T22:00:00Z", "2026-09-16T22:30:00Z")]);
+    expect(projection).toEqual({ version: "2.0", travelDay: "no", calendarEvents: true, trips: [], fits: [] });
+  });
+
   it("projects nothing while disabled or after a revision change", () => {
     const plan = resolveTravelPlan(planning({}));
     const input = evidence(plan, []);
     expect(resolveTravelEvidence(input).modelProjection).toBeNull();
     expect(resolveTravelEvidence({ ...input, modelProjection: "enabled", expectedJourneyRevision: "changed" }).modelProjection).toBeNull();
+  });
+});
+
+describe("Ticket 265: a trip made unreliable by an earlier late arrival", () => {
+  const exit = { arrivalSeconds: 0, exitSeconds: 300, settlingSeconds: 0 };
+  // Every leg is a 20-minute walk from its ready time.
+  function chain(reviewEnd: string, candidates: TravelEvidenceInput["collisionCandidates"]) {
+    const plan = resolveTravelPlan(planning({ defaultMode: "walking", buffers: exit, commitments: [
+      commitment("event-standup", "2026-09-16T14:00:00Z", "2026-09-16T15:00:00Z", place("standup")),
+      commitment("event-review", "2026-09-16T14:30:00Z", reviewEnd, place("review")),
+    ] }));
+    const results = plan.legs.map((leg) => {
+      const arrivalAt = Temporal.Instant.from(leg.readyAt).add({ seconds: 1200 }).toString();
+      return { legId: leg.id, provenance: leg.provenance, estimate: estimate({ departureAt: leg.readyAt, arrivalAt, seconds: 1200 }) };
+    });
+    const result = resolveTravelEvidence({ ...evidence(plan, candidates), buffers: exit, results, modelProjection: "enabled" });
+    return { result, projection: result.modelProjection! };
+  }
+  const fitOf = (projection: TravelTimingModelProjection, ref: string) => projection.fits.find((fit) => fit.ref === ref);
+
+  it("the reviewer's example: no fit inside the window the trip home may take", () => {
+    const { result, projection } = chain("2026-09-16T15:10:00Z", [
+      candidate("stretch", "2026-09-16T15:36:00Z", "2026-09-16T15:40:00Z"),
+      candidate("tea", "2026-09-16T15:20:00Z", "2026-09-16T15:30:00Z"),
+      candidate("journal", "2026-09-16T15:45:00Z", "2026-09-16T16:00:00Z"),
+    ]);
+    // The onward trip arrives 15:25; the trip home was estimated 15:15-15:35.
+    expect(result.legs.map(({ estimate: value }) => [value?.departureAt, value?.arrivalAt]).at(-1)).toEqual(["2026-09-16T15:15:00Z", "2026-09-16T15:35:00Z"]);
+    expect(projection.trips.find((trip) => trip.role === "return")).toMatchObject({ estimate: "unknown" });
+    expect(fitOf(projection, "stretch")).toMatchObject({ conclusion: "unknown", basis: "travel_unknown" });
+    // Known travel still counts: the onward walk, 15:05-15:25, is reliable.
+    expect(fitOf(projection, "tea")).toMatchObject({ conclusion: "does_not_fit", basis: "travel_overlap", trip: { role: "onward" } });
+    expect(fitOf(projection, "journal")).toMatchObject({ conclusion: "fits", basis: "travel_known" });
+    expect(projection.version).toBe("2.0");
+    assertNoTiming(projection);
+  });
+
+  it("an on-time chain still fits", () => {
+    const { result, projection } = chain("2026-09-16T15:30:00Z", [
+      candidate("stretch", "2026-09-16T16:00:00Z", "2026-09-16T16:10:00Z"),
+    ]);
+    expect(result.completeTrip).toBe(true);
+    expect(projection.trips.every((trip) => trip.estimate === "current")).toBe(true);
+    expect(fitOf(projection, "stretch")).toMatchObject({ conclusion: "fits", basis: "travel_known" });
+  });
+
+  it("a Daily Brief option inside the window is not justified", () => {
+    const facts = (projection: TravelTimingModelProjection) => ({ version: "1.0", routing: "on", usualMode: "walking", behaviors: [],
+      route: { state: "available", conclusions: projection } }) as unknown as BriefingModelTravelFacts;
+    const unreliable = chain("2026-09-16T15:10:00Z", [candidate("stretch", "2026-09-16T15:36:00Z", "2026-09-16T15:40:00Z")]).projection;
+    expect(briefingTravelOptionPolicy(facts(unreliable), "stretch")).toEqual({ offer: true, fallback: false });
+    const onTime = chain("2026-09-16T15:30:00Z", [candidate("stretch", "2026-09-16T16:00:00Z", "2026-09-16T16:10:00Z")]).projection;
+    expect(briefingTravelOptionPolicy(facts(onTime), "stretch")).toEqual({ offer: true, fallback: true });
   });
 });
 

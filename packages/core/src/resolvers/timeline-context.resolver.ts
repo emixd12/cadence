@@ -1,7 +1,9 @@
 import type { ExternalEventSchedulingFact } from "../types/external-event";
 import { Temporal } from "@js-temporal/polyfill";
+import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
 import { resolveTravelCollisions } from "./travel.resolver";
+import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
 
 import type {
   BehaviorDurationEstimate,
@@ -196,7 +198,16 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
   estimate: BehaviorDurationEstimate;
   events: readonly (NormalizedExternalEvent | ExternalEventSchedulingFact)[];
   freshness: ExternalEventFreshness;
-  travel?: Pick<TravelEvidenceResult, "segments" | "completeTrip"> | null;
+  travel?: Pick<TravelEvidenceResult, "segments" | "completeTrip"> & Partial<Pick<TravelEvidenceResult, "legs" | "unknownLegs">> | null;
+  /**
+   * Ticket 266: the departure model's remaining trips. When given, the trip home's state decides
+   * whether "Return time unknown." applies, so the row agrees with the drawer and dialog.
+   */
+  departure?: Readonly<{ trips: readonly Pick<DepartureTrip, "role" | "state">[] }> | null;
+  /** Ticket 261: titles by commitment ref, to name the trip a Behavior overlaps. */
+  travelLabels?: ReadonlyMap<string, string>;
+  /** The account timezone for the trip's times. Defaults to America/New_York. */
+  timezone?: string;
   now: Temporal.Instant;
 }>): TimelineOccurrenceContext {
   const scheduledFor = parseInstant(input.scheduledFor, "Occurrence scheduled_for");
@@ -289,13 +300,57 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     activitySignals,
     overlappingEventIds,
     overlapAssessment,
-    overlapLabel: travelCollision?.travelCreated ? "Possible travel overlap"
-      : overlapAssessment === "unknown" && input.travel && !input.travel.completeTrip ? "Travel timing incomplete"
+    overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel(input, travelCollision.segmentIds)
+      : overlapAssessment === "unknown" && returnTimeUnknown(input.travel, input.departure) ? RETURN_TIME_UNKNOWN
       : overlapAssessment === "unknown" && hasUncertainTimedEvent
       ? `Event end unknown · ${input.freshness.label}`
       : overlapLabel(overlapAssessment, input.freshness, estimatedEnd !== null),
     freshness: input.freshness,
   };
+}
+
+/**
+ * Ticket 266: "Return time unknown." only when the trip home has no time and none is coming. With
+ * the departure model: its trip home cannot be timed (time unknown or needs a start), or trips
+ * remain with no trip home at all. A waiting estimate, a known time or a finished day says nothing.
+ * Without the model, a return leg that is not current or an unknown return leg.
+ */
+function returnTimeUnknown(
+  travel: Readonly<{ completeTrip: boolean; legs?: TravelEvidenceResult["legs"]; unknownLegs?: TravelEvidenceResult["unknownLegs"] }> | null | undefined,
+  departure: Readonly<{ trips: readonly Pick<DepartureTrip, "role" | "state">[] }> | null | undefined,
+): boolean {
+  if (!travel || travel.completeTrip) return false;
+  if (departure) {
+    const home = departure.trips.find((trip) => trip.role === "return");
+    if (!home) return departure.trips.length > 0;
+    return home.state === "time_unknown" || home.state === "needs_origin";
+  }
+  return (travel.legs ?? []).some((entry) => entry.leg.role === "return" && entry.state !== "current") ||
+    (travel.unknownLegs ?? []).some((leg) => leg.role === "return");
+}
+
+/** Names the trip a Behavior overlaps and that trip's travel span, from the colliding segments. */
+function travelOverlapLabel(
+  input: Readonly<{ travel?: Pick<TravelEvidenceResult, "segments"> & Partial<Pick<TravelEvidenceResult, "legs">> | null;
+    travelLabels?: ReadonlyMap<string, string>; timezone?: string; now: Temporal.Instant }>,
+  segmentIds: readonly string[],
+): string {
+  const segments = input.travel?.segments ?? [];
+  const legId = segments.find((segment) => segmentIds.includes(segment.id) && segment.kind !== "commitment" && segment.legId)?.legId ?? null;
+  const entry = input.travel?.legs?.find((item) => item.leg.id === legId);
+  const leg = entry?.leg;
+  // The shown leave and arrival times, which include any weather margin.
+  const travelled = entry?.estimate
+    ? [{ startAt: entry.weather?.departureAt ?? entry.estimate.departureAt, endAt: entry.weather?.arrivalAt ?? entry.estimate.arrivalAt }]
+    : segments.filter((segment) => segment.legId === legId && segment.kind === "route");
+  const span = travelled.length ? travelled : segments.filter((segment) => segmentIds.includes(segment.id));
+  const startAt = span.map((segment) => Temporal.Instant.from(segment.startAt)).sort(Temporal.Instant.compare)[0]!;
+  const endAt = span.map((segment) => Temporal.Instant.from(segment.endAt)).sort(Temporal.Instant.compare).at(-1)!;
+  const destinationRef = leg?.destinationCommitmentRef ?? null;
+  const timezone = input.timezone ?? "America/New_York";
+  return departureOverlapPhrase({ home: leg?.role === "return",
+    destinationLabel: destinationRef ? input.travelLabels?.get(destinationRef) ?? null : null,
+    startAt: startAt.toString(), endAt: endAt.toString() }, departurePhraseContext(input.now.toString(), timezone));
 }
 
 function intervalsOverlap(

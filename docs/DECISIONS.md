@@ -1541,3 +1541,26 @@ native reminders that need a desktop release. Marketing: none until release (P-0
 Future mobile: mobile web inherits shared UI and push; native mobile stays deferred.
 Messaging impact: P-015 corrected; P-016 to P-021 logged. Legal: L-014 updated; L-015 and
 L-016 logged.
+
+## 2026-11-05: Wave 1 travel wording approved
+
+The owner reviewed the 62 new or changed travel phrases from Wave 1 (Tickets 261 and 265)
+on November 5, 2026, and answered:
+
+> Apply R1–R3, approve the rest
+
+| # | Proposed | Approved wording |
+|---|---|---|
+| R1 | "The leave time is ready to check." | "Refresh travel to get the leave time." Line forms: "Refresh travel to get the leave time for Dentist." and "Refresh travel to get the leave time for the trip home." Where the line offers the Refresh travel action, its first words are the action, so the words never repeat. |
+| R2 | "The leave time for Dentist depends on Gym." | "Fix Gym's place or attendance to get a leave time for Dentist." |
+| R3 | "Leave time unknown." | "No leave time for this trip." Forms: "No leave time for this trip, because you may arrive late at Gym.", "No leave time for the trip to Dentist." and "No leave time for the trip to Dentist, because you may arrive late at Gym." The trip home keeps "Return time unknown.", which the owner approved. |
+
+Every other phrase is approved as shipped, including "Last estimate: … · checked {time}."
+(R4) and "If you haven't left yet, you'd arrive about {time}." (R5). The list lives in
+`DEPARTURE_PHRASE_REVIEW` in `packages/core/src/services/departure-phrases.ts`, each entry
+with its approval date. New or changed wording goes in with `approvedOn: null` until the
+owner approves it. The bench at `/design-system?preview=departure-states` shows the list.
+
+Platform impact: web and desktop through the shared phrase module and components.
+Marketing: not applicable. Future mobile: shared module. Messaging impact: P-015 and P-022
+quote the final words.

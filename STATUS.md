@@ -1,5 +1,148 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 266 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The bench now shows
+real travel timing.
+
+- `/design-system?preview=departure-states` (link "Travel timing states" in the bench nav) renders one
+  day with Home saved, Gym (a located Behavior) and Dentist (a located Calendar event). A state switch
+  picks fresh, expired, appears later, soon, leave now, late from the route, late from the clock,
+  head home, trip changed, needs a place, needs attendance, needs a start, no trips or paused. A
+  slider moves the bench clock. Routes follow the shipped plan, 3-hour window and 5-minute expiry;
+  Refresh travel re-checks at the bench clock. The real status line, Timeline, expanded Behavior row,
+  drawer, Calendar details and Daily Brief bubble render each state; the drawer and dialog sit in the
+  page flow on this bench only.
+- A wording review lists every travel phrase, rendered by the product code with sample values, with
+  when it shows, what it replaces and its approval date. The list is `DEPARTURE_PHRASE_REVIEW` in
+  `departure-phrases.ts`, plus the correction note and the production unavailable message.
+- The year-2999 expiries are gone from the bench fixtures. Captions say where a fixture holds the
+  clock still on purpose. The 5-minute lifetime is one core constant used by the provider adapter.
+- Verifier fixes: the review lists 62 phrases, and a test runs both phrase builders over every state,
+  role and freshness and fails on any sentence missing from it. "Return time unknown." now shows only
+  when there is a trip home without a time, so a day with no trips shows no travel text. The drawer
+  and dialog show a repeated line, such as the pause, once.
+- Owner wording decision, November 5, 2026: "Apply R1–R3, approve the rest". R1 "Refresh travel
+  to get the leave time." (the words are the Refresh travel action itself), R2 "Fix Gym's place or
+  attendance to get a leave time for Dentist.", R3 "No leave time for this trip." and its forms.
+  All 62 phrases on the bench now show their approval date (`docs/DECISIONS.md`).
+- Known gap, shown on the bench: no screen shows the place, attendance or start steps yet (Ticket
+  273), and no screen shows the next-departure line (Ticket 269).
+
+Platform impact: web bench and DOM tests; desktop uses the same shared components. Marketing: not
+applicable. Future mobile: checked at 390 px. Messaging impact: none.
+
+## Travel advisory revamp Wave 1: Ticket 261 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Travel lines now say
+what to do and when, in plain words, from the departure model.
+
+- The Calendar drawer, the Calendar details dialog and the expanded Behavior row show the model's
+  phrase for each remaining trip: "Leave by 1:15 PM · walking, arrive 2:20 PM.", "Head home 4:40 PM ·
+  walking, home by 6:35 PM.", and the last-estimate, expired, changed, no-route and appears-later
+  forms. Lines that need a new estimate end with Refresh travel (`INT-TRAVEL-004`).
+- The weather margin shows once per event as "15 min added for thunderstorms." The Open-Meteo credit
+  keeps its links and drops its second sentence. "Google Maps · checked 8:00 AM." stays.
+- The Behavior overlap label names the trip and its times. The Daily Brief footer reads "Calculated by
+  Cadence · Google Maps · 9:00 AM." Its line shows the mode advice in development builds only.
+- The travel status line is silent on a day with no trips. Production builds show the unavailable
+  message instead of the provider-review text.
+- Calendar details: plain all-day ranges, "Tentative" or "Cancelled" beside the time, and "Applies to
+  this event until you close the Timeline."
+- One core `departureStops` builder and `behaviorEndAt` rule serve web, Mac and the hosted refresh.
+
+Platform impact: web and desktop through the shared components and core. Marketing: not applicable.
+Future mobile: shared components, checked at 390 px. Messaging impact: P-015 now lists the shipped
+words. The owner approved the wording on November 5, 2026, with changes R1–R3.
+
+## Travel advisory revamp Wave 1: Ticket 262 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar details
+dialog now leads with what the user needs, for Google, Outlook and iCloud events.
+
+- Order: Time, Location, the travel lines, Directions, the journey mode choice, "Google Calendar ·
+  Work" on one row, Attendees, Organizer, Conference, Attachments, then the description.
+- A row with no value disappears in every build, so none of the four empty-row strings remain.
+- Duration shows only when the end is unspecified. Providers always report that duration as unknown,
+  so the row reads "Unknown".
+- State, Source timezone, Recurrence, Updated and raw completeness lines show only in development
+  builds, under a "Development" label. Times use the account timezone. No build shows a raw ISO instant.
+- The correction form, Open source event, navigation and "Dismiss from timeline" keep their behavior and
+  registry intents. Ticket 271 moves the form, and Ticket 261 rewords the travel lines.
+
+Platform impact: web and desktop through the shared component. Marketing: not applicable. Future
+mobile: shared component, checked at 390 px. Messaging impact: none; the user guide does not list these
+rows.
+
+## Travel advisory revamp Wave 1: Ticket 265 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** One departure model
+now answers what to do next. No component reads it yet: Tickets 261, 269, 271, 272, 273, 277 and 280
+will.
+
+- `packages/core/src/resolvers/departure.resolver.ts` gives each remaining trip and the next trip a
+  state. Every phrase lives in `packages/core/src/services/departure-phrases.ts`. "Leave now" lasts
+  5 minutes. A current `late` flag then keeps "You may arrive late" with the route's arrival. With
+  only the clock past the leave time, the line reads "If you haven't left yet, you'd arrive about
+  {time}", because the user may already have left. `lateBasis` tells surfaces which case it is.
+- The time an estimate will appear comes from `travelEstimateAppearsAt` in
+  `travel-refresh-policy.ts`. Ticket 267 changes the rule there.
+- Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
+  and `finalAvailabilityAt`. A weather margin can no longer move any departure before its ready time;
+  it follows the arrival, and the leg is flagged `late` if that passes the arrival target.
+- After an Occurrence is resolved, the departure model reads the trip from it to a later stop as a
+  changed trip, so the next trip does not skip that stop. Shipped rows and drawers show nothing new.
+- The owner approved the phrases on November 5, 2026, with changes R1–R3 (`docs/DECISIONS.md`).
+
+Platform impact: web and desktop read the same core module from later tickets. Marketing: not
+applicable. Future mobile: portable core module. Messaging impact: P-022; Tickets 261 and 269 own the
+user-visible words.
+
+## Travel advisory revamp Wave 1: Ticket 260 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Text meant for
+developers no longer reaches a production user.
+
+- `@cadence/ui/runtime` gains `DevelopmentBuildProvider` and `useDevelopmentBuild`. Web supplies
+  `NODE_ENV === "development"` through `WebRuntimeProvider`; desktop supplies Vite's
+  `import.meta.env.DEV` in `apps/desktop/src/product.tsx`. With no provider the flag is off.
+- Production shows no route warning string. A late leg shows "You may arrive late: arrive {time}."
+  in every build, from the `late` flag. The hosted route still sends the old warning string for
+  released Mac 0.1.8.
+- Development builds show every warning verbatim under a "Development" label, and the weather mode
+  advice in the drawer, dialog and Daily Brief bubble. The margin stays in every build. Model input
+  is unchanged.
+- Bench fixtures carry no fixture notes in `warnings`. "Synthetic route. No provider call." is a
+  bench-only caption, and the Calendar details preview shows both modes side by side.
+
+Platform impact: web and desktop through the shared components. Marketing: not applicable. Future
+mobile: shared components, checked at 390 px. Messaging impact: P-015 still matches; L-013 stays open.
+
+## Travel advisory revamp Wave 1: Ticket 264 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The hosted
+route now reports what used to go silent. Evidence version stays `1.0`: no client compares
+it, and every change adds a field.
+
+- A late leg stays usable. Walking, cycling and static driving depart at the ready time and
+  arrive one route duration later. A new `late` flag marks every late leg, including
+  traffic-aware driving.
+- A late transit leg makes one more call from its ready time, with spend reserved first.
+  If the budget refuses that call, only that leg is lost.
+- A physical event under way with a usable place stays the prior stop until its end. A fresh
+  device still names the next departure's origin, and that departure waits for the known end.
+  A started commitment with no known end is not under way: it leaves the plan as before, later
+  trips plan from the device or Home, and no end is invented.
+- A stop that a later physical commitment starts inside is not a prior stop. A leg ready only at
+  or after its destination's end stays `unavailable`; one that can still get there stays `late`.
+- `unknownLegs` reaches the client with commitment refs and a reason only.
+- Signed conclusions keep their meaning, including `late_arrival`. Started Behaviors get no
+  fit conclusion. A weather margin never moves a late departure before its ready time.
+
+Platform impact: web and desktop share the hosted route; released Mac 0.1.8 ignores the new
+fields. Marketing: not applicable. Future mobile: inherits the hosted behavior. Messaging
+impact: none; Tickets 261 and 269 own the words. `docs/COSTS.md` records the new route calls.
+
 ## Travel advisory revamp filed: Tickets 263–285 — November 4, 2026
 
 **Documents only, on branch `us-work`. No runtime, schema or user-visible text change.**
@@ -7,16 +150,24 @@ The owner approved the revamp on November 4, 2026 (`docs/DECISIONS.md`, 2026-11-
 "Travel advisory revamp"). Merges, deployments, hosted migrations, provider spending, Mac
 notarization and publication still wait for the owner's instruction each time.
 
+PR #189 merged on November 5, 2026 as `767e5bf`. Both Vercel projects built READY on that
+commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names marketing deployment
+`dpl_FEa4ooh58swsPGJF2oBsHFF61btS`. The app was redeployed as
+`dpl_8xfU1GASkj2zCNxGV4Bk6135X5Sr` and aliased to app.cadence-me.com. Login, trust evidence
+and marketing pages returned 200. Trust checks may read stale until the next scheduled
+collection.
+
 PR #182 merged on November 4 as `1a369e4`, on the owner's instruction. It carries the
 travel departure review, the rule that provider-terms questions are logged and never
 gate work, and Tickets 260–262. Main `1a369e4` deployed on November 4: both Vercel
-projects built READY on that commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+projects built READY on that commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` then named
 marketing deployment `dpl_9qRsEuWVTsV7869VeHSfNiPCpeGw`. The app was redeployed as
 `dpl_EWhEbMXHhZVLbe1TYuXtWcXcJUiN` and aliased to app.cadence-me.com. Login, trust evidence
 and marketing pages returned 200. Trust checks may read stale until the next scheduled
 collection.
 
-- Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started,
+- Ticket 263 (Wave 0) is complete on the branch. It files Tickets 264–285, not started
+  when filed,
   and amends Tickets 260–262, still not started.
 - Wave order: 1 is Tickets 264–266 and 260–262; 2 is 267–268; 3 is 269–274; 4 is 275–280;
   5 is 281–283; 6 is 284–285.

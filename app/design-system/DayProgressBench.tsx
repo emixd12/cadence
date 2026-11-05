@@ -1,5 +1,6 @@
 "use client";
 
+import { allDayRangeLabel } from "@cadence/core/services/departure-phrases";
 import { Temporal } from "@js-temporal/polyfill";
 import { CalendarDays, ExternalLink, X } from "lucide-react";
 import {
@@ -801,7 +802,7 @@ function requiredSection(index: number) {
 
 function eventTimeLabel(event: BenchEvent) {
   if (event.kind === "all_day") {
-    return `${event.startLocalDate} through ${event.endLocalDate} (exclusive)`;
+    return allDayRangeLabel(event.startLocalDate, event.endLocalDate);
   }
   const start = Temporal.Instant.from(event.startAt).toZonedDateTimeISO(TIMEZONE);
   const end = Temporal.Instant.from(event.endAt).toZonedDateTimeISO(TIMEZONE);

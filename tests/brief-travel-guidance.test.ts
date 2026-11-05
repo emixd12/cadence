@@ -1,4 +1,6 @@
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
+import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import { overlapsTravelSpans, projectBriefTravelGuidance, type BriefTravelEvidence } from "@cadence/core/services/brief-travel-guidance";
 
 // Dentist 15:00–16:00Z. Outbound leg leaves 14:30Z; return leg leaves 16:10Z; walk occurrence 14:45Z collides with outbound travel.
@@ -98,4 +100,44 @@ it("shows the weather-adjusted departure, its fixed margin and the weather credi
   expect(guidance.weather).toEqual({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION });
   const noPosition = projectBriefTravelGuidance(input(evidence({ weather: { ...weather, state: "no_position", forecastAt: null, attribution: null } })))!;
   expect(noPosition.weather).toEqual({ state: "no_position", attribution: null });
+});
+
+describe("Ticket 265: options inside a trip made unreliable by a late arrival", () => {
+  const place = (ref: string, latitude: number) => ({ ref, source: "calendar" as const, sourceRevision: `${ref}-1`, point: { kind: "coordinates" as const, latitude, longitude: 0 } });
+  const stop = (ref: string, startAt: string, endAt: string, latitude: number) => ({ ref, revision: `${ref}-1`, kind: "calendar" as const, startAt, endAt, attendance: "physical" as const, endpoint: place(ref, latitude), mode: "walking" as const });
+  const buffers = { arrivalSeconds: 0, exitSeconds: 300, settlingSeconds: 0 };
+  const now = "2026-09-16T12:00:00Z";
+  // Every leg walks 20 minutes from its ready time.
+  function chain(reviewEnd: string): BriefTravelEvidence {
+    const plan = resolveTravelPlan({ journeyRef: "day", journeyRevision: "1", now, grantRevision: "g", defaultMode: "walking", device: null, predictedOrigin: null, corrections: [], buffers,
+      base: { ref: "home", source: "saved_base", sourceRevision: "h1", point: { kind: "coordinates", latitude: 1, longitude: 0 } },
+      commitments: [stop("standup", "2026-09-16T14:00:00Z", "2026-09-16T15:00:00Z", 2), stop("review", "2026-09-16T14:30:00Z", reviewEnd, 3)] });
+    const results = plan.legs.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: { durationSeconds: 1200, departureAt: leg.readyAt,
+      arrivalAt: Temporal.Instant.from(leg.readyAt).add({ seconds: 1200 }).toString(), warnings: [], fallback: false, attribution: "Google Maps", observedAt: now, expiresAt: "2026-09-16T23:00:00Z" } }));
+    const { modelProjection: _projection, ...rest } = resolveTravelEvidence({ plan, results, collisionCandidates: [], buffers, now, expectedJourneyRevision: "1", expectedGrantRevision: "g", modelProjection: "disabled" });
+    return rest;
+  }
+  const options = [
+    { id: "stretch", startAt: "2026-09-16T15:36:00Z", endAt: "2026-09-16T15:40:00Z" },
+    { id: "tea", startAt: "2026-09-16T15:42:00Z", endAt: "2026-09-16T15:50:00Z" },
+    { id: "later", startAt: "2026-09-16T16:00:00Z", endAt: "2026-09-16T16:10:00Z" },
+  ];
+  const project = (value: BriefTravelEvidence) => projectBriefTravelGuidance({ evidence: value, localDate: "2026-09-16", now, labels: new Map(), behaviorRefs: new Set(), options })!;
+
+  it("marks options inside the span as conflicting and returns the span", () => {
+    const value = chain("2026-09-16T15:10:00Z");
+    // The trip home was estimated 15:15-15:35, but the onward trip arrives only at 15:25.
+    expect(value.occupiedSpans.at(-1)?.endAt).toBe("2026-09-16T15:35:00Z");
+    const guidance = project(value);
+    expect(guidance.conflictingOptionIds).toEqual(["stretch", "tea"]);
+    expect(guidance.occupiedSpans).toContainEqual({ startAt: "2026-09-16T15:15:00Z", endAt: "2026-09-16T15:45:00Z" });
+  });
+
+  it("leaves an on-time chain unchanged", () => {
+    const value = chain("2026-09-16T15:30:00Z");
+    const guidance = project(value);
+    expect(guidance.occupiedSpans).toEqual(value.occupiedSpans.map((span) => ({ startAt: span.startAt, endAt: span.endAt })));
+    expect(guidance.conflictingOptionIds).toEqual(["stretch", "tea"].filter((id) => overlapsTravelSpans(options.find((option) => option.id === id)!, value.occupiedSpans)));
+    expect(guidance.conflictingOptionIds).not.toContain("later");
+  });
 });

@@ -15487,7 +15487,7 @@ at desktop width and 390 px, in both a production build and a development build.
 
 ## Ticket 260: Development-only travel text and route warnings
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 263. Tickets 261 and 262 use its flag.
 
 Goal: text meant for developers never reaches a production user, and production
@@ -15536,7 +15536,24 @@ width and 390 px in both modes.
 
 ## Ticket 261: Plain travel timing copy
 
-Status: filed November 4, 2026. Amended the same day. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Filed November 4, 2026, and amended the same day.
+
+Implementation notes:
+
+- `DayProgressTimeline` resolves the departure model once, from the evidence after
+  `resolveTravelAfterDecisions`. The drawer, dialog and expanded Behavior row show
+  `trip.phrase` for the trips of that event; steps that need a place or attendance wait
+  for Ticket 273. A finished trip shows no line.
+- `packages/core/src/services/departure-stops.ts` builds the stops for Calendar events
+  and Behaviors. Its `behaviorEndAt` is now the only Behavior end rule; the hosted route
+  refresh uses it. The Timeline view carries `scheduleKind` and `scheduleEndTime` for it.
+- A trip with no estimate whose stop is missing from the stops lasts no longer than the
+  local day of its plan.
+- Additions from Ticket 262: all-day events read "Nov 1 – Nov 2" (or "Nov 1"), and the
+  dialog shows "Tentative" or "Cancelled" beside the time.
+- The Daily Brief line shows the mode advice in development builds only (Ticket 260); Ticket 272 moves its lines
+  to the model.
 Dependencies: Ticket 265 (departure model) and Ticket 260 (development-only flag). All
 timing phrases come from core.
 
@@ -15580,10 +15597,11 @@ the expanded Behavior row and the Daily Brief travel block:
   - "Applies only to this event revision while the Timeline is open." becomes "Applies
     to this event until you close the Timeline." Ticket 281 replaces it when corrections
     are remembered.
-- Wording not yet approved by the owner: "Last estimate: leave by {time} · checked
-  {time}", "Return time unknown." as the replacement for "Travel timing incomplete",
-  "Applies to this event until you close the Timeline.", and the existing unavailable
-  message as the replacement for the provider-review text.
+- Wording approved by the owner on November 5, 2026 ("Apply R1–R3, approve the rest";
+  `docs/DECISIONS.md`): "Last estimate: leave by {time} · checked {time}", "Return time
+  unknown." as the replacement for "Travel timing incomplete", "Applies to this event
+  until you close the Timeline.", and the existing unavailable message as the replacement
+  for the provider-review text. R1–R3 changed Ticket 265 phrases only.
 - No travel status line on a day with no trips (G9). Ticket 269 then replaces the line.
 - `docs/MESSAGING_CHANGES.md` P-015 matches the shipped words.
 - Provenance footer: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on
@@ -15627,7 +15645,7 @@ the bench at desktop width and 390 px.
 
 ## Ticket 262: Calendar details dialog metadata
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
 Dependencies: Ticket 260 (development-only flag).
 
 Amended November 4, 2026, with C8 and G11.
@@ -15772,7 +15790,7 @@ Verification: `npm run agents:check`, `npm run interactions:check` and
 
 ## Ticket 264: Report late trips, trips home and missing estimates
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 263.
 
 Goal: the evidence stops going silent when the user needs it most (gaps G1–G4).
@@ -15812,7 +15830,7 @@ tests/travel-provider.test.ts`, `npm run resolvers:check`, `npm run core:check`.
 
 ## Ticket 265: One departure model in core
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 264.
 
 Goal: every surface gives the same answer about what to do next.
@@ -15842,13 +15860,29 @@ Platform impact:
 | Marketing | Not applicable: no marketing surface reads it. |
 | Future mobile | Portable core module. Native mobile is deferred. |
 
-Messaging impact: none. Tickets 261 and 269 own the user-visible words.
+Messaging impact: P-022. Tickets 261 and 269 own the user-visible words.
 
 Verification: the new test file, `npm run resolvers:check`, `npm run core:check`.
 
 ## Ticket 266: Bench and tests show real timing
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Filed November 4, 2026.
+
+Implementation notes:
+
+- `/design-system?preview=departure-states` (`app/design-system/DepartureStatesBench.tsx`) adds the
+  state switch and bench clock, and the wording review
+  (`app/design-system/DepartureWordingReview.tsx`) built from
+  `DEPARTURE_PHRASE_REVIEW` in `packages/core/src/services/departure-phrases.ts`.
+- `TRAVEL_ESTIMATE_LIFETIME_SECONDS` in `travel-refresh-policy.ts` is the shipped 5-minute expiry,
+  used by the provider adapter and the bench.
+- Verifier fixes: `tests/departure-wording-coverage.test.ts` fails on any builder sentence missing from
+  the review. The overlap label says "Return time unknown." only for a return leg that is not
+  current or an unknown return leg (`timeline-context.resolver.ts`). Travel timing shows a repeated
+  sentence once per view.
+- Tests: `tests/departure-states-bench.dom.test.tsx`. Test fixtures that check copy rather than
+  timing keep their far-future expiry.
 Dependencies: Ticket 265.
 
 Goal: the test page stops showing only the best case (report, "The two rules"; C6).

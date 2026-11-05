@@ -39,7 +39,9 @@ describe("Daily Brief travel facts", () => {
         { destinationRef: "event_travel_dentist", role: "outbound", mode: "cycling", estimate: "current" },
         // Stage 2: the remembered mode for Home (Ticket 217) shapes the trips there and back.
         { destinationRef: "occurrence_travel_stretch", role: "onward", mode: "walking", estimate: "current" },
-        { destinationRef: null, role: "return", mode: "walking", estimate: "current" },
+        // Ticket 265: the weather margin follows the onward arrival, which then lands after the
+        // Home stop ends, so the trip home cannot be relied on.
+        { destinationRef: null, role: "return", mode: "walking", estimate: "unknown" },
       ] } },
       habits: { rulesVersion: "travel-habit-defaults@1", getReadyMinutes: 15, getReadySource: "learned",
         placeModes: [{ behaviorRef: "behavior_travel_stretch", mode: "walking" }] },

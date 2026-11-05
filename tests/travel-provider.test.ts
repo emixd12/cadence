@@ -281,6 +281,116 @@ describe("travel provider", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  describe("late transit (Ticket 264)", () => {
+    const TRANSIT: TravelRouteRequest = { ...REQUEST, mode: "transit", readyAt: "2026-09-22T12:00:00Z", timing: { kind: "arrive_by", at: "2026-09-22T12:10:00Z" } };
+    const journey = (departureTime: string, arrivalTime: string, walk = "120s") => Response.json({ routes: [{ duration: "1800s", legs: [{ steps: [
+      { travelMode: "WALK", staticDuration: walk },
+      { travelMode: "TRANSIT", transitDetails: { stopDetails: { departureTime, arrivalTime } } },
+    ] }] }] });
+    const bodies = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string) as Record<string, unknown>);
+
+    it("reserves spend, then makes one more call from the ready time", async () => {
+      const order: string[] = [];
+      const fetch = vi.fn(async () => {
+        order.push("call");
+        return order.filter((item) => item === "call").length === 1
+          ? journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z")
+          : journey("2026-09-22T12:05:00Z", "2026-09-22T12:35:00Z");
+      });
+      const reserve = vi.fn(async (amount: number) => { order.push(`reserve:${amount}`); });
+      const [result] = await routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(order).toEqual(["reserve:10000", "call", "reserve:10000", "call"]);
+      expect(bodies(fetch)[0]).toMatchObject({ arrivalTime: "2026-09-22T12:10:00Z" });
+      expect(bodies(fetch)[1]).toMatchObject({ departureTime: "2026-09-22T12:00:00Z" });
+      expect(bodies(fetch)[1]).not.toHaveProperty("arrivalTime");
+      expect(result).toMatchObject({ failure: null, estimate: { departureAt: "2026-09-22T12:03:00Z", arrivalAt: "2026-09-22T12:35:00Z" } });
+    });
+
+    it("makes one call and no extra reservation for a transit trip that can start in time", async () => {
+      const fetch = vi.fn(async () => journey("2026-09-22T12:05:00Z", "2026-09-22T12:09:00Z"));
+      const reserve = vi.fn(async () => undefined);
+      await routeTravelLegs({ routes: [{ id: "on-time", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(reserve.mock.calls).toEqual([[10_000]]);
+    });
+
+    it("makes no extra call for walking, cycling or driving", async () => {
+      for (const mode of ["walking", "cycling", "driving"] as const) {
+        const fetch = vi.fn(async () => Response.json({ routes: [{ duration: "1800s" }] }));
+        const reserve = vi.fn(async () => undefined);
+        await routeTravelLegs({ routes: [{ id: "late", request: { ...TRANSIT, mode } }], provider: APPROVED, reserve, now: NOW, fetch });
+        expect(fetch).toHaveBeenCalledOnce();
+        expect(reserve).toHaveBeenCalledOnce();
+      }
+    });
+
+    it("loses only this leg when the budget refuses the extra call", async () => {
+      const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        void init;
+        return journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z");
+      });
+      const refusal = new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" });
+      const reserve = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(refusal);
+      const results = await routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(results).toEqual([{ id: "late", estimate: null, failure: refusal.failure }]);
+    });
+
+    it("reserves each retried call once and repeats only the failed one", async () => {
+      const fetch = vi.fn()
+        .mockResolvedValueOnce(journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z"))
+        .mockResolvedValueOnce(new Response(null, { status: 503 }))
+        .mockResolvedValueOnce(journey("2026-09-22T12:05:00Z", "2026-09-22T12:35:00Z"));
+      const reserve = vi.fn(async () => undefined);
+      const [result] = await routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(reserve).toHaveBeenCalledTimes(3);
+      expect(bodies(fetch)[2]).toMatchObject({ departureTime: "2026-09-22T12:00:00Z" });
+      expect(result?.estimate?.arrivalAt).toBe("2026-09-22T12:35:00Z");
+    });
+
+    it("loses only this leg when the budget refuses the retry of the extra call", async () => {
+      const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        const body = JSON.parse(init!.body as string) as Record<string, unknown>;
+        if (body.travelMode === "WALK") return Response.json({ routes: [{ duration: "600s" }] });
+        return body.arrivalTime ? journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z") : new Response(null, { status: 503 });
+      });
+      const refusal = new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" });
+      const reserve = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValueOnce(refusal);
+      const results = await routeTravelLegs({ routes: [
+        { id: "late", request: TRANSIT },
+        { id: "paid-walk", request: { ...REQUEST, mode: "walking", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } } },
+      ], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(results[0]).toEqual({ id: "late", estimate: null, failure: refusal.failure });
+      expect(results[1]).toMatchObject({ id: "paid-walk", failure: null, estimate: { durationSeconds: 600 } });
+      expect(reserve).toHaveBeenCalledTimes(3);
+    });
+
+    it("still fails the batch when the budget refuses a retry of a first call", async () => {
+      const fetch = vi.fn(async () => new Response(null, { status: 503 }));
+      const refusal = new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" });
+      const reserve = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(refusal);
+      await expect(routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch })).rejects.toBe(refusal);
+    });
+
+    it("reports the leg as unavailable when the extra call fails", async () => {
+      const fetch = vi.fn()
+        .mockResolvedValueOnce(journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z"))
+        .mockResolvedValue(new Response(null, { status: 400 }));
+      const [result] = await routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve: async () => undefined, now: NOW, fetch });
+      expect(result).toMatchObject({ estimate: null, failure: { code: "provider_unavailable" } });
+    });
+
+    it("starts a journey at the ready time when the walk rounds to just before it", async () => {
+      const fetch = vi.fn()
+        .mockResolvedValueOnce(journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z"))
+        .mockResolvedValueOnce(journey("2026-09-22T12:01:30Z", "2026-09-22T12:31:00Z"));
+      const [result] = await routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve: async () => undefined, now: NOW, fetch });
+      expect(result?.estimate).toMatchObject({ departureAt: "2026-09-22T12:00:00Z", arrivalAt: "2026-09-22T12:31:00Z", durationSeconds: 1860 });
+    });
+  });
+
   it("makes one call per driving leg and reserves the single batch retry before it runs", async () => {
     let failed = false;
     const fetch = vi.fn(async () => {

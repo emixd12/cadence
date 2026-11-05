@@ -6,6 +6,7 @@ import type {
   TravelRouteEstimate,
   TravelRouteRequest,
 } from "@cadence/core/types/travel";
+import { TRAVEL_ESTIMATE_LIFETIME_SECONDS } from "@cadence/core/services/travel-refresh-policy";
 import {
   getGoogleWorkloadIdentityAccessToken,
   GoogleWorkloadIdentityError,
@@ -161,7 +162,8 @@ export async function computeGoogleRoute(
   assertTravelProviderReady(options.config);
   const timingAt = instantString(request.timing.at);
   const trafficAware = drivingTrafficAware(request, options.now);
-  // One call per leg (Ticket 214). Routes API accepts arrivalTime for TRANSIT only.
+  // One call per leg (Ticket 214); a late transit leg alone gets a second one from
+  // routeTravelLegs (Ticket 264). Routes API accepts arrivalTime for TRANSIT only.
   // Traffic-aware driving evaluates departure from the earliest possible start; later
   // driving, walking and cycling use static durations without an arrivalTime request.
   const drivingAt = request.mode !== "driving" ? timingAt
@@ -438,7 +440,7 @@ function instantString(value: string): string {
 }
 
 function boundedExpiry(value: number | undefined): number {
-  return boundedInteger(value, 300, 1, 300);
+  return boundedInteger(value, TRAVEL_ESTIMATE_LIFETIME_SECONDS, 1, TRAVEL_ESTIMATE_LIFETIME_SECONDS);
 }
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number): number {

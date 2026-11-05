@@ -4,7 +4,7 @@ import { combineExternalEventFreshness, projectExternalEventSchedulingEvent } fr
 import { CalendarDays } from "lucide-react";
 import type { TravelEvidenceResult, TravelLeaveAnswer, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { Temporal } from "@js-temporal/polyfill";
-import { useRefresh } from "@cadence/ui/runtime";
+import { useDevelopmentBuild, useRefresh } from "@cadence/ui/runtime";
 import {
   useCallback,
   useEffect,
@@ -16,6 +16,9 @@ import {
 } from "react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { departureStops } from "@cadence/core/services/departure-stops";
+import type { DepartureModel } from "@cadence/core/types/departure";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
 import type {
@@ -25,7 +28,7 @@ import type {
   TimelineOccurrenceContext,
 } from "@cadence/core/types/day-progress";
 
-import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming } from "./ExternalEventDetails";
+import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
@@ -37,7 +40,7 @@ import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
-import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
+import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
 import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import {
   dismissTravelLeaveQuestion,
@@ -197,6 +200,21 @@ export function DayProgressTimeline({
   const habitsClient = context ? context.travelSettingsClient ?? null : liveCalendar ? webTravelSettingsClient : null;
   const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence));
   const usualTravelMode = context?.travelMode ?? liveTravel.view?.mode ?? null;
+  // Ticket 261: one departure model for every travel line. Components only show its phrases.
+  const habitsForModel = travelHabits.settings?.habits ?? null;
+  const departure = useMemo((): DepartureModel => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    const buffers = resolveTravelHabits(habitsForModel).buffers;
+    return resolveDepartureModel({ evidence: travel ?? null, now, timezone: timeline.timezone,
+      stops: departureStops({ events: travelEvents, occurrences: today?.occurrences ?? [], durationEstimates: durations, timezone: timeline.timezone }),
+      arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds,
+      pausedUntil: travelStatus?.resumesAt ?? null });
+  }, [travel, now, timeline.timezone, timeline.daySections, timeline.todayLocalDate, travelEvents, durations, habitsForModel, travelStatus?.resumesAt]);
+  const refreshTravel: TravelRefreshAction | null = travelStatus && !travelStatus.resumesAt
+    ? { onRefresh: travelStatus.refresh, pending: travelStatus.pending } : null;
+  const travelLabels = useMemo(() => new Map(departure.trips.length ? [...travelEvents.map((event) => [event.id, event.title || "Untitled event"] as const),
+    ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.title] as const))] : []),
+  [departure.trips.length, travelEvents, timeline.daySections]);
   const travelAccountKey = travelStatus?.view?.accountId ?? travelAccountId;
   const [, setLeaveDismissals] = useState(0);
   const [leaveConfirmation, setLeaveConfirmation] = useState<string | null>(null);
@@ -324,7 +342,7 @@ export function DayProgressTimeline({
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
-      <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} />
+      <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} hasTrips={departure.trips.length > 0} />
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
@@ -346,11 +364,14 @@ export function DayProgressTimeline({
         activeIds={activeIds}
         activity={section.localDate === timeline.todayLocalDate ? (context ? context.recordedActivity ?? null : hevy) : null}
         travel={travel}
+        departure={departure}
+        refresh={refreshTravel}
+        now={now}
         travelHabits={travelHabits}
         usualTravelMode={usualTravelMode}
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
-        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel)}
+        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
@@ -369,6 +390,9 @@ export function DayProgressTimeline({
         onDismiss={() => dismissPreview(true)}
         onOpen={openDetails}
         travel={travel}
+        departure={departure}
+        refresh={refreshTravel}
+        now={now}
       /> : null}
       <ExternalEventDetails
         event={detailEvent}
@@ -386,6 +410,9 @@ export function DayProgressTimeline({
           setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
         } : undefined)}
         travelHabits={travelHabits}
+        departure={departure}
+        refresh={refreshTravel}
+        now={now}
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
@@ -402,6 +429,9 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   activity: HevyTimelineState | null;
   contexts: ReadonlyMap<string, TimelineOccurrenceContext>;
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
+  departure: DepartureModel;
+  refresh: TravelRefreshAction | null;
+  now: string;
   travelHabits?: TravelHabitsState | null;
   usualTravelMode?: TravelMode | null;
   timezone: string;
@@ -421,6 +451,9 @@ function DayProgressDay({
   activity,
   contexts,
   travel,
+  departure,
+  refresh,
+  now,
   travelHabits,
   usualTravelMode,
   timezone,
@@ -549,7 +582,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={contexts.get(occurrence.id)}
-                  travelDetails={travelDetails(occurrence.id, travel, timezone, travelHabits, usualTravelMode, onOpenExternal)}
+                  travelDetails={travelDetails({ occurrenceId: occurrence.id, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, onOpenExternal, refresh })}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -617,6 +650,9 @@ function resolveContexts(
   now: string,
   estimates: Readonly<Record<string, BehaviorDurationEstimate>> | undefined,
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null,
+  travelLabels?: ReadonlyMap<string, string>,
+  timezone?: string,
+  departure?: DepartureModel,
 ): ReadonlyMap<string, TimelineOccurrenceContext> {
   const instant = Temporal.Instant.from(now);
   return new Map(section.occurrences.map((occurrence) => [occurrence.id, resolveTimelineOccurrenceContext({
@@ -628,6 +664,9 @@ function resolveContexts(
     events: events.map(projectExternalEventSchedulingEvent),
     freshness,
     travel,
+    travelLabels,
+    timezone,
+    departure,
     // A timing mutation can arrive between minute ticks. Its timestamp is the
     // earliest instant at which the returned running state can be assessed.
     now: occurrence.timeTracking.runningStartedAt && Temporal.Instant.compare(Temporal.Instant.from(occurrence.timeTracking.runningStartedAt), instant) > 0
@@ -698,15 +737,27 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
 }
 
 /** A located Behavior's travel timing and, for a journey to a place, its mode choice (Ticket 217). */
-function travelDetails(occurrenceId: string, travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined, timezone: string,
-  habits: TravelHabitsState | null | undefined, usualMode: TravelMode | null | undefined, onOpenExternal?: (url: string) => void | Promise<void>) {
-  const timing = renderTravelTiming({ eventId: occurrenceId, travel, timezone, onOpenExternal });
+function travelDetails({ occurrenceId, travel, departure, now, timezone, habits, usualMode, onOpenExternal, refresh }: Readonly<{
+  occurrenceId: string; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
+  timezone: string; habits: TravelHabitsState | null | undefined; usualMode: TravelMode | null | undefined;
+  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
+}>) {
+  const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh });
   return timing ? <>{timing}<TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></> : null;
 }
 
-/** One status line for travel: observation time or failure copy, plus a manual refresh link. */
-export function TravelStatusLine({ status, message, timezone }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string }>) {
-  const text = travelStatusText(status, message ?? null, timezone);
+/**
+ * One status line for travel: observation time or failure copy, plus a manual refresh link.
+ * Ticket 261: no line on a day with no trips unless there is a message to give. Production
+ * builds show the plain unavailable message in place of the provider-review text.
+ */
+export function TravelStatusLine({ status, message, timezone, hasTrips = true }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string; hasTrips?: boolean }>) {
+  const developmentBuild = useDevelopmentBuild();
+  // The provider-review text is for development builds. Swap it before the line is composed,
+  // so no composed line can carry it into production.
+  const productionMessage = (value: string | null) => !developmentBuild && value === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : value;
+  const shown = status && status.message !== productionMessage(status.message) ? { ...status, message: productionMessage(status.message) } : status;
+  const text = travelStatusText(shown, productionMessage(message ?? null), timezone, { hasTrips });
   if (!text) return null;
   const showRefresh = !!status && !status.resumesAt && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
   return (
@@ -717,13 +768,15 @@ export function TravelStatusLine({ status, message, timezone }: Readonly<{ statu
   );
 }
 
-export function travelStatusText(status: TravelState | null, fallbackMessage: string | null, timezone: string): string | null {
+export function travelStatusText(status: TravelState | null, fallbackMessage: string | null, timezone: string,
+  { hasTrips = true }: Readonly<{ hasTrips?: boolean }> = {}): string | null {
   if (!status) return fallbackMessage;
   const resumes = status.resumesAt
     ? `Travel estimates resume on ${Temporal.Instant.from(status.resumesAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "long", day: "numeric" })}.`
     : null;
   const message = resumes ?? status.message;
-  if (status.view?.evidence && status.observedAt) {
+  // A day with no trips has nothing to time, so only a message can be said.
+  if (status.view?.evidence && status.observedAt && hasTrips) {
     const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
     const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
     const text = message ? `${prefix} ${message}` : prefix;

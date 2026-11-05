@@ -1,7 +1,7 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
-import { TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
+import { TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
@@ -67,6 +67,7 @@ import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.r
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
+import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -398,6 +399,19 @@ export default async function DesignSystemPage({
       </WebRuntimeProvider>
     );
   }
+  if (selectedPreviewId === "departure-states") {
+    // Ticket 266: every travel timing state on a movable bench clock, and the wording review.
+    return (
+      <WebRuntimeProvider>
+        <main className="min-h-dvh bg-background text-foreground">
+          <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
+            <a href="/design-system" className="w-fit text-sm underline underline-offset-4">Back to the design-system bench</a>
+            <DepartureStatesBench initialStateId={selectedFixtureState ?? undefined} />
+          </div>
+        </main>
+      </WebRuntimeProvider>
+    );
+  }
   const usageByComponent = groupUsages(usage.usages);
   const previews = buildPreviews(selectedPreviewId, selectedFixtureState);
 
@@ -481,6 +495,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-surface-model">Surfaces</BenchAnchor>
       <BenchAnchor href="#bench-canonical-inventory">Canonical inventory</BenchAnchor>
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
+      <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
     </nav>
   );
 }
@@ -1628,9 +1643,9 @@ const previewFactories: Record<
   "composite.behavior-place-assist": () => <ProductPreview><BehaviorPlaceAssistBench /></ProductPreview>,
   "module.daily-brief-bubble": () => <ProductPreview><DailyBriefBubbleBench /></ProductPreview>,
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
-  "composite.external-event-details": () => <ProductPreview><CalendarDetailsBench /></ProductPreview>,
+  "composite.external-event-details": () => <ProductPreview maxHeight="120rem"><CalendarDetailsBench /><TravelDevelopmentTextBench /></ProductPreview>,
   "composite.external-event-preview": () => <ProductPreview><CalendarDetailsBench preview /></ProductPreview>,
-  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
+  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Leave by 2:05 PM · cycling, arrive 2:50 PM.</p><p>15 min added for thunderstorms.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
   "module.day-progress-timeline": () => <ProductPreview maxHeight="48rem"><CalendarTimelineBench /></ProductPreview>,
   "module.timeline": () => (
       <ProductPreview maxHeight="48rem">

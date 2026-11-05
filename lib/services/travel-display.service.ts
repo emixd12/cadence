@@ -5,7 +5,7 @@ export type TravelRouteDisplay = Omit<TravelEvidenceResult, "modelProjection">;
 
 export function projectTravelRouteDisplay(evidence: TravelEvidenceResult): TravelRouteDisplay {
   return { version: evidence.version, journeyRef: evidence.journeyRef, legs: evidence.legs,
-    segments: evidence.segments, occupiedSpans: evidence.occupiedSpans, collisions: evidence.collisions,
+    unknownLegs: evidence.unknownLegs ?? [], segments: evidence.segments, occupiedSpans: evidence.occupiedSpans, collisions: evidence.collisions,
     completeTrip: evidence.completeTrip, finalAvailabilityAt: evidence.finalAvailabilityAt,
     ...(evidence.weather ? { weather: evidence.weather } : {}) };
 }

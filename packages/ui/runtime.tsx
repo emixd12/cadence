@@ -15,6 +15,8 @@ export type RuntimeLinkProps = Omit<ComponentProps<"a">, "href"> & {
   scroll?: boolean;
 };
 const LinkContext = createContext<ComponentType<RuntimeLinkProps> | null>(null);
+// Unlike the contexts above, this one has a safe default: with no provider, developer text stays hidden.
+const DevelopmentBuildContext = createContext(false);
 
 export function LinkProvider({
   component,
@@ -43,6 +45,22 @@ export function RefreshProvider({
       {children}
     </RefreshContext.Provider>
   );
+}
+
+/** Each platform runtime supplies its own build mode. Shared components never read the environment. */
+export function DevelopmentBuildProvider({
+  value,
+  children,
+}: Readonly<{ value: boolean; children: ReactNode }>) {
+  return (
+    <DevelopmentBuildContext.Provider value={value}>
+      {children}
+    </DevelopmentBuildContext.Provider>
+  );
+}
+
+export function useDevelopmentBuild(): boolean {
+  return useContext(DevelopmentBuildContext);
 }
 
 export function useRefresh(): () => void {

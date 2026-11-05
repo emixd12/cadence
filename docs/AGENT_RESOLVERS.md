@@ -286,6 +286,7 @@ pure owner with paired tests; current runtime owners are listed below.
 | Briefing analysis lanes | `packages/core/src/resolvers/briefing-analysis.resolver.ts` | `lib/services/briefing-pipeline.ts`, the private workbench through that pipeline, synthetic fixtures, and resolver tests | Components, API routes, provider adapters or prompts computing rates, treating Unresolved as failure, splitting periods at reminder/category-only revisions, reading undisclosed sources, or claiming causes | `docs/TICKETS.md` | `tests/briefing-analysis.resolver.test.ts` | Selected window before aggregation, stated sufficiency/materiality thresholds, capped or undisclosed inputs unavailable, weekday strata for load |
 | Travel itinerary and occupancy | `packages/core/src/resolvers/travel.resolver.ts` | Owner-scoped routing services, Timeline/advisor projections, synthetic fixtures, and resolver tests | Provider I/O, location reads, moving schedules, treating unknown travel as zero, or returning raw points in evidence | `docs/TICKETS.md`, `docs/plans/travel-departure-discovery.md` | `tests/travel.resolver.test.ts`, `tests/travel-model-projection.test.ts` | Injected instants, revision fences, exact route segments, half-open collisions, and a conclusions-only model projection (Ticket 219) |
 | Learned travel habits | `packages/core/src/services/travel-habits.ts` | Refresh service, web and desktop travel settings services, Travel Settings, Timeline mode choice and leave-time question | Restating defaults, steps or bounds; learning from position or route durations; storing place text or event titles | `docs/TICKETS.md` (Ticket 217), `docs/DATA_MODEL.md` | `tests/travel-habits.test.ts` | Versioned rules constant, injected instants, canonical stored order, one answer per local date |
+| Departure model | `packages/core/src/resolvers/departure.resolver.ts` | Next-departure line, drawer, dialog, Daily Brief block and leave reminders (Tickets 261, 269, 271, 272, 273, 277, 280), resolver tests | Components choosing the next trip or a state, surfaces writing their own departure wording, provider I/O, clocks or environment reads, sending any of its output to the Daily Brief model | `docs/TICKETS.md` (Ticket 265) | `tests/departure.resolver.test.ts` | Injected `now` and timezone. Words live only in `packages/core/src/services/departure-phrases.ts`. |
 | Weather travel margin | `packages/core/src/resolvers/weather-margin.resolver.ts` | `travel.resolver.ts`, `lib/services/weather-forecast.service.ts` (area and cache hour), the Ticket 219 slot validator in `advisor-day-context.ts` (table margins only), synthetic fixtures, and resolver tests | Provider I/O, location reads, Google coordinates as an area, margins scaled by route duration, stacked margins, or a model inventing rules | `docs/TICKETS.md` (Ticket 218) | `tests/weather-margin.resolver.test.ts` | Versioned `weather-margin@1` table, largest single margin, planned-timing windows, 0.1° device grid, injected instants |
 | Completion place labels and Where suggestions | `packages/core/src/resolvers/place-label.resolver.ts` | `lib/services/place-labels.service.ts`, `apps/desktop/src/local-place-labels.service.ts`, `components/travel/PlaceLabels.tsx` for the device comparison, `packages/core/src/services/briefing-travel.ts` for Ticket 219 label counts, resolver tests | Fetching, storing or comparing Google coordinates; keeping completion samples; UI or repositories choosing labels, qualifying completions or suggestions; changing a Behavior from a suggestion; changing a rule value without a new version | `docs/TICKETS.md` | `tests/place-label.resolver.test.ts` | `place-label-rules@1` and `where-suggestion-rules@1` are frozen and pinned by tests. Callers inject instants, today and device clock. The resolver compares a device sample with device-recorded markers and returns a label, never a position. Suggestions read labels only and carry their rule version. `projectPlaceLabelCounts` returns counts only and has no model caller until Ticket 219. |
 
@@ -332,7 +333,14 @@ Ticket 219 section below for how conclusions reach model input.
 
 `resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
 affected by manual decisions, preserves unaffected estimates, and withholds a
-complete-trip claim until routing refreshes. The shared Timeline calls it;
+complete-trip claim until routing refreshes. Ticket 265: `legs` and occupancy lose every
+leg to or from a resolved stop, so shipped rows and drawers change nothing. A leg from a
+resolved stop to a later stop moves to `unknownLegs` as `origin_unknown` with
+`blockerResolved`, so the departure model reports `trip_changed` and the next trip does not
+skip that stop. An unknown onward leg from a resolved stop stays, and an `origin_unknown` leg
+whose blocking stop was resolved gains `blockerResolved`. An unknown trip home from a
+resolved stop leaves. `blockerResolved` is set on the client only: the hosted route never
+sends it, and only the departure model reads it. The shared Timeline calls it;
 `tests/travel.resolver.test.ts` covers removal and restoration without mutation.
 
 `packages/core/src/resolvers/weather-margin.resolver.ts` (Ticket 218) owns the
@@ -364,6 +372,24 @@ without moving the route. The refresh service, web and desktop settings services
 Travel Settings and the Timeline call these functions; they must not restate the
 steps, bounds or prompt rules. Place keys come from Ticket 216's
 `packages/core/src/services/travel-place-key.ts`.
+
+`packages/core/src/resolvers/departure.resolver.ts` (Ticket 265) answers what to do next,
+for each remaining trip and for the next trip, from evidence after
+`resolveTravelAfterDecisions`. `packages/core/src/services/departure-phrases.ts` holds every
+phrase. Surfaces read the state and phrase; they must not recompute either. The time an
+estimate will appear comes only from `travelEstimateAppearsAt` in
+`travel-refresh-policy.ts`, which Ticket 267 changes. `travelLegsAfterLateArrival` in the
+travel resolver finds a trip that would leave before the previous trip arrives: the evidence
+then withholds `completeTrip`, and the model reports `time_unknown`. Its output carries leave
+times and event titles, so it never enters Daily Brief model input.
+
+Ticket 261: `DayProgressTimeline` resolves the model once and passes it to the drawer, dialog
+and expanded Behavior row. Its stops come from `departureStops` in
+`packages/core/src/services/departure-stops.ts`, whose `behaviorEndAt` is the only Behavior
+end rule; `lib/services/travel-route-refresh.service.ts` uses it too. A trip with no
+estimate whose stop is missing from the stops lasts no longer than its plan's local day.
+The timeline-context resolver's `overlapLabel` names the trip a Behavior overlaps and its
+shown times, from the colliding segments and their leg.
 
 ## Day-progress production consumers (Tickets 133–136)
 

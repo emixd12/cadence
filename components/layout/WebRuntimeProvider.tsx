@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  DevelopmentBuildProvider,
   LinkProvider,
   RefreshProvider,
   type RuntimeLinkProps,
@@ -15,9 +16,11 @@ export function WebRuntimeProvider({
   const router = useRouter();
   const refresh = useCallback(() => router.refresh(), [router]);
   return (
-    <LinkProvider component={WebLink}>
-      <RefreshProvider onRefresh={refresh}>{children}</RefreshProvider>
-    </LinkProvider>
+    <DevelopmentBuildProvider value={process.env.NODE_ENV === "development"}>
+      <LinkProvider component={WebLink}>
+        <RefreshProvider onRefresh={refresh}>{children}</RefreshProvider>
+      </LinkProvider>
+    </DevelopmentBuildProvider>
   );
 }
 
