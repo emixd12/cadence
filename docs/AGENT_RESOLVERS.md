@@ -333,7 +333,9 @@ Ticket 219 section below for how conclusions reach model input.
 
 `resolveTravelAfterDecisions` in the travel resolver removes legs and occupancy
 affected by manual decisions, preserves unaffected estimates, and withholds a
-complete-trip claim until routing refreshes. The shared Timeline calls it;
+complete-trip claim until routing refreshes. A leg from a resolved stop to a later stop
+stays as `rejected_revision` with no estimate or occupancy, so the next trip does not
+skip that stop (Ticket 265). The shared Timeline calls it;
 `tests/travel.resolver.test.ts` covers removal and restoration without mutation.
 
 `packages/core/src/resolvers/weather-margin.resolver.ts` (Ticket 218) owns the

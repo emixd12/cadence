@@ -61,7 +61,7 @@ export function travelEstimateAppearsAt(input: Readonly<{
 }>, windowSeconds = TRAVEL_ROUTE_WINDOW_SECONDS): string | null {
   if (input.role === "return") return Temporal.Instant.from(input.readyAt).subtract({ seconds: windowSeconds }).toString();
   if (!input.destinationStartAt) return null;
-  return Temporal.Instant.from(input.destinationStartAt).subtract({ seconds: input.arrivalBufferSeconds + windowSeconds }).toString();
+  return Temporal.Instant.from(input.destinationStartAt).subtract({ seconds: Math.ceil(input.arrivalBufferSeconds + windowSeconds) }).toString();
 }
 
 export type TravelDeviceSample = Readonly<{ latitude: number; longitude: number; accuracyMeters: number }>;

@@ -11,7 +11,10 @@ import type { DepartureTrip } from "../types/departure";
  * - New in Ticket 265: the countdown, "leave now" and late forms, the other "Last estimate"
  *   forms, the overdue "appears" line, the needs-place, needs-attendance and
  *   needs-origin sentences, the "for {event}" line forms, and the past-the-leave-time forms:
- *   "If you haven't left yet, you'd arrive about {time}." and "you'd be home about {time}".
+ *   "If you haven't left yet, you'd arrive about {time}." and "you'd be home about {time}",
+ *   the time-unknown forms ("Leave time unknown.", "The leave time for {event} is unknown.",
+ *   "... because you may arrive late at {event}."), the "the trip home" line forms, and
+ *   "Travel estimates are paused."
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */
@@ -20,6 +23,7 @@ const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
 const NEXT_STOP_FALLBACK = "your next stop";
 const PRIOR_STOP_FALLBACK = "your last stop";
+const TRIP_HOME = "the trip home";
 
 export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
 
@@ -74,7 +78,7 @@ export function departureLinePhrase(input: DeparturePhraseInput, context: Depart
 }
 
 function build(input: DeparturePhraseInput, context: DeparturePhraseContext, named: boolean): string {
-  const destination = input.destinationLabel ?? NEXT_STOP_FALLBACK;
+  const destination = input.role === "return" ? TRIP_HOME : input.destinationLabel ?? NEXT_STOP_FALLBACK;
   const time = (at: string) => departureTimeLabel(at, context);
   const forStop = named ? ` for ${destination}` : "";
   switch (input.state) {
@@ -103,7 +107,8 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
     case "no_route":
       return named ? `No route found for ${destination}.` : "No route found.";
     case "trip_changed":
-      return named ? `The trip to ${destination} changed.` : "Trip changed.";
+      if (!named) return "Trip changed.";
+      return input.role === "return" ? "The trip home changed." : `The trip to ${destination} changed.`;
     case "estimate_expired":
       return named ? `The estimate for ${destination} expired.` : "Estimate expired.";
     case "paused":

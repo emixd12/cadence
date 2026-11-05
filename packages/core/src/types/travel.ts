@@ -198,6 +198,11 @@ export type TravelUnknownLeg = Readonly<{
     | "timing_unknown"
     | "return_base_missing"
     | "leg_limit";
+  /**
+   * Ticket 265: set on the client only, after a decision. The unknown stop that held this
+   * trip's origin was resolved, so only a new plan can say where the trip starts.
+   */
+  blockerResolved?: true;
 }>;
 
 export type TravelPlanningResult = Readonly<{

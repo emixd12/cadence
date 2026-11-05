@@ -15842,7 +15842,7 @@ Platform impact:
 | Marketing | Not applicable: no marketing surface reads it. |
 | Future mobile | Portable core module. Native mobile is deferred. |
 
-Messaging impact: none. Tickets 261 and 269 own the user-visible words.
+Messaging impact: P-022. Tickets 261 and 269 own the user-visible words.
 
 Verification: the new test file, `npm run resolvers:check`, `npm run core:check`.
 

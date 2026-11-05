@@ -44,8 +44,9 @@ export function resolveDepartureModel(input: DepartureModelInput): DepartureMode
   ));
   const next = trips[0] ?? null;
   if (next) return { state: next.state, next, phrase: next.linePhrase, trips, resumesAt: paused, pausedPhrase };
-  // Evidence with no trips means none. Without evidence a pause is all that can be said.
-  if (paused && !input.evidence) return { state: "paused", next: null, phrase: pausedPhrase, trips, resumesAt: paused, pausedPhrase };
+  // Evidence with no trips means none, and so does a day with no stops. Otherwise, without
+  // evidence, a pause is all that can be said.
+  if (paused && !input.evidence && input.stops.length > 0) return { state: "paused", next: null, phrase: pausedPhrase, trips, resumesAt: paused, pausedPhrase };
   return { state: "none", next: null, phrase: null, trips, resumesAt: null, pausedPhrase: null };
 }
 
@@ -114,7 +115,9 @@ function fromLeg(
   const state: Draft["state"] = lateBasis ? "late"
     : arrived ? "leave_now" : untilLeave <= DEPARTURE_SOON_SECONDS ? "soon" : "upcoming";
   const fromNow = now.add(travel);
-  const shownArrival = lateBasis !== "evidence" && arrived && Temporal.Instant.compare(fromNow, arriveAt) > 0 ? fromNow : arriveAt;
+  const shownArrival = lateBasis === "evidence"
+    ? carriedArrival
+    : arrived && Temporal.Instant.compare(fromNow, arriveAt) > 0 ? fromNow : arriveAt;
   return { finishedAt, draft: { ...trip, state, lateBasis,
     freshness: expired ? "last_estimate" : "current",
     checkedAt: estimate.observedAt,
@@ -155,6 +158,7 @@ function fromUnknown(
     case "destination_unknown": return { finishedAt, draft: { ...trip, state: "needs_place" } };
     case "attendance_unknown": return { finishedAt, draft: { ...trip, state: "needs_attendance" } };
     case "origin_unknown": {
+      if (unknown.blockerResolved) return { finishedAt, draft: { ...trip, state: "trip_changed", action: "refresh" } };
       // The plan loses its place at the unknown stop before this one, and names no origin itself.
       const blocker = previous && !("leg" in previous) &&
         (previous.reason === "destination_unknown" || previous.reason === "attendance_unknown")
@@ -178,7 +182,7 @@ function baseDraft(role: Draft["role"], originRef: string | null, destinationRef
 /** Mirrors the evidence's get-ready segment: outbound only, and never before the ready time. */
 function getReadyAt(role: Draft["role"], leaveAt: Temporal.Instant, readyAt: Temporal.Instant, preparationSeconds: number): string | null {
   if (role !== "outbound" || preparationSeconds <= 0) return null;
-  const earliest = leaveAt.subtract({ seconds: preparationSeconds });
+  const earliest = leaveAt.subtract({ seconds: Math.ceil(preparationSeconds) });
   return (Temporal.Instant.compare(earliest, readyAt) < 0 ? readyAt : earliest).toString();
 }
 

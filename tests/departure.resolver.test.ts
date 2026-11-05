@@ -344,12 +344,17 @@ describe("paused", () => {
     expect(result).toMatchObject({ state: "upcoming", pausedPhrase: "Travel estimates resume on October 1.", next: { freshness: "last_estimate", action: null } });
   });
 
+  it("says nothing on a day with no trips, even with no evidence", () => {
+    const result = resolveDepartureModel({ evidence: null, stops: [], now: local("08:00"), timezone: NY, arrivalBufferSeconds: 0, preparationSeconds: 0, pausedUntil });
+    expect(result).toEqual({ state: "none", next: null, phrase: null, trips: [], resumesAt: null, pausedPhrase: null });
+  });
+
   it("keeps a step the user can take", () => {
     expect(model(local("08:00"), [], { pausedUntil, unknownLegs: [unknown("outbound", null, "dentist", "destination_unknown")] }).state).toBe("needs_place");
   });
 
   it("reads paused without evidence, none with empty evidence, and ends on the resume date", () => {
-    const input = { evidence: null, stops: [], timezone: NY, arrivalBufferSeconds: 0, preparationSeconds: 0, pausedUntil };
+    const input = { evidence: null, stops: [DENTIST], timezone: NY, arrivalBufferSeconds: 0, preparationSeconds: 0, pausedUntil };
     expect(resolveDepartureModel({ ...input, now: local("08:00") })).toMatchObject({ state: "paused", next: null, phrase: "Travel estimates resume on October 1." });
     expect(resolveDepartureModel({ ...input, now: pausedUntil })).toMatchObject({ state: "none", phrase: null });
     expect(model(local("08:00"), [], { pausedUntil }).state).toBe("none");
@@ -394,12 +399,40 @@ describe("choosing the next trip", () => {
     expect(model(local("15:30"), [], { unknownLegs }).state).toBe("none");
   });
 
-  it("a resolved Occurrence has already left through resolveTravelAfterDecisions", () => {
-    const evidence = { version: "1.0" as const, journeyRef: "day", legs: [toLunch(), onward(), tripHome()], unknownLegs: [], segments: [], occupiedSpans: [], collisions: [], completeTrip: true, finalAvailabilityAt: null };
-    const after = resolveTravelAfterDecisions(evidence, [{ id: "lunch", status: "completed" }]);
+  const decided = (legs: readonly TravelResolvedLegEvidence[], unknownLegs: readonly TravelUnknownLeg[], resolved: string) =>
+    resolveTravelAfterDecisions({ version: "1.0" as const, journeyRef: "day", legs: [...legs], unknownLegs, segments: [], occupiedSpans: [], collisions: [], completeTrip: true, finalAvailabilityAt: null }, [{ id: resolved, status: "completed" }]);
+
+  it("a resolved Occurrence's own trip leaves, and the next trip does not skip the next stop", () => {
+    const after = decided([toLunch(), onward(), tripHome()], [], "lunch");
     const result = resolveDepartureModel({ evidence: after, stops, now: local("09:00"), timezone: NY, arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null });
-    expect(result.next?.role).toBe("return");
     expect(result.trips.some((trip) => trip.destinationRef === "lunch")).toBe(false);
+    expect(result.next).toMatchObject({ role: "onward", destinationRef: "dentist", state: "trip_changed", action: "refresh", leaveAt: null, linePhrase: "The trip to Dentist changed." });
+    expect(result.trips.map((trip) => trip.role)).toEqual(["onward", "return"]);
+    expect(after?.completeTrip).toBe(false);
+  });
+
+  it("the withdrawn leg keeps no estimate and no occupancy", () => {
+    const lunchRoute = toLunch();
+    const leaving = onward();
+    const arrival = { id: `arrival:${leaving.leg.id}`, kind: "arrival_buffer" as const, startAt: local("14:20"), endAt: local("14:30"), sourceRefs: ["dentist"], legId: leaving.leg.id };
+    const route = { id: `route:${leaving.leg.id}`, kind: "route" as const, startAt: local("13:55"), endAt: local("14:20"), sourceRefs: ["lunch", "dentist"], legId: leaving.leg.id };
+    const after = resolveTravelAfterDecisions({ version: "1.0" as const, journeyRef: "day", legs: [lunchRoute, leaving], unknownLegs: [], segments: [route, arrival], occupiedSpans: [], collisions: [], completeTrip: true, finalAvailabilityAt: null }, [{ id: "lunch", status: "completed" }]);
+    expect(after?.legs).toEqual([expect.objectContaining({ state: "rejected_revision", estimate: null })]);
+    expect(after?.segments).toEqual([]);
+  });
+
+  it("a stop whose blocker was resolved reads trip changed, not Add Home", () => {
+    const unknownLegs = [unknown("outbound", null, "lunch", "destination_unknown"), unknown("outbound", null, "dentist", "origin_unknown")];
+    const after = decided([], unknownLegs, "lunch");
+    const { next } = resolveDepartureModel({ evidence: after, stops, now: local("09:00"), timezone: NY, arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null });
+    expect(next).toMatchObject({ state: "trip_changed", action: "refresh", phrase: "Trip changed.", blockingRef: null });
+    expect(next?.phrase).not.toContain("Home");
+    expect(decided([], unknownLegs, "other")?.unknownLegs).toEqual(unknownLegs);
+  });
+
+  it("an unknown trip onward from a resolved stop stays", () => {
+    const after = decided([], [unknown("onward", "lunch", "dentist", "destination_unknown"), unknown("return", "dentist", null, "return_base_missing")], "lunch");
+    expect(after?.unknownLegs?.map((item) => item.reason)).toEqual(["destination_unknown", "return_base_missing"]);
   });
 
   it("does not change its input", () => {
@@ -450,6 +483,40 @@ describe("unreliable chains", () => {
     const arrived = run("15:25");
     expect(arrived.next).toMatchObject({ role: "return", state: "late", lateBasis: "clock", arriveAt: local("15:45"), phrase: "If you haven't left yet, you'd be home about 3:45 PM." });
     expect(run("15:45")).toMatchObject({ state: "none" });
+  });
+
+  it("a late trip held up by an earlier late trip shows the carried arrival, never one already past", () => {
+    const stop2 = (ref: string, start: string, end: string): DepartureStop => ({ ref, label: ref, startAt: local(start), endAt: local(end) });
+    const first = timed(leg("outbound", null, "a"), local("10:00"), local("11:20"), { late: true });
+    const second = timed(leg("onward", "a", "b"), local("11:10"), local("11:30"), { late: true });
+    const legs = [first, second];
+    const input = { stops: [stop2("a", "10:30", "11:00"), stop2("b", "11:15", "12:00")] };
+    expect(model(local("11:10"), legs, input).trips[1]).toMatchObject({ state: "time_unknown", leaveAt: null });
+    const { next } = model(local("11:35"), legs, input);
+    expect(next).toMatchObject({ destinationRef: "b", lateBasis: "evidence", arriveAt: local("11:40"), phrase: "You may arrive late: arrive 11:40 AM." });
+    expect(model(local("11:40"), legs, input).state).toBe("none");
+  });
+
+  it("a fractional clock does not crash the evidence or the model", () => {
+    const now = "2026-11-02T13:50:12.345Z";
+    const at = (seconds: number) => new Date(Date.parse(now) + seconds * 1000).toISOString();
+    const base = { ref: "home", source: "saved_base" as const, sourceRevision: "h1", point: { kind: "coordinates" as const, latitude: 41, longitude: -74 } };
+    const a = { ...stop("a", at(600), "2026-11-02T14:05:00Z"), endpoint: PLACE("a", 1) };
+    const b = { ...stop("b", "2026-11-02T14:20:00Z", "2026-11-02T15:00:00Z"), endpoint: PLACE("b", 2) };
+    const plan = resolveTravelPlan({ journeyRef: "day", journeyRevision: "1", now, grantRevision: "g", defaultMode: "walking", base, device: null, predictedOrigin: null, corrections: [], commitments: [a, b], buffers });
+    // The first walk lands at a fractional instant, past when the next leg leaves.
+    const results = plan.legs.map((planned, index) => {
+      const duration = index === 0 ? 3600 : 600;
+      const arrivalAt = new Date(Date.parse(planned.readyAt) + duration * 1000).toISOString();
+      return { legId: planned.id, provenance: planned.provenance, estimate: { durationSeconds: duration, departureAt: planned.readyAt, arrivalAt, warnings: [], fallback: false, attribution: "Google Maps", observedAt: now, expiresAt: "2026-11-02T23:00:00Z" } };
+    });
+    const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: [], buffers, now, expectedJourneyRevision: "1", expectedGrantRevision: "g", modelProjection: "disabled" });
+    expect(evidence.legs.every((entry) => entry.state === "current")).toBe(true);
+    expect(evidence.completeTrip).toBe(false);
+    const result = resolveDepartureModel({ evidence, stops: [], now, timezone: NY, arrivalBufferSeconds: 0.5, preparationSeconds: 90.5, pausedUntil: null });
+    expect(result.trips.map((trip) => trip.state)).toContain("time_unknown");
+    const appears = resolveDepartureModel({ evidence: { legs: [missing(OUTBOUND, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW)], unknownLegs: [] }, stops: [DENTIST], now: local("08:00"), timezone: NY, arrivalBufferSeconds: 0.5, preparationSeconds: 0, pausedUntil: null });
+    expect(appears.next?.state).toBe("appears_later");
   });
 
   it("a later stop with room absorbs the shortfall", () => {
@@ -519,6 +586,16 @@ describe("the phrase module", () => {
     const context = departurePhraseContext(local("12:00"), NY);
     expect(departureFreeAgainPhrase(local("18:45"), context)).toBe("Free again 6:45 PM.");
     expect(departureCheckedPhrase("Google Maps", local("08:00"), context)).toBe("Google Maps · checked 8:00 AM.");
+  });
+
+  it("calls the trip home by name in the line form, never your next stop", () => {
+    const line = (entry: TravelResolvedLegEvidence, now = "08:00") => model(local(now), [entry]).next?.linePhrase;
+    expect(line(missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW))).toBe("The leave time for the trip home appears by 12:40 PM.");
+    expect(line(missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW), "13:00")).toBe("The leave time for the trip home is ready to check.");
+    expect(line(missing(HOME, "unavailable", "Route unavailable."))).toBe("No route found for the trip home.");
+    expect(line(missing(HOME, "rejected_revision", "Journey or grant revision changed."))).toBe("The trip home changed.");
+    expect(line(missing(HOME, "stale", "Route estimate expired."))).toBe("The estimate for the trip home expired.");
+    expect(model(local("08:00"), [missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW)], { stops: [] }).next?.linePhrase).toBe("The leave time for the trip home appears by 12:40 PM.");
   });
 
   it("carries no weather advice and no internal terms", () => {

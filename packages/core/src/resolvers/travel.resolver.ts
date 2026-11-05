@@ -289,7 +289,7 @@ export function travelLegsAfterLateArrival(
     const departure = instant(weather?.departureAt ?? estimate.departureAt, "Route departure");
     const arrival = instant(weather?.arrivalAt ?? estimate.arrivalAt, "Route arrival");
     const shortfall = carriedArrival && Temporal.Instant.compare(carriedArrival, departure) > 0
-      ? carriedArrival.since(departure).total("seconds")
+      ? Math.ceil(carriedArrival.since(departure).total("seconds")) // Temporal rejects fractional seconds.
       : 0;
     if (shortfall > 0) shortfalls.set(leg.id, shortfall);
     carriedArrival = arrival.add({ seconds: shortfall });
@@ -313,9 +313,15 @@ export function resolveTravelAfterDecisions(
       source.durationSeconds !== (duration?.kind === "known" ? duration.seconds : null));
   })) return null;
   if (!resolvedRefs.size) return evidence;
-  const legs = evidence.legs.filter(({ leg }) =>
-    !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? ""));
-  const legIds = new Set(legs.map(({ leg }) => leg.id));
+  // Ticket 265: a leg from a resolved stop to a later stop stays known but withdrawn, so the
+  // next trip does not skip that stop. A leg to a resolved stop, or home from one, leaves.
+  const legs = evidence.legs.flatMap((entry): TravelResolvedLegEvidence[] => {
+    const { leg } = entry;
+    if (resolvedRefs.has(leg.destinationCommitmentRef ?? "")) return [];
+    if (!resolvedRefs.has(leg.originCommitmentRef ?? "")) return [entry];
+    return leg.destinationCommitmentRef ? [rejected(leg, "rejected_revision", "Route origin was resolved.")] : [];
+  });
+  const legIds = new Set(legs.filter(({ leg }) => !resolvedRefs.has(leg.originCommitmentRef ?? "")).map(({ leg }) => leg.id));
   const segments = evidence.segments.filter(segment =>
     !segment.sourceRefs.some(ref => resolvedRefs.has(ref)) && (!segment.legId || legIds.has(segment.legId)));
   const segmentById = new Map(segments.map(segment => [segment.id, segment]));
@@ -325,11 +331,23 @@ export function resolveTravelAfterDecisions(
     return segmentIds.length ? [{ ...collision, segmentIds,
       travelCreated: segmentIds.some(id => segmentById.get(id)!.kind !== "commitment") }] : [];
   });
-  const changed = legs.length !== evidence.legs.length || segments.length !== evidence.segments.length;
+  const changed = legIds.size !== evidence.legs.length || segments.length !== evidence.segments.length;
   return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
-    ...(evidence.unknownLegs ? { unknownLegs: evidence.unknownLegs.filter((leg) =>
-      !resolvedRefs.has(leg.originCommitmentRef ?? "") && !resolvedRefs.has(leg.destinationCommitmentRef ?? "")) } : {}),
+    ...(evidence.unknownLegs ? { unknownLegs: unknownLegsAfterDecisions(evidence.unknownLegs, resolvedRefs) } : {}),
     completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
+}
+
+/** A leg blocked by a stop the user has just resolved is marked, so nothing blames a missing Home. */
+function unknownLegsAfterDecisions(unknownLegs: readonly TravelUnknownLeg[], resolvedRefs: ReadonlySet<string>): TravelUnknownLeg[] {
+  const leaves = (leg: TravelUnknownLeg) => resolvedRefs.has(leg.destinationCommitmentRef ?? "") ||
+    (resolvedRefs.has(leg.originCommitmentRef ?? "") && !leg.destinationCommitmentRef);
+  return unknownLegs.flatMap((leg, index) => {
+    if (leaves(leg)) return [];
+    const previous = unknownLegs[index - 1];
+    const blockerLeft = leg.reason === "origin_unknown" && !!previous && leaves(previous) &&
+      (previous.reason === "destination_unknown" || previous.reason === "attendance_unknown");
+    return [blockerLeft ? { ...leg, blockerResolved: true as const } : leg];
+  });
 }
 
 type OpenWindow = Readonly<{ startAt: Temporal.Instant | null; endAt: Temporal.Instant | null }>;

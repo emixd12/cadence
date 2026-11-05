@@ -91,6 +91,7 @@ Status values:
 | [P-019](#p-019-outlook-and-icloud-event-locations-read-for-routing) | Outlook and iCloud event locations read for routing | logged | 283 | Privacy, user guide, provider submissions |
 | [P-020](#p-020-remembered-places-and-attendance) | Remembered places and attendance | logged | 281 | Privacy, user guide |
 | [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
+| [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -684,4 +685,18 @@ cite has not changed.
     so a reload before the event ends means no question that day."
 - **Update needed:** describe the line, the marker, Directions on rows and the drawer,
   tomorrow's first trip, and the remembered question.
+- **Status:** logged.
+
+## P-022: Weather margin can mean arriving later
+
+- **Change:** Ticket 265 stops a weather margin moving a departure before the trip's ready time.
+  When the margin does not fit before the departure, the leave time stays and the margin follows
+  the arrival. On a trip with an arrival target, that can mean arriving later or arriving late.
+- **Affected:** Ticket 265. Files: `docs/user-guide/travel.md`.
+- **Surfaces:** user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md`, "Weather margin": "Bad weather
+  before a trip adds a fixed margin: leave earlier for an arrival, or expect to arrive later on
+  a trip home."
+- **Update needed:** say that a margin that cannot fit before the leave time means arriving
+  later, for any trip. Weather stays off until the owner turns it on.
 - **Status:** logged.
