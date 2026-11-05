@@ -15812,7 +15812,7 @@ tests/travel-provider.test.ts`, `npm run resolvers:check`, `npm run core:check`.
 
 ## Ticket 265: One departure model in core
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 264.
 
 Goal: every surface gives the same answer about what to do next.

@@ -48,6 +48,22 @@ export function partitionTravelLegsByWindow<T extends Pick<TravelPlannedLeg, "id
   return { due, later };
 }
 
+/**
+ * Ticket 265: when a leg left for a later refresh gets its estimate. Today's window counts
+ * back from the arrival target, or from the departure of the trip home, as above.
+ * Ticket 267 changes the rule, here only. Null when the destination's start is unknown.
+ */
+export function travelEstimateAppearsAt(input: Readonly<{
+  role: TravelPlannedLeg["role"];
+  readyAt: string;
+  destinationStartAt: string | null;
+  arrivalBufferSeconds: number;
+}>, windowSeconds = TRAVEL_ROUTE_WINDOW_SECONDS): string | null {
+  if (input.role === "return") return Temporal.Instant.from(input.readyAt).subtract({ seconds: windowSeconds }).toString();
+  if (!input.destinationStartAt) return null;
+  return Temporal.Instant.from(input.destinationStartAt).subtract({ seconds: input.arrivalBufferSeconds + windowSeconds }).toString();
+}
+
 export type TravelDeviceSample = Readonly<{ latitude: number; longitude: number; accuracyMeters: number }>;
 
 /**

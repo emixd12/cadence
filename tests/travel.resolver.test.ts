@@ -857,3 +857,37 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
     expect(resolveTravelAfterDecisions(released, [{ id: "event-1", status: "completed" }])).not.toHaveProperty("unknownLegs");
   });
 });
+
+describe("Ticket 265: a weather margin and the ready time", () => {
+  const rain = Array.from({ length: 8 }, (_, index) => ({ time: Temporal.Instant.from("2026-09-16T13:00:00Z").add({ hours: index }).toString(), weatherCode: 61,
+    rainMillimeters: 1.2, snowfallCentimeters: 0, precipitationProbabilityPercent: 80, apparentTemperatureCelsius: 14, windGustsKilometersPerHour: 20 }));
+  const weather = { state: "forecast" as const, forecast: { provider: "open-meteo" as const, areaKey: "x", hourStart: "2026-09-16T16:00:00Z", fetchedAt: NOW, expiresAt: "2026-09-16T17:00:00Z", hours: rain } };
+  const event = commitment("event-1", "2026-09-16T17:00:00Z", "2026-09-16T18:00:00Z", endpoint("near", "calendar", "near-1", 2));
+
+  it("does not move a non-late departure before its ready time", () => {
+    const plan = resolveTravelPlan(planningInput({ commitments: [event] }));
+    const outbound = plan.legs[0]!;
+    // Ready at 16:00, leaves at 16:05, on time for the 16:50 target. A 10-minute margin cannot fit before it.
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(outbound, estimate("2026-09-16T16:05:00Z", "2026-09-16T16:45:00Z", 2400))], []), now: NOW, weather });
+    const entry = evidence.legs[0]!;
+    expect(Temporal.Instant.compare(Temporal.Instant.from(entry.weather!.departureAt!), Temporal.Instant.from(outbound.readyAt))).toBeGreaterThanOrEqual(0);
+    expect(entry.weather).toMatchObject({ marginSeconds: 600, departureAt: "2026-09-16T16:05:00Z", arrivalAt: "2026-09-16T16:55:00Z" });
+    // The margin now pushes the arrival past the 16:50 target.
+    expect(entry).toMatchObject({ late: true, state: "current" });
+    expect(evidence.segments.find((segment) => segment.kind === "weather_margin")).toMatchObject({ startAt: "2026-09-16T16:45:00Z", endAt: "2026-09-16T16:55:00Z" });
+  });
+
+  it("stays on time when the moved margin still arrives by the target", () => {
+    const plan = resolveTravelPlan(planningInput({ commitments: [event] }));
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(plan.legs[0]!, estimate("2026-09-16T16:05:00Z", "2026-09-16T16:30:00Z", 1500))], []), now: NOW, weather });
+    expect(evidence.legs[0]?.weather).toMatchObject({ departureAt: "2026-09-16T16:05:00Z", arrivalAt: "2026-09-16T16:40:00Z" });
+    expect(evidence.legs[0]).not.toHaveProperty("late");
+  });
+
+  it("still moves a departure earlier when there is room", () => {
+    const plan = resolveTravelPlan(planningInput({ commitments: [event] }));
+    const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(plan.legs[0]!, estimate("2026-09-16T16:30:00Z", "2026-09-16T16:50:00Z", 1200))], []), now: NOW, weather });
+    expect(evidence.legs[0]?.weather).toMatchObject({ departureAt: "2026-09-16T16:20:00Z", arrivalAt: "2026-09-16T16:50:00Z" });
+    expect(evidence.legs[0]).not.toHaveProperty("late");
+  });
+});

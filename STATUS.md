@@ -1,5 +1,25 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 265 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** One departure model
+now answers what to do next. No component reads it yet: Tickets 261, 269, 271, 272, 273, 277 and 280
+will.
+
+- `packages/core/src/resolvers/departure.resolver.ts` gives each remaining trip and the next trip a
+  state. Every phrase lives in `packages/core/src/services/departure-phrases.ts`. "Leave now" lasts
+  5 minutes, then the trip reads late with an arrival counted from now.
+- The time an estimate will appear comes from `travelEstimateAppearsAt` in
+  `travel-refresh-policy.ts`. Ticket 267 changes the rule there.
+- Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
+  and `finalAvailabilityAt`. A weather margin can no longer move any departure before its ready time;
+  it follows the arrival, and the leg is flagged `late` if that passes the arrival target.
+- Most phrases are not yet approved by the owner. The list is at the top of the phrase module.
+
+Platform impact: web and desktop read the same core module from later tickets. Marketing: not
+applicable. Future mobile: portable core module. Messaging impact: none; Tickets 261 and 269 own the
+user-visible words.
+
 ## Travel advisory revamp Wave 1: Ticket 260 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** Text meant for

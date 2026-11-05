@@ -243,10 +243,12 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
   const occupiedSpans = mergeSegments(segments);
   const collisions = resolveTravelCollisions(segments, input.collisionCandidates);
   const returnLeg = legs.find((entry) => entry.leg.role === "return") ?? null;
+  // Ticket 265: a trip that leaves before the previous one arrives makes every later time unreliable.
   const completeTrip = input.plan.unknownLegs.length === 0 &&
     legs.length > 0 &&
     legs.every((entry) => entry.state === "current") &&
-    returnLeg?.state === "current";
+    returnLeg?.state === "current" &&
+    travelLegsAfterLateArrival(legs).size === 0;
   const finalAvailabilityAt = completeTrip && returnLeg?.state === "current" && returnLeg.estimate
     ? instant(returnLeg.weather?.arrivalAt ?? returnLeg.estimate.arrivalAt, "Return arrival")
         .add({ seconds: input.buffers.settlingSeconds })
@@ -269,6 +271,30 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     ...(weather.summary ? { weather: weather.summary } : {}),
     modelProjection,
   };
+}
+
+/**
+ * Ticket 265: legs that would leave before the previous leg arrives, with the shortfall in
+ * seconds. A shortfall carries forward until a later stop has room to absorb it. A leg with
+ * no origin stop starts a new chain, and a leg with no estimate ends what can be known.
+ */
+export function travelLegsAfterLateArrival(
+  legs: readonly Pick<TravelResolvedLegEvidence, "leg" | "estimate" | "weather">[],
+): ReadonlyMap<string, number> {
+  const shortfalls = new Map<string, number>();
+  let carriedArrival: Temporal.Instant | null = null;
+  for (const { leg, estimate, weather } of legs) {
+    if (!leg.originCommitmentRef) carriedArrival = null;
+    if (!estimate) { carriedArrival = null; continue; }
+    const departure = instant(weather?.departureAt ?? estimate.departureAt, "Route departure");
+    const arrival = instant(weather?.arrivalAt ?? estimate.arrivalAt, "Route arrival");
+    const shortfall = carriedArrival && Temporal.Instant.compare(carriedArrival, departure) > 0
+      ? carriedArrival.since(departure).total("seconds")
+      : 0;
+    if (shortfall > 0) shortfalls.set(leg.id, shortfall);
+    carriedArrival = arrival.add({ seconds: shortfall });
+  }
+  return shortfalls;
 }
 
 /** Reuse estimates after manual decisions; never invent a route around a resolved stop. */

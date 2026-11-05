@@ -205,8 +205,8 @@ export function resolveTravelWeather(input: Readonly<{
     if (!planned || entry.state === "rejected_revision") return entry;
     const margin = resolveWeatherMargin({ hours: forecast.hours, period: weatherDeparturePeriod(planned), mode: planned.mode });
     const estimate = entry.state === "current" ? entry.estimate : null;
-    // Ticket 264: a margin never moves a late leg's departure before its ready time; it follows the arrival.
-    const fixedDeparture = planned.request.timing.kind === "depart_at" || (!!estimate && entry.late === true &&
+    // Tickets 264 and 265: a margin never moves a departure before its ready time; it follows the arrival.
+    const fixedDeparture = planned.request.timing.kind === "depart_at" || (!!estimate &&
       Temporal.Instant.compare(instant(shift(estimate.departureAt, -margin.marginSeconds), "Weather-adjusted time"), instant(entry.leg.readyAt, "Route ready time")) < 0);
     const departureAt = estimate
       ? fixedDeparture ? estimate.departureAt : shift(estimate.departureAt, -margin.marginSeconds)
@@ -221,7 +221,11 @@ export function resolveTravelWeather(input: Readonly<{
         ? { id: `weather:${entry.leg.id}`, kind: "weather_margin", startAt: estimate.arrivalAt, endAt: arrivalAt!, sourceRefs, legId: entry.leg.id }
         : { id: `weather:${entry.leg.id}`, kind: "weather_margin", startAt: departureAt!, endAt: estimate.departureAt, sourceRefs, legId: entry.leg.id });
     }
-    return { ...entry, weather: { ...margin, departureAt, arrivalAt } };
+    // Ticket 265: a margin that has to follow the arrival can make the trip late.
+    const pushedLate = !!arrivalAt && fixedDeparture && !entry.late && planned.request.timing.kind === "arrive_by" &&
+      Temporal.Instant.compare(instant(arrivalAt, "Weather-adjusted time"), instant(planned.request.timing.at, "Arrival target")) > 0;
+    return { ...entry, ...(pushedLate ? { late: true, estimate: { ...estimate!, warnings: [...estimate!.warnings, "Estimated arrival is after the planned arrival time."] } } : {}),
+      weather: { ...margin, departureAt, arrivalAt } };
   });
   return {
     summary: { tableVersion: WEATHER_MARGIN_TABLE_VERSION, state: "applied", forecastAt: forecast.fetchedAt, attribution: OPEN_METEO_ATTRIBUTION },
