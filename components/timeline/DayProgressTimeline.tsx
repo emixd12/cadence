@@ -19,6 +19,7 @@ import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.reso
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
+import { travelDestinationResolved } from "@cadence/core/services/travel-navigation";
 import { DEPARTURE_REFRESH_LABEL } from "@cadence/core/services/departure-phrases";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
@@ -29,7 +30,7 @@ import type {
   TimelineOccurrenceContext,
 } from "@cadence/core/types/day-progress";
 
-import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
+import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
@@ -373,6 +374,7 @@ export function DayProgressTimeline({
         now={now}
         travelHabits={travelHabits}
         usualTravelMode={usualTravelMode}
+        navigationPreference={context?.navigationPreference}
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
@@ -397,6 +399,9 @@ export function DayProgressTimeline({
         departure={departure}
         refresh={refreshTravel}
         now={now}
+        navigationPreference={context?.navigationPreference}
+        travelMode={usualTravelMode}
+        onOpenExternal={onOpenExternal}
       /> : null}
       <ExternalEventDetails
         event={detailEvent}
@@ -438,6 +443,7 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   now: string;
   travelHabits?: TravelHabitsState | null;
   usualTravelMode?: TravelMode | null;
+  navigationPreference?: TravelNavigationPreference | null;
   timezone: string;
   onMeasure: () => void;
   registerMeasurement: (date: string, measure: () => MeasuredDay) => () => void;
@@ -460,6 +466,7 @@ function DayProgressDay({
   now,
   travelHabits,
   usualTravelMode,
+  navigationPreference,
   timezone,
   onOpenExternal,
   onMeasure,
@@ -586,7 +593,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={contexts.get(occurrence.id)}
-                  travelDetails={travelDetails({ occurrenceId: occurrence.id, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, onOpenExternal, refresh })}
+                  travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh })}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -740,14 +747,22 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
   }
 }
 
-/** A located Behavior's travel timing and, for a journey to a place, its mode choice (Ticket 217). */
-function travelDetails({ occurrenceId, travel, departure, now, timezone, habits, usualMode, onOpenExternal, refresh }: Readonly<{
-  occurrenceId: string; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
+/**
+ * A located Behavior's travel timing, its Maps link (Ticket 271) and, for a journey to a place, its
+ * mode choice (Ticket 217). The link carries only the Behavior's own place text.
+ */
+function travelDetails({ occurrenceId, placeText, travel, departure, now, timezone, habits, usualMode, navigationPreference, onOpenExternal, refresh }: Readonly<{
+  occurrenceId: string; placeText: string | undefined; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
   timezone: string; habits: TravelHabitsState | null | undefined; usualMode: TravelMode | null | undefined;
+  navigationPreference: TravelNavigationPreference | null | undefined;
   onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
 }>) {
   const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh });
-  return timing ? <>{timing}<TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></> : null;
+  if (!timing) return null;
+  return <>{timing}
+    <TravelNavigationLink locationText={placeText} preference={navigationPreference} mode={usualMode}
+      resolved={travelDestinationResolved(travel, occurrenceId, "behavior")} onOpenExternal={onOpenExternal} />
+    <TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></>;
 }
 
 /**

@@ -16117,7 +16117,8 @@ tests/day-progress-bench.dom.test.tsx`, bench at both widths,
 
 ## Ticket 271: Drawer and dialog lead with the leave time
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The
+"Change for this trip" label is not yet approved (decision D7).
 Dependencies: Tickets 261, 262 and 268.
 
 Goal: the event views answer the question first, with directions one tap away (proposal
@@ -16134,6 +16135,8 @@ Scope and acceptance:
 - Navigation links still use only source-authored text.
 - Do not use the mockup's weather advice or bold type.
 - Update `interaction-registry.json`.
+- From Ticket 262: drop the Duration row when the end is unknown. The time row already
+  says "End unknown".
 
 References: `components/timeline/ExternalEventDetails.tsx`,
 `components/timeline/OccurrenceRow.tsx`, `components/timeline/DayProgressTimeline.tsx`,

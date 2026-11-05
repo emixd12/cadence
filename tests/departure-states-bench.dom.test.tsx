@@ -147,6 +147,26 @@ it("shows the drawer, dialog, Behavior row and bubble after the 5-minute expiry"
   expect(container.querySelector("[data-bench-checked]")?.textContent).toBe("7:00 AM, expired at 7:05 AM");
 });
 
+it("keeps Directions after expiry where a route reached the place, and Search where none has (Ticket 271, C2)", async () => {
+  await render("expired");
+  const kind = (scope: Element | null) => scope?.querySelector("[data-travel-navigation]")?.getAttribute("data-travel-navigation") ?? null;
+  // Gym's route was checked at 7:00 and expired at 7:05. Its place is still resolved.
+  expect(gymRow()).toContain("Last estimate: leave by 9:35 AM");
+  expect(kind(surface("Timeline").querySelector('[data-occurrence-id="bench-gym"]'))).toBe("directions");
+  // Dentist's trip waits outside the 3-hour window, so no route has reached it yet.
+  expect(kind(surface("Dentist drawer"))).toBe("search");
+  expect(kind(surface("Dentist Calendar details"))).toBe("search");
+  // Route Dentist at noon, then let that estimate expire.
+  await moveClock("12:00");
+  const refresh = [...surface("Timeline").querySelectorAll("button")].find((button) => button.textContent === "Refresh travel");
+  await act(async () => refresh!.click());
+  await moveClock("12:10");
+  const drawer = surface("Dentist drawer");
+  expect(drawer.querySelector("[data-departure-lead]")?.textContent).toMatch(/^Last estimate: leave by 1:20 PM · checked 12:00 PM\./);
+  expect(kind(drawer)).toBe("directions");
+  expect(kind(surface("Dentist Calendar details"))).toBe("directions");
+});
+
 it("re-checks routes at the bench clock from Refresh travel", async () => {
   await render("trip-changed");
   const refresh = [...surface("Dentist drawer").querySelectorAll("button")].find((element) => element.textContent === "Refresh travel")!;
@@ -233,7 +253,10 @@ it("makes Refresh travel the first words of a line that asks for it, never repea
 it("shows the owner's approval on the wording review", async () => {
   await render();
   // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("All 63 phrases approved by the owner on November 5, 2026");
+  // Ticket 271 adds the correction control's label, not yet approved (decision D7).
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("1 of 64 phrases await the owner's approval.");
+  expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-sample]')?.textContent).toBe("Change for this trip");
+  expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-status]')?.textContent).toBe("Not yet approved");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-sample]')?.textContent).toBe("A planned trip changed.");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-status]')?.textContent).toBe("Approved November 5, 2026");
   expect(container.querySelector('[data-wording-id="line-changed"] [data-wording-status]')?.textContent).toContain("Approved");

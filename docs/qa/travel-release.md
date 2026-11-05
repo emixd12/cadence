@@ -519,7 +519,8 @@ Installed checks, after protected installation and account acceptance:
    Confirm the destination and selected mode in the actual external Maps surface.
    The installed path calls `auth_open_url`, then `NSWorkspace.openURL`.
    It uses source-authored location text, never provider route content.
-   Record whether the link says Search or Directions. Directions require a current matching route leg.
+   Record whether the link says Search or Directions. Directions require a resolved place: a route
+   that reached the event, even after its estimate expired (Ticket 271).
    Apple Maps cycling links disclose that the user must choose cycling there.
 3. Record notification permission and product coverage in Settings. Request permission only through the visible action.
    Record the retained count, eligible count, target, verified horizon and last readback time.
@@ -1094,15 +1095,17 @@ Current source rules (`packages/core/src/services/travel-navigation.ts`,
 
 - Desktop always uses Apple Maps. Web uses Apple Maps when the platform or user
   agent names Mac, iPhone, iPad or iPod, and Google Maps elsewhere.
-- Directions replace Search only when the event has a current route leg ending at
-  it and a usual travel mode is set. Otherwise the link says Search.
+- Directions replace Search only when a route has reached the stop's place and a
+  usual travel mode is set. An expired estimate still counts (Ticket 271, correction
+  C2). A missing, failed or withdrawn route says Search.
 - Apple Maps uses `daddr` with `dirflg` `w`, `r` or `d`. Cycling has no flag; the
   details show "Choose cycling in Apple Maps; this link cannot preselect it."
   Google Maps uses `/maps/dir/?api=1&destination=…&travelmode=…`, with `bicycling`
   for cycling.
 - The link carries the user's source text only, never provider route content.
-- Only Calendar event details have a navigation link. A Behavior with Where = A
-  place gets travel timing in its expanded row and no navigation action.
+- The Calendar drawer and details, and the expanded row of a Behavior with Where =
+  A place, have a navigation link (Ticket 271). The row's link carries the
+  Behavior's own place text.
 
 Fixtures, in the dedicated test Calendar and the owner test account:
 
@@ -1113,8 +1116,8 @@ Fixtures, in the dedicated test Calendar and the owner test account:
 - Travel on, Home set, usual travel Walking first. Device location allowed on each
   device, or Home as the origin where it is not.
 
-Matrix. For each row, open Timeline, choose Refresh travel, open E1's details,
-record the link label, then open the link and record the destination and mode
+Matrix. For each row, open Timeline, choose Refresh travel, open E1's drawer and
+details, record the link label, then open the link and record the destination and mode
 shown by the Maps app:
 
 | Surface | Expected app | Expected label |
@@ -1131,13 +1134,12 @@ cycling notice and open Apple Maps with no preselected mode; the Google row must
 open with bicycling. Negative checks:
 
 - Before any refresh, E1 says Search, not Directions.
-- After estimates expire, E1 keeps Directions while its route view stays in memory
-  (correction C2 in `docs/plans/2026-11-04-travel-departure-ux-review.md`). After Ticket
-  271, Directions depends on a resolved place, not on a 5-minute estimate.
+- After estimates expire, E1 keeps Directions, and its leave line reads "Last
+  estimate" with its check time. Directions depends on a resolved place, not on a
+  5-minute estimate (correction C2, Ticket 271). Expiry does not revert it to Search.
 - With travel off, E1 says Search.
-- B1's expanded row shows its travel timing and no Search or Directions link.
-  Record this as current behavior until Ticket 271 adds Directions to located Behavior
-  rows.
+- B1's expanded row shows its travel timing and Directions to B1's own place text,
+  and keeps Directions after its estimate expires.
 
 Record each row's label, app, destination text and mode. Record no coordinates,
 route durations or provider responses.

@@ -267,10 +267,23 @@ changed-stop message or the weather state, in that order of preference. A polite
 region announces the line only when the next trip or its state changes, never a
 countdown minute. Web and Mac share `TravelStatusLine` in `DayProgressTimeline`.
 
+The drawer and the details dialog lead with the leave time (Ticket 271). The drawer puts the
+departure model's phrase for this event directly under the title, then the calendar and time
+line, the location, and a row with the Maps link and **View details**. The dialog's body starts
+with the same phrase, then the Maps link, the journey mode choice and **Change for this trip**,
+then Time and Location. The first line is one step larger than the lines under it, at regular
+weight: emphasis comes from position and wording, never bold. It covers the countdown within
+30 minutes, leave now, both late forms and the last-estimate form after expiry. The details
+dialog has no Duration row. An expanded located Behavior row adds the same Maps link after its
+travel lines, built from the Behavior's own place text.
+
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a
-verified route. Current position is the default immediate origin, ahead of a
+verified route. Directions needs a resolved place: a route that reached this stop, even
+after its 5-minute estimate expired (Ticket 271, correction C2). The link carries only the
+source-authored text. The attendance and destination correction sits behind one native
+**Change for this trip** disclosure; saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
 predicted scheduled position. When location is unavailable, Home or the previous
 stop is the origin. Missing Home withholds only the trip back; current-location-
 to-event and event-to-event advice remain available for usable points. Never

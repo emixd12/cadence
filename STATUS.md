@@ -17,6 +17,33 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 271 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar drawer
+and details dialog now lead with the leave time, and Directions is one tap away in more places.
+
+- The drawer shows the departure model's phrase under the event title; the dialog's body starts
+  with it. The first line is one step larger, at weight 400. It covers the countdown, leave now,
+  both late forms and the last-estimate form.
+- Directions: the drawer, the dialog and expanded located Behavior rows have the Maps link.
+  `travelDestinationResolved` in `packages/core/src/services/travel-navigation.ts` decides
+  Directions from a resolved place, so an expired estimate keeps it (correction C2). The link
+  carries only source-authored text. The row uses the Behavior's own place text, which the shared
+  timeline service now passes as the optional `placeText` on the Timeline occurrence view.
+- The attendance and destination correction sits behind one native "Change for this trip"
+  disclosure. Saving closes it and returns focus to it. `INT-TRAVEL-003` is kept.
+- The details dialog has no Duration row (from Ticket 262).
+- New wording: "Change for this trip", in `departure-phrases.ts` and the bench wording review,
+  not yet approved (D7). It replaces the "Travel for this event" heading.
+- `docs/qa/travel-release.md` no longer says expiry reverts Directions to Search, and B1 now
+  expects Directions. Screenshots at 1440 and 390 px are in `.intent/artifacts/t271/` (local,
+  not committed).
+
+Platform impact: web `components/timeline/ExternalEventDetails.tsx` and `DayProgressTimeline.tsx`;
+desktop renders the same components through `apps/desktop/src/product.tsx`, and Ticket 285 checks
+the installed app. Marketing: not applicable. Future mobile: mobile web inherits it, checked at
+390 px. Messaging impact: P-021 (stale user-guide sentences added).
+
 ## Travel advisory revamp Wave 3: Ticket 269 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** One line at the top

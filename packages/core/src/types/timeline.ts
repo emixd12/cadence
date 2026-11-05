@@ -14,6 +14,11 @@ export type TimelineOccurrenceInput = {
   /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
   scheduleKind?: "exact" | "range";
   scheduleEndTime?: string | null;
+  /**
+   * Ticket 271: the Behavior's own place text when Where is A place, for a Directions link.
+   * Absent otherwise. Source-authored text only; never route content.
+   */
+  placeText?: string;
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;
@@ -42,6 +47,8 @@ export type TimelineOccurrenceView = {
   /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
   scheduleKind?: "exact" | "range";
   scheduleEndTime?: string | null;
+  /** Ticket 271: see `TimelineOccurrenceInput.placeText`. */
+  placeText?: string;
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;

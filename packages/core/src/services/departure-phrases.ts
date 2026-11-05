@@ -24,6 +24,8 @@ const PRIOR_STOP_FALLBACK = "your last stop";
 const TRIP_HOME = "the trip home";
 
 export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
+/** Ticket 271: the one short control that opens the attendance and destination correction. Not yet approved. */
+export const TRAVEL_CORRECTION_TOGGLE = "Change for this trip";
 /** The overlap label when the trip home has no known time. */
 export const RETURN_TIME_UNKNOWN = "Return time unknown.";
 
@@ -33,7 +35,7 @@ export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268";
+  ticket: "261" | "265" | "268" | "271";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -295,6 +297,10 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "The travel budget is used up and its renewal date is unknown.",
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "correction-toggle", ticket: "271", template: "Change for this trip",
+    situation: "Calendar details, the control that opens the attendance and destination correction for one journey.",
+    replaces: "Travel for this event",
+    approvedOn: null, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {

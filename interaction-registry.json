@@ -811,7 +811,7 @@
     {
       "path": "components/timeline/ExternalEventDetails.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 23,
+      "interaction_marker_count": 24,
       "interaction_ids": [
         "INT-CALENDAR-005",
         "INT-CALENDAR-006",
@@ -12170,7 +12170,7 @@
           "control": "Open source event, attachment, meeting or navigation link"
         }
       ],
-      "availability": "Available for a safe external URL or structured Google Maps/Apple Maps location link.",
+      "availability": "Available for a safe external URL or structured Google Maps/Apple Maps location link. Ticket 271: the Calendar drawer, Calendar details and expanded located Behavior rows carry the Maps link with source-authored place text only; Directions needs a resolved place and survives estimate expiry, otherwise Search.",
       "success_result": "Opens the external source through the browser or desktop system-browser boundary.",
       "failure_result": "Unsafe or missing URLs are not actionable.",
       "effects": [
@@ -12180,13 +12180,16 @@
       "confirmation": "none",
       "implementation": [
         "components/timeline/ExternalEventDetails.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
         "packages/core/src/services/travel-navigation.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/day-progress-timeline.dom.test.tsx",
-          "tests/travel-navigation.test.ts"
+          "tests/travel-navigation.test.ts",
+          "tests/calendar-details-dialog.dom.test.tsx",
+          "tests/departure-states-bench.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
       },
@@ -12195,10 +12198,12 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/timeline/ExternalEventDetails.tsx"
+            "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/DayProgressTimeline.tsx"
           ],
           "evidence": [
-            "tests/day-progress-timeline.dom.test.tsx"
+            "tests/day-progress-timeline.dom.test.tsx",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -12211,7 +12216,8 @@
           ],
           "evidence": [
             "tests/day-progress-timeline.dom.test.tsx",
-            "tests/desktop-calendar.test.ts"
+            "tests/desktop-calendar.test.ts",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ],
           "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
         },
@@ -13620,10 +13626,14 @@
       "triggers": [
         {
           "kind": "activate",
+          "control": "Change for this trip"
+        },
+        {
+          "kind": "activate",
           "control": "Use for this journey"
         }
       ],
-      "availability": "Versioned timed Calendar event details while routing context is available.",
+      "availability": "Versioned timed Calendar event details while routing context is available. Ticket 271 puts the form behind one native Change for this trip disclosure; saving closes it and returns focus to that control.",
       "success_result": "Use an explicit attendance and destination correction for one event revision while the Timeline stays open.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
@@ -13638,7 +13648,8 @@
       "test_coverage": {
         "level": "direct",
         "references": [
-          "tests/travel-settings.dom.test.tsx"
+          "tests/travel-settings.dom.test.tsx",
+          "tests/calendar-details-dialog.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
       },
@@ -13650,7 +13661,8 @@
             "components/timeline/ExternalEventDetails.tsx"
           ],
           "evidence": [
-            "tests/travel-settings.dom.test.tsx"
+            "tests/travel-settings.dom.test.tsx",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -13662,7 +13674,8 @@
             "apps/desktop/src/product.tsx"
           ],
           "evidence": [
-            "tests/travel-settings.dom.test.tsx"
+            "tests/travel-settings.dom.test.tsx",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },

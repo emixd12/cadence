@@ -1,4 +1,21 @@
-import type { TravelMode, TravelNavigationPreference } from "../types/travel";
+import type { TravelEndpointSource, TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "../types/travel";
+
+/**
+ * Ticket 271 (correction C2): whether a route has reached this stop's own place, so the link can
+ * offer Directions. A route estimate that has expired still counts: Directions depends on a resolved
+ * place, not on the estimate's 5-minute life. A missing, failed or withdrawn route does not count.
+ * `source` keeps the link's text and the routed place the same: a corrected destination is not the
+ * source text the link carries.
+ */
+export function travelDestinationResolved(
+  evidence: Pick<TravelEvidenceResult, "legs"> | null | undefined,
+  ref: string,
+  source: Extract<TravelEndpointSource, "calendar" | "behavior">,
+): boolean {
+  return (evidence?.legs ?? []).some((item) => item.leg.destinationCommitmentRef === ref &&
+    item.leg.provenance.destinationSource === source && item.estimate !== null &&
+    (item.state === "current" || item.state === "stale"));
+}
 
 /** Only source-authored text belongs here, never provider-derived route content. */
 export function buildTravelNavigationLink(input: Readonly<{

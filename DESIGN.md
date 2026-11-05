@@ -572,8 +572,16 @@ across web and desktop. `ExternalEventDetails` owns persistent preview and nativ
 dialog presentation. `GoogleCalendarPanel` reuses SettingsPanel and native form
 controls. Synthetic Calendar bench adapters perform no provider or account reads.
 
-Calendar details lead with Time and Location, then the travel lines, Directions and
-the journey mode choice. The source and calendar share one row, followed by Attendees,
+Calendar details lead with the travel lines (Ticket 271), then Directions, the journey mode
+choice and the **Change for this trip** disclosure, then Time and Location. The first travel
+line is `text-base` in the dialog and `text-sm` in the drawer, both weight 400, with the
+other travel lines at `text-xs`. There is no Duration row. The drawer shows the travel lines
+under the title, then the calendar and time line, the location, and one wrapping row with
+the Maps link and View details. Maps links use the shared `text-link` underline; the global
+anchor reset hides the Tailwind `underline` utility. The correction disclosure is a native
+`summary` with the shared disclosure trigger and indicator. An expanded located Behavior row
+adds the same Maps link after its travel lines. Screenshots at 1440 and 390 px:
+`.intent/artifacts/t271/` (local, not committed). The source and calendar share one row, followed by Attendees,
 Organizer, Conference and Attachments, then the description. A row with no value is
 removed from the grid. State, Source timezone, Recurrence, Updated and completeness
 lines appear only in development builds, under a "Development" label, with times in

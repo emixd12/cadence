@@ -730,6 +730,12 @@ cite has not changed.
     Refresh travel shows only when that trip needs it.
   - "Learned travel habits": "Cadence remembers such trips only while the app stays open,
     so a reload before the event ends means no question that day."
+  - From Ticket 271, "Open navigation": "Event details show available Calendar location
+    text and a Search in maps link" and "A verified route can offer Directions". The drawer
+    and located Behavior rows now have the link too, and Directions stays after an estimate
+    expires. "Inspect travel and correct a journey": "event details allow an in-person or
+    remote choice and a destination correction"; that form now opens from Change for this
+    trip.
 - **Update needed:** describe the line, the marker, Directions on rows and the drawer,
   tomorrow's first trip, and the remembered question.
 - **Status:** logged.

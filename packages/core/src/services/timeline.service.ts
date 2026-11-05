@@ -11,6 +11,7 @@ import { normalizeRecurrenceRule, normalizeScheduledTime, summarizeRecurrenceRul
 import { formatCompactOccurrenceScheduleLabel } from "./schedule";
 import { normalizeScheduleKind, normalizeSchedulePreset } from "./occurrence-generation";
 import { normalizeOccurrenceStatus } from "./occurrence.service";
+import { storedBehaviorWhere } from "./behavior-where";
 
 export function resolvePersistedTimeline(input: {
   behaviors: BehaviorGraphRecord[];
@@ -100,6 +101,7 @@ function toTimelineOccurrenceInput(
     }),
     scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
     scheduleEndTime: occurrence.schedule_end_time ? normalizeScheduledTime(occurrence.schedule_end_time) : null,
+    ...behaviorPlaceText(behavior),
     localDate: occurrence.local_date,
     status: normalizeOccurrenceStatus(occurrence.status),
     statusMarkedAt: occurrence.status_marked_at,
@@ -110,4 +112,14 @@ function toTimelineOccurrenceInput(
     },
     canStartTimeTracking: behavior.active,
   };
+}
+
+/** Ticket 271: A place's text for the row's Directions link. An unreadable Where gives none. */
+function behaviorPlaceText(behavior: BehaviorGraphRecord): { placeText?: string } {
+  try {
+    const where = storedBehaviorWhere(behavior);
+    return where.where_kind === "place" && where.location_text ? { placeText: where.location_text } : {};
+  } catch {
+    return {};
+  }
 }

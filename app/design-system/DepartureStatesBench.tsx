@@ -126,10 +126,11 @@ function benchEvent(variant: DentistVariant): NormalizedExternalEvent {
 
 const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {};
 
-function benchTimeline(gymStatus: "unresolved" | "completed") {
+function benchTimeline(gymStatus: "unresolved" | "completed", gym: GymVariant) {
   return resolveTimeline({ timezone: TIMEZONE, now: Temporal.Instant.from(instantAt("06:00")), futureDays: 0,
     occurrences: [{ id: GYM_ID, behaviorId: "bench-gym-behavior", title: "Gym", description: "Synthetic located Behavior.", categoryName: "Health",
       scheduleSummary: "Weekdays", scheduledFor: instantAt("10:00"), scheduledTimeLabel: "10:00 AM", scheduleKind: "range", scheduleEndTime: "11:00",
+      ...(gym === "located" ? { placeText: "Synthetic gym" } : {}),
       localDate: DATE, status: gymStatus, statusMarkedAt: gymStatus === "completed" ? instantAt("10:57") : null, note: "", canStartTimeTracking: false,
       timeTracking: { recordedSeconds: 0, runningStartedAt: null } }] });
 }
@@ -223,7 +224,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
   const scenario: Scenario = useMemo(() => ({ dentist: preset.dentist, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
     [preset.dentist, preset.gym, preset.gymCompletedAt]);
   const gymStatus = scenario.gymCompletedAt && minutesOf(clock) >= minutesOf(scenario.gymCompletedAt) ? "completed" as const : "unresolved" as const;
-  const timeline = useMemo(() => benchTimeline(gymStatus), [gymStatus]);
+  const timeline = useMemo(() => benchTimeline(gymStatus, scenario.gym), [gymStatus, scenario.gym]);
   const event = useMemo(() => benchEvent(scenario.dentist), [scenario.dentist]);
   const events = useMemo(() => [event], [event]);
   const evidence = useMemo(() => benchEvidence(scenario, checked), [scenario, checked]);
@@ -323,7 +324,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
         <div className="grid min-w-0 content-start gap-8">
           <InlineSurface label="Dentist drawer">
             <ExternalEventPreview key={`${stateId}-${scenario.dentist}`} id="departure-bench-drawer" events={events} timezone={TIMEZONE}
-              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} />
+              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" />
           </InlineSurface>
           <InlineSurface label="Dentist Calendar details">
             <ExternalEventDetails event={event} timezone={TIMEZONE} onClose={() => undefined} onDismissAllDay={() => undefined} onTravelCorrection={() => undefined}

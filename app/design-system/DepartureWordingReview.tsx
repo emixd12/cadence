@@ -4,6 +4,7 @@ import {
   DEPARTURE_PHRASE_REVIEW,
   OWNER_APPROVED_2026_11_05,
   RETURN_TIME_UNKNOWN,
+  TRAVEL_CORRECTION_TOGGLE,
   allDayRangeLabel,
   departureBriefFooterPhrase,
   departureCheckedPhrase,
@@ -102,6 +103,7 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "home-ready": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: at("12:00"), appearsOverdue: true }),
   "home-no-route": () => line({ ...HOME_TRIP, state: "no_route" }),
   "paused": () => detail({ state: "paused", resumesAt: null }),
+  "correction-toggle": () => TRAVEL_CORRECTION_TOGGLE,
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;
