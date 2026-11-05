@@ -15978,6 +15978,12 @@ Implementation notes:
   or from a stop that moved, changed place or is gone are withdrawn first and read "The trip to
   {event} changed." (`travelStopRevisions`, `changedTravelStops`, `withdrawChangedTravelTrips`).
 - A revision mismatch counts as a failed request, so automatic requests wait 5 minutes.
+- A reload after a source change still restores the session view as a kept view, so the
+  withdrawal and "Last estimate" marks survive the reload at the 80% pause, after a failure
+  and on the quota path.
+- New wording, not yet approved (decision D7): "A planned trip changed." for a changed trip
+  whose stop has no title, such as a cancelled event (`line-changed-unnamed` in
+  `departure-phrases.ts`, shown on the bench wording review).
 - Movement over 500 m (Ticket 267's trigger, changed here) refreshes only the next outbound trip,
   as a trip request, no sooner than 10 minutes after the last request that routed from the device.
 - `tests/travel-refresh-day.dom.test.tsx` runs whole days through the real hosted service: typical

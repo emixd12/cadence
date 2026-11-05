@@ -403,6 +403,12 @@ export function useTravelContext(input: Readonly<{
       }
       if (record.budget && !travelBudgets.has(accountId)) travelBudgets.set(accountId, record.budget);
       if (record.view && record.stateDigest === stateDigest && !travelViewCache.has(stateKey)) cacheTravel(stateKey, { view: record.view, message: null, at: record.at, stops: record.stops ?? null });
+      // Ticket 268: after a source change the record belongs to the old sources. Keep it for
+      // keptDayView, which withdraws the changed trips and marks the rest "Last estimate".
+      else if (record.view && record.stateDigest !== stateDigest) {
+        const keptKey = JSON.stringify([accountId, localDate, "session", record.stateDigest]);
+        if (!travelViewCache.has(keptKey)) cacheTravel(keptKey, { view: record.view, message: null, at: record.at, stops: record.stops ?? null });
+      }
     };
     const persist = () => {
       const cached = travelViewCache.get(stateKey);

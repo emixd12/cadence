@@ -32,7 +32,8 @@ follow the trip refresh plan and keep every leave time they already know.
 - Verifier fixes: trips merge on the stop they serve, so an onward trip that becomes outbound keeps
   its time. A changed source, at the 80% pause or after a failed request, keeps the last view with
   every time marked "Last estimate" and Refresh travel; trips to or from a moved, re-placed or
-  cancelled stop show as changed instead. A revision mismatch waits 5 minutes like a failure. Movement refreshes only the next trip from the
+  cancelled stop show as changed instead, and this survives a reload. A revision mismatch waits 5
+  minutes like a failure. New phrase awaiting the owner's approval: "A planned trip changed." Movement refreshes only the next trip from the
   device, at most every 10 minutes. Measured through the real service: typical day 6 requests and 8
   legs, heavy day 10 and 14, moving 45 minutes 5 and 7 (`docs/COSTS.md`).
 - **Release order: ship the server before any new Mac build.** The deployed server (`c599d24`)

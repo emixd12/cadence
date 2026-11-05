@@ -37,6 +37,7 @@ const world = {
   events: [] as Ev[],
   device: null as null | { latitude: number; longitude: number; accuracyMeters: number },
   fail: false,
+  quota: false,
   log: [] as { at: string; kind: string; legs: number; roles: string; providerCalls: number }[],
 };
 const caller = { client: {} as never, user: { id: "owner" } as never };
@@ -53,7 +54,7 @@ function calendarEvents() {
 let routedThisCall = 0;
 beforeEach(() => {
   vi.clearAllMocks();
-  world.events = []; world.device = null; world.fail = false; world.log = [];
+  world.events = []; world.device = null; world.fail = false; world.quota = false; world.log = [];
   mocks.source.mockResolvedValue(source);
   mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
   mocks.events.mockImplementation(async () => ({ requestedRange: { timezone: "America/New_York" }, events: calendarEvents() }));
@@ -80,6 +81,7 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 const routes = vi.fn(async (input: TravelRoutesInput) => {
   if (world.fail) throw new TravelClientError("provider_unavailable");
+  if (world.quota) throw new TravelClientError("quota_exceeded", 60, "2026-10-01T04:00:00Z");
   routedThisCall = 0;
   const now = Temporal.Instant.fromEpochMilliseconds(Date.now());
   try {
@@ -274,6 +276,54 @@ describe("a kept view withdraws trips whose stop changed (R5)", () => {
     expect(current().view!.evidence!.legs.map((entry) => [entry.leg.role, entry.state, !!entry.estimate]))
       .toEqual([["outbound", "current", true], ["onward", "rejected_revision", false], ["return", "rejected_revision", false]]);
     expect(model().trips[0]).toMatchObject({ destinationRef: "dentist", freshness: "last_estimate", leaveAt: "2026-09-21T12:35:00Z" });
+    await d.done();
+  });
+});
+
+describe("a reload after a source change keeps the kept view (R6)", () => {
+  const trips = () => model().trips.map((trip) => [trip.role, trip.state === "trip_changed" ? "changed" : trip.freshness]);
+  const moved = () => [TYPICAL[0]!, { ...TYPICAL[1]!, start: et("15:00"), end: et("16:00") }];
+  const expectKept = () => {
+    // The Gym moved: the trip to it and the trip home from it changed; the dentist trip keeps its last estimate.
+    expect(trips()).toEqual([["outbound", "last_estimate"], ["onward", "changed"], ["return", "changed"]]);
+    expect(model().trips[0]).toMatchObject({ destinationRef: "dentist", leaveAt: "2026-09-21T12:35:00Z" });
+  };
+  it("at 80% of the ceiling, with Refresh travel", async () => {
+    world.events = [...TYPICAL];
+    mocks.monthSpend.mockResolvedValue(4_100_000);
+    const d = await start(et("7:00"));
+    world.events = moved();
+    await d.render(); await advance(400);
+    await d.reload();
+    expect(world.log).toHaveLength(1);
+    expectKept();
+    expect(current().resumesAt).toBeNull();
+    expect(current().view?.evidence).toBeTruthy();
+    // A cancelled stop's trip has no title to name.
+    world.events = [TYPICAL[0]!];
+    await d.reload();
+    expect(model().trips.map((trip) => trip.linePhrase)).toContain("A planned trip changed.");
+    await d.done();
+  });
+  it("after a failed request, with Refresh travel", async () => {
+    world.events = [...TYPICAL];
+    const d = await start(et("7:00"));
+    world.fail = true; world.events = moved();
+    await d.render(); await advance(400);
+    await d.reload();
+    expectKept();
+    expect(current().message).toBe("Travel estimates are unavailable right now. Tracking and Calendar still work.");
+    expect(current().resumesAt).toBeNull();
+    await d.done();
+  });
+  it("on the quota path", async () => {
+    world.events = [...TYPICAL];
+    const d = await start(et("7:00"));
+    world.quota = true; world.events = moved();
+    await d.render(); await advance(400);
+    await d.reload();
+    expectKept();
+    expect(current().resumesAt).toBe("2026-10-01T04:00:00Z");
     await d.done();
   });
 });
