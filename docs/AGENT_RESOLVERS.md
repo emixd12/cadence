@@ -357,6 +357,13 @@ shared hourly cache. Neither restates a table value.
 `packages/core/src/services/travel-refresh-policy.ts` (Tickets 213–214) owns the
 three-hour routing window, place-lookup reuse periods, typed-text normalization
 and the 500 m movement rule, paired with `tests/travel-refresh-policy.test.ts`.
+Ticket 267 adds the trip refresh plan there: `resolveTravelRefreshPlan` says which
+request is due now (whole day, named trips or none) and when the next falls due, from
+the trips the client knows (`travelRefreshTrips`), its last-request state
+(`recordTravelRefresh`), focus, source key, device sample and the response's `budget`.
+It also owns trip identity (`travelTripKey`, `travelTripMatches`), the 80% budget pause
+(`travelBudgetPausesAutomatic`) and the unavailable reason for a leg ready only after
+its destination ends. Clients must not restate the triggers or thresholds.
 `lib/services/travel-route-refresh.service.ts` and `lib/ui/travel.ts` call it; they
 must not restate those rules. Provider SKU prices and the traffic-aware window stay
 in the provider adapter `lib/services/travel-provider.ts`.
@@ -378,7 +385,8 @@ for each remaining trip and for the next trip, from evidence after
 `resolveTravelAfterDecisions`. `packages/core/src/services/departure-phrases.ts` holds every
 phrase. Surfaces read the state and phrase; they must not recompute either. The time an
 estimate will appear comes only from `travelEstimateAppearsAt` in
-`travel-refresh-policy.ts`, which Ticket 267 changes. `travelLegsAfterLateArrival` in the
+`travel-refresh-policy.ts`. Ticket 267 made it the refresh plan's fallback time, and an
+onward trip's time counts back from when it can leave. `travelLegsAfterLateArrival` in the
 travel resolver finds a trip that would leave before the previous trip arrives: the evidence
 then withholds `completeTrip`, and the model reports `time_unknown`. Its output carries leave
 times and event titles, so it never enters Daily Brief model input.

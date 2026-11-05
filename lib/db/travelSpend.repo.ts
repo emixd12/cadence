@@ -1,5 +1,11 @@
 import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 
+/**
+ * Mirrors `owner_month_ceiling` in `reserve_travel_provider_spend`, for reporting only
+ * (Ticket 267). The database function alone enforces it; a test keeps the two equal.
+ */
+export const TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS = 5_000_000;
+
 export type TravelSpendDecision = Readonly<{ allowed: boolean; retryAfterSeconds: number; resetsAt: string | null }>;
 
 /** Reserves list-price microdollars before travel provider calls; refused requests reserve nothing. */

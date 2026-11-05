@@ -213,6 +213,11 @@ export type TravelPlanningResult = Readonly<{
   commitments: TravelCommitment[];
   legs: TravelPlannedLeg[];
   unknownLegs: TravelUnknownLeg[];
+  /**
+   * Ticket 267: the last stop is at Home, so no trip home is planned. Its ready time, when
+   * known, dates complete-trip availability.
+   */
+  noReturnFrom?: Readonly<{ commitmentRef: string; readyAt: string | null }>;
 }>;
 
 export type TravelLegResult = Readonly<{

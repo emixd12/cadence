@@ -5,12 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   source: vi.fn(), calendar: vi.fn(), events: vi.fn(), spend: vi.fn(), readPlaces: vi.fn(), writePlaces: vi.fn(),
   occurrences: vi.fn(), behaviors: vi.fn(), timezone: vi.fn(), geocode: vi.fn(), route: vi.fn(),
-  historySessions: vi.fn(), weather: vi.fn(),
+  historySessions: vi.fn(), weather: vi.fn(), monthSpend: vi.fn(),
 }));
 
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.source }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar, getCalendarEvents: mocks.events }));
-vi.mock("@/lib/db/travelSpend.repo", () => ({ reserveTravelProviderSpend: mocks.spend }));
+vi.mock("@/lib/db/travelSpend.repo", async (load) => ({
+  ...(await load<typeof import("@/lib/db/travelSpend.repo")>()),
+  reserveTravelProviderSpend: mocks.spend, readTravelMonthSpend: mocks.monthSpend,
+}));
 vi.mock("@/lib/db/travelPlaceCache.repo", () => ({ readTravelPlaceCache: mocks.readPlaces, writeTravelPlaceCache: mocks.writePlaces }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.occurrences }));
 vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.historySessions }));
@@ -28,6 +31,15 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
+import {
+  TRAVEL_LEG_READY_AFTER_END,
+  recordTravelRefresh,
+  resolveTravelRefreshPlan,
+  travelRefreshRequestFields,
+  travelRefreshTrips,
+  travelTripKey,
+  type TravelRefreshPlanInput,
+} from "@cadence/core/services/travel-refresh-policy";
 
 const now = Temporal.Instant.from("2026-09-22T08:00:00Z");
 const source = {
@@ -58,6 +70,7 @@ beforeEach(() => {
   mocks.historySessions.mockResolvedValue([]);
   mocks.timezone.mockResolvedValue("America/New_York");
   mocks.weather.mockResolvedValue(null);
+  mocks.monthSpend.mockResolvedValue(0);
 });
 
 const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
@@ -717,3 +730,152 @@ function strings(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(strings);
   return value && typeof value === "object" ? [...Object.keys(value), ...Object.values(value).flatMap(strings)] : [];
 }
+
+describe("trip refresh plan through the service (Ticket 267)", () => {
+  const device = { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T08:00:00Z" };
+  const cached = (texts: readonly string[]) => mocks.readPlaces.mockResolvedValue(texts.map((text) =>
+    ({ textKey: keyOf(text), outcome: "resolved", placeId: `place:${text}`, lookedUpAt: "2026-09-01T00:00:00Z" })));
+  /** Habit 10:00–10:30, then Gym 15:00–16:00, then home: three legs. */
+  const twoStops = () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, behaviors: [source.behaviors[0]!,
+      { id: "behavior-3", whereKind: "place" as const, locationText: "3 Gym St", updatedAt: "2026-09-20T00:00:00Z" }] });
+    mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: 30 }, { id: "behavior-3", default_duration_minutes: 60 }]);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === day.startLocalDate
+      ? [occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"), occurrence("occurrence-3", "behavior-3", "2026-09-22T15:00:00Z")]
+      : []);
+    cached(["2 Habit St", "3 Gym St", "1 Base St"]);
+  };
+  const routedLegs = () => mocks.route.mock.calls.reduce((count, [input]) => count + input.routes.length, 0);
+  const providerCalls = () => routedLegs() + mocks.geocode.mock.calls.length;
+
+  it("reports the month's budget, and omits it when the read fails", async () => {
+    located();
+    mocks.monthSpend.mockResolvedValue(4_100_000);
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(mocks.monthSpend).toHaveBeenCalledWith(caller.client, "owner", "2026-09-01");
+    expect(result.budget).toEqual({ reservedMicrodollars: 4_100_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-10-01T04:00:00Z" });
+    located();
+    mocks.monthSpend.mockRejectedValue(new Error("unavailable"));
+    expect(await refreshTravelRoutes(caller, day, config, now)).not.toHaveProperty("budget");
+  });
+
+  it("routes only the named trip's legs and signs no conclusions for it", async () => {
+    twoStops();
+    const onward = { role: "onward", originRef: "occurrence-1", destinationRef: "occurrence-3" };
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day", device, trips: [onward] }, config, now, undefined, "test-only-conclusions-secret-0123456789");
+    expect(mocks.route.mock.calls[0]![0].routes).toHaveLength(1);
+    expect(result.evidence?.legs.map((entry) => [entry.leg.role, entry.state, entry.reason])).toEqual([
+      ["outbound", "unavailable", "outside_route_window"], ["onward", "current", null], ["return", "unavailable", "outside_route_window"],
+    ]);
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("asserts provider calls for each trigger", async () => {
+    // Every place is already stored, so each call below is a route leg. Transit doubles each leg in the provider.
+    const counts: Record<string, number> = {};
+    const timezone = "America/New_York";
+    const at = (time: string) => `2026-09-22T${time}:00Z`;
+    const homeSample = { latitude: device.latitude, longitude: device.longitude, accuracyMeters: device.accuracyMeters };
+    const base: TravelRefreshPlanInput = { now: at("08:00"), timezone, timelineFocused: true, sourceKey: "s1", device: homeSample, trips: [], budget: null, last: null };
+    const run = async (label: string, input: TravelRefreshPlanInput) => {
+      twoStops();
+      vi.clearAllMocks();
+      twoStops();
+      mocks.monthSpend.mockResolvedValue(0);
+      mocks.spend.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, resetsAt: null });
+      mocks.route.mockImplementation(routeAll);
+      mocks.historySessions.mockResolvedValue([]);
+      mocks.weather.mockResolvedValue(null);
+      const plan = resolveTravelRefreshPlan(input);
+      if (plan.request) await refreshTravelRoutes(caller, { ...day, device, ...travelRefreshRequestFields(plan.request) }, config, Temporal.Instant.from(input.now));
+      counts[label] = providerCalls();
+      return plan;
+    };
+
+    // First open routes the whole day, and its evidence gives every trip a leave time.
+    await run("first open", base);
+    const evidence = (await refreshTravelRoutes(caller, { ...day, scope: "day", device }, config, now)).evidence!;
+    const stops = [{ ref: "occurrence-1", startAt: at("10:00") }, { ref: "occurrence-3", startAt: at("15:00") }];
+    const onwardKey = travelTripKey({ role: "onward", originRef: "occurrence-1", destinationRef: "occurrence-3" });
+    const trips = travelRefreshTrips({ legs: evidence.legs, stops, arrivalBufferSeconds: 600 });
+    const last = recordTravelRefresh(null, { kind: "day", trigger: "first_open" }, base);
+    const onward = { role: "onward" as const, originRef: "occurrence-1", destinationRef: "occurrence-3" };
+    // The test's fixed estimate gives the outbound and onward trips leave times; the trip home's fixture is rejected.
+    expect(trips.map((trip) => [trip.key, trip.leaveAt])).toEqual([["outbound::occurrence-1", at("09:50")], [onwardKey, at("10:30")]]);
+    const onwardOnly = [{ ...onward, key: onwardKey, leaveAt: at("14:20"), checkedAt: at("08:00"), fallbackAt: null }];
+
+    await run("open with a last estimate", { ...base, now: at("09:00"), trips: onwardOnly, last });
+    await run("3-hour refresh", { ...base, now: at("11:20"), trips: onwardOnly, last });
+    await run("30-minute refresh", { ...base, now: at("13:50"), trips: onwardOnly,
+      last: recordTravelRefresh(last, { kind: "trip", trigger: "trip_3h", trips: [onward] }, { ...base, now: at("11:20") }) });
+    await run("fallback", { ...base, now: at("11:30"), trips: [{ ...onward, key: onwardKey, leaveAt: null, checkedAt: null, fallbackAt: at("11:30") }], last });
+    await run("source change", { ...base, now: at("09:00"), sourceKey: "s2", trips: onwardOnly, last });
+    await run("movement", { ...base, now: at("09:00"), device: { ...homeSample, latitude: 40.01 }, trips: onwardOnly, last });
+    await run("Refresh travel", { ...base, now: at("09:00"), refreshTravel: true, trips: onwardOnly, last });
+    const budget = { reservedMicrodollars: 4_000_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-10-01T04:00:00Z" };
+    await run("budget at 80%, 3-hour refresh", { ...base, now: at("11:20"), trips: onwardOnly, last, budget });
+    await run("budget at 80%, first open", { ...base, budget });
+    await run("budget at 80%, Refresh travel", { ...base, now: at("09:00"), refreshTravel: true, trips: onwardOnly, last, budget });
+
+    expect(counts).toEqual({
+      "first open": 3,
+      "open with a last estimate": 0,
+      "3-hour refresh": 1,
+      "30-minute refresh": 1,
+      "fallback": 1,
+      "source change": 3,
+      "movement": 3,
+      "Refresh travel": 3,
+      "budget at 80%, 3-hour refresh": 0,
+      "budget at 80%, first open": 0,
+      "budget at 80%, Refresh travel": 3,
+    });
+  });
+
+  it("gives a trip longer than three hours its leave time on the first open, before it is due (C3)", async () => {
+    twoStops();
+    const long = { durationSeconds: 5 * 3600, departureAt: "2026-09-22T09:40:00Z", arrivalAt: "2026-09-22T14:40:00Z", warnings: [], fallback: false,
+      attribution: "Google Maps", observedAt: now.toString(), expiresAt: "2026-09-22T08:05:00Z" };
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string }[] }) => routes.map((route) => ({ id: route.id, estimate: long, failure: null })));
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day", device }, config, now);
+    const onward = result.evidence!.legs.find((entry) => entry.leg.role === "onward")!;
+    expect(onward.estimate).not.toBeNull();
+    expect(Temporal.Instant.compare(now, Temporal.Instant.from(onward.estimate!.departureAt))).toBeLessThan(0);
+  });
+
+  it("routes no trip home from a stop at Home, and the day is still complete", async () => {
+    located();
+    mocks.source.mockResolvedValue({ ...source, behaviors: [{ id: "behavior-1", whereKind: "home", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    cached(["1 Base St"]);
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day", device }, config, now);
+    expect(routedLegs()).toBe(1);
+    expect(result.evidence?.legs.map((entry) => entry.leg.role)).toEqual(["outbound"]);
+    expect(result.evidence?.completeTrip).toBe(true);
+    // Free again when the Home stop ends, as the trip home from Home used to say.
+    expect(result.evidence?.finalAvailabilityAt).toBe("2026-09-22T10:30:00Z");
+
+    vi.clearAllMocks();
+    located();
+    mocks.source.mockResolvedValue({ ...source, behaviors: [{ id: "behavior-1", whereKind: "home", locationText: null, updatedAt: "2026-09-20T00:00:00Z" }] });
+    cached(["1 Base St"]);
+    mocks.monthSpend.mockResolvedValue(0);
+    const atHome = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    expect(mocks.route).not.toHaveBeenCalled();
+    expect(atHome.evidence).toMatchObject({ legs: [], unknownLegs: [], completeTrip: true, finalAvailabilityAt: "2026-09-22T10:30:00Z" });
+  });
+
+  it("routes no leg that could leave only after its destination ends", async () => {
+    // Habit 10:00–11:00, then Gym 10:30–10:40: the trip to Gym is ready at 11:00, after Gym ends.
+    twoStops();
+    mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: 60 }, { id: "behavior-3", default_duration_minutes: 10 }]);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === day.startLocalDate
+      ? [occurrence("occurrence-1", "behavior-1", "2026-09-22T10:00:00Z"), occurrence("occurrence-3", "behavior-3", "2026-09-22T10:30:00Z")]
+      : []);
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day", device }, config, now);
+    expect(routedLegs()).toBe(2);
+    expect(mocks.route.mock.calls[0]![0].routes.map((route: { id: string }) => result.evidence!.legs.find((entry) => entry.leg.id === route.id)?.leg.role))
+      .toEqual(["outbound", "return"]);
+    expect(result.evidence?.legs.find((entry) => entry.leg.role === "onward")).toMatchObject({ state: "unavailable", estimate: null, reason: TRAVEL_LEG_READY_AFTER_END });
+  });
+});

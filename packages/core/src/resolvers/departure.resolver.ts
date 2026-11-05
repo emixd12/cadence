@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { departureDetailPhrase, departureLinePhrase, departurePausedPhrase, departurePhraseContext } from "../services/departure-phrases";
 import type { DeparturePhraseContext } from "../services/departure-phrases";
-import { TRAVEL_LEG_OUTSIDE_WINDOW, travelEstimateAppearsAt } from "../services/travel-refresh-policy";
+import { TRAVEL_LEG_OUTSIDE_WINDOW, travelEstimateAppearsAt, travelTripKey } from "../services/travel-refresh-policy";
 import type { DepartureModel, DepartureModelInput, DepartureStop, DepartureTrip } from "../types/departure";
 import type { TravelResolvedLegEvidence, TravelUnknownLeg } from "../types/travel";
 import { travelLegsAfterLateArrival } from "./travel.resolver";
@@ -186,7 +186,7 @@ function endOfLocalDay(at: Temporal.Instant, timezone: string): Temporal.Instant
 }
 
 function baseDraft(role: Draft["role"], originRef: string | null, destinationRef: string | null, legId: string | null): Draft {
-  return { key: `${role}:${originRef ?? ""}:${destinationRef ?? ""}`, legId, role, originRef, destinationRef,
+  return { key: travelTripKey({ role, originRef, destinationRef }), legId, role, originRef, destinationRef,
     mode: null, fromHome: false, state: "no_route", lateBasis: null, freshness: null, checkedAt: null, leaveAt: null, arriveAt: null,
     getReadyAt: null, minutesUntilLeave: null, appearsAt: null, timeUnknownCause: null, blockingRef: null, blockingLabel: null, action: null };
 }

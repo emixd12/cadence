@@ -1,8 +1,11 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import type { TravelPlannedLeg } from "../types/travel";
+import type { TravelLegRole, TravelPlannedLeg, TravelResolvedLegEvidence } from "../types/travel";
 
-/** Ticket 214: a Timeline refresh routes only legs that depart, or must arrive, within this window. */
+/**
+ * Ticket 214: a `timeline` scope request, which released clients still send, routes only legs
+ * that fall due within this window. Ticket 267's refresh plan sends `day` and trip requests instead.
+ */
 export const TRAVEL_ROUTE_WINDOW_SECONDS = 3 * 60 * 60;
 /** A route estimate expires this long after it was checked. The provider adapter caps its expiry here. */
 export const TRAVEL_ESTIMATE_LIFETIME_SECONDS = 5 * 60;
@@ -14,6 +17,17 @@ export const TRAVEL_PLACE_RESOLVED_REUSE_SECONDS = 365 * 24 * 60 * 60;
 export const TRAVEL_PLACE_UNRESOLVED_REUSE_SECONDS = 30 * 24 * 60 * 60;
 /** Unavailable reason for a leg left for a later refresh; it is never zero travel. */
 export const TRAVEL_LEG_OUTSIDE_WINDOW = "outside_route_window";
+/**
+ * Ticket 267: unavailable reason for a leg that could leave only at or after its destination
+ * ends. The server passes it to the resolver without a route call. The text is the resolver's own.
+ */
+export const TRAVEL_LEG_READY_AFTER_END = "Route is ready only after its destination ends.";
+/** Ticket 267: a trip with a known leave time is refreshed once within this long of it... */
+export const TRAVEL_TRIP_FIRST_REFRESH_SECONDS = 3 * 60 * 60;
+/** ...and once more within this long of it. */
+export const TRAVEL_TRIP_FINAL_REFRESH_SECONDS = 30 * 60;
+/** Ticket 267: at this share of the monthly ceiling, automatic refreshes stop. Refresh travel continues. */
+export const TRAVEL_BUDGET_AUTOMATIC_PAUSE_SHARE = 0.8;
 
 export type TravelPlaceLookupOutcome = "resolved" | "unresolved" | "ambiguous";
 
@@ -33,27 +47,39 @@ export function travelPlaceLookupReusable(
   return age < (entry.outcome === "resolved" ? TRAVEL_PLACE_RESOLVED_REUSE_SECONDS : TRAVEL_PLACE_UNRESOLVED_REUSE_SECONDS);
 }
 
-/** Splits planned legs into those to route now and those left for a later refresh. */
-export function partitionTravelLegsByWindow<T extends Pick<TravelPlannedLeg, "id" | "request">>(
+/**
+ * Splits planned legs into those to route now and those left for a later refresh, for a
+ * `timeline` scope request. A leg is due once its estimate's appearance time has come.
+ */
+export function partitionTravelLegsByWindow<T extends Pick<TravelPlannedLeg, "id" | "role" | "readyAt" | "request">>(
   legs: readonly T[],
   now: Temporal.Instant,
   windowSeconds = TRAVEL_ROUTE_WINDOW_SECONDS,
 ): Readonly<{ due: T[]; later: T[] }> {
-  const limit = now.add({ seconds: windowSeconds });
   const due: T[] = [];
   const later: T[] = [];
   for (const leg of legs) {
-    // A depart-at leg is due by its departure; an arrive-by leg by its arrival target.
-    const at = Temporal.Instant.from(leg.request.timing.at);
-    (Temporal.Instant.compare(at, limit) <= 0 ? due : later).push(leg);
+    const at = Temporal.Instant.from(legDueAnchor(leg)).subtract({ seconds: windowSeconds });
+    (Temporal.Instant.compare(at, now) <= 0 ? due : later).push(leg);
   }
   return { due, later };
 }
 
 /**
- * Ticket 265: when a leg left for a later refresh gets its estimate. Today's window counts
- * back from the arrival target, or from the departure of the trip home, as above.
- * Ticket 267 changes the rule, here only. Null when the destination's start is unknown.
+ * A depart-at leg counts back from its departure and an arrive-by leg from its arrival target.
+ * An onward leg also counts back from its ready time, the earliest it can leave, so a trip
+ * longer than the window still gets its leave time before it is due (Ticket 267, C3).
+ */
+function legDueAnchor(leg: Pick<TravelPlannedLeg, "role" | "readyAt" | "request">): string {
+  const at = leg.request.timing.at;
+  if (leg.role !== "onward") return at;
+  return Temporal.Instant.compare(Temporal.Instant.from(leg.readyAt), Temporal.Instant.from(at)) < 0 ? leg.readyAt : at;
+}
+
+/**
+ * Ticket 265: when a leg with no estimate gets one. Ticket 267: this is both the `timeline`
+ * scope window above and the refresh plan's fallback for a trip with no estimate, so
+ * "Leave time appears by" stays true. Null when the destination's start is unknown.
  */
 export function travelEstimateAppearsAt(input: Readonly<{
   role: TravelPlannedLeg["role"];
@@ -63,7 +89,201 @@ export function travelEstimateAppearsAt(input: Readonly<{
 }>, windowSeconds = TRAVEL_ROUTE_WINDOW_SECONDS): string | null {
   if (input.role === "return") return Temporal.Instant.from(input.readyAt).subtract({ seconds: windowSeconds }).toString();
   if (!input.destinationStartAt) return null;
-  return Temporal.Instant.from(input.destinationStartAt).subtract({ seconds: Math.ceil(input.arrivalBufferSeconds + windowSeconds) }).toString();
+  const arrivalTarget = Temporal.Instant.from(input.destinationStartAt).subtract({ seconds: Math.ceil(input.arrivalBufferSeconds) });
+  return Temporal.Instant.from(legDueAnchor({ role: input.role, readyAt: input.readyAt,
+    request: { timing: { kind: "arrive_by", at: arrivalTarget.toString() } } as TravelPlannedLeg["request"] }))
+    .subtract({ seconds: windowSeconds }).toString();
+}
+
+/** Ticket 267: one trip, by role and commitment refs. Leg IDs change with each device sample. */
+export type TravelTripRef = Readonly<{ role: TravelLegRole; originRef: string | null; destinationRef: string | null }>;
+
+/** The trip's key, as the departure model names it. */
+export function travelTripKey(trip: TravelTripRef): string {
+  return `${trip.role}:${trip.originRef ?? ""}:${trip.destinationRef ?? ""}`;
+}
+
+/**
+ * True when a planned leg is the requested trip: the trip to the same stop, or the trip home
+ * from the same stop. An onward trip becomes an outbound one once its earlier stop has
+ * passed, and is still the trip asked for.
+ */
+export function travelTripMatches(
+  trip: TravelTripRef,
+  leg: Readonly<{ role: TravelLegRole; originCommitmentRef: string | null; destinationCommitmentRef: string | null }>,
+): boolean {
+  if (trip.role === "return" || leg.role === "return") return trip.role === leg.role && trip.originRef === leg.originCommitmentRef;
+  return trip.destinationRef !== null && trip.destinationRef === leg.destinationCommitmentRef;
+}
+
+/** Ticket 267: the month's reserved spend, as the route response reports it. */
+export type TravelBudgetState = Readonly<{
+  reservedMicrodollars: number;
+  ceilingMicrodollars: number;
+  /** The start of the next local month, when the budget renews. */
+  resetsAt: string;
+}>;
+
+/** True from 80% of the ceiling until the budget renews. The ceiling itself stays in the database. */
+export function travelBudgetPausesAutomatic(budget: TravelBudgetState | null | undefined, now: Temporal.Instant): boolean {
+  if (!budget || budget.ceilingMicrodollars <= 0) return false;
+  if (Temporal.Instant.compare(now, Temporal.Instant.from(budget.resetsAt)) >= 0) return false;
+  return budget.reservedMicrodollars >= budget.ceilingMicrodollars * TRAVEL_BUDGET_AUTOMATIC_PAUSE_SHARE;
+}
+
+/** One trip as the refresh plan sees it. */
+export type TravelRefreshTrip = TravelTripRef & Readonly<{
+  key: string;
+  /** The leave time from the last estimate, current or not. */
+  leaveAt: string | null;
+  /** When that estimate was checked. */
+  checkedAt: string | null;
+  /** For a trip with no estimate that a later request will route: when it falls due. */
+  fallbackAt: string | null;
+}>;
+
+/**
+ * Ticket 267: the trips a refresh plan watches, from the latest evidence the client keeps.
+ * A trip with no estimate is watched only when it was left for later. A trip that failed
+ * for another reason waits for Refresh travel or a whole-day trigger.
+ */
+export function travelRefreshTrips(input: Readonly<{
+  legs: readonly Pick<TravelResolvedLegEvidence, "leg" | "estimate" | "reason" | "weather">[];
+  stops: readonly Readonly<{ ref: string; startAt: string }>[];
+  arrivalBufferSeconds: number;
+}>): TravelRefreshTrip[] {
+  const starts = new Map(input.stops.map((stop) => [stop.ref, stop.startAt]));
+  return input.legs.flatMap(({ leg, estimate, reason, weather }): TravelRefreshTrip[] => {
+    const ref: TravelTripRef = { role: leg.role, originRef: leg.originCommitmentRef, destinationRef: leg.destinationCommitmentRef };
+    const key = travelTripKey(ref);
+    if (estimate) return [{ ...ref, key, leaveAt: weather?.departureAt ?? estimate.departureAt, checkedAt: estimate.observedAt, fallbackAt: null }];
+    if (reason !== TRAVEL_LEG_OUTSIDE_WINDOW) return [];
+    const fallbackAt = travelEstimateAppearsAt({ role: leg.role, readyAt: leg.readyAt,
+      destinationStartAt: starts.get(leg.destinationCommitmentRef ?? "") ?? null, arrivalBufferSeconds: input.arrivalBufferSeconds });
+    return fallbackAt ? [{ ...ref, key, leaveAt: null, checkedAt: null, fallbackAt }] : [];
+  });
+}
+
+/** What the client remembers about its last requests. Display data stays out of it. */
+export type TravelRefreshState = Readonly<{
+  /** The local date of the last whole-day request. */
+  localDate: string;
+  /** The client's source key at that request; a different key is a source change. */
+  sourceKey: string | null;
+  /** The device sample that request used. */
+  device: TravelDeviceSample | null;
+  /** Trip key to the time a trip request for it was last sent, today. */
+  tripAttempts: Readonly<Record<string, string>>;
+}>;
+
+export type TravelRefreshDayTrigger = "refresh_travel" | "first_open" | "source_changed" | "device_moved";
+export type TravelRefreshTripTrigger = "trip_3h" | "trip_30m" | "no_estimate";
+export type TravelRefreshRequest =
+  | Readonly<{ kind: "day"; trigger: TravelRefreshDayTrigger }>
+  | Readonly<{ kind: "trip"; trigger: TravelRefreshTripTrigger; trips: readonly TravelTripRef[] }>;
+
+export type TravelRefreshPlan = Readonly<{
+  /** The request due now, or null. */
+  request: TravelRefreshRequest | null;
+  /** When the next automatic request falls due, if nothing else changes. Re-plan then. */
+  nextDueAt: string | null;
+  /** At 80% of the monthly ceiling until it renews. Only Refresh travel requests. */
+  automaticPaused: boolean;
+}>;
+
+export type TravelRefreshPlanInput = Readonly<{
+  now: string;
+  timezone: string;
+  /** The user chose Refresh travel. It always routes the whole day, whatever the budget state. */
+  refreshTravel?: boolean;
+  /** The Timeline is visible and its window focused. Only then do trip refreshes fall due. */
+  timelineFocused: boolean;
+  /** The client's key for the route sources (settings, Calendar, Behaviors, corrections). */
+  sourceKey: string | null;
+  device: TravelDeviceSample | null;
+  trips: readonly TravelRefreshTrip[];
+  budget: TravelBudgetState | null;
+  last: TravelRefreshState | null;
+}>;
+
+/**
+ * Ticket 267 (decision D1): which travel request is due now, if any, and when the next one
+ * falls due. Pure; `now` is injected. In order:
+ *
+ * 1. Refresh travel routes the whole day.
+ * 2. At 80% of the monthly ceiling nothing else requests.
+ * 3. The first open of a local date routes the whole day, with or without the Daily Brief.
+ * 4. A source change, or the device moving more than 500 m, routes the whole day.
+ * 5. While the Timeline is visible and focused, a trip with a known leave time is refreshed
+ *    once within 3 hours of it and once within 30 minutes. A trip with no estimate is
+ *    requested once its estimate's appearance time has come. All trips due now share one request.
+ *
+ * An open with a last estimate and none of these triggers requests nothing.
+ */
+export function resolveTravelRefreshPlan(input: TravelRefreshPlanInput): TravelRefreshPlan {
+  const now = Temporal.Instant.from(input.now);
+  const today = now.toZonedDateTimeISO(input.timezone).toPlainDate();
+  const nextMidnight = today.add({ days: 1 }).toZonedDateTime({ timeZone: input.timezone }).toInstant();
+  const automaticPaused = travelBudgetPausesAutomatic(input.budget, now);
+  if (input.refreshTravel) return { request: { kind: "day", trigger: "refresh_travel" }, nextDueAt: null, automaticPaused };
+  if (automaticPaused) return { request: null, nextDueAt: input.budget!.resetsAt, automaticPaused };
+
+  const last = input.last;
+  const day = (trigger: TravelRefreshDayTrigger): TravelRefreshPlan => ({ request: { kind: "day", trigger }, nextDueAt: null, automaticPaused });
+  if (!last || last.localDate !== today.toString()) return day("first_open");
+  if (input.sourceKey !== last.sourceKey) return day("source_changed");
+  if (travelDeviceMoved(last.device, input.device)) return day("device_moved");
+
+  let next = nextMidnight;
+  const later = (at: Temporal.Instant) => { if (Temporal.Instant.compare(at, next) < 0) next = at; };
+  const due = new Map<string, Readonly<{ trip: TravelTripRef; trigger: TravelRefreshTripTrigger }>>();
+  for (const trip of input.trips) {
+    const attempt = last.tripAttempts[trip.key] ?? null;
+    const touchedSince = (at: Temporal.Instant) => [trip.checkedAt, attempt].some((value) => !!value && Temporal.Instant.compare(Temporal.Instant.from(value), at) >= 0);
+    if (trip.leaveAt) {
+      const leaveAt = Temporal.Instant.from(trip.leaveAt);
+      if (Temporal.Instant.compare(now, leaveAt) >= 0) continue;
+      const first = leaveAt.subtract({ seconds: TRAVEL_TRIP_FIRST_REFRESH_SECONDS });
+      const final = leaveAt.subtract({ seconds: TRAVEL_TRIP_FINAL_REFRESH_SECONDS });
+      if (Temporal.Instant.compare(now, final) >= 0) { if (!touchedSince(final)) due.set(trip.key, { trip, trigger: "trip_30m" }); }
+      else if (Temporal.Instant.compare(now, first) >= 0) { if (!touchedSince(first)) due.set(trip.key, { trip, trigger: "trip_3h" }); later(final); }
+      else later(first);
+    } else if (trip.fallbackAt) {
+      const fallbackAt = Temporal.Instant.from(trip.fallbackAt);
+      if (Temporal.Instant.compare(now, fallbackAt) < 0) later(fallbackAt);
+      else if (!touchedSince(fallbackAt)) due.set(trip.key, { trip, trigger: "no_estimate" });
+    }
+  }
+  if (!input.timelineFocused || !due.size) {
+    // Unfocused, a due trip waits for focus; the plan is asked again then.
+    return { request: null, nextDueAt: next.toString(), automaticPaused };
+  }
+  const triggers = [...due.values()].map((entry) => entry.trigger);
+  const trigger = triggers.includes("trip_30m") ? "trip_30m" : triggers.includes("trip_3h") ? "trip_3h" : "no_estimate";
+  const trips = [...due.values()].map(({ trip }) => ({ role: trip.role, originRef: trip.originRef, destinationRef: trip.destinationRef }));
+  return { request: { kind: "trip", trigger, trips }, nextDueAt: next.toString(), automaticPaused };
+}
+
+/**
+ * The state to keep after sending a request. Record a whole-day request once it returns a
+ * route response, so a failed one is tried again on the next open. Record a trip request
+ * when it is sent, so a failing trip is not requested again before its next threshold.
+ */
+export function recordTravelRefresh(
+  last: TravelRefreshState | null,
+  request: TravelRefreshRequest,
+  input: Pick<TravelRefreshPlanInput, "now" | "timezone" | "sourceKey" | "device">,
+): TravelRefreshState {
+  const today = Temporal.Instant.from(input.now).toZonedDateTimeISO(input.timezone).toPlainDate().toString();
+  const attempts = last?.localDate === today ? last.tripAttempts : {};
+  if (request.kind === "day") return { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: attempts };
+  const base = last?.localDate === today ? last : { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: {} };
+  return { ...base, tripAttempts: { ...attempts, ...Object.fromEntries(request.trips.map((trip) => [travelTripKey(trip), input.now])) } };
+}
+
+/** The route request fields for a planned request. Both kinds use the whole-day scope. */
+export function travelRefreshRequestFields(request: TravelRefreshRequest): Readonly<{ scope: "day"; trips?: readonly TravelTripRef[] }> {
+  return request.kind === "trip" ? { scope: "day", trips: request.trips } : { scope: "day" };
 }
 
 export type TravelDeviceSample = Readonly<{ latitude: number; longitude: number; accuracyMeters: number }>;

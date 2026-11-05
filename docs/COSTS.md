@@ -151,7 +151,9 @@ accepted the model-input risk under a conclusions-only regime (`docs/LEGAL.md` L
   code makes two.
 
 These describe today's model. Owner decision D1 replaces the three-hour and focus rules
-when Tickets 267 and 268 ship; see "Travel advisory revamp usage model" below.
+when Tickets 267 and 268 ship; see "Travel advisory revamp usage model" below. Ticket 267
+puts the refresh plan in source; clients follow it once Ticket 268 ships. Released clients
+keep the three-hour `timeline` scope until they update.
 
 | Assumption | Light | Typical | Heavy |
 | --- | --- | --- | --- |
@@ -176,23 +178,52 @@ today's model until the tickets ship.
 | --- | --- | --- | --- |
 | Today's model, route legs | 40 | 240 | 650 |
 | Today's model, cost with lookups | US$0.23–0.37 | US$1.30–2.14 | US$3.45–5.73 |
-| Whole-day pass, legs | 16 | 60 | 130 |
-| Opens that still route, legs | 4 | 20 | 52 |
-| Near-departure refreshes, legs | 8–16 | 40–80 | 104–208 |
+| First open of the day, whole-day pass, legs | 16 | 60 | 130 |
+| Open with a last estimate, legs | 0 | 0 | 0 |
+| Source change, movement over 500 m or Refresh travel, legs | 4 | 20 | 52 |
+| 3-hour and 30-minute trip refreshes, legs | 16–32 | 60–120 | 130–260 |
+| Trip with no estimate, fallback, legs | 0 | 0 | 0 |
 | Reminder job, legs | 16 | 80 | 208 |
-| **Proposed, route legs** | **44–52** | **200–240** | **494–598** |
-| **Proposed, cost with lookups** | **US$0.25–0.47** | **US$1.10–2.14** | **US$2.67–5.28** |
+| **Proposed, route legs** | **52–68** | **220–280** | **520–650** |
+| **Proposed, cost with lookups** | **US$0.29–0.60** | **US$1.20–2.48** | **US$2.80–5.73** |
 
-Showing last estimates removes most re-routing on opens, which roughly offsets the new
-refreshes and reminders. Re-routing on Timeline opens is 180 of the 240 typical legs today.
+Ticket 267 replaced the earlier draft rows with the refresh plan's counts, November 5,
+2026. All rows stay assumed. Showing last estimates removes re-routing on opens, which
+is 180 of the 240 typical legs today. The trip refreshes and reminders spend most of it
+again. The heavy upper bound reaches today's figure, but automatic refreshes stop at
+US$4.00, 80% of the ceiling, so automatic spend cannot reach it.
+
+Calls per trigger, from `resolveTravelRefreshPlan` in
+`packages/core/src/services/travel-refresh-policy.ts` and the hosted route. Transit makes
+two provider calls per leg.
+
+| Trigger | Request | Route legs |
+| --- | --- | --- |
+| First open of a local date, with or without the Daily Brief | whole day | every planned leg, at most eight |
+| Open with a last estimate and no change | none | 0 |
+| Source change, or the device moved more than 500 m | whole day | every planned leg |
+| Within 3 hours of a known leave time, once, Timeline visible and focused | that trip | 1 |
+| Within 30 minutes of a known leave time, once, same condition | that trip | 1 |
+| Trip with no estimate, once its appearance time comes | that trip | 1 |
+| Refresh travel | whole day | every planned leg |
+| At 80% of the monthly ceiling | none, except Refresh travel | 0 |
+| Trip home from a last stop at Home | not planned | 0 |
+| Leg ready only after its destination ends | not routed | 0 |
 
 Assumptions and limits:
 
-- The ranges cover one or two near-departure refreshes per trip.
-- Whole-day pass: 2, 3 and 5 legs per travel day.
-- Opens that still route: 0.5, 1 and 2 legs per travel day.
-- Outbound trips: 1, 2 and 4 per travel day.
-- Near-departure refreshes: one or two refreshes per trip.
+- Travel days per month: 8, 20 and 26. Planned legs per travel day: 2, 3 and 5.
+- Every planned trip with a known leave time gets one or two trip refreshes. A check
+  already within 3 hours, or within 30 minutes, of leaving counts as that refresh, so
+  a trip checked late gets fewer. The lower bound is one per trip. The upper bound
+  assumes the Timeline is visible and focused at both times.
+- Source changes, movement and Refresh travel together: 0.5, 1 and 2 legs per travel day.
+- Fallback: none assumed, because the whole-day pass gives every trip an estimate. It
+  routes only a trip that has none, once.
+- Lookups: 5, 20 and 40 new places per month at US$0.005. Cost per leg US$0.005, and
+  US$0.0085 for the driving upper bound.
+- Not routing a trip home from Home, or a leg ready only after its destination ends,
+  saves one call each, and two by transit. Not counted in the table.
 - Reminder job: two route calls per trip, with every trip's account opted in.
 - Not counted yet: tomorrow's first trip (Ticket 282) and Outlook and iCloud legs
   (Ticket 283). Each ticket adds its own count.

@@ -665,6 +665,9 @@ cite has not changed.
 - **Update needed:** say that estimates stay in browser session storage until the session
   ends or the listed events clear them. Describe the whole-day pass, the near-departure
   refresh, and the "Last estimate" label.
+- **Ticket 267 note, November 5, 2026:** the plan is in source. The quoted words did not
+  change. The guide should also say that at 80% of the month's travel budget Cadence stops
+  refreshing on its own, and Refresh travel still works.
 - **Status:** logged.
 
 ## P-019: Outlook and iCloud event locations read for routing

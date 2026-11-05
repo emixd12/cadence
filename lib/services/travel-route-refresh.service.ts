@@ -8,13 +8,16 @@ import { rememberedTravelMode, travelHabitBuffers, travelHabitPlaceKey } from "@
 import {
   TRAVEL_ESTIMATE_LIFETIME_SECONDS,
   TRAVEL_LEG_OUTSIDE_WINDOW,
+  TRAVEL_LEG_READY_AFTER_END,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
   travelPlaceLookupReusable,
+  travelTripMatches,
+  type TravelBudgetState,
 } from "@cadence/core/services/travel-refresh-policy";
 import type { BehaviorDurationHistoryOccurrence, BehaviorDurationEstimate } from "@cadence/core/types/day-progress";
 import type { TravelCollisionCandidate, TravelCommitment, TravelEndpoint, TravelPoint } from "@cadence/core/types/travel";
-import { reserveTravelProviderSpend } from "@/lib/db/travelSpend.repo";
+import { TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS, readTravelMonthSpend, reserveTravelProviderSpend } from "@/lib/db/travelSpend.repo";
 import { readTravelPlaceCache, writeTravelPlaceCache, type TravelPlaceCacheRow } from "@/lib/db/travelPlaceCache.repo";
 import { listOccurrencesBetweenLocalDates } from "@/lib/db/occurrences.repo";
 import { getProfileTimezone, listUserBehaviors } from "@/lib/db/behaviors.repo";
@@ -43,6 +46,8 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 218: weather comes from the device position only, through a shared hourly cache.
  * Ticket 219 Option A: with a signing secret, a one-day view also carries a signed token
  * of Cadence's own conclusions for the Daily Brief request to return.
+ * Ticket 267: a request naming trips routes only those trips' legs. A leg that could leave
+ * only after its destination ends is never routed. The response reports the month's budget.
  */
 export async function refreshTravelRoutes(
   caller: CalendarCaller,
@@ -160,9 +165,21 @@ export async function refreshTravelRoutes(
   const weatherRequest = plan.legs.length
     ? readTravelWeather({ device: request.device, config: weatherConfig, now }).catch(() => ({ state: "unavailable" as const }))
     : Promise.resolve(null);
-  const { due, later } = request.scope === "day"
-    ? { due: plan.legs, later: [] }
-    : partitionTravelLegsByWindow(plan.legs, now);
+  const trips = request.trips ?? null;
+  const requested = (leg: (typeof plan.legs)[number]) => !!trips?.some((trip) => travelTripMatches(trip, leg));
+  const { due: candidates, later } = trips
+    ? { due: plan.legs.filter(requested), later: plan.legs.filter((leg) => !requested(leg)) }
+    : request.scope === "day"
+      ? { due: plan.legs, later: [] }
+      : partitionTravelLegsByWindow(plan.legs, now);
+  // The resolver would reject such a leg as unavailable after a paid call, two for transit.
+  const commitmentEnds = new Map(plan.commitments.map((commitment) => [commitment.ref, commitment.endAt]));
+  const readyAfterEnd = (leg: (typeof plan.legs)[number]) => {
+    const endAt = commitmentEnds.get(leg.destinationCommitmentRef ?? "");
+    return !!endAt && compareInstants(leg.readyAt, endAt) >= 0;
+  };
+  const due = candidates.filter((leg) => !readyAfterEnd(leg));
+  const doomed = candidates.filter(readyAfterEnd);
   let routed: Awaited<ReturnType<typeof routeTravelLegs>> = [];
   if (due.length) {
     await beforeFirstProviderCall();
@@ -175,8 +192,10 @@ export async function refreshTravelRoutes(
   const results = [
     ...routed.map((result) => ({ legId: result.id, provenance: provenance.get(result.id)!, estimate: result.estimate, unavailableReason: result.failure?.code })),
     ...later.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_OUTSIDE_WINDOW })),
+    ...doomed.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_READY_AFTER_END })),
   ];
-  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate;
+  // A trip request leaves the other trips unrouted, so its conclusions would not describe the day.
+  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
@@ -186,7 +205,8 @@ export async function refreshTravelRoutes(
       baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
       calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
-  return response(caller.user.id, source, conclusionsToken, { ...projectTravelRouteDisplay(evidence),
+  const budget = await readTravelBudget(caller, timezone, now);
+  return response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now) ||
       (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
         notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
@@ -451,13 +471,28 @@ function collisionCandidates(commitments: readonly TravelCommitment[], occupancy
   return [...candidates, ...occupancy.filter((candidate) => !refs.has(candidate.ref))];
 }
 
+/**
+ * Ticket 267: the month's reserved spend after this request. The ceiling is enforced only by
+ * `reserve_travel_provider_spend`; this readback never reserves. A failed read omits the field.
+ */
+async function readTravelBudget(caller: CalendarCaller, timezone: string, now: Temporal.Instant): Promise<TravelBudgetState | null> {
+  try {
+    const month = now.toZonedDateTimeISO(timezone).toPlainDate().with({ day: 1 });
+    const reserved = await readTravelMonthSpend(caller.client, caller.user.id, month.toString());
+    return { reservedMicrodollars: reserved, ceilingMicrodollars: TRAVEL_OWNER_MONTH_CEILING_MICRODOLLARS,
+      resetsAt: month.add({ months: 1 }).toZonedDateTime({ timeZone: timezone }).toInstant().toString() };
+  } catch {
+    return null;
+  }
+}
+
 function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, conclusionsToken: ((expiresAt: string) => string | null) | null,
-  evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
+  budget: TravelBudgetState | null, evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
   const expiresAt = evidence?.legs.reduce<string | null>((earliest, leg) => !leg.estimate ? earliest : !earliest || leg.estimate.expiresAt < earliest ? leg.estimate.expiresAt : earliest, null)
     ?? Temporal.Now.instant().add({ seconds: TRAVEL_ESTIMATE_LIFETIME_SECONDS }).toString();
   const token = conclusionsToken?.(expiresAt) ?? null;
   return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision,
-    habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}) };
+    habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}), ...(budget ? { budget } : {}) };
 }
 
 /**

@@ -151,7 +151,13 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
   }
 
   const lastStop = priorCommitment ?? overriddenStop;
-  if (lastStop && priorEndpoint) {
+  // Ticket 267: after a last stop at Home there is no trip home, and no route call for one.
+  const endsAtHome = !!lastStop && lastStop === priorCommitment && !!priorEndpoint && chained && !!input.base &&
+    samePlace(priorEndpoint.point, input.base.point);
+  let noReturnFrom: TravelPlanningResult["noReturnFrom"];
+  if (lastStop && endsAtHome) {
+    noReturnFrom = { commitmentRef: lastStop.ref, readyAt: readyAfter(lastStop, input.buffers.exitSeconds) };
+  } else if (lastStop && priorEndpoint) {
     if (!input.base) {
       unknownLegs.push(unknownLeg("return", lastStop.ref, null, "return_base_missing"));
     } else if (legs.length >= maxLegs) {
@@ -186,6 +192,7 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
     commitments,
     legs,
     unknownLegs,
+    ...(noReturnFrom ? { noReturnFrom } : {}),
   };
 }
 
@@ -244,16 +251,22 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
   const collisions = resolveTravelCollisions(segments, input.collisionCandidates);
   const returnLeg = legs.find((entry) => entry.leg.role === "return") ?? null;
   // Ticket 265: a trip that leaves before the previous one arrives makes every later time unreliable.
+  // Ticket 267: a day that ends at Home is complete without a trip home.
+  const noReturn = input.plan.noReturnFrom ?? null;
   const completeTrip = input.plan.unknownLegs.length === 0 &&
-    legs.length > 0 &&
+    (legs.length > 0 || !!noReturn) &&
     legs.every((entry) => entry.state === "current") &&
-    returnLeg?.state === "current" &&
+    (returnLeg ? returnLeg.state === "current" : !!noReturn) &&
     travelLegsAfterLateArrival(legs).size === 0;
-  const finalAvailabilityAt = completeTrip && returnLeg?.state === "current" && returnLeg.estimate
-    ? instant(returnLeg.weather?.arrivalAt ?? returnLeg.estimate.arrivalAt, "Return arrival")
+  // Free again once the last stop's ready time has settled, as the trip home from Home used to say.
+  const finalAvailabilityAt = !completeTrip ? null
+    : returnLeg?.state === "current" && returnLeg.estimate
+      ? instant(returnLeg.weather?.arrivalAt ?? returnLeg.estimate.arrivalAt, "Return arrival")
         .add({ seconds: input.buffers.settlingSeconds })
         .toString()
-    : null;
+      : !returnLeg && noReturn?.readyAt
+        ? instant(noReturn.readyAt, "Route ready time").add({ seconds: input.buffers.settlingSeconds }).toString()
+        : null;
   const modelProjection = input.modelProjection === "enabled" && planRevisionCurrent && grantCurrent
     ? resolveTravelModelProjection(input.plan, legs, segments, input.collisionCandidates, now)
     : null;

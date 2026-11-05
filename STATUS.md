@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 2: Ticket 267 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The trip refresh
+plan and the hosted route changes are in source. No client follows the plan yet: Ticket 268 does.
+
+- `resolveTravelRefreshPlan` in `packages/core/src/services/travel-refresh-policy.ts` says which
+  request is due now (whole day, named trips or none) and when the next falls due. The first open of
+  a local date routes the whole day. An open with a last estimate requests nothing unless a source
+  changed or the device moved more than 500 m. While the Timeline is visible and focused, each trip
+  with a known leave time is refreshed once within 3 hours and once within 30 minutes. A trip with no
+  estimate is requested once at its "appears by" time. Refresh travel always routes the whole day.
+  At 80% of the monthly ceiling nothing else requests.
+- `POST /api/travel/routes` adds fields only: an optional `trips` list routes only those trips' legs,
+  and the response carries `budget` (reserved, ceiling, renewal). The ceiling stays in
+  `reserve_travel_provider_spend`.
+- The route no longer plans a trip home after a last stop at Home, and the day stays complete. It no
+  longer routes a leg ready only after its destination ends.
+- An onward trip falls due 3 hours before it can leave, so a trip longer than 3 hours gets its leave
+  time before it is due (C3). `travelEstimateAppearsAt` applies the same rule.
+- Tests assert route calls for each trigger. `docs/COSTS.md` records the plan's counts, assumed.
+
+Platform impact: web and desktop share the hosted route; released Mac builds ignore the new fields
+and keep the `timeline` scope. Marketing: not applicable. Future mobile: inherits the hosted route.
+Messaging impact: P-018 (note added for the budget pause).
+
 ## Travel advisory revamp Wave 1: Ticket 266 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The bench now shows
@@ -86,7 +111,7 @@ will.
   only the clock past the leave time, the line reads "If you haven't left yet, you'd arrive about
   {time}", because the user may already have left. `lateBasis` tells surfaces which case it is.
 - The time an estimate will appear comes from `travelEstimateAppearsAt` in
-  `travel-refresh-policy.ts`. Ticket 267 changes the rule there.
+  `travel-refresh-policy.ts`. Ticket 267 changed the rule there.
 - Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
   and `finalAvailabilityAt`. A weather margin can no longer move any departure before its ready time;
   it follows the arrival, and the leg is flagged `late` if that passes the arrival target.

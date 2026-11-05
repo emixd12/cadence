@@ -15916,7 +15916,10 @@ tests/day-progress-bench.dom.test.tsx tests/day-progress-timeline.dom.test.tsx`.
 
 ## Ticket 267: Trip refresh plan replaces the 3-hour window
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed. The plan is
+`resolveTravelRefreshPlan`; Ticket 268 makes the clients follow it. The route adds an optional
+`trips` request field and a `budget` response field, plans no trip home after a last stop at
+Home and routes no leg ready only after its destination ends.
 Dependencies: Ticket 264.
 
 Goal: refresh when a trip needs it, not on every Timeline open (decision D1).

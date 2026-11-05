@@ -95,7 +95,8 @@ it("walks the state switch through every state and shows the bench clock", async
 it("renders each preset's sentences in the shared surfaces", async () => {
   await render("fresh");
   expect(gymRow()).toContain("Leave by 9:35 AM from Home · walking, arrive 9:55 AM.");
-  expect(text("Dentist drawer")).toContain("Leave time appears by 10:55 AM.");
+  // Ticket 267: the trip from Gym to Dentist falls due 3 hours before Gym ends.
+  expect(text("Dentist drawer")).toContain("Leave time appears by 8:00 AM.");
   expect(statusLine()).toContain("Travel as of 7:00 AM");
   expect(text("Daily Brief")).toContain("Leave by 9:35 AM for Gym (walking).");
 
@@ -207,7 +208,7 @@ it("keeps the Gym row and the Dentist drawer in agreement about the trip home th
 
 it("makes Refresh travel the first words of a line that asks for it, never repeating them (owner change R1)", async () => {
   await render("fresh");
-  // At 11:30 AM the trip to Dentist was due at 10:55 AM, and nobody refreshed.
+  // At 11:30 AM the trip to Dentist was due at 8:00 AM, and nobody refreshed.
   await moveClock("11:30");
   for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
     const view = text(label);

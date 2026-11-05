@@ -37,11 +37,9 @@ describe("Daily Brief travel facts", () => {
       ],
       route: { state: "available", conclusions: { version: "2.0", travelDay: "yes", calendarEvents: true, trips: [
         { destinationRef: "event_travel_dentist", role: "outbound", mode: "cycling", estimate: "current" },
-        // Stage 2: the remembered mode for Home (Ticket 217) shapes the trips there and back.
+        // Stage 2: the remembered mode for Home (Ticket 217) shapes the trip there.
         { destinationRef: "occurrence_travel_stretch", role: "onward", mode: "walking", estimate: "current" },
-        // Ticket 265: the weather margin follows the onward arrival, which then lands after the
-        // Home stop ends, so the trip home cannot be relied on.
-        { destinationRef: null, role: "return", mode: "walking", estimate: "unknown" },
+        // Ticket 267: the last stop is at Home, so no trip home is planned or routed.
       ] } },
       habits: { rulesVersion: "travel-habit-defaults@1", getReadyMinutes: 15, getReadySource: "learned",
         placeModes: [{ behaviorRef: "behavior_travel_stretch", mode: "walking" }] },
@@ -49,7 +47,6 @@ describe("Daily Brief travel facts", () => {
         { destinationRef: "event_travel_dentist", role: "outbound", mode: "cycling", state: "margin", conditions: ["rain"], marginMinutes: 10,
           suggestion: { instead: "cycling", alternatives: ["transit"] } },
         { destinationRef: "occurrence_travel_stretch", role: "onward", mode: "walking", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
-        { destinationRef: null, role: "return", mode: "walking", state: "clear", conditions: [], marginMinutes: 0, suggestion: null },
       ] },
       placeLabels: { rulesVersion: "where-suggestion-rules@1", periodDays: 60, behaviors: [
         { behaviorRef: "behavior_fixture", total: 10, home: 2, wherePlace: 0, otherSavedPlace: 1, elsewhere: 7 },
@@ -65,7 +62,8 @@ describe("Daily Brief travel facts", () => {
       occurrence_travel_run: ["fits", "travel_known", "event_travel_dentist", "outbound", "before"],
       occurrence_travel_read: ["does_not_fit", "travel_overlap", "event_travel_dentist", "outbound", null],
       occurrence_travel_stretch: ["does_not_fit", "late_arrival", "occurrence_travel_stretch", "onward", null],
-      occurrence_travel_journal: ["fits", "travel_known", null, "return", "after"],
+      // Ticket 267: with no trip home from Home, Journal fits after the trip there.
+      occurrence_travel_journal: ["fits", "travel_known", "occurrence_travel_stretch", "onward", "after"],
     });
     expect(contextControls.travel).toEqual({ route: "available" });
   });

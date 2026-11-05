@@ -60,11 +60,11 @@ export type DepartureBenchState = Readonly<{
 
 export const DEPARTURE_BENCH_STATES: readonly DepartureBenchState[] = [
   { id: "fresh", label: "Fresh estimate", clock: "07:00", checked: "07:00", dentist: "located", gym: "located", expected: "upcoming",
-    description: "Routes were checked just now. The trip to Gym has a leave time; Dentist and the trip home are more than 3 hours away, so their estimates wait." },
+    description: "Routes were checked just now. The trip to Gym has a leave time. The trips to Dentist and home can leave only after Gym, more than 3 hours away, so their estimates wait." },
   { id: "expired", label: "Expired: last estimate", clock: "07:10", checked: "07:00", dentist: "located", gym: "located", expected: "upcoming",
     description: "Ten minutes after the check. Estimates expire after 5 minutes, so the leave time is shown as the last estimate with its check time." },
-  { id: "appears-later", label: "Appears later", clock: "10:15", checked: "10:15", dentist: "located", gym: "located", expected: "appears_later",
-    description: "During Gym. The trip to Dentist is outside the 3-hour window, so it says when its leave time appears." },
+  { id: "appears-later", label: "Appears later", clock: "10:15", checked: "10:15", dentist: "located", gym: "not_located", expected: "appears_later",
+    description: "Gym has no place, so the trip to Dentist starts from Home. It is outside the 3-hour window, so it says when its leave time appears." },
   { id: "soon", label: "Soon", clock: "09:10", checked: "09:10", dentist: "located", gym: "located", expected: "soon",
     description: "Less than 30 minutes before leaving for Gym: a countdown." },
   { id: "leave-now", label: "Leave now", clock: "09:36", checked: "09:35", dentist: "located", gym: "located", expected: "leave_now",
@@ -145,7 +145,10 @@ function walkingEstimate(leg: TravelPlannedLeg, checkedAt: Temporal.Instant): Tr
 
 type Scenario = Readonly<{ dentist: DentistVariant; gym: GymVariant; gymCompletedAt: string | null }>;
 
-/** What the hosted route returns for a check at `checked`: plan, window and 5-minute expiry. */
+/**
+ * What the hosted route returns for a `timeline` check at `checked`: plan, window and 5-minute
+ * expiry. Ticket 267: an onward trip falls due 3 hours before it can leave.
+ */
 function benchEvidence(scenario: Scenario, checked: string): Omit<TravelEvidenceResult, "modelProjection"> {
   const checkedAt = Temporal.Instant.from(instantAt(checked));
   const gymResolvedBeforeCheck = scenario.gymCompletedAt !== null && minutesOf(scenario.gymCompletedAt) <= minutesOf(checked);

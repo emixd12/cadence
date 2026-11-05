@@ -912,6 +912,23 @@ Refresh travel becomes available without a reload.
 The private workbench account-access read shows month-to-date reserved travel spend
 without provider calls or generation.
 
+### Trip refresh plan (Ticket 267)
+
+The hosted route and the core plan are in source. Web and Mac follow the plan once
+Ticket 268 ships; until then they request as described above.
+
+1. The first open of a local date routes the whole day, with or without the Daily Brief.
+2. Later opens with a last estimate request nothing, unless a route source changed or the
+   device moved more than 500 m. Either routes the whole day again.
+3. While the Timeline is visible and focused, each trip with a known leave time is
+   refreshed once within 3 hours of leaving and once within 30 minutes. A check already
+   that close counts. Trips due together share one request, which routes only their legs.
+4. A trip with no estimate is requested once, when its "Leave time appears by" time comes.
+5. Refresh travel always routes the whole day. At 80% of the month's travel budget nothing
+   else requests until the budget renews; the 100% ceiling still refuses every request.
+6. No trip home is routed after a last stop at Home; the day is still complete. A trip that
+   could leave only after its stop ends is not routed and says no route was found.
+
 ### Travel Settings and Behavior Where (Ticket 215)
 
 Travel Settings supersedes steps 1–2 above with three inputs:

@@ -19,3 +19,20 @@ describe("travel route scope", () => {
     expect(() => parseTravelRouteRefreshRequest({ ...day, scope: "unlimited" })).toThrow();
   });
 });
+
+describe("travel route trips (Ticket 267)", () => {
+  const day = { startLocalDate: "2026-11-05", endLocalDate: "2026-11-05", scope: "day" };
+  it("accepts named trips and leaves them out for older clients", () => {
+    expect(parseTravelRouteRefreshRequest(day)).not.toHaveProperty("trips");
+    const trips = [{ role: "onward", originRef: "a", destinationRef: "b" }, { role: "return", originRef: "b", destinationRef: null }];
+    expect(parseTravelRouteRefreshRequest({ ...day, trips }).trips).toEqual(trips);
+  });
+
+  it("rejects malformed or unbounded trips", () => {
+    for (const trips of [[], "a", [{ role: "outbound", originRef: null, destinationRef: null }], [{ role: "return", originRef: null, destinationRef: null }],
+      [{ role: "sideways", originRef: null, destinationRef: "b" }], [{ role: "outbound", originRef: null, destinationRef: "x".repeat(257) }],
+      Array.from({ length: 11 }, (_, index) => ({ role: "outbound", originRef: null, destinationRef: `s${index}` }))]) {
+      expect(() => parseTravelRouteRefreshRequest({ ...day, trips }), JSON.stringify(trips).slice(0, 60)).toThrow("Travel trip");
+    }
+  });
+});
