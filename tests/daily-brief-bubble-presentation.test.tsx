@@ -156,7 +156,7 @@ describe("Daily Brief visible text and quote validation", () => {
     expect(moves.textContent).toContain("New suggested time");
     expect(moves.querySelector("strong")?.textContent).toBe("Walk");
     expect(moves.textContent).toContain("overlaps planned travel.");
-    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist (walking). Includes 15 min for rain.");
+    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist (walking). 15 min added for rain.");
     expect(container.querySelectorAll("[data-weather-credit]")).toHaveLength(1);
     expect(container.querySelector("[data-brief-weather-credit]")).toBeNull();
     expect(container.querySelector(`a[href="${OPEN_METEO_ATTRIBUTION.url}"]`)).not.toBeNull();

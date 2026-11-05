@@ -1,5 +1,28 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 261 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Travel lines now say
+what to do and when, in plain words, from the departure model.
+
+- The Calendar drawer, the Calendar details dialog and the expanded Behavior row show the model's
+  phrase for each remaining trip: "Leave by 1:15 PM · walking, arrive 2:20 PM.", "Head home 4:40 PM ·
+  walking, home by 6:35 PM.", and the last-estimate, expired, changed, no-route and appears-later
+  forms. Lines that need a new estimate end with Refresh travel (`INT-TRAVEL-004`).
+- The weather margin shows once per event as "15 min added for thunderstorms." The Open-Meteo credit
+  keeps its links and drops its second sentence. "Google Maps · checked 8:00 AM." stays.
+- The Behavior overlap label names the trip and its times. The Daily Brief footer reads "Calculated by
+  Cadence · Google Maps · 9:00 AM." and its line drops the mode advice.
+- The travel status line is silent on a day with no trips. Production builds show the unavailable
+  message instead of the provider-review text.
+- Calendar details: plain all-day ranges, "Tentative" or "Cancelled" beside the time, and "Applies to
+  this event until you close the Timeline."
+- One core `departureStops` builder and `behaviorEndAt` rule serve web, Mac and the hosted refresh.
+
+Platform impact: web and desktop through the shared components and core. Marketing: not applicable.
+Future mobile: shared components, checked at 390 px. Messaging impact: P-015 now lists the shipped
+words. Most wording still needs the owner's approval.
+
 ## Travel advisory revamp Wave 1: Ticket 262 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar details

@@ -11,6 +11,9 @@ export type TimelineOccurrenceInput = {
   scheduleSummary: string;
   scheduledFor: string;
   scheduledTimeLabel: string;
+  /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
+  scheduleKind?: "exact" | "range";
+  scheduleEndTime?: string | null;
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;
@@ -36,6 +39,9 @@ export type TimelineOccurrenceView = {
   title: string;
   scheduledFor: string;
   scheduledTimeLabel: string;
+  /** Ticket 261: schedule facts for the Behavior's end. Optional so older views stay valid. */
+  scheduleKind?: "exact" | "range";
+  scheduleEndTime?: string | null;
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;

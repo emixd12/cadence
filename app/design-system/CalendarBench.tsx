@@ -1,5 +1,5 @@
 "use client";
-import { TravelBenchCaption, travelBenchEvidence } from "./TravelBench";
+import { TRAVEL_BENCH_NOW, TravelBenchCaption, travelBenchDeparture, travelBenchEvidence } from "./TravelBench";
 import { Temporal } from "@js-temporal/polyfill";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { resolveTimeline } from "@cadence/core/resolvers/timeline.resolver";
@@ -70,9 +70,16 @@ export function CalendarDetailsBench({ preview = false }: { preview?: boolean })
     <button type="button" className="w-fit" onClick={() => setOpen(true)}>Open synthetic Calendar details</button>
     <DevelopmentBuildProvider value={development}>
       <ExternalEventDetails event={open ? selected.event : null} timezone={snapshot.requestedRange.timezone} onClose={() => setOpen(false)} onDismissAllDay={() => setOpen(false)} onTravelCorrection={() => undefined}
-        travel={selected.travel ? travelBenchEvidence(selected.event.id, true, "thunderstorm") : null} travelMode="walking" />
+        {...benchDialogTravel(selected.travel ? selected.event.id : null)} travelMode="walking" />
     </DevelopmentBuildProvider>
   </div>;
+}
+
+/** Synthetic travel for the dialog, with its departure model. No provider call. */
+function benchDialogTravel(eventId: string | null) {
+  if (!eventId) return { travel: null };
+  const travel = travelBenchEvidence(eventId, true, "thunderstorm");
+  return { travel, departure: travelBenchDeparture(eventId, travel), now: TRAVEL_BENCH_NOW };
 }
 
 const timeline = resolveTimeline({ timezone: snapshot.requestedRange.timezone, now: Temporal.Instant.from(snapshot.fetchedAt), futureDays: 7,

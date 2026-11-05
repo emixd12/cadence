@@ -15536,7 +15536,24 @@ width and 390 px in both modes.
 
 ## Ticket 261: Plain travel timing copy
 
-Status: filed November 4, 2026. Amended the same day. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Filed November 4, 2026, and amended the same day.
+
+Implementation notes:
+
+- `DayProgressTimeline` resolves the departure model once, from the evidence after
+  `resolveTravelAfterDecisions`. The drawer, dialog and expanded Behavior row show
+  `trip.phrase` for the trips of that event; steps that need a place or attendance wait
+  for Ticket 273. A finished trip shows no line.
+- `packages/core/src/services/departure-stops.ts` builds the stops for Calendar events
+  and Behaviors. Its `behaviorEndAt` is now the only Behavior end rule; the hosted route
+  refresh uses it. The Timeline view carries `scheduleKind` and `scheduleEndTime` for it.
+- A trip with no estimate whose stop is missing from the stops lasts no longer than the
+  local day of its plan.
+- Additions from Ticket 262: all-day events read "Nov 1 – Nov 2" (or "Nov 1"), and the
+  dialog shows "Tentative" or "Cancelled" beside the time.
+- The Daily Brief line drops the mode advice in every build; Ticket 272 moves its lines
+  to the model.
 Dependencies: Ticket 265 (departure model) and Ticket 260 (development-only flag). All
 timing phrases come from core.
 

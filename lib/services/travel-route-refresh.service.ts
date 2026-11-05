@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { behaviorEndAt as coreBehaviorEndAt } from "@cadence/core/services/departure-stops";
 import { Temporal } from "@js-temporal/polyfill";
 
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
@@ -354,18 +355,14 @@ function behaviorOccupancyCandidates(
     });
 }
 
+/** The core rule, from a database row. The Timeline uses the same one through `departureStops`. */
 function behaviorEndAt(
   occurrence: Awaited<ReturnType<typeof listOccurrencesBetweenLocalDates>>[number],
   estimate: BehaviorDurationEstimate | undefined,
   timezone: string,
 ): string | null {
-  try {
-    if (occurrence.schedule_kind === "range" && occurrence.schedule_end_time) {
-      return Temporal.PlainDate.from(occurrence.local_date).toZonedDateTime({ timeZone: timezone, plainTime: Temporal.PlainTime.from(occurrence.schedule_end_time) }).toInstant().toString();
-    }
-    if (occurrence.schedule_kind === "exact" && estimate?.kind === "known") return Temporal.Instant.from(occurrence.scheduled_for).add({ seconds: estimate.seconds }).toString();
-  } catch { return null; }
-  return null;
+  return coreBehaviorEndAt({ localDate: occurrence.local_date, scheduledFor: occurrence.scheduled_for,
+    scheduleKind: occurrence.schedule_kind, scheduleEndTime: occurrence.schedule_end_time }, estimate, timezone);
 }
 
 function endpointForDevice(device: NonNullable<TravelRouteRefreshRequest["device"]>, grantRevision: string): TravelEndpoint {

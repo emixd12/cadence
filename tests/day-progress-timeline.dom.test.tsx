@@ -71,10 +71,12 @@ describe("DayProgressTimeline", () => {
     expect(toggle).not.toBeNull();
     await act(() => toggle!.click());
     const timing = container.querySelector('[aria-label="Travel timing"]');
-    expect(timing?.textContent).toContain("Outbound");
-    expect(timing?.textContent).toContain("Return home");
-    expect(timing?.textContent).toContain("Available again");
-    expect(timing?.textContent).toContain("Google Maps");
+    // Ticket 261: plain lines from the departure model, with no internal terms.
+    expect(timing?.textContent).toContain("Leave by Nov 1, 1:30 PM · walking, arrive Nov 1, 2:20 PM.");
+    expect(timing?.textContent).toContain("Head home Nov 1, 4:40 PM · walking, home by Nov 1, 6:20 PM.");
+    expect(timing?.textContent).toContain("Free again Nov 1, 6:30 PM.");
+    expect(timing?.textContent).toContain("Google Maps · checked Nov 1, 8:00 AM.");
+    for (const internal of ["Outbound", "Return home", "Origin:", "Available again", "Estimates depend on"]) expect(timing?.textContent).not.toContain(internal);
   });
   it("withdraws omitted-stop guidance and offers manual refresh after clearing a decision", async () => {
     const input = props();
@@ -124,14 +126,14 @@ describe("DayProgressTimeline", () => {
 
     await act(() => summary("occurrence-2").click());
     const later = container.querySelector('article[data-occurrence-id="occurrence-2"] [aria-label="Travel timing"]');
-    expect(later?.textContent).toContain("Onward");
+    expect(later?.textContent).toContain("Leave by 2:00 PM · walking, arrive 2:20 PM.");
     expect(later?.textContent).not.toContain("timing unavailable");
     expect(container.textContent).not.toContain("timing unavailable");
 
     await act(() => button("All day: Design offsite").click());
     await act(() => button("View details: Design offsite").click());
     const drawer = container.querySelector("dialog");
-    expect(drawer?.textContent).toContain("Return home");
+    expect(drawer?.textContent).toContain("Head home");
     expect(drawer?.textContent).not.toContain("timing unavailable");
   });
 

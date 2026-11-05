@@ -1630,7 +1630,7 @@ const previewFactories: Record<
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
   "composite.external-event-details": () => <ProductPreview maxHeight="120rem"><CalendarDetailsBench /><TravelDevelopmentTextBench /></ProductPreview>,
   "composite.external-event-preview": () => <ProductPreview><CalendarDetailsBench preview /></ProductPreview>,
-  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
+  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Leave by 2:05 PM · cycling, arrive 2:50 PM.</p><p>15 min added for thunderstorms.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
   "module.day-progress-timeline": () => <ProductPreview maxHeight="48rem"><CalendarTimelineBench /></ProductPreview>,
   "module.timeline": () => (
       <ProductPreview maxHeight="48rem">

@@ -546,26 +546,54 @@ cite has not changed.
 
 ## P-015: Plain travel timing copy and development-only weather advice
 
-- **Change:** Tickets 260 and 261 reword the travel lines ("Outbound · walking: leave
-  …" becomes "Leave by 1:15 PM · walking, arrive 2:20 PM"). They limit the weather mode
-  advice ("Consider transit or driving instead of walking.") to development builds and
-  replace "estimated within 3 hours of departure" with "Leave time appears by {time}."
+- **Change:** Tickets 260 and 261 reword the travel lines and limit the weather mode
+  advice ("Consider transit or driving instead of walking.") to development builds.
   Owner direction, November 4, 2026
   (`docs/plans/2026-11-04-travel-departure-ux-review.md`). Corrected the same day: an
   earlier draft of this entry and Ticket 261 said "3 hours before the trip", but the
-  window counts back from the arrival target (correction C3).
+  window counts back from the arrival target (correction C3). Ticket 261 shipped on
+  branch `us-work`, November 5, 2026, with these words. Many are not yet approved by
+  the owner; the list is at the top of `packages/core/src/services/departure-phrases.ts`.
+  - Trips: "Leave by 1:15 PM · walking, arrive 2:20 PM.", "Leave by 1:15 PM from Home
+    · walking, arrive 2:20 PM.", "Head home 4:40 PM · walking, home by 6:35 PM." The
+    date shows only for a trip on another local date. "Origin: …" is gone.
+  - Countdown, leave now and late forms from the departure model (Ticket 265), for
+    example "You may arrive late: leave by 6:50 PM · cycling, arrive 7:40 PM." Ticket
+    260's separate late line is now this one line.
+  - Missing estimates: "Last estimate: leave by {time} · checked {time}. Refresh
+    travel", "Estimate expired. Refresh travel", "Trip changed. Refresh travel", "No
+    route found.", "Leave time appears by {time}.", "Return time unknown." and "Return
+    time unknown. Add Home in Settings to estimate it."
+  - Weather: "15 min added for thunderstorms.", once per event, in every build; the
+    Daily Brief line reads "Leave by 2:05 PM for Dentist (cycling). 10 min added for
+    rain." The credit reads "Weather data by Open-Meteo.com (CC BY 4.0)." without
+    "Cadence derived travel margins from the forecast."
+  - "Free again 6:45 PM." and "Google Maps · checked 8:00 AM."
+  - Expanded Behavior row: "Overlaps your trip to {event} ({start}–{end})", "Overlaps
+    your trip home ({start}–{end})", and "Return time unknown." in place of "Travel
+    timing incomplete".
+  - Daily Brief footer: "Calculated by Cadence · Google Maps · 9:00 AM."
+  - Status line: no line on a day with no trips unless it has a message. Production
+    shows "Travel estimates are unavailable right now. Tracking and Calendar still
+    work." in place of "Travel estimates await this deployment's provider review."
+  - Calendar details: "Applies to this event until you close the Timeline.", all-day
+    days as "Nov 1 – Nov 2" (or "Nov 1"), and "Tentative" or "Cancelled" beside the time.
 - **Affected:** Tickets 260 and 261. Files: `docs/user-guide/travel.md`.
 - **Surfaces:** user guide.
 - **Conflicting current text:** `docs/user-guide/travel.md`:
   - "Refresh travel estimates": "Later trips say "estimated within 3 hours of
     departure" until then."
-  - "Weather margin": the table's Suggestion column and "A suggestion appears only for
-    the modes its row names."
+  - "Refresh travel estimates": "The status line shows Travel as of and the time the
+    estimates were observed." It does not say that a day with no trips shows no line.
+  - "Weather margin": the table's Suggestion column, "A suggestion appears only for
+    the modes its row names." and "Travel timing shows the adjusted leave time with, for
+    example, "Includes 10 min for rain.""
   - "Inspect travel and correct a journey": "Text identifies travel-created overlap."
-    It does not show the new overlap wording.
+    It does not show the new overlap wording. "for that journey and event revision"
+    differs from "Applies to this event until you close the Timeline."
 - **Update needed:** quote the new phrases. Say that production shows the weather
   margin without a mode suggestion. Describe the overlap line as naming the trip and
-  its times.
+  its times, and the status line as silent on a day with no trips.
 - **Status:** logged.
 
 ## P-016: Opt-in leave reminders

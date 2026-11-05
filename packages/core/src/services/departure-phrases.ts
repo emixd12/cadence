@@ -1,6 +1,8 @@
 import { Temporal } from "@js-temporal/polyfill";
 
+import type { ExternalEventState } from "../types/day-progress";
 import type { DepartureTrip } from "../types/departure";
+import type { WeatherConditionId } from "../types/weather";
 
 /**
  * Every departure phrase, so wording changes in one place (Ticket 265).
@@ -15,6 +17,13 @@ import type { DepartureTrip } from "../types/departure";
  *   the time-unknown forms ("Leave time unknown.", "The leave time for {event} is unknown.",
  *   "... because you may arrive late at {event}."), the "the trip home" line forms, and
  *   "Travel estimates are paused."
+ * - New in Ticket 261: "{n} min added for {condition}.", "Google Maps · checked {time}.",
+ *   "Calculated by Cadence · Google Maps · {time}.", "Overlaps your trip to {event}
+ *   ({start}–{end})", "Overlaps your trip home ({start}–{end})", "Return time unknown." as the
+ *   overlap label, "Free again {time}.", the all-day range "Nov 1 – Nov 2", the event status
+ *   words "Tentative" and "Cancelled", and, outside this module, "Applies to this event until
+ *   you close the Timeline." and the existing unavailable message in place of the
+ *   provider-review text in production builds.
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */
@@ -26,6 +35,18 @@ const PRIOR_STOP_FALLBACK = "your last stop";
 const TRIP_HOME = "the trip home";
 
 export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
+/** The overlap label when the trip home has no known time. */
+export const RETURN_TIME_UNKNOWN = "Return time unknown.";
+
+const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
+  thunderstorm: "thunderstorms",
+  snow: "snow",
+  freezing_precipitation: "freezing rain",
+  heavy_rain: "heavy rain",
+  rain: "rain",
+  extreme_heat: "extreme heat",
+  strong_wind: "strong wind",
+};
 
 export type DeparturePhraseContext = Readonly<{
   timezone: string;
@@ -65,6 +86,40 @@ export function departureFreeAgainPhrase(at: string, context: DeparturePhraseCon
 
 export function departureCheckedPhrase(attribution: string, at: string, context: DeparturePhraseContext): string {
   return `${attribution} · checked ${departureTimeLabel(at, context)}.`;
+}
+
+/** "15 min added for thunderstorms." The leave time already includes it. Empty with no margin. */
+export function departureWeatherMarginPhrase(marginMinutes: number, conditions: readonly WeatherConditionId[]): string {
+  const condition = conditions[0];
+  if (!condition || marginMinutes <= 0) return "";
+  return `${marginMinutes} min added for ${WEATHER_CONDITIONS[condition]}.`;
+}
+
+/** The Daily Brief travel block's footer: who calculated it, from what, and when. */
+export function departureBriefFooterPhrase(attribution: string | null, at: string, context: DeparturePhraseContext): string {
+  return ["Calculated by Cadence", attribution, departureTimeLabel(at, context)].filter(Boolean).join(" · ") + ".";
+}
+
+/** A Behavior crowded by a trip: names the trip and its span. */
+export function departureOverlapPhrase(input: Readonly<{ home: boolean; destinationLabel: string | null; startAt: string; endAt: string }>,
+  context: DeparturePhraseContext): string {
+  const trip = input.home ? "your trip home" : `your trip to ${input.destinationLabel ?? NEXT_STOP_FALLBACK}`;
+  return `Overlaps ${trip} (${departureTimeLabel(input.startAt, context)}–${departureTimeLabel(input.endAt, context)})`;
+}
+
+/** An all-day event's days, the last one inclusive: "Nov 1 – Nov 2", or "Nov 1" for one day. */
+export function allDayRangeLabel(startLocalDate: string, endLocalDateExclusive: string): string {
+  const start = Temporal.PlainDate.from(startLocalDate);
+  const lastDay = Temporal.PlainDate.from(endLocalDateExclusive).subtract({ days: 1 });
+  const day = (date: Temporal.PlainDate) => `${MONTHS_SHORT[date.month - 1]} ${date.day}`;
+  return Temporal.PlainDate.compare(lastDay, start) <= 0 ? day(start) : `${day(start)} – ${day(lastDay)}`;
+}
+
+/** The plain word for an event that is not confirmed. Confirmed says nothing. */
+export function eventStateWord(state: ExternalEventState): string | null {
+  if (state === "tentative") return "Tentative";
+  if (state === "cancelled") return "Cancelled";
+  return null;
 }
 
 /** The form for a place that already names the event. */
@@ -167,7 +222,7 @@ function lowerFirst(text: string): string {
 
 function timeUnknown(input: DeparturePhraseInput, destination: string, named: boolean): string {
   if (input.role === "return") {
-    return input.timeUnknownCause === "home_missing" ? "Return time unknown. Add Home in Settings to estimate it." : "Return time unknown.";
+    return input.timeUnknownCause === "home_missing" ? `${RETURN_TIME_UNKNOWN} Add Home in Settings to estimate it.` : RETURN_TIME_UNKNOWN;
   }
   if (input.timeUnknownCause === "late_arrival") {
     return `The leave time${named ? ` for ${destination}` : ""} is unknown, because you may arrive late at ${input.blockingLabel ?? PRIOR_STOP_FALLBACK}.`;

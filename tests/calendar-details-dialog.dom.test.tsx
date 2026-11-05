@@ -8,6 +8,8 @@ import { ExternalEventDetails } from "@/components/timeline/ExternalEventDetails
 import { validateExternalEventSnapshot, validateVersionedExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { allDayRangeLabel } from "@cadence/core/services/departure-phrases";
 import googleFixture from "@/tests/fixtures/external-event-snapshot.valid.json";
 import outlookFixture from "@/tests/fixtures/external-event-snapshot.outlook.valid.json";
 import icloudFixture from "@/tests/fixtures/external-event-snapshot.icloud.valid.json";
@@ -39,6 +41,11 @@ const travel: Omit<TravelEvidenceResult, "modelProjection"> = { version: "1.0", 
     readyAt: "2026-11-01T04:00:00Z", provenance }, state: "current", reason: null,
   estimate: { durationSeconds: 600, departureAt: "2026-11-01T05:10:00Z", arrivalAt: "2026-11-01T05:20:00Z", warnings: [], fallback: false,
     attribution: "Google Maps", observedAt: "2026-11-01T04:00:00Z", expiresAt: "2026-11-01T04:05:00Z" } }] };
+const NOW = "2026-11-01T04:00:00Z";
+/** Ticket 261: the dialog's travel lines come from the departure model. */
+const departureFor = (evidence: Omit<TravelEvidenceResult, "modelProjection">) => resolveDepartureModel({ evidence, now: NOW, timezone: "America/New_York",
+  arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null,
+  stops: [{ ref: full.id, label: full.title, startAt: "2026-11-01T05:30:00Z", endAt: "2026-11-01T06:30:00Z" }] });
 
 let container: HTMLDivElement;
 let root: Root;
@@ -60,7 +67,8 @@ type DialogOptions = Readonly<{ development?: boolean; timezone?: string; onDism
 async function open(event: NormalizedExternalEvent, options: DialogOptions = {}) {
   await act(() => root.render(<DevelopmentBuildProvider value={options.development ?? false}>
     <ExternalEventDetails event={event} timezone={options.timezone ?? "America/New_York"} onClose={() => undefined} onDismissAllDay={options.onDismissAllDay ?? (() => undefined)}
-      onTravelCorrection={options.onTravelCorrection} travel={options.withTravel ? travel : null} />
+      onTravelCorrection={options.onTravelCorrection} travel={options.withTravel ? travel : null}
+      departure={options.withTravel ? departureFor(travel) : null} now={NOW} />
   </DevelopmentBuildProvider>));
   return container.querySelector("dialog")!;
 }
@@ -72,7 +80,7 @@ describe("Calendar details order", () => {
     const dialog = await open(full, { withTravel: true, onTravelCorrection: () => undefined });
     expect(labels(dialog)).toEqual(["Time", "Location", "Calendar", "Attendees", "Organizer", "Conference", "Attachments"]);
     const text = dialog.querySelector("article")!.textContent!;
-    const positions = ["Time", "12 Harbor Street", "Outbound", "Search in Google Maps", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form", "Travel for this event"]
+    const positions = ["Time", "12 Harbor Street", "Leave by", "Search in Google Maps", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form", "Travel for this event"]
       .map((part) => text.indexOf(part));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -172,7 +180,8 @@ describe("Calendar details duration and time", () => {
   it("keeps the all-day label and its dismiss control", async () => {
     const dismissed = vi.fn();
     const dialog = await open(allDay, { onDismissAllDay: dismissed });
-    expect(row(dialog, "Time")).toBe(`${allDay.startLocalDate} through ${allDay.endLocalDate} (exclusive)`);
+    expect(row(dialog, "Time")).toContain(allDayRangeLabel(allDay.startLocalDate, allDay.endLocalDate));
+    expect(row(dialog, "Time")).not.toContain("exclusive");
     const dismiss = [...dialog.querySelectorAll("button")].find((item) => item.textContent === "Dismiss from timeline")!;
     await act(() => dismiss.click());
     expect(dismissed).toHaveBeenCalledWith(allDay.id);
@@ -180,6 +189,28 @@ describe("Calendar details duration and time", () => {
 
   it("offers no dismiss control on a timed event", async () => {
     expect((await open(timed)).textContent).not.toContain("Dismiss from timeline");
+  });
+});
+
+describe("Ticket 261 wording", () => {
+  it("shows an all-day range in plain words, the last day inclusive", () => {
+    expect(allDayRangeLabel("2026-11-01", "2026-11-03")).toBe("Nov 1 – Nov 2");
+    expect(allDayRangeLabel("2026-11-01", "2026-11-02")).toBe("Nov 1");
+    expect(allDayRangeLabel("2026-10-31", "2026-11-02")).toBe("Oct 31 – Nov 1");
+    expect(allDayRangeLabel("2026-12-31", "2027-01-02")).toBe("Dec 31 – Jan 1");
+  });
+
+  it("names a tentative or cancelled event beside the time, and says nothing for confirmed", async () => {
+    const time = (state: NormalizedExternalEvent["state"]) => open({ ...timed, state }).then((dialog) => row(dialog, "Time"));
+    expect(await time("tentative")).toMatch(/ · Tentative$/);
+    expect(await time("cancelled")).toMatch(/ · Cancelled$/);
+    expect(await time("confirmed")).not.toMatch(/Tentative|Cancelled|·/);
+  });
+
+  it("says how long a journey correction applies in plain words", async () => {
+    const dialog = await open(full, { onTravelCorrection: () => undefined });
+    expect(dialog.textContent).toContain("Applies to this event until you close the Timeline.");
+    expect(dialog.textContent).not.toContain("revision");
   });
 });
 
@@ -199,10 +230,10 @@ describe("Calendar details actions", () => {
   it("keeps the journey mode choice with the travel lines", async () => {
     const save = vi.fn(async () => undefined);
     const withPlace = { ...travel, legs: travel.legs.map((item) => ({ ...item, leg: { ...item.leg, destinationPlaceKey: "place-1" } })) };
-    await act(() => root.render(<ExternalEventDetails event={full} timezone="UTC" onClose={() => undefined} onDismissAllDay={() => undefined} travel={withPlace}
+    await act(() => root.render(<ExternalEventDetails event={full} timezone="UTC" onClose={() => undefined} onDismissAllDay={() => undefined} travel={withPlace} departure={departureFor(withPlace)} now={NOW}
       travelHabits={{ settings: { enabled: true, baseLocationText: "Home", mode: "walking", navigationPreference: null, routingConsentAt: null, onboardingCompletedAt: null, updatedAt: "2026-11-01T00:00:00Z" }, save } as never} />));
     const text = container.querySelector("article")!.textContent!;
-    expect(text.indexOf("Travel by")).toBeGreaterThan(text.indexOf("Outbound"));
+    expect(text.indexOf("Travel by")).toBeGreaterThan(text.indexOf("Leave by"));
     expect(text.indexOf("Travel by")).toBeLessThan(text.indexOf("Google Calendar · Work"));
   });
 

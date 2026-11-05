@@ -2,14 +2,15 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { ExternalLink, X } from "lucide-react";
-import { Fragment, forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useDevelopmentBuild } from "@cadence/ui/runtime";
 
 import type { ExternalEventSource, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
 import { buildTravelNavigationLink } from "@cadence/core/services/travel-navigation";
-import { TRAVEL_LEG_OUTSIDE_WINDOW } from "@cadence/core/services/travel-refresh-policy";
+import { DEPARTURE_REFRESH_LABEL, allDayRangeLabel, departureCheckedPhrase, departureFreeAgainPhrase, departurePhraseContext, eventStateWord, type DeparturePhraseContext } from "@cadence/core/services/departure-phrases";
+import type { DepartureModel, DepartureTrip } from "@cadence/core/types/departure";
 import type { TravelCorrection } from "@/lib/ui/travel";
 import type { TravelHabitsState } from "@/lib/ui/travel-habits";
 import { TravelModeChoice } from "./TravelModeChoice";
@@ -36,6 +37,10 @@ type ExternalEventPreviewProps = Readonly<{
   onDismiss: () => void;
   onOpen: (event: NormalizedExternalEvent) => void;
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
+  departure?: DepartureModel | null;
+  refresh?: TravelRefreshAction | null;
+  /** When the departure model was resolved. Required with `departure`. */
+  now?: string;
 }>;
 
 export function ExternalEventPreview({
@@ -45,6 +50,9 @@ export function ExternalEventPreview({
   onDismiss,
   onOpen,
   travel,
+  departure,
+  refresh,
+  now,
 }: ExternalEventPreviewProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -73,7 +81,7 @@ export function ExternalEventPreview({
                 {event.calendarName} · {eventTimeLabel(event, timezone)}
               </p>
               {event.location ? <p className="mt-2 break-words text-xs">{event.location}</p> : null}
-              {renderTravelTiming({ eventId: event.id, travel, timezone, compact: true })}
+              {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, refresh }) : null}
               <button
                 type="button"
                 onClick={() => onOpen(event)}
@@ -110,10 +118,14 @@ type ExternalEventDetailsProps = Readonly<{
   onTravelCorrection?: (correction: TravelCorrection) => void;
   /** Ticket 217: remembered travel per place for this journey's mode choice. */
   travelHabits?: TravelHabitsState | null;
+  departure?: DepartureModel | null;
+  refresh?: TravelRefreshAction | null;
+  /** When the departure model was resolved. Required with `departure`. */
+  now?: string;
 }>;
 
 export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventDetailsProps>(
-  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection, travelHabits }, ref) {
+  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection, travelHabits, departure, refresh, now }, ref) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [linkError, setLinkError] = useState(false);
     const openExternal = (url: string) => {
@@ -161,11 +173,11 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
           {linkError ? <p role="alert">The link could not open. Try again.</p> : null}
           <article className="grid min-w-0 gap-2 text-sm leading-6">
             <dl className={DETAIL_ROWS}>
-              <DetailRow label="Time" value={eventTimeLabel(event, timezone)} />
+              <DetailRow label="Time" value={[eventTimeLabel(event, timezone), eventStateWord(event.state)].filter(hasText).join(" · ")} />
               <DetailRow label="Duration" value={durationOnlyWhenEndUnknown(event)} />
               <DetailRow label="Location" value={event.location} />
             </dl>
-            {renderTravelTiming({ eventId: event.id, travel, timezone, onOpenExternal })}
+            {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, onOpenExternal, refresh }) : null}
             {navigation ? <><a href={navigation.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline" onClick={onOpenExternal ? (click) => { click.preventDefault(); openExternal(navigation.href); } : undefined}>{navigation.label}</a>{navigation.modeNotice ? <p>{navigation.modeNotice}</p> : null}</> : null}
             <TravelModeChoice eventId={event.id} travel={travel} habits={travelHabits} usualMode={travelMode} />
             <dl className={DETAIL_ROWS}>
@@ -187,7 +199,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
               <p className="font-bold">Travel for this event</p>
               <label className="grid gap-1">Attendance<select name="travel_attendance" required defaultValue="" className="min-h-11 min-w-0 border-b border-line bg-background"><option value="">Choose attendance</option><option value="physical">In person</option><option value="remote">Remote, no travel</option></select></label>
               <label className="grid gap-1">Destination for this journey<input name="travel_location" maxLength={500} defaultValue={event.location} className="min-h-11 min-w-0 border-b border-line bg-background" /></label>
-              <p className="text-muted-readable">Applies only to this event revision while the Timeline is open. Calendar and saved locations stay unchanged.</p>
+              <p className="text-muted-readable">Applies to this event until you close the Timeline. Calendar and saved locations stay unchanged.</p>
               <button type="submit" className="product-action product-action-secondary min-h-11 w-fit">Use for this journey</button>
             </form> : null}
             {event.conference?.notes ? <p className="break-words">{event.conference.notes}</p> : null}
@@ -205,46 +217,59 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
 
 type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
 
-export function renderTravelTiming({ eventId, travel, timezone, compact = false, onOpenExternal }: Readonly<{
-  eventId: string; travel?: TravelTimingEvidence | null; timezone: string; compact?: boolean;
-  onOpenExternal?: (url: string) => void | Promise<void>;
-}>) {
-  const legs = travel?.legs.filter((item) => item.leg.originCommitmentRef === eventId || item.leg.destinationCommitmentRef === eventId) ?? [];
-  if (!legs.length) return null;
-  return <TravelTiming legs={legs} travel={travel} timezone={timezone} compact={compact} onOpenExternal={onOpenExternal} />;
+/** Ticket 261: the shared "Refresh travel" action (INT-TRAVEL-004), offered in a line that needs it. */
+export type TravelRefreshAction = Readonly<{ onRefresh: () => void; pending: boolean }>;
+
+/** The trips this event's views talk about. Steps that need a place or attendance wait for Ticket 273. */
+function eventTrips(departure: DepartureModel | null | undefined, eventId: string): DepartureTrip[] {
+  return (departure?.trips ?? []).filter((trip) => trip.legId !== null
+    ? trip.originRef === eventId || trip.destinationRef === eventId
+    : (trip.state === "time_unknown" || trip.state === "trip_changed") &&
+      (trip.role === "return" ? trip.originRef === eventId : trip.destinationRef === eventId));
 }
 
-function TravelTiming({ legs, travel, timezone, compact, onOpenExternal }: Readonly<{
-  legs: TravelTimingEvidence["legs"]; travel?: TravelTimingEvidence | null; timezone: string; compact: boolean;
+export function renderTravelTiming({ eventId, travel, departure, now, timezone, onOpenExternal, refresh }: Readonly<{
+  eventId: string; travel?: TravelTimingEvidence | null; departure?: DepartureModel | null;
+  /** The instant the departure model was resolved at, so every line dates times the same way. */
+  now: string; timezone: string;
   onOpenExternal?: (url: string) => void | Promise<void>;
+  refresh?: TravelRefreshAction | null;
+}>) {
+  const trips = eventTrips(departure, eventId);
+  if (!trips.length) return null;
+  return <TravelTiming trips={trips} travel={travel} context={departurePhraseContext(now, timezone)} onOpenExternal={onOpenExternal} refresh={refresh ?? null} />;
+}
+
+function TravelTiming({ trips, travel, context, onOpenExternal, refresh }: Readonly<{
+  trips: readonly DepartureTrip[]; travel?: TravelTimingEvidence | null; context: DeparturePhraseContext;
+  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
 }>) {
   const developmentBuild = useDevelopmentBuild();
-  const zoned = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone);
-  const label = (value: string) => zoned(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  // The date appears only when the trip ends on a later day than the leave time printed above it.
-  const lateArrival = (departureAt: string, arrivalAt: string) => zoned(departureAt).toPlainDate().equals(zoned(arrivalAt).toPlainDate())
-    ? zoned(arrivalAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" }) : label(arrivalAt);
-  const originLabels = { device: "current device position", saved_base: "Home", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
+  const legIds = new Set(trips.flatMap((trip) => trip.legId ? [trip.legId] : []));
+  const legs = travel?.legs.filter((item) => legIds.has(item.leg.id)) ?? [];
+  // The margin once per event. The leave time already includes it.
+  const weather = legs.find((item) => item.weather?.state === "margin")?.weather;
+  const margin = weather ? travelWeatherMarginText({ marginMinutes: weather.marginSeconds / 60, conditions: weather.conditions, suggestion: weather.suggestion }, { developmentBuild }) : "";
   // Production shows no route warning text. Released Mac 0.1.8 still prints the same strings.
   const developmentWarnings = developmentBuild ? [...new Set(legs.flatMap((item) => item.estimate?.warnings ?? []))] : [];
+  const checked = trips.find((trip) => trip.checkedAt);
+  const attribution = legs.find((item) => item.estimate?.attribution)?.estimate?.attribution;
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
-    {legs.map(({ leg, state, estimate, reason, weather, late }) => <Fragment key={leg.id}><p>
-      {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return home" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(weather?.departureAt ?? estimate.departureAt)}, arrive ${label(weather?.arrivalAt ?? estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
-      {weather?.state === "margin" ? ` ${travelWeatherMarginText({ marginMinutes: weather.marginSeconds / 60, conditions: weather.conditions, suggestion: weather.suggestion }, { developmentBuild })}` : ""}
-      {!compact ? ` Origin: ${(leg.originCommitmentRef ? "planned prior stop" : originLabels[leg.provenance.originSource])}.` : ""}
-    </p>
-    {state === "current" && late && estimate ? <p>You may arrive late: arrive {lateArrival(weather?.departureAt ?? estimate.departureAt, weather?.arrivalAt ?? estimate.arrivalAt)}.</p> : null}
-    </Fragment>)}
-    {!travel?.completeTrip ? <p>Full-trip availability is unknown. Known travel spans still apply.</p> : travel.finalAvailabilityAt ? <p>Available again {label(travel.finalAvailabilityAt)}.</p> : null}
+    {trips.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
+      {trip.phrase}
+      {trip.action === "refresh" && refresh ? <>{" "}<button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{DEPARTURE_REFRESH_LABEL}</button></> : null}
+    </p>)}
+    {margin ? <p>{margin}</p> : null}
+    {travel?.completeTrip && travel.finalAvailabilityAt ? <p>{departureFreeAgainPhrase(travel.finalAvailabilityAt, context)}</p> : null}
     {developmentWarnings.length ? <div data-travel-development-warnings><p className="font-bold text-muted-readable">Development</p>
       {developmentWarnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
-      {legs.some((item) => item.estimate) ? <p>Google Maps · {legs.find((item) => item.estimate)?.estimate?.observedAt ? `Checked ${label(legs.find((item) => item.estimate)!.estimate!.observedAt)}. ` : ""}Estimates depend on attendance and current conditions.</p> : null}
-      {travel?.weather?.attribution && legs.some((item) => item.weather?.state === "margin") ? <TravelWeatherCredit attribution={travel.weather.attribution} onOpenExternal={onOpenExternal} /> : null}
+    {checked?.checkedAt && attribution ? <p>{departureCheckedPhrase(attribution, checked.checkedAt, context)}</p> : null}
+    {travel?.weather?.attribution && weather ? <TravelWeatherCredit attribution={travel.weather.attribution} onOpenExternal={onOpenExternal} /> : null}
   </div>;
 }
 
 export function eventTimeLabel(event: NormalizedExternalEvent, timezone: string): string {
-  if (event.kind === "all_day") return `${event.startLocalDate} through ${event.endLocalDate} (exclusive)`;
+  if (event.kind === "all_day") return allDayRangeLabel(event.startLocalDate, event.endLocalDate);
   const start = Temporal.Instant.from(event.startAt).toZonedDateTimeISO(timezone);
   const end = Temporal.Instant.from(event.endAt).toZonedDateTimeISO(timezone);
   const zone = start.offset !== end.offset ? { timeZoneName: "short" as const } : {};

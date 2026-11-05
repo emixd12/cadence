@@ -9,11 +9,16 @@ import {
 } from "../packages/core/src/resolvers/departure.resolver";
 import { resolveTravelAfterDecisions, resolveTravelEvidence, resolveTravelPlan } from "../packages/core/src/resolvers/travel.resolver";
 import {
+  departureBriefFooterPhrase,
   departureCheckedPhrase,
   departureFreeAgainPhrase,
+  departureOverlapPhrase,
   departurePhraseContext,
   departureTimeLabel,
+  departureWeatherMarginPhrase,
+  eventStateWord,
 } from "../packages/core/src/services/departure-phrases";
+import { behaviorEndAt, departureStops } from "../packages/core/src/services/departure-stops";
 import { TRAVEL_LEG_OUTSIDE_WINDOW, travelEstimateAppearsAt } from "../packages/core/src/services/travel-refresh-policy";
 import type { DepartureModelInput, DepartureStop } from "../packages/core/src/types/departure";
 import type { TravelEvidenceLeg, TravelLegRole, TravelMode, TravelResolvedLegEvidence, TravelUnknownLeg } from "../packages/core/src/types/travel";
@@ -616,5 +621,71 @@ describe("the phrase module", () => {
       const source = readFileSync(file, "utf8");
       expect(source).not.toMatch(/new Date|Date\.now|Temporal\.Now|process\.env|window\.|document\.|navigator\./);
     }
+  });
+});
+
+describe("Ticket 261: a trip whose stop is missing from the input", () => {
+  it("stays the next trip only until its local day ends", () => {
+    const run = (now: string) => model(now, [missing(OUTBOUND, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW)], { stops: [] });
+    expect(run(local("23:59")).next?.state).toBe("appears_later");
+    expect(run(local("00:00", "2026-09-17"))).toMatchObject({ state: "none", next: null, trips: [] });
+  });
+
+  it("ends a trip the plan could not build with the day of the plan's routed legs", () => {
+    const run = (now: string) => model(now, [onTime()], { stops: [], unknownLegs: [unknown("outbound", null, "lunch", "destination_unknown")] });
+    expect(run(local("23:59")).next?.state).toBe("needs_place");
+    expect(run(local("00:00", "2026-09-17")).next).toBeNull();
+    const home = (now: string) => model(now, [onTime()], { stops: [], unknownLegs: [unknown("return", "lunch", null, "return_base_missing")] });
+    expect(home(local("23:59")).next?.state).toBe("time_unknown");
+    expect(home(local("00:00", "2026-09-17")).next).toBeNull();
+  });
+});
+
+describe("Ticket 261: departure stops", () => {
+  const estimate = { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 3, lookbackDays: 90, provenance: "completed_stopped_occurrence_mean" } as const;
+
+  it("ends a range Behavior at its end time, and an exact one after its known duration", () => {
+    expect(behaviorEndAt({ localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "range", scheduleEndTime: "10:15:00" }, undefined, NY)).toBe(local("10:15"));
+    expect(behaviorEndAt({ localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "exact", scheduleEndTime: null }, estimate, NY)).toBe(local("09:30"));
+    expect(behaviorEndAt({ localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "exact" }, undefined, NY)).toBeNull();
+    // A range gives its own end, never the duration estimate.
+    expect(behaviorEndAt({ localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "range", scheduleEndTime: null }, estimate, NY)).toBeNull();
+    expect(behaviorEndAt({ localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "range", scheduleEndTime: "not a time" }, undefined, NY)).toBeNull();
+  });
+
+  it("is the one rule the hosted route refresh uses", () => {
+    const service = readFileSync("lib/services/travel-route-refresh.service.ts", "utf8");
+    expect(service).toContain("@cadence/core/services/departure-stops");
+    expect(service).not.toMatch(/schedule_kind === "range"/);
+  });
+
+  it("builds stops from timed Calendar events and Behavior Occurrences", () => {
+    const timedEvent = { id: "event", kind: "timed", title: "", startAt: local("12:00"), endAt: local("13:00"), endUnspecified: false } as never;
+    const openEnded = { id: "open", kind: "timed", title: "Call", startAt: local("16:00"), endAt: local("17:00"), endUnspecified: true } as never;
+    const allDay = { id: "all-day", kind: "all_day", title: "Offsite", startLocalDate: "2026-09-16", endLocalDate: "2026-09-17" } as never;
+    const stops = departureStops({ events: [timedEvent, openEnded, allDay], timezone: NY, durationEstimates: { walk: estimate },
+      occurrences: [{ id: "occurrence", behaviorId: "walk", title: "Walk", localDate: "2026-09-16", scheduledFor: local("09:00"), scheduleKind: "exact" }] });
+    expect(stops).toEqual([
+      { ref: "event", label: "Untitled event", startAt: local("12:00"), endAt: local("13:00") },
+      { ref: "open", label: "Call", startAt: local("16:00"), endAt: null },
+      { ref: "occurrence", label: "Walk", startAt: local("09:00"), endAt: local("09:30") },
+    ]);
+  });
+});
+
+describe("Ticket 261 phrases", () => {
+  const context = departurePhraseContext(local("08:00"), NY);
+  it("words the weather margin, the brief footer and the overlap label", () => {
+    expect(departureWeatherMarginPhrase(15, ["thunderstorm", "heavy_rain"])).toBe("15 min added for thunderstorms.");
+    expect(departureWeatherMarginPhrase(0, ["rain"])).toBe("");
+    expect(departureBriefFooterPhrase("Google Maps", local("09:00"), context)).toBe("Calculated by Cadence · Google Maps · 9:00 AM.");
+    expect(departureBriefFooterPhrase(null, local("09:00"), context)).toBe("Calculated by Cadence · 9:00 AM.");
+    expect(departureOverlapPhrase({ home: false, destinationLabel: "Dentist", startAt: local("13:55"), endAt: local("14:20") }, context))
+      .toBe("Overlaps your trip to Dentist (1:55 PM–2:20 PM)");
+    expect(departureOverlapPhrase({ home: true, destinationLabel: null, startAt: local("15:40"), endAt: local("16:10") }, context))
+      .toBe("Overlaps your trip home (3:40 PM–4:10 PM)");
+    expect(eventStateWord("tentative")).toBe("Tentative");
+    expect(eventStateWord("cancelled")).toBe("Cancelled");
+    expect(eventStateWord("confirmed")).toBeNull();
   });
 });

@@ -72,7 +72,9 @@ async function routeRequest(init: RequestInit): Promise<unknown> {
 
 /** Used only when a refusal arrives without its reset time; the status line otherwise names the date. */
 const QUOTA_MESSAGE = "Travel estimates are paused until the travel limit renews.";
-const UNAVAILABLE_MESSAGE = "Travel estimates are unavailable right now. Tracking and Calendar still work.";
+export const TRAVEL_UNAVAILABLE_MESSAGE = "Travel estimates are unavailable right now. Tracking and Calendar still work.";
+const UNAVAILABLE_MESSAGE = TRAVEL_UNAVAILABLE_MESSAGE;
+/** Development builds only (Ticket 261). Production shows the unavailable message instead. */
 export const TRAVEL_CLEARANCE_MESSAGE = "Travel estimates await this deployment’s provider review.";
 const CLEARANCE_MESSAGE = TRAVEL_CLEARANCE_MESSAGE;
 function travelErrorMessage(error: unknown): string | null {

@@ -383,6 +383,14 @@ travel resolver finds a trip that would leave before the previous trip arrives: 
 then withholds `completeTrip`, and the model reports `time_unknown`. Its output carries leave
 times and event titles, so it never enters Daily Brief model input.
 
+Ticket 261: `DayProgressTimeline` resolves the model once and passes it to the drawer, dialog
+and expanded Behavior row. Its stops come from `departureStops` in
+`packages/core/src/services/departure-stops.ts`, whose `behaviorEndAt` is the only Behavior
+end rule; `lib/services/travel-route-refresh.service.ts` uses it too. A trip with no
+estimate whose stop is missing from the stops lasts no longer than its plan's local day.
+The timeline-context resolver's `overlapLabel` names the trip a Behavior overlaps and its
+shown times, from the colliding segments and their leg.
+
 ## Day-progress production consumers (Tickets 133–136)
 
 `DayProgressTimeline` consumes the shared day-progress layout resolver and the

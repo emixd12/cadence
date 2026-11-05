@@ -275,7 +275,8 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   expect(container.textContent).toContain("Travel to Dentist overlaps Walk.");
   expect(container.textContent).toContain("Leave by 2:30 PM for Dentist (transit).");
   expect(container.textContent).toContain("Return time is unknown.");
-  expect(container.textContent).toContain("Not written by the model.");
+  expect(container.textContent).toContain("Calculated by Cadence · Google Maps · 9:00 AM.");
+  expect(container.textContent).not.toContain("Not written by the model.");
   expect(container.textContent).toContain("This time overlaps planned travel.");
   expect([...container.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["Close"]);
 });

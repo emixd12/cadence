@@ -98,6 +98,8 @@ function toTimelineOccurrenceInput(
         ? normalizeScheduledTime(occurrence.schedule_end_time)
         : null,
     }),
+    scheduleKind: normalizeScheduleKind(occurrence.schedule_kind),
+    scheduleEndTime: occurrence.schedule_end_time ? normalizeScheduledTime(occurrence.schedule_end_time) : null,
     localDate: occurrence.local_date,
     status: normalizeOccurrenceStatus(occurrence.status),
     statusMarkedAt: occurrence.status_marked_at,

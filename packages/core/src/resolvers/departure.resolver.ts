@@ -29,11 +29,14 @@ export function resolveDepartureModel(input: DepartureModelInput): DepartureMode
   const stops = new Map(input.stops.map((stop) => [stop.ref, stop]));
   const afterLate = input.evidence ? travelLegsAfterLateArrival(input.evidence.legs) : new Map<string, number>();
 
+  // An unknown trip has no time of its own. Its plan's day is the day of the earliest routed leg.
+  const readyTimes = (input.evidence?.legs ?? []).map((entry) => Temporal.Instant.from(entry.leg.readyAt)).sort(Temporal.Instant.compare);
+  const unknownDayEnd = endOfLocalDay(readyTimes[0] ?? now, input.timezone);
   const remaining = input.evidence
     ? tripsInOrder(input.evidence, stops).flatMap((trip, index, all): Candidate[] => {
         const candidate = "leg" in trip
           ? fromLeg(trip, input, now, stops, afterLate.get(trip.leg.id) ?? 0)
-          : fromUnknown(trip, all[index - 1] ?? null, stops);
+          : fromUnknown(trip, all[index - 1] ?? null, stops, unknownDayEnd);
         return candidate.finishedAt && Temporal.Instant.compare(now, candidate.finishedAt) >= 0 ? [] : [candidate];
       })
     : [];
@@ -88,7 +91,8 @@ function fromLeg(
     draft: withoutTime(trip, entry, input, destinationStart, now),
     finishedAt: leg.role === "return"
       ? Temporal.Instant.from(leg.readyAt)
-      : destinationStart ? Temporal.Instant.from(destinationStart) : null,
+      // A stop missing from the input has no start, so the trip ends with its local day.
+      : destinationStart ? Temporal.Instant.from(destinationStart) : endOfLocalDay(Temporal.Instant.from(leg.readyAt), input.timezone),
   };
 
   const leaveAt = Temporal.Instant.from(entry.weather?.departureAt ?? estimate.departureAt);
@@ -147,13 +151,15 @@ function fromUnknown(
   unknown: TravelUnknownLeg,
   previous: EvidenceTrip | null,
   stops: ReadonlyMap<string, DepartureStop>,
+  dayEnd: Temporal.Instant,
 ): Candidate {
   const trip = baseDraft(unknown.role, unknown.originCommitmentRef, unknown.destinationCommitmentRef, null);
   const origin = stops.get(unknown.originCommitmentRef ?? "");
   const destination = stops.get(unknown.destinationCommitmentRef ?? "");
+  // A stop missing from the input gives no time, so such a trip lasts no longer than today.
   const finishedAt = unknown.role === "return"
-    ? origin ? Temporal.Instant.from(origin.endAt ?? origin.startAt) : null
-    : destination ? Temporal.Instant.from(destination.startAt) : null;
+    ? origin ? Temporal.Instant.from(origin.endAt ?? origin.startAt) : dayEnd
+    : destination ? Temporal.Instant.from(destination.startAt) : dayEnd;
   switch (unknown.reason) {
     case "destination_unknown": return { finishedAt, draft: { ...trip, state: "needs_place" } };
     case "attendance_unknown": return { finishedAt, draft: { ...trip, state: "needs_attendance" } };
@@ -171,6 +177,11 @@ function fromUnknown(
     case "timing_unknown": return { finishedAt, draft: { ...trip, state: "time_unknown", timeUnknownCause: "no_known_end" } };
     case "leg_limit": return { finishedAt, draft: { ...trip, state: "time_unknown", timeUnknownCause: "leg_limit" } };
   }
+}
+
+/** The first instant of the next local date, so a trip with no time of its own lasts no longer than its day. */
+function endOfLocalDay(at: Temporal.Instant, timezone: string): Temporal.Instant {
+  return at.toZonedDateTimeISO(timezone).toPlainDate().add({ days: 1 }).toZonedDateTime({ timeZone: timezone }).toInstant();
 }
 
 function baseDraft(role: Draft["role"], originRef: string | null, destinationRef: string | null, legId: string | null): Draft {

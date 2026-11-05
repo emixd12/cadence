@@ -11,13 +11,16 @@ import { renderTravelTiming } from "@/components/timeline/ExternalEventDetails";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
 const CADENCE_WARNING = "Estimated arrival is after the planned arrival time.";
 const PROVIDER_WARNING = "This route has tolls.";
 const ADVICE = "Consider transit or driving instead of cycling.";
-const LATE_LINE = "You may arrive late: arrive 7:40 PM.";
+const LATE_LINE = "You may arrive late: leave by 6:50 PM · cycling, arrive 7:40 PM.";
+const MARGIN = "15 min added for thunderstorms.";
+const NOW = "2026-11-01T13:00:00Z";
 
 const provenance = { originRef: "device", originSource: "device", originRevision: "1", destinationRef: "event-1", destinationSource: "calendar",
   destinationRevision: "1", grantRevision: "g" } as const;
@@ -62,13 +65,20 @@ async function renderIn(developmentBuild: boolean, node: ReactNode): Promise<str
   return container.textContent ?? "";
 }
 
-describe.each([{ surface: "dialog", compact: false }, { surface: "drawer", compact: true }])("travel timing in the $surface", ({ compact }) => {
-  const timing = (travel = lateTrip) => renderTravelTiming({ eventId: "event-1", travel, timezone: "UTC", compact });
+const departure = (travel: Omit<TravelEvidenceResult, "modelProjection">) => resolveDepartureModel({ evidence: travel, now: NOW, timezone: "UTC",
+  stops: [{ ref: "event-1", label: "Dentist", startAt: "2026-11-01T19:30:00Z", endAt: "2026-11-01T20:30:00Z" }],
+  arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null });
+
+// The drawer and the dialog render the same lines from the same model (Ticket 261).
+describe.each([{ surface: "dialog" }, { surface: "drawer" }])("travel timing in the $surface", () => {
+  const timing = (travel = lateTrip) => renderTravelTiming({ eventId: "event-1", travel, departure: departure(travel), now: NOW, timezone: "UTC" });
 
   it("shows production only what a user can act on", async () => {
     const text = await renderIn(false, timing());
     expect(text).toContain(LATE_LINE);
-    expect(text).toContain("Includes 15 min for thunderstorms.");
+    expect(text).toContain(MARGIN);
+    // One late line: the model's phrase, not a second line from the same flag.
+    expect(text.split("You may arrive late").length).toBe(2);
     for (const hidden of [CADENCE_WARNING, PROVIDER_WARNING, ADVICE, "Development"]) expect(text).not.toContain(hidden);
     expect(container.querySelector("[data-travel-development-warnings]")).toBeNull();
   });
@@ -76,7 +86,7 @@ describe.each([{ surface: "dialog", compact: false }, { surface: "drawer", compa
   it("shows development every warning verbatim under a Development label, and the advice", async () => {
     const text = await renderIn(true, timing());
     expect(text).toContain(LATE_LINE);
-    expect(text).toContain(`Includes 15 min for thunderstorms. ${ADVICE}`);
+    expect(text).toContain(`${MARGIN} ${ADVICE}`);
     const block = container.querySelector("[data-travel-development-warnings]");
     expect([...block!.querySelectorAll("p")].map((line) => line.textContent)).toEqual(["Development", CADENCE_WARNING, PROVIDER_WARNING]);
   });
@@ -88,21 +98,19 @@ describe.each([{ surface: "dialog", compact: false }, { surface: "drawer", compa
 
   it("adds the date only when the late arrival falls on a later day than the leave time", async () => {
     const text = await renderIn(false, timing(evidence({ late: true, warnings: [], arrivalAt: "2026-11-02T00:20:00Z" })));
-    expect(text).toContain("You may arrive late: arrive Nov 2, 12:20 AM.");
+    expect(text).toContain("You may arrive late: leave by 6:50 PM · cycling, arrive Nov 2, 12:20 AM.");
   });
 });
 
 describe("Daily Brief travel line", () => {
   const bubble = <DailyBriefBubble state="ready" briefing={briefing} travel={guidance} onDismiss={() => undefined} />;
 
-  it("keeps the margin in production and drops the advice", async () => {
-    const text = await renderIn(false, bubble);
-    expect(text).toContain("Leave by 6:05 PM for Dentist (cycling). Includes 15 min for thunderstorms.");
-    expect(text).not.toContain(ADVICE);
-  });
-
-  it("adds the advice in development", async () => {
-    expect(await renderIn(true, bubble)).toContain(`Includes 15 min for thunderstorms. ${ADVICE}`);
+  it("keeps the margin and drops the advice in every build (Ticket 261)", async () => {
+    for (const developmentBuild of [false, true]) {
+      const text = await renderIn(developmentBuild, bubble);
+      expect(text).toContain(`Leave by 6:05 PM for Dentist (cycling). ${MARGIN}`);
+      expect(text).not.toContain(ADVICE);
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import type { TravelEvidenceResult, TravelOccupiedSegment } from "@cadence/core/
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TravelStatusLine } from "@/components/timeline/DayProgressTimeline";
+import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
 import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey, type TravelRoutesView, type TravelState } from "@/lib/ui/travel";
 
 const segments: TravelOccupiedSegment[] = [
@@ -25,8 +26,28 @@ describe("shared Timeline travel occupancy", () => {
       runningStartedAt: null, estimate: { kind: "known", seconds: 900, durationLabel: "15 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
       events: [], freshness: { state: "current", refreshedAt: "2026-09-21T12:00:00Z", label: "Calendar current", canAssertNoOverlap: true },
       now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel });
-    expect(resolve("2026-09-21T13:45:00Z")).toMatchObject({ overlappingEventIds: ["event"], overlapLabel: "Possible travel overlap" });
-    expect(resolve("2026-09-21T18:30:00Z")).toMatchObject({ overlappingEventIds: [], overlapAssessment: "unknown", overlapLabel: "Travel timing incomplete" });
+    expect(resolve("2026-09-21T13:45:00Z")).toMatchObject({ overlappingEventIds: ["event"] });
+    expect(resolve("2026-09-21T18:30:00Z")).toMatchObject({ overlappingEventIds: [], overlapAssessment: "unknown", overlapLabel: "Return time unknown." });
+  });
+  it("names the overlapped trip and its span (Ticket 261)", () => {
+    const legs = [{ leg: { id: "out", role: "outbound", destinationCommitmentRef: "event" }, state: "current", estimate: null },
+      { leg: { id: "return", role: "return", originCommitmentRef: "event", destinationCommitmentRef: null }, state: "current", estimate: null }] as never;
+    const resolve = (scheduledFor: string, extra: Partial<Parameters<typeof resolveTimelineOccurrenceContext>[0]> = {}) => resolveTimelineOccurrenceContext({
+      occurrenceId: "behavior", scheduledFor, runningStartedAt: null,
+      estimate: { kind: "known", seconds: 900, durationLabel: "15 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
+      events: [], freshness: { state: "current", refreshedAt: "2026-09-21T12:00:00Z", label: "Calendar current", canAssertNoOverlap: true },
+      now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel: { ...travel, legs }, travelLabels: new Map([["event", "Dentist"]]), timezone: "UTC", ...extra });
+    expect(resolve("2026-09-21T13:45:00Z").overlapLabel).toBe("Overlaps your trip to Dentist (1:30 PM–2:30 PM)");
+    expect(resolve("2026-09-21T17:00:00Z").overlapLabel).toBe("Overlaps your trip home (4:30 PM–6:30 PM)");
+    // The shown times include a weather margin when the leg has an estimate.
+    const estimated = [{ leg: { id: "out", role: "outbound", destinationCommitmentRef: "event" }, state: "current",
+      estimate: { departureAt: "2026-09-21T13:30:00Z", arrivalAt: "2026-09-21T14:30:00Z" },
+      weather: { departureAt: "2026-09-21T13:15:00Z", arrivalAt: "2026-09-21T14:30:00Z" } }] as never;
+    expect(resolve("2026-09-21T13:45:00Z", { travel: { ...travel, legs: estimated }, timezone: "America/New_York" }).overlapLabel)
+      .toBe("Overlaps your trip to Dentist (9:15 AM–10:30 AM)");
+    // No title for the stop, or no legs at all: the trip still gets a plain name.
+    expect(resolve("2026-09-21T13:45:00Z", { travelLabels: undefined }).overlapLabel).toBe("Overlaps your trip to your next stop (1:30 PM–2:30 PM)");
+    expect(resolve("2026-09-21T13:45:00Z", { travel }).overlapLabel).toBe("Overlaps your trip to your next stop (1:30 PM–2:30 PM)");
   });
   it("clips overnight travel against actual DST day boundaries", () => {
     const layout = resolveDayProgressLayout({ timezone: "America/New_York", days: [
@@ -58,9 +79,21 @@ describe("Timeline travel status line", () => {
     const unavailable = render(status({ message: "Travel estimates are unavailable right now. Tracking and Calendar still work." }));
     expect(unavailable).toContain("unavailable right now");
     expect(unavailable).toContain("Refresh travel");
+    // Ticket 261: the provider-review text is for development builds. Production says estimates are unavailable.
     const review = render(status({ message: TRAVEL_CLEARANCE_MESSAGE }));
-    expect(review).toContain("provider review");
+    expect(review).not.toContain("provider review");
+    expect(review).toContain("Travel estimates are unavailable right now. Tracking and Calendar still work.");
     expect(review).not.toContain("Refresh travel");
+    const development = renderToStaticMarkup(createElement(DevelopmentBuildProvider, { value: true } as Parameters<typeof DevelopmentBuildProvider>[0],
+      createElement(TravelStatusLine, { status: status({ message: TRAVEL_CLEARANCE_MESSAGE }), timezone: "America/New_York" })));
+    expect(development).toContain("provider review");
+    expect(development).not.toContain("Refresh travel");
+  });
+  it("says nothing on a day with no trips, unless there is a message (G9)", () => {
+    const none = (value: TravelState) => renderToStaticMarkup(createElement(TravelStatusLine, { status: value, timezone: "America/New_York", hasTrips: false }));
+    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z" }))).toBe("");
+    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", stale: true }))).toBe("");
+    expect(none(status({ view: routesView, observedAt: "2026-09-21T18:52:00Z", resumesAt: "2026-10-01T04:00:00Z" }))).toContain("Travel estimates resume on October 1.");
   });
   it("names the renewal date in the user's timezone and hides the link while the budget is used up", () => {
     const resumes = render(status({ resumesAt: "2026-10-01T04:00:00Z" }));

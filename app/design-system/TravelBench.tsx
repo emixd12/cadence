@@ -6,6 +6,7 @@ import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { renderTravelTiming } from "@/components/timeline/ExternalEventDetails";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { resolveTravelPlan, resolveTravelEvidence } from "@cadence/core/resolvers/travel.resolver";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { planTravelHabitChange } from "@cadence/core/services/travel-habits";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { TravelHabitsSection } from "@/components/settings/TravelHabitsSection";
@@ -111,6 +112,14 @@ export function travelBenchEvidence(eventId: string, withBase: boolean, weather?
       observedAt: now, expiresAt: "2026-11-01T13:05:00Z", fallback: false, warnings: [], attribution: "Google Maps" } })) });
 }
 
+export const TRAVEL_BENCH_NOW = "2026-11-01T13:00:00Z";
+
+/** The departure model for bench evidence: one stop at the synthetic 2:30–4:30 PM attendance. */
+export function travelBenchDeparture(eventId: string, evidence: ReturnType<typeof travelBenchEvidence> | null, label = "Afternoon appointment", now = TRAVEL_BENCH_NOW) {
+  return resolveDepartureModel({ evidence, now, timezone: "America/New_York", arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null,
+    stops: [{ ref: eventId, label, startAt: "2026-11-01T19:30:00Z", endAt: "2026-11-01T21:30:00Z" }] });
+}
+
 /** Bench-only caption. It never travels in a fixture's warnings. */
 export function TravelBenchCaption() {
   return <p className="text-xs leading-5 text-muted-readable">Synthetic route. No provider call.</p>;
@@ -133,7 +142,7 @@ export function TravelDevelopmentTextBench() {
       {[{ name: "Production build", value: false }, { name: "Development build", value: true }].map((build) => <section key={build.name} className="grid min-w-0 content-start gap-3" data-travel-bench-build={build.value ? "development" : "production"}>
         <h4 className="text-sm font-bold">{build.name}</h4>
         <DevelopmentBuildProvider value={build.value}>
-          {renderTravelTiming({ eventId: "bench-event", travel, timezone: "America/New_York" })}
+          {renderTravelTiming({ eventId: "bench-event", travel, departure: travelBenchDeparture("bench-event", travel, "Dentist"), now: TRAVEL_BENCH_NOW, timezone: "America/New_York" })}
           <div className="pt-8"><DailyBriefBubble state="ready" briefing={briefing} travel={guidance} onDismiss={() => undefined} /></div>
         </DevelopmentBuildProvider>
       </section>)}
