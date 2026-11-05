@@ -7,11 +7,12 @@ import type { WeatherConditionId } from "../types/weather";
 /**
  * Every departure phrase, so wording changes in one place (Ticket 265).
  *
- * `DEPARTURE_PHRASES_AWAITING_APPROVAL` below lists the words the owner has not yet approved.
- * The design-system bench renders each one with sample values (Ticket 266), so keep the list
- * in step with the builders here. Two phrases from Ticket 261 live outside this module: the
- * correction note in `ExternalEventDetails` and the production unavailable message in
- * `lib/ui/travel.ts`. The bench lists them too.
+ * `DEPARTURE_PHRASE_REVIEW` below lists every reviewed phrase. The owner approved them on
+ * November 5, 2026. The design-system bench renders each one with sample values (Ticket 266), and
+ * a test fails when a builder produces a sentence missing from the list. New wording is added
+ * with `approvedOn: null` until the owner approves it. Two phrases from Ticket 261 live outside
+ * this module: the correction note in `ExternalEventDetails` and the production unavailable
+ * message in `lib/ui/travel.ts`. The bench lists them too.
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */
@@ -26,7 +27,10 @@ export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
 /** The overlap label when the trip home has no known time. */
 export const RETURN_TIME_UNKNOWN = "Return time unknown.";
 
-/** One phrase the owner has not yet approved (Ticket 266 lists them on the bench). */
+/** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
+export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
+
+/** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
   ticket: "261" | "265";
@@ -36,190 +40,257 @@ export type DeparturePhraseApproval = Readonly<{
   situation: string;
   /** The text it replaces, or null for a new line. */
   replaces: string | null;
+  /** When the owner approved the words. New or changed wording goes in with null: not yet approved. */
+  approvedOn: string | null;
+  /** The owner's change to the proposed words, with the proposal it replaced. */
+  ownerChange: Readonly<{ id: string; before: string }> | null;
 }>;
 
-/** Not yet approved by the owner. Built by the functions below; the bench renders each with sample values. */
-export const DEPARTURE_PHRASES_AWAITING_APPROVAL: readonly DeparturePhraseApproval[] = [
+/**
+ * The reviewed travel wording, built by the functions below. The owner approved all of it on
+ * November 5, 2026, with changes R1–R3. Add new or changed wording here with `approvedOn: null`.
+ */
+export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "last-estimate-leave-by", ticket: "261", template: "Last estimate: leave by {time} · checked {time}.",
     situation: "Event drawer, dialog or Behavior row, once the estimate is more than 5 minutes old and a leave time is known.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "return-time-unknown", ticket: "261", template: "Return time unknown.",
     situation: "Event drawer, dialog or Behavior row, when the trip home has no time, for example because the last stop has no end.",
-    replaces: "Full-trip availability is unknown. Known travel spans still apply." },
+    replaces: "Full-trip availability is unknown. Known travel spans still apply.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "overlap-return-unknown", ticket: "261", template: "Return time unknown.",
     situation: "Expanded Behavior row overlap label, when the trip home has no known time.",
-    replaces: "Travel timing incomplete" },
+    replaces: "Travel timing incomplete",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "weather-margin", ticket: "261", template: "{minutes} min added for {condition}.",
     situation: "Once per event, when the forecast adds time to a trip.",
-    replaces: "Includes {minutes} min for {condition}." },
+    replaces: "Includes {minutes} min for {condition}.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "checked", ticket: "261", template: "Google Maps · checked {time}.",
     situation: "Under the travel lines in the drawer, dialog and Behavior row.",
-    replaces: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on attendance and current conditions." },
+    replaces: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on attendance and current conditions.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "brief-footer", ticket: "261", template: "Calculated by Cadence · Google Maps · {time}.",
     situation: "Daily Brief travel block footer.",
-    replaces: "Calculated by Cadence from travel estimates as of 9:00 AM, Google Maps. Not written by the model." },
+    replaces: "Calculated by Cadence from travel estimates as of 9:00 AM, Google Maps. Not written by the model.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "overlap-trip-to", ticket: "261", template: "Overlaps your trip to {event} ({start}–{end})",
     situation: "Expanded Behavior row, when a trip to an event crowds this Behavior.",
-    replaces: "Possible travel overlap" },
+    replaces: "Possible travel overlap",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "overlap-trip-home", ticket: "261", template: "Overlaps your trip home ({start}–{end})",
     situation: "Expanded Behavior row, when the trip home crowds this Behavior.",
-    replaces: "Possible travel overlap" },
+    replaces: "Possible travel overlap",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "free-again", ticket: "261", template: "Free again {time}.",
     situation: "Event drawer and dialog, when the whole day's trip is known.",
-    replaces: "Available again Nov 1, 6:45 PM." },
+    replaces: "Available again Nov 1, 6:45 PM.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "all-day-range", ticket: "261", template: "{date} – {date}",
     situation: "Calendar details time row for an all-day event over several days. One day shows only its date.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "event-tentative", ticket: "261", template: "Tentative",
     situation: "Calendar details time row, for an event not yet confirmed.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "event-cancelled", ticket: "261", template: "Cancelled",
     situation: "Calendar details time row, for a cancelled event.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "soon", ticket: "265", template: "Leave in {minutes} minutes, by {time} from Home · {mode}, arrive {time}.",
     situation: "30 minutes or less before the leave time.",
-    replaces: "Outbound · walking: leave Nov 1, 1:15 PM, arrive Nov 1, 2:20 PM." },
+    replaces: "Outbound · walking: leave Nov 1, 1:15 PM, arrive Nov 1, 2:20 PM.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "leave-now", ticket: "265", template: "Leave now from Home · {mode}, arrive {time}.",
     situation: "From the leave time until 5 minutes after it.",
-    replaces: "Outbound · walking: leave Nov 1, 1:15 PM, arrive Nov 1, 2:20 PM." },
+    replaces: "Outbound · walking: leave Nov 1, 1:15 PM, arrive Nov 1, 2:20 PM.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "late-before-leave", ticket: "265", template: "You may arrive late: leave by {time} from Home · {mode}, arrive {time}.",
     situation: "The route arrives after the planned arrival time, before the leave time.",
-    replaces: "Estimated arrival is after the planned arrival time." },
+    replaces: "Estimated arrival is after the planned arrival time.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "late-after-leave", ticket: "265", template: "You may arrive late: arrive {time}.",
     situation: "The route arrives after the planned arrival time, once the leave time has passed.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "past-leave-time", ticket: "265", template: "If you haven't left yet, you'd arrive about {time}.",
     situation: "5 minutes or more after the leave time. Only the clock has passed it; the route was on time.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "past-leave-time-home", ticket: "265", template: "If you haven't left yet, you'd be home about {time}.",
     situation: "The trip home, 5 minutes or more after its leave time.",
-    replaces: "Return home · walking: timing unavailable." },
+    replaces: "Return home · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "head-home-soon", ticket: "265", template: "Head home in {minutes} minutes, by {time} · {mode}, home by {time}.",
     situation: "The trip home, 30 minutes or less before its leave time.",
-    replaces: "Return home · walking: leave Nov 1, 4:40 PM, arrive Nov 1, 6:35 PM." },
+    replaces: "Return home · walking: leave Nov 1, 4:40 PM, arrive Nov 1, 6:35 PM.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "head-home-now", ticket: "265", template: "Head home now · {mode}, home by {time}.",
     situation: "The trip home, from its leave time until 5 minutes after it.",
-    replaces: "Return home · walking: leave Nov 1, 4:40 PM, arrive Nov 1, 6:35 PM." },
+    replaces: "Return home · walking: leave Nov 1, 4:40 PM, arrive Nov 1, 6:35 PM.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-leave-now", ticket: "265", template: "Last estimate: leave now · checked {time}.",
     situation: "Leave now, with an estimate more than 5 minutes old.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-late-before", ticket: "265", template: "Last estimate: you may arrive late, leave by {time}, arrive {time} · checked {time}.",
     situation: "Late from the route, before the leave time, with an old estimate.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-late-after", ticket: "265", template: "Last estimate: you may arrive late, arrive {time} · checked {time}.",
     situation: "Late from the route, after the leave time, with an old estimate.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-past-leave", ticket: "265", template: "Last estimate: if you haven't left yet, you'd arrive about {time} · checked {time}.",
     situation: "5 minutes or more after the leave time, with an old estimate.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-head-home", ticket: "265", template: "Last estimate: head home {time} · checked {time}.",
     situation: "The trip home, with an old estimate.",
-    replaces: "Return home · walking: timing unavailable." },
+    replaces: "Return home · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "last-estimate-past-leave-home", ticket: "265", template: "Last estimate: if you haven't left yet, you'd be home about {time} · checked {time}.",
     situation: "The trip home, 5 minutes or more after its leave time, with an old estimate.",
-    replaces: "Return home · walking: timing unavailable." },
-  { id: "appears-overdue", ticket: "265", template: "The leave time is ready to check.",
+    replaces: "Return home · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "appears-overdue", ticket: "265", template: "Refresh travel to get the leave time.",
     situation: "The time the estimate was due has passed, and nobody has refreshed.",
-    replaces: "estimated within 3 hours of departure" },
+    replaces: "estimated within 3 hours of departure",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R1", before: "The leave time is ready to check." } },
   { id: "appears-later", ticket: "265", template: "Leave time appears later.",
     situation: "Event drawer, dialog or Behavior row, when the stop's start is unknown so the estimate time cannot be given.",
-    replaces: "estimated within 3 hours of departure" },
+    replaces: "estimated within 3 hours of departure",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "needs-place", ticket: "265", template: "Add a place for {event} to get a leave time.",
     situation: "The event or Behavior has no place.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "needs-attendance", ticket: "265", template: "Is {event} in person or remote?",
     situation: "Cadence cannot tell whether the event is in person.",
-    replaces: null },
-  { id: "needs-origin-blocked", ticket: "265", template: "The leave time for {event} depends on {other event}.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "needs-origin-blocked", ticket: "265", template: "Fix {other event}'s place or attendance to get a leave time for {event}.",
     situation: "The stop before this one has no place or attendance, so the trip has no start.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R2", before: "The leave time for {event} depends on {other event}." } },
   { id: "needs-origin-home", ticket: "265", template: "Add Home in Settings to get a leave time for {event}.",
     situation: "No Home is saved and the device location is unknown.",
-    replaces: null },
-  { id: "time-unknown", ticket: "265", template: "Leave time unknown.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "time-unknown", ticket: "265", template: "No leave time for this trip.",
     situation: "No leave time can be given, for example past the trip limit.",
-    replaces: "Outbound · walking: timing unavailable." },
-  { id: "time-unknown-late", ticket: "265", template: "The leave time is unknown, because you may arrive late at {event}.",
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R3", before: "Leave time unknown." } },
+  { id: "time-unknown-late", ticket: "265", template: "No leave time for this trip, because you may arrive late at {event}.",
     situation: "The trip before this one arrives late, so this trip's times cannot be relied on.",
-    replaces: "Outbound · walking: timing unavailable." },
+    replaces: "Outbound · walking: timing unavailable.",
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R3", before: "The leave time is unknown, because you may arrive late at {event}." } },
   { id: "line-leave-by", ticket: "265", template: "Leave by {time} for {event} from Home · {mode}, arrive {time}.",
     situation: "Line form that names the event, for the next-departure line and reminders.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-soon", ticket: "265", template: "Leave in {minutes} minutes, by {time} for {event} from Home · {mode}, arrive {time}.",
     situation: "Line form, 30 minutes or less before the leave time.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-leave-now", ticket: "265", template: "Leave now for {event} from Home · {mode}, arrive {time}.",
     situation: "Line form, from the leave time until 5 minutes after it.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-late", ticket: "265", template: "You may arrive late at {event}: arrive {time}.",
     situation: "Line form, late from the route after the leave time.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-late-before-leave", ticket: "265", template: "You may arrive late at {event}: leave by {time} from Home · {mode}, arrive {time}.",
     situation: "Line form, late from the route, before the leave time.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-past-leave-time", ticket: "265", template: "If you haven't left for {event} yet, you'd arrive about {time}.",
     situation: "Line form, 5 minutes or more after the leave time.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-last-estimate", ticket: "265", template: "Last estimate: leave by {time} for {event} · checked {time}.",
     situation: "Line form, with an old estimate.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-last-estimate-leave-now", ticket: "265", template: "Last estimate: leave now for {event} · checked {time}.",
     situation: "Line form, leave now with an old estimate.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-last-estimate-late-before", ticket: "265", template: "Last estimate: you may arrive late at {event}, leave by {time}, arrive {time} · checked {time}.",
     situation: "Line form, late from the route before the leave time, with an old estimate.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-last-estimate-late-after", ticket: "265", template: "Last estimate: you may arrive late at {event}, arrive {time} · checked {time}.",
     situation: "Line form, late from the route after the leave time, with an old estimate.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-last-estimate-past-leave", ticket: "265", template: "Last estimate: if you haven't left for {event} yet, you'd arrive about {time} · checked {time}.",
     situation: "Line form, 5 minutes or more after the leave time, with an old estimate.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-appears-by", ticket: "265", template: "The leave time for {event} appears by {time}.",
     situation: "Line form, before the trip's estimate is due.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-appears-later", ticket: "265", template: "The leave time for {event} appears later.",
     situation: "Line form, when the stop's start is unknown.",
-    replaces: null },
-  { id: "line-ready", ticket: "265", template: "The leave time for {event} is ready to check.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "line-ready", ticket: "265", template: "Refresh travel to get the leave time for {event}.",
     situation: "Line form, after the estimate was due.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R1", before: "The leave time for {event} is ready to check." } },
   { id: "line-expired", ticket: "265", template: "The estimate for {event} expired.",
     situation: "Line form, when the server says the estimate expired.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-no-route", ticket: "265", template: "No route found for {event}.",
     situation: "Line form, when no route was found.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-changed", ticket: "265", template: "The trip to {event} changed.",
     situation: "Line form, after a stop on the way was resolved or the plan changed.",
-    replaces: null },
-  { id: "line-time-unknown", ticket: "265", template: "The leave time for {event} is unknown.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "line-time-unknown", ticket: "265", template: "No leave time for the trip to {event}.",
     situation: "Line form, when no leave time can be given.",
-    replaces: null },
-  { id: "line-time-unknown-late", ticket: "265", template: "The leave time for {event} is unknown, because you may arrive late at {other event}.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R3", before: "The leave time for {event} is unknown." } },
+  { id: "line-time-unknown-late", ticket: "265", template: "No leave time for the trip to {event}, because you may arrive late at {other event}.",
     situation: "Line form, when the trip before arrives late.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R3", before: "The leave time for {event} is unknown, because you may arrive late at {other event}." } },
   { id: "home-appears-by", ticket: "265", template: "The leave time for the trip home appears by {time}.",
     situation: "Line form for the trip home, before its estimate is due.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "home-appears-later", ticket: "265", template: "The leave time for the trip home appears later.",
     situation: "Line form for the trip home, when its start is unknown.",
-    replaces: null },
-  { id: "home-ready", ticket: "265", template: "The leave time for the trip home is ready to check.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "home-ready", ticket: "265", template: "Refresh travel to get the leave time for the trip home.",
     situation: "Line form for the trip home, after its estimate was due.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R1", before: "The leave time for the trip home is ready to check." } },
   { id: "home-no-route", ticket: "265", template: "No route found for the trip home.",
     situation: "Line form for the trip home, when no route was found.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "home-expired", ticket: "265", template: "The estimate for the trip home expired.",
     situation: "Line form for the trip home, when its estimate expired.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "home-changed", ticket: "265", template: "The trip home changed.",
     situation: "Line form for the trip home, after the plan changed.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "paused", ticket: "265", template: "Travel estimates are paused.",
     situation: "The travel budget is used up and its renewal date is unknown.",
-    replaces: null },
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
@@ -330,7 +401,7 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
         ? lastEstimate(input, time, forStop, named ? ` at ${destination}` : "", named ? destination : null)
         : current(input, time, forStop, named ? ` at ${destination}` : "", named ? destination : null);
     case "appears_later":
-      if (input.appearsOverdue) return named ? `The leave time for ${destination} is ready to check.` : "The leave time is ready to check.";
+      if (input.appearsOverdue) return named ? `${DEPARTURE_REFRESH_LABEL} to get the leave time for ${destination}.` : `${DEPARTURE_REFRESH_LABEL} to get the leave time.`;
       if (!input.appearsAt) return named ? `The leave time for ${destination} appears later.` : "Leave time appears later.";
       return named ? `The leave time for ${destination} appears by ${time(input.appearsAt)}.` : `Leave time appears by ${time(input.appearsAt)}.`;
     case "needs_place":
@@ -339,7 +410,7 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
       return `Is ${destination} in person or remote?`;
     case "needs_origin":
       return input.blockingLabel
-        ? `The leave time for ${destination} depends on ${input.blockingLabel}.`
+        ? `Fix ${input.blockingLabel}'s place or attendance to get a leave time for ${destination}.`
         : `Add Home in Settings to get a leave time for ${destination}.`;
     case "time_unknown":
       return timeUnknown(input, destination, named);
@@ -409,7 +480,7 @@ function timeUnknown(input: DeparturePhraseInput, destination: string, named: bo
     return input.timeUnknownCause === "home_missing" ? `${RETURN_TIME_UNKNOWN} Add Home in Settings to estimate it.` : RETURN_TIME_UNKNOWN;
   }
   if (input.timeUnknownCause === "late_arrival") {
-    return `The leave time${named ? ` for ${destination}` : ""} is unknown, because you may arrive late at ${input.blockingLabel ?? PRIOR_STOP_FALLBACK}.`;
+    return `No leave time for ${named ? `the trip to ${destination}` : "this trip"}, because you may arrive late at ${input.blockingLabel ?? PRIOR_STOP_FALLBACK}.`;
   }
-  return named ? `The leave time for ${destination} is unknown.` : "Leave time unknown.";
+  return named ? `No leave time for the trip to ${destination}.` : "No leave time for this trip.";
 }

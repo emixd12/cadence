@@ -222,7 +222,7 @@ describe("each state", () => {
   it("appears later: once the time has passed it offers a refresh", () => {
     const { next } = model(local("11:30"), [missing(OUTBOUND, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW)]);
     expect(next).toMatchObject({ state: "appears_later", action: "refresh" });
-    expect(next?.phrase).toBe("The leave time is ready to check.");
+    expect(next?.phrase).toBe("Refresh travel to get the leave time.");
   });
 
   it("appears later: a stop missing from the input gives no invented time", () => {
@@ -249,7 +249,7 @@ describe("each state", () => {
       unknown("outbound", null, "lunch", "destination_unknown"),
     ] });
     expect(result.trips.map((trip) => trip.state)).toEqual(["needs_place", "needs_origin"]);
-    expect(result.trips[1]).toMatchObject({ blockingRef: "lunch", blockingLabel: "Lunch", phrase: "The leave time for Dentist depends on Lunch." });
+    expect(result.trips[1]).toMatchObject({ blockingRef: "lunch", blockingLabel: "Lunch", phrase: "Fix Lunch's place or attendance to get a leave time for Dentist." });
     const asked = model(local("08:00"), [], { stops: [DENTIST, lunch], unknownLegs: [
       unknown("outbound", null, "lunch", "attendance_unknown"),
       unknown("outbound", null, "dentist", "origin_unknown"),
@@ -280,7 +280,7 @@ describe("each state", () => {
     const noEnd = model(local("08:00"), [], { unknownLegs: [unknown("return", "dentist", null, "timing_unknown")] });
     expect(noEnd).toMatchObject({ phrase: "Return time unknown." });
     const limit = model(local("08:00"), [], { unknownLegs: [unknown("onward", "lunch", "dentist", "leg_limit")] });
-    expect(limit.next).toMatchObject({ timeUnknownCause: "leg_limit", phrase: "Leave time unknown.", linePhrase: "The leave time for Dentist is unknown." });
+    expect(limit.next).toMatchObject({ timeUnknownCause: "leg_limit", phrase: "No leave time for this trip.", linePhrase: "No leave time for the trip to Dentist." });
   });
 
   it("gives one line for each reason an estimate is missing", () => {
@@ -536,7 +536,7 @@ describe("unreliable chains", () => {
     const toC = timed(leg("onward", "b", "c"), local("13:00"), local("13:20"));
     const { trips } = model(local("09:00"), [late, toB, toC], { stops: [stopRef("a", "10:30", "11:00"), stopRef("b", "11:30", "12:00"), stopRef("c", "13:30", "14:00")] });
     expect(trips.map((trip) => trip.state)).toEqual(["late", "time_unknown", "upcoming"]);
-    expect(trips[1]?.linePhrase).toBe("The leave time for b is unknown, because you may arrive late at a.");
+    expect(trips[1]?.linePhrase).toBe("No leave time for the trip to b, because you may arrive late at a.");
   });
 });
 
@@ -601,7 +601,7 @@ describe("the phrase module", () => {
   it("calls the trip home by name in the line form, never your next stop", () => {
     const line = (entry: TravelResolvedLegEvidence, now = "08:00") => model(local(now), [entry]).next?.linePhrase;
     expect(line(missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW))).toBe("The leave time for the trip home appears by 12:40 PM.");
-    expect(line(missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW), "13:00")).toBe("The leave time for the trip home is ready to check.");
+    expect(line(missing(HOME, "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW), "13:00")).toBe("Refresh travel to get the leave time for the trip home.");
     expect(line(missing(HOME, "unavailable", "Route unavailable."))).toBe("No route found for the trip home.");
     expect(line(missing(HOME, "rejected_revision", "Journey or grant revision changed."))).toBe("The trip home changed.");
     expect(line(missing(HOME, "stale", "Route estimate expired."))).toBe("The estimate for the trip home expired.");

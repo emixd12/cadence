@@ -15597,10 +15597,11 @@ the expanded Behavior row and the Daily Brief travel block:
   - "Applies only to this event revision while the Timeline is open." becomes "Applies
     to this event until you close the Timeline." Ticket 281 replaces it when corrections
     are remembered.
-- Wording not yet approved by the owner: "Last estimate: leave by {time} · checked
-  {time}", "Return time unknown." as the replacement for "Travel timing incomplete",
-  "Applies to this event until you close the Timeline.", and the existing unavailable
-  message as the replacement for the provider-review text.
+- Wording approved by the owner on November 5, 2026 ("Apply R1–R3, approve the rest";
+  `docs/DECISIONS.md`): "Last estimate: leave by {time} · checked {time}", "Return time
+  unknown." as the replacement for "Travel timing incomplete", "Applies to this event
+  until you close the Timeline.", and the existing unavailable message as the replacement
+  for the provider-review text. R1–R3 changed Ticket 265 phrases only.
 - No travel status line on a day with no trips (G9). Ticket 269 then replaces the line.
 - `docs/MESSAGING_CHANGES.md` P-015 matches the shipped words.
 - Provenance footer: "Google Maps · Checked Nov 1, 8:00 AM. Estimates depend on
@@ -15873,7 +15874,7 @@ Implementation notes:
 - `/design-system?preview=departure-states` (`app/design-system/DepartureStatesBench.tsx`) adds the
   state switch and bench clock, and the wording review
   (`app/design-system/DepartureWordingReview.tsx`) built from
-  `DEPARTURE_PHRASES_AWAITING_APPROVAL` in `packages/core/src/services/departure-phrases.ts`.
+  `DEPARTURE_PHRASE_REVIEW` in `packages/core/src/services/departure-phrases.ts`.
 - `TRAVEL_ESTIMATE_LIFETIME_SECONDS` in `travel-refresh-policy.ts` is the shipped 5-minute expiry,
   used by the provider adapter and the bench.
 - Verifier fixes: `tests/departure-wording-coverage.test.ts` fails on any builder sentence missing from

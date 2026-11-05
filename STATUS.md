@@ -13,16 +13,19 @@ real travel timing.
   Refresh travel re-checks at the bench clock. The real status line, Timeline, expanded Behavior row,
   drawer, Calendar details and Daily Brief bubble render each state; the drawer and dialog sit in the
   page flow on this bench only.
-- A wording review lists every phrase awaiting the owner's approval, rendered by the product code
-  with sample values, with when it shows and what it replaces. The list is
-  `DEPARTURE_PHRASES_AWAITING_APPROVAL` in `departure-phrases.ts`, plus the correction note and the
-  production unavailable message.
+- A wording review lists every travel phrase, rendered by the product code with sample values, with
+  when it shows, what it replaces and its approval date. The list is `DEPARTURE_PHRASE_REVIEW` in
+  `departure-phrases.ts`, plus the correction note and the production unavailable message.
 - The year-2999 expiries are gone from the bench fixtures. Captions say where a fixture holds the
   clock still on purpose. The 5-minute lifetime is one core constant used by the provider adapter.
 - Verifier fixes: the review lists 62 phrases, and a test runs both phrase builders over every state,
   role and freshness and fails on any sentence missing from it. "Return time unknown." now shows only
   when there is a trip home without a time, so a day with no trips shows no travel text. The drawer
   and dialog show a repeated line, such as the pause, once.
+- Owner wording decision, November 5, 2026: "Apply R1–R3, approve the rest". R1 "Refresh travel
+  to get the leave time." (the words are the Refresh travel action itself), R2 "Fix Gym's place or
+  attendance to get a leave time for Dentist.", R3 "No leave time for this trip." and its forms.
+  All 62 phrases on the bench now show their approval date (`docs/DECISIONS.md`).
 - Known gap, shown on the bench: no screen shows the place, attendance or start steps yet (Ticket
   273), and no screen shows the next-departure line (Ticket 269).
 
@@ -50,7 +53,7 @@ what to do and when, in plain words, from the departure model.
 
 Platform impact: web and desktop through the shared components and core. Marketing: not applicable.
 Future mobile: shared components, checked at 390 px. Messaging impact: P-015 now lists the shipped
-words. Most wording still needs the owner's approval.
+words. The owner approved the wording on November 5, 2026, with changes R1–R3.
 
 ## Travel advisory revamp Wave 1: Ticket 262 implemented — November 5, 2026
 
@@ -89,7 +92,7 @@ will.
   it follows the arrival, and the leg is flagged `late` if that passes the arrival target.
 - After an Occurrence is resolved, the departure model reads the trip from it to a later stop as a
   changed trip, so the next trip does not skip that stop. Shipped rows and drawers show nothing new.
-- Most phrases are not yet approved by the owner. The list is at the top of the phrase module.
+- The owner approved the phrases on November 5, 2026, with changes R1–R3 (`docs/DECISIONS.md`).
 
 Platform impact: web and desktop read the same core module from later tickets. Marketing: not
 applicable. Future mobile: portable core module. Messaging impact: P-022; Tickets 261 and 269 own the

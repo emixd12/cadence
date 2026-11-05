@@ -215,7 +215,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
   },
 );
 
-/** Ticket 261 wording, not yet approved by the owner. The bench lists it for review (Ticket 266). */
+/** Ticket 261 wording, approved by the owner on November 5, 2026. The bench lists it (Ticket 266). */
 export const TRAVEL_CORRECTION_NOTE = "Applies to this event until you close the Timeline.";
 
 type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
@@ -261,12 +261,19 @@ function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh
   const text = (trip: DepartureTrip) => trip.originRef === eventId ? trip.linePhrase : trip.phrase;
   // The same sentence once per view, such as the pause shared by every trip (Ticket 266).
   const shown = trips.filter((trip, index) => trips.findIndex((other) => text(other) === text(trip)) === index);
-  // One Refresh travel per view, on the first line that needs it.
-  const refreshKey = shown.find((trip) => trips.some((other) => text(other) === text(trip) && other.action === "refresh"))?.key ?? null;
+  // One Refresh travel per view. A line that starts with "Refresh travel" carries it as its own
+  // first words, so the words never repeat (Ticket 266, owner change R1).
+  const needsRefresh = (trip: DepartureTrip) => trips.some((other) => text(other) === text(trip) && other.action === "refresh");
+  const leadsWithRefresh = (trip: DepartureTrip) => text(trip).startsWith(`${DEPARTURE_REFRESH_LABEL} `);
+  const refreshKey = (shown.find((trip) => needsRefresh(trip) && leadsWithRefresh(trip)) ?? shown.find(needsRefresh))?.key ?? null;
+  const refreshButton = (label: string) => refresh
+    ? <button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{label}</button> : label;
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
     {shown.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
-      {text(trip)}
-      {trip.key === refreshKey && refresh ? <>{" "}<button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{DEPARTURE_REFRESH_LABEL}</button></> : null}
+      {trip.key === refreshKey && leadsWithRefresh(trip)
+        ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{text(trip).slice(DEPARTURE_REFRESH_LABEL.length)}</>
+        : text(trip)}
+      {trip.key === refreshKey && !leadsWithRefresh(trip) && refresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
     </p>)}
     {margin ? <p>{margin}</p> : null}
     {travel?.completeTrip && travel.finalAvailabilityAt ? <p>{departureFreeAgainPhrase(travel.finalAvailabilityAt, context)}</p> : null}

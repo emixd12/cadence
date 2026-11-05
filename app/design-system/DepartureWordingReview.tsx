@@ -1,7 +1,8 @@
 "use client";
 
 import {
-  DEPARTURE_PHRASES_AWAITING_APPROVAL,
+  DEPARTURE_PHRASE_REVIEW,
+  OWNER_APPROVED_2026_11_05,
   RETURN_TIME_UNKNOWN,
   allDayRangeLabel,
   departureBriefFooterPhrase,
@@ -19,8 +20,8 @@ import { TRAVEL_CORRECTION_NOTE } from "@/components/timeline/ExternalEventDetai
 import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE } from "@/lib/ui/travel";
 
 /**
- * Ticket 266: every phrase the owner has not yet approved, rendered by the real phrase
- * functions with sample values. The list comes from `departure-phrases.ts`, so it cannot drift.
+ * Ticket 266: every reviewed travel phrase, rendered by the real phrase functions with sample
+ * values. The list and its approval dates come from `departure-phrases.ts`, so it cannot drift.
  */
 
 const TIMEZONE = "America/New_York";
@@ -102,29 +103,32 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "paused": () => detail({ state: "paused", resumesAt: null }),
 };
 
-export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null }>;
+export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;
+  approvedOn: string | null; ownerChange: Readonly<{ id: string; before: string }> | null }>;
 
 /** The rows the review shows: the module's list, then the two Ticket 261 phrases kept outside it. */
 export function departureWordingRows(): DepartureWordingRow[] {
   return [
-    ...DEPARTURE_PHRASES_AWAITING_APPROVAL.map((entry) => ({ ...entry, source: "departure-phrases.ts",
+    ...DEPARTURE_PHRASE_REVIEW.map((entry) => ({ ...entry, source: "departure-phrases.ts",
       sample: DEPARTURE_WORDING_SAMPLES[entry.id]?.() ?? "" })),
     { id: "correction-note", ticket: "261", source: "ExternalEventDetails.tsx", sample: TRAVEL_CORRECTION_NOTE, template: TRAVEL_CORRECTION_NOTE,
       situation: "Calendar details, under the form that corrects attendance or the destination for one journey.",
-      replaces: "Applies only to this event revision while the Timeline is open." },
+      replaces: "Applies only to this event revision while the Timeline is open.", approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
     { id: "production-unavailable", ticket: "261", source: "lib/ui/travel.ts", sample: TRAVEL_UNAVAILABLE_MESSAGE, template: TRAVEL_UNAVAILABLE_MESSAGE,
       situation: "Travel status line in production builds while travel waits for the deployment's provider review.",
-      replaces: TRAVEL_CLEARANCE_MESSAGE },
+      replaces: TRAVEL_CLEARANCE_MESSAGE, approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   ];
 }
 
 export function DepartureWordingReview() {
   const rows = departureWordingRows();
+  const pending = rows.filter((row) => !row.approvedOn).length;
   return <section aria-labelledby="departure-wording-title" className="grid gap-4" data-departure-wording-review>
     <div className="grid gap-2">
-      <h2 id="departure-wording-title" className="text-xl font-bold">Wording awaiting approval</h2>
-      <p className="max-w-3xl text-sm leading-6 text-muted-readable">
-        {rows.length} phrases. Each sentence is rendered by the product code with sample values: Dentist at 2 PM, leaving Home at 1:20 PM on foot,
+      <h2 id="departure-wording-title" className="text-xl font-bold">Travel wording</h2>
+      <p className="max-w-3xl text-sm leading-6 text-muted-readable" data-wording-approval>
+        {pending ? `${pending} of ${rows.length} phrases await the owner's approval. ` : `All ${rows.length} phrases approved by the owner on ${approvalDate(OWNER_APPROVED_2026_11_05)}, with changes R1–R3. `}
+        Each sentence is rendered by the product code with sample values: Dentist at 2 PM, leaving Home at 1:20 PM on foot,
         and Gym as the stop before it. Times on November 10 show without a date.
       </p>
     </div>
@@ -132,6 +136,7 @@ export function DepartureWordingReview() {
       {rows.map((row) => <li key={row.id} className="grid min-w-0 gap-2 border border-line bg-background p-4" data-wording-id={row.id}>
         <p className="break-words text-base font-bold [overflow-wrap:anywhere]" data-wording-sample>{row.sample}</p>
         <dl className="grid gap-x-4 gap-y-1 text-sm leading-6 sm:grid-cols-[8rem_minmax(0,1fr)]">
+          <dt className="text-muted-readable">Status</dt><dd className="min-w-0 break-words" data-wording-status>{row.approvedOn ? `Approved ${approvalDate(row.approvedOn)}` : "Not yet approved"}{row.ownerChange ? ` with owner change ${row.ownerChange.id}. Proposed: “${row.ownerChange.before}”` : ""}</dd>
           <dt className="text-muted-readable">Shown when</dt><dd className="min-w-0 break-words">{row.situation}</dd>
           <dt className="text-muted-readable">Replaces</dt><dd className="min-w-0 break-words">{row.replaces ? `“${row.replaces}”` : "Nothing. This is a new line."}</dd>
           <dt className="text-muted-readable">Pattern</dt><dd className="min-w-0 break-words">{row.template}</dd>
@@ -140,4 +145,9 @@ export function DepartureWordingReview() {
       </li>)}
     </ol>
   </section>;
+}
+
+function approvalDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][month! - 1]} ${day}, ${year}`;
 }

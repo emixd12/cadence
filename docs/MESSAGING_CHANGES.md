@@ -552,8 +552,13 @@ cite has not changed.
   (`docs/plans/2026-11-04-travel-departure-ux-review.md`). Corrected the same day: an
   earlier draft of this entry and Ticket 261 said "3 hours before the trip", but the
   window counts back from the arrival target (correction C3). Ticket 261 shipped on
-  branch `us-work`, November 5, 2026, with these words. Many are not yet approved by
-  the owner; the list is at the top of `packages/core/src/services/departure-phrases.ts`.
+  branch `us-work`, November 5, 2026, with these words. The owner approved the wording on
+  November 5, 2026 ("Apply R1–R3, approve the rest"; `docs/DECISIONS.md`). The full list is
+  `DEPARTURE_PHRASE_REVIEW` in `packages/core/src/services/departure-phrases.ts`.
+  - Owner changes R1–R3: "Refresh travel to get the leave time." (was "The leave time is
+    ready to check."), "Fix Gym's place or attendance to get a leave time for Dentist."
+    (was "… depends on Gym."), and "No leave time for this trip." (was "Leave time
+    unknown."), with "No leave time for this trip, because you may arrive late at Gym."
   - Trips: "Leave by 1:15 PM · walking, arrive 2:20 PM.", "Leave by 1:15 PM from Home
     · walking, arrive 2:20 PM.", "Head home 4:40 PM · walking, home by 6:35 PM." The
     date shows only for a trip on another local date. "Origin: …" is gone.
@@ -727,4 +732,8 @@ cite has not changed.
   a trip home."
 - **Update needed:** say that a margin that cannot fit before the leave time means arriving
   later, for any trip. Weather stays off until the owner turns it on.
+- **Approved wording** (owner, November 5, 2026): the margin line reads "15 min added for
+  thunderstorms.", and a trip the margin makes late reads "You may arrive late: leave by
+  1:20 PM from Home · walking, arrive 2:05 PM." before the leave time, or "You may arrive
+  late: arrive 2:05 PM." after it.
 - **Status:** logged.

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RefreshProvider } from "@cadence/ui/runtime";
-import { DEPARTURE_PHRASES_AWAITING_APPROVAL } from "@cadence/core/services/departure-phrases";
+import { DEPARTURE_PHRASE_REVIEW } from "@cadence/core/services/departure-phrases";
 import { DEPARTURE_BENCH_STATES, DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { DEPARTURE_WORDING_SAMPLES, departureWordingRows } from "@/app/design-system/DepartureWordingReview";
 
@@ -118,7 +118,7 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Is Dentist in person or remote?");
   await choose("needs-origin");
   expect(container.querySelector("[data-departure-model-state]")?.textContent).toBe("Needs a start");
-  expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("The leave time for Dentist depends on Gym.");
+  expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Fix Gym's place or attendance to get a leave time for Dentist.");
   await choose("paused");
   expect(statusLine()).toContain("Travel estimates resume on December 1.");
   for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
@@ -165,10 +165,10 @@ it("keeps development-only text to the development build", async () => {
   expect(container.querySelector("[data-travel-development-warnings]")?.textContent).toContain("Estimated arrival is after the planned arrival time.");
 });
 
-it("lists every phrase awaiting approval, rendered by the module to match its pattern", async () => {
+it("lists every reviewed phrase with its approval, rendered by the module to match its pattern", async () => {
   const rows = departureWordingRows();
-  expect(rows).toHaveLength(DEPARTURE_PHRASES_AWAITING_APPROVAL.length + 2);
-  expect(Object.keys(DEPARTURE_WORDING_SAMPLES).sort()).toEqual(DEPARTURE_PHRASES_AWAITING_APPROVAL.map((entry) => entry.id).sort());
+  expect(rows).toHaveLength(DEPARTURE_PHRASE_REVIEW.length + 2);
+  expect(Object.keys(DEPARTURE_WORDING_SAMPLES).sort()).toEqual(DEPARTURE_PHRASE_REVIEW.map((entry) => entry.id).sort());
   for (const row of rows) {
     const pattern = new RegExp(`^${row.template.split(/\{[^}]+\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".+?")}$`);
     expect(row.sample, row.id).toMatch(pattern);
@@ -203,4 +203,26 @@ it("keeps the Gym row and the Dentist drawer in agreement about the trip home th
   // A known time for the trip home.
   await choose("head-home");
   expect(gymRow()).not.toContain("Return time unknown");
+});
+
+it("makes Refresh travel the first words of a line that asks for it, never repeating them (owner change R1)", async () => {
+  await render("fresh");
+  // At 11:30 AM the trip to Dentist was due at 10:55 AM, and nobody refreshed.
+  await moveClock("11:30");
+  for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
+    const view = text(label);
+    expect(view, label).toContain("Refresh travel to get the leave time.");
+    expect(view, label).not.toMatch(/Refresh travel\s*Refresh travel/);
+    expect([...surface(label).querySelectorAll("button")].filter((button) => button.textContent === "Refresh travel"), label).toHaveLength(1);
+  }
+  const button = [...surface("Dentist drawer").querySelectorAll("button")].find((element) => element.textContent === "Refresh travel")!;
+  expect(button.closest("p")?.textContent).toBe("Refresh travel to get the leave time.");
+  for (const line of container.querySelectorAll("p")) expect(line.textContent ?? "").not.toMatch(/Refresh travel\s*Refresh travel/);
+});
+
+it("shows the owner's approval on the wording review", async () => {
+  await render();
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("approved by the owner on November 5, 2026, with changes R1–R3");
+  expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-sample]')?.textContent).toBe("Refresh travel to get the leave time.");
+  expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-status]')?.textContent).toContain("owner change R1");
 });
