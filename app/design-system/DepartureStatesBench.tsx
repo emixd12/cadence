@@ -15,6 +15,7 @@ import type { DepartureModel, DepartureState } from "@cadence/core/types/departu
 import type { TravelCommitment, TravelEndpoint, TravelEvidenceResult, TravelPlannedLeg, TravelRouteEstimate } from "@cadence/core/types/travel";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
+import { NEXT_TRIP_PRESENTATION, type NextDepartureLineSize, type NextTripMarker } from "@/components/timeline/next-trip-presentation";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import type { TravelState } from "@/lib/ui/travel";
@@ -33,6 +34,7 @@ const DATE = "2026-11-10";
 const DAY_START_MINUTES = 6 * 60;
 const DAY_END_MINUTES = 18 * 60;
 const GYM_ID = "bench-gym";
+const CALL_ID = "bench-call";
 const DENTIST_ID = "google_calendar/bench/dentist";
 /** Walking minutes to each destination. The provider is synthetic; the timing rules are real. */
 const WALK_MINUTES: Readonly<Record<string, number>> = { [GYM_ID]: 20, [DENTIST_ID]: 35, home: 30 };
@@ -54,6 +56,8 @@ export type DepartureBenchState = Readonly<{
   /** Gym was marked Completed at this local time, after the routes were checked. */
   gymCompletedAt?: string;
   paused?: boolean;
+  /** Ticket 270: adds Call Mom (1:30 PM, no place), which the trip to Dentist crowds. */
+  crowded?: boolean;
   /** The model state this preset produces. Tests walk every preset. */
   expected: DepartureState;
 }>;
@@ -73,6 +77,8 @@ export const DEPARTURE_BENCH_STATES: readonly DepartureBenchState[] = [
     description: "Routes checked after the leave time. The route arrives after the planned arrival, so Cadence gives the late arrival." },
   { id: "late-clock", label: "Late: clock only", clock: "09:45", checked: "09:00", dentist: "located", gym: "located", expected: "late",
     description: "The route was on time, but the clock is 10 minutes past the leave time. Cadence cannot tell whether you left, so it says when you would arrive. The estimate is also old." },
+  { id: "upcoming-dentist", label: "Upcoming: a trip crowds a Behavior", clock: "12:30", checked: "12:30", crowded: true, dentist: "located", gym: "located", expected: "upcoming",
+    description: "Gym is over. The next trip goes from Gym to Dentist, and Call Mom (1:30 PM, no place) falls inside it, so its collapsed row says so." },
   { id: "head-home", label: "During the event: head home", clock: "14:15", checked: "14:15", dentist: "located", gym: "located", expected: "head_home",
     description: "Dentist is under way. The next trip is the trip home." },
   { id: "trip-changed", label: "Trip changed after resolving a stop", clock: "10:58", checked: "10:56", gymCompletedAt: "10:57", dentist: "located", gym: "located", expected: "trip_changed",
@@ -124,15 +130,21 @@ function benchEvent(variant: DentistVariant): NormalizedExternalEvent {
   };
 }
 
-const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {};
+/** Ticket 270: Call Mom's default duration, so the trip to Dentist can crowd it. */
+const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {
+  "bench-call-behavior": { kind: "known", seconds: 15 * 60, durationLabel: "15 min", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
+};
 
-function benchTimeline(gymStatus: "unresolved" | "completed", gym: GymVariant) {
+function benchTimeline(gymStatus: "unresolved" | "completed", gym: GymVariant, crowded = false) {
   return resolveTimeline({ timezone: TIMEZONE, now: Temporal.Instant.from(instantAt("06:00")), futureDays: 0,
     occurrences: [{ id: GYM_ID, behaviorId: "bench-gym-behavior", title: "Gym", description: "Synthetic located Behavior.", categoryName: "Health",
       scheduleSummary: "Weekdays", scheduledFor: instantAt("10:00"), scheduledTimeLabel: "10:00 AM", scheduleKind: "range", scheduleEndTime: "11:00",
       ...(gym === "located" ? { placeText: "Synthetic gym" } : {}),
       localDate: DATE, status: gymStatus, statusMarkedAt: gymStatus === "completed" ? instantAt("10:57") : null, note: "", canStartTimeTracking: false,
-      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }] });
+      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }, ...crowded ? [{ id: CALL_ID, behaviorId: "bench-call-behavior", title: "Call Mom", description: "Synthetic Behavior with no place.", categoryName: "Family",
+      scheduleSummary: "Weekly", scheduledFor: instantAt("13:30"), scheduledTimeLabel: "1:30 PM", scheduleKind: "exact" as const,
+      localDate: DATE, status: "unresolved" as const, statusMarkedAt: null, note: "", canStartTimeTracking: false,
+      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }] : []] });
 }
 
 /** The provider rule for walking as shipped: arrive-by legs count back from the target, depart-at legs forward. */
@@ -199,9 +211,23 @@ function InlineSurface({ children, label }: Readonly<{ children: ReactNode; labe
   </section>;
 }
 
+/** Ticket 270: the owner compares three markers, each with the line at two sizes. */
+export const NEXT_TRIP_MARKER_OPTIONS: readonly Readonly<{ id: NextTripMarker; letter: string; label: string; description: string }>[] = [
+  { id: "rail_label", letter: "A", label: "A: label in the left rail", description: "\"Leave 1:15\" beside the axis, with a tick at the leave time. Below 576 px it moves clear of Calendar markers." },
+  { id: "behavior_row", letter: "B", label: "B: slim row among the Behaviors", description: "\"Leave 1:15 PM for Dentist\" as a text row in time order, before the first Behavior at or after the leave time." },
+  { id: "axis_tick", letter: "C", label: "C: axis tick only", description: "A tick on the axis at the leave time. The time is in the next-departure line." },
+];
+export const NEXT_DEPARTURE_LINE_OPTIONS: readonly Readonly<{ id: NextDepartureLineSize; label: string }>[] = [
+  { id: "status", label: "Small status size (today)" },
+  { id: "title", label: "Behavior title size" },
+];
+
 const idleAction = async () => ({ status: "idle" as const, message: "Bench only. Nothing is saved." });
 
-export function DepartureStatesBench({ initialStateId }: Readonly<{ initialStateId?: string }>) {
+export function DepartureStatesBench({ initialStateId, initialMarker, initialLine }: Readonly<{ initialStateId?: string; initialMarker?: string; initialLine?: string }>) {
+  const [marker, setMarker] = useState<NextTripMarker>(NEXT_TRIP_MARKER_OPTIONS.find((option) => option.id === initialMarker || option.letter === initialMarker?.toUpperCase())?.id ?? NEXT_TRIP_PRESENTATION.marker);
+  const [lineSize, setLineSize] = useState<NextDepartureLineSize>(NEXT_DEPARTURE_LINE_OPTIONS.find((option) => option.id === initialLine)?.id ?? NEXT_TRIP_PRESENTATION.line);
+  const markerOption = NEXT_TRIP_MARKER_OPTIONS.find((option) => option.id === marker)!;
   const initial = DEPARTURE_BENCH_STATES.find((state) => state.id === initialStateId) ?? DEPARTURE_BENCH_STATES[0]!;
   const [stateId, setStateId] = useState(initial.id);
   const [clock, setClock] = useState(initial.clock);
@@ -224,7 +250,8 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
   const scenario: Scenario = useMemo(() => ({ dentist: preset.dentist, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
     [preset.dentist, preset.gym, preset.gymCompletedAt]);
   const gymStatus = scenario.gymCompletedAt && minutesOf(clock) >= minutesOf(scenario.gymCompletedAt) ? "completed" as const : "unresolved" as const;
-  const timeline = useMemo(() => benchTimeline(gymStatus, scenario.gym), [gymStatus, scenario.gym]);
+  const crowded = preset.crowded ?? false;
+  const timeline = useMemo(() => benchTimeline(gymStatus, scenario.gym, crowded), [gymStatus, scenario.gym, crowded]);
   const event = useMemo(() => benchEvent(scenario.dentist), [scenario.dentist]);
   const events = useMemo(() => [event], [event]);
   const evidence = useMemo(() => benchEvidence(scenario, checked), [scenario, checked]);
@@ -287,6 +314,17 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
             <option value="development">Development (shows text production never shows)</option>
           </select>
         </label>
+        <label className="grid gap-2 text-sm font-bold">Next trip marker (Ticket 270)
+          <select className="min-h-11 border border-line bg-background font-normal" value={marker} onChange={(change) => setMarker(change.target.value as NextTripMarker)} data-bench-marker>
+            {NEXT_TRIP_MARKER_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}{option.id === NEXT_TRIP_PRESENTATION.marker ? " (production now)" : ""}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-bold">Next-departure line size
+          <select className="min-h-11 border border-line bg-background font-normal" value={lineSize} onChange={(change) => setLineSize(change.target.value as NextDepartureLineSize)} data-bench-line-size>
+            {NEXT_DEPARTURE_LINE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}{option.id === NEXT_TRIP_PRESENTATION.line ? " (production now)" : ""}</option>)}
+          </select>
+        </label>
+        <p className="text-xs leading-5 text-muted-readable sm:col-span-2" data-bench-marker-note>{markerOption.description} Every marker keeps the magenta span from get-ready or leave time to arrival, for the next trip only. The owner picks one; production uses the constant in next-trip-presentation.ts.</p>
         <div className="grid gap-2 sm:col-span-2">
           <label htmlFor="departure-bench-clock" className="text-sm font-bold">Bench clock</label>
           <div className="flex flex-wrap items-center gap-3">
@@ -318,7 +356,8 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
             <DayProgressTimeline timeline={timeline}
               context={{ events, freshness: { state: "current", refreshedAt: checkedAt, label: "Calendar current", canAssertNoOverlap: true },
                 now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking" }}
-              statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction} />
+              statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction}
+              nextTripPresentation={{ marker, line: lineSize }} />
           </div>
         </section>
         <div className="grid min-w-0 content-start gap-8">

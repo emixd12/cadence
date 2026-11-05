@@ -279,8 +279,12 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
   // Ticket 271 adds the correction control's label, not yet approved (decision D7).
   // Ticket 272 lists the Daily Brief's overlap and return lines, not yet approved.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("4 of 67 phrases await the owner's approval.");
-  for (const id of ["brief-overlap", "brief-overlap-trip-home", "brief-back"]) {
+  // Ticket 270 adds the rail label and the slim row's two forms, not yet approved.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("7 of 70 phrases await the owner's approval.");
+  expect(container.querySelector('[data-wording-id="marker-rail"] [data-wording-sample]')?.textContent).toBe("Leave 1:20");
+  expect(container.querySelector('[data-wording-id="marker-row"] [data-wording-sample]')?.textContent).toBe("Leave 1:20 PM for Dentist");
+  expect(container.querySelector('[data-wording-id="marker-row-home"] [data-wording-sample]')?.textContent).toBe("Leave 3:00 PM for home");
+  for (const id of ["brief-overlap", "brief-overlap-trip-home", "brief-back", "marker-rail", "marker-row", "marker-row-home"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
   }
   expect(container.querySelector('[data-wording-id="brief-back"] [data-wording-sample]')?.textContent).toBe("Back around 3:30 PM.");
@@ -312,5 +316,91 @@ it("gives every line that starts with Refresh travel its own button when two tri
     if (summary && !summary.closest("details")?.open) await act(() => summary.click());
     const row = surface("Timeline").querySelector('[data-occurrence-id="bench-gym"]')!;
     for (const line of leading(row)) expect(line.querySelectorAll("button"), `${time} Gym row`).toHaveLength(1);
+  }
+});
+
+// Ticket 270 (D2, "Next trip only"): the next trip's span and marker, in each bench variant.
+async function chooseSelect(attribute: string, value: string) {
+  const select = container.querySelector<HTMLSelectElement>(`select[${attribute}]`)!;
+  await act(async () => {
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+const timelineSurface = () => surface("Timeline");
+const marks = () => ({
+  spans: [...timelineSurface().querySelectorAll("[data-next-trip-span]")].map((line) => line.getAttribute("data-next-trip-span")),
+  ticks: timelineSurface().querySelectorAll("[data-next-trip-tick]").length,
+  labels: [...timelineSurface().querySelectorAll("[data-next-trip-label]")].map((label) => label.textContent),
+  rows: [...timelineSurface().querySelectorAll("[data-next-trip-row]")].map((row) => row.textContent),
+  hoverSpans: timelineSurface().querySelectorAll("[data-travel-duration], [data-event-duration]").length,
+});
+const tabStops = () => [...timelineSurface().querySelectorAll<HTMLElement>("button, a[href], input, select, summary, [tabindex]")]
+  .filter((element) => element.tabIndex >= 0).length;
+
+it("marks the next trip only, without hovering, in each marker variant (Ticket 270)", async () => {
+  await render("fresh");
+  const stops: number[] = [];
+  for (const marker of ["rail_label", "behavior_row", "axis_tick"]) {
+    await chooseSelect("data-bench-marker", marker);
+    const shown = marks();
+    // One magenta span, for the trip to Gym; the other trips stay inspection-only.
+    expect(shown.spans, marker).toEqual(["outbound::bench-gym"]);
+    expect(shown.hoverSpans, marker).toBe(0);
+    expect(shown.ticks, marker).toBe(marker === "behavior_row" ? 0 : 1);
+    expect(shown.labels, marker).toEqual(marker === "rail_label" ? ["Leave 9:35"] : []);
+    expect(shown.rows, marker).toEqual(marker === "behavior_row" ? ["Leave 9:35 AM for Gym"] : []);
+    stops.push(tabStops());
+  }
+  // No marker adds a tab stop.
+  expect(new Set(stops).size).toBe(1);
+  expect(timelineSurface().querySelector("[data-next-trip-label], [data-next-trip-row]")?.closest("button, a")).toBeFalsy();
+});
+
+it("keeps the marks for late, leave now, last estimate and head home, and drops them without a time (Ticket 270)", async () => {
+  await render("fresh");
+  await chooseSelect("data-bench-marker", "behavior_row");
+  const cases: ReadonlyArray<readonly [string, string | null]> = [
+    ["expired", "Leave 9:35 AM for Gym"], ["leave-now", "Leave 9:35 AM for Gym"], ["late-clock", "Leave 9:35 AM for Gym"],
+    ["head-home", "Leave 3:00 PM for home"], ["needs-place", null], ["appears-later", null], ["no-trips", null], ["paused", null],
+  ];
+  for (const [state, row] of cases) {
+    await choose(state);
+    expect(marks().rows, state).toEqual(row ? [row] : []);
+    expect(marks().spans.length, state).toBe(row ? 1 : 0);
+  }
+});
+
+it("shows one muted line on a Behavior the next trip crowds, only while collapsed (Ticket 270)", async () => {
+  await render("upcoming-dentist");
+  const call = () => timelineSurface().querySelector('[data-occurrence-id="bench-call"]')!;
+  const line = call().querySelector("summary [data-next-trip-crowded]");
+  expect(line?.textContent?.trim()).toMatch(/^Overlaps your trip to Dentist \(\d{1,2}:\d{2} PM–\d{1,2}:\d{2} PM\)$/);
+  expect(line?.className).toContain("group-open:hidden");
+  expect(call().querySelectorAll("[data-next-trip-crowded]")).toHaveLength(1);
+  // Gym is not crowded: it is a stop, not a Behavior the trip passes over.
+  expect(timelineSurface().querySelector('[data-occurrence-id="bench-gym"] [data-next-trip-crowded]')).toBeNull();
+  // Before Gym ends, the next trip is the trip to Gym, so Call Mom carries no line.
+  await moveClock("08:00");
+  expect(call().querySelector("[data-next-trip-crowded]")).toBeNull();
+});
+
+it("sets the next-departure line's size and keeps it regular weight (Ticket 270)", async () => {
+  await render("fresh");
+  const line = () => timelineSurface().querySelector<HTMLElement>("[data-departure-line]")!;
+  expect(line().getAttribute("data-line-size")).toBe("status");
+  await chooseSelect("data-bench-line-size", "title");
+  expect(line().getAttribute("data-line-size")).toBe("title");
+  expect(line().className).not.toMatch(/font-(bold|semibold|medium)/);
+});
+
+it("moves only the marks on a moving clock, never the rows (Ticket 270)", async () => {
+  await render("soon");
+  await chooseSelect("data-bench-marker", "behavior_row");
+  const order = () => [...timelineSurface().querySelectorAll("[data-next-trip-row], [data-occurrence-id]")].map((node) => node.getAttribute("data-occurrence-id") ?? "trip");
+  const before = order();
+  for (const time of ["09:11", "09:20", "09:34"]) {
+    await moveClock(time);
+    expect(order(), time).toEqual(before);
   }
 });

@@ -233,4 +233,11 @@ describe("live region", () => {
     await show(model(trip("soon", "Leave in 20 minutes, by 1:20 PM for Dentist.", "onward:gym:dentist")));
     expect(announced()).toBe("Leave in 20 minutes, by 1:20 PM for Dentist.");
   });
+  it("announces when the next trip's action changes within one state (Ticket 270)", async () => {
+    const appears = (linePhrase: string, action: DepartureTrip["action"]) => ({ ...trip("appears_later", linePhrase), action }) as DepartureTrip;
+    await show(model(appears("Leave time for Dentist appears by 10:55 AM.", null)));
+    expect(announced()).toBe("");
+    await show(model(appears("Refresh travel to get a leave time for Dentist.", "refresh")));
+    expect(announced()).toBe("Refresh travel to get a leave time for Dentist.");
+  });
 });

@@ -17,6 +17,26 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 270 bench built — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed. Waiting for the owner to pick a marker.**
+
+- The next trip alone gets a magenta span on the axis, from get-ready (or leave) time to arrival,
+  without hovering (D2). Other trips stay inspection-only. A last estimate keeps the marks; steps
+  without a time have none.
+- Three markers are on the "Travel timing states" bench, each with the next-departure line at the
+  small status size and at the Behavior title size: A, "Leave 1:15" in the left rail with a tick;
+  B, a slim row "Leave 1:15 PM for Dentist" among the Behaviors; C, an axis tick only. Production
+  uses one constant, `NEXT_TRIP_PRESENTATION`, set to the recommended A with the small line.
+- A Behavior the next trip crowds shows its overlap line, muted, while collapsed.
+- No marker is a tab stop. The live region speaks when the next trip's action changes.
+- Layout rules live in `day-progress.resolver.ts`: the span, the leave tick, the rail label kept
+  clear of Calendar markers in a shared rail, and marker B's place in the list.
+- New wording, not yet approved (D7): "Leave {time}", "Leave {time} for {event}" and "Leave {time}
+  for home". `DESIGN.md` and `docs/UI_SPEC.md` change after the owner's choice.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web, checked
+  at 390 px. Messaging impact: P-021 (Ticket 270 note).
+
 ## Travel advisory revamp Wave 3: Ticket 274 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The leave-time

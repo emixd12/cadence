@@ -13,6 +13,8 @@ import {
   departureDetailPhrase,
   departureFreeAgainPhrase,
   departureLinePhrase,
+  departureMarkerRailPhrase,
+  departureMarkerRowPhrase,
   departureOverlapPhrase,
   departurePhraseContext,
   departureWeatherMarginPhrase,
@@ -109,6 +111,9 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "brief-overlap": () => departureBriefOverlapPhrase("Walk", EVENT),
   "brief-overlap-trip-home": () => departureBriefOverlapPhrase("Walk", null),
   "brief-back": () => departureBriefBackPhrase(at("15:30"), CONTEXT),
+  "marker-rail": () => departureMarkerRailPhrase(at("13:20"), TIMEZONE),
+  "marker-row": () => departureMarkerRowPhrase({ leaveAt: at("13:20"), home: false, destinationLabel: EVENT }, CONTEXT),
+  "marker-row-home": () => departureMarkerRowPhrase({ leaveAt: at("15:00"), home: true, destinationLabel: null }, CONTEXT),
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

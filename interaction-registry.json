@@ -1015,9 +1015,9 @@
     {
       "path": "app/design-system/DepartureStatesBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 6,
+      "interaction_marker_count": 10,
       "interaction_ids": [],
-      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. No provider call, account access or product write."
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, Ticket 270's next-trip marker and line-size selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. No provider call, account access or product write."
     },
     {
       "path": "app/design-system/TravelBench.tsx",

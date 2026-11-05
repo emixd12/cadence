@@ -6,6 +6,7 @@ import type { TravelEvidenceResult, TravelLeaveAnswer, TravelMode, TravelNavigat
 import { Temporal } from "@js-temporal/polyfill";
 import { useDevelopmentBuild, useRefresh } from "@cadence/ui/runtime";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -19,15 +20,17 @@ import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.reso
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
-import { DEPARTURE_REFRESH_LABEL } from "@cadence/core/services/departure-phrases";
-import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
+import { DEPARTURE_REFRESH_LABEL, departureMarkerRailPhrase, departureMarkerRowPhrase, departurePhraseContext } from "@cadence/core/services/departure-phrases";
+import { nextTripCrowdsBehavior, resolveDayProgressLayout, resolveNextTripMarkInput, resolveNextTripRowIndex } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
 import type {
   BehaviorDurationEstimate,
   ExternalEventFreshness,
   NormalizedExternalEvent,
+  DayProgressNextTripInput,
   TimelineOccurrenceContext,
 } from "@cadence/core/types/day-progress";
+import { NEXT_TRIP_PRESENTATION, type NextDepartureLineSize, type NextTripPresentation } from "./next-trip-presentation";
 
 import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
@@ -98,7 +101,16 @@ type DayProgressTimelineProps = Readonly<{
   onOpenExternal?: (url: string) => void | Promise<void>;
   liveCalendar?: boolean;
   travelAccountId?: string | null;
+  /** Ticket 270: the bench compares marker variants. Production uses `NEXT_TRIP_PRESENTATION`. */
+  nextTripPresentation?: NextTripPresentation;
 }>;
+
+/** Ticket 270, marker A: the rail label is two short lines ("Leave" over "1:15"). */
+const RAIL_LABEL_HEIGHT = 32;
+const RAIL_LABEL_WIDTH = 36;
+const RAIL_LABEL_GAP = 10;
+
+type NextTripRow = Readonly<{ index: number; text: string }>;
 
 type MeasuredDay = Parameters<typeof resolveDayProgressLayout>[0]["days"][number] & Readonly<{
   axisX: number;
@@ -138,6 +150,7 @@ export function DayProgressTimeline({
   onOpenExternal,
   liveCalendar = false,
   travelAccountId = null,
+  nextTripPresentation = NEXT_TRIP_PRESENTATION,
 }: DayProgressTimelineProps) {
   const runtimeRefresh = useRefresh();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -247,9 +260,17 @@ export function DayProgressTimeline({
     return confirmation;
   };
 
+  // Ticket 270 (D2): the next trip alone gets a span and a marker without hovering.
+  const nextTrip = useMemo(() => resolveNextTripMarkInput(departure.next), [departure.next]);
+  const nextTripRail = nextTrip && nextTripPresentation.marker === "rail_label" ? departureMarkerRailPhrase(nextTrip.leaveAt, timeline.timezone) : null;
+  const nextTripRowText = nextTrip && nextTripPresentation.marker === "behavior_row" && departure.next
+    ? departureMarkerRowPhrase({ leaveAt: nextTrip.leaveAt, home: departure.next.role === "return",
+      destinationLabel: departure.next.destinationRef ? travelLabels.get(departure.next.destinationRef) ?? null : null }, departurePhraseContext(now, timeline.timezone))
+    : null;
   const layout = useMemo(() => {
     const days = visibleSections.flatMap((section) => measured[section.localDate] ? [measured[section.localDate]!] : []);
     if (days.length !== visibleSections.length) return null;
+    const first = days[0];
     return resolveDayProgressLayout({
       timezone: timeline.timezone,
       firstVisibleDate: visibleSections[0]?.localDate,
@@ -259,8 +280,12 @@ export function DayProgressTimeline({
       now: Temporal.Instant.from(now),
       minIconSpacing: 44,
       maxIconLanes: 1,
+      nextTrip,
+      // The label clears the Calendar markers when both sit in the same part of the rail (narrow layouts).
+      nextTripLabel: { height: RAIL_LABEL_HEIGHT,
+        avoidIcons: !!first && first.axisX - RAIL_LABEL_GAP - RAIL_LABEL_WIDTH < first.iconX + 22 },
     });
-  }, [travel, events, measured, now, timeline.timezone, visibleSections]);
+  }, [travel, events, measured, now, timeline.timezone, visibleSections, nextTrip]);
 
   const activeIds = preview?.ids ?? EMPTY_IDS;
   const previewEvents = useMemo(() => activeIds.flatMap((id) => {
@@ -351,7 +376,8 @@ export function DayProgressTimeline({
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
-      <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel} />
+      <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel}
+        size={nextTripPresentation.line} />
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
@@ -362,6 +388,8 @@ export function DayProgressTimeline({
         activeIds={activeIds}
         previewId={preview ? "calendar-preview" : undefined}
         onPreview={openPreview}
+        nextTripMarker={nextTripPresentation.marker}
+        nextTripRail={nextTripRail}
       /> : null}
       {visibleSections.map((section) => <DayProgressDay
         key={section.key}
@@ -382,6 +410,8 @@ export function DayProgressTimeline({
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
+        nextTrip={nextTrip}
+        nextTripRow={nextTripRowText ? nextTripRowFor(section, timeline.timezone, nextTrip, nextTripRowText) : null}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
@@ -453,6 +483,8 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   registerMeasurement: (date: string, measure: () => MeasuredDay) => () => void;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
   onRestoreAllDay: () => void;
+  nextTrip: DayProgressNextTripInput | null;
+  nextTripRow: NextTripRow | null;
 }>;
 
 function DayProgressDay({
@@ -477,6 +509,8 @@ function DayProgressDay({
   registerMeasurement,
   onPreview,
   onRestoreAllDay,
+  nextTrip,
+  nextTripRow,
   statusAction,
   noteAction,
   startTimeTrackingAction,
@@ -584,10 +618,12 @@ function DayProgressDay({
       <div className={styles.feed}>
         <div ref={bodyRef} className="relative min-h-24 py-4" data-day-progress-date={section.localDate}>
           {section.occurrences.length === 0 ? <p className="bg-surface p-3 text-base leading-7 text-muted-readable">{section.emptyMessage}</p> : <div className="grid gap-1">
-            {section.occurrences.map((occurrence) => {
+            {section.occurrences.map((occurrence, index) => {
               const highlighted = contexts.get(occurrence.id)?.overlappingEventIds.some((id) => activeIds.includes(id));
-              return <div
-                key={occurrence.id}
+              const context = contexts.get(occurrence.id);
+              return <Fragment key={occurrence.id}>
+              {nextTripRow?.index === index ? <NextTripRowMarker text={nextTripRow.text} /> : null}
+              <div
                 ref={(node) => { if (node) rows.current.set(occurrence.id, node); else rows.current.delete(occurrence.id); }}
                 className={styles.row}
                 onFocus={(event) => { if (travel?.legs.some((item) => item.leg.destinationCommitmentRef === occurrence.id || item.leg.originCommitmentRef === occurrence.id)) onPreview([occurrence.id], event.target as HTMLElement); }}
@@ -596,7 +632,7 @@ function DayProgressDay({
               >
                 <OccurrenceRow
                   occurrence={occurrence}
-                  context={contexts.get(occurrence.id)}
+                  context={context}
                   travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh })}
                   statusAction={statusAction}
                   noteAction={noteAction}
@@ -605,9 +641,11 @@ function DayProgressDay({
                   resetTimeTrackingAction={resetTimeTrackingAction}
                   shortcuts={shortcutsByBehavior?.[occurrence.behaviorId]}
                   statusIconsOnly={iconsOnly[occurrence.id] ?? false}
+                  crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
                 />
-              </div>;
+              </div></Fragment>;
             })}
+            {nextTripRow && nextTripRow.index >= section.occurrences.length ? <NextTripRowMarker text={nextTripRow.text} /> : null}
           </div>}
         </div>
       </div>
@@ -622,6 +660,8 @@ function DayOverlay({
   activeIds,
   previewId,
   onPreview,
+  nextTripMarker,
+  nextTripRail,
 }: Readonly<{
   layout: ReturnType<typeof resolveDayProgressLayout>;
   measured: Readonly<Record<string, MeasuredDay>>;
@@ -629,6 +669,8 @@ function DayOverlay({
   activeIds: readonly string[];
   previewId?: string;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
+  nextTripMarker: NextTripPresentation["marker"];
+  nextTripRail: string | null;
 }>) {
   const controls = layout.days.flatMap((day) => [
     ...day.timedEventSpans.filter((span) => span.iconLane !== null && !span.overflowGroupId).map((span) => ({ id: span.eventId, position: span.iconPosition, eventIds: [span.eventId], count: 1, iconX: 0, axisX: 0 })),
@@ -640,6 +682,9 @@ function DayOverlay({
         {controls.map((control) => <line key={control.id} data-calendar-stem={control.id} x1={control.iconX} x2={control.axisX} y1={control.position} y2={control.position} stroke="currentColor" />)}
         {layout.days.flatMap((day) => day.timedEventSpans.filter((span) => activeIds.includes(span.eventId) && span.endPosition !== null).map((span) => <line key={`${day.localDate}-${span.eventId}`} data-event-duration={span.eventId} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={span.continuesBefore && span.iconLane === null && !span.overflowGroupId ? day.top : span.iconPosition} y2={span.continuesAfter ? day.bottom : Math.min(day.bottom, span.iconPosition + Math.max(2, span.endPosition! - span.startPosition))} stroke="var(--calendar-overlap)" strokeWidth={1} />))}
         {layout.days.flatMap((day) => day.travelSpans.filter((span) => span.sourceRefs.some((ref) => activeIds.includes(ref))).map((span) => <line key={`${day.localDate}-${span.segmentId}`} data-travel-duration={span.segmentId} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={span.startPosition} y2={span.endPosition} stroke="var(--calendar-overlap)" strokeWidth={1} />))}
+        {/* Ticket 270 (D2): the next trip's span shows without hovering, under the current-time dot. */}
+        {layout.days.flatMap((day) => day.nextTrip ? [<line key={`next-trip-${day.localDate}`} data-next-trip-span={day.nextTrip.key} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={day.nextTrip.startPosition} y2={day.nextTrip.endPosition} stroke="var(--calendar-overlap)" strokeWidth={1} />] : [])}
+        {nextTripMarker !== "behavior_row" ? layout.days.flatMap((day) => day.nextTrip?.leavePosition != null ? [<line key={`next-trip-tick-${day.localDate}`} data-next-trip-tick={day.nextTrip.key} x1={measured[day.localDate]!.axisX - 6} x2={measured[day.localDate]!.axisX + 7} y1={day.nextTrip.leavePosition} y2={day.nextTrip.leavePosition} stroke="var(--calendar-overlap)" strokeWidth={2} />] : []) : null}
         {layout.days.flatMap((day) => day.movingDot ? [<circle key={day.localDate} className={styles.currentTime} data-current-time-marker cx={measured[day.localDate]!.axisX} cy={day.movingDot.displayPosition} r={5} fill="var(--primary)" stroke="var(--background)" strokeWidth={2} />] : [])}
       </svg>
       {controls.map((control) => {
@@ -654,8 +699,22 @@ function DayOverlay({
             : <CalendarDays size={16} aria-hidden="true" />}
           {control.count > 1 ? <span className={styles.countBadge}>×{control.count}</span> : null}</span></button>;
       })}
+      {/* Ticket 270, marker A. Decorative: the next-departure line already says it. */}
+      {nextTripRail ? layout.days.flatMap((day) => day.nextTrip?.labelPosition != null ? [<span key={`next-trip-label-${day.localDate}`} aria-hidden="true" data-next-trip-label={day.nextTrip.key}
+        className={styles.railLabel} style={{ right: `calc(100% - ${measured[day.localDate]!.axisX - RAIL_LABEL_GAP}px)`, top: day.nextTrip.labelPosition, width: RAIL_LABEL_WIDTH, height: RAIL_LABEL_HEIGHT }}>
+        {nextTripRail.split(" ").map((word, index) => <span key={index} className="block">{index ? ` ${word}` : word}</span>)}</span>] : []) : null}
     </div>
   );
+}
+
+/** Ticket 270, marker B: one slim, non-interactive row among the Behaviors. */
+function NextTripRowMarker({ text }: Readonly<{ text: string }>) {
+  return <p className={styles.nextTripRow} data-next-trip-row>{text}</p>;
+}
+
+function nextTripRowFor(section: TimelineDaySection, timezone: string, trip: DayProgressNextTripInput | null, text: string): NextTripRow | null {
+  const index = resolveNextTripRowIndex({ localDate: section.localDate, timezone, scheduledFor: section.occurrences.map((occurrence) => occurrence.scheduledFor), trip });
+  return index === null ? null : { index, text };
 }
 
 function resolveContexts(
@@ -818,8 +877,10 @@ export function travelStatusLines({ departure, status, message = null, hasEviden
 
 const TIMED_DEPARTURE_STATES: ReadonlySet<string> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
 
-export function TravelStatusLine({ departure, status, message = null, hasEvidence }: Readonly<{
+export function TravelStatusLine({ departure, status, message = null, hasEvidence, size = NEXT_TRIP_PRESENTATION.line }: Readonly<{
   departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean;
+  /** Ticket 270: the line's size, from `NEXT_TRIP_PRESENTATION` unless the bench compares. */
+  size?: NextDepartureLineSize;
 }>) {
   const developmentBuild = useDevelopmentBuild();
   const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild });
@@ -845,7 +906,7 @@ export function TravelStatusLine({ departure, status, message = null, hasEvidenc
   const nextState = departure.next?.state ?? departure.state;
   return (
     <div ref={containerRef} className={styles.travelStatus} data-travel-status>
-      {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState}
+      {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState} data-line-size={size}
         data-departure-timed={TIMED_DEPARTURE_STATES.has(nextState) ? "true" : undefined}>
         {lines.lineRefresh === "lead"
           ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{lines.line.slice(DEPARTURE_REFRESH_LABEL.length)}</>

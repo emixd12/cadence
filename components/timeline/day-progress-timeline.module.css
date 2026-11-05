@@ -6,6 +6,14 @@
 .travelStatus { display: contents; }
 .departureLine { max-width: 40rem; margin: 0 0 0.5rem var(--timeline-gutter); color: var(--foreground); font-size: var(--text-sm); line-height: 1.25rem; overflow-wrap: anywhere; }
 .departureLine[data-departure-timed="true"] { border-left: 1px solid var(--calendar-overlap); padding-left: 0.5rem; }
+/* Ticket 270: the bench compares the line at the status size and at the Behavior title size. Both regular weight. */
+.departureLine[data-line-size="title"] { font-size: var(--text-base); line-height: 1.5rem; }
+@media (min-width: 576px) { .departureLine[data-line-size="title"] { font-size: var(--text-lg); line-height: 1.75rem; } }
+/* Ticket 270, marker A: "Leave" over the time, right-aligned to the axis in the left rail. */
+.railLabel { position: absolute; display: grid; align-content: center; transform: translateY(-50%); color: var(--foreground); font-size: 11px; line-height: 16px; text-align: right; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+/* Ticket 270, marker B: a slim row among the Behaviors. Text only, never a tab stop. */
+.nextTripRow { margin: 0; border-left: 1px solid var(--calendar-overlap); padding: 0.25rem 0.75rem; color: var(--foreground); font-size: var(--text-sm); line-height: 1.25rem; overflow-wrap: anywhere; }
+@media (max-width: 575px) { .nextTripRow { padding-inline: 0.5rem; } }
 .day { position: relative; padding-block: 1.25rem; }
 .day:first-child { padding-top: 0; }
 .day:last-child { padding-bottom: 0; }

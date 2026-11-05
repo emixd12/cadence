@@ -35,7 +35,7 @@ export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "271" | "272";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -309,6 +309,18 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Daily Brief travel block, when the trip home crowds an Unresolved Behavior. Shipped with Ticket 170 as \"Travel to planned travel overlaps {behavior}.\"",
     replaces: "Travel to planned travel overlaps {behavior}.",
     approvedOn: null, ownerChange: null },
+  { id: "marker-rail", ticket: "270", template: "Leave {time}",
+    situation: "Timeline left rail, marker A: the next trip's leave time beside the axis. The time has no AM or PM.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "marker-row", ticket: "270", template: "Leave {time} for {event}",
+    situation: "Timeline, marker B: a slim row among the Behaviors at the next trip's leave time.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "marker-row-home", ticket: "270", template: "Leave {time} for home",
+    situation: "Timeline, marker B: the slim row when the next trip is the trip home.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
   { id: "brief-back", ticket: "272", template: "Back around {time}.",
     situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
     replaces: null,
@@ -385,6 +397,18 @@ export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLa
 /** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Not yet approved. */
 export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
   return `Back around ${departureTimeLabel(at, context)}.`;
+}
+
+/** Ticket 270, marker A: "Leave 1:15". The rail is narrow, so the time has no AM or PM. Not yet approved. */
+export function departureMarkerRailPhrase(leaveAt: string, timezone: string): string {
+  const zoned = Temporal.Instant.from(leaveAt).toZonedDateTimeISO(timezone);
+  return `Leave ${zoned.hour % 12 === 0 ? 12 : zoned.hour % 12}:${String(zoned.minute).padStart(2, "0")}`;
+}
+
+/** Ticket 270, marker B: "Leave 1:15 PM for Dentist", or "for home" for the trip home. Not yet approved. */
+export function departureMarkerRowPhrase(input: Readonly<{ leaveAt: string; home: boolean; destinationLabel: string | null }>,
+  context: DeparturePhraseContext): string {
+  return `Leave ${departureTimeLabel(input.leaveAt, context)} for ${input.home ? "home" : input.destinationLabel ?? NEXT_STOP_FALLBACK}`;
 }
 
 /** A Behavior crowded by a trip: names the trip and its span. */

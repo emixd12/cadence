@@ -754,6 +754,11 @@ cite has not changed.
   question that day" is now wrong. The Privacy Google Calendar section ("The web app holds
   returned event details in memory") still holds as written: only digests of event IDs and
   end times are stored, so no Privacy edit is proposed.
+- **Ticket 270 detail (November 5, 2026):** the Timeline shows the next trip's magenta span
+  and one marker without hovering. The owner has not yet picked the marker (rail label "Leave
+  1:15", a slim row "Leave 1:15 PM for Dentist", or an axis tick only), so the guide text waits
+  for that choice. A Behavior the next trip crowds shows its overlap line while collapsed. The
+  three marker phrases are on the bench wording review, not yet approved (D7).
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later

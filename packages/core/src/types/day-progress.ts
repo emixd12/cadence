@@ -245,6 +245,32 @@ export type DayProgressDayLayout = Readonly<{
   iconLayoutOverflow: boolean;
   allDayEventIds: string[];
   iconOverflowGroups: DayProgressIconOverflowGroup[];
+  /** Ticket 270 (D2): the next trip's span and marker on this day, or null. */
+  nextTrip: DayProgressNextTripMarks | null;
+}>;
+
+/**
+ * Ticket 270 (D2, "Next trip only"): the one trip that gets a span and a marker without hovering.
+ * Built from the departure model's next trip by `resolveNextTripMarkInput`.
+ */
+export type DayProgressNextTripInput = Readonly<{
+  key: string;
+  legId: string | null;
+  /** Get-ready start for a trip from Home, otherwise the leave time. */
+  startAt: string;
+  leaveAt: string;
+  arriveAt: string;
+}>;
+
+export type DayProgressNextTripMarks = Readonly<{
+  key: string;
+  /** The magenta span on the axis, clipped to this day. */
+  startPosition: number;
+  endPosition: number;
+  /** The leave time on the axis. Null when the leave time falls on another day. */
+  leavePosition: number | null;
+  /** Where a rail label sits: the leave position, moved clear of Calendar markers when they share the rail. */
+  labelPosition: number | null;
 }>;
 
 export type DayProgressLayout = Readonly<{
@@ -300,5 +326,7 @@ export type TimelineOccurrenceContext = Readonly<{
   overlappingEventIds: string[];
   overlapAssessment: "possible" | "none" | "unknown";
   overlapLabel: string;
+  /** Ticket 270: the legs of the trip that crowds this Behavior, when travel created the overlap. */
+  travelOverlapLegIds?: readonly string[];
   freshness: ExternalEventFreshness;
 }>;

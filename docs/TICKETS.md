@@ -16079,7 +16079,11 @@ Verification: DOM test with a moving clock, bench at both widths,
 
 ## Ticket 270: Next trip's marker and span
 
-Status: filed November 4, 2026. Not started.
+Status: bench built November 5, 2026 on branch `us-work`; waiting for the owner's marker choice.
+Not merged or deployed. Variants A, B and C, each with the line at two sizes, are on the
+"Travel timing states" bench. Production uses `NEXT_TRIP_PRESENTATION` in
+`components/timeline/next-trip-presentation.ts`, set to the recommended A with the small line.
+`DESIGN.md` and `docs/UI_SPEC.md` are updated after the choice.
 Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).
