@@ -2,7 +2,9 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { ExternalLink, X } from "lucide-react";
-import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
+
+import { useDevelopmentBuild } from "@cadence/ui/runtime";
 
 import type { ExternalEventSource, NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "@cadence/core/types/travel";
@@ -204,23 +206,41 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
   },
 );
 
+type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
+
 export function renderTravelTiming({ eventId, travel, timezone, compact = false, onOpenExternal }: Readonly<{
-  eventId: string; travel?: Omit<TravelEvidenceResult, "modelProjection"> | null; timezone: string; compact?: boolean;
+  eventId: string; travel?: TravelTimingEvidence | null; timezone: string; compact?: boolean;
   onOpenExternal?: (url: string) => void | Promise<void>;
 }>) {
   const legs = travel?.legs.filter((item) => item.leg.originCommitmentRef === eventId || item.leg.destinationCommitmentRef === eventId) ?? [];
   if (!legs.length) return null;
-  const label = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return <TravelTiming legs={legs} travel={travel} timezone={timezone} compact={compact} onOpenExternal={onOpenExternal} />;
+}
+
+function TravelTiming({ legs, travel, timezone, compact, onOpenExternal }: Readonly<{
+  legs: TravelTimingEvidence["legs"]; travel?: TravelTimingEvidence | null; timezone: string; compact: boolean;
+  onOpenExternal?: (url: string) => void | Promise<void>;
+}>) {
+  const developmentBuild = useDevelopmentBuild();
+  const zoned = (value: string) => Temporal.Instant.from(value).toZonedDateTimeISO(timezone);
+  const label = (value: string) => zoned(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  // The date appears only when the trip ends on a later day than the leave time printed above it.
+  const lateArrival = (departureAt: string, arrivalAt: string) => zoned(departureAt).toPlainDate().equals(zoned(arrivalAt).toPlainDate())
+    ? zoned(arrivalAt).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" }) : label(arrivalAt);
   const originLabels = { device: "current device position", saved_base: "Home", planned_stop: "planned prior stop", correction: "journey correction", calendar: "Calendar location", behavior: "Behavior location" };
+  // Production shows no route warning text. Released Mac 0.1.8 still prints the same strings.
+  const developmentWarnings = developmentBuild ? [...new Set(legs.flatMap((item) => item.estimate?.warnings ?? []))] : [];
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
-    {legs.map(({ leg, state, estimate, reason, weather }) => <p key={leg.id}>
+    {legs.map(({ leg, state, estimate, reason, weather, late }) => <Fragment key={leg.id}><p>
       {leg.role === "outbound" ? "Outbound" : leg.role === "return" ? "Return home" : "Onward"} · {leg.mode}: {state === "current" && estimate ? `leave ${label(weather?.departureAt ?? estimate.departureAt)}, arrive ${label(weather?.arrivalAt ?? estimate.arrivalAt)}` : reason === TRAVEL_LEG_OUTSIDE_WINDOW ? "estimated within 3 hours of departure" : "timing unavailable"}.
-      {weather?.state === "margin" ? ` ${travelWeatherMarginText({ marginMinutes: weather.marginSeconds / 60, conditions: weather.conditions, suggestion: weather.suggestion })}` : ""}
+      {weather?.state === "margin" ? ` ${travelWeatherMarginText({ marginMinutes: weather.marginSeconds / 60, conditions: weather.conditions, suggestion: weather.suggestion }, { developmentBuild })}` : ""}
       {!compact ? ` Origin: ${(leg.originCommitmentRef ? "planned prior stop" : originLabels[leg.provenance.originSource])}.` : ""}
-    </p>)}
+    </p>
+    {state === "current" && late && estimate ? <p>You may arrive late: arrive {lateArrival(weather?.departureAt ?? estimate.departureAt, weather?.arrivalAt ?? estimate.arrivalAt)}.</p> : null}
+    </Fragment>)}
     {!travel?.completeTrip ? <p>Full-trip availability is unknown. Known travel spans still apply.</p> : travel.finalAvailabilityAt ? <p>Available again {label(travel.finalAvailabilityAt)}.</p> : null}
-    {!compact ? <>{legs.flatMap((item) => item.estimate?.warnings ?? []).filter((warning, index, all) => all.indexOf(warning) === index).map((warning) => <p key={warning}>{warning}</p>)}
-      </> : null}
+    {developmentWarnings.length ? <div data-travel-development-warnings><p className="font-bold text-muted-readable">Development</p>
+      {developmentWarnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
       {legs.some((item) => item.estimate) ? <p>Google Maps · {legs.find((item) => item.estimate)?.estimate?.observedAt ? `Checked ${label(legs.find((item) => item.estimate)!.estimate!.observedAt)}. ` : ""}Estimates depend on attendance and current conditions.</p> : null}
       {travel?.weather?.attribution && legs.some((item) => item.weather?.state === "margin") ? <TravelWeatherCredit attribution={travel.weather.attribution} onOpenExternal={onOpenExternal} /> : null}
   </div>;

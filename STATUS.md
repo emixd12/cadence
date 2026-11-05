@@ -1,5 +1,25 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 260 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Text meant for
+developers no longer reaches a production user.
+
+- `@cadence/ui/runtime` gains `DevelopmentBuildProvider` and `useDevelopmentBuild`. Web supplies
+  `NODE_ENV === "development"` through `WebRuntimeProvider`; desktop supplies Vite's
+  `import.meta.env.DEV` in `apps/desktop/src/product.tsx`. With no provider the flag is off.
+- Production shows no route warning string. A late leg shows "You may arrive late: arrive {time}."
+  in every build, from the `late` flag. The hosted route still sends the old warning string for
+  released Mac 0.1.8.
+- Development builds show every warning verbatim under a "Development" label, and the weather mode
+  advice in the drawer, dialog and Daily Brief bubble. The margin stays in every build. Model input
+  is unchanged.
+- Bench fixtures carry no fixture notes in `warnings`. "Synthetic route. No provider call." is a
+  bench-only caption, and the Calendar details preview shows both modes side by side.
+
+Platform impact: web and desktop through the shared components. Marketing: not applicable. Future
+mobile: shared components, checked at 390 px. Messaging impact: P-015 still matches; L-013 stays open.
+
 ## Travel advisory revamp Wave 1: Ticket 264 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The hosted

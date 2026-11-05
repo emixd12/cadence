@@ -1,7 +1,7 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
-import { TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
+import { TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
@@ -1628,9 +1628,9 @@ const previewFactories: Record<
   "composite.behavior-place-assist": () => <ProductPreview><BehaviorPlaceAssistBench /></ProductPreview>,
   "module.daily-brief-bubble": () => <ProductPreview><DailyBriefBubbleBench /></ProductPreview>,
   "module.daily-brief-settings-panel": () => <ProductPreview><DailyBriefSettingsBench /></ProductPreview>,
-  "composite.external-event-details": () => <ProductPreview><CalendarDetailsBench /></ProductPreview>,
+  "composite.external-event-details": () => <ProductPreview maxHeight="120rem"><CalendarDetailsBench /><TravelDevelopmentTextBench /></ProductPreview>,
   "composite.external-event-preview": () => <ProductPreview><CalendarDetailsBench preview /></ProductPreview>,
-  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
+  "composite.travel-weather-credit": () => <ProductPreview><div className="grid gap-1 p-4 text-xs leading-5"><p>Outbound · cycling: leave 2:05 PM, arrive 2:50 PM. Includes 15 min for thunderstorms.</p><TravelWeatherCredit attribution={OPEN_METEO_ATTRIBUTION} /></div></ProductPreview>,
   "module.day-progress-timeline": () => <ProductPreview maxHeight="48rem"><CalendarTimelineBench /></ProductPreview>,
   "module.timeline": () => (
       <ProductPreview maxHeight="48rem">

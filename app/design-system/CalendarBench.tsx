@@ -1,5 +1,5 @@
 "use client";
-import { travelBenchEvidence } from "./TravelBench";
+import { TravelBenchCaption, travelBenchEvidence } from "./TravelBench";
 import { Temporal } from "@js-temporal/polyfill";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { resolveTimeline } from "@cadence/core/resolvers/timeline.resolver";
@@ -64,6 +64,7 @@ export function CalendarTimelineBench() {
     refresh: () => undefined } : null;
   const events = connectors ? [...snapshot.events, ...benchOutlookSnapshot.events] : scenario === "calendar" ? snapshot.events : [{ ...first, kind: "timed" as const, title: "Afternoon appointment", location: "Synthetic destination", startAt: "2026-11-01T19:30:00Z", endAt: "2026-11-01T21:30:00Z", endUnspecified: false, duration: { kind: "known" as const, seconds: 7200 } }];
   return <><label className="mb-4 grid gap-2 text-sm">Fixture<select className="min-h-11 border border-line bg-background" value={scenario} onChange={(event) => setScenario(event.target.value)}><option value="calendar">Calendar</option><option value="connectors">Google, Outlook, and Hevy</option><option value="connectors-offline">Outlook incomplete, Hevy offline</option><option value="travel">Complete trip: 1:30–6:30 PM</option><option value="travel-weather">Thunderstorms: 15 min weather margin</option><option value="travel-no-position">No device location: no weather margin</option><option value="no-base">No base: keep outbound</option></select></label>
+    {travel ? <div className="mb-4"><TravelBenchCaption /></div> : null}
     <DayProgressTimeline timeline={timeline} context={{ events, freshness: snapshot.freshness, now: snapshot.fetchedAt,
       durationEstimates: { "calendar-bench-behavior": { kind: "known", seconds: 1800, durationLabel: "30 minutes", sampleCount: 0, lookbackDays: 30, provenance: "behavior_default" } },
       travel, travelStatus, travelMode: "walking",

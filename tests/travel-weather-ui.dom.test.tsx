@@ -48,10 +48,12 @@ function evidence(weather: TravelLegWeather | undefined, summary: TravelWeatherS
 
 describe("travel weather copy", () => {
   it("names the condition that set the margin and the suggested modes", () => {
-    expect(travelWeatherMarginText({ marginMinutes: 15, conditions: ["thunderstorm", "heavy_rain"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } }))
+    const stormMargin = { marginMinutes: 15, conditions: ["thunderstorm", "heavy_rain"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } as const;
+    expect(travelWeatherMarginText(stormMargin, { developmentBuild: true }))
       .toBe("Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.");
-    expect(travelWeatherMarginText({ marginMinutes: 10, conditions: ["rain"], suggestion: null })).toBe("Includes 10 min for rain.");
-    expect(travelWeatherMarginText({ marginMinutes: 0, conditions: [], suggestion: null })).toBe("");
+    expect(travelWeatherMarginText(stormMargin, { developmentBuild: false })).toBe("Includes 15 min for thunderstorms.");
+    expect(travelWeatherMarginText({ marginMinutes: 10, conditions: ["rain"], suggestion: null }, { developmentBuild: true })).toBe("Includes 10 min for rain.");
+    expect(travelWeatherMarginText({ marginMinutes: 0, conditions: [], suggestion: null }, { developmentBuild: true })).toBe("");
   });
 
   it("says plainly why no margin was added", () => {
@@ -73,10 +75,10 @@ describe("travel weather copy", () => {
 });
 
 describe("travel timing with a weather margin", () => {
-  it("shows the weather-adjusted leave time, the margin, the suggestion and the Open-Meteo credit", async () => {
+  it("shows the weather-adjusted leave time, the margin and the Open-Meteo credit", async () => {
     await act(() => root.render(<>{renderTravelTiming({ eventId: "event-1", travel: evidence(stormy, applied), timezone: "UTC" })}</>));
     expect(container.textContent).toContain("leave Nov 1, 6:15 PM, arrive Nov 1, 7:20 PM.");
-    expect(container.textContent).toContain("Includes 15 min for thunderstorms. Consider transit or driving instead of cycling.");
+    expect(container.textContent).toContain("Includes 15 min for thunderstorms.");
     const links = [...container.querySelectorAll("[data-weather-credit] a")].map((link) => [link.textContent, link.getAttribute("href"), link.getAttribute("rel")]);
     expect(links).toEqual([["Weather data by Open-Meteo.com", "https://open-meteo.com/", "noreferrer"],
       ["CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/", "noreferrer"]]);
@@ -115,7 +117,7 @@ describe("Daily Brief travel block with weather", () => {
   it("shows the margin beside the departure with the credit", async () => {
     await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
       travel={guidance({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION }, true)} />));
-    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling). Includes 10 min for rain. Consider transit instead of cycling.");
+    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling). Includes 10 min for rain.");
     expect(container.querySelector("[data-weather-credit]")?.textContent).toContain("Weather data by Open-Meteo.com (CC BY 4.0).");
   });
 
@@ -149,7 +151,7 @@ describe("travel timing with the Ticket 264 fields", () => {
       legs: base.legs.map((entry) => ({ ...entry, late: true, estimate: { ...entry.estimate!, warnings: ["Estimated arrival is after the planned arrival time."] } })) };
     await act(() => root.render(renderTravelTiming({ eventId: "event-1", travel: late, timezone: "America/New_York" })));
     expect(container.textContent).toContain("Outbound · cycling: leave");
-    expect(container.textContent).toContain("Estimated arrival is after the planned arrival time.");
+    expect(container.textContent).toContain("You may arrive late: arrive 2:20 PM.");
     expect(container.textContent).not.toContain("timing unavailable");
     expect(container.textContent).not.toContain("return_base_missing");
   });

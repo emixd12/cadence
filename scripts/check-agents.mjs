@@ -64,7 +64,8 @@ function sourceEnvironmentVariables() {
 
   for (const sourceFile of sourceFiles) {
     for (const match of read(sourceFile).matchAll(pattern)) {
-      names.add(match[1]);
+      // Vite sets this from the build mode; nobody configures it.
+      if (match[0] !== "import.meta.env.DEV") names.add(match[1]);
     }
   }
 

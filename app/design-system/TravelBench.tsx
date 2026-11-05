@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
+import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
+import { renderTravelTiming } from "@/components/timeline/ExternalEventDetails";
+import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { resolveTravelPlan, resolveTravelEvidence } from "@cadence/core/resolvers/travel.resolver";
 import { planTravelHabitChange } from "@cadence/core/services/travel-habits";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
@@ -104,5 +108,35 @@ export function travelBenchEvidence(eventId: string, withBase: boolean, weather?
     results: plan.legs.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: { durationSeconds: leg.role === "return" ? 6000 : 3000,
       departureAt: leg.role === "return" ? "2026-11-01T21:40:00Z" : "2026-11-01T18:30:00Z",
       arrivalAt: leg.role === "return" ? "2026-11-01T23:20:00Z" : "2026-11-01T19:20:00Z",
-      observedAt: now, expiresAt: "2026-11-01T13:05:00Z", fallback: false, warnings: ["Synthetic route. No provider call."], attribution: "Google Maps" } })) });
+      observedAt: now, expiresAt: "2026-11-01T13:05:00Z", fallback: false, warnings: [], attribution: "Google Maps" } })) });
+}
+
+/** Bench-only caption. It never travels in a fixture's warnings. */
+export function TravelBenchCaption() {
+  return <p className="text-xs leading-5 text-muted-readable">Synthetic route. No provider call.</p>;
+}
+
+/** Ticket 260: the same evidence in both build modes, side by side. */
+export function TravelDevelopmentTextBench() {
+  const evidence = travelBenchEvidence("bench-event", true, "thunderstorm");
+  const travel = { ...evidence, legs: evidence.legs.map((entry) => entry.leg.role === "outbound" && entry.estimate ? { ...entry, late: true,
+    estimate: { ...entry.estimate, warnings: ["Estimated arrival is after the planned arrival time.", "This route includes a toll road."] } } : entry) };
+  const briefing = { text: "Dentist anchors the afternoon.", localDate: "2026-11-01", timezone: "America/New_York",
+    generatedAt: "2026-11-01T12:00:00Z", expiresAt: "2999-11-01T16:00:00Z", coverage: "complete" as const, warnings: [] };
+  const guidance = { localDate: "2026-11-01", observedAt: "2026-11-01T13:00:00Z", expiresAt: "2999-11-01T16:00:00Z", attribution: "Google Maps",
+    items: [{ kind: "departure" as const, at: "2026-11-01T18:05:00Z", label: "Dentist", mode: "cycling" as const,
+      weather: { marginMinutes: 15, conditions: ["thunderstorm" as const], suggestion: { instead: "cycling" as const, alternatives: ["transit" as const, "driving" as const] } } }],
+    conflictingOptionIds: [], occupiedSpans: [], weather: { state: "applied" as const, attribution: OPEN_METEO_ATTRIBUTION } };
+  return <div className="mt-4 grid gap-4 border-t border-line pt-4">
+    <TravelBenchCaption />
+    <div className="grid gap-6 lg:grid-cols-2">
+      {[{ name: "Production build", value: false }, { name: "Development build", value: true }].map((build) => <section key={build.name} className="grid min-w-0 content-start gap-3" data-travel-bench-build={build.value ? "development" : "production"}>
+        <h4 className="text-sm font-bold">{build.name}</h4>
+        <DevelopmentBuildProvider value={build.value}>
+          {renderTravelTiming({ eventId: "bench-event", travel, timezone: "America/New_York" })}
+          <div className="pt-8"><DailyBriefBubble state="ready" briefing={briefing} travel={guidance} onDismiss={() => undefined} /></div>
+        </DevelopmentBuildProvider>
+      </section>)}
+    </div>
+  </div>;
 }

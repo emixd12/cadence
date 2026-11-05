@@ -15487,7 +15487,7 @@ at desktop width and 390 px, in both a production build and a development build.
 
 ## Ticket 260: Development-only travel text and route warnings
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 263. Tickets 261 and 262 use its flag.
 
 Goal: text meant for developers never reaches a production user, and production

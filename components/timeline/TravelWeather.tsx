@@ -22,12 +22,15 @@ export type TravelWeatherMargin = Readonly<{
   suggestion: WeatherModeSuggestion | null;
 }>;
 
-/** Plain copy for a fixed weather margin, for example "Includes 10 min for rain." */
-export function travelWeatherMarginText(weather: TravelWeatherMargin): string {
+/**
+ * Plain copy for a fixed weather margin, for example "Includes 10 min for rain."
+ * The mode advice is development-only (Ticket 260). The model's weather facts are separate.
+ */
+export function travelWeatherMarginText(weather: TravelWeatherMargin, { developmentBuild }: Readonly<{ developmentBuild: boolean }>): string {
   const condition = weather.conditions[0];
   if (!condition || weather.marginMinutes <= 0) return "";
   const margin = `Includes ${weather.marginMinutes} min for ${CONDITION_LABELS[condition]}.`;
-  if (!weather.suggestion) return margin;
+  if (!developmentBuild || !weather.suggestion) return margin;
   return `${margin} Consider ${weather.suggestion.alternatives.join(" or ")} instead of ${weather.suggestion.instead}.`;
 }
 
