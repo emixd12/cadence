@@ -15968,9 +15968,17 @@ Implementation notes:
   `resolveTravelRefreshPlan` on open, focus, return to the window, movement and the plan's
   own timer. Trips come from the kept view (`travelRefreshTripsFromEvidence`). Trip requests
   send `trips`; a Daily Brief still asks for the whole day, which alone carries the token.
-- `mergeTravelLastEstimates` (travel resolver) merges every response per trip. A trip keeps
-  its last estimate unless anything it was planned from changed, the new plan rejects it,
-  it cannot leave before its stop ends, or it has arrived. A failed refresh keeps the view.
+- `mergeTravelLastEstimates` (travel resolver) merges every response per trip, matched on the
+  stop each trip serves (the stop it goes to, or for the trip home the stop it leaves), so an
+  onward trip that becomes outbound keeps its time. A trip keeps its last estimate unless
+  anything it was planned from changed, the new plan rejects it, it cannot leave before its stop
+  ends, or it has arrived. A failed refresh keeps the view.
+- A changed source shows the last view with every time marked "Last estimate" until its
+  response arrives; at the 80% pause or after a failure it stays, with Refresh travel.
+- Movement over 500 m (Ticket 267's trigger, changed here) refreshes only the next outbound trip,
+  as a trip request, no sooner than 10 minutes after the last request that routed from the device.
+- `tests/travel-refresh-day.dom.test.tsx` runs whole days through the real hosted service: typical
+  6 requests and 8 legs, heavy 10 and 14, moving 45 minutes 5 and 7.
 - `sessionStorage` key `cadence:travel-session`: one account and date, no device sample,
   token or place text, source keys as a digest. Sign-out (web and Mac), account change,
   travel off, settings change and day change clear it (`docs/DATA_MODEL.md`). After a reload

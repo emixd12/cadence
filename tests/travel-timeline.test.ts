@@ -237,7 +237,10 @@ describe("Ticket 268: last estimates, unreliable trips and a trip home that chan
       segments: value.segments.filter((segment) => !segment.legId || !value.legs.some((entry) => roles.includes(entry.leg.role) && entry.leg.id === segment.legId)) });
     const merged = mergeTravelLastEstimates(first, unrouted(next, ["onward", "return"]), "2026-09-16T12:10:00Z");
     expect(merged.legs.map((entry) => entry.estimate?.departureAt)).toEqual(first.legs.map((entry) => entry.estimate?.departureAt));
-    expect(merged.occupiedSpans).toEqual(first.occupiedSpans);
+    // The kept estimates sit on the new legs, so their segments carry the new leg IDs.
+    expect(merged.legs.map((entry) => entry.leg.id)).toEqual([first.legs[0]!.leg.id, `${first.legs[1]!.leg.id}-new`, `${first.legs[2]!.leg.id}-new`]);
+    expect(merged.occupiedSpans.map(({ startAt, endAt }) => [startAt, endAt])).toEqual(first.occupiedSpans.map(({ startAt, endAt }) => [startAt, endAt]));
+    expect(merged.segments.filter((segment) => segment.legId).every((segment) => merged.legs.some((entry) => entry.leg.id === segment.legId))).toBe(true);
     expect(merged.completeTrip).toBe(true);
     // No previous view, or nothing to carry: the response is used as it is.
     expect(mergeTravelLastEstimates(null, next, now)).toBe(next);

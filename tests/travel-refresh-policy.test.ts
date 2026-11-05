@@ -138,10 +138,28 @@ describe("trip refresh plan (Ticket 267)", () => {
     expect(plan("11:30", { trips, last: tried }).request).toBeNull();
   });
 
-  it("routes the whole day after a source change or movement beyond 500 m", () => {
+  it("routes the whole day after a source change", () => {
     expect(plan("09:00", { sourceKey: "s2" }).request).toEqual({ kind: "day", trigger: "source_changed" });
-    expect(plan("09:00", { device: { ...HOME_SAMPLE, latitude: 42.06 } }).request).toEqual({ kind: "day", trigger: "device_moved" });
-    expect(plan("09:00", { device: { ...HOME_SAMPLE, latitude: 42.051 } }).request).toBeNull();
+  });
+
+  it("refreshes only the next trip from the device after movement beyond 500 m, at most every 10 minutes (Ticket 268)", () => {
+    const moved = { ...HOME_SAMPLE, latitude: 42.06 };
+    const trips = [known(DENTIST, at("13:55"), at("08:00")), known(GYM, at("15:00"), at("08:00"))];
+    expect(plan("09:00", { device: moved, trips }).request).toEqual({ kind: "trip", trigger: "device_moved", trips: [DENTIST_TRIP] });
+    expect(plan("09:00", { device: { ...HOME_SAMPLE, latitude: 42.051 }, trips }).request).toBeNull();
+    // Unfocused, or with no trip leaving from the device, movement requests nothing.
+    expect(plan("09:00", { device: moved, trips, timelineFocused: false }).request).toBeNull();
+    expect(plan("09:00", { device: moved, trips: [known(GYM, at("15:00"), at("08:00"))] }).request).toBeNull();
+    // The request moves the baseline and starts the floor.
+    const after = recordTravelRefresh(opened(), { kind: "trip", trigger: "device_moved", trips: [DENTIST_TRIP] }, { now: at("09:00"), timezone: NY, sourceKey: "s1", device: moved });
+    expect(after).toMatchObject({ device: moved, deviceRoutedAt: at("09:00"), tripAttempts: { [DENTIST]: at("09:00") } });
+    const further = { ...HOME_SAMPLE, latitude: 42.07 };
+    expect(plan("09:09", { device: further, trips, last: after })).toMatchObject({ request: null, nextDueAt: at("09:10") });
+    expect(plan("09:10", { device: further, trips, last: after }).request).toEqual({ kind: "trip", trigger: "device_moved", trips: [DENTIST_TRIP] });
+    // A whole-day request also routes from the device, so it restarts the floor.
+    const day = recordTravelRefresh(after, { kind: "day", trigger: "source_changed" }, { now: at("09:05"), timezone: NY, sourceKey: "s1", device: further });
+    expect(day.deviceRoutedAt).toBe(at("09:05"));
+    expect(plan("09:14", { device: { ...HOME_SAMPLE, latitude: 42.09 }, trips, last: day }).request).toBeNull();
   });
 
   it("stops automatic requests at 80% of the ceiling until it renews; Refresh travel still routes", () => {
@@ -158,7 +176,7 @@ describe("trip refresh plan (Ticket 267)", () => {
   it("records a whole-day request with its date, sources and device, and resets trip attempts each day", () => {
     const fields = { now: at("07:00", "2026-11-06"), timezone: NY, sourceKey: "s3", device: null };
     const tried = { ...opened(), tripAttempts: { [DENTIST]: at("10:55") } };
-    expect(recordTravelRefresh(tried, { kind: "day", trigger: "first_open" }, fields)).toEqual({ localDate: "2026-11-06", sourceKey: "s3", device: null, tripAttempts: {} });
+    expect(recordTravelRefresh(tried, { kind: "day", trigger: "first_open" }, fields)).toEqual({ localDate: "2026-11-06", sourceKey: "s3", device: null, tripAttempts: {}, deviceRoutedAt: fields.now });
     expect(recordTravelRefresh(tried, { kind: "day", trigger: "source_changed" }, { ...fields, now: at("12:00") }).tripAttempts).toEqual({ [DENTIST]: at("10:55") });
     expect(travelRefreshRequestFields({ kind: "day", trigger: "first_open" })).toEqual({ scope: "day" });
     expect(travelRefreshRequestFields({ kind: "trip", trigger: "trip_3h", trips: [DENTIST_TRIP] })).toEqual({ scope: "day", trips: [DENTIST_TRIP] });

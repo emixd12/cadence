@@ -822,7 +822,10 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
       last: recordTravelRefresh(last, { kind: "trip", trigger: "trip_3h", trips: [onward] }, { ...base, now: at("11:20") }) });
     await run("fallback", { ...base, now: at("11:30"), trips: [{ ...onward, key: onwardKey, leaveAt: null, checkedAt: null, fallbackAt: at("11:30") }], last });
     await run("source change", { ...base, now: at("09:00"), sourceKey: "s2", trips: onwardOnly, last });
-    await run("movement", { ...base, now: at("09:00"), device: { ...homeSample, latitude: 40.01 }, trips: onwardOnly, last });
+    // Ticket 268: movement refreshes only the next trip that leaves from the device.
+    const outbound = { role: "outbound" as const, originRef: null, destinationRef: "occurrence-1" };
+    await run("movement", { ...base, now: at("09:00"), device: { ...homeSample, latitude: 40.01 },
+      trips: [{ ...outbound, key: travelTripKey(outbound), leaveAt: at("09:50"), checkedAt: at("08:00"), fallbackAt: null }, ...onwardOnly], last });
     await run("Refresh travel", { ...base, now: at("09:00"), refreshTravel: true, trips: onwardOnly, last });
     const budget = { reservedMicrodollars: 4_000_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-10-01T04:00:00Z" };
     await run("budget at 80%, 3-hour refresh", { ...base, now: at("11:20"), trips: onwardOnly, last, budget });
@@ -836,7 +839,7 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
       "30-minute refresh": 1,
       "fallback": 1,
       "source change": 3,
-      "movement": 3,
+      "movement": 1,
       "Refresh travel": 3,
       "budget at 80%, 3-hour refresh": 0,
       "budget at 80%, first open": 0,

@@ -26,6 +26,8 @@ export const TRAVEL_LEG_READY_AFTER_END = "Route is ready only after its destina
 export const TRAVEL_TRIP_FIRST_REFRESH_SECONDS = 3 * 60 * 60;
 /** ...and once more within this long of it. */
 export const TRAVEL_TRIP_FINAL_REFRESH_SECONDS = 30 * 60;
+/** Ticket 268: movement refreshes the next trip from the device at most this often. */
+export const TRAVEL_MOVEMENT_REFRESH_FLOOR_SECONDS = 10 * 60;
 /** Ticket 267: at this share of the monthly ceiling, automatic refreshes stop. Refresh travel continues. */
 export const TRAVEL_BUDGET_AUTOMATIC_PAUSE_SHARE = 0.8;
 
@@ -190,10 +192,15 @@ export type TravelRefreshState = Readonly<{
   device: TravelDeviceSample | null;
   /** Trip key to the time a trip request for it was last sent, today. */
   tripAttempts: Readonly<Record<string, string>>;
+  /**
+   * Ticket 268: when a request last routed from a new device sample (a whole-day request or a
+   * movement refresh). Movement waits 10 minutes from it.
+   */
+  deviceRoutedAt?: string;
 }>;
 
 export type TravelRefreshDayTrigger = "refresh_travel" | "first_open" | "source_changed" | "device_moved";
-export type TravelRefreshTripTrigger = "trip_3h" | "trip_30m" | "no_estimate";
+export type TravelRefreshTripTrigger = "trip_3h" | "trip_30m" | "no_estimate" | "device_moved";
 export type TravelRefreshRequest =
   | Readonly<{ kind: "day"; trigger: TravelRefreshDayTrigger }>
   | Readonly<{ kind: "trip"; trigger: TravelRefreshTripTrigger; trips: readonly TravelTripRef[] }>;
@@ -229,10 +236,12 @@ export type TravelRefreshPlanInput = Readonly<{
  * 1. Refresh travel routes the whole day.
  * 2. At 80% of the monthly ceiling nothing else requests.
  * 3. The first open of a local date routes the whole day, with or without the Daily Brief.
- * 4. A source change, or the device moving more than 500 m, routes the whole day.
+ * 4. A source change routes the whole day.
  * 5. While the Timeline is visible and focused, a trip with a known leave time is refreshed
  *    once within 3 hours of it and once within 30 minutes. A trip with no estimate is
- *    requested once its estimate's appearance time has come. All trips due now share one request.
+ *    requested once its estimate's appearance time has come. Ticket 268: the device moving
+ *    more than 500 m refreshes only the next trip that leaves from the device, the next
+ *    outbound trip, no sooner than 10 minutes after the last request that routed from the device. All trips due now share one request.
  *
  * An open with a last estimate and none of these triggers requests nothing.
  */
@@ -248,7 +257,6 @@ export function resolveTravelRefreshPlan(input: TravelRefreshPlanInput): TravelR
   const day = (trigger: TravelRefreshDayTrigger): TravelRefreshPlan => ({ request: { kind: "day", trigger }, nextDueAt: null, automaticPaused });
   if (!last || last.localDate !== today.toString()) return day("first_open");
   if (input.sourceKey !== last.sourceKey) return day("source_changed");
-  if (travelDeviceMoved(last.device, input.device)) return day("device_moved");
 
   let next = nextMidnight;
   const later = (at: Temporal.Instant) => { if (Temporal.Instant.compare(at, next) < 0) next = at; };
@@ -270,12 +278,21 @@ export function resolveTravelRefreshPlan(input: TravelRefreshPlanInput): TravelR
       else if (!touchedSince(fallbackAt)) due.set(trip.key, { trip, trigger: "no_estimate" });
     }
   }
+  // Only a trip that leaves from the device depends on where it is: the next outbound trip.
+  if (travelDeviceMoved(last.device, input.device)) {
+    const floorEnds = last.deviceRoutedAt ? Temporal.Instant.from(last.deviceRoutedAt).add({ seconds: TRAVEL_MOVEMENT_REFRESH_FLOOR_SECONDS }) : null;
+    const nextOutbound = input.trips
+      .filter((trip) => trip.role === "outbound" && (!trip.leaveAt || Temporal.Instant.compare(Temporal.Instant.from(trip.leaveAt), now) > 0))
+      .sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.leaveAt ?? left.fallbackAt ?? input.now), Temporal.Instant.from(right.leaveAt ?? right.fallbackAt ?? input.now)))[0];
+    if (floorEnds && Temporal.Instant.compare(now, floorEnds) < 0) later(floorEnds);
+    else if (nextOutbound) due.set(nextOutbound.key, { trip: nextOutbound, trigger: "device_moved" });
+  }
   if (!input.timelineFocused || !due.size) {
     // Unfocused, a due trip waits for focus; the plan is asked again then.
     return { request: null, nextDueAt: next.toString(), automaticPaused };
   }
   const triggers = [...due.values()].map((entry) => entry.trigger);
-  const trigger = triggers.includes("trip_30m") ? "trip_30m" : triggers.includes("trip_3h") ? "trip_3h" : "no_estimate";
+  const trigger = triggers.includes("device_moved") ? "device_moved" : triggers.includes("trip_30m") ? "trip_30m" : triggers.includes("trip_3h") ? "trip_3h" : "no_estimate";
   const trips = [...due.values()].map(({ trip }) => ({ role: trip.role, originRef: trip.originRef, destinationRef: trip.destinationRef }));
   return { request: { kind: "trip", trigger, trips }, nextDueAt: next.toString(), automaticPaused };
 }
@@ -292,8 +309,10 @@ export function recordTravelRefresh(
 ): TravelRefreshState {
   const today = Temporal.Instant.from(input.now).toZonedDateTimeISO(input.timezone).toPlainDate().toString();
   const attempts = last?.localDate === today ? last.tripAttempts : {};
-  if (request.kind === "day") return { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: attempts };
-  const base = last?.localDate === today ? last : { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: {} };
+  if (request.kind === "day") return { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: attempts, deviceRoutedAt: input.now };
+  const kept = last?.localDate === today ? last : { localDate: today, sourceKey: input.sourceKey, device: input.device, tripAttempts: {} };
+  // Movement moves the baseline to the sample the request used and starts the 10-minute floor.
+  const base = request.trigger === "device_moved" ? { ...kept, device: input.device, deviceRoutedAt: input.now } : kept;
   return { ...base, tripAttempts: { ...attempts, ...Object.fromEntries(request.trips.map((trip) => [travelTripKey(trip), input.now])) } };
 }
 

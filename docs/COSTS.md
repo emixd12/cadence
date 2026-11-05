@@ -193,11 +193,25 @@ is 180 of the 240 typical legs today. The trip refreshes and reminders spend mos
 again. The heavy upper bound reaches today's figure, but automatic refreshes stop at
 US$4.00, 80% of the ceiling, so automatic spend cannot reach it.
 
-Ticket 268 checks the typical day with a fake clock (`tests/travel-lifecycle.dom.test.tsx`,
-"spends the call counts"): three trips, first open at 7:00 AM, hourly returns to the
-window, a break, a remount and a reload. The client makes 6 route requests and routes 8
-legs: one whole-day pass of 3 legs, then 5 trip refreshes of 1 leg each. That matches the
-typical row: 3 legs for the first open and 3 to 6 for trip refreshes.
+Measured with a fake clock through the real client hook and the real hosted service
+(`tests/travel-refresh-day.dom.test.tsx`, Ticket 268, November 5, 2026; provider, database and
+Calendar reads mocked, walking, so one provider call per leg):
+
+| Day | Route requests | Legs |
+| --- | --- | --- |
+| Typical: Dentist 9–10 AM, Gym 1–2 PM, home; hourly focus, a remount and a reload | 6 | 8 |
+| Heavy: four stops, focus every 15 minutes | 10 | 14 |
+| Moving 1 km a minute for 45 minutes, Timeline focused, typical day | 5 | 7 |
+
+The typical day is one whole-day pass of 3 legs, then 5 trip refreshes of 1 leg, inside the
+typical row (3 legs for the first open, 3 to 6 for trip refreshes). The heavy day is 5 legs
+plus 9 refreshes, under the plan's bound of 15. Movement over 500 m refreshes only the next
+trip that leaves from the device, at most once every 10 minutes after the last request that
+routed from the device: here the first open plus 4 one-leg refreshes. Before this fix the
+same 45 minutes made 46 requests and 138 legs. A user moving all day with an outbound trip
+ahead could add up to 6 legs an hour while the Timeline is focused; the assumption below of
+0.5 to 2 legs per travel day for source changes, movement and Refresh travel describes a
+mostly stationary user. Transit doubles each figure.
 
 Calls per trigger, from `resolveTravelRefreshPlan` in
 `packages/core/src/services/travel-refresh-policy.ts` and the hosted route. Transit makes
@@ -207,7 +221,8 @@ two provider calls per leg.
 | --- | --- | --- |
 | First open of a local date, with or without the Daily Brief | whole day | every planned leg, at most eight |
 | Open with a last estimate and no change | none | 0 |
-| Source change, or the device moved more than 500 m | whole day | every planned leg |
+| Source change | whole day | every planned leg |
+| Device moved more than 500 m, Timeline focused, at most every 10 minutes (Ticket 268) | next trip from the device | 1 |
 | Within 3 hours of a known leave time, once, Timeline visible and focused | that trip | 1 |
 | Within 30 minutes of a known leave time, once, same condition | that trip | 1 |
 | Trip with no estimate, once its appearance time comes | that trip | 1 |

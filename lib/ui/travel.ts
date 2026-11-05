@@ -289,6 +289,18 @@ function mergedTravelView(previous: TravelRoutesView | null | undefined, next: T
   return { ...next, evidence, expiresAt };
 }
 
+/**
+ * Ticket 268: a view planned from older sources, shown until a new response arrives or while
+ * automatic requests are paused. Every estimate counts as expired, so each trip reads
+ * "Last estimate" with its checked time, and Refresh travel stays offered.
+ */
+function asLastEstimates(view: TravelRoutesView, now: string): TravelRoutesView {
+  if (!view.evidence) return view;
+  const cap = (value: string) => Date.parse(value) < Date.parse(now) ? value : now;
+  return { ...view, expiresAt: now, evidence: { ...view.evidence, legs: view.evidence.legs.map((entry) => entry.estimate
+    ? { ...entry, estimate: { ...entry.estimate, expiresAt: cap(entry.estimate.expiresAt) } } : entry) } };
+}
+
 function sampleOf(device: Readonly<{ latitude: number; longitude: number; accuracyMeters: number }> | null): TravelDeviceSample | null {
   return device ? { latitude: device.latitude, longitude: device.longitude, accuracyMeters: device.accuracyMeters } : null;
 }
@@ -376,7 +388,8 @@ export function useTravelContext(input: Readonly<{
       // The Daily Brief token stays in page memory; JSON omits the undefined field.
       const view = cached?.view ? { ...cached.view, conclusionsToken: undefined } : null;
       writeTravelSession({ version: 1, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(),
-        refresh: refreshState ? { localDate: refreshState.localDate, sourceKey: refreshState.sourceKey, tripAttempts: refreshState.tripAttempts } : null,
+        refresh: refreshState ? { localDate: refreshState.localDate, sourceKey: refreshState.sourceKey, tripAttempts: refreshState.tripAttempts,
+          ...(refreshState.deviceRoutedAt ? { deviceRoutedAt: refreshState.deviceRoutedAt } : {}) } : null,
         budget: travelBudgets.get(accountId) ?? null });
     };
     restore();
@@ -494,8 +507,9 @@ export function useTravelContext(input: Readonly<{
           if (planned.kind === "day" && briefRequest) briefRequest.pending = false;
           // A trip request is recorded when sent, so a failing trip waits for its next threshold.
           if (planned.kind === "trip" && sameEpoch()) {
+            // Movement moves the baseline to the sample this request uses.
             travelRefreshStates.set(accountId, recordTravelRefresh(travelRefreshStates.get(accountId) ?? null, planned,
-              { now: sentAt, timezone, sourceKey: planKey, device: travelRefreshStates.get(accountId)?.device ?? null }));
+              { now: sentAt, timezone, sourceKey: planKey, device: planned.trigger === "device_moved" ? sampleOf(device) : travelRefreshStates.get(accountId)?.device ?? null }));
           }
           // Join a routes call already in flight for this key (an immediate remount); otherwise start one and register it.
           const callRoutes = (): Promise<TravelRoutesView> => {
@@ -634,7 +648,13 @@ export function useTravelContext(input: Readonly<{
       pauseBudget(resumesAt);
     } else {
       if (cached?.view && !cached.resumesAt) showView(cached.view, cached.at);
-      else if (cached && !cached.view && cached.message && !cached.resumesAt && Date.now() - cached.at < FAILURE_REUSE_MS) patch({ message: cached.message });
+      else {
+        // A changed source: keep today's last view, marked, until its response arrives. The merge
+        // then withdraws the changed trips. While paused or failing it stays, with Refresh travel.
+        const last = lastDayView();
+        if (last?.view) showView(asLastEstimates(last.view, new Date().toISOString()), last.at);
+        if (cached && !cached.view && cached.message && !cached.resumesAt && Date.now() - cached.at < FAILURE_REUSE_MS) patch({ message: cached.message });
+      }
       const failedRecently = !!cached && !cached.view && !!cached.message && Date.now() - cached.at < FAILURE_REUSE_MS;
       if (!failedRecently) evaluate();
       if (cached?.view?.evidence) void checkMovement();

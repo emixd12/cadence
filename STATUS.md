@@ -26,9 +26,16 @@ follow the trip refresh plan and keep every leave time they already know.
 - Automatic requests wait for the Google Calendar read that feeds travel to settle, at most 10
   seconds, on web and Mac. Refresh travel does not wait. A reload with a late Calendar makes no
   second whole-day request.
-- A typical day with a fake clock makes 6 route requests and routes 8 legs, as `docs/COSTS.md` assumes.
 - Not decided: wording for the 80% automatic pause. It shows nothing new; a response reporting the
   whole budget used shows the approved paused line (P-018 note).
+
+- Verifier fixes: trips merge on the stop they serve, so an onward trip that becomes outbound keeps
+  its time. A changed source, at the 80% pause or after a failed request, keeps the last view with
+  every time marked "Last estimate" and Refresh travel. Movement refreshes only the next trip from the
+  device, at most every 10 minutes. Measured through the real service: typical day 6 requests and 8
+  legs, heavy day 10 and 14, moving 45 minutes 5 and 7 (`docs/COSTS.md`).
+- **Release order: ship the server before any new Mac build.** The deployed server (`c599d24`)
+  ignores `trips`, so a new Mac build against it routes the whole day on every trip refresh.
 
 Platform impact: web `lib/ui/travel.ts`; desktop uses the same hook in `apps/desktop/src/product.tsx`,
 and session data never enters SQLite. Marketing: not applicable. Future mobile: mobile web inherits

@@ -14,6 +14,16 @@ const settings = { enabled: true, mode: "walking" as const, baseLocationText: nu
 const view = (accountId: string): TravelRoutesView => ({ accountId, mode: "walking", navigationPreference: "google_maps", settingsRevision: "revision",
   expiresAt: new Date(Date.now() + 300_000).toISOString(), evidence: { version: "1.0", journeyRef: accountId,
     legs: [], segments: [], occupiedSpans: [], collisions: [], completeTrip: false, finalAvailabilityAt: null } });
+/** A view with one outbound trip, which leaves from the device, so movement has a trip to refresh. */
+const movingView = (accountId: string): TravelRoutesView => {
+  const now = new Date().toISOString();
+  const leg = { id: `out-${Date.now()}`, role: "outbound" as const, journeyRef: accountId, originCommitmentRef: null, destinationCommitmentRef: "dentist",
+    mode: "walking" as const, readyAt: now, provenance: { originRef: "device", originSource: "device", originRevision: now, destinationRef: "dentist",
+      destinationSource: "calendar", destinationRevision: "r1", grantRevision: "revision" } as TravelEvidenceLeg["provenance"] };
+  const estimate = { durationSeconds: 1200, departureAt: "2026-09-21T23:00:00Z", arrivalAt: "2026-09-21T23:20:00Z", warnings: [], fallback: false,
+    attribution: "Google", observedAt: now, expiresAt: new Date(Date.now() + 300_000).toISOString() };
+  return { ...view(accountId), evidence: { ...view(accountId).evidence!, legs: [{ leg, state: "current", estimate, reason: null }] } };
+};
 const capture = vi.fn<(state: TravelState) => void>();
 const latest = () => capture.mock.lastCall![0];
 function Probe({ client, accountId, sourceKey = "source", localDate = "2026-09-21", sourceReady }: { client: TravelClient; accountId: string; sourceKey?: string; localDate?: string; sourceReady?: boolean }) {
@@ -48,7 +58,9 @@ it("gates device reads, shows provider review, and rejects late account response
     await act(async () => { resolveOld(view("account-a")); await vi.advanceTimersByTimeAsync(350); });
     expect(host.textContent).toBe("account-b");
     await act(() => root.render(<Probe client={client} accountId="account-b" sourceKey="changed" />));
-    expect(host.textContent).toBe("empty");
+    // Ticket 268: a changed source keeps today's last view, marked, until its response arrives.
+    expect(host.textContent).toBe("account-b");
+    expect(latest().stale).toBe(true);
     await act(async () => vi.advanceTimersByTimeAsync(350));
     expect(host.textContent).toBe("account-b");
     await act(() => window.dispatchEvent(new Event("offline")));
@@ -200,7 +212,7 @@ it("requests again on open only when the device moved beyond the threshold", asy
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
   const at = (latitude: number) => ({ state: "available" as const, latitude, longitude: -87.68, accuracyMeters: 10, sampledAt: Date.now() });
   const readLocation = vi.fn(async () => at(42.0500));
-  const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
+  const routes = vi.fn<TravelClient["routes"]>(async () => movingView("account-a"));
   const client: TravelClient = { settings: { load: async () => settings, save: async () => settings }, configured: async () => true, readLocation, routes };
   const host = document.createElement("div"); document.body.append(host);
   let root = createRoot(host);
@@ -220,7 +232,14 @@ it("requests again on open only when the device moved beyond the threshold", asy
     await act(() => root.unmount());
     readLocation.mockResolvedValue(at(42.0700)); // About 2.2 km: the estimate is out of date.
     await open();
+    // Ticket 268: movement waits 10 minutes from the last request that routed from the device.
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(() => root.unmount());
+    await act(async () => vi.advanceTimersByTimeAsync(600_000));
+    await open();
     expect(routes).toHaveBeenCalledTimes(2);
+    // Ticket 268: movement refreshes only the trip that leaves from the device.
+    expect(routes.mock.calls[1]![0].trips).toEqual([{ role: "outbound", originRef: null, destinationRef: "dentist" }]);
   } finally { await act(() => root.unmount()); host.remove(); }
 });
 
@@ -472,7 +491,7 @@ it("honors a budget refusal across source changes and unlocks manual refresh at 
 
 
 it("checks foreground movement without refreshing stationary or background positions", async () => {
-  const routes = vi.fn(async () => view("account-a"));
+  const routes = vi.fn<TravelClient["routes"]>(async () => movingView("account-a"));
   const { client, unmount } = await mount(routes);
   try {
     const position = { state: "available" as const, latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: Date.now() };
@@ -488,7 +507,11 @@ it("checks foreground movement without refreshing stationary or background posit
     expect(routes).toHaveBeenCalledTimes(2);
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     await act(async () => vi.advanceTimersByTimeAsync(60_350));
+    // Ticket 268: within 10 minutes of the last request that routed from the device, movement waits.
+    expect(routes).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(8 * 60_000));
     expect(routes).toHaveBeenCalledTimes(3);
+    expect(routes.mock.lastCall![0].trips).toEqual([{ role: "outbound", originRef: null, destinationRef: "dentist" }]);
   } finally { await unmount(); }
 });
 
@@ -632,11 +655,11 @@ it("merges a trip response per trip, so other trips keep their times (Ticket 268
     expect(routes.mock.calls[1]![0]).toMatchObject({ scope: "day", trips: [{ role: "outbound", originRef: null, destinationRef: "dentist" }] });
     const legs = latest().view!.evidence!.legs;
     expect(legs.map((entry) => [entry.leg.id, entry.estimate?.observedAt])).toEqual([
-      ["outbound-2", "2026-09-21T12:00:00.350Z"], ["onward-1", "2026-09-21T11:00:00.350Z"], ["return-1", "2026-09-21T11:00:00.350Z"]]);
+      ["outbound-2", "2026-09-21T12:00:00.350Z"], ["onward-2", "2026-09-21T11:00:00.350Z"], ["return-2", "2026-09-21T11:00:00.350Z"]]);
     const trips = departureAt(latest().view).trips;
     expect(trips.map((trip) => [trip.role, trip.freshness, trip.leaveAt])).toEqual([
       ["outbound", "current", "2026-09-21T12:30:00Z"], ["onward", "last_estimate", "2026-09-21T16:30:00Z"], ["return", "last_estimate", "2026-09-21T18:05:00Z"]]);
-    expect(latest().view!.evidence!.segments.filter((segment) => segment.kind === "route").map((segment) => segment.legId)).toEqual(["outbound-2", "onward-1", "return-1"]);
+    expect(latest().view!.evidence!.segments.filter((segment) => segment.kind === "route").map((segment) => segment.legId)).toEqual(["outbound-2", "onward-2", "return-2"]);
   } finally { await day.done(); }
 });
 
