@@ -107,7 +107,15 @@ plan's last-request record. It stores no device sample, no Daily Brief token and
 event title or place text; source keys and each stop's revision are kept only as digests. Sign-out, an account
 change, travel turned off, a travel settings change and a new local date clear it, and it
 ends with the browser session. The Mac webview's `sessionStorage` lasts for the app
-session; it never enters SQLite, sync or backups. Ticket 216 place markers
+session; it never enters SQLite, sync or backups. Ticket 274 keeps today's leave-time
+question candidates in a second `sessionStorage` entry, `cadence:travel-leave-question`:
+one account and one local date, at most 32 `{eventRef, endsAt}` pairs and a Not now flag.
+`eventRef` is the same hex SHA-256 as `leave_feedback.event_ref`; `endsAt` is the event's
+end, or its start when no end is known. It holds no title, place or other event text; the
+question takes its title from the current Calendar or Behavior read and is skipped when
+the event is gone. Sign-out, an account change, travel turned off and a new local date
+clear it, and it ends with the browser session. The Mac keeps it the same way and never
+writes it to SQLite, sync or backups. Ticket 216 place markers
 are the one stored device position: the user records each with "I'm here", and
 they sync and enter desktop backups (see `place_markers` below). Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive

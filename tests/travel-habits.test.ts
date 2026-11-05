@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  restoreTravelLeaveCandidates,
+  storedTravelLeaveCandidate,
   EMPTY_TRAVEL_HABITS,
   TRAVEL_HABIT_RULES,
   TravelHabitConflictError,
@@ -216,6 +218,16 @@ describe("leave-time question", () => {
     const answered = change(null, { kind: "leave_feedback", eventRef: EVENT, localDate: "2026-10-22", answer: "about_right" }, T1);
     expect(ask("2026-10-22T18:00:00Z", answered)).toBeNull();
     expect(resolveTravelLeavePrompt({ now: "2026-10-23T09:00:00Z", localDate: "2026-10-23", habits: answered, candidates, dismissed: false })).toBeNull();
+  });
+
+  it("keeps digests and end times, and takes titles from the current read (Ticket 274)", () => {
+    const stored = candidates.map(storedTravelLeaveCandidate);
+    expect(stored).toEqual([{ eventRef: travelEventRef("calendar", "dentist"), endsAt: "2026-10-22T15:00:00Z" }]);
+    expect(JSON.stringify(stored)).not.toMatch(/dentist/i);
+    const renamed = subjects.map((subject) => subject.ref === "dentist" ? { ...subject, title: "Dentist, moved room" } : subject);
+    expect(restoreTravelLeaveCandidates(stored, renamed)).toEqual([{ kind: "calendar", ref: "dentist", title: "Dentist, moved room",
+      localDate: "2026-10-22", endsAt: "2026-10-22T15:00:00Z" }]);
+    expect(restoreTravelLeaveCandidates(stored, subjects.filter((subject) => subject.ref !== "dentist"))).toEqual([]);
   });
 
   it("keeps event references free of titles, times and places", () => {

@@ -985,6 +985,19 @@ setup (Ticket 212) links to the same Home and usual travel controls at
 5. Settings deletes labels or markers on request; Turn off deletes both and every
    dismissal. A shorter retention asks first and deletes older labels.
 
+### Leave-time question (Tickets 217 and 274)
+
+1. While the Timeline shows a trip from Home or the current position with a current
+   estimate, Cadence keeps that event as a candidate for today: a one-way digest and the
+   event's end time, in this tab's browser session. No title or place is kept.
+2. After the event ends, the Timeline asks once: the leave time was too early, about
+   right or too late. A reload, or reopening the Mac app's Timeline in the same app
+   session, still asks. The title comes from the current Calendar or Behavior read; if
+   the event is gone, Cadence skips the question.
+3. An answer is saved with the account, so no tab or device asks again that day. Not now
+   saves nothing and hides the question in this tab until the tab or app session ends.
+4. Sign-out, another account, travel turned off and a new day clear the kept candidates.
+
 ## Connect and disconnect an AI client
 
 1. Start a Cadence connection from the AI client.

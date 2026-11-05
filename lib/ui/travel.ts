@@ -7,6 +7,7 @@ import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TimelineView } from "@/lib/types/timeline";
 import type { TravelSettingsClient } from "./travel-settings";
 import { webTravelSettingsClient } from "./travel-settings";
+import { clearTravelLeaveMemory } from "./travel-habits";
 import { readBrowserForegroundLocation, type ForegroundLocation } from "./foreground-location";
 import {
   recordTravelRefresh, resolveTravelRefreshPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
@@ -257,9 +258,10 @@ function invalidateAllTravel(): void {
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
 /**
  * Ticket 268: forgets every travel view, estimate and refresh record in page memory and the
- * browser session. Sign-out calls it on web and Mac.
+ * browser session. Sign-out calls it on web and Mac. Ticket 274: it also removes today's
+ * leave-time candidates.
  */
-export function clearTravelSession(): void { invalidateAllTravel(); }
+export function clearTravelSession(): void { invalidateAllTravel(); clearTravelLeaveMemory(); }
 /** Test-only reset of the in-memory travel view cache. `keepSession` simulates a page reload. */
 export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: boolean }> = {}): void {
   if (options.keepSession) {
@@ -580,6 +582,7 @@ export function useTravelContext(input: Readonly<{
           if (!settings.enabled || !settings.routingConsentAt || !settings.mode) {
             // Travel turned off: nothing of today's travel stays in the session.
             forgetTravelAccount(accountId);
+            clearTravelLeaveMemory();
             travelOffAccounts.add(accountId);
             settle({ view: null, message: null, resumesAt: null, stale: false, observedAt: null }); return;
           }

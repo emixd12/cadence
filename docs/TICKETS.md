@@ -16231,7 +16231,8 @@ tests/travel-settings.dom.test.tsx`, bench at both widths, `npm run interactions
 
 ## Ticket 274: Leave-time question survives a reload
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Candidates
+are kept in `sessionStorage` (`cadence:travel-leave-question`) as digests and end times.
 Dependencies: Ticket 263.
 
 Goal: the question that teaches Cadence survives a page reload (report image 6).

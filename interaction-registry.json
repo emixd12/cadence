@@ -13997,7 +13997,7 @@
           "control": "Not now"
         }
       ],
-      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this page session. Hidden after an answer that day or after Not now in this session.",
+      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this tab's browser session (Ticket 274: kept as digests and end times through a reload; the title comes from the current read, and a deleted event asks nothing). Hidden after an answer that day in any tab or after Not now in this tab's session.",
       "success_result": "Stores the answer with an event digest, local date, time and rules version, updates the arrival buffer, names the new buffer and refreshes estimates when the buffer changed. Not now records nothing.",
       "failure_result": "Keeps the question and says the answer could not save. Tracking data and estimates are unchanged.",
       "effects": [
@@ -14020,7 +14020,7 @@
           "tests/travel-habits.dom.test.tsx",
           "tests/travel-habits.test.ts"
         ],
-        "notes": "Provider-free tests. No position, route duration or event title is stored."
+        "notes": "Provider-free tests, including reload, deleted event, sign-out and day change (Ticket 274). No position, route duration or event title is stored."
       },
       "platforms": {
         "web": {

@@ -17,6 +17,26 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 274 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The leave-time
+question now survives a reload.
+
+- Today's candidates live in `sessionStorage` under `cadence:travel-leave-question`, beside the
+  Ticket 268 travel session: one account, one local date, at most 32 `{eventRef, endsAt}` pairs
+  and the Not now flag. `eventRef` is the existing SHA-256 digest; no title, place or event
+  text is stored. A reload in the tab still asks once after the event ends; a new tab does not
+  inherit candidates. `sessionStorage` was chosen to match Ticket 268 and to end with the tab.
+- `restoreTravelLeaveCandidates` (core) matches kept digests to the current Calendar and
+  Behavior read for the title. A deleted event asks nothing. Not now now lasts through a reload
+  in that tab. An About right answer tells other tabs to reload habits, so an answered day never
+  asks again in another tab.
+- Sign-out (web and Mac, through `clearTravelSession`), an account change, travel turned off and
+  a new local date clear the entry. The Mac uses the same code; nothing reaches SQLite.
+- `docs/DATA_MODEL.md` and `docs/USER_FLOWS.md` describe the store and flow. P-021 has a Ticket
+  274 note for the user-guide sentence that says a reload means no question; the guide and
+  Privacy are unchanged.
+
 ## Travel advisory revamp Wave 3: Ticket 272 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The Daily Brief

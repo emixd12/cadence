@@ -744,6 +744,16 @@ cite has not changed.
     trip.
 - **Update needed:** describe the line, the marker, Directions on rows and the drawer,
   tomorrow's first trip, and the remembered question.
+- **Ticket 274 detail (November 5, 2026):** the question now survives a reload. Today's
+  candidates stay in the tab's browser session as event digests and end times only, so a
+  reload or new Timeline view in that tab still asks once after the event ends. A new tab
+  does not inherit them. Not now now also lasts through a reload in that tab. The title comes
+  from the current Calendar or Behavior read; a deleted event asks nothing. Sign-out, another
+  account, travel turned off and a new day clear them. The guide sentence "Cadence remembers
+  such trips only while the app stays open, so a reload before the event ends means no
+  question that day" is now wrong. The Privacy Google Calendar section ("The web app holds
+  returned event details in memory") still holds as written: only digests of event IDs and
+  end times are stored, so no Privacy edit is proposed.
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later

@@ -54,6 +54,7 @@ import {
 import {
   resolveTravelHabits,
   resolveTravelLeavePrompt,
+  restoreTravelLeaveCandidates,
   routedOutboundCandidates,
   travelArrivalPhrase,
   travelLeaveSubjects,
@@ -223,15 +224,18 @@ export function DayProgressTimeline({
   const travelAccountKey = travelStatus?.view?.accountId ?? travelAccountId;
   const [, setLeaveDismissals] = useState(0);
   const [leaveConfirmation, setLeaveConfirmation] = useState<string | null>(null);
+  // Ticket 274: today's Calendar events and Behaviors as the current read; kept candidates take their titles from it.
+  const leaveSubjects = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return travelLeaveSubjects({ localDate: timeline.todayLocalDate, evidence: travel, events: travelEvents, occurrences: today?.occurrences ?? [] });
+  }, [travel, travelEvents, timeline.daySections, timeline.todayLocalDate]);
   useEffect(() => {
     if (!travelAccountKey || !travel) return;
-    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
-    rememberTravelLeaveCandidates(travelAccountKey, timeline.todayLocalDate, routedOutboundCandidates(travel, travelLeaveSubjects({
-      localDate: timeline.todayLocalDate, evidence: travel, events: travelEvents, occurrences: today?.occurrences ?? [] })));
-  }, [travel, travelAccountKey, travelEvents, timeline.daySections, timeline.todayLocalDate]);
+    rememberTravelLeaveCandidates(travelAccountKey, timeline.todayLocalDate, routedOutboundCandidates(travel, leaveSubjects));
+  }, [travel, travelAccountKey, leaveSubjects, timeline.todayLocalDate]);
   const leavePrompt = travelAccountKey && travelHabits.save && travelHabits.settings ? resolveTravelLeavePrompt({
     now, localDate: timeline.todayLocalDate, habits: travelHabits.settings.habits,
-    candidates: travelLeaveCandidates(travelAccountKey, timeline.todayLocalDate),
+    candidates: restoreTravelLeaveCandidates(travelLeaveCandidates(travelAccountKey, timeline.todayLocalDate), leaveSubjects),
     dismissed: travelLeaveQuestionDismissed(travelAccountKey, timeline.todayLocalDate),
   }) : null;
   const answerLeaveTime = async (answer: TravelLeaveAnswer) => {

@@ -9,7 +9,8 @@ import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { travelEventRef, type TravelHabitSaveInput } from "@cadence/core/services/travel-habits";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import type { TravelEvidenceResult, TravelHabits, TravelSettings } from "@cadence/core/types/travel";
-import { resetTravelHabitMemoryForTest } from "@/lib/ui/travel-habits";
+import { resetTravelHabitMemoryForTest, travelLeaveCandidates } from "@/lib/ui/travel-habits";
+import { clearTravelSession } from "@/lib/ui/travel";
 import type { TravelSettingsClient } from "@/lib/ui/travel-settings";
 import type { TimelineView } from "@/lib/types/timeline";
 
@@ -127,20 +128,21 @@ describe("Timeline mode choice and leave-time question (Ticket 217)", () => {
       return { top, bottom: top + height, left: 160, right: 760, width: this.tagName === "TIME" ? 64 : 600, height, x: 160, y: top, toJSON() {} };
     });
   });
-  function evidence(): Omit<TravelEvidenceResult, "modelProjection"> {
+  /** `routed` false: after the event the trip has no current estimate, so only kept candidates can ask. */
+  function evidence(routed = true): Omit<TravelEvidenceResult, "modelProjection"> {
     const provenance = { originRef: "device", originSource: "device" as const, originRevision: "r", destinationRef: "occurrence-1",
       destinationSource: "behavior" as const, destinationRevision: "r", grantRevision: "g" };
     return { version: "1.0", journeyRef: "day", completeTrip: false, finalAvailabilityAt: null, collisions: [], occupiedSpans: [],
       segments: [{ id: "commitment:occurrence-1", kind: "commitment", startAt: "2026-09-16T13:00:00Z", endAt: "2026-09-16T13:30:00Z",
         sourceRefs: ["occurrence-1"], legId: null }],
       legs: [{ leg: { id: "leg-1", role: "outbound", journeyRef: "day", originCommitmentRef: null, destinationCommitmentRef: "occurrence-1",
-        destinationPlaceKey: placeKey, mode: "walking", readyAt: "2026-09-16T12:00:00Z", provenance }, state: "current", reason: null,
-        estimate: { durationSeconds: 900, departureAt: "2026-09-16T12:40:00Z", arrivalAt: "2026-09-16T12:55:00Z", warnings: [], fallback: false,
+        destinationPlaceKey: placeKey, mode: "walking", readyAt: "2026-09-16T12:00:00Z", provenance }, state: routed ? "current" : "unavailable", reason: null,
+        estimate: !routed ? null : { durationSeconds: 900, departureAt: "2026-09-16T12:40:00Z", arrivalAt: "2026-09-16T12:55:00Z", warnings: [], fallback: false,
           attribution: "Google Maps", observedAt: "2026-09-16T12:00:00Z", expiresAt: "2026-09-16T12:05:00Z" } }] };
   }
-  async function renderTimeline(travelClient: TravelSettingsClient, now: string) {
-    const travel = evidence();
-    await act(async () => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline timeline={timeline()}
+  async function renderTimeline(travelClient: TravelSettingsClient, now: string, withOccurrence = true, routed = true) {
+    const travel = evidence(routed);
+    await act(async () => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline timeline={timeline(withOccurrence)}
       statusAction={action} noteAction={action} startTimeTrackingAction={action} stopTimeTrackingAction={action} resetTimeTrackingAction={action}
       context={{ events: [], now, travel, travelSettingsClient: travelClient, travelMode: "walking",
         freshness: { state: "current", refreshedAt: now, label: "Calendar current", canAssertNoOverlap: true },
@@ -184,6 +186,74 @@ describe("Timeline mode choice and leave-time question (Ticket 217)", () => {
     expect(travel.saveHabits).not.toHaveBeenCalled();
   });
 
+  /** A page reload: the component and page memory go, sessionStorage stays. */
+  async function reload() {
+    await act(() => root.unmount());
+    resetTravelHabitMemoryForTest({ keepSession: true });
+    root = createRoot(container);
+  }
+  const question = () => container.querySelector('[aria-label="Leave time question"]');
+
+  it("asks after a reload before the event ends, with the title from the current read (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    await reload();
+    await renderTimeline(travel.value, "2026-09-16T14:00:00Z", true, false);
+    expect(question()?.textContent).toContain("Your leave time for Gym was:");
+  });
+
+  it("keeps only digests and end times in sessionStorage (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    const stored = window.sessionStorage.getItem("cadence:travel-leave-question")!;
+    expect(JSON.parse(stored)).toEqual({ version: 1, accountId: "owner", localDate: "2026-09-16", dismissed: false,
+      candidates: [{ eventRef: travelEventRef("behavior", "occurrence-1"), endsAt: "2026-09-16T13:30:00Z" }] });
+    for (const text of ["Gym", "occurrence-1", "Gym Street", "Home Road"]) expect(stored).not.toContain(text);
+  });
+
+  it("does not ask after a reload once today was answered (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    await renderTimeline(travel.value, "2026-09-16T14:00:00Z");
+    await act(async () => button("About right").click());
+    await reload();
+    await renderTimeline(travel.value, "2026-09-16T14:30:00Z");
+    expect(question()).toBeNull();
+  });
+
+  it("keeps Not now through a reload (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    await renderTimeline(travel.value, "2026-09-16T14:00:00Z");
+    await act(async () => button("Not now").click());
+    await reload();
+    await renderTimeline(travel.value, "2026-09-16T14:30:00Z");
+    expect(question()).toBeNull();
+    expect(travel.saveHabits).not.toHaveBeenCalled();
+  });
+
+  it("skips the question when the event is gone from the current read (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    await reload();
+    await renderTimeline(travel.value, "2026-09-16T14:00:00Z", false, false);
+    expect(question()).toBeNull();
+  });
+
+  it("clears the kept candidates on sign-out, a new day and another account (Ticket 274)", async () => {
+    const travel = client(settings());
+    await renderTimeline(travel.value, "2026-09-16T12:10:00Z");
+    clearTravelSession();
+    expect(window.sessionStorage.getItem("cadence:travel-leave-question")).toBeNull();
+    expect(travelLeaveCandidates("owner", "2026-09-16")).toEqual([]);
+    await renderTimeline(travel.value, "2026-09-16T12:20:00Z");
+    expect(travelLeaveCandidates("owner", "2026-09-16")).toHaveLength(1);
+    expect(travelLeaveCandidates("owner", "2026-09-17")).toEqual([]);
+    expect(window.sessionStorage.getItem("cadence:travel-leave-question")).toBeNull();
+    await renderTimeline(travel.value, "2026-09-16T12:30:00Z");
+    expect(travelLeaveCandidates("someone-else", "2026-09-16")).toEqual([]);
+  });
+
   it("does not ask when today was already answered", async () => {
     const travel = client(settings({ updatedAt: "2026-09-16T10:00:00.000000Z", leaveFeedback: [{ eventRef: "a".repeat(64),
       localDate: "2026-09-16", answer: "about_right", answeredAt: "2026-09-16T10:00:00.000000Z", rulesVersion: "travel-habit-defaults@1" }] }));
@@ -193,13 +263,13 @@ describe("Timeline mode choice and leave-time question (Ticket 217)", () => {
   });
 });
 
-function timeline(): TimelineView {
+function timeline(withOccurrence = true): TimelineView {
   return {
     timezone: "America/New_York", todayLocalDate: "2026-09-16", visibleFutureDays: 7, maxFutureDays: 30, nextFutureDays: null,
     needsDecision: { title: "Needs decision", emptyMessage: "No prior unresolved occurrences.", occurrenceCount: 0, daySections: [] },
     daySections: [{
       key: "today-2026-09-16", kind: "today", localDate: "2026-09-16", label: "Wednesday, September 16", relativeLabel: "Today", emptyMessage: "No behaviors today.", unresolvedOccurrenceCount: 1,
-      occurrences: [{ id: "occurrence-1", behaviorId: "behavior-1", title: "Gym", scheduledFor: "2026-09-16T13:00:00Z", scheduledTimeLabel: "9:00 AM", localDate: "2026-09-16", status: "unresolved", statusMarkedAt: null, statusLabel: "Unresolved", statusDetail: "Awaiting decision", expandedStatusActionLabel: "Set status", visualTone: "default", isVisibleInNeedsDecision: false, canShowDecisionActionsWhenUnresolved: true, showDecisionActions: true, showCollapsedStatusLabel: false, description: "", categoryName: "Health", scheduleSummary: "Daily", note: "", timeTracking: { recordedSeconds: 0, runningStartedAt: null }, canStartTimeTracking: true }],
+      occurrences: withOccurrence ? [{ id: "occurrence-1", behaviorId: "behavior-1", title: "Gym", scheduledFor: "2026-09-16T13:00:00Z", scheduledTimeLabel: "9:00 AM", localDate: "2026-09-16", status: "unresolved", statusMarkedAt: null, statusLabel: "Unresolved", statusDetail: "Awaiting decision", expandedStatusActionLabel: "Set status", visualTone: "default", isVisibleInNeedsDecision: false, canShowDecisionActionsWhenUnresolved: true, showDecisionActions: true, showCollapsedStatusLabel: false, description: "", categoryName: "Health", scheduleSummary: "Daily", note: "", timeTracking: { recordedSeconds: 0, runningStartedAt: null }, canStartTimeTracking: true }] : [],
       occurrenceGroups: [{ key: "occurrence-1", behaviorId: "behavior-1", title: "Gym", occurrences: [], isGroupedStack: false }],
     }],
   };
