@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import type { TravelLegRole, TravelPlannedLeg, TravelResolvedLegEvidence } from "../types/travel";
+import type { TravelEvidenceResult, TravelLegRole, TravelPlannedLeg, TravelResolvedLegEvidence } from "../types/travel";
 
 /**
  * Ticket 214: a `timeline` scope request, which released clients still send, routes only legs
@@ -162,6 +162,22 @@ export function travelRefreshTrips(input: Readonly<{
       destinationStartAt: starts.get(leg.destinationCommitmentRef ?? "") ?? null, arrivalBufferSeconds: input.arrivalBufferSeconds });
     return fallbackAt ? [{ ...ref, key, leaveAt: null, checkedAt: null, fallbackAt }] : [];
   });
+}
+
+/**
+ * Ticket 268: the refresh plan's trips from a route response alone. Stop starts come from its
+ * commitment segments and the arrival buffer from an arrival segment, so a client needs no
+ * Calendar or Behavior detail to plan. A stop with no known end has no commitment segment, so
+ * its trip, if it has no estimate, gets no fallback; Refresh travel and whole-day triggers still apply.
+ */
+export function travelRefreshTripsFromEvidence(evidence: Pick<TravelEvidenceResult, "legs" | "segments">): TravelRefreshTrip[] {
+  const stops = evidence.segments.flatMap((segment) => segment.kind === "commitment" && segment.sourceRefs.length === 1
+    ? [{ ref: segment.sourceRefs[0]!, startAt: segment.startAt }] : []);
+  const arrival = evidence.segments.find((segment) => segment.kind === "arrival_buffer");
+  const arrivalBufferSeconds = arrival
+    ? Math.max(0, Temporal.Instant.from(arrival.endAt).since(Temporal.Instant.from(arrival.startAt)).total("seconds"))
+    : 0;
+  return travelRefreshTrips({ legs: evidence.legs, stops, arrivalBufferSeconds });
 }
 
 /** What the client remembers about its last requests. Display data stays out of it. */

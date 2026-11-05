@@ -668,6 +668,13 @@ cite has not changed.
 - **Ticket 267 note, November 5, 2026:** the plan is in source. The quoted words did not
   change. The guide should also say that at 80% of the month's travel budget Cadence stops
   refreshing on its own, and Refresh travel still works.
+- **Ticket 268 note, November 5, 2026:** clients follow the plan. Today's estimates stay in
+  browser session storage across a reload and are cleared by sign-out, an account change,
+  travel turned off, a travel settings change or a new day. A trip refresh keeps the other
+  trips' times. Returning to the window requests only when a trip is due. The quoted words
+  did not change. Not yet decided: the status line at the 80% pause. It shows nothing new;
+  a response reporting the whole budget used shows the approved line "Travel estimates
+  resume on {date}." The owner may want a line for the 80% pause.
 - **Status:** logged.
 
 ## P-019: Outlook and iCloud event locations read for routing

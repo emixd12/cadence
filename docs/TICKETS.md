@@ -15959,8 +15959,29 @@ tests/travel-route-refresh.service.test.ts tests/travel-budget.contract.test.ts`
 
 ## Ticket 268: Keep last estimates and apply the refresh plan
 
-Status: filed November 4, 2026. Not started.
+Status: implemented on branch `us-work`, November 5, 2026. Not merged or deployed.
 Dependencies: Ticket 267.
+
+Implementation notes:
+
+- `useTravelContext` in `lib/ui/travel.ts` keeps a `TravelRefreshState` per account and asks
+  `resolveTravelRefreshPlan` on open, focus, return to the window, movement and the plan's
+  own timer. Trips come from the kept view (`travelRefreshTripsFromEvidence`). Trip requests
+  send `trips`; a Daily Brief still asks for the whole day, which alone carries the token.
+- `mergeTravelLastEstimates` (travel resolver) merges every response per trip. A trip keeps
+  its last estimate unless anything it was planned from changed, the new plan rejects it,
+  it cannot leave before its stop ends, or it has arrived. A failed refresh keeps the view.
+- `sessionStorage` key `cadence:travel-session`: one account and date, no device sample,
+  token or place text, source keys as a digest. Sign-out (web and Mac), account change,
+  travel off, settings change and day change clear it (`docs/DATA_MODEL.md`). After a reload
+  the next device sample becomes the movement baseline.
+- From review: resolving the last stop while an earlier one remains shows the trip home as
+  changed, with Refresh travel. Timeline collisions mark a Behavior inside a trip after a
+  late arrival (`travelUnreliableSegments`). A response reporting the whole budget used
+  shows the approved paused line; the 80% pause shows nothing new (P-018 note).
+- Tests: `tests/travel-lifecycle.dom.test.tsx` (reload, per-trip merge, clearing, plan
+  timers with focus loss, a typical day: 6 requests, 8 legs), `tests/travel-timeline.test.ts`,
+  and a released Mac request in `tests/travel-route-refresh.service.test.ts`.
 
 Goal: Cadence never loses a leave time it already knows (C1, G8, decision D1).
 

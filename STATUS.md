@@ -1,9 +1,32 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 2: Ticket 268 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Web and Mac now
+follow the trip refresh plan and keep every leave time they already know.
+
+- `useTravelContext` asks `resolveTravelRefreshPlan` on open, focus, return to the window,
+  movement and the plan's timer. Returning to the window requests only when a trip is due. Trip
+  refreshes send `trips`; a Daily Brief still asks for the whole day and its token.
+- Responses merge per trip (`mergeTravelLastEstimates`), keyed on role and commitment refs. A trip
+  keeps its last estimate, marked "Last estimate" once it expires, until its source changes, the
+  plan rejects it or it has arrived. A failed refresh keeps the known times.
+- Today's view stays in `sessionStorage` across a reload, with no device sample, token or place
+  text. Sign-out on web and Mac, account change, travel off, settings change and day change clear it.
+- From earlier reviews: resolving the last stop while an earlier stop remains shows the trip home as
+  changed with Refresh travel. Timeline collisions mark a Behavior inside a trip after a late arrival.
+- A typical day with a fake clock makes 6 route requests and routes 8 legs, as `docs/COSTS.md` assumes.
+- Not decided: wording for the 80% automatic pause. It shows nothing new; a response reporting the
+  whole budget used shows the approved paused line (P-018 note).
+
+Platform impact: web `lib/ui/travel.ts`; desktop uses the same hook in `apps/desktop/src/product.tsx`,
+and session data never enters SQLite. Marketing: not applicable. Future mobile: mobile web inherits
+the hook. Messaging impact: P-018 (note added).
+
 ## Travel advisory revamp Wave 2: Ticket 267 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The trip refresh
-plan and the hosted route changes are in source. No client follows the plan yet: Ticket 268 does.
+plan and the hosted route changes are in source. Ticket 268 makes the clients follow it.
 
 - `resolveTravelRefreshPlan` in `packages/core/src/services/travel-refresh-policy.ts` says which
   request is due now (whole day, named trips or none) and when the next falls due. The first open of

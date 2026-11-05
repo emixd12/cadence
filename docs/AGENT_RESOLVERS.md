@@ -363,7 +363,14 @@ the trips the client knows (`travelRefreshTrips`), its last-request state
 (`recordTravelRefresh`), focus, source key, device sample and the response's `budget`.
 It also owns trip identity (`travelTripKey`, `travelTripMatches`), the 80% budget pause
 (`travelBudgetPausesAutomatic`) and the unavailable reason for a leg ready only after
-its destination ends. Clients must not restate the triggers or thresholds.
+its destination ends. Clients must not restate the triggers or thresholds. Ticket 268's
+`travelRefreshTripsFromEvidence` builds the plan's trips from a route response alone, and
+`lib/ui/travel.ts` follows the plan on open, focus, return to the window and plan timers.
+`mergeTravelLastEstimates` in the travel resolver merges each response into the kept view
+per trip, so a trip refresh never erases another trip's time and a known leave time stays
+as a last estimate; `travelUnreliableSegments` gives a trip after a late arrival its whole
+uncertain span for Timeline collisions. Both are paired with `tests/travel-timeline.test.ts`
+and `tests/travel-lifecycle.dom.test.tsx`.
 `lib/services/travel-route-refresh.service.ts` and `lib/ui/travel.ts` call it; they
 must not restate those rules. Provider SKU prices and the traffic-aware window stay
 in the provider adapter `lib/services/travel-provider.ts`.

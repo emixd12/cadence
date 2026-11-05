@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { sha256 } from "../hash";
 import { TRAVEL_PLACE_KEY_PATTERN } from "../services/travel-place-key";
+import { TRAVEL_LEG_READY_AFTER_END, travelTripKey } from "../services/travel-refresh-policy";
 import type { BehaviorDurationEstimate } from "../types/day-progress";
 import type { TimelineOccurrenceView } from "../types/timeline";
 
@@ -345,10 +346,110 @@ export function resolveTravelAfterDecisions(
     resolvedRefs.has(leg.originCommitmentRef ?? "") && leg.destinationCommitmentRef && !resolvedRefs.has(leg.destinationCommitmentRef)
       ? [{ role: leg.role, originCommitmentRef: leg.originCommitmentRef, destinationCommitmentRef: leg.destinationCommitmentRef, reason: "origin_unknown", blockerResolved: true }]
       : []);
+  const unknownLegs = [...unknownLegsAfterDecisions(evidence.unknownLegs ?? [], resolvedRefs), ...withdrawn];
+  // Ticket 268: resolving the last stop removes the trip home. While an earlier stop remains, the
+  // trip home now leaves from it, which only a new plan can time, so the trip shows as changed.
+  const isHome = (role: TravelLegRole) => role === "return";
+  const homeBefore = evidence.legs.some(({ leg }) => isHome(leg.role)) || (evidence.unknownLegs ?? []).some((leg) => isHome(leg.role));
+  const homeAfter = legs.some(({ leg }) => isHome(leg.role)) || unknownLegs.some((leg) => isHome(leg.role));
+  const remainingStop = homeBefore && !homeAfter
+    ? [...legs.map(({ leg }) => leg), ...unknownLegs].filter((leg) => !isHome(leg.role) && leg.destinationCommitmentRef).at(-1)?.destinationCommitmentRef ?? null
+    : null;
+  if (remainingStop) unknownLegs.push({ role: "return", originCommitmentRef: remainingStop, destinationCommitmentRef: null, reason: "origin_unknown", blockerResolved: true });
   return { ...evidence, legs, segments, collisions, occupiedSpans: mergeSegments(segments),
     // Evidence from a released server may have no unknown legs. It gains the field only when one exists.
-    ...(evidence.unknownLegs || withdrawn.length ? { unknownLegs: [...unknownLegsAfterDecisions(evidence.unknownLegs ?? [], resolvedRefs), ...withdrawn] } : {}),
+    ...(evidence.unknownLegs || unknownLegs.length ? { unknownLegs } : {}),
     completeTrip: !changed && evidence.completeTrip, finalAvailabilityAt: changed ? null : evidence.finalAvailabilityAt };
+}
+
+/**
+ * Ticket 268: a Behavior inside a trip that leaves before the previous trip arrives cannot be
+ * cleared by that trip's route times. Each such leg occupies its ready time until its route
+ * arrival plus the shortfall, the span the Daily Brief and model projection treat as unknown.
+ */
+export function travelUnreliableSegments(
+  evidence: Pick<TravelEvidenceResult, "legs">,
+): TravelOccupiedSegment[] {
+  const shortfalls = travelLegsAfterLateArrival(evidence.legs);
+  return evidence.legs.flatMap((entry): TravelOccupiedSegment[] => {
+    const shortfall = shortfalls.get(entry.leg.id);
+    if (shortfall === undefined || !entry.estimate) return [];
+    const endAt = instant(entry.weather?.arrivalAt ?? entry.estimate.arrivalAt, "Route arrival").add({ seconds: shortfall });
+    if (Temporal.Instant.compare(instant(entry.leg.readyAt, "Route ready time"), endAt) >= 0) return [];
+    const sourceRefs = [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef].filter((ref): ref is string => ref !== null);
+    return [segment(`unreliable:${entry.leg.id}`, "route", entry.leg.readyAt, endAt.toString(), sourceRefs, entry.leg.id)];
+  });
+}
+
+type TravelDisplayEvidence = Omit<TravelEvidenceResult, "modelProjection">;
+
+/** Ticket 268: a leg names the same trip only when nothing it was planned from has changed. */
+function sameTrip(left: TravelEvidenceLeg, right: TravelEvidenceLeg): boolean {
+  const device = (leg: TravelEvidenceLeg) => leg.provenance.originSource === "device";
+  return left.role === right.role && left.originCommitmentRef === right.originCommitmentRef &&
+    left.destinationCommitmentRef === right.destinationCommitmentRef && left.mode === right.mode && left.readyAt === right.readyAt &&
+    left.provenance.originSource === right.provenance.originSource &&
+    // A new device sample is a new origin revision for the same trip.
+    (device(left) || left.provenance.originRevision === right.provenance.originRevision) &&
+    left.provenance.destinationSource === right.provenance.destinationSource &&
+    left.provenance.destinationRevision === right.provenance.destinationRevision &&
+    left.provenance.grantRevision === right.provenance.grantRevision;
+}
+
+function shownArrival(entry: TravelResolvedLegEvidence): Temporal.Instant | null {
+  return entry.estimate ? instant(entry.weather?.arrivalAt ?? entry.estimate.arrivalAt, "Route arrival") : null;
+}
+
+/**
+ * Ticket 268 (decision D1, C1): keeps every leave time Cadence already knows. Merges a new
+ * route response into the previous one per trip, keyed on role and commitment refs, because
+ * leg IDs change with each device sample. A trip the new response did not route, or failed to
+ * route, keeps its last estimate, which the departure model marks "Last estimate" once it
+ * expires. A trip is withdrawn when anything it was planned from changed, when the new plan
+ * rejects it, when it can no longer leave before its destination ends, or once it has arrived.
+ * Pure; `now` is injected. Device positions never enter the result.
+ */
+export function mergeTravelLastEstimates(
+  previous: TravelDisplayEvidence | null | undefined,
+  next: TravelDisplayEvidence,
+  now: string,
+): TravelDisplayEvidence {
+  if (!previous) return next;
+  const at = instant(now, "Merge now");
+  const known = new Map(previous.legs.flatMap((entry) => entry.estimate && entry.state === "current"
+    ? [[travelTripKey({ role: entry.leg.role, originRef: entry.leg.originCommitmentRef, destinationRef: entry.leg.destinationCommitmentRef }), entry] as const]
+    : []));
+  const carried = new Set<string>();
+  const legs = next.legs.map((entry) => {
+    if (entry.estimate || entry.state !== "unavailable" || entry.reason === TRAVEL_LEG_READY_AFTER_END) return entry;
+    const last = known.get(travelTripKey({ role: entry.leg.role, originRef: entry.leg.originCommitmentRef, destinationRef: entry.leg.destinationCommitmentRef }));
+    if (!last || !sameTrip(last.leg, entry.leg)) return entry;
+    const arrival = shownArrival(last);
+    if (!arrival || Temporal.Instant.compare(arrival, at) <= 0) return entry;
+    carried.add(last.leg.id);
+    return last;
+  });
+  if (!carried.size) return next;
+  const replaced = new Set(next.legs.filter((entry, index) => legs[index] !== entry).map((entry) => entry.leg.id));
+  const segments = [
+    ...next.segments.filter((value) => !value.legId || !replaced.has(value.legId)),
+    ...previous.segments.filter((value) => value.legId && carried.has(value.legId)),
+  ].sort((left, right) => Temporal.Instant.compare(instant(left.startAt, "Occupied segment start"), instant(right.startAt, "Occupied segment start")) || left.id.localeCompare(right.id));
+  const segmentById = new Map(segments.map((value) => [value.id, value]));
+  const collisionIds = new Map<string, string[]>();
+  for (const collision of [...next.collisions, ...previous.collisions]) {
+    const ids = collision.segmentIds.filter((id) => segmentById.has(id) && (next.collisions.includes(collision) || carried.has(segmentById.get(id)!.legId ?? "")));
+    if (ids.length) collisionIds.set(collision.candidateRef, [...new Set([...(collisionIds.get(collision.candidateRef) ?? []), ...ids])]);
+  }
+  const collisions = [...collisionIds].map(([candidateRef, segmentIds]) => ({ candidateRef, segmentIds,
+    travelCreated: segmentIds.some((id) => segmentById.get(id)!.kind !== "commitment") }));
+  const home = legs.find((entry) => entry.leg.role === "return") ?? null;
+  const completeTrip = (next.unknownLegs ?? []).length === 0 && legs.length > 0 &&
+    legs.every((entry) => entry.state === "current" && !!entry.estimate) &&
+    (!!home || next.completeTrip || previous.completeTrip) && travelLegsAfterLateArrival(legs).size === 0;
+  const settled = home ? segments.find((value) => value.kind === "settling_buffer" && value.legId === home.leg.id)?.endAt ?? shownArrival(home)?.toString() ?? null : null;
+  return { ...next, legs, segments, occupiedSpans: mergeSegments(segments), collisions, completeTrip,
+    finalAvailabilityAt: !completeTrip ? null : home ? settled : next.finalAvailabilityAt ?? previous.finalAvailabilityAt };
 }
 
 /** A leg blocked by a stop the user has just resolved is marked, so nothing blames a missing Home. */

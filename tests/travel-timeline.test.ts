@@ -2,6 +2,8 @@ import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
+import { mergeTravelLastEstimates, resolveTravelAfterDecisions, resolveTravelEvidence, resolveTravelPlan, travelUnreliableSegments } from "@cadence/core/resolvers/travel.resolver";
+import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import type { TravelEvidenceResult, TravelOccupiedSegment } from "@cadence/core/types/travel";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -177,5 +179,80 @@ describe("travel sourceKey", () => {
     const before = travelSourceKey([], withBehavior, [{ id: "b", locationText: "1 St", updatedAt: "t1" }]);
     expect(travelSourceKey([], withBehavior, [{ id: "b", locationText: "1 St", updatedAt: "t1" }])).toBe(before);
     expect(travelSourceKey([], withBehavior, [{ id: "b", locationText: "2 St", updatedAt: "t2" }])).not.toBe(before);
+  });
+});
+
+describe("Ticket 268: last estimates, unreliable trips and a trip home that changed", () => {
+  const place = (ref: string, latitude: number) => ({ ref, source: "calendar" as const, sourceRevision: `${ref}-1`, point: { kind: "coordinates" as const, latitude, longitude: 0 } });
+  const stop = (ref: string, startAt: string, endAt: string, latitude: number) => ({ ref, revision: `${ref}-1`, kind: "calendar" as const, startAt, endAt, attendance: "physical" as const, endpoint: place(ref, latitude), mode: "walking" as const });
+  const buffers = { arrivalSeconds: 0, exitSeconds: 300, settlingSeconds: 0 };
+  const now = "2026-09-16T12:00:00Z";
+  const stops = [{ ref: "standup", label: "Standup", startAt: "2026-09-16T14:00:00Z", endAt: "2026-09-16T15:00:00Z" }];
+  /** The Ticket 265 reviewer's chain: every leg walks 20 minutes from its ready time. */
+  function chain(reviewEnd: string, revision = "1"): Omit<TravelEvidenceResult, "modelProjection"> {
+    const plan = resolveTravelPlan({ journeyRef: "day", journeyRevision: revision, now, grantRevision: "g", defaultMode: "walking", device: null, predictedOrigin: null, corrections: [], buffers,
+      base: { ref: "home", source: "saved_base", sourceRevision: "h1", point: { kind: "coordinates", latitude: 1, longitude: 0 } },
+      commitments: [stop("standup", "2026-09-16T14:00:00Z", "2026-09-16T15:00:00Z", 2), { ...stop("review", "2026-09-16T14:30:00Z", reviewEnd, 3), revision: `review-${revision}`, endpoint: { ...place("review", 3), sourceRevision: `review-${revision}` } }] });
+    const results = plan.legs.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: { durationSeconds: 1200, departureAt: leg.readyAt,
+      arrivalAt: Temporal.Instant.from(leg.readyAt).add({ seconds: 1200 }).toString(), warnings: [], fallback: false, attribution: "Google Maps", observedAt: now, expiresAt: "2026-09-16T12:05:00Z" } }));
+    const { modelProjection, ...rest } = resolveTravelEvidence({ plan, results, collisionCandidates: [], buffers, now, expectedJourneyRevision: revision, expectedGrantRevision: "g", modelProjection: "disabled" });
+    expect(modelProjection).toBeNull();
+    return rest;
+  }
+  const behaviorAt = (scheduledFor: string, value: Omit<TravelEvidenceResult, "modelProjection">) => resolveTimelineOccurrenceContext({
+    occurrenceId: "stretch", scheduledFor, runningStartedAt: null,
+    estimate: { kind: "known", seconds: 240, durationLabel: "4 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
+    events: [], freshness: { state: "current", refreshedAt: now, label: "Calendar current", canAssertNoOverlap: true },
+    now: Temporal.Instant.from(now), travel: value, timezone: "UTC" });
+
+  it("marks a Behavior inside an unreliable trip's window, as the Daily Brief does", () => {
+    const late = chain("2026-09-16T15:10:00Z");
+    // The trip home's route says 15:15–15:35, but the onward trip arrives only at 15:25.
+    expect(travelUnreliableSegments(late).map(({ startAt, endAt }) => [startAt, endAt])).toEqual([["2026-09-16T15:15:00Z", "2026-09-16T15:45:00Z"]]);
+    const context = behaviorAt("2026-09-16T15:36:00Z", late);
+    expect(context.overlapAssessment).toBe("possible");
+    expect(context.overlapLabel).toBe("Overlaps your trip home (3:15 PM–3:45 PM)");
+    expect(behaviorAt("2026-09-16T15:46:00Z", late).overlapLabel).not.toMatch(/^Overlaps/);
+    // An on-time chain adds no window.
+    expect(travelUnreliableSegments(chain("2026-09-16T15:30:00Z"))).toEqual([]);
+  });
+
+  it("shows the trip home as changed when resolving the last stop leaves an earlier one", () => {
+    const value = chain("2026-09-16T15:30:00Z");
+    const after = resolveTravelAfterDecisions(value, [{ id: "standup", status: "unresolved" }, { id: "review", status: "completed" }])!;
+    expect(after.legs.map(({ leg }) => leg.role)).toEqual(["outbound"]);
+    expect(after.unknownLegs).toContainEqual({ role: "return", originCommitmentRef: "standup", destinationCommitmentRef: null, reason: "origin_unknown", blockerResolved: true });
+    const model = resolveDepartureModel({ evidence: after, stops, now, timezone: "UTC", arrivalBufferSeconds: 0, preparationSeconds: 0, pausedUntil: null });
+    expect(model.trips.at(-1)).toMatchObject({ role: "return", state: "trip_changed", action: "refresh" });
+    // With no stop left, there is no trip home to change.
+    const none = resolveTravelAfterDecisions(value, [{ id: "standup", status: "completed" }, { id: "review", status: "completed" }])!;
+    expect((none.unknownLegs ?? []).some((leg) => leg.role === "return")).toBe(false);
+  });
+
+  it("keeps a trip's last estimate when a later response leaves it unrouted", () => {
+    const first = chain("2026-09-16T15:30:00Z");
+    const next = chain("2026-09-16T15:30:00Z");
+    const unrouted = (value: typeof next, roles: readonly string[]) => ({ ...value,
+      legs: value.legs.map((entry) => roles.includes(entry.leg.role) ? { ...entry, leg: { ...entry.leg, id: `${entry.leg.id}-new` }, state: "unavailable" as const, estimate: null, reason: "outside_route_window" } : entry),
+      segments: value.segments.filter((segment) => !segment.legId || !value.legs.some((entry) => roles.includes(entry.leg.role) && entry.leg.id === segment.legId)) });
+    const merged = mergeTravelLastEstimates(first, unrouted(next, ["onward", "return"]), "2026-09-16T12:10:00Z");
+    expect(merged.legs.map((entry) => entry.estimate?.departureAt)).toEqual(first.legs.map((entry) => entry.estimate?.departureAt));
+    expect(merged.occupiedSpans).toEqual(first.occupiedSpans);
+    expect(merged.completeTrip).toBe(true);
+    // No previous view, or nothing to carry: the response is used as it is.
+    expect(mergeTravelLastEstimates(null, next, now)).toBe(next);
+    expect(mergeTravelLastEstimates(first, next, now)).toBe(next);
+  });
+
+  it("withdraws a trip's times when its source changed, its trip has passed, or it cannot leave before its stop ends", () => {
+    const first = chain("2026-09-16T15:30:00Z");
+    const changed = chain("2026-09-16T15:30:00Z", "2");
+    const unrouted = (value: typeof first, reason = "outside_route_window") => ({ ...value,
+      legs: value.legs.map((entry) => ({ ...entry, state: "unavailable" as const, estimate: null, reason })), segments: value.segments.filter((segment) => !segment.legId) });
+    // The review's revision changed: its two trips are withdrawn, the trip to standup stays.
+    expect(mergeTravelLastEstimates(first, unrouted(changed), now).legs.map((entry) => !!entry.estimate)).toEqual([true, false, false]);
+    // After the first trip arrived (14:20 local ready + 20 min), only later trips keep times.
+    expect(mergeTravelLastEstimates(first, unrouted(first), "2026-09-16T14:00:00Z").legs.map((entry) => !!entry.estimate)).toEqual([false, true, true]);
+    expect(mergeTravelLastEstimates(first, unrouted(first, "Route is ready only after its destination ends."), now).legs.every((entry) => !entry.estimate)).toBe(true);
   });
 });

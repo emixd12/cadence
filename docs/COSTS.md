@@ -193,6 +193,12 @@ is 180 of the 240 typical legs today. The trip refreshes and reminders spend mos
 again. The heavy upper bound reaches today's figure, but automatic refreshes stop at
 US$4.00, 80% of the ceiling, so automatic spend cannot reach it.
 
+Ticket 268 checks the typical day with a fake clock (`tests/travel-lifecycle.dom.test.tsx`,
+"spends the call counts"): three trips, first open at 7:00 AM, hourly returns to the
+window, a break, a remount and a reload. The client makes 6 route requests and routes 8
+legs: one whole-day pass of 3 legs, then 5 trip refreshes of 1 leg each. That matches the
+typical row: 3 legs for the first open and 3 to 6 for trip refreshes.
+
 Calls per trigger, from `resolveTravelRefreshPlan` in
 `packages/core/src/services/travel-refresh-policy.ts` and the hosted route. Transit makes
 two provider calls per leg.

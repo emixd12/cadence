@@ -100,7 +100,14 @@ updated, as Ticket 215 builds do for Where. Route durations are never stored to
 learn habits.
 
 Device samples used for travel and route results remain transient. Exclude them
-from account sync, exports, backups, logs and analytics. Ticket 216 place markers
+from account sync, exports, backups, logs and analytics. Ticket 268 keeps today's route
+results for display in the browser session only: one `sessionStorage` entry,
+`cadence:travel-session`, holds one account's view for one local date and the refresh
+plan's last-request record. It stores no device sample, no Daily Brief token and no
+event title or place text; source keys are kept only as a digest. Sign-out, an account
+change, travel turned off, a travel settings change and a new local date clear it, and it
+ends with the browser session. The Mac webview's `sessionStorage` lasts for the app
+session; it never enters SQLite, sync or backups. Ticket 216 place markers
 are the one stored device position: the user records each with "I'm here", and
 they sync and enter desktop backups (see `place_markers` below). Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive

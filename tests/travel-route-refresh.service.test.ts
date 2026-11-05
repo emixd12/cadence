@@ -771,6 +771,17 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
     expect(result).not.toHaveProperty("conclusionsToken");
   });
 
+  it("serves a released Mac build's request as before, with only the budget added (Ticket 268)", async () => {
+    // Released builds send the three-hour timeline scope, never trips, and read only the shipped fields.
+    twoStops();
+    const released = await refreshTravelRoutes(caller, { ...day, device, scope: "timeline" }, config, now, undefined, "test-only-conclusions-secret-0123456789");
+    expect(Object.keys(released).sort()).toEqual(["accountId", "budget", "conclusionsToken", "evidence", "expiresAt", "habitsRevision", "mode", "navigationPreference", "settingsRevision"]);
+    // The timeline scope still leaves the trip home, due after the window, for a later refresh.
+    expect(released.evidence?.legs.at(-1)).toMatchObject({ leg: { role: "return" }, state: "unavailable", reason: "outside_route_window" });
+    expect(released.evidence?.legs[0]).toMatchObject({ leg: { role: "outbound" }, state: "current" });
+    expect(Object.keys(released.evidence!).sort()).toEqual(["behaviorSources", "collisions", "completeTrip", "finalAvailabilityAt", "journeyRef", "legs", "occupiedSpans", "segments", "unknownLegs", "version"]);
+  });
+
   it("asserts provider calls for each trigger", async () => {
     // Every place is already stored, so each call below is a route leg. Transit doubles each leg in the provider.
     const counts: Record<string, number> = {};
