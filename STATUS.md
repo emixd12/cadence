@@ -1,5 +1,14 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 2 deployed — November 5, 2026
+
+PR #191 merged on November 5, 2026 as `e6a49c8`. Both Vercel projects built READY on that commit.
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names `dpl_E6SKhPfv7ppZQTA6oR4upfTHPQWT`. The app was
+redeployed as `dpl_7677PW7SHrd1wMJcAeBskXQET3F5` and aliased to app.cadence-me.com. Login, trust
+evidence and marketing pages returned 200. The required CI check failed once on a Chrome start
+timeout in `acceptance-web-client` and passed on rerun. As the coordinator reported; not rechecked
+here.
+
 ## Travel advisory revamp Wave 1 deployed — November 5, 2026
 
 PR #190 merged on November 5, 2026 as `c599d24`. Both Vercel projects built READY on that commit;
