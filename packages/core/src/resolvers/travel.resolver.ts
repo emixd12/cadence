@@ -384,6 +384,44 @@ export function travelUnreliableSegments(
 type TravelDisplayEvidence = Omit<TravelEvidenceResult, "modelProjection">;
 
 /**
+ * Ticket 268: stops whose source no longer matches. A stop is changed when it is gone from the
+ * current sources, or its revision (start, end, location, attendance) differs. Revisions are
+ * opaque strings or digests; a stop new since the view says nothing about the view's trips.
+ */
+export function changedTravelStops(
+  previous: Readonly<Record<string, string>>,
+  current: Readonly<Record<string, string>>,
+): Set<string> {
+  return new Set(Object.keys(previous).filter((ref) => current[ref] !== previous[ref]));
+}
+
+/**
+ * Ticket 268: a kept view shown before any new response, with every trip to or from a changed
+ * stop withdrawn. Such a trip keeps its place as `rejected_revision`, which the departure model
+ * shows as "The trip to {event} changed." with Refresh travel. Its segments and collisions go.
+ * Pure: no clock and no position.
+ */
+export function withdrawChangedTravelTrips(
+  evidence: TravelDisplayEvidence,
+  changedRefs: ReadonlySet<string>,
+): TravelDisplayEvidence {
+  const touches = (leg: TravelEvidenceLeg) => changedRefs.has(leg.originCommitmentRef ?? "") || changedRefs.has(leg.destinationCommitmentRef ?? "");
+  const withdrawn = new Set(evidence.legs.filter(({ leg }) => touches(leg)).map(({ leg }) => leg.id));
+  if (!withdrawn.size) return evidence;
+  const legs = evidence.legs.map((entry): TravelResolvedLegEvidence => withdrawn.has(entry.leg.id)
+    ? { leg: entry.leg, state: "rejected_revision", estimate: null, reason: "Trip source changed." } : entry);
+  const segments = evidence.segments.filter((value) => !(value.legId && withdrawn.has(value.legId)) &&
+    !(value.kind === "commitment" && value.sourceRefs.some((ref) => changedRefs.has(ref))));
+  const segmentIds = new Set(segments.map((value) => value.id));
+  const segmentById = new Map(segments.map((value) => [value.id, value]));
+  const collisions = evidence.collisions.flatMap((collision) => {
+    const ids = collision.segmentIds.filter((id) => segmentIds.has(id));
+    return ids.length ? [{ ...collision, segmentIds: ids, travelCreated: ids.some((id) => segmentById.get(id)!.kind !== "commitment") }] : [];
+  });
+  return { ...evidence, legs, segments, occupiedSpans: mergeSegments(segments), collisions, completeTrip: false, finalAvailabilityAt: null };
+}
+
+/**
  * Ticket 268: a trip is the stop it serves, whatever its role: the stop it goes to, or for the
  * trip home the stop it leaves (`travelTripMatches`). An onward trip becomes outbound once its
  * earlier stop ends, and is still the same trip.

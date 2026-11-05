@@ -425,8 +425,8 @@ part of L-002.
   provider warning text and attribution, observed and expiry times, segments and collisions,
   the weather summary when weather is on, `behaviorSources` (Occurrence IDs and learned
   durations) and `budget`. Also the refresh record: a source-key digest, trip keys, attempt
-  times and the last device-routed time. No coordinates, place text, event titles or Daily
-  Brief token. Sign-out, account change, travel off, settings change and a new day clear it.
+  times and the last device-routed time, and one digest per stop of its times, place and
+  attendance. No coordinates, place text, event titles or Daily Brief token. Sign-out, account change, travel off, settings change and a new day clear it.
 - **Risk level:** medium.
 - **Owner decision or risk acceptance:** owner decision D1, November 4, 2026: "Last
   estimate and per-trip refresh" (`docs/DECISIONS.md`). That decides the product

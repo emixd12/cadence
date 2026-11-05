@@ -104,7 +104,7 @@ from account sync, exports, backups, logs and analytics. Ticket 268 keeps today'
 results for display in the browser session only: one `sessionStorage` entry,
 `cadence:travel-session`, holds one account's view for one local date and the refresh
 plan's last-request record. It stores no device sample, no Daily Brief token and no
-event title or place text; source keys are kept only as a digest. Sign-out, an account
+event title or place text; source keys and each stop's revision are kept only as digests. Sign-out, an account
 change, travel turned off, a travel settings change and a new local date clear it, and it
 ends with the browser session. The Mac webview's `sessionStorage` lasts for the app
 session; it never enters SQLite, sync or backups. Ticket 216 place markers

@@ -12,7 +12,7 @@ import {
   recordTravelRefresh, resolveTravelRefreshPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
   type TravelBudgetState, type TravelDeviceSample, type TravelRefreshRequest, type TravelRefreshState, type TravelTripRef,
 } from "@cadence/core/services/travel-refresh-policy";
-import { mergeTravelLastEstimates } from "@cadence/core/resolvers/travel.resolver";
+import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
 
 export type TravelCorrection = Readonly<{ eventId: string; revision: string; attendance: "physical" | "remote"; locationText: string | null }>;
 export type TravelRoutesInput = Readonly<{
@@ -129,8 +129,26 @@ export function travelSourceKey(events: readonly NormalizedExternalEvent[], time
 }
 
 
+/**
+ * Ticket 268: each stop's travel inputs, by commitment ref (event ID or Occurrence ID): its
+ * times, place, attendance and response. The same inputs as `travelSourceKey`, per stop, so a
+ * kept view can withdraw only the trips whose stop changed or is gone. Kept in memory; the
+ * browser session holds only digests.
+ */
+export function travelStopRevisions(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections">, behaviors: readonly TravelBehaviorRevision[] = []): Record<string, string> {
+  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
+  return Object.fromEntries([
+    ...events.map((event) => [event.id, JSON.stringify([event.location, event.state, event.currentUserResponse, !!event.conference,
+      event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null])] as const),
+    ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) =>
+      [occurrence.id, JSON.stringify([occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null])] as const)),
+  ]);
+}
+
 type TravelCacheEntry = Readonly<{
   view: TravelRoutesView | null; message: string | null; at: number;
+  /** Ticket 268: digests of each stop's revision when the view was made, to withdraw changed trips. */
+  stops?: Readonly<Record<string, string>> | null;
   /** A budget refusal is reused until the budget renews. */
   resumesAt?: string | null;
 }>;
@@ -212,7 +230,7 @@ export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: bo
 const TRAVEL_SESSION_KEY = "cadence:travel-session";
 type TravelSessionRecord = Readonly<{
   version: 1; accountId: string; localDate: string; stateDigest: string;
-  view: TravelRoutesView | null; at: number;
+  view: TravelRoutesView | null; at: number; stops?: Readonly<Record<string, string>> | null;
   refresh: Omit<TravelRefreshState, "device"> | null; budget: TravelBudgetState | null;
 }>;
 function travelSessionStorage(): Storage | null {
@@ -326,6 +344,8 @@ export function useTravelContext(input: Readonly<{
    * Automatic requests wait for it, at most 10 seconds; Refresh travel does not. Defaults to true.
    */
   sourceReady?: boolean;
+  /** Ticket 268: `travelStopRevisions` for the same sources as `sourceKey`. Without it a kept view withdraws nothing. */
+  stopRevisions?: Readonly<Record<string, string>>;
 }>): TravelState {
   const client = input.client === undefined ? webTravelClient : input.client;
   const correctionsKey = JSON.stringify(input.corrections ?? []);
@@ -346,6 +366,8 @@ export function useTravelContext(input: Readonly<{
     // The plan's source key covers Calendar, Behaviors and corrections. A settings change clears the plan instead.
     const planKey = travelDigest(JSON.stringify([input.sourceKey, correctionsKey]));
     const stateDigest = travelDigest(stateKey);
+    const stopDigests = input.stopRevisions
+      ? Object.fromEntries(Object.entries(input.stopRevisions).map(([ref, revision]) => [ref, travelDigest(revision)])) : null;
     const setState = (value: Omit<StoredTravel, "key">) => { const next = { ...value, key: stateKey }; storedRef.current = next; setStored(next); };
     const current = () => storedRef.current.key === stateKey ? storedRef.current : { key: stateKey, ...empty };
     const patch = (value: Partial<Omit<StoredTravel, "key">>) => setState({ ...current(), ...value });
@@ -380,14 +402,14 @@ export function useTravelContext(input: Readonly<{
         travelDeviceUnknown.add(accountId);
       }
       if (record.budget && !travelBudgets.has(accountId)) travelBudgets.set(accountId, record.budget);
-      if (record.view && record.stateDigest === stateDigest && !travelViewCache.has(stateKey)) cacheTravel(stateKey, { view: record.view, message: null, at: record.at });
+      if (record.view && record.stateDigest === stateDigest && !travelViewCache.has(stateKey)) cacheTravel(stateKey, { view: record.view, message: null, at: record.at, stops: record.stops ?? null });
     };
     const persist = () => {
       const cached = travelViewCache.get(stateKey);
       const refreshState = travelRefreshStates.get(accountId) ?? null;
       // The Daily Brief token stays in page memory; JSON omits the undefined field.
       const view = cached?.view ? { ...cached.view, conclusionsToken: undefined } : null;
-      writeTravelSession({ version: 1, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(),
+      writeTravelSession({ version: 1, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(), stops: cached?.stops ?? null,
         refresh: refreshState ? { localDate: refreshState.localDate, sourceKey: refreshState.sourceKey, tripAttempts: refreshState.tripAttempts,
           ...(refreshState.deviceRoutedAt ? { deviceRoutedAt: refreshState.deviceRoutedAt } : {}) } : null,
         budget: travelBudgets.get(accountId) ?? null });
@@ -407,6 +429,17 @@ export function useTravelContext(input: Readonly<{
       const [owner, day] = JSON.parse(key) as string[];
       return owner === accountId && day === localDate && entry.view;
     })?.[1];
+    /**
+     * Ticket 268: today's last view from other sources, every time marked "Last estimate", with
+     * each trip to or from a stop that changed or is gone withdrawn as changed.
+     */
+    const keptDayView = (): Readonly<{ view: TravelRoutesView; at: number }> | null => {
+      const last = lastDayView();
+      if (!last?.view) return null;
+      const marked = asLastEstimates(last.view, new Date().toISOString());
+      const changed = last.stops && stopDigests ? changedTravelStops(last.stops, stopDigests) : new Set<string>();
+      return { view: marked.evidence && changed.size ? { ...marked, evidence: withdrawChangedTravelTrips(marked.evidence, changed) } : marked, at: last.at };
+    };
     const budgetReset = () => {
       const reset = travelBudgetResets.get(accountId);
       return reset && Date.parse(reset) > Date.now() ? reset : null;
@@ -533,12 +566,16 @@ export function useTravelContext(input: Readonly<{
           }
           if (!live()) return;
           if (response.accountId !== accountId || response.settingsRevision !== settings.updatedAt
-            || (response.habitsRevision ?? null) !== (settings.habits?.updatedAt ?? null)) { settle({}); return; }
+            || (response.habitsRevision ?? null) !== (settings.habits?.updatedAt ?? null)) {
+            // A revision mismatch is a failed request: automatic requests wait 5 minutes, not every focus.
+            if (!manualRequest) travelFailures.set(accountId, Date.now());
+            settle({}); return;
+          }
           const receivedAt = new Date().toISOString();
           const previous = travelViewCache.get(stateKey)?.view ?? lastDayView()?.view ?? null;
           const view = mergedTravelView(previous, planned.kind === "trip" ? { ...response, conclusionsToken: undefined } : response, receivedAt);
           if (sameEpoch()) {
-            cacheTravel(stateKey, { view, message: null, at: Date.now() });
+            cacheTravel(stateKey, { view, message: null, at: Date.now(), stops: stopDigests });
             // Trip requests carry no conclusions; only a whole-day response replaces the token.
             if (planned.kind === "day") {
               rememberTravelConclusions(accountId, localDate, view);
@@ -565,8 +602,8 @@ export function useTravelContext(input: Readonly<{
           if (resumesAt || (error instanceof TravelClientError && error.code === "quota_exceeded")) {
             // The budget is used up: keep the last plan visible as stale and stop live updates until it renews.
             if (!current().view) {
-              const last = lastDayView();
-              if (last?.view) showView(last.view, last.at);
+              const last = keptDayView();
+              if (last) showView(last.view, last.at);
             }
             const previous = current();
             if (resumesAt) travelBudgetResets.set(accountId, resumesAt);
@@ -643,7 +680,7 @@ export function useTravelContext(input: Readonly<{
     const resumesAt = budgetReset();
     if (resumesAt) {
       // The budget is still used up: show the last plan as stale without another request.
-      const previous = cached?.view ? cached : lastDayView();
+      const previous = cached?.view ? cached : keptDayView();
       if (previous?.view) showView(previous.view, previous.at);
       pauseBudget(resumesAt);
     } else {
@@ -651,8 +688,8 @@ export function useTravelContext(input: Readonly<{
       else {
         // A changed source: keep today's last view, marked, until its response arrives. The merge
         // then withdraws the changed trips. While paused or failing it stays, with Refresh travel.
-        const last = lastDayView();
-        if (last?.view) showView(asLastEstimates(last.view, new Date().toISOString()), last.at);
+        const last = keptDayView();
+        if (last) showView(last.view, last.at);
         if (cached && !cached.view && cached.message && !cached.resumesAt && Date.now() - cached.at < FAILURE_REUSE_MS) patch({ message: cached.message });
       }
       const failedRecently = !!cached && !cached.view && !!cached.message && Date.now() - cached.at < FAILURE_REUSE_MS;

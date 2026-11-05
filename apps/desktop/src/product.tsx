@@ -8,7 +8,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { travelSourceKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
+import { travelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
@@ -347,13 +347,15 @@ export function Product() {
   const visibleCalendarEvents = calendar.preferences?.visible ? calendar.snapshot?.events.filter((event) =>
     !calendar.preferences!.hiddenCalendarIds.includes(event.calendarId)
     && (calendar.preferences!.showAllDay || event.kind !== "all_day")) ?? [] : [];
+  const travelBehaviorRevisions = bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null,
+    locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? [];
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     timezone: profile?.timezone ?? "America/New_York",
     // Ticket 268: automatic travel requests wait for the first Calendar read to settle.
     sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL,
-    sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} },
-      bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
+    sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
+    stopRevisions: travelStopRevisions(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions) });
   const calendarContext = {
     travelMessage: travel.message,
     travelStatus: travel,

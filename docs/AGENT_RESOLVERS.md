@@ -366,6 +366,9 @@ It also owns trip identity (`travelTripKey`, `travelTripMatches`), the 80% budge
 its destination ends. Clients must not restate the triggers or thresholds. Ticket 268's
 `travelRefreshTripsFromEvidence` builds the plan's trips from a route response alone, and
 `lib/ui/travel.ts` follows the plan on open, focus, return to the window and plan timers.
+A kept view from older sources first passes `changedTravelStops` and
+`withdrawChangedTravelTrips` (travel resolver), so a moved, re-placed or cancelled stop's trips
+read as changed instead of keeping their old times.
 Movement over 500 m plans a trip request for the next outbound trip only, no sooner than
 `TRAVEL_MOVEMENT_REFRESH_FLOOR_SECONDS` after the last request that routed from the device.
 `mergeTravelLastEstimates` in the travel resolver merges each response into the kept view

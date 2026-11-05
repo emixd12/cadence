@@ -40,7 +40,7 @@ import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
-import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
+import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
 import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import {
   dismissTravelLeaveQuestion,
@@ -173,11 +173,12 @@ export function DayProgressTimeline({
   // Travel estimates and their brief guidance stay Google-only (Ticket 238 adds no new routing disclosure).
   const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
+  const stopRevisions = useMemo(() => travelStopRevisions(travelEvents, timeline), [travelEvents, timeline]);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone,
     // Ticket 268: automatic travel requests wait for the Google Calendar read that feeds travel to settle.
-    sourceReady: live.state !== "not_loaded" });
+    sourceReady: live.state !== "not_loaded", stopRevisions });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
   const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,

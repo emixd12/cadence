@@ -15974,7 +15974,10 @@ Implementation notes:
   anything it was planned from changed, the new plan rejects it, it cannot leave before its stop
   ends, or it has arrived. A failed refresh keeps the view.
 - A changed source shows the last view with every time marked "Last estimate" until its
-  response arrives; at the 80% pause or after a failure it stays, with Refresh travel.
+  response arrives; at the 80% pause or after a failure it stays, with Refresh travel. Trips to
+  or from a stop that moved, changed place or is gone are withdrawn first and read "The trip to
+  {event} changed." (`travelStopRevisions`, `changedTravelStops`, `withdrawChangedTravelTrips`).
+- A revision mismatch counts as a failed request, so automatic requests wait 5 minutes.
 - Movement over 500 m (Ticket 267's trigger, changed here) refreshes only the next outbound trip,
   as a trip request, no sooner than 10 minutes after the last request that routed from the device.
 - `tests/travel-refresh-day.dom.test.tsx` runs whole days through the real hosted service: typical

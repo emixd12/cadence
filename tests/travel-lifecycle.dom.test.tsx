@@ -804,3 +804,19 @@ it("proceeds after 10 seconds when the Calendar never settles, and never delays 
     expect(latest().view?.evidence?.legs).toHaveLength(3);
   } finally { await manualDay.done(); }
 });
+
+
+it("waits 5 minutes after a revision mismatch instead of requesting on every focus (O4)", async () => {
+  const routes = vi.fn(async () => ({ ...view("account-a"), settingsRevision: "older" }));
+  const { unmount } = await mount(routes);
+  try {
+    expect(routes).toHaveBeenCalledTimes(1);
+    await focusAndWait(); await focusAndWait();
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    await focusAndWait();
+    expect(routes).toHaveBeenCalledTimes(2);
+  } finally { await unmount(); }
+});

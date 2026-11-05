@@ -7,7 +7,7 @@
  */
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 
 const mocks = vi.hoisted(() => ({
@@ -103,7 +103,8 @@ const client: TravelClient = {
 const capture = vi.fn<(state: TravelState) => void>();
 const current = () => capture.mock.lastCall![0];
 function Probe(props: { sourceKey: string; sourceReady?: boolean; accountId?: string }) {
-  const state = useTravelContext({ enabled: true, accountId: props.accountId ?? "owner", localDate: "2026-09-21", sourceKey: props.sourceKey, client, timezone: "America/New_York", sourceReady: props.sourceReady });
+  const state = useTravelContext({ enabled: true, accountId: props.accountId ?? "owner", localDate: "2026-09-21", sourceKey: props.sourceKey, client, timezone: "America/New_York", sourceReady: props.sourceReady,
+    stopRevisions: Object.fromEntries(world.events.map((event) => [event.id, JSON.stringify([event.start, event.end, event.location, event.etag ?? null])])) });
   capture(state);
   return createElement("p", null, "x");
 }
@@ -233,7 +234,46 @@ it("a failed source-change request keeps last estimates, marked", async () => {
   world.events = [TYPICAL[0]!, { ...TYPICAL[1]!, etag: "moved" }];
   await d.render(); await advance(400);
   expect(current().message).toBe("Travel estimates are unavailable right now. Tracking and Calendar still work.");
-  expect(model().trips.filter((trip) => trip.leaveAt).map((trip) => [trip.destinationRef, trip.freshness]))
-    .toEqual([["dentist", "last_estimate"], ["gym", "last_estimate"], [null, "last_estimate"]]);
+  // The Gym event's revision changed, so its trips are withdrawn; the dentist trip keeps its last estimate.
+  expect(model().trips.map((trip) => [trip.destinationRef, trip.state === "trip_changed" ? "changed" : trip.freshness]))
+    .toEqual([["dentist", "last_estimate"], ["gym", "changed"], [null, "changed"]]);
   await d.done();
+});
+
+describe("a kept view withdraws trips whose stop changed (R5)", () => {
+  const trips = () => model().trips.map((trip) => [trip.role, trip.destinationRef ?? trip.originRef, trip.state === "trip_changed" ? "changed" : trip.freshness]);
+  it("an event moved at 80% of the ceiling", async () => {
+    world.events = [...TYPICAL];
+    mocks.monthSpend.mockResolvedValue(4_100_000);
+    const d = await start(et("7:00"));
+    world.events = [{ ...TYPICAL[0]!, start: et("11:00"), end: et("12:00") }, TYPICAL[1]!];
+    await d.render(); await advance(400); await focus();
+    expect(world.log).toHaveLength(1);
+    // The dentist trip and the trip from the dentist changed; the trip home keeps its last estimate.
+    expect(trips()).toEqual([["outbound", "dentist", "changed"], ["onward", "gym", "changed"], ["return", "gym", "last_estimate"]]);
+    expect(model().trips[0]).toMatchObject({ action: "refresh", leaveAt: null });
+    expect(current().resumesAt).toBeNull();
+    await d.done();
+  });
+  it("an event moved after a failed request", async () => {
+    world.events = [...TYPICAL];
+    const d = await start(et("7:00"));
+    world.fail = true;
+    world.events = [TYPICAL[0]!, { ...TYPICAL[1]!, start: et("15:00"), end: et("16:00") }];
+    await d.render(); await advance(400);
+    expect(current().message).toBe("Travel estimates are unavailable right now. Tracking and Calendar still work.");
+    expect(trips()).toEqual([["outbound", "dentist", "last_estimate"], ["onward", "gym", "changed"], ["return", "gym", "changed"]]);
+    await d.done();
+  });
+  it("a cancelled event, while an unchanged one keeps its last estimate", async () => {
+    world.events = [...TYPICAL];
+    mocks.monthSpend.mockResolvedValue(4_100_000);
+    const d = await start(et("7:00"));
+    world.events = [TYPICAL[0]!];
+    await d.render(); await advance(400);
+    expect(current().view!.evidence!.legs.map((entry) => [entry.leg.role, entry.state, !!entry.estimate]))
+      .toEqual([["outbound", "current", true], ["onward", "rejected_revision", false], ["return", "rejected_revision", false]]);
+    expect(model().trips[0]).toMatchObject({ destinationRef: "dentist", freshness: "last_estimate", leaveAt: "2026-09-21T12:35:00Z" });
+    await d.done();
+  });
 });
