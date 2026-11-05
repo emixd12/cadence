@@ -371,7 +371,7 @@ export function DayProgressTimeline({
         usualTravelMode={usualTravelMode}
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
-        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone)}
+        contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
@@ -652,6 +652,7 @@ function resolveContexts(
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null,
   travelLabels?: ReadonlyMap<string, string>,
   timezone?: string,
+  departure?: DepartureModel,
 ): ReadonlyMap<string, TimelineOccurrenceContext> {
   const instant = Temporal.Instant.from(now);
   return new Map(section.occurrences.map((occurrence) => [occurrence.id, resolveTimelineOccurrenceContext({
@@ -665,6 +666,7 @@ function resolveContexts(
     travel,
     travelLabels,
     timezone,
+    departure,
     // A timing mutation can arrive between minute ticks. Its timestamp is the
     // earliest instant at which the returned running state can be assessed.
     now: occurrence.timeTracking.runningStartedAt && Temporal.Instant.compare(Temporal.Instant.from(occurrence.timeTracking.runningStartedAt), instant) > 0

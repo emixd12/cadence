@@ -1,5 +1,6 @@
 import type { ExternalEventSchedulingFact } from "../types/external-event";
 import { Temporal } from "@js-temporal/polyfill";
+import type { DepartureTrip } from "../types/departure";
 import type { TravelEvidenceResult } from "../types/travel";
 import { resolveTravelCollisions } from "./travel.resolver";
 import { RETURN_TIME_UNKNOWN, departureOverlapPhrase, departurePhraseContext } from "../services/departure-phrases";
@@ -198,6 +199,11 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
   events: readonly (NormalizedExternalEvent | ExternalEventSchedulingFact)[];
   freshness: ExternalEventFreshness;
   travel?: Pick<TravelEvidenceResult, "segments" | "completeTrip"> & Partial<Pick<TravelEvidenceResult, "legs" | "unknownLegs">> | null;
+  /**
+   * Ticket 266: the departure model's remaining trips. When given, the trip home's state decides
+   * whether "Return time unknown." applies, so the row agrees with the drawer and dialog.
+   */
+  departure?: Readonly<{ trips: readonly Pick<DepartureTrip, "role" | "state">[] }> | null;
   /** Ticket 261: titles by commitment ref, to name the trip a Behavior overlaps. */
   travelLabels?: ReadonlyMap<string, string>;
   /** The account timezone for the trip's times. Defaults to America/New_York. */
@@ -295,7 +301,7 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     overlappingEventIds,
     overlapAssessment,
     overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel(input, travelCollision.segmentIds)
-      : overlapAssessment === "unknown" && returnTimeUnknown(input.travel) ? RETURN_TIME_UNKNOWN
+      : overlapAssessment === "unknown" && returnTimeUnknown(input.travel, input.departure) ? RETURN_TIME_UNKNOWN
       : overlapAssessment === "unknown" && hasUncertainTimedEvent
       ? `Event end unknown · ${input.freshness.label}`
       : overlapLabel(overlapAssessment, input.freshness, estimatedEnd !== null),
@@ -304,11 +310,21 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
 }
 
 /**
- * Ticket 266: the trip home has no known time only when there is a trip home: a return leg that is
- * not current, or an unknown return leg. A day with no trips says nothing about travel.
+ * Ticket 266: "Return time unknown." only when the trip home has no time and none is coming. With
+ * the departure model: its trip home cannot be timed (time unknown or needs a start), or trips
+ * remain with no trip home at all. A waiting estimate, a known time or a finished day says nothing.
+ * Without the model, a return leg that is not current or an unknown return leg.
  */
-function returnTimeUnknown(travel: Readonly<{ completeTrip: boolean; legs?: TravelEvidenceResult["legs"]; unknownLegs?: TravelEvidenceResult["unknownLegs"] }> | null | undefined): boolean {
+function returnTimeUnknown(
+  travel: Readonly<{ completeTrip: boolean; legs?: TravelEvidenceResult["legs"]; unknownLegs?: TravelEvidenceResult["unknownLegs"] }> | null | undefined,
+  departure: Readonly<{ trips: readonly Pick<DepartureTrip, "role" | "state">[] }> | null | undefined,
+): boolean {
   if (!travel || travel.completeTrip) return false;
+  if (departure) {
+    const home = departure.trips.find((trip) => trip.role === "return");
+    if (!home) return departure.trips.length > 0;
+    return home.state === "time_unknown" || home.state === "needs_origin";
+  }
   return (travel.legs ?? []).some((entry) => entry.leg.role === "return" && entry.state !== "current") ||
     (travel.unknownLegs ?? []).some((leg) => leg.role === "return");
 }

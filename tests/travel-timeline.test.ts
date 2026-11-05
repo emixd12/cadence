@@ -29,6 +29,27 @@ describe("shared Timeline travel occupancy", () => {
     expect(resolve("2026-09-21T13:45:00Z")).toMatchObject({ overlappingEventIds: ["event"] });
     expect(resolve("2026-09-21T18:30:00Z")).toMatchObject({ overlappingEventIds: [], overlapAssessment: "unknown", overlapLabel: "Return time unknown." });
   });
+  it("follows the departure model's trip home, so the row agrees with the drawer (Ticket 266)", () => {
+    // Raw legs alone would say the return is unknown: its leg has no estimate yet.
+    const legs = [{ leg: { id: "return", role: "return" }, state: "unavailable", estimate: null }] as never;
+    const resolve = (trips: { role: "outbound" | "onward" | "return"; state: string }[]) => resolveTimelineOccurrenceContext({ occurrenceId: "behavior",
+      scheduledFor: "2026-09-21T18:30:00Z", runningStartedAt: null,
+      estimate: { kind: "unknown", reason: "insufficient_samples", sampleCount: 0, requiredSampleCount: 3, lookbackDays: 90 },
+      events: [], freshness: { state: "current", refreshedAt: "2026-09-21T12:00:00Z", label: "Calendar current", canAssertNoOverlap: true },
+      now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel: { ...travel, segments: [], legs },
+      departure: { trips: trips as never } }).overlapLabel;
+    // Waiting for its estimate, including once it is ready to check.
+    expect(resolve([{ role: "outbound", state: "upcoming" }, { role: "return", state: "appears_later" }])).not.toBe("Return time unknown.");
+    // A known time.
+    expect(resolve([{ role: "return", state: "head_home" }])).not.toBe("Return time unknown.");
+    expect(resolve([{ role: "return", state: "upcoming" }])).not.toBe("Return time unknown.");
+    // The day's trips are over.
+    expect(resolve([])).not.toBe("Return time unknown.");
+    // No time and none coming.
+    expect(resolve([{ role: "return", state: "time_unknown" }])).toBe("Return time unknown.");
+    expect(resolve([{ role: "return", state: "needs_origin" }])).toBe("Return time unknown.");
+    expect(resolve([{ role: "outbound", state: "needs_place" }])).toBe("Return time unknown.");
+  });
   it("says nothing about the trip home on a day with no trips (Ticket 266)", () => {
     const resolve = (extra: Partial<TravelEvidenceResult>) => resolveTimelineOccurrenceContext({ occurrenceId: "behavior", scheduledFor: "2026-09-21T18:30:00Z",
       runningStartedAt: null, estimate: { kind: "unknown", reason: "insufficient_samples", sampleCount: 0, requiredSampleCount: 3, lookbackDays: 90 },

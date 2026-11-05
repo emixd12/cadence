@@ -186,3 +186,21 @@ it("keeps fixture notes out of route warnings and shows production timing", asyn
   expect(container.querySelector("[data-frozen-time-note]")?.textContent).toContain("Estimates expire 5 minutes after they are checked");
   expect(container.textContent).not.toContain("2999");
 });
+
+it("keeps the Gym row and the Dentist drawer in agreement about the trip home through the day", async () => {
+  await render("fresh");
+  for (let minutes = 7 * 60; minutes <= 18 * 60; minutes += 5) {
+    const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    await moveClock(time);
+    const homeLine = /trip home|Head home|home by/.test(text("Dentist drawer"));
+    // The trip home is waiting for its estimate, has a time or is over: never "unknown".
+    expect(gymRow(), time).not.toContain("Return time unknown");
+    if (minutes < 15 * 60) expect(homeLine, time).toBe(true);
+  }
+  // No trip home and none coming: Dentist has no place, so the row says so.
+  await choose("needs-place");
+  expect(gymRow()).toContain("Return time unknown.");
+  // A known time for the trip home.
+  await choose("head-home");
+  expect(gymRow()).not.toContain("Return time unknown");
+});
