@@ -431,9 +431,9 @@ function afterNow(value: string, now: Temporal.Instant): boolean {
   catch { return false; }
 }
 
-/** A commitment with no known end cannot be shown to have ended. Its end is never invented. */
+/** Ticket 264: only a known end shows a started commitment is under way. No end is invented. */
 function notEnded(endAt: string | null, now: Temporal.Instant): boolean {
-  return endAt === null || afterNow(endAt, now);
+  return endAt !== null && afterNow(endAt, now);
 }
 
 function compareInstants(left: string, right: string): number {

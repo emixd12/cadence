@@ -74,8 +74,7 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
   const initialOrigin = observedOrigin ?? input.base;
   const currentStop = selectCurrentStop(commitments, corrections, input.base, now);
   // Ticket 264: a stop in progress is the prior stop. A fresh device or an explicit
-  // correction still names the origin of the next departure, which then waits for the
-  // stop's known end. A stop with no known end gets none: the wait is simply unknown.
+  // correction still names the origin of the next departure, which then waits for the stop's end.
   const overriddenStop = currentStop && observedOrigin ? currentStop.commitment : null;
   const immediateReadyAt = (overriddenStop && readyAfter(overriddenStop, input.buffers.exitSeconds)) ?? now.toString();
   const legs: TravelPlannedLeg[] = [];
@@ -421,8 +420,9 @@ function compareOptionalInstants(left: Temporal.Instant | null, right: Temporal.
 
 /**
  * Ticket 264: the most recently started stop still under way. Only a physical stop with
- * a usable place qualifies; anything else cannot name where the user is, so planning
- * falls back to the immediate origin. A stop at Home needs no trip home.
+ * a usable place and a known end later than now qualifies. Anything else cannot show
+ * where the user is, so planning uses the immediate origin. No end is ever invented.
+ * A stop at Home needs no trip home.
  */
 function selectCurrentStop(
   commitments: readonly TravelCommitment[],
@@ -430,19 +430,14 @@ function selectCurrentStop(
   base: TravelEndpoint | null,
   now: Temporal.Instant,
 ): Readonly<{ commitment: TravelCommitment; endpoint: TravelEndpoint }> | null {
-  // A later stop that has started shows the user moved on from a stop with no known end.
-  let laterStopStarted = false;
   for (const commitment of [...commitments].reverse()) {
-    if (commitment.attendance !== "physical" ||
-      Temporal.Instant.compare(instant(commitment.startAt, "Commitment start"), now) > 0) continue;
+    if (commitment.attendance !== "physical" || !commitment.endAt ||
+      Temporal.Instant.compare(instant(commitment.startAt, "Commitment start"), now) > 0 ||
+      Temporal.Instant.compare(instant(commitment.endAt, "Commitment end"), now) <= 0) continue;
     const endpoint = correctionFor(corrections, commitment.ref, commitment.revision)?.endpoint ?? commitment.endpoint;
     if (!endpoint) continue;
     validateEndpoint(endpoint);
-    const underWay = commitment.endAt
-      ? Temporal.Instant.compare(instant(commitment.endAt, "Commitment end"), now) > 0
-      : !laterStopStarted;
-    laterStopStarted = true;
-    if (underWay) return base && samePlace(endpoint.point, base.point) ? null : { commitment, endpoint };
+    return base && samePlace(endpoint.point, base.point) ? null : { commitment, endpoint };
   }
   return null;
 }

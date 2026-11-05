@@ -150,14 +150,11 @@ describe("travel model projection", () => {
     expect(JSON.stringify(projection)).not.toContain("13:43");
   });
 
-  it("Ticket 264: an event under way with no known end keeps later fits unknown, never free", () => {
+  it("Ticket 264: a started stop with no known end adds no trip and no unknown trip", () => {
     const projection = project({ commitments: [
       { ...commitment("event-now", "2026-09-16T11:30:00Z", "2026-09-16T13:00:00Z", place("dentist")), endAt: null },
     ] }, [candidate("journal", "2026-09-16T22:00:00Z", "2026-09-16T22:30:00Z")]);
-    expect(projection.travelDay).toBe("unknown");
-    expect(projection.trips).toEqual([{ destinationRef: null, role: "return", mode: null, estimate: "unknown" }]);
-    expect(projection.fits).toEqual([{ ref: "journal", conclusion: "unknown", basis: "travel_unknown",
-      trip: { destinationRef: null, role: "return" }, position: "after" }]);
+    expect(projection).toEqual({ version: "2.0", travelDay: "no", calendarEvents: true, trips: [], fits: [] });
   });
 
   it("projects nothing while disabled or after a revision change", () => {

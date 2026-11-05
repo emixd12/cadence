@@ -420,12 +420,26 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(result.evidence?.unknownLegs).toEqual([]);
   });
 
-  it("scenario D: passes an end-unspecified event through without inventing an end", async () => {
+  it("scenario D: leaves a started event with no specified end out of the plan", async () => {
     withEvents([event("ongoing", "2026-09-22T07:30:00Z", "2026-09-22T07:30:00Z", "ongoing St", { endUnspecified: true })]);
     const result = await refreshTravelRoutes(caller, day, config, now);
     expect(mocks.route).not.toHaveBeenCalled();
-    expect(result.evidence?.legs).toEqual([]);
-    expect(result.evidence?.unknownLegs).toEqual([{ role: "return", originCommitmentRef: "ongoing", destinationCommitmentRef: null, reason: "timing_unknown" }]);
+    expect(result.evidence).toMatchObject({ legs: [], unknownLegs: [], segments: [] });
+  });
+
+  it("gives a later event a current leg from Home after a started Behavior with no duration", async () => {
+    withEvents([event("later", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z")]);
+    mocks.source.mockResolvedValue(source);
+    mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: null }]);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-09-22"
+      ? [occurrence("occurrence-1", "behavior-1", "2026-09-22T07:00:00Z")] : []);
+    const result = await refreshTravelRoutes(caller, day, config, now);
+    expect(result.evidence?.unknownLegs).toEqual([]);
+    expect(result.evidence?.legs[0]).toMatchObject({ state: "current", leg: { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "later",
+      readyAt: now.toString(), provenance: { originRef: "base", originSource: "saved_base" } } });
+    expect(result.evidence?.legs.some((entry) => entry.leg.originCommitmentRef === "occurrence-1")).toBe(false);
+    expect(result.evidence?.behaviorSources).toEqual([]);
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("2 Habit St");
   });
 
   it("leaves ended, remote-looking and unplaced events under way out of the plan", async () => {

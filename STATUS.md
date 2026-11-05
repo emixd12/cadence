@@ -13,8 +13,8 @@ it, and every change adds a field.
   If the budget refuses that call, only that leg is lost.
 - A physical event under way with a usable place stays the prior stop until its end. A fresh
   device still names the next departure's origin, and that departure waits for the known end.
-  An event with no known end gets none: the next leg reports `timing_unknown` until a later
-  stop starts.
+  A started commitment with no known end is not under way: it leaves the plan as before, later
+  trips plan from the device or Home, and no end is invented.
 - `unknownLegs` reaches the client with commitment refs and a reason only.
 - Signed conclusions keep their meaning, including `late_arrival`. Started Behaviors get no
   fit conclusion. A weather margin never moves a late departure before its ready time.

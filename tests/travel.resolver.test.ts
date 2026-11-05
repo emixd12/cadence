@@ -669,28 +669,16 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
       expect(resolveTravelPlan(walking({ device: stale, commitments: [ongoing] })).legs[0]?.provenance.originRef).toBe("here");
     });
 
-    it("invents no end for an event without one", () => {
+    it("does not treat a started stop with no known end as under way, and invents no end", () => {
       const open = { ...ongoing, endAt: null };
-      const alone = resolveTravelPlan(walking({ commitments: [open] }));
-      expect(alone.legs).toEqual([]);
-      expect(alone.unknownLegs).toEqual([{ role: "return", originCommitmentRef: "event-now", destinationCommitmentRef: null, reason: "timing_unknown" }]);
-      const onward = resolveTravelPlan(walking({ commitments: [open, later] }));
-      expect(onward.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "event-now", destinationCommitmentRef: "event-later", reason: "timing_unknown" }]);
-      expect(onward.legs.map((leg) => leg.role)).toEqual(["return"]);
-      const device = resolveTravelPlan(walking({ device: fresh, commitments: [open, later] }));
-      expect(device.legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "device" } });
-      const deviceAlone = resolveTravelPlan(walking({ device: fresh, commitments: [open] }));
-      expect(deviceAlone.legs).toEqual([]);
-      expect(deviceAlone.unknownLegs[0]?.reason).toBe("timing_unknown");
-    });
-
-    it("stops treating an event with no known end as the prior stop once a later stop has started", () => {
-      const open = commitment("event-open", "2026-09-16T08:00:00Z", null, place("old", 4));
-      const ended = commitment("event-ended", "2026-09-16T12:00:00Z", "2026-09-16T13:00:00Z", place("mid", 5));
-      expect(resolveTravelPlan(walking({ commitments: [open, ended, later] })).legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "base" } });
-      expect(resolveTravelPlan(walking({ commitments: [open, ongoing, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-now" });
-      const long = commitment("event-long", "2026-09-16T12:00:00Z", "2026-09-16T17:00:00Z", place("long", 6));
-      expect(resolveTravelPlan(walking({ commitments: [long, ended, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-long" });
+      expect(resolveTravelPlan(walking({ commitments: [open] }))).toMatchObject({ legs: [], unknownLegs: [] });
+      const fromHome = resolveTravelPlan(walking({ commitments: [open, later] }));
+      expect(fromHome.unknownLegs).toEqual([]);
+      expect(fromHome.legs[0]).toMatchObject({ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-later", readyAt: NOW, provenance: { originRef: "base" } });
+      const fromDevice = resolveTravelPlan(walking({ device: fresh, commitments: [open, later] }));
+      expect(fromDevice.legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "device" } });
+      expect(resolveTravelPlan(walking({ device: fresh, commitments: [open] }))).toMatchObject({ legs: [], unknownLegs: [] });
+      expect(resolveTravelPlan(walking({ commitments: [{ ...open, ref: "event-open" }, ongoing, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-now" });
     });
 
     it("treats an ended event, a remote one and one with no place as no prior stop", () => {
