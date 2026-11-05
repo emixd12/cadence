@@ -10,7 +10,8 @@ import type { DepartureTrip } from "../types/departure";
  *   "Return time unknown." where it replaces "Travel timing incomplete".
  * - New in Ticket 265: the countdown, "leave now" and late forms, the other "Last estimate"
  *   forms, the overdue "appears" line, the needs-place, needs-attendance and
- *   needs-origin sentences, and the "for {event}" line forms.
+ *   needs-origin sentences, the "for {event}" line forms, and the past-the-leave-time forms:
+ *   "If you haven't left yet, you'd arrive about {time}." and "you'd be home about {time}".
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */
@@ -28,7 +29,7 @@ export type DeparturePhraseContext = Readonly<{
   currentDate: Temporal.PlainDate;
 }>;
 
-export type DeparturePhraseInput = Pick<DepartureTrip, "state" | "role" | "mode" | "fromHome" | "freshness" |
+export type DeparturePhraseInput = Pick<DepartureTrip, "state" | "lateBasis" | "role" | "mode" | "fromHome" | "freshness" |
   "checkedAt" | "leaveAt" | "arriveAt" | "minutesUntilLeave" | "appearsAt" | "timeUnknownCause" | "blockingLabel"> & Readonly<{
   /** The trip's destination title, when known. */
   destinationLabel: string | null;
@@ -83,8 +84,8 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
     case "late":
     case "head_home":
       return input.freshness === "last_estimate"
-        ? lastEstimate(input, time, forStop, named ? ` at ${destination}` : "")
-        : current(input, time, forStop, named ? ` at ${destination}` : "");
+        ? lastEstimate(input, time, forStop, named ? ` at ${destination}` : "", named ? destination : null)
+        : current(input, time, forStop, named ? ` at ${destination}` : "", named ? destination : null);
     case "appears_later":
       if (input.appearsOverdue) return named ? `The leave time for ${destination} is ready to check.` : "The leave time is ready to check.";
       if (!input.appearsAt) return named ? `The leave time for ${destination} appears later.` : "Leave time appears later.";
@@ -110,7 +111,14 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
   }
 }
 
-function current(input: DeparturePhraseInput, time: (at: string) => string, forStop: string, atStop: string): string {
+/** True whether or not the user has left: Cadence cannot tell, and the time is a rough figure. */
+function pastLeaveTime(input: DeparturePhraseInput, time: (at: string) => string, stop: string | null): string {
+  if (input.role === "return") return `If you haven't left yet, you'd be home about ${time(input.arriveAt!)}`;
+  return `If you haven't left${stop ? ` for ${stop}` : ""} yet, you'd arrive about ${time(input.arriveAt!)}`;
+}
+
+function current(input: DeparturePhraseInput, time: (at: string) => string, forStop: string, atStop: string, stop: string | null): string {
+  if (input.lateBasis === "clock") return `${pastLeaveTime(input, time, stop)}.`;
   const leaveAt = input.leaveAt!;
   const arriveAt = input.arriveAt!;
   const start = input.fromHome ? " from Home" : "";
@@ -132,8 +140,9 @@ function current(input: DeparturePhraseInput, time: (at: string) => string, forS
   }
 }
 
-function lastEstimate(input: DeparturePhraseInput, time: (at: string) => string, forStop: string, atStop: string): string {
+function lastEstimate(input: DeparturePhraseInput, time: (at: string) => string, forStop: string, atStop: string, stop: string | null): string {
   const checked = ` · checked ${time(input.checkedAt!)}.`;
+  if (input.lateBasis === "clock") return `Last estimate: ${lowerFirst(pastLeaveTime(input, time, stop))}${checked}`;
   const leaveAt = input.leaveAt!;
   const arrived = input.minutesUntilLeave === null;
   if (input.role === "return") return `Last estimate: head home ${arrived ? "now" : time(leaveAt)}${checked}`;
@@ -145,6 +154,10 @@ function lastEstimate(input: DeparturePhraseInput, time: (at: string) => string,
   return input.state === "leave_now"
     ? `Last estimate: leave now${forStop}${checked}`
     : `Last estimate: leave by ${time(leaveAt)}${forStop}${checked}`;
+}
+
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 function timeUnknown(input: DeparturePhraseInput, destination: string, named: boolean): string {

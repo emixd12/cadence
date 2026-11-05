@@ -67,14 +67,14 @@ describe("the moving clock", () => {
       ["13:54:01", routed, "soon", "Leave in 1 minute, by 1:55 PM for Dentist from Home · walking, arrive 2:20 PM."],
       ["13:55", routed, "leave_now", "Leave now for Dentist from Home · walking, arrive 2:20 PM."],
       ["13:59:59", routed, "leave_now", "Leave now for Dentist from Home · walking, arrive 2:24 PM."],
-      ["14:00", routed, "late", "You may arrive late at Dentist: arrive 2:25 PM."],
-      ["14:29", routed, "late", "You may arrive late at Dentist: arrive 2:54 PM."],
+      ["14:00", routed, "late", "If you haven't left for Dentist yet, you'd arrive about 2:25 PM."],
+      ["14:29", routed, "late", "If you haven't left for Dentist yet, you'd arrive about 2:54 PM."],
       ["14:30", routed, "head_home", "Head home 3:40 PM · walking, home by 4:10 PM."],
       ["15:09", routed, "head_home", "Head home 3:40 PM · walking, home by 4:10 PM."],
       ["15:29", routed, "head_home", "Head home in 11 minutes, by 3:40 PM · walking, home by 4:10 PM."],
       ["15:30", routed, "soon", "Head home in 10 minutes, by 3:40 PM · walking, home by 4:10 PM."],
       ["15:40", routed, "leave_now", "Head home now · walking, home by 4:10 PM."],
-      ["15:45", routed, "late", "Head home now · walking, home by 4:15 PM."],
+      ["15:45", routed, "late", "If you haven't left yet, you'd be home about 4:15 PM."],
       ["16:10", routed, "none", ""],
     ];
     for (const [time, legs, state, phrase] of steps) {
@@ -119,11 +119,69 @@ describe("each state", () => {
     expect(next?.phrase).toBe("You may arrive late: leave by 2:10 PM from Home · walking, arrive 2:40 PM.");
   });
 
-  it("late: a flagged leg whose departure has passed does not vanish, and its arrival moves on", () => {
+  it("late from evidence: a current flag keeps the route's arrival after its departure passes", () => {
     const late = timed(OUTBOUND, local("14:10"), local("14:40"), { late: true });
-    const { next } = model(local("14:15"), [late]);
-    expect(next).toMatchObject({ state: "late", arriveAt: local("14:45"), minutesUntilLeave: null });
-    expect(next?.phrase).toBe("You may arrive late: arrive 2:45 PM.");
+    for (const time of ["14:15", "14:25"]) {
+      const { next } = model(local(time), [late]);
+      expect(next).toMatchObject({ state: "late", lateBasis: "evidence", freshness: "current", arriveAt: local("14:40"), minutesUntilLeave: null });
+      expect(next?.phrase).toBe("You may arrive late: arrive 2:40 PM.");
+    }
+    expect(model(local("14:15"), [late]).next?.linePhrase).toBe("You may arrive late at Dentist: arrive 2:40 PM.");
+  });
+
+  it("late from the clock: the words hold whether or not the user has left", () => {
+    const { next } = model(local("14:05"), [onTime()]);
+    expect(next).toMatchObject({ state: "late", lateBasis: "clock", arriveAt: local("14:30") });
+    expect(next?.phrase).toBe("If you haven't left yet, you'd arrive about 2:30 PM.");
+    expect(next?.linePhrase).toBe("If you haven't left for Dentist yet, you'd arrive about 2:30 PM.");
+    expect(next?.phrase).not.toMatch(/late/i);
+  });
+
+  it("late from the clock: an expired late flag no longer counts as evidence", () => {
+    const entry = timed(OUTBOUND, local("14:10"), local("14:40"), { late: true }, local("14:12"));
+    expect(model(local("14:11"), [entry]).next).toMatchObject({ lateBasis: "evidence", freshness: "current", arriveAt: local("14:40") });
+    expect(model(local("14:13"), [entry]).next).toMatchObject({ lateBasis: "evidence", freshness: "last_estimate", arriveAt: local("14:40"),
+      phrase: "Last estimate: you may arrive late, arrive 2:40 PM · checked 8:00 AM." });
+    expect(model(local("14:15"), [entry]).next).toMatchObject({ lateBasis: "clock", freshness: "last_estimate", arriveAt: local("14:45"),
+      phrase: "Last estimate: if you haven't left yet, you'd arrive about 2:45 PM · checked 8:00 AM." });
+  });
+
+  it("only a late state has a late basis", () => {
+    for (const time of ["12:00", "13:40", "13:56", "14:45"]) {
+      expect(model(local(time), [onTime(), tripHome()]).next?.lateBasis).toBeNull();
+    }
+  });
+
+  it("late from the clock: a transit trip stays a rough figure", () => {
+    const transit = leg("outbound", null, "dentist", { mode: "transit" });
+    expect(model(local("14:05"), [timed(transit, local("13:55"), local("14:20"))]).next?.phrase).toBe("If you haven't left yet, you'd arrive about 2:30 PM.");
+  });
+
+  it("an arrival moved by the clock keeps no trip open past the event's start and end", () => {
+    const lastOut = timed(OUTBOUND, local("13:55"), local("14:20"));
+    const steps: readonly [string, string, string | null][] = [
+      ["14:00", "outbound", "late"],
+      ["14:29:59", "outbound", "late"],
+      ["14:30", "return", "head_home"],
+      ["15:00", "return", "head_home"],
+      ["15:29:59", "return", "head_home"],
+      ["15:30", "return", "soon"],
+      ["15:44", "return", "leave_now"],
+      ["16:09:59", "return", "late"],
+    ];
+    for (const [time, role, state] of steps) {
+      const { next } = model(local(time), [lastOut, tripHome()]);
+      expect([time, next?.role, next?.state]).toEqual([time, role, state]);
+    }
+    // The clock-moved arrival at 16:09:59 reads 4:39 PM, yet the trip ends at its route arrival.
+    expect(model(local("16:09:59"), [lastOut, tripHome()]).next?.arriveAt).toBe(local("16:39:59"));
+    expect(model(local("16:10"), [lastOut, tripHome()])).toMatchObject({ state: "none", next: null, trips: [] });
+  });
+
+  it("late from evidence: a flagged trip ends at its route arrival, then the next trip takes over", () => {
+    const late = timed(OUTBOUND, local("14:20"), local("14:50"), { late: true });
+    expect(model(local("14:49:59"), [late, tripHome()]).next).toMatchObject({ role: "outbound", arriveAt: local("14:50") });
+    expect(model(local("14:50"), [late, tripHome()]).next).toMatchObject({ role: "return", state: "head_home" });
   });
 
   it("late: stays the next trip past the event's start until its estimated arrival", () => {
@@ -135,7 +193,7 @@ describe("each state", () => {
   it.each(["walking", "cycling", "transit", "driving"] as TravelMode[])("late: gives an arrival for %s", (mode) => {
     const entry = leg("outbound", null, "dentist", { mode });
     const { next } = model(local("14:15"), [timed(entry, local("14:10"), local("14:40"), { late: true })]);
-    expect(next?.arriveAt).toBe(local("14:45"));
+    expect(next).toMatchObject({ lateBasis: "evidence", arriveAt: local("14:40") });
   });
 
   it("head home: only while the event is under way and the trip home is next", () => {
@@ -249,10 +307,11 @@ describe("last estimate", () => {
       ["12:00", expiredOut, "upcoming", "Last estimate: leave by 1:55 PM · checked 8:00 AM."],
       ["13:40", expiredOut, "soon", "Last estimate: leave by 1:55 PM · checked 8:00 AM."],
       ["13:56", expiredOut, "leave_now", "Last estimate: leave now · checked 8:00 AM."],
-      ["14:10", expiredOut, "late", "Last estimate: you may arrive late, arrive 2:35 PM · checked 8:00 AM."],
+      ["14:10", expiredOut, "late", "Last estimate: if you haven't left yet, you'd arrive about 2:35 PM · checked 8:00 AM."],
       ["13:00", expired(OUTBOUND, local("14:10"), local("14:40"), { late: true }), "late", "Last estimate: you may arrive late, leave by 2:10 PM, arrive 2:40 PM · checked 8:00 AM."],
       ["14:45", expired(HOME, local("15:40"), local("16:10")), "head_home", "Last estimate: head home 3:40 PM · checked 8:00 AM."],
       ["15:42", expired(HOME, local("15:40"), local("16:10")), "leave_now", "Last estimate: head home now · checked 8:00 AM."],
+      ["15:50", expired(HOME, local("15:40"), local("16:10")), "late", "Last estimate: if you haven't left yet, you'd be home about 4:20 PM · checked 8:00 AM."],
     ];
     for (const [time, entry, state, phrase] of cases) {
       expect(model(local(time), [entry]).next).toMatchObject({ state, phrase, freshness: "last_estimate", checkedAt: local("08:00"), action: "refresh" });
@@ -389,7 +448,7 @@ describe("unreliable chains", () => {
     // Past the old 15:15 departure, the late trip is still next and the return still has no time.
     expect(run("15:20").trips[1]?.state).toBe("time_unknown");
     const arrived = run("15:25");
-    expect(arrived.next).toMatchObject({ role: "return", state: "late", arriveAt: local("15:45"), phrase: "Head home now · walking, home by 3:45 PM." });
+    expect(arrived.next).toMatchObject({ role: "return", state: "late", lateBasis: "clock", arriveAt: local("15:45"), phrase: "If you haven't left yet, you'd be home about 3:45 PM." });
     expect(run("15:45")).toMatchObject({ state: "none" });
   });
 

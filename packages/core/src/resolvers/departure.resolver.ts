@@ -93,6 +93,7 @@ function fromLeg(
   const leaveAt = Temporal.Instant.from(entry.weather?.departureAt ?? estimate.departureAt);
   const arriveAt = Temporal.Instant.from(entry.weather?.arrivalAt ?? estimate.arrivalAt);
   const travel = arriveAt.since(leaveAt);
+  // From route times only. An arrival moved by the clock must never keep a trip open.
   const carriedArrival = arriveAt.add({ seconds: delaySeconds });
   const finishedAt = leg.role !== "return" && destinationStart && Temporal.Instant.compare(Temporal.Instant.from(destinationStart), carriedArrival) > 0
     ? Temporal.Instant.from(destinationStart)
@@ -107,12 +108,14 @@ function fromLeg(
   const expired = entry.state === "stale" || Temporal.Instant.compare(Temporal.Instant.from(estimate.expiresAt), now) <= 0;
   const untilLeave = leaveAt.since(now).total("seconds");
   const arrived = untilLeave <= 0;
-  const state: Draft["state"] = entry.late || untilLeave <= -DEPARTURE_LEAVE_NOW_SECONDS
-    ? "late"
+  const pastLeaveNow = untilLeave <= -DEPARTURE_LEAVE_NOW_SECONDS;
+  // An expired late flag says nothing once leave now has passed. Only the clock is left.
+  const lateBasis = entry.late && !(expired && pastLeaveNow) ? "evidence" : pastLeaveNow ? "clock" : null;
+  const state: Draft["state"] = lateBasis ? "late"
     : arrived ? "leave_now" : untilLeave <= DEPARTURE_SOON_SECONDS ? "soon" : "upcoming";
   const fromNow = now.add(travel);
-  const shownArrival = arrived && Temporal.Instant.compare(fromNow, arriveAt) > 0 ? fromNow : arriveAt;
-  return { finishedAt, draft: { ...trip, state,
+  const shownArrival = lateBasis !== "evidence" && arrived && Temporal.Instant.compare(fromNow, arriveAt) > 0 ? fromNow : arriveAt;
+  return { finishedAt, draft: { ...trip, state, lateBasis,
     freshness: expired ? "last_estimate" : "current",
     checkedAt: estimate.observedAt,
     leaveAt: leaveAt.toString(),
@@ -168,7 +171,7 @@ function fromUnknown(
 
 function baseDraft(role: Draft["role"], originRef: string | null, destinationRef: string | null, legId: string | null): Draft {
   return { key: `${role}:${originRef ?? ""}:${destinationRef ?? ""}`, legId, role, originRef, destinationRef,
-    mode: null, fromHome: false, state: "no_route", freshness: null, checkedAt: null, leaveAt: null, arriveAt: null,
+    mode: null, fromHome: false, state: "no_route", lateBasis: null, freshness: null, checkedAt: null, leaveAt: null, arriveAt: null,
     getReadyAt: null, minutesUntilLeave: null, appearsAt: null, timeUnknownCause: null, blockingRef: null, blockingLabel: null, action: null };
 }
 

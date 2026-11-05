@@ -31,6 +31,13 @@ export type DepartureTimeUnknownCause =
   | "no_known_end"
   | "leg_limit";
 
+/**
+ * Why a trip reads `late`. `evidence`: the route says it arrives after its target; with
+ * `freshness: "current"` this is the only case to treat as an alarm. `clock`: only the clock has
+ * passed the leave time. The user may well have left, so never present this as a problem.
+ */
+export type DepartureLateBasis = "evidence" | "clock";
+
 export type DepartureAction = "refresh";
 
 export type DepartureStop = Readonly<{
@@ -66,11 +73,16 @@ export type DepartureTrip = Readonly<{
   mode: TravelMode | null;
   fromHome: boolean;
   state: Exclude<DepartureState, "none">;
+  /** Set only when `state` is `late`. */
+  lateBasis: DepartureLateBasis | null;
   freshness: DepartureFreshness | null;
   /** When the estimate was checked. Null without a shown time. */
   checkedAt: string | null;
   leaveAt: string | null;
-  /** Estimated arrival. Once the leave time has arrived it is now plus the travel time. */
+  /**
+   * Estimated arrival. The route's arrival for late evidence. Otherwise, once the leave time
+   * has arrived, now plus the travel time: a rough figure that never keeps a trip open.
+   */
   arriveAt: string | null;
   /** When get-ready time starts, for an outbound trip. Never before the leg can start. */
   getReadyAt: string | null;

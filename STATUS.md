@@ -8,7 +8,9 @@ will.
 
 - `packages/core/src/resolvers/departure.resolver.ts` gives each remaining trip and the next trip a
   state. Every phrase lives in `packages/core/src/services/departure-phrases.ts`. "Leave now" lasts
-  5 minutes, then the trip reads late with an arrival counted from now.
+  5 minutes. A current `late` flag then keeps "You may arrive late" with the route's arrival. With
+  only the clock past the leave time, the line reads "If you haven't left yet, you'd arrive about
+  {time}", because the user may already have left. `lateBasis` tells surfaces which case it is.
 - The time an estimate will appear comes from `travelEstimateAppearsAt` in
   `travel-refresh-policy.ts`. Ticket 267 changes the rule there.
 - Evidence changes: a trip that would leave before the previous trip arrives withholds `completeTrip`
