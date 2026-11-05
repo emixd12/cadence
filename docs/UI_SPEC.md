@@ -177,7 +177,8 @@ scale; the presentation must disclose compressed spacing. A timed-event hover/
 focus preview shows duration as a temporary solid 1px magenta axis segment and can
 highlight overlapping Behavior rows. An overnight continuation starts at the
 next day section and ends at the event's mapped end. It adds no second marker or
-stem. No permanent duration bar appears. All-day events retain date-only meaning.
+stem. No permanent duration bar appears, except the next trip's span under decision D2
+(Ticket 270). All-day events retain date-only meaning.
 
 Optional Calendar context uses the same Google identity as the Cadence account.
 `components/settings/GoogleCalendarPanel.tsx` provides explicit connection,
@@ -247,6 +248,12 @@ return/availability, assumptions and freshness. Label travel-created conflicts i
 text. Preserve hover/focus/tap/click behavior, keyboard access, 44px targets,
 left-side Calendar context and the right-side ledger. Add no separate travel lane
 or permanent duration fill. Unknown timing never creates a precise occupied span.
+
+Exception, owner decision D2, "Next trip only" (`docs/DECISIONS.md`, 2026-11-04; Tickets
+269 and 270): the next trip alone gets one line at the top of the Timeline, one marker and
+one magenta span without hovering. The owner picks the marker's form on the bench. A
+Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
+inspection-only. There is no collapsed Daily Brief strip.
 
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app

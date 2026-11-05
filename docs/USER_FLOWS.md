@@ -18,7 +18,10 @@ policy is defined in `plans/first-external-consumer.md`.
 Tips and travel (Tickets 170–173): a brief may carry at most one pattern tip when a
 calculated finding bears on today; Cadence shows the evidence line beside it. Tips
 repeat at most once per cooldown. Travel lines beside the brief come from existing
-travel evidence, disappear when it expires, and never regenerate the brief. Reminder
+travel evidence and never regenerate the brief. Today they disappear when the evidence
+expires. Owner decisions D1 and D2 (`docs/DECISIONS.md`, 2026-11-04; Ticket 272) change
+that: the block marks a last estimate instead of disappearing, and there is no collapsed
+strip. Reminder
 history and Notes need their own Settings disclosure; turning Daily Brief off revokes both.
 
 Navigation during loading keeps the attempt; returning to Timeline shows its result.

@@ -45,7 +45,8 @@ Cadence-owned OAuth server, and Claude and ChatGPT plugins; see
 `docs/MCP_INTEGRATION.md` and `docs/MCP_CONTRACT.md`. Tickets 233–240 implement
 read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
 web and linked desktop with local verification. Ticket 241 owns final
-disclosure/evidence review; live and release gates remain open. Mobile and
+disclosure/evidence review; live and release gates remain open. Tickets 263–285
+implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Mobile and
 broader workspace restructuring remain deferred.
 
 ## Agent operating model
@@ -191,6 +192,11 @@ In scope:
   settings, developer docs, and Claude and ChatGPT plugins under Tickets 220–232:
   full tracking-data read plus scoped, user-confirmed writes (Occurrence status
   and notes; create, edit, archive, and restore Behaviors; no deletes)
+- Travel advisory revamp under Tickets 263–285 (`docs/DECISIONS.md`, 2026-11-04): last
+  estimates and per-trip refresh; a next-departure line, marker and magenta span for the
+  next trip only, without hovering; opt-in leave reminders that reach the user with
+  Cadence closed; remembered places and attendance; tomorrow's first trip; and Outlook
+  and iCloud event locations read for routing
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -212,6 +218,8 @@ Out of scope for v1:
 - Calendar sync and event editing, except read-only Google Calendar context in
   Tickets 132–137 and locally implemented read-only Outlook and iCloud Calendar context in
   Tickets 233–241
+- Background location tracking; leave times in Daily Brief model input or MCP; snooze,
+  notification action buttons and email leave reminders; a new paid Google place search
 - Workout writes, coaching, exercise analysis, and automatic Behavior completion
   from recorded activity
 - EventKit and local-only Mac calendar access
@@ -359,6 +367,18 @@ browser/email semantics. Target 30 days, prioritize nearest eligible reminders,
 and show contiguous coverage verified through OS readback. Clearly disclose a
 shorter OS-limited horizon; do not assume a universal request cap or add a
 background helper. Desktop email delivery remains inactive.
+
+Leave reminders (decision D3, Tickets 275–280) are a separate reminder kind:
+- Off by default. They fire at leave time minus get-ready time, once per trip, with one
+  update only if the leave time moves 10 minutes or more earlier.
+- They use their own hosted-only record, because `reminder_deliveries` requires an
+  Occurrence and Calendar events have none. The preference stays outside the synced
+  profile.
+- Web uses a hosted job and web push. The job starts from Home or the previous stop.
+- Mac uses native scheduled notifications from the last estimate, with no background
+  helper. They stay out of the Behavior reminder coverage calculation.
+- The text names the start or estimate time. `docs/NOTIFICATION_SPEC.md` gains the full
+  rules under Ticket 275.
 
 ## Supabase CLI rules
 
@@ -572,6 +592,16 @@ Do not expand scope to solve speculative future requirements.
   revocable. Integration operations reach user data only through RLS as the
   grant's user; the service role is limited to OAuth token-endpoint functions.
   Never log tokens or note text.
+- The leave reminder job (Ticket 276, decision D3) may act as one user with no session.
+  It uses its own token channel, never an MCP grant. Tokens last 5 minutes or less, stay
+  server-only and never reach logs. Selecting which accounts are due needs a cross-account
+  read, so this one selection uses the service role, as `lib/services/reminder.service.ts`
+  does, and reads only account IDs and next check times. All other user data goes through
+  RLS as that user.
+- Never store device positions, route durations or Google event details on the server.
+  Ticket 216's user-recorded place markers stay the one stored device position. Read a
+  Calendar title for a leave reminder only at send time, in memory. Never send leave
+  times to the Daily Brief model.
 - Use server-side code for privileged operations.
 - Treat provider CLI login output, API keys, and approval codes as secrets.
 

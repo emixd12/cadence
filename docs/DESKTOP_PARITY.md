@@ -34,7 +34,7 @@ is restorable local presentation state, never a provider deletion or Cadence
 status. Timed-event hover/focus previews show duration on a solid 1px magenta axis segment from
 the displayed original-day perpendicular-stem contact and highlight matching Behavior rows. Preserve mapped length
 to the day body bottom. An overnight continuation starts at the next section top above its heading, continues to the event end without another marker or stem; details retain actual times. No permanent duration bars
-appear. Calendar icons use centered perpendicular stems without axis nodes.
+appear, except the next trip's span under decision D2 (Ticket 270). Calendar icons use centered perpendicular stems without axis nodes.
 No persistent overlap fill or edge appears. Hover/focus changes only overlapping Behavior borders to the owner-selected Poline facet `#DA3278`. Point overlap uses
 `start <= activation < end`; estimated-duration overlap is half-open. Completed
 and Not Completed fills remain unchanged. The current-time dot uses brand blue and
