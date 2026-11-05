@@ -4,7 +4,11 @@ import {
   DEPARTURE_PHRASE_REVIEW,
   OWNER_APPROVED_2026_11_05,
   RETURN_TIME_UNKNOWN,
+  SETUP_TRAVEL_ESTIMATES_OFF,
+  TRAVEL_ATTENDANCE_IN_PERSON,
+  TRAVEL_ATTENDANCE_REMOTE,
   TRAVEL_CORRECTION_TOGGLE,
+  TRAVEL_OFF_DISMISS,
   allDayRangeLabel,
   departureBriefBackPhrase,
   departureBriefFooterPhrase,
@@ -17,6 +21,7 @@ import {
   departureMarkerRowPhrase,
   departureOverlapPhrase,
   departurePhraseContext,
+  departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
   type DeparturePhraseInput,
@@ -114,6 +119,11 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "marker-rail": () => departureMarkerRailPhrase(at("13:20"), TIMEZONE),
   "marker-row": () => departureMarkerRowPhrase({ leaveAt: at("13:20"), home: false, destinationLabel: EVENT }, CONTEXT),
   "marker-row-home": () => departureMarkerRowPhrase({ leaveAt: at("15:00"), home: true, destinationLabel: null }, CONTEXT),
+  "step-in-person": () => TRAVEL_ATTENDANCE_IN_PERSON,
+  "step-remote": () => TRAVEL_ATTENDANCE_REMOTE,
+  "travel-off-offer": () => departureTravelOffPhrase(EVENT),
+  "travel-off-dismiss": () => TRAVEL_OFF_DISMISS,
+  "setup-estimates-off": () => SETUP_TRAVEL_ESTIMATES_OFF,
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

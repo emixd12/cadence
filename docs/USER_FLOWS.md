@@ -216,8 +216,11 @@ is configured; that report calls no provider. The row opens the Travel settings
 section, where the user enters Home and chooses usual travel, then chooses Save
 travel settings. Saving sends nothing to Google, requests no device location and
 leaves the Travel estimates toggle unchanged. The row reads Saved once both
-values exist. The
-setup read carries only whether each value exists, never the Home text. On
+values exist and Travel estimates is on. With both saved and Travel estimates off, it reads
+Estimates off, because nothing appears until the toggle is on (Ticket 273). The row only
+opens Travel settings; consent still comes only from the Travel estimates toggle. The
+setup read carries only whether each value exists and whether estimates are on, never the
+Home text. On
 desktop the row needs a linked account to ask the deployment; local mode omits
 it, and Travel settings still saves both values offline.
 If browser notifications are denied or already blocked, that permission state

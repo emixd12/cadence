@@ -174,10 +174,11 @@ describe("travel timing with the Ticket 264 fields", () => {
     expect(container.textContent).not.toContain("return_base_missing");
   });
 
-  it("shows nothing new for an event with only unknown legs", async () => {
+  it("gives an event with only unknown legs its next step (Ticket 273)", async () => {
     const only: Omit<TravelEvidenceResult, "modelProjection"> = { ...evidence(undefined, undefined), legs: [],
       unknownLegs: [{ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-1", reason: "origin_unknown" }] };
-    expect(timing(only, "America/New_York")).toBeNull();
+    await act(() => root.render(<>{timing(only, "America/New_York")}</>));
+    expect(container.querySelector('[data-departure-state="needs_origin"]')?.textContent).toBe("Add Home in Settings to get a leave time for Dentist.");
   });
 });
 

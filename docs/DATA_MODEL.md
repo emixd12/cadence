@@ -115,7 +115,9 @@ end, or its start when no end is known. It holds no title, place or other event 
 question takes its title from the current Calendar or Behavior read and is skipped when
 the event is gone. Sign-out, an account change, travel turned off and a new local date
 clear it, and it ends with the browser session. The Mac keeps it the same way and never
-writes it to SQLite, sync or backups. Ticket 216 place markers
+writes it to SQLite, sync or backups. Ticket 273 adds one `localStorage` flag,
+`cadence:travel-offer-dismissed` = `"true"`, after Not now on the Timeline's offer to turn
+on Travel estimates. It holds no event text and stays on that device. Ticket 216 place markers
 are the one stored device position: the user records each with "I'm here", and
 they sync and enter desktop backups (see `place_markers` below). Since Ticket 214, a provider geocode persists
 only as a place ID in `travel_place_cache` (below); its coordinates are never stored. Shared resolvers derive

@@ -1,3 +1,4 @@
+import { SETUP_TRAVEL_ESTIMATES_OFF } from "@cadence/core/services/departure-phrases";
 import type {
   FirstRunOnboardingClientSnapshot,
   FirstRunOnboardingItem,
@@ -57,12 +58,14 @@ export function resolveFirstRunOnboardingModel(
     },
   ];
   // Ticket 212: ask for Home and usual travel only where routing can use them.
+  // Ticket 273: Home and travel do nothing while Travel estimates is off, so that row never reads Saved.
   if (state.travel && client.travelRoutingConfigured === true) {
-    const complete = state.travel.hasHome && state.travel.hasMode;
+    const saved = state.travel.hasHome && state.travel.hasMode;
+    const complete = saved && state.travel.enabled;
     items.push({
       key: "travel",
       label: "Home and travel",
-      statusLabel: complete ? "Saved" : "Optional",
+      statusLabel: complete ? "Saved" : saved ? SETUP_TRAVEL_ESTIMATES_OFF : "Optional",
       href: "/settings#travel",
       actionLabel: "Open travel",
       complete,

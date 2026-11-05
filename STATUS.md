@@ -17,6 +17,32 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 273 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Every missing
+estimate now says why in one sentence and offers one action (G3, G4, G10).
+
+- Needs place: "Add a place for {event}" is the action. For a Calendar event it opens the
+  details with Change for this trip open and the destination focused; for a Behavior it opens
+  Behaviors. Needs attendance: In person and Remote answer for this trip in one tap, with the
+  event's own location (INT-TRAVEL-003). Needs a start: the blocking stop comes from the
+  departure model's `blockingRef`, so "Fix {event}'s place or attendance" goes to that stop;
+  with none, "Add Home in Settings" opens Travel settings (INT-TRAVEL-011).
+- The next-departure line, the drawer, the details dialog and expanded Behavior rows share
+  `TravelStepText` (`components/timeline/TravelNextStep.tsx`). Focus moves to the travel status
+  or the dialog title when an answer removes its buttons.
+- With Travel estimates off and a located event or Behavior ahead today, one line offers to turn
+  them on and opens Travel settings; Not now hides it on that device with one `localStorage`
+  flag (INT-TRAVEL-012). Consent still comes only from the toggle. The Mac shows it only with a
+  linked account.
+- The first-run Home and travel row reads Estimates off, not Saved, while the toggle is off; the
+  setup read now carries `enabled`. `docs/USER_FLOWS.md` says so.
+- New wording, not yet approved (D7): "In person", "Remote", "Turn on Travel estimates in
+  Settings to get a leave time for {event}.", "Not now" and "Estimates off". Wording review is
+  now 12 of 75 awaiting.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web,
+  checked at 390 px. Messaging impact: P-021 (Ticket 273 note).
+
 ## Travel advisory revamp Wave 3: Ticket 270 bench built — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed. Waiting for the owner to pick a marker.**

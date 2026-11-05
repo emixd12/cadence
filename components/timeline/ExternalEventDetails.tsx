@@ -16,6 +16,7 @@ import type { TravelHabitsState } from "@/lib/ui/travel-habits";
 import { TravelModeChoice } from "./TravelModeChoice";
 import { platformNavigationPreference } from "@/lib/ui/navigation-platform";
 import { TravelWeatherCredit, travelWeatherMarginText } from "./TravelWeather";
+import { TravelStepText, isTravelStep, type TravelStepActions } from "./TravelNextStep";
 
 import styles from "./day-progress-timeline.module.css";
 
@@ -44,6 +45,8 @@ type ExternalEventPreviewProps = Readonly<{
   navigationPreference?: TravelNavigationPreference | null;
   travelMode?: TravelMode | null;
   onOpenExternal?: (url: string) => void | Promise<void>;
+  /** Ticket 273: the one action for a missing estimate. */
+  steps?: TravelStepActions | null;
 }>;
 
 export function ExternalEventPreview({
@@ -59,6 +62,7 @@ export function ExternalEventPreview({
   navigationPreference,
   travelMode,
   onOpenExternal,
+  steps,
 }: ExternalEventPreviewProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -77,6 +81,8 @@ export function ExternalEventPreview({
       aria-label={allDay ? "All Day Events preview" : `Calendar preview: ${events[0]!.title || "Untitled event"}`}
       className={styles.drawer}
       data-calendar-drawer="preview"
+      data-travel-focus
+      tabIndex={-1}
     >
       <div className={styles.drawerContent}>
         <div className={styles.drawerEvents}>
@@ -84,7 +90,7 @@ export function ExternalEventPreview({
             <article key={event.id} className="min-w-0">
               <h3 className="break-words font-bold">{event.title || "Untitled event"}</h3>
               {/* Ticket 271: the leave line answers the question first, under the title. */}
-              {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, onOpenExternal, refresh, lead: "sm", className: "mt-1" }) : null}
+              {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, onOpenExternal, refresh, steps, lead: "sm", className: "mt-1" }) : null}
               <p className="mt-1 text-xs text-muted-readable">
                 {event.calendarName} · {eventTimeLabel(event, timezone)}
               </p>
@@ -133,10 +139,14 @@ type ExternalEventDetailsProps = Readonly<{
   refresh?: TravelRefreshAction | null;
   /** When the departure model was resolved. Required with `departure`. */
   now?: string;
+  /** Ticket 273: the one action for a missing estimate. */
+  steps?: TravelStepActions | null;
+  /** Ticket 273: each increase opens the trip correction and focuses its destination. */
+  correctionRequest?: number;
 }>;
 
 export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventDetailsProps>(
-  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection, travelHabits, departure, refresh, now }, ref) {
+  function ExternalEventDetails({ event, timezone, onClose, onDismissAllDay, onOpenExternal, travel, navigationPreference, travelMode, onTravelCorrection, travelHabits, departure, refresh, now, steps, correctionRequest = 0 }, ref) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [linkError, setLinkError] = useState(false);
     const openExternal = (url: string) => {
@@ -165,11 +175,12 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
         aria-labelledby="calendar-details-title"
         className={styles.details}
         data-calendar-drawer="details"
+        data-travel-focus
       >
         <div className="flex items-start justify-between border-b border-line p-4">
           <div className="min-w-0">
             <p className="text-xs font-bold text-muted-readable">Calendar details</p>
-            <h2 id="calendar-details-title" className="mt-1 text-xl font-bold">
+            <h2 id="calendar-details-title" className="mt-1 text-xl font-bold" tabIndex={-1} data-travel-focus-target>
               {event?.title || "Untitled event"}
             </h2>
           </div>
@@ -181,12 +192,12 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
           {linkError ? <p role="alert">The link could not open. Try again.</p> : null}
           <article className="grid min-w-0 gap-2 text-sm leading-6">
             {/* Ticket 271: the leave line comes first, then Directions one tap away. */}
-            {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, onOpenExternal, refresh, lead: "base" }) : null}
+            {now ? renderTravelTiming({ eventId: event.id, travel, departure, now, timezone, onOpenExternal, refresh, steps, lead: "base" }) : null}
             <TravelNavigationLink locationText={event.location} preference={navigationPreference} usualMode={travelMode}
               travel={travel} stopRef={event.id} source="calendar" onOpenExternal={onOpenExternal} />
             <TravelModeChoice eventId={event.id} travel={travel} habits={travelHabits} usualMode={travelMode} />
             {onTravelCorrection && event.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt)
-              ? <TravelCorrectionControl key={`${event.id}-${event.revision.providerEtag ?? event.revision.providerUpdatedAt}`} event={event} onTravelCorrection={onTravelCorrection} /> : null}
+              ? <TravelCorrectionControl key={`${event.id}-${event.revision.providerEtag ?? event.revision.providerUpdatedAt}`} event={event} onTravelCorrection={onTravelCorrection} openRequest={correctionRequest} /> : null}
             <dl className={DETAIL_ROWS}>
               <DetailRow label="Time" value={[eventTimeLabel(event, timezone), eventStateWord(event.state)].filter(hasText).join(" · ")} />
               <DetailRow label="Location" value={event.location} />
@@ -248,11 +259,18 @@ export function TravelNavigationLink({ locationText, preference, usualMode, trav
  * Ticket 271: the attendance and destination correction (INT-TRAVEL-003), behind one short
  * native disclosure. Saving closes it and returns focus to the control.
  */
-function TravelCorrectionControl({ event, onTravelCorrection }: Readonly<{
+function TravelCorrectionControl({ event, onTravelCorrection, openRequest = 0 }: Readonly<{
   event: Extract<NormalizedExternalEvent, { kind: "timed" }>; onTravelCorrection: (correction: TravelCorrection) => void;
+  /** Ticket 273: a place step opens the correction with its destination focused. */
+  openRequest?: number;
 }>) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!openRequest || !detailsRef.current) return;
+    detailsRef.current.open = true;
+    detailsRef.current.querySelector<HTMLInputElement>('input[name="travel_location"]')?.focus();
+  }, [openRequest]);
   return <details ref={detailsRef} className="grid min-w-0" data-travel-correction>
     <summary ref={summaryRef} className="product-disclosure-trigger inline-flex min-h-11 w-fit items-center">
       <span className="product-disclosure-indicator" aria-hidden="true" />
@@ -281,20 +299,22 @@ type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
 /** Ticket 261: the shared "Refresh travel" action (INT-TRAVEL-004), offered in a line that needs it. */
 export type TravelRefreshAction = Readonly<{ onRefresh: () => void; pending: boolean }>;
 
-/** The trips this event's views talk about. Steps that need a place or attendance wait for Ticket 273. */
+/** The trips this event's views talk about. Ticket 273 adds the trips to it that need a place, attendance or a start. */
 function eventTrips(departure: DepartureModel | null | undefined, eventId: string): DepartureTrip[] {
   return (departure?.trips ?? []).filter((trip) => trip.legId !== null
     ? trip.originRef === eventId || trip.destinationRef === eventId
-    : (trip.state === "time_unknown" || trip.state === "trip_changed") &&
+    : (trip.state === "time_unknown" || trip.state === "trip_changed" || isTravelStep(trip)) &&
       (trip.role === "return" ? trip.originRef === eventId : trip.destinationRef === eventId));
 }
 
-export function renderTravelTiming({ eventId, travel, departure, now, timezone, onOpenExternal, refresh, lead, className }: Readonly<{
+export function renderTravelTiming({ eventId, travel, departure, now, timezone, onOpenExternal, refresh, steps, lead, className }: Readonly<{
   eventId: string; travel?: TravelTimingEvidence | null; departure?: DepartureModel | null;
   /** The instant the departure model was resolved at, so every line dates times the same way. */
   now: string; timezone: string;
   onOpenExternal?: (url: string) => void | Promise<void>;
   refresh?: TravelRefreshAction | null;
+  /** Ticket 273: the one action for a missing estimate. Without it the sentence shows alone. */
+  steps?: TravelStepActions | null;
   /** Ticket 271: the first line is the answer, one step larger than the rest. Weight stays regular. */
   lead?: TravelTimingLead;
   /** Spacing from the surrounding view. Nothing renders when the event has no trip. */
@@ -302,15 +322,16 @@ export function renderTravelTiming({ eventId, travel, departure, now, timezone, 
 }>) {
   const trips = eventTrips(departure, eventId);
   if (!trips.length) return null;
-  return <TravelTiming eventId={eventId} trips={trips} travel={travel} context={departurePhraseContext(now, timezone)} onOpenExternal={onOpenExternal} refresh={refresh ?? null} lead={lead ?? "sm"} className={className} />;
+  return <TravelTiming eventId={eventId} trips={trips} travel={travel} context={departurePhraseContext(now, timezone)} onOpenExternal={onOpenExternal} refresh={refresh ?? null} steps={steps ?? null} lead={lead ?? "sm"} className={className} />;
 }
 
 type TravelTimingLead = "sm" | "base";
 const LEAD_CLASS: Readonly<Record<TravelTimingLead, string>> = { sm: "text-sm leading-6", base: "text-base leading-6" };
 
-function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh, lead, className }: Readonly<{
+function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh, steps, lead, className }: Readonly<{
   eventId: string; trips: readonly DepartureTrip[]; travel?: TravelTimingEvidence | null; context: DeparturePhraseContext;
-  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null; lead: TravelTimingLead; className?: string;
+  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null; steps: TravelStepActions | null;
+  lead: TravelTimingLead; className?: string;
 }>) {
   const developmentBuild = useDevelopmentBuild();
   const legIds = new Set(trips.flatMap((trip) => trip.legId ? [trip.legId] : []));
@@ -340,7 +361,7 @@ function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh
       className={index === 0 ? LEAD_CLASS[lead] : undefined}>
       {leadsWithRefresh(trip)
         ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{text(trip).slice(DEPARTURE_REFRESH_LABEL.length)}</>
-        : text(trip)}
+        : steps && isTravelStep(trip) ? <TravelStepText key={trip.state} trip={trip} text={text(trip)} actions={steps} /> : text(trip)}
       {trip.key === trailingKey && refresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
     </p>)}
     {margin ? <p>{margin}</p> : null}

@@ -35,13 +35,13 @@ export async function readTravelSettingsRow(
 export async function readTravelSetupPresence(
   client: AppSupabaseClient,
   userId: string,
-): Promise<{ hasHome: boolean; hasMode: boolean } | null> {
-  const { data, error } = await client.from("travel_settings").select("base_location_text,mode")
+): Promise<{ hasHome: boolean; hasMode: boolean; enabled: boolean } | null> {
+  const { data, error } = await client.from("travel_settings").select("base_location_text,mode,enabled")
     .eq("user_id", userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const row = data as Pick<TravelSettingsRow, "base_location_text" | "mode">;
-  return { hasHome: Boolean(row.base_location_text?.trim()), hasMode: row.mode !== null };
+  const row = data as Pick<TravelSettingsRow, "base_location_text" | "mode" | "enabled">;
+  return { hasHome: Boolean(row.base_location_text?.trim()), hasMode: row.mode !== null, enabled: row.enabled === true };
 }
 
 export async function updateTravelSettingsRow(

@@ -8,7 +8,7 @@ const onboardingFixture: FirstRunOnboardingState = {
   hasImportRuns: false,
   timezone: "America/New_York",
   vapidPublicKey: "",
-  travel: { hasHome: false, hasMode: false },
+  travel: { hasHome: false, hasMode: false, enabled: false },
 };
 
 // Synthetic routing report: the bench never calls the travel routes endpoint.

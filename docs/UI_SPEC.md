@@ -261,7 +261,18 @@ the next trip in every state; a day with no trips shows no travel text. While th
 budget is used up, the paused phrase follows a known time on the same line. Where the
 phrase starts with "Refresh travel", those words are the button (R1); otherwise Refresh
 travel ends the line only when the trip needs a new estimate. Steps that need a place,
-attendance or a start show their sentence with no action until Ticket 273. Below it, at
+attendance or a start (Ticket 273) show one sentence and one action. A place step makes its
+first words the action, as R1 does: "Add a place for Dentist" opens that event's details with
+**Change for this trip** open and the destination focused, or, for a Behavior, opens
+Behaviors. Attendance ends with **In person** and **Remote**, which answer for this trip in one
+tap. A trip held up by another stop names that stop ("Fix Gym's place or attendance"), taken
+from the departure model, and its action goes to that stop. With no Home or device position,
+"Add Home in Settings" opens Travel settings. The drawer, the details dialog and expanded
+Behavior rows show the same sentence and action. When an answer removes its buttons, focus
+moves to the travel status, or to the dialog title. With Travel estimates off and a located
+event or Behavior still ahead today, one muted line under it reads "Turn on Travel estimates
+in Settings to get a leave time for {event}." with **Not now**; the first words open Travel
+settings and nothing turns on from the line. Below it, at
 most one muted note: the unavailable message, the development-only provider review, a
 changed-stop message or the weather state, in that order of preference. A polite live
 region announces the line only when the next trip or its state changes, never a

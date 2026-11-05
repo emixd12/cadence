@@ -17,6 +17,8 @@ import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { NEXT_TRIP_PRESENTATION, type NextDepartureLineSize, type NextTripMarker } from "@/components/timeline/next-trip-presentation";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
+import { TravelOffOffer, type TravelStepActions } from "@/components/timeline/TravelNextStep";
+import type { TravelCorrection } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import type { TravelState } from "@/lib/ui/travel";
 import { DepartureWordingReview } from "./DepartureWordingReview";
@@ -233,9 +235,16 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
   const [clock, setClock] = useState(initial.clock);
   const [checked, setChecked] = useState(initial.checked);
   const [development, setDevelopment] = useState(false);
+  // Ticket 273: an answer from a step changes Dentist until another preset is chosen. Links only say where they go.
+  const [dentistOverride, setDentistOverride] = useState<DentistVariant | null>(null);
+  const [stepNote, setStepNote] = useState("");
+  const [correctionRequest, setCorrectionRequest] = useState(0);
+  const [offerShown, setOfferShown] = useState(true);
   const preset = DEPARTURE_BENCH_STATES.find((state) => state.id === stateId) ?? initial;
   const choose = (id: string) => {
     const next = DEPARTURE_BENCH_STATES.find((state) => state.id === id) ?? initial;
+    setDentistOverride(null);
+    setStepNote("");
     setStateId(next.id);
     setClock(next.clock);
     setChecked(next.checked);
@@ -247,8 +256,9 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
     if (minutes < minutesOf(checked)) setChecked(next);
   };
 
-  const scenario: Scenario = useMemo(() => ({ dentist: preset.dentist, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
-    [preset.dentist, preset.gym, preset.gymCompletedAt]);
+  const dentistVariant = dentistOverride ?? preset.dentist;
+  const scenario: Scenario = useMemo(() => ({ dentist: dentistVariant, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
+    [dentistVariant, preset.gym, preset.gymCompletedAt]);
   const gymStatus = scenario.gymCompletedAt && minutesOf(clock) >= minutesOf(scenario.gymCompletedAt) ? "completed" as const : "unresolved" as const;
   const crowded = preset.crowded ?? false;
   const timeline = useMemo(() => benchTimeline(gymStatus, scenario.gym, crowded), [gymStatus, scenario.gym, crowded]);
@@ -275,6 +285,18 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
       durationEstimates: DURATIONS, timezone: TIMEZONE }),
     arrivalBufferSeconds: BUFFERS.arrivalSeconds, preparationSeconds: BUFFERS.preparationSeconds, pausedUntil: resumesAt });
   const refresh = resumesAt ? null : { onRefresh: status.refresh, pending: false };
+  // Ticket 273: a correction re-plans Dentist as the hosted route would, from the bench clock.
+  const correct = (correction: Pick<TravelCorrection, "attendance" | "locationText">) => {
+    setDentistOverride(correction.attendance === "remote" ? "remote"
+      : correction.locationText || dentistVariant === "attendance_unknown" || dentistVariant === "located" ? "located" : "no_place");
+    setChecked(clock);
+  };
+  const steps: TravelStepActions = {
+    correction: (ref) => ref === DENTIST_ID ? () => setCorrectionRequest((count) => count + 1) : null,
+    attendance: (ref) => ref === DENTIST_ID ? (attendance) => correct({ attendance, locationText: null }) : null,
+    behavior: (ref) => ref === GYM_ID ? { onOpen: () => setStepNote("Opens Behaviors, where Gym's place is changed.") } : null,
+    settings: { onOpen: () => setStepNote("Opens Travel settings: Home and device location.") },
+  };
   const context = departurePhraseContext(now, TIMEZONE);
   const briefTravel = useBriefTravel();
   const briefing = { text: "Gym this morning, Dentist at 2 PM.", localDate: DATE, timezone: TIMEZONE, generatedAt: instantAt("06:00"),
@@ -340,9 +362,10 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
           <dd data-departure-model-state={departure.state}>{MODEL_STATE_WORDS[departure.state]}{lateBasis}{freshness}</dd>
           <dt className="font-bold">Next-departure line</dt>
           <dd data-bench-model-line>{departure.phrase ?? "None: no travel text."}
-            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). Place, attendance and start steps get their actions in Ticket 273.</span></dd>
+            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). A place, attendance or start step carries one action (Ticket 273).</span></dd>
           <dt className="font-bold">This state</dt>
           <dd>{preset.description}</dd>
+          {stepNote ? <><dt className="font-bold">Step action</dt><dd role="status" data-bench-step-note>{stepNote}</dd></> : null}
         </dl>
       </div>
     </section>
@@ -355,7 +378,9 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
           <div ref={gymRow} className="min-w-0 border border-line bg-background">
             <DayProgressTimeline timeline={timeline}
               context={{ events, freshness: { state: "current", refreshedAt: checkedAt, label: "Calendar current", canAssertNoOverlap: true },
-                now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking" }}
+                now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking",
+                onTravelCorrection: correct, openTravelSettings: steps.settings && "onOpen" in steps.settings ? steps.settings.onOpen : undefined,
+                openBehavior: () => setStepNote("Opens Behaviors, where Gym's place is changed.") }}
               statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction}
               nextTripPresentation={{ marker, line: lineSize }} />
           </div>
@@ -363,12 +388,18 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
         <div className="grid min-w-0 content-start gap-8">
           <InlineSurface label="Dentist drawer">
             <ExternalEventPreview key={`${stateId}-${scenario.dentist}`} id="departure-bench-drawer" events={events} timezone={TIMEZONE}
-              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" />
+              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" steps={steps} />
           </InlineSurface>
           <InlineSurface label="Dentist Calendar details">
-            <ExternalEventDetails event={event} timezone={TIMEZONE} onClose={() => undefined} onDismissAllDay={() => undefined} onTravelCorrection={() => undefined}
-              travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" />
+            <ExternalEventDetails event={event} timezone={TIMEZONE} onClose={() => undefined} onDismissAllDay={() => undefined} onTravelCorrection={correct}
+              travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" steps={steps} correctionRequest={correctionRequest} />
           </InlineSurface>
+          <section aria-label="Travel estimates off" className="grid min-w-0 content-start gap-2" data-bench-travel-off>
+            <h3 className="text-sm font-bold">Travel estimates off (Ticket 273)</h3>
+            <p className="text-xs leading-5 text-muted-readable">With Travel estimates off and Dentist ahead today, the Timeline offers this once. It opens Travel settings; consent stays with the Travel estimates toggle.</p>
+            {offerShown ? <TravelOffOffer label="Dentist" target={steps.settings!} onDismiss={() => setOfferShown(false)} className="text-sm leading-6" />
+              : <button type="button" className="text-link w-fit text-sm" onClick={() => setOfferShown(true)}>Show the offer again</button>}
+          </section>
           <section aria-label="Daily Brief" className="grid min-w-0 content-start gap-2">
             <h3 className="text-sm font-bold">Daily Brief</h3>
             {briefTravel?.items.length ? null : <p className="text-xs leading-5 text-muted-readable" data-bench-brief-note>No travel block: no trip has a time or a known return yet.</p>}

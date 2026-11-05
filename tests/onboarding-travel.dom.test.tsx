@@ -16,7 +16,7 @@ const STATE: FirstRunOnboardingState = {
   hasImportRuns: false,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   vapidPublicKey: "",
-  travel: { hasHome: false, hasMode: false },
+  travel: { hasHome: false, hasMode: false, enabled: false },
 };
 
 let root: Root;
@@ -51,6 +51,18 @@ describe("web first-run setup", () => {
     expect(container.textContent).toContain(PURPOSE);
     expect(travelLink()?.textContent).toBe("Open travel");
     expect(container.textContent).toContain("Use this only if you already have a BehaviorLog bundle.");
+  });
+
+  it.each([
+    [false, "Estimates off"],
+    [true, "Saved"],
+  ])("reads Saved only while Travel estimates is on (Ticket 273, on: %s)", async (enabled, status) => {
+    await act(async () => root.render(<FirstRunOnboardingPanel onboarding={{ ...STATE, travel: { hasHome: true, hasMode: true, enabled } }}
+      readTravelRoutingConfigured={async () => true} />));
+    await flush();
+    const row = travelLink()!.closest("li") ?? travelLink()!.parentElement!.parentElement!;
+    expect(row.textContent).toContain(status);
+    if (!enabled) expect(row.textContent).not.toContain("Saved");
   });
 
   it.each([
@@ -93,7 +105,7 @@ describe("desktop setup guide", () => {
 
   it("routes Home and travel to the Settings travel anchor after the hosted report", async () => {
     const onNavigate = vi.fn();
-    const loadTravelSetup = vi.fn(async () => ({ hasHome: true, hasMode: false }));
+    const loadTravelSetup = vi.fn(async () => ({ hasHome: true, hasMode: false, enabled: false }));
     await act(async () => root.render(<DesktopOnboardingGuide {...props} onNavigate={onNavigate} forceOpen
       loadTravelSetup={loadTravelSetup} readTravelRoutingConfigured={async () => true} />));
     await flush();
@@ -109,8 +121,16 @@ describe("desktop setup guide", () => {
     expect(container.textContent).not.toContain("Home and travel");
   });
 
+  it("does not read Saved while Travel estimates is off (Ticket 273)", async () => {
+    await act(async () => root.render(<DesktopOnboardingGuide {...props} onNavigate={vi.fn()} forceOpen
+      loadTravelSetup={async () => ({ hasHome: true, hasMode: true, enabled: false })} readTravelRoutingConfigured={async () => true} />));
+    await flush();
+    expect(container.textContent).toContain("Estimates off");
+    expect(container.textContent).not.toContain("Saved");
+  });
+
   it("omits the row in local mode, where no account can ask the deployment", async () => {
-    const loadTravelSetup = vi.fn(async () => ({ hasHome: true, hasMode: true }));
+    const loadTravelSetup = vi.fn(async () => ({ hasHome: true, hasMode: true, enabled: false }));
     await act(async () => root.render(<DesktopOnboardingGuide {...props} onNavigate={vi.fn()} forceOpen
       loadTravelSetup={loadTravelSetup} readTravelRoutingConfigured={null} />));
     await flush();

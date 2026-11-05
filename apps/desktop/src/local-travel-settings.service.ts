@@ -17,9 +17,9 @@ export async function readLocalTravelSettings(): Promise<TravelSettings> {
 }
 
 /** Ticket 212: the setup guide learns only whether Home and usual travel exist. */
-export async function readLocalTravelSetupPresence(): Promise<{ hasHome: boolean; hasMode: boolean }> {
+export async function readLocalTravelSetupPresence(): Promise<{ hasHome: boolean; hasMode: boolean; enabled: boolean }> {
   const settings = await readLocalTravelSettings();
-  return { hasHome: Boolean(settings.baseLocationText?.trim()), hasMode: settings.mode !== null };
+  return { hasHome: Boolean(settings.baseLocationText?.trim()), hasMode: settings.mode !== null, enabled: settings.enabled };
 }
 
 export async function saveLocalTravelSettings(

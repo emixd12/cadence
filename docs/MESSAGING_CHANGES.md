@@ -759,6 +759,18 @@ cite has not changed.
   1:15", a slim row "Leave 1:15 PM for Dentist", or an axis tick only), so the guide text waits
   for that choice. A Behavior the next trip crowds shows its overlap line while collapsed. The
   three marker phrases are on the bench wording review, not yet approved (D7).
+- **Ticket 273 detail (November 5, 2026):** a trip with no leave time now says why with one
+  action. "Add a place for {event}" and "Fix {event}'s place or attendance" open that event's
+  Change for this trip with the destination focused, or Behaviors for a Behavior. "Is {event}
+  in person or remote?" ends with In person and Remote, which answer for this trip in one tap.
+  "Add Home in Settings" opens Travel settings. With Travel estimates off and a located event
+  ahead today, the Timeline offers once "Turn on Travel estimates in Settings to get a leave
+  time for {event}." with Not now; it only opens Settings, so consent stays with the toggle.
+  The first-run Home and travel row reads Estimates off, not Saved, while the toggle is off.
+  The guide's "Inspect travel and correct a journey" and "Set up travel" sections do not
+  describe these steps. Five phrases are on the bench wording review, not yet approved (D7):
+  In person, Remote, the offer, its Not now, and Estimates off. P-007 keeps the first-run
+  row's label and purpose text unchanged.
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later

@@ -362,6 +362,9 @@ export function Product() {
     onTravelCorrection: travel.view ? (correction: TravelCorrection) => setTravelCorrections((previous) => ({ accountId: accountUserId, items: [...(previous.accountId === accountUserId ? previous.items : []).filter((item) => item.eventId !== correction.eventId).slice(-7), correction] })) : undefined,
     travel: travel.view?.evidence, travelMode: travel.view?.mode, navigationPreference: "apple_maps" as const,
     travelSettingsClient,
+    // Ticket 273: steps open Settings or Behaviors. Estimates need a linked account, so local mode offers no Travel estimates.
+    openTravelSettings: accountUserId ? () => navigate("settings", "travel") : undefined,
+    openBehavior: () => navigate("behaviors"),
     // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
     events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
     ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),

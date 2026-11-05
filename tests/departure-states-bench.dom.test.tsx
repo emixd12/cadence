@@ -280,7 +280,13 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 271 adds the correction control's label, not yet approved (decision D7).
   // Ticket 272 lists the Daily Brief's overlap and return lines, not yet approved.
   // Ticket 270 adds the rail label and the slim row's two forms, not yet approved.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("7 of 70 phrases await the owner's approval.");
+  // Ticket 273 adds In person, Remote, the Travel estimates offer, its Not now and the setup row's Estimates off.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("12 of 75 phrases await the owner's approval.");
+  for (const id of ["step-in-person", "step-remote", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off"]) {
+    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
+  }
+  expect(container.querySelector('[data-wording-id="travel-off-offer"] [data-wording-sample]')?.textContent)
+    .toBe("Turn on Travel estimates in Settings to get a leave time for Dentist.");
   expect(container.querySelector('[data-wording-id="marker-rail"] [data-wording-sample]')?.textContent).toBe("Leave 1:20");
   expect(container.querySelector('[data-wording-id="marker-row"] [data-wording-sample]')?.textContent).toBe("Leave 1:20 PM for Dentist");
   expect(container.querySelector('[data-wording-id="marker-row-home"] [data-wording-sample]')?.textContent).toBe("Leave 3:00 PM for home");

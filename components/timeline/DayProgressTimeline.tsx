@@ -18,7 +18,7 @@ import {
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
-import { departureStops } from "@cadence/core/services/departure-stops";
+import { departureStops, firstLocatedStopAhead } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
 import { DEPARTURE_REFRESH_LABEL, departureMarkerRailPhrase, departureMarkerRowPhrase, departurePhraseContext } from "@cadence/core/services/departure-phrases";
 import { nextTripCrowdsBehavior, resolveDayProgressLayout, resolveNextTripMarkInput, resolveNextTripRowIndex } from "@cadence/core/resolvers/day-progress.resolver";
@@ -37,6 +37,7 @@ import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
+import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
 import styles from "./day-progress-timeline.module.css";
@@ -86,6 +87,10 @@ export type DayProgressContext = Readonly<{
   recordedActivity?: HevyTimelineState | null;
   /** Ticket 238: status lines for calendar sources other than Google. */
   sourceMessages?: readonly string[];
+  /** Ticket 273 (Mac): opens Travel settings. Without it no step links there and Travel estimates are not offered. */
+  openTravelSettings?: () => void;
+  /** Ticket 273 (Mac): opens the Behaviors screen, where a Behavior's place is changed. */
+  openBehavior?: (behaviorId: string) => void;
 }>;
 
 type DayProgressTimelineProps = Readonly<{
@@ -206,7 +211,16 @@ export function DayProgressTimeline({
 
   // Ticket 217: learned habits, the journey mode choice and the once-a-day leave-time question.
   const habitsClient = context ? context.travelSettingsClient ?? null : liveCalendar ? webTravelSettingsClient : null;
-  const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence));
+  // Ticket 273: with no travel evidence, a located event ahead today loads settings to learn whether estimates are off.
+  const offerStop = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return firstLocatedStopAhead({ events: travelEvents, occurrences: today?.occurrences ?? [], now });
+  }, [travelEvents, timeline.daySections, timeline.todayLocalDate, now]);
+  const [offerDismissed, setOfferDismissed] = useState(() => typeof window !== "undefined" && travelOfferDismissed());
+  const offerTarget: TravelLinkTarget | null = context ? context.openTravelSettings ? { onOpen: context.openTravelSettings } : null : { href: "/settings#travel" };
+  const offerWanted = !!offerStop && !!offerTarget && !offerDismissed && !routeEvidence;
+  const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence) || offerWanted);
+  const travelOffer = offerWanted && travelHabits.settings?.enabled === false ? offerStop : null;
   const usualTravelMode = context?.travelMode ?? liveTravel.view?.mode ?? null;
   // Ticket 261: one departure model for every travel line. Components only show its phrases.
   const habitsForModel = travelHabits.settings?.habits ?? null;
@@ -235,6 +249,42 @@ export function DayProgressTimeline({
     ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.title] as const))] : []),
   [departure.trips.length, travelEvents, timeline.daySections]);
   const travelAccountKey = travelStatus?.view?.accountId ?? travelAccountId;
+  // Ticket 273: one action for each missing estimate. Corrections apply to this trip only, as INT-TRAVEL-003 does.
+  const travelCorrection = context?.onTravelCorrection ?? (liveTravel.view ? (correction: TravelCorrection) => {
+    setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
+  } : undefined);
+  const [correctionRequest, setCorrectionRequest] = useState<Readonly<{ eventId: string; count: number }>>({ eventId: "", count: 0 });
+  const stepActions: TravelStepActions = (() => {
+    const correctable = (ref: string) => {
+      const event = travelEvents.find((item) => item.id === ref);
+      return travelCorrection && event?.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt) ? event : null;
+    };
+    const occurrences = timeline.daySections.flatMap((section) => section.occurrences);
+    return {
+      correction: (ref) => {
+        const event = correctable(ref);
+        return event ? () => {
+          if (!detailEvent) drawerLauncher.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          setPreview(null);
+          setDetailEvent(event);
+          setCorrectionRequest((previous) => ({ eventId: event.id, count: previous.count + 1 }));
+        } : null;
+      },
+      attendance: (ref) => {
+        const event = correctable(ref);
+        return event && travelCorrection ? (attendance) => travelCorrection({ eventId: event.id,
+          revision: event.revision.providerEtag ?? event.revision.providerUpdatedAt!, attendance, locationText: null }) : null;
+      },
+      behavior: (ref) => {
+        const behaviorId = occurrences.find((occurrence) => occurrence.id === ref)?.behaviorId;
+        if (!behaviorId) return null;
+        if (!context) return { href: `/behaviors?behavior=${encodeURIComponent(behaviorId)}` };
+        const open = context.openBehavior;
+        return open ? { onOpen: () => open(behaviorId) } : null;
+      },
+      settings: offerTarget,
+    };
+  })();
   const [, setLeaveDismissals] = useState(0);
   const [leaveConfirmation, setLeaveConfirmation] = useState<string | null>(null);
   // Ticket 274: today's Calendar events and Behaviors as the current read; kept candidates take their titles from it.
@@ -377,7 +427,9 @@ export function DayProgressTimeline({
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
       <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel}
-        size={nextTripPresentation.line} />
+        size={nextTripPresentation.line} steps={stepActions} />
+      {travelOffer && offerTarget ? <TravelOffOffer label={travelOffer.label} target={offerTarget} className={styles.calendarState}
+        onDismiss={() => { dismissTravelOffer(); setOfferDismissed(true); }} /> : null}
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
@@ -403,6 +455,7 @@ export function DayProgressTimeline({
         travel={travel}
         departure={departure}
         refresh={refreshTravel}
+        steps={stepActions}
         now={now}
         travelHabits={travelHabits}
         usualTravelMode={usualTravelMode}
@@ -436,6 +489,7 @@ export function DayProgressTimeline({
         navigationPreference={context?.navigationPreference}
         travelMode={usualTravelMode}
         onOpenExternal={onOpenExternal}
+        steps={stepActions}
       /> : null}
       <ExternalEventDetails
         event={detailEvent}
@@ -449,13 +503,13 @@ export function DayProgressTimeline({
         travel={travel}
         navigationPreference={context?.navigationPreference}
         travelMode={context?.travelMode ?? liveTravel.view?.mode}
-        onTravelCorrection={context?.onTravelCorrection ?? (liveTravel.view ? (correction) => {
-          setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
-        } : undefined)}
+        onTravelCorrection={travelCorrection}
         travelHabits={travelHabits}
         departure={departure}
         refresh={refreshTravel}
         now={now}
+        steps={stepActions}
+        correctionRequest={correctionRequest.eventId === detailEvent?.id ? correctionRequest.count : 0}
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
@@ -474,6 +528,7 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
   departure: DepartureModel;
   refresh: TravelRefreshAction | null;
+  steps: TravelStepActions;
   now: string;
   travelHabits?: TravelHabitsState | null;
   usualTravelMode?: TravelMode | null;
@@ -499,6 +554,7 @@ function DayProgressDay({
   travel,
   departure,
   refresh,
+  steps,
   now,
   travelHabits,
   usualTravelMode,
@@ -633,7 +689,7 @@ function DayProgressDay({
                 <OccurrenceRow
                   occurrence={occurrence}
                   context={context}
-                  travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh })}
+                  travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh, steps })}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -814,13 +870,13 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
  * A located Behavior's travel timing, its Maps link (Ticket 271) and, for a journey to a place, its
  * mode choice (Ticket 217). The link carries only the Behavior's own place text.
  */
-function travelDetails({ occurrenceId, placeText, travel, departure, now, timezone, habits, usualMode, navigationPreference, onOpenExternal, refresh }: Readonly<{
+function travelDetails({ occurrenceId, placeText, travel, departure, now, timezone, habits, usualMode, navigationPreference, onOpenExternal, refresh, steps }: Readonly<{
   occurrenceId: string; placeText: string | undefined; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
   timezone: string; habits: TravelHabitsState | null | undefined; usualMode: TravelMode | null | undefined;
   navigationPreference: TravelNavigationPreference | null | undefined;
-  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
+  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null; steps: TravelStepActions;
 }>) {
-  const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh });
+  const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh, steps });
   if (!timing) return null;
   return <>{timing}
     <TravelNavigationLink locationText={placeText} preference={navigationPreference} usualMode={usualMode}
@@ -877,10 +933,12 @@ export function travelStatusLines({ departure, status, message = null, hasEviden
 
 const TIMED_DEPARTURE_STATES: ReadonlySet<string> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
 
-export function TravelStatusLine({ departure, status, message = null, hasEvidence, size = NEXT_TRIP_PRESENTATION.line }: Readonly<{
+export function TravelStatusLine({ departure, status, message = null, hasEvidence, size = NEXT_TRIP_PRESENTATION.line, steps = null }: Readonly<{
   departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean;
   /** Ticket 270: the line's size, from `NEXT_TRIP_PRESENTATION` unless the bench compares. */
   size?: NextDepartureLineSize;
+  /** Ticket 273: the one action for a missing estimate. */
+  steps?: TravelStepActions | null;
 }>) {
   const developmentBuild = useDevelopmentBuild();
   const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild });
@@ -905,12 +963,14 @@ export function TravelStatusLine({ departure, status, message = null, hasEvidenc
     ? <button type="button" className="text-link" disabled={status.pending} onClick={() => { refreshedFromButton.current = true; status.refresh(); }}>{label}</button> : label;
   const nextState = departure.next?.state ?? departure.state;
   return (
-    <div ref={containerRef} className={styles.travelStatus} data-travel-status>
+    <div ref={containerRef} className={styles.travelStatus} data-travel-status data-travel-focus tabIndex={-1}>
       {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState} data-line-size={size}
         data-departure-timed={TIMED_DEPARTURE_STATES.has(nextState) ? "true" : undefined}>
         {lines.lineRefresh === "lead"
           ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{lines.line.slice(DEPARTURE_REFRESH_LABEL.length)}</>
-          : lines.line}
+          : steps && departure.next && isTravelStep(departure.next)
+            ? <TravelStepText key={`${departure.next.key}|${departure.next.state}`} trip={departure.next} text={lines.line} actions={steps} />
+            : lines.line}
         {lines.lineRefresh === "end" ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
       </p> : null}
       {lines.note ? <p className={styles.calendarState} data-travel-note>

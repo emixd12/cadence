@@ -7,6 +7,8 @@ import type {
 export type FirstRunTravelSetup = {
   hasHome: boolean;
   hasMode: boolean;
+  /** Ticket 273: Travel estimates is on. Saved Home and travel do nothing while it is off. */
+  enabled: boolean;
 };
 
 export type FirstRunOnboardingState = {

@@ -20,7 +20,7 @@ const BASE_STATE = {
   hasImportRuns: false,
   timezone: "America/New_York",
   vapidPublicKey: "public-key",
-  travel: { hasHome: false, hasMode: false },
+  travel: { hasHome: false, hasMode: false, enabled: false },
 } satisfies FirstRunOnboardingState;
 
 const BASE_CLIENT = {
@@ -211,13 +211,16 @@ describe("Home and travel setup item (Ticket 212)", () => {
   });
 
   it.each([
-    [false, false, false, "Optional"],
-    [true, false, false, "Optional"],
-    [false, true, false, "Optional"],
-    [true, true, true, "Saved"],
-  ])("with Home %s and usual travel %s is complete only when both exist", (hasHome, hasMode, complete, statusLabel) => {
+    [false, false, false, false, "Optional"],
+    [true, false, false, false, "Optional"],
+    [false, true, false, false, "Optional"],
+    [true, true, false, false, "Estimates off"],
+    [false, true, true, false, "Optional"],
+    [true, true, true, true, "Saved"],
+  ])("with Home %s, usual travel %s and estimates on %s is complete only when all hold", (hasHome, hasMode, enabled, complete, statusLabel) => {
+    // Ticket 273: Saved while Travel estimates is off would hide that nothing will appear.
     const model = resolveFirstRunOnboardingModel(
-      { ...BASE_STATE, travel: { hasHome, hasMode } },
+      { ...BASE_STATE, travel: { hasHome, hasMode, enabled } },
       ROUTING,
     );
 
@@ -277,14 +280,14 @@ describe("travel presence in the onboarding state read (Ticket 212)", () => {
     const selected: string[] = [];
     const presence = await readTravelSetupPresence(
       travelSettingsClient(
-        { data: { base_location_text: ADDRESS, mode: "transit" }, error: null },
+        { data: { base_location_text: ADDRESS, mode: "transit", enabled: true }, error: null },
         selected,
       ),
       "user-1",
     );
 
-    expect(selected).toEqual(["base_location_text,mode"]);
-    expect(presence).toEqual({ hasHome: true, hasMode: true });
+    expect(selected).toEqual(["base_location_text,mode,enabled"]);
+    expect(presence).toEqual({ hasHome: true, hasMode: true, enabled: true });
     expect(JSON.stringify(presence)).not.toContain("Example");
   });
 
@@ -294,7 +297,7 @@ describe("travel presence in the onboarding state read (Ticket 212)", () => {
         travelSettingsClient({ data: { base_location_text: "  ", mode: null }, error: null }),
         "user-1",
       ),
-    ).resolves.toEqual({ hasHome: false, hasMode: false });
+    ).resolves.toEqual({ hasHome: false, hasMode: false, enabled: false });
   });
 
   it("hides the item instead of failing Timeline when the read fails", async () => {
@@ -311,10 +314,10 @@ describe("travel presence in the onboarding state read (Ticket 212)", () => {
       hasAnyBehavior: false,
       hasImportRuns: false,
       timezone: null,
-      travel: { hasHome: true, hasMode: false, baseLocationText: ADDRESS } as never,
+      travel: { hasHome: true, hasMode: false, enabled: false, baseLocationText: ADDRESS } as never,
     });
 
-    expect(state.travel).toEqual({ hasHome: true, hasMode: false });
+    expect(state.travel).toEqual({ hasHome: true, hasMode: false, enabled: false });
     expect(JSON.stringify(state)).not.toContain("Example");
   });
 });

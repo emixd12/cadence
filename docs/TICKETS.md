@@ -16198,7 +16198,8 @@ tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 273: A next step for every missing estimate
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Five new
+phrases await the owner's approval (D7).
 Dependencies: Ticket 269.
 
 Goal: replace silence with a reason and one action (G3, G4 and G10).

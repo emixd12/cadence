@@ -1524,6 +1524,16 @@
       "reason": "Opening macOS Location Services is a local native action with no HTTP traffic."
     },
     {
+      "id": "INT-TRAVEL-011",
+      "classification": "browser_only",
+      "reason": "A missing estimate's step opens Travel settings, Behaviors or the trip correction in the page and makes no HTTP request of its own."
+    },
+    {
+      "id": "INT-TRAVEL-012",
+      "classification": "browser_only",
+      "reason": "The Travel estimates offer opens Travel settings, and Not now stores one local flag; neither makes an HTTP request."
+    },
+    {
       "id": "INT-CALENDAR-012",
       "classification": "external_provider",
       "reason": "iCloud credential intake and CalDAV reads use synthetic fixtures only; live provider load is not authorized."

@@ -28,6 +28,15 @@ export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
 export const TRAVEL_CORRECTION_TOGGLE = "Change for this trip";
 /** The overlap label when the trip home has no known time. */
 export const RETURN_TIME_UNKNOWN = "Return time unknown.";
+/** Ticket 273: the one-tap answers after "Is {event} in person or remote?". Not yet approved. */
+export const TRAVEL_ATTENDANCE_IN_PERSON = "In person";
+export const TRAVEL_ATTENDANCE_REMOTE = "Remote";
+/** Ticket 273: dismisses the line offering Travel estimates. The leave-time question uses the same words. Not yet approved here. */
+export const TRAVEL_OFF_DISMISS = "Not now";
+/** Ticket 273: the first-run Home and travel row once both are saved but Travel estimates is off. Not yet approved. */
+export const SETUP_TRAVEL_ESTIMATES_OFF = "Estimates off";
+/** Ticket 273: in a step phrase, the words before this are the step's own action (as owner change R1 does for Refresh travel). */
+const DEPARTURE_STEP_SUFFIX = " to get a leave time";
 
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
@@ -35,7 +44,7 @@ export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -325,6 +334,26 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
     replaces: null,
     approvedOn: null, ownerChange: null },
+  { id: "step-in-person", ticket: "273", template: "In person",
+    situation: "Next-departure line, drawer and dialog: one tap after \"Is {event} in person or remote?\". Routes the event for this trip.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "step-remote", ticket: "273", template: "Remote",
+    situation: "Next-departure line, drawer and dialog: one tap after \"Is {event} in person or remote?\". No travel for the event on this trip.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "travel-off-offer", ticket: "273", template: "Turn on Travel estimates in Settings to get a leave time for {event}.",
+    situation: "Top of the Timeline, once, while Travel estimates is off and a located event is still ahead today. The words before \"to get\" open Travel settings; nothing turns on from here.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "travel-off-dismiss", ticket: "273", template: "Not now",
+    situation: "After the Travel estimates offer. Hides it on this device. The leave-time question already uses the same words.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "setup-estimates-off", ticket: "273", template: "Estimates off",
+    situation: "First-run setup, Home and travel row, when both are saved but Travel estimates is off. Replaces Saved there.",
+    replaces: "Saved",
+    approvedOn: null, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
@@ -397,6 +426,21 @@ export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLa
 /** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Not yet approved. */
 export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
   return `Back around ${departureTimeLabel(at, context)}.`;
+}
+
+/** Ticket 273: offered while Travel estimates is off and a located event is ahead today. Not yet approved. */
+export function departureTravelOffPhrase(eventLabel: string): string {
+  return `Turn on Travel estimates in Settings${DEPARTURE_STEP_SUFFIX} for ${eventLabel}.`;
+}
+
+/**
+ * Ticket 273: splits a step phrase into its action words and the rest, so the action is the
+ * sentence's own first words: "Add a place for Dentist" + " to get a leave time." Null when the
+ * phrase has no such step.
+ */
+export function departureStepLead(phrase: string): Readonly<{ lead: string; rest: string }> | null {
+  const index = phrase.indexOf(DEPARTURE_STEP_SUFFIX);
+  return index > 0 ? { lead: phrase.slice(0, index), rest: phrase.slice(index) } : null;
 }
 
 /** Ticket 270, marker A: "Leave 1:15". The rail is narrow, so the time has no AM or PM. Not yet approved. */
