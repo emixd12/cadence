@@ -6,6 +6,7 @@ import type {
   TravelRouteEstimate,
   TravelRouteRequest,
 } from "@cadence/core/types/travel";
+import { TRAVEL_ESTIMATE_LIFETIME_SECONDS } from "@cadence/core/services/travel-refresh-policy";
 import {
   getGoogleWorkloadIdentityAccessToken,
   GoogleWorkloadIdentityError,
@@ -439,7 +440,7 @@ function instantString(value: string): string {
 }
 
 function boundedExpiry(value: number | undefined): number {
-  return boundedInteger(value, 300, 1, 300);
+  return boundedInteger(value, TRAVEL_ESTIMATE_LIFETIME_SECONDS, 1, TRAVEL_ESTIMATE_LIFETIME_SECONDS);
 }
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number): number {

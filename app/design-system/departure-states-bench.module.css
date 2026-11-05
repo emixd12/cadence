@@ -1,0 +1,17 @@
+/* Ticket 266: the drawer and dialog are top-layer surfaces in the product. Here they sit in the
+   page flow so every surface of one state can be read at once. Only this bench uses these rules. */
+.inline :global([data-calendar-drawer]) {
+  position: static;
+  inset: auto;
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  border: 1px solid var(--line);
+  overflow: visible;
+}
+.inline :global(dialog[data-calendar-drawer]:not([open])) { display: block; }
+.inline :global([data-calendar-drawer]) > div { max-height: none; }
+.clock { font-variant-numeric: tabular-nums; }

@@ -4,6 +4,8 @@ import type { TravelPlannedLeg } from "../types/travel";
 
 /** Ticket 214: a Timeline refresh routes only legs that depart, or must arrive, within this window. */
 export const TRAVEL_ROUTE_WINDOW_SECONDS = 3 * 60 * 60;
+/** A route estimate expires this long after it was checked. The provider adapter caps its expiry here. */
+export const TRAVEL_ESTIMATE_LIFETIME_SECONDS = 5 * 60;
 /** Ticket 214: a device more than this far from the last sample used makes the current estimate out of date. */
 export const TRAVEL_MOVEMENT_THRESHOLD_METERS = 500;
 /** Google permits storing place IDs indefinitely; refresh them yearly so closed or moved places resolve again. */

@@ -15865,7 +15865,19 @@ Verification: the new test file, `npm run resolvers:check`, `npm run core:check`
 
 ## Ticket 266: Bench and tests show real timing
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026, on branch `us-work`. Not merged or deployed.
+Filed November 4, 2026.
+
+Implementation notes:
+
+- `/design-system?preview=departure-states` (`app/design-system/DepartureStatesBench.tsx`) adds the
+  state switch and bench clock, and the wording review
+  (`app/design-system/DepartureWordingReview.tsx`) built from
+  `DEPARTURE_PHRASES_AWAITING_APPROVAL` in `packages/core/src/services/departure-phrases.ts`.
+- `TRAVEL_ESTIMATE_LIFETIME_SECONDS` in `travel-refresh-policy.ts` is the shipped 5-minute expiry,
+  used by the provider adapter and the bench.
+- Tests: `tests/departure-states-bench.dom.test.tsx`. Test fixtures that check copy rather than
+  timing keep their far-future expiry.
 Dependencies: Ticket 265.
 
 Goal: the test page stops showing only the best case (report, "The two rules"; C6).

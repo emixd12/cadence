@@ -396,7 +396,7 @@
     {
       "path": "app/design-system/page.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 29,
+      "interaction_marker_count": 30,
       "interaction_ids": [],
       "reason": "Local dev-only component bench, not a product surface."
     },
@@ -1011,6 +1011,20 @@
       "interaction_ids": [
         "INT-WEATHER-001"
       ]
+    },
+    {
+      "path": "app/design-system/DepartureStatesBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 6,
+      "interaction_ids": [],
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. No provider call, account access or product write."
+    },
+    {
+      "path": "app/design-system/TravelBench.tsx",
+      "classification": "excluded",
+      "interaction_marker_count": 1,
+      "interaction_ids": [],
+      "reason": "Development-only travel benches with bench-only habit saves and a caption link to the travel timing states bench. No provider call or account access."
     }
   ],
   "interactions": [

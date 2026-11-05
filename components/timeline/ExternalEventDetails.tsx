@@ -199,7 +199,7 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
               <p className="font-bold">Travel for this event</p>
               <label className="grid gap-1">Attendance<select name="travel_attendance" required defaultValue="" className="min-h-11 min-w-0 border-b border-line bg-background"><option value="">Choose attendance</option><option value="physical">In person</option><option value="remote">Remote, no travel</option></select></label>
               <label className="grid gap-1">Destination for this journey<input name="travel_location" maxLength={500} defaultValue={event.location} className="min-h-11 min-w-0 border-b border-line bg-background" /></label>
-              <p className="text-muted-readable">Applies to this event until you close the Timeline. Calendar and saved locations stay unchanged.</p>
+              <p className="text-muted-readable">{TRAVEL_CORRECTION_NOTE} Calendar and saved locations stay unchanged.</p>
               <button type="submit" className="product-action product-action-secondary min-h-11 w-fit">Use for this journey</button>
             </form> : null}
             {event.conference?.notes ? <p className="break-words">{event.conference.notes}</p> : null}
@@ -214,6 +214,9 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
     );
   },
 );
+
+/** Ticket 261 wording, not yet approved by the owner. The bench lists it for review (Ticket 266). */
+export const TRAVEL_CORRECTION_NOTE = "Applies to this event until you close the Timeline.";
 
 type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
 

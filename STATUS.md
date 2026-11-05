@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 1: Ticket 266 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The bench now shows
+real travel timing.
+
+- `/design-system?preview=departure-states` (link "Travel timing states" in the bench nav) renders one
+  day with Home saved, Gym (a located Behavior) and Dentist (a located Calendar event). A state switch
+  picks fresh, expired, appears later, soon, leave now, late from the route, late from the clock,
+  head home, trip changed, needs a place, needs attendance, needs a start, no trips or paused. A
+  slider moves the bench clock. Routes follow the shipped plan, 3-hour window and 5-minute expiry;
+  Refresh travel re-checks at the bench clock. The real status line, Timeline, expanded Behavior row,
+  drawer, Calendar details and Daily Brief bubble render each state; the drawer and dialog sit in the
+  page flow on this bench only.
+- A wording review lists every phrase awaiting the owner's approval, rendered by the product code
+  with sample values, with when it shows and what it replaces. The list is
+  `DEPARTURE_PHRASES_AWAITING_APPROVAL` in `departure-phrases.ts`, plus the correction note and the
+  production unavailable message.
+- The year-2999 expiries are gone from the bench fixtures. Captions say where a fixture holds the
+  clock still on purpose. The 5-minute lifetime is one core constant used by the provider adapter.
+- Known gap, shown on the bench: no screen shows the place, attendance or start steps yet (Ticket
+  273), and no screen shows the next-departure line (Ticket 269).
+
+Platform impact: web bench and DOM tests; desktop uses the same shared components. Marketing: not
+applicable. Future mobile: checked at 390 px. Messaging impact: none.
+
 ## Travel advisory revamp Wave 1: Ticket 261 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** Travel lines now say

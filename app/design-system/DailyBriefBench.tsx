@@ -40,7 +40,7 @@ const client: DailyBriefClient = {
 
 // Ticket 218 synthetic guidance: a thunderstorm margin with its credit, and no device location.
 const briefTravel = (weather: "applied" | "no_position"): BriefTravelGuidance => ({
-  localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
+  localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2026-09-20T13:05:00Z", attribution: "Google Maps",
   items: [
     { kind: "departure", at: weather === "applied" ? "2026-09-20T18:05:00Z" : "2026-09-20T18:20:00Z", label: "Dentist", mode: "cycling",
       weather: weather === "applied" ? { marginMinutes: 15, conditions: ["thunderstorm", "heavy_rain", "rain"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } : null },
@@ -50,12 +50,12 @@ const briefTravel = (weather: "applied" | "no_position"): BriefTravelGuidance =>
   weather: weather === "applied" ? { state: "applied", attribution: OPEN_METEO_ATTRIBUTION } : { state: "no_position", attribution: null },
 });
 const travelBriefing: DailyBriefing = { text: "Dentist anchors the afternoon.", localDate: "2026-09-20", timezone: "America/New_York",
-  generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] };
+  generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2026-09-21T04:00:00Z", coverage: "complete", warnings: [] };
 
 /** Static recipe 1.1 state: plain suggested time and a Logging tip with nested evidence. Not model output. */
 const RECIPE_V11_BENCH_BRIEFING: DailyBriefing = {
   text: "Walk overlaps your noon meeting.", localDate: "2026-09-20", timezone: "America/New_York",
-  generatedAt: "2026-09-20T11:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: ["Suggestions only. No changes were applied."],
+  generatedAt: "2026-09-20T11:00:00Z", expiresAt: "2026-09-21T04:00:00Z", coverage: "complete", warnings: ["Suggestions only. No changes were applied."],
   suggestions: [{ text: "Move Walk to the morning so it clears your meeting.", occurrenceRefs: [], referenceIds: [], optionId: "bench-option",
     option: { intervals: { proposed: { startAt: "2026-09-20T11:00:00Z", endAt: "2026-09-20T11:20:00Z" } } } as BriefingPlanOption }],
   tip: { text: "Walk marks tend to come in the evening. Logging it right after can keep the record closer to when you did it.", laneId: "realistic-timing",
@@ -81,7 +81,7 @@ function estimatesDurations(config: BriefingConfig): boolean {
 export function DailyBriefBubbleBench() {
   return <div className="bg-background"><div className="aspect-[1423/367] w-full overflow-hidden bg-background sm:aspect-[2041/239]"><picture className="block h-full w-full"><source media="(max-width: 639px)" srcSet="/brand/cadence-timeline-horse-lines-dots-mobile-right-18.png" /><img src="/brand/cadence-timeline-horse-lines-dots-clear-background.png" width={2041} height={239} alt="" aria-hidden="true" className="block h-full w-full object-fill" /></picture></div><div className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={{
     text: `Your midday walk overlaps a fixed commitment. ${"schedule".repeat(260)}`, localDate: "2026-09-20", timezone: "America/New_York",
-    generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
+    generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2026-09-21T04:00:00Z", coverage: "partial", warnings: ["Suggestions only. No changes were applied."],
   }} /></div><div className="mx-auto grid max-w-6xl gap-10 px-3 pt-10 sm:px-6 lg:px-10"><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V11_BENCH_BRIEFING} /><DailyBriefBubble state="ready" onDismiss={() => undefined} briefing={RECIPE_V12_BENCH_BRIEFING} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("applied")} onDismiss={() => undefined} /><DailyBriefBubble state="ready" briefing={travelBriefing} travel={briefTravel("no_position")} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Your Timeline changed after this brief was prepared." retryLabel="Refresh brief" onRetry={() => undefined} onDismiss={() => undefined} /><DailyBriefBubble state="error" message="Daily Brief is busy. Try again in about 30 seconds." onRetry={() => undefined} retryDisabled onDismiss={() => undefined} /></div><div className="mx-auto max-w-6xl px-3 py-8 sm:px-6 lg:px-10"><button type="button" className="product-action product-action-primary min-h-11 py-2 text-sm">Completed</button><button type="button" className="product-action product-action-secondary ml-3 min-h-11 py-2 text-sm">Not Completed</button></div></div>;
 }
 

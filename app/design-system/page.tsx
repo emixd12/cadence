@@ -67,6 +67,7 @@ import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.r
 import { TimelineGroup } from "@/components/timeline/TimelineGroup";
 import { GoogleLoginButton } from "@/app/(auth)/login/GoogleLoginButton";
 import { DayProgressBench } from "@/app/design-system/DayProgressBench";
+import { DepartureStatesBench } from "@/app/design-system/DepartureStatesBench";
 import { EXPORT_PROMPT_TEMPLATES } from "@/lib/export-prompts";
 import { APP_NAV_ITEMS, type AppNavHref } from "@/lib/navigation";
 import type { AnalyticsView } from "@/lib/types/analytics";
@@ -398,6 +399,19 @@ export default async function DesignSystemPage({
       </WebRuntimeProvider>
     );
   }
+  if (selectedPreviewId === "departure-states") {
+    // Ticket 266: every travel timing state on a movable bench clock, and the wording review.
+    return (
+      <WebRuntimeProvider>
+        <main className="min-h-dvh bg-background text-foreground">
+          <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
+            <a href="/design-system" className="w-fit text-sm underline underline-offset-4">Back to the design-system bench</a>
+            <DepartureStatesBench initialStateId={selectedFixtureState ?? undefined} />
+          </div>
+        </main>
+      </WebRuntimeProvider>
+    );
+  }
   const usageByComponent = groupUsages(usage.usages);
   const previews = buildPreviews(selectedPreviewId, selectedFixtureState);
 
@@ -481,6 +495,7 @@ function BenchNav() {
       <BenchAnchor href="#bench-surface-model">Surfaces</BenchAnchor>
       <BenchAnchor href="#bench-canonical-inventory">Canonical inventory</BenchAnchor>
       <BenchAnchor href="#bench-traces">Trace cards</BenchAnchor>
+      <BenchAnchor href="?preview=departure-states">Travel timing states</BenchAnchor>
     </nav>
   );
 }

@@ -6,6 +6,7 @@ import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolver
 import { resolveBehaviorDurationEstimate } from "@cadence/core/resolvers/timeline-context.resolver";
 import { rememberedTravelMode, travelHabitBuffers, travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import {
+  TRAVEL_ESTIMATE_LIFETIME_SECONDS,
   TRAVEL_LEG_OUTSIDE_WINDOW,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
@@ -453,7 +454,7 @@ function collisionCandidates(commitments: readonly TravelCommitment[], occupancy
 function response(accountId: string, source: Awaited<ReturnType<typeof readTravelRouteSource>>, conclusionsToken: ((expiresAt: string) => string | null) | null,
   evidence: TravelRoutesResponse["evidence"]): TravelRoutesResponse {
   const expiresAt = evidence?.legs.reduce<string | null>((earliest, leg) => !leg.estimate ? earliest : !earliest || leg.estimate.expiresAt < earliest ? leg.estimate.expiresAt : earliest, null)
-    ?? Temporal.Now.instant().add({ seconds: 300 }).toString();
+    ?? Temporal.Now.instant().add({ seconds: TRAVEL_ESTIMATE_LIFETIME_SECONDS }).toString();
   const token = conclusionsToken?.(expiresAt) ?? null;
   return { accountId, mode: source.settings.mode, navigationPreference: source.settings.navigationPreference, settingsRevision: source.settingsRevision,
     habitsRevision: source.habitsRevision, expiresAt, evidence, ...(token ? { conclusionsToken: token } : {}) };
