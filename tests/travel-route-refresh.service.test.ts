@@ -442,6 +442,20 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("2 Habit St");
   });
 
+  it("counts an event under way in the nine-commitment limit", async () => {
+    const future = Array.from({ length: 9 }, (_, index) => event(`future${index + 1}`, `2026-09-22T${String(10 + index)}:00:00Z`, `2026-09-22T${String(10 + index)}:30:00Z`));
+    withEvents([ongoing, ...future]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    // Ongoing, then seven routable stops. The eighth future stop is the unrouted boundary, and the ninth is left out.
+    expect(result.evidence?.legs.map((entry) => [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([
+      ["ongoing", "future1"], ...Array.from({ length: 6 }, (_, index) => [`future${index + 1}`, `future${index + 2}`]),
+    ]);
+    expect(result.evidence?.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "future7", destinationCommitmentRef: "future8", reason: "attendance_unknown" }]);
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("future8 St");
+    expect(JSON.stringify(result.evidence)).not.toContain("future9");
+  });
+
   it("leaves ended, remote-looking and unplaced events under way out of the plan", async () => {
     withEvents([
       event("ended", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z"),

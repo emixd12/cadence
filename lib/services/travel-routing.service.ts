@@ -94,7 +94,13 @@ export async function routeTravelLegs(
         if (error instanceof TravelRoutingError) throw error;
         if (error instanceof TravelProviderError && error.retryable && !retried) {
           retried = true;
-          await input.reserve(travelRouteMicrodollars(route.request, input.now));
+          try {
+            await input.reserve(travelRouteMicrodollars(route.request, input.now));
+          } catch (refusal) {
+            // After the first call was paid for, a refusal costs only this leg (Ticket 264).
+            if (first && refusal instanceof TravelRoutingError) return { id: route.id, estimate: null, failure: refusal.failure };
+            throw refusal;
+          }
           continue;
         }
         if (error instanceof TravelProviderError) {

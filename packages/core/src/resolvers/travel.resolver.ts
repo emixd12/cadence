@@ -199,6 +199,7 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
   for (const resultId of resultByLeg.keys()) {
     if (!plannedLegIds.has(resultId)) throw new Error("Travel route result must belong to the current plan.");
   }
+  const commitmentEnds = new Map(input.plan.commitments.map((commitment) => [commitment.ref, commitment.endAt]));
   const routedLegs = input.plan.legs.map((leg): TravelResolvedLegEvidence => {
     if (!planRevisionCurrent || !grantCurrent) {
       return rejected(publicLeg(leg), "rejected_revision", "Journey or grant revision changed.");
@@ -217,6 +218,10 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     }
     if (Temporal.Instant.compare(instant(result.estimate.observedAt, "Route observation"), now) > 0) {
       return rejected(publicLeg(leg), "rejected_revision", "Route observation is in the future.");
+    }
+    const destinationEnd = commitmentEnds.get(leg.destinationCommitmentRef ?? "");
+    if (destinationEnd && Temporal.Instant.compare(instant(leg.readyAt, "Route ready time"), instant(destinationEnd, "Commitment end")) >= 0) {
+      return rejected(publicLeg(leg), "unavailable", "Route is ready only after its destination ends.");
     }
     const timed = fromReadyTime(leg, result.estimate);
     if (!timed) return rejected(publicLeg(leg), "unavailable", "Route departs before its ready time.");
@@ -422,7 +427,8 @@ function compareOptionalInstants(left: Temporal.Instant | null, right: Temporal.
  * Ticket 264: the most recently started stop still under way. Only a physical stop with
  * a usable place and a known end later than now qualifies. Anything else cannot show
  * where the user is, so planning uses the immediate origin. No end is ever invented.
- * A stop at Home needs no trip home.
+ * A stop that a later physical commitment starts inside cannot be left at its end, so it
+ * is no prior stop either. A stop at Home needs no trip home.
  */
 function selectCurrentStop(
   commitments: readonly TravelCommitment[],
@@ -430,10 +436,17 @@ function selectCurrentStop(
   base: TravelEndpoint | null,
   now: Temporal.Instant,
 ): Readonly<{ commitment: TravelCommitment; endpoint: TravelEndpoint }> | null {
+  let nextStart: Temporal.Instant | null = null;
   for (const commitment of [...commitments].reverse()) {
-    if (commitment.attendance !== "physical" || !commitment.endAt ||
-      Temporal.Instant.compare(instant(commitment.startAt, "Commitment start"), now) > 0 ||
-      Temporal.Instant.compare(instant(commitment.endAt, "Commitment end"), now) <= 0) continue;
+    if (commitment.attendance !== "physical") continue;
+    const start = instant(commitment.startAt, "Commitment start");
+    const end = commitment.endAt ? instant(commitment.endAt, "Commitment end") : null;
+    const started = Temporal.Instant.compare(start, now) <= 0;
+    const ended = started && (!end || Temporal.Instant.compare(end, now) <= 0);
+    if (ended) continue;
+    const interrupted = !!nextStart && !!end && Temporal.Instant.compare(nextStart, end) < 0;
+    nextStart = start;
+    if (!started || interrupted) continue;
     const endpoint = correctionFor(corrections, commitment.ref, commitment.revision)?.endpoint ?? commitment.endpoint;
     if (!endpoint) continue;
     validateEndpoint(endpoint);
@@ -583,8 +596,13 @@ function resolveSegments(
     const preparationSeconds = buffers.preparationSeconds ?? 0;
     if (leg.role === "outbound" && preparationSeconds > 0) {
       const leaveAt = entry.weather?.departureAt ?? estimate.departureAt;
-      const start = instant(leaveAt, "Route departure").subtract({ seconds: preparationSeconds }).toString();
-      segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start, leaveAt, sourceRefs, leg.id));
+      // Ticket 264: nothing can be got ready before the leg's ready time, such as during a stop under way.
+      const earliest = instant(leaveAt, "Route departure").subtract({ seconds: preparationSeconds });
+      const readyAt = instant(leg.readyAt, "Route ready time");
+      const start = Temporal.Instant.compare(earliest, readyAt) < 0 ? readyAt : earliest;
+      if (Temporal.Instant.compare(start, instant(leaveAt, "Route departure")) < 0) {
+        segments.push(segment(`preparation:${leg.id}`, "preparation_buffer", start.toString(), leaveAt, sourceRefs, leg.id));
+      }
     }
 
     const origin = leg.originCommitmentRef ? commitmentsByRef.get(leg.originCommitmentRef) : null;

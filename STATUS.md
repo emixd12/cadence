@@ -15,6 +15,8 @@ it, and every change adds a field.
   device still names the next departure's origin, and that departure waits for the known end.
   A started commitment with no known end is not under way: it leaves the plan as before, later
   trips plan from the device or Home, and no end is invented.
+- A stop that a later physical commitment starts inside is not a prior stop. A leg ready only at
+  or after its destination's end stays `unavailable`; one that can still get there stays `late`.
 - `unknownLegs` reaches the client with commitment refs and a reason only.
 - Signed conclusions keep their meaning, including `late_arrival`. Started Behaviors get no
   fit conclusion. A weather margin never moves a late departure before its ready time.

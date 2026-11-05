@@ -350,6 +350,30 @@ describe("travel provider", () => {
       expect(result?.estimate?.arrivalAt).toBe("2026-09-22T12:35:00Z");
     });
 
+    it("loses only this leg when the budget refuses the retry of the extra call", async () => {
+      const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        const body = JSON.parse(init!.body as string) as Record<string, unknown>;
+        if (body.travelMode === "WALK") return Response.json({ routes: [{ duration: "600s" }] });
+        return body.arrivalTime ? journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z") : new Response(null, { status: 503 });
+      });
+      const refusal = new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" });
+      const reserve = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValueOnce(refusal);
+      const results = await routeTravelLegs({ routes: [
+        { id: "late", request: TRANSIT },
+        { id: "paid-walk", request: { ...REQUEST, mode: "walking", timing: { kind: "arrive_by", at: "2026-09-22T13:00:00Z" } } },
+      ], provider: APPROVED, reserve, now: NOW, fetch });
+      expect(results[0]).toEqual({ id: "late", estimate: null, failure: refusal.failure });
+      expect(results[1]).toMatchObject({ id: "paid-walk", failure: null, estimate: { durationSeconds: 600 } });
+      expect(reserve).toHaveBeenCalledTimes(3);
+    });
+
+    it("still fails the batch when the budget refuses a retry of a first call", async () => {
+      const fetch = vi.fn(async () => new Response(null, { status: 503 }));
+      const refusal = new TravelRoutingError({ code: "quota_exceeded", retryable: true, retryAfterSeconds: 60, resetsAt: "2026-10-01T04:00:00Z" });
+      const reserve = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(refusal);
+      await expect(routeTravelLegs({ routes: [{ id: "late", request: TRANSIT }], provider: APPROVED, reserve, now: NOW, fetch })).rejects.toBe(refusal);
+    });
+
     it("reports the leg as unavailable when the extra call fails", async () => {
       const fetch = vi.fn()
         .mockResolvedValueOnce(journey("2026-09-22T11:42:00Z", "2026-09-22T12:08:00Z"))
