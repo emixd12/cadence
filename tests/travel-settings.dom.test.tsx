@@ -3,6 +3,7 @@ import { act, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
+import { dismissTravelLeaveQuestion, resetTravelHabitMemoryForTest, travelLeaveQuestionDismissed } from "@/lib/ui/travel-habits";
 import type { TravelSettings } from "@cadence/core/types/travel";
 import { ExternalEventDetails } from "@/components/timeline/ExternalEventDetails";
 import { validateExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
@@ -67,6 +68,21 @@ it("saves Home and usual travel without changing the toggle", async () => {
     await act(async () => saveButton.click());
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ enabled: true, baseLocationText: "1 Example Street", mode: "cycling", acceptRoutingDisclosure: true }));
     expect(readLocation).not.toHaveBeenCalledWith(true);
+  } finally { await unmount(); }
+});
+
+it("turning travel off in Settings removes the leave-question record with no Timeline mounted (Ticket 274)", async () => {
+  mockPermissions(null);
+  resetTravelHabitMemoryForTest();
+  dismissTravelLeaveQuestion("owner", "2026-09-21");
+  expect(window.sessionStorage.getItem("cadence:travel-leave-question")).not.toBeNull();
+  const settings: TravelSettings = { enabled: true, baseLocationText: "1 Example Street", mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  const save = vi.fn(async () => ({ ...settings, enabled: false, routingConsentAt: null }));
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), save, settings });
+  try {
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    expect(window.sessionStorage.getItem("cadence:travel-leave-question")).toBeNull();
+    expect(travelLeaveQuestionDismissed("owner", "2026-09-21")).toBe(false);
   } finally { await unmount(); }
 });
 

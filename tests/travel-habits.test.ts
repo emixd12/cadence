@@ -228,6 +228,12 @@ describe("leave-time question", () => {
     expect(restoreTravelLeaveCandidates(stored, renamed)).toEqual([{ kind: "calendar", ref: "dentist", title: "Dentist, moved room",
       localDate: "2026-10-22", endsAt: "2026-10-22T15:00:00Z" }]);
     expect(restoreTravelLeaveCandidates(stored, subjects.filter((subject) => subject.ref !== "dentist"))).toEqual([]);
+    const moved = subjects.map((subject) => subject.ref === "dentist" ? { ...subject, startAt: "2026-10-22T16:00:00Z", endAt: "2026-10-22T17:00:00Z" } : subject);
+    expect(restoreTravelLeaveCandidates(stored, moved)[0]?.endsAt).toBe("2026-10-22T17:00:00Z");
+    const ask = (now: string) => resolveTravelLeavePrompt({ now, localDate: "2026-10-22", habits: null,
+      candidates: restoreTravelLeaveCandidates(stored, moved), dismissed: false });
+    expect(ask("2026-10-22T15:30:00Z")).toBeNull();
+    expect(ask("2026-10-22T17:00:00Z")).toMatchObject({ ref: "dentist" });
   });
 
   it("keeps event references free of titles, times and places", () => {
