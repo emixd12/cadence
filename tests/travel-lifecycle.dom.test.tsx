@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { clearTravelSession, requestDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesInput, type TravelRoutesView } from "@/lib/ui/travel";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DAILY_BRIEF_TRAVEL_WAIT_MS, clearTravelSession, requestDailyBriefTravel, waitForDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesInput, type TravelRoutesView } from "@/lib/ui/travel";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { travelTripMatches } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelEvidenceLeg, TravelOccupiedSegment, TravelResolvedLegEvidence } from "@cadence/core/types/travel";
@@ -819,4 +819,61 @@ it("waits 5 minutes after a revision mismatch instead of requesting on every foc
     await focusAndWait();
     expect(routes).toHaveBeenCalledTimes(2);
   } finally { await unmount(); }
+});
+
+describe("Ticket 272: the first Daily Brief's travel wait", () => {
+  const signed = (accountId: string): TravelRoutesView => ({ ...view(accountId), conclusionsToken: "signed.token" });
+
+  it("uses the page-load request already in flight, and the delivered brief routes nothing more", async () => {
+    let answer!: (value: TravelRoutesView) => void;
+    const routes = vi.fn<TravelClient["routes"]>().mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }))
+      .mockImplementation(async () => signed("account-a"));
+    const { unmount } = await mount(routes);
+    try {
+      expect(routes).toHaveBeenCalledOnce();
+      const token = waitForDailyBriefTravel("account-a", "2026-09-21");
+      await act(async () => { answer(signed("account-a")); await vi.advanceTimersByTimeAsync(0); });
+      await expect(token).resolves.toBe("signed.token");
+      await act(async () => { requestDailyBriefTravel("account-a", "2026-09-21", "generation-1"); await vi.advanceTimersByTimeAsync(1_000); });
+      expect(routes).toHaveBeenCalledOnce();
+    } finally { await unmount(); }
+  });
+
+  it("asks for the day when nothing is in flight and resolves with its token", async () => {
+    const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
+    const { unmount } = await mount(routes);
+    try {
+      routes.mockImplementation(async () => signed("account-a"));
+      // The page-load response carried no token, so a later first brief asks for the day.
+      const token = waitForDailyBriefTravel("account-a", "2026-09-21");
+      await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+      await expect(token).resolves.toBe("signed.token");
+      expect(routes).toHaveBeenCalledTimes(2);
+      expect(routes).toHaveBeenLastCalledWith(expect.objectContaining({ scope: "day" }), expect.any(AbortSignal));
+    } finally { await unmount(); }
+  });
+
+  it("returns a held token at once and null without a mounted travel view", async () => {
+    const routes = vi.fn<TravelClient["routes"]>(async () => signed("account-a"));
+    const { unmount } = await mount(routes);
+    try {
+      await expect(waitForDailyBriefTravel("account-a", "2026-09-21")).resolves.toBe("signed.token");
+      await expect(waitForDailyBriefTravel("account-b", "2026-09-21")).resolves.toBeNull();
+      await expect(waitForDailyBriefTravel(null, "2026-09-21")).resolves.toBeNull();
+    } finally { await unmount(); }
+  });
+
+  it("never waits longer than 5 seconds", async () => {
+    const routes = vi.fn<TravelClient["routes"]>(async () => view("account-a"));
+    const { unmount } = await mount(routes);
+    try {
+      routes.mockImplementation(() => new Promise(() => {}));
+      let settled: string | null | undefined;
+      void waitForDailyBriefTravel("account-a", "2026-09-21").then((value) => { settled = value; });
+      await act(async () => { await vi.advanceTimersByTimeAsync(DAILY_BRIEF_TRAVEL_WAIT_MS - 1); });
+      expect(settled).toBeUndefined();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(settled).toBeNull();
+    } finally { await unmount(); }
+  });
 });

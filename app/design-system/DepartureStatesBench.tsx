@@ -332,7 +332,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
           </InlineSurface>
           <section aria-label="Daily Brief" className="grid min-w-0 content-start gap-2">
             <h3 className="text-sm font-bold">Daily Brief</h3>
-            {briefTravel ? null : <p className="text-xs leading-5 text-muted-readable" data-bench-brief-note>No travel block: the brief shows travel only while an estimate is current.</p>}
+            {briefTravel?.items.length ? null : <p className="text-xs leading-5 text-muted-readable" data-bench-brief-note>No travel block: no trip has a time or a known return yet.</p>}
             <div className="pt-8"><DailyBriefBubble state="ready" briefing={briefing} travel={briefTravel} onDismiss={() => undefined} /></div>
           </section>
         </div>

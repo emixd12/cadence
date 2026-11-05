@@ -35,7 +35,7 @@ export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "271";
+  ticket: "261" | "265" | "268" | "271" | "272";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -301,6 +301,18 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Calendar details, the control that opens the attendance and destination correction for one journey.",
     replaces: "Travel for this event",
     approvedOn: null, ownerChange: null },
+  { id: "brief-overlap", ticket: "272", template: "Travel to {event} overlaps {behavior}.",
+    situation: "Daily Brief travel block, when a trip crowds an Unresolved Behavior. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
+  { id: "brief-overlap-trip-home", ticket: "272", template: "Planned travel overlaps {behavior}.",
+    situation: "Daily Brief travel block, when the trip home crowds an Unresolved Behavior. Shipped with Ticket 170 as \"Travel to planned travel overlaps {behavior}.\"",
+    replaces: "Travel to planned travel overlaps {behavior}.",
+    approvedOn: null, ownerChange: null },
+  { id: "brief-back", ticket: "272", template: "Back around {time}.",
+    situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
+    replaces: null,
+    approvedOn: null, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
@@ -363,6 +375,16 @@ export function departureWeatherMarginPhrase(marginMinutes: number, conditions: 
 /** The Daily Brief travel block's footer: who calculated it, from what, and when. */
 export function departureBriefFooterPhrase(attribution: string | null, at: string, context: DeparturePhraseContext): string {
   return ["Calculated by Cadence", attribution, departureTimeLabel(at, context)].filter(Boolean).join(" · ") + ".";
+}
+
+/** Ticket 272: the Daily Brief's overlap line. A trip with no named destination is the trip home. Not yet approved. */
+export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLabel: string | null): string {
+  return destinationLabel ? `Travel to ${destinationLabel} overlaps ${behaviorLabel}.` : `Planned travel overlaps ${behaviorLabel}.`;
+}
+
+/** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Not yet approved. */
+export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
+  return `Back around ${departureTimeLabel(at, context)}.`;
 }
 
 /** A Behavior crowded by a trip: names the trip and its span. */

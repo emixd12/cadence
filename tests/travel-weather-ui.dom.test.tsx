@@ -125,7 +125,7 @@ describe("travel timing with a weather margin", () => {
 describe("Daily Brief travel block with weather", () => {
   const guidance = (weather: BriefTravelGuidance["weather"], withMargin: boolean): BriefTravelGuidance => ({
     localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-    items: [{ kind: "departure", at: "2026-09-20T18:05:00Z", label: "Dentist", mode: "cycling",
+    items: [{ kind: "departure", phrase: "Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM.",
       weather: withMargin ? { marginMinutes: 10, conditions: ["rain"], suggestion: { instead: "cycling", alternatives: ["transit"] } } : null }],
     conflictingOptionIds: [], occupiedSpans: [], weather,
   });
@@ -135,14 +135,14 @@ describe("Daily Brief travel block with weather", () => {
   it("shows the margin beside the departure with the credit", async () => {
     await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
       travel={guidance({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION }, true)} />));
-    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling). 10 min added for rain.");
+    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM. 10 min added for rain.");
     expect(container.querySelector("[data-weather-credit]")?.textContent).toContain("Weather data by Open-Meteo.com (CC BY 4.0).");
   });
 
   it("says plainly when there is no device location and shows no credit", async () => {
     await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
       travel={guidance({ state: "no_position", attribution: null }, false)} />));
-    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling).");
+    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM.");
     expect(container.textContent).toContain("No weather margin: device location is unavailable.");
     expect(container.querySelector("[data-weather-credit]")).toBeNull();
   });

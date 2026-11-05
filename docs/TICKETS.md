@@ -16159,7 +16159,8 @@ tests/day-progress-timeline.dom.test.tsx`, bench at both widths,
 
 ## Ticket 272: Daily Brief travel block stays useful
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Three
+Daily Brief lines are listed for review, not yet approved (decision D7).
 Dependencies: Tickets 265 and 268.
 
 Goal: the block stops vanishing after 5 minutes, and the first brief gets its trip facts

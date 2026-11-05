@@ -38,7 +38,7 @@ function evidence(options: Readonly<{ late: boolean; warnings: string[]; arrival
 const lateTrip = evidence({ late: true, warnings: [CADENCE_WARNING, PROVIDER_WARNING] });
 
 const guidance: BriefTravelGuidance = { localDate: "2026-11-01", observedAt: "2026-11-01T13:00:00Z", expiresAt: "2999-11-01T16:00:00Z", attribution: "Google Maps",
-  items: [{ kind: "departure", at: "2026-11-01T18:05:00Z", label: "Dentist", mode: "cycling",
+  items: [{ kind: "departure", phrase: "Leave by 6:05 PM for Dentist · cycling, arrive 6:35 PM.",
     weather: { marginMinutes: 15, conditions: ["thunderstorm"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } }],
   conflictingOptionIds: [], occupiedSpans: [], weather: { state: "applied", attribution: OPEN_METEO_ATTRIBUTION } };
 const briefing = { text: "Dentist anchors the afternoon.", localDate: "2026-11-01", timezone: "UTC",
@@ -107,7 +107,7 @@ describe("Daily Brief travel line", () => {
 
   it("keeps the margin in production and drops the advice", async () => {
     const text = await renderIn(false, bubble);
-    expect(text).toContain(`Leave by 6:05 PM for Dentist (cycling). ${MARGIN}`);
+    expect(text).toContain(`Leave by 6:05 PM for Dentist · cycling, arrive 6:35 PM. ${MARGIN}`);
     expect(text).not.toContain(ADVICE);
   });
 

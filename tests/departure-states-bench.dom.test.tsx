@@ -99,7 +99,8 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   // Ticket 267: the trip from Gym to Dentist falls due 3 hours before Gym ends.
   expect(text("Dentist drawer")).toContain("Leave time appears by 8:00 AM.");
   expect(statusLine()).toBe("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.");
-  expect(text("Daily Brief")).toContain("Leave by 9:35 AM for Gym (walking).");
+  // Ticket 272: the bubble uses the model's line form, which names the event.
+  expect(text("Daily Brief")).toContain("Leave by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.");
 
   await choose("soon");
   expect(gymRow()).toContain("Leave in 25 minutes, by 9:35 AM from Home · walking, arrive 9:55 AM.");
@@ -111,7 +112,9 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(gymRow()).toContain("Last estimate: if you haven't left yet, you'd arrive about 10:05 AM · checked 9:00 AM.");
   await choose("head-home");
   expect(text("Dentist drawer")).toContain("Head home 3:00 PM · walking, home by 3:30 PM.");
-  expect(text("Daily Brief")).toContain("Back around 3:30 PM.");
+  // Ticket 272: during the event the trip home is the next trip, so the bubble says when to head home.
+  expect(text("Daily Brief")).toContain("Head home 3:00 PM · walking, home by 3:30 PM.");
+  expect(text("Daily Brief")).not.toContain("Back around");
   await choose("trip-changed");
   expect(text("Dentist drawer")).toContain("Trip changed.");
   await choose("needs-place");
@@ -129,6 +132,24 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   }
 });
 
+it("shows the bubble's travel block from the model in every state (Ticket 272)", async () => {
+  await render();
+  const briefLines = () => [...surface("Daily Brief").querySelectorAll("li")].map((line) => line.textContent ?? "");
+  const TIMED = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
+  for (const state of DEPARTURE_BENCH_STATES) {
+    await choose(state.id);
+    const lines = briefLines();
+    if (state.expected === "none") {
+      expect(lines, state.id).toEqual([]);
+      expect(text("Daily Brief"), state.id).not.toContain("Travel");
+      continue;
+    }
+    // The next trip's line in the bubble is the Timeline's line, without its Refresh travel button.
+    if (TIMED.has(state.expected)) expect(lines, state.id).toContain(statusLine().replace(/ Refresh travel$/, ""));
+    for (const line of lines) expect(line, state.id).not.toMatch(/\((walking|cycling|transit|driving)\)/);
+  }
+});
+
 it("shows the drawer, dialog, Behavior row and bubble after the 5-minute expiry", async () => {
   await render("head-home");
   expect(text("Dentist Calendar details")).toContain("Head home 3:00 PM · walking, home by 3:30 PM.");
@@ -138,12 +159,15 @@ it("shows the drawer, dialog, Behavior row and bubble after the 5-minute expiry"
     expect(text(label), label).toContain("Last estimate: head home 3:00 PM · checked 2:15 PM.");
     expect(text(label), label).not.toContain("Head home 3:00 PM · walking");
   }
-  expect(text("Daily Brief")).not.toContain("Back around");
-  expect(container.querySelector("[data-bench-brief-note]")).not.toBeNull();
+  // Ticket 272: the bubble keeps the trip home, marked, instead of losing the block.
+  expect(text("Daily Brief")).toContain("Last estimate: head home 3:00 PM · checked 2:15 PM.");
+  expect(container.querySelector("[data-bench-brief-note]")).toBeNull();
 
   await choose("fresh");
   await moveClock("07:05");
   expect(gymRow()).toContain("Last estimate: leave by 9:35 AM · checked 7:00 AM.");
+  expect(text("Daily Brief")).toContain("Last estimate: leave by 9:35 AM for Gym · checked 7:00 AM.");
+  expect(text("Daily Brief")).toContain("Calculated by Cadence · Google Maps · 7:00 AM.");
   expect(container.querySelector("[data-bench-checked]")?.textContent).toBe("7:00 AM, expired at 7:05 AM");
 });
 
@@ -254,7 +278,12 @@ it("shows the owner's approval on the wording review", async () => {
   await render();
   // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
   // Ticket 271 adds the correction control's label, not yet approved (decision D7).
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("1 of 64 phrases await the owner's approval.");
+  // Ticket 272 lists the Daily Brief's overlap and return lines, not yet approved.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("4 of 67 phrases await the owner's approval.");
+  for (const id of ["brief-overlap", "brief-overlap-trip-home", "brief-back"]) {
+    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
+  }
+  expect(container.querySelector('[data-wording-id="brief-back"] [data-wording-sample]')?.textContent).toBe("Back around 3:30 PM.");
   expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-sample]')?.textContent).toBe("Change for this trip");
   expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-status]')?.textContent).toBe("Not yet approved");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-sample]')?.textContent).toBe("A planned trip changed.");

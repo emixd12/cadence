@@ -4,9 +4,9 @@ import { useState } from "react";
 import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { renderTravelTiming } from "@/components/timeline/ExternalEventDetails";
-import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
 import { resolveTravelPlan, resolveTravelEvidence } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 import { planTravelHabitChange } from "@cadence/core/services/travel-habits";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { TravelHabitsSection } from "@/components/settings/TravelHabitsSection";
@@ -132,10 +132,9 @@ export function TravelDevelopmentTextBench() {
     estimate: { ...entry.estimate, warnings: ["Estimated arrival is after the planned arrival time.", "This route includes a toll road."] } } : entry) };
   const briefing = { text: "Dentist anchors the afternoon.", localDate: "2026-11-01", timezone: "America/New_York",
     generatedAt: "2026-11-01T12:00:00Z", expiresAt: "2026-11-02T05:00:00Z", coverage: "complete" as const, warnings: [] };
-  const guidance = { localDate: "2026-11-01", observedAt: "2026-11-01T13:00:00Z", expiresAt: "2026-11-01T13:05:00Z", attribution: "Google Maps",
-    items: [{ kind: "departure" as const, at: "2026-11-01T18:05:00Z", label: "Dentist", mode: "cycling" as const,
-      weather: { marginMinutes: 15, conditions: ["thunderstorm" as const], suggestion: { instead: "cycling" as const, alternatives: ["transit" as const, "driving" as const] } } }],
-    conflictingOptionIds: [], occupiedSpans: [], weather: { state: "applied" as const, attribution: OPEN_METEO_ATTRIBUTION } };
+  // Ticket 272: the brief block's real projection from the same evidence and departure model.
+  const guidance = projectBriefTravelGuidance({ evidence: travel, departure: travelBenchDeparture("bench-event", travel, "Dentist"),
+    localDate: "2026-11-01", now: TRAVEL_BENCH_NOW, timezone: "America/New_York", labels: new Map([["bench-event", "Dentist"]]), behaviorRefs: new Set() });
   return <div className="mt-4 grid gap-4 border-t border-line pt-4">
     <TravelBenchCaption />
     <div className="grid gap-6 lg:grid-cols-2">

@@ -22,7 +22,7 @@ import {
   type DailyBriefAttempt,
   type DailyBriefOutcome,
 } from "@/lib/ui/daily-brief-session";
-import { requestDailyBriefTravel, travelConclusionsToken } from "@/lib/ui/travel";
+import { DAILY_BRIEF_TRAVEL_WAIT_MS, requestDailyBriefTravel, travelConclusionsToken, waitForDailyBriefTravel } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import { DailyBriefBubble } from "./DailyBriefBubble";
 
@@ -114,16 +114,21 @@ export function DailyBriefLauncher({ client, desktop = false, sessionKey = "curr
     };
 
     const start = (settings: DailyBriefSettings, retry: boolean) => {
-      const claim = Date.now() + DAILY_BRIEF_CLIENT_DEADLINES.installationMs + DAILY_BRIEF_CLIENT_DEADLINES.briefMs;
+      // The first brief of the day may first wait for travel (Ticket 272), so its claim covers that wait.
+      const claim = Date.now() + DAILY_BRIEF_CLIENT_DEADLINES.installationMs + DAILY_BRIEF_CLIENT_DEADLINES.briefMs + (retry ? 0 : DAILY_BRIEF_TRAVEL_WAIT_MS);
       mark(settings, { attempted: true, pendingUntil: claim });
       const attempt = startDailyBriefAttempt(briefClient, settings, {
         sourceKey: sourceKeyRef.current,
         retry,
         run: async (signal) => {
-          const installationId = await dailyBriefInstallationId(window.localStorage, signal);
           // Ticket 219 Option A: the latest signed travel conclusions for this account and day, if any.
-          // Account-free desktop has no travel account, so it sends nothing.
-          const travelConclusions = travelConclusionsToken(travelAccountId, settings.localDate);
+          // Account-free desktop has no travel account, so it sends nothing. Ticket 272: the day's
+          // first brief waits up to 5 seconds for the first travel result. It does not wait with
+          // travel off, not configured or not mounted, and a retry uses the token it has.
+          const [installationId, travelConclusions] = await Promise.all([
+            dailyBriefInstallationId(window.localStorage, signal),
+            retry ? travelConclusionsToken(travelAccountId, settings.localDate) : waitForDailyBriefTravel(travelAccountId, settings.localDate, signal),
+          ]);
           return briefClient.requestBrief({ installationId, retry, ...(travelConclusions ? { travelConclusions } : {}) }, signal);
         },
       });

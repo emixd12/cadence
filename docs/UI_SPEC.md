@@ -1160,8 +1160,11 @@ changed ("Refresh brief"). Close stays a 44px control in every state.
 A ready brief may add two quiet sections below the text, separated by a hairline:
 "Pattern tip" (the model's tip plus a muted deterministic evidence line and one
 limitation) and "Travel" (up to four calculated lines: travel-created Behavior
-overlaps, departures, the return or an unknown-return note, then a muted "Calculated
-by Cadence … Not written by the model." line). A hypothetical option that overlaps
+overlaps, up to two departures, then the return or an unknown-return note, then a muted
+"Calculated by Cadence · Google Maps · {time}." line). Since Ticket 272 the departure and
+trip-home lines are the departure model's line forms, which name the event, including
+"Last estimate" after expiry and the late forms; the block does not disappear when an
+estimate expires. A hypothetical option that overlaps
 travel adds "This time overlaps planned travel." No new buttons; no apply action.
 When the model's facts held weather trips (Ticket 219 stage 2), a muted Open-Meteo
 credit line ("Weather data by Open-Meteo.com (CC BY 4.0)" with site and licence

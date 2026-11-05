@@ -189,16 +189,6 @@ export function DayProgressTimeline({
   const invalidTravelMessage = routeEvidence && !travel ? "Travel changed. Refresh travel to update estimates." : null;
   const displayedTravelStatus = invalidTravelMessage && travelStatus
     ? { ...travelStatus, view: null, message: invalidTravelMessage, stale: true } : travelStatus;
-  // The bubble projects current evidence; Ticket 214 requests the day when a brief is generated.
-  const briefTravel = useMemo(() => {
-    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
-    return projectBriefTravelGuidance({
-      evidence: travel, localDate: timeline.todayLocalDate, now,
-      ...briefTravelSubjects(today?.occurrences ?? [], travelEvents),
-    });
-  }, [travel, travelEvents, now, timeline.daySections, timeline.todayLocalDate]);
-  useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
-  useEffect(() => () => publishBriefTravel(null), []);
 
   // Ticket 217: learned habits, the journey mode choice and the once-a-day leave-time question.
   const habitsClient = context ? context.travelSettingsClient ?? null : liveCalendar ? webTravelSettingsClient : null;
@@ -214,6 +204,17 @@ export function DayProgressTimeline({
       arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds,
       pausedUntil: travelStatus?.resumesAt ?? null });
   }, [travel, now, timeline.timezone, timeline.daySections, timeline.todayLocalDate, travelEvents, durations, habitsForModel, travelStatus?.resumesAt]);
+  // Ticket 272: the bubble reads the same departure model, so it keeps last estimates and late trips.
+  // Ticket 214 requests the day when a brief is generated.
+  const briefTravel = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return projectBriefTravelGuidance({
+      evidence: travel, departure, localDate: timeline.todayLocalDate, now, timezone: timeline.timezone,
+      ...briefTravelSubjects(today?.occurrences ?? [], travelEvents),
+    });
+  }, [travel, departure, travelEvents, now, timeline.daySections, timeline.todayLocalDate, timeline.timezone]);
+  useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
+  useEffect(() => () => publishBriefTravel(null), []);
   const refreshTravel: TravelRefreshAction | null = travelStatus && !travelStatus.resumesAt
     ? { onRefresh: travelStatus.refresh, pending: travelStatus.pending } : null;
   const travelLabels = useMemo(() => new Map(departure.trips.length ? [...travelEvents.map((event) => [event.id, event.title || "Untitled event"] as const),

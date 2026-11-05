@@ -665,6 +665,12 @@ cite has not changed.
 - **Update needed:** say that estimates stay in browser session storage until the session
   ends or the listed events clear them. Describe the whole-day pass, the near-departure
   refresh, and the "Last estimate" label.
+- **Ticket 272 note, November 5, 2026:** the brief block now keeps last estimates and late
+  trips. The day's first brief waits up to 5 seconds for the first whole-day travel result,
+  so it usually carries the signed conclusions. The guide's "When the Timeline has current
+  travel estimates, the brief request also carries Cadence's signed trip and weather
+  conclusions" stays true; it could add that the first brief waits briefly for them. The
+  model still receives no times. Not yet edited.
 - **Ticket 267 note, November 5, 2026:** the plan is in source. The quoted words did not
   change. The guide should also say that at 80% of the month's travel budget Cadence stops
   refreshing on its own, and Refresh travel still works.

@@ -12,7 +12,9 @@ import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import type { BriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
 
 const travelToken = vi.hoisted(() => vi.fn<(accountId: string | null, localDate: string) => string | null>(() => null));
-vi.mock("@/lib/ui/travel", async (load) => ({ ...(await load<typeof import("@/lib/ui/travel")>()), travelConclusionsToken: travelToken }));
+// A held token returns at once from the Ticket 272 wait, as the real module does.
+vi.mock("@/lib/ui/travel", async (load) => ({ ...(await load<typeof import("@/lib/ui/travel")>()), travelConclusionsToken: travelToken,
+  waitForDailyBriefTravel: async (accountId: string | null, localDate: string) => accountId ? travelToken(accountId, localDate) : null }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -263,7 +265,7 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
     travel={{ localDate: settings.localDate, observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-      items: [{ kind: "overlap", behaviorLabel: "Walk", travelLabel: "Dentist" }, { kind: "departure", at: "2026-09-20T18:30:00Z", label: "Dentist", mode: "transit", weather: null }, { kind: "return_unknown" }],
+      items: [{ kind: "overlap", phrase: "Travel to Dentist overlaps Walk.", weather: null }, { kind: "departure", phrase: "Leave by 2:30 PM for Dentist · transit, arrive 3:00 PM.", weather: null }, { kind: "return", phrase: "Return time unknown.", weather: null }],
       weather: null, conflictingOptionIds: [], occupiedSpans: [{ startAt: "2026-09-20T18:30:00Z", endAt: "2026-09-20T20:00:00Z" }] }}
     briefing={{
       text: "Dentist anchors the afternoon.", localDate: settings.localDate, timezone: settings.timezone,
@@ -276,8 +278,8 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
   expect(container.textContent).toContain("Pattern tip");
   expect(container.textContent).toContain("6 of 15 past occurrences are still Unresolved");
   expect(container.textContent).toContain("Travel to Dentist overlaps Walk.");
-  expect(container.textContent).toContain("Leave by 2:30 PM for Dentist (transit).");
-  expect(container.textContent).toContain("Return time is unknown.");
+  expect(container.textContent).toContain("Leave by 2:30 PM for Dentist · transit, arrive 3:00 PM.");
+  expect(container.textContent).toContain("Return time unknown.");
   expect(container.textContent).toContain("Calculated by Cadence · Google Maps · 9:00 AM.");
   expect(container.textContent).not.toContain("Not written by the model.");
   expect(container.textContent).toContain("This time overlaps planned travel.");
@@ -287,19 +289,19 @@ it("shows a tip with its deterministic evidence and travel guidance labeled as c
 it("omits travel from another day", async () => {
   const { DailyBriefBubble } = await import("@/components/briefing/DailyBriefBubble");
   await act(() => root.render(<DailyBriefBubble state="ready" onDismiss={() => undefined}
-    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, weather: null, items: [{ kind: "return_unknown" }], conflictingOptionIds: [], occupiedSpans: [] }}
+    travel={{ localDate: "2026-09-19", observedAt: "2026-09-19T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: null, weather: null, items: [{ kind: "return", phrase: "Return time unknown.", weather: null }], conflictingOptionIds: [], occupiedSpans: [] }}
     briefing={{ text: "Quiet day.", localDate: settings.localDate, timezone: settings.timezone, generatedAt: "2026-09-20T12:00:00Z", expiresAt: "2999-09-20T16:00:00Z", coverage: "complete", warnings: [] }} />));
   expect(container.textContent).not.toContain("Travel");
 });
 
 it("shows the weather mode advice in the travel line in development builds only (Tickets 260 and 261)", async () => {
   const travel: BriefTravelGuidance = { localDate: "2026-11-01", observedAt: "2026-11-01T13:00:00Z", expiresAt: "2999-11-01T16:00:00Z", attribution: "Google Maps",
-    items: [{ kind: "departure", at: "2026-11-01T18:05:00Z", label: "Dentist", mode: "cycling",
+    items: [{ kind: "departure", phrase: "Leave by 6:05 PM for Dentist · cycling, arrive 6:35 PM.",
       weather: { marginMinutes: 15, conditions: ["thunderstorm"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } }],
     conflictingOptionIds: [], occupiedSpans: [], weather: null };
   const briefing = { text: "Dentist anchors the afternoon.", localDate: "2026-11-01", timezone: "UTC",
     generatedAt: "2026-11-01T12:00:00Z", expiresAt: "2999-11-01T16:00:00Z", coverage: "complete" as const, warnings: [] };
-  const line = "Leave by 6:05 PM for Dentist (cycling). 15 min added for thunderstorms.";
+  const line = "Leave by 6:05 PM for Dentist · cycling, arrive 6:35 PM. 15 min added for thunderstorms.";
   const advice = "Consider transit or driving instead of cycling.";
   await act(() => root.render(<DevelopmentBuildProvider value={true}><DailyBriefBubble state="ready" briefing={briefing} travel={travel} onDismiss={() => undefined} /></DevelopmentBuildProvider>));
   expect(container.textContent).toContain(`${line} ${advice}`);

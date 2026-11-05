@@ -6,7 +6,9 @@ import {
   RETURN_TIME_UNKNOWN,
   TRAVEL_CORRECTION_TOGGLE,
   allDayRangeLabel,
+  departureBriefBackPhrase,
   departureBriefFooterPhrase,
+  departureBriefOverlapPhrase,
   departureCheckedPhrase,
   departureDetailPhrase,
   departureFreeAgainPhrase,
@@ -104,6 +106,9 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "home-no-route": () => line({ ...HOME_TRIP, state: "no_route" }),
   "paused": () => detail({ state: "paused", resumesAt: null }),
   "correction-toggle": () => TRAVEL_CORRECTION_TOGGLE,
+  "brief-overlap": () => departureBriefOverlapPhrase("Walk", EVENT),
+  "brief-overlap-trip-home": () => departureBriefOverlapPhrase("Walk", null),
+  "brief-back": () => departureBriefBackPhrase(at("15:30"), CONTEXT),
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

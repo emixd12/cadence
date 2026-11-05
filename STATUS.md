@@ -17,6 +17,32 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: Ticket 272 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Daily Brief
+travel block now stays useful through the day, and the first brief gets its trip facts.
+
+- `projectBriefTravelGuidance` reads the departure model. Departure and trip-home lines are the
+  model's line forms, which name the event and match the next-departure line. An expired estimate
+  stays, marked "Last estimate … checked {time}". A late trip stays and says when you would arrive
+  (the old filter dropped it). During the last event the trip home says when to head home;
+  before that, a known whole trip says "Back around {time}". A trip after a late arrival says it
+  has no time. Unreliable spans stay in `conflictingOptionIds` and `occupiedSpans` (Ticket 268).
+- The day's first automatic brief waits for the first whole-day travel result, at most 5 seconds
+  (`waitForDailyBriefTravel` in `lib/ui/travel.ts`). No wait with travel off or not configured,
+  with no Timeline travel view mounted, or on a retry. The bubble shows its loading state while
+  it waits. The same request serves the delivered brief, so the day is not routed twice.
+- Model input is unchanged: the request carries only the opaque signed token. Tests check the
+  request body and that no model-input module imports the block or the departure model (L-001).
+- No collapsed strip (D2). Once-a-day, dismissal and the footer are unchanged.
+- Wording: "Travel to {event} overlaps {behavior}." and "Back around {time}." move into
+  `departure-phrases.ts` unchanged. The trip-home overlap now reads "Planned travel overlaps
+  {behavior}." instead of "Travel to planned travel overlaps {behavior}.". All three are on the
+  bench wording review, not yet approved (D7). "Return time is unknown." now uses the approved
+  "Return time unknown.".
+- `docs/USER_FLOWS.md` and `docs/UI_SPEC.md` describe the block and the wait; P-018 has a Ticket
+  272 note. Screenshots at 1440 and 390 px are in `.intent/artifacts/t272/` (local, not committed).
+
 ## Travel advisory revamp Wave 3: Ticket 271 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar drawer

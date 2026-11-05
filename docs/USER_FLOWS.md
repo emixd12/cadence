@@ -18,10 +18,15 @@ policy is defined in `plans/first-external-consumer.md`.
 Tips and travel (Tickets 170–173): a brief may carry at most one pattern tip when a
 calculated finding bears on today; Cadence shows the evidence line beside it. Tips
 repeat at most once per cooldown. Travel lines beside the brief come from existing
-travel evidence and never regenerate the brief. Today they disappear when the evidence
-expires. Owner decisions D1 and D2 (`docs/DECISIONS.md`, 2026-11-04; Ticket 272) change
-that: the block marks a last estimate instead of disappearing, and there is no collapsed
-strip. Reminder
+travel evidence and never regenerate the brief. Since Ticket 272 (owner decisions D1 and
+D2, `docs/DECISIONS.md`, 2026-11-04) they come from the departure model, in the line
+forms that name the event, so they match the Timeline's next-departure line. The block
+no longer disappears when an estimate expires: a time older than 5 minutes stays,
+marked "Last estimate … checked {time}". A late trip stays and says when you would
+arrive. During the last event the trip home says when to head home; before that, a
+known whole trip says when you are back. A trip after a late arrival says it has no time.
+A trip leaves the block once it has arrived, and with no trips today there is no block.
+There is no collapsed strip, and the once-a-day and dismissal rules are unchanged. Reminder
 history and Notes need their own Settings disclosure; turning Daily Brief off revokes both.
 
 Navigation during loading keeps the attempt; returning to Timeline shows its result.
@@ -902,7 +907,12 @@ not promote it into the daily configuration. Legacy drafts load with timing disa
 ### Travel refresh completion (Tickets 213–214)
 
 A delivered Daily Brief requests the day's travel once through the shared web and
-desktop client. Requests still require travel consent and provider clearance.
+desktop client. Since Ticket 272 the day's first automatic brief waits for the first
+whole-day travel result, at most 5 seconds, so it carries Cadence's signed trip
+conclusions; the bubble shows its loading state meanwhile. It does not wait when travel is
+off or not configured, when no Timeline travel view is open, or on a retry. That request
+also serves the delivered brief, so the day is not routed twice. Requests still require
+travel consent and provider clearance.
 The existing eight-leg limit applies. Travel remains outside model input.
 A foreground minute check reads an already-allowed device position; only movement
 beyond 500 m plus both accuracy radii requests routing. Manual decisions reproject
