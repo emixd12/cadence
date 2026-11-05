@@ -230,10 +230,10 @@ it("makes Refresh travel the first words of a line that asks for it, never repea
 
 it("shows the owner's approval on the wording review", async () => {
   await render();
-  // Ticket 268 adds one phrase, not yet approved (decision D7).
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("1 of 63 phrases await the owner's approval.");
+  // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("All 63 phrases approved by the owner on November 5, 2026");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-sample]')?.textContent).toBe("A planned trip changed.");
-  expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-status]')?.textContent).toBe("Not yet approved");
+  expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-status]')?.textContent).toBe("Approved November 5, 2026");
   expect(container.querySelector('[data-wording-id="line-changed"] [data-wording-status]')?.textContent).toContain("Approved");
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-sample]')?.textContent).toBe("Refresh travel to get the leave time.");
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-status]')?.textContent).toContain("owner change R1");

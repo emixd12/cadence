@@ -281,12 +281,22 @@ describe("Ticket 268: last estimates, unreliable trips and a trip home that chan
       expect(stateOf(merged).slice(0, 2)).toEqual([["outbound", null, "review", "rejected_revision", false], ["onward", "review", "standup", "rejected_revision", false]]);
     });
 
+    it("a deleted stop that has not ended is not a passed stop (R7)", () => {
+      const first = chain("2026-09-16T15:30:00Z");
+      const [, onward, home] = first.legs as [Entry, Entry, Entry];
+      // At 14:10 standup (14:00–15:00) is deleted; the trip to review now leaves from Home and fails.
+      const next = respond(first, [failed(onward, { role: "outbound", originCommitmentRef: null }), { ...home, leg: { ...home.leg, id: "home-new" } }]);
+      const merged = mergeTravelLastEstimates(first, next, "2026-09-16T14:10:00Z");
+      expect(stateOf(merged)[0]).toEqual(["outbound", null, "review", "rejected_revision", false]);
+    });
+
     it("an onward trip whose earlier stop has passed keeps its estimate as an outbound trip", () => {
       const first = chain("2026-09-16T15:30:00Z");
       const [, onward, home] = first.legs as [Entry, Entry, Entry];
       // Standup has ended and left the plan: the trip to review now leaves from Home, and its route failed.
       const next = respond(first, [failed(onward, { role: "outbound", originCommitmentRef: null }), { ...home, leg: { ...home.leg, id: "home-new" } }]);
-      const merged = mergeTravelLastEstimates(first, next, "2026-09-16T14:10:00Z");
+      // Standup ended at 15:00; the trip to review arrives at 15:25.
+      const merged = mergeTravelLastEstimates(first, next, "2026-09-16T15:10:00Z");
       expect(merged.legs[0]).toMatchObject({ state: "current", leg: { id: `${onward.leg.id}-new`, role: "outbound" } });
       expect(merged.legs[0]!.estimate?.departureAt).toBe(onward.estimate!.departureAt);
       expect(merged.segments.filter((segment) => segment.legId === `${onward.leg.id}-new`).length).toBeGreaterThan(0);

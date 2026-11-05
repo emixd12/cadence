@@ -672,9 +672,10 @@ cite has not changed.
   browser session storage across a reload and are cleared by sign-out, an account change,
   travel turned off, a travel settings change or a new day. A trip refresh keeps the other
   trips' times. Returning to the window requests only when a trip is due. The quoted words
-  did not change. Not yet decided: the status line at the 80% pause. It shows nothing new;
-  a response reporting the whole budget used shows the approved line "Travel estimates
-  resume on {date}." The owner may want a line for the 80% pause.
+  did not change. The 80% pause shows nothing new (owner, November 5, 2026: "Nothing new",
+  `docs/DECISIONS.md`); a response reporting the whole budget used shows the approved line
+  "Travel estimates resume on {date}." A changed trip whose stop has no title reads "A
+  planned trip changed." (approved as written).
 - **Status:** logged.
 
 ## P-019: Outlook and iCloud event locations read for routing

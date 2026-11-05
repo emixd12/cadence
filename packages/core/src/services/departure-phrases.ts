@@ -258,7 +258,7 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "line-changed-unnamed", ticket: "268", template: "A planned trip changed.",
     situation: "Line form, when a kept estimate's stop was cancelled or has no title. Refresh travel follows.",
     replaces: "The trip to your next stop changed.",
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "line-time-unknown", ticket: "265", template: "No leave time for the trip to {event}.",
     situation: "Line form, when no leave time can be given.",
     replaces: null,

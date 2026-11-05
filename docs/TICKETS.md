@@ -15971,7 +15971,8 @@ Implementation notes:
 - `mergeTravelLastEstimates` (travel resolver) merges every response per trip, matched on the
   stop each trip serves (the stop it goes to, or for the trip home the stop it leaves), so an
   onward trip that becomes outbound keeps its time. An estimate carries over only from the
-  same origin stop, or from an onward trip whose earlier stop has left the plan; a stop
+  same origin stop, or from an onward trip whose earlier stop has left the plan after its
+  end (a deleted stop that has not ended does not count); a stop
   inserted or reordered before a trip makes that trip read as changed (PR #191 review). A trip keeps its last estimate unless
   anything it was planned from changed, the new plan rejects it, it cannot leave before its stop
   ends, or it has arrived. A failed refresh keeps the view.
@@ -15983,7 +15984,7 @@ Implementation notes:
 - A reload after a source change still restores the session view as a kept view, so the
   withdrawal and "Last estimate" marks survive the reload at the 80% pause, after a failure
   and on the quota path.
-- New wording, not yet approved (decision D7): "A planned trip changed." for a changed trip
+- New wording, approved by the owner as written on November 5, 2026: "A planned trip changed." for a changed trip
   whose stop has no title, such as a cancelled event (`line-changed-unnamed` in
   `departure-phrases.ts`, shown on the bench wording review).
 - Movement over 500 m (Ticket 267's trigger, changed here) refreshes only the next outbound trip,
@@ -16001,7 +16002,8 @@ Implementation notes:
 - From review: resolving the last stop while an earlier one remains shows the trip home as
   changed, with Refresh travel. Timeline collisions mark a Behavior inside a trip after a
   late arrival (`travelUnreliableSegments`). A response reporting the whole budget used
-  shows the approved paused line; the 80% pause shows nothing new (P-018 note).
+  shows the approved paused line; the 80% pause shows nothing new, as the owner decided
+  ("Nothing new", `docs/DECISIONS.md`, 2026-11-05).
 - Tests: `tests/travel-lifecycle.dom.test.tsx` (reload, per-trip merge, clearing, plan
   timers with focus loss, a typical day: 6 requests, 8 legs), `tests/travel-timeline.test.ts`,
   and a released Mac request in `tests/travel-route-refresh.service.test.ts`.
