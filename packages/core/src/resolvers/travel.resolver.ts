@@ -392,16 +392,23 @@ function resolveTravelModelProjection(
     role === "return" ? endOf(originRef) : startOf(destinationRef);
 
   const evidenceById = new Map(legs.map((entry) => [entry.leg.id, entry]));
+  // Ticket 265: a leg that would leave before the previous trip arrives is not a known trip.
+  // It may occupy anything from its ready time until its arrival delayed by that shortfall.
+  const unreliable = travelLegsAfterLateArrival(legs);
   const lateArrivals = new Map<string, TravelLegRole>();
   const tripByLegId = new Map<string, ModelTripAnchor>();
   const anchors: ModelTripAnchor[] = [];
   for (const leg of plan.legs) {
     const entry = evidenceById.get(leg.id);
-    const estimate = entry?.state === "current" ? entry.estimate : null;
+    const shortfall = unreliable.get(leg.id);
+    const estimate = entry?.state === "current" && shortfall === undefined ? entry.estimate : null;
+    const delayedArrival = shortfall !== undefined && entry?.estimate
+      ? instant(entry.weather?.arrivalAt ?? entry.estimate.arrivalAt, "Route arrival").add({ seconds: shortfall })
+      : null;
     const value: ModelTripAnchor = {
       trip: { destinationRef: leg.destinationCommitmentRef, role: leg.role, mode: leg.mode, estimate: estimate ? "current" : "unknown" },
       anchor: anchorFor(leg.role, leg.originCommitmentRef, leg.destinationCommitmentRef),
-      uncertain: estimate ? null : { startAt: instant(leg.readyAt, "Route ready time"), endAt: startOf(leg.destinationCommitmentRef) },
+      uncertain: estimate ? null : { startAt: instant(leg.readyAt, "Route ready time"), endAt: delayedArrival ?? startOf(leg.destinationCommitmentRef) },
       possiblyRemote: false,
     };
     tripByLegId.set(leg.id, value);
@@ -418,7 +425,8 @@ function resolveTravelModelProjection(
   }
   anchors.sort((left, right) => compareOptionalInstants(left.anchor, right.anchor));
   const trips = anchors.filter((item) => !item.possiblyRemote);
-  const travelSegments = segments.filter((value) => value.kind !== "commitment" && value.legId);
+  // An unreliable leg's segments are not known occupancy; its uncertain span stands in for them.
+  const travelSegments = segments.filter((value) => value.kind !== "commitment" && value.legId && !unreliable.has(value.legId));
 
   const about = (subject: Temporal.Instant, item: ModelTripAnchor | null | undefined, withPosition = true): Pick<TravelModelFit, "trip" | "position"> => {
     if (!item) return { trip: null, position: null };
