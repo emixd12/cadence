@@ -27,7 +27,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { GRANTS, checkConsentView, readConsentView, submitConsent } from './consent-page.mjs';
+import { GRANTS, checkConsentView, consentRecord, readConsentView, requestedScopesFrom, submitConsent } from './consent-page.mjs';
 import { createRun, resumeRun } from './ledger.mjs';
 import { AcceptanceError, PRODUCTION } from './test-account-sessions.mjs';
 import { CONVERSATION, NOT_CONVERSATION, SITES, WebStop, archiveChat, chatIdOf, classifyPage, clickable, waitVisible } from './web-sites.mjs';
@@ -252,7 +252,7 @@ export async function waitForCadencePage(context, issuer, timeoutMs) {
 }
 
 /** Complete Cadence's consent for the slot with Ticket 248's checks. */
-export async function completeConsent({ context, issuer, account, site, decision, grant, timeoutMs, track }) {
+export async function completeConsent({ context, issuer, account, site, decision, grant, timeoutMs, track, requested = () => null, onView = () => {} }) {
   const found = await waitForCadencePage(context, issuer, timeoutMs);
   if (!found) throw new WebStop('consent-not-reached', 'consent');
   track(found.page);
@@ -264,6 +264,9 @@ export async function completeConsent({ context, issuer, account, site, decision
   if (problems.includes('account') || problems.includes('email')) throw new WebStop('consent-wrong-account', 'consent');
   if (problems.length) throw new WebStop(`consent-mismatch-${problems[0]}`, 'consent');
   const grantScopes = GRANTS[grant];
+  // Evidence before the click: the client's requested scopes and each switch's start.
+  const record = consentRecord({ view, requestedScopes: requested(), decision, grantScopes });
+  await onView(record);
   try { await submitConsent(found.page, { decision, grantScopes }); } catch (error) {
     throw new WebStop(error instanceof AcceptanceError ? error.code : 'consent-submit-failed', 'consent');
   }
@@ -276,7 +279,8 @@ export async function completeConsent({ context, issuer, account, site, decision
     if (Date.now() >= leftBy) throw new WebStop('consent-stuck', 'consent');
     await sleep(200);
   }
-  return { offeredScopes: offered.sort(), grantedScopes: decision === 'allow' ? grantScopes.filter((s) => offered.includes(s)).sort() : [] };
+  return { offeredScopes: offered.sort(), grantedScopes: decision === 'allow' ? grantScopes.filter((s) => offered.includes(s)).sort() : [],
+    requestedScopes: record.requestedScopes, initialSwitches: record.initialSwitches };
 }
 
 /**
@@ -448,8 +452,17 @@ export async function runWebScenario({
     const watcherScenario = scenario.watcherSuffix ? `${site.watcherScenario}-${scenario.watcherSuffix}` : site.watcherScenario;
     if (scenario.watch) watch = watcher.start({ scenario: watcherScenario, slot, sinceIso: pre.windowStartAt, runId: run.runId });
 
+    // The client's last /oauth/authorize request in this context; only its scope parameter is kept.
+    let lastRequested = null;
+    const issuerOrigin = new URL(issuer).origin;
+    context.on?.('request', (request) => {
+      let url;
+      try { url = new URL(request.url()); } catch { return; }
+      if (url.origin === issuerOrigin && url.pathname === '/oauth/authorize') lastRequested = requestedScopesFrom(url.href);
+    });
     const consentAnswer = (decision, grant) => () => completeConsent({
       context, issuer, account, site, decision, grant, timeoutMs: timeouts.consentMs, track,
+      requested: () => lastRequested, onView: (record) => run.appendEvent({ type: 'consent.view', slot, ...record }),
     });
 
     const connected = await run.step('connect', async ({ interrupted }) => {
@@ -468,7 +481,8 @@ export async function runWebScenario({
       await sessions.absorbBrowserCookies(slot, await context.cookies(issuer)).catch(() => ({ rotated: false }));
       return consent;
     });
-    emit({ step: 'connect', ok: true, offeredScopes: connected.offeredScopes, grantedScopes: connected.grantedScopes });
+    emit({ step: 'connect', ok: true, offeredScopes: connected.offeredScopes, grantedScopes: connected.grantedScopes,
+      requestedScopes: connected.requestedScopes ?? null, initialSwitches: connected.initialSwitches ?? null });
 
     if (scenario.decision === 'deny') {
       const result = await run.step('deny-check', async () => {

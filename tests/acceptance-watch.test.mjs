@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +8,7 @@ import {
   createLedgerSink, createRpcSource, main, matchScenario, parseSince, parseWatchArgs, psqlQuery, publishableKeyFrom, watch,
 } from '../scripts/acceptance/watch.mjs';
 import { USERS } from '../scripts/mcp-acceptance-cleanup.mjs';
+import { createRun } from '../scripts/acceptance/ledger.mjs';
 import { PRODUCTION_QA } from '../scripts/acceptance/qa-config.mjs';
 
 const T0 = Date.parse('2026-10-30T02:00:00.000Z');
@@ -119,6 +120,8 @@ async function runWatch({ world, source = 'db', opts = {}, root, clock = fakeClo
   const src = source === 'db'
     ? createDbSource({ query: async () => dbRows(world, clock.now()), userIds: { A, B }, sinceIso: SINCE })
     : createRpcSource({ rest: restFor(world, clock), accounts: opts.accounts ?? ['A'], sinceIso: SINCE });
+  // The runner owns the run folder; the watcher only appends to it.
+  if (root && !existsSync(join(root, 'run-250', 'run.json'))) createRun({ target: 'local', runId: 'run-250', root, gitSha: null }).close();
   const sink = root ? createLedgerSink({ root, runId: 'run-250' }) : null;
   const code = await watch({ options: options(opts), source: src, sinceIso: SINCE, print: (l) => lines.push(l), sink, now: clock.now, sleep: clock.sleep });
   return { code, out: lines.join('\n'), lines, ledger: sink ? readFileSync(sink.file, 'utf8') : '' };
@@ -535,5 +538,31 @@ describe('production session adapter (Ticket 248 module shape)', () => {
     expect(await tokenFor('B')).toBeNull();
     expect(() => createSessionTokenFor({ accessTokenFor() {} }, { publishableKey: 'sb_publishable_x' })).toThrow('session-provider-unavailable');
     expect(() => createSessionTokenFor({ ...fakeModule(async () => ({})), PRODUCTION: { supabaseUrl: 'https://evil.example' } }, { publishableKey: 'sb_publishable_x' })).toThrow('session-provider-unavailable');
+  });
+});
+
+describe('watcher started before the runner (Ticket 259 live check)', () => {
+  it('never creates the run folder, so the runner can still create it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'watch259-'));
+    const sink = createLedgerSink({ root, runId: 'run-259' });
+    sink.append([{ type: 'watcher.event', run: 'run-259', n: 1 }]);
+    expect(existsSync(join(root, 'run-259'))).toBe(false);
+    expect(sink.pending).toBe(1);
+    const run = createRun({ target: 'production', runId: 'run-259', root, gitSha: null });
+    sink.append([{ type: 'watcher.event', run: 'run-259', n: 2 }]);
+    expect(sink.pending).toBe(0);
+    expect(readFileSync(sink.file, 'utf8').trim().split('\n').map((l) => JSON.parse(l).n)).toEqual([1, 2]);
+    run.close();
+  });
+  it('says so when the run folder never appeared', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'watch259-'));
+    const sink = createLedgerSink({ root, runId: 'run-259' });
+    const lines = [];
+    const clock = fakeClock();
+    const src = createDbSource({ query: async () => dbRows(makeWorld('inspector'), clock.now()), userIds: { A, B }, sinceIso: SINCE });
+    const code = await watch({ options: options({ runId: 'run-259', expect: 'inspector' }), source: src, sinceIso: SINCE, print: (l) => lines.push(l), sink, now: clock.now, sleep: clock.sleep });
+    expect(code).toBe(0);
+    expect(existsSync(join(root, 'run-259'))).toBe(false);
+    expect(lines.at(-1)).toMatch(/^ledger-pending \d+ records: run folder run-259 not found; events are in this output only$/);
   });
 });

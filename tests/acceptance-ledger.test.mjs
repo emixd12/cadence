@@ -50,6 +50,9 @@ describe('acceptance run ledger', () => {
       await run.step('consent-a', async ({ checkpoint }) => {
         appendFileSync(${JSON.stringify(join(root, 'calls'))}, 'consent-a\\n');
         checkpoint('grant', ${JSON.stringify(grantCheckpoint('consent-a', id(901)))});
+        // Hold the event loop open: an unsettled await alone lets Node exit with
+        // code 13 right after "ready", racing the kill.
+        setInterval(() => {}, 60_000);
         process.stdout.write('ready\\n');
         await new Promise(() => {});
       });

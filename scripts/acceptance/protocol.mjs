@@ -559,7 +559,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     }
     // User IDs only, so a watcher (npm run mcp:watch -- --user-a/--user-b) can follow this run.
     out(JSON.stringify({ result: 'accounts', userIdA: sessions.account('A')?.userId ?? null, userIdB: sessions.account('B')?.userId ?? null }));
-    const driver = createOAuthDriver({ target: options.target, issuer, sessions, browser, callbackPort: options.callbackPort, ignoreLocalCertificate: local });
+    const driver = createOAuthDriver({ target: options.target, issuer, sessions, browser, callbackPort: options.callbackPort, ignoreLocalCertificate: local,
+      onConsentView: (view) => run.appendEvent({ type: 'consent.view', ...view }) });
     const protocol = await createLiveProtocol({ issuer });
     const rest = createRest({ origin: supabaseUrl, publishableKey, tokenFor: async (slot) => (await sessions.current(slot)).accessToken });
     const runTag = sha(run.runId).slice(0, 8);
