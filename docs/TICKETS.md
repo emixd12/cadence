@@ -15975,6 +15975,10 @@ Implementation notes:
   token or place text, source keys as a digest. Sign-out (web and Mac), account change,
   travel off, settings change and day change clear it (`docs/DATA_MODEL.md`). After a reload
   the next device sample becomes the movement baseline.
+- Automatic requests wait until the Google Calendar read that feeds travel has settled (web
+  `live.state`, Mac `DESKTOP_CALENDAR_NOT_LOADED_LABEL`), at most 10 seconds
+  (`TRAVEL_SOURCE_WAIT_MS`). Refresh travel does not wait. A late Calendar no longer costs a
+  second whole-day request, and the first settled load is not a source change.
 - From review: resolving the last stop while an earlier one remains shows the trip home as
   changed, with Refresh travel. Timeline collisions mark a Behavior inside a trip after a
   late arrival (`travelUnreliableSegments`). A response reporting the whole budget used

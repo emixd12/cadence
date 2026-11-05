@@ -16,8 +16,8 @@ const view = (accountId: string): TravelRoutesView => ({ accountId, mode: "walki
     legs: [], segments: [], occupiedSpans: [], collisions: [], completeTrip: false, finalAvailabilityAt: null } });
 const capture = vi.fn<(state: TravelState) => void>();
 const latest = () => capture.mock.lastCall![0];
-function Probe({ client, accountId, sourceKey = "source", localDate = "2026-09-21" }: { client: TravelClient; accountId: string; sourceKey?: string; localDate?: string }) {
-  const state = useTravelContext({ enabled: true, accountId, sourceKey, localDate, client, timezone: "America/New_York" });
+function Probe({ client, accountId, sourceKey = "source", localDate = "2026-09-21", sourceReady }: { client: TravelClient; accountId: string; sourceKey?: string; localDate?: string; sourceReady?: boolean }) {
+  const state = useTravelContext({ enabled: true, accountId, sourceKey, localDate, client, timezone: "America/New_York", sourceReady });
   capture(state);
   return <p>{state.view?.evidence?.journeyRef ?? state.message ?? "empty"}</p>;
 }
@@ -574,7 +574,7 @@ function dayServer() {
 }
 const departureAt = (view: TravelRoutesView | null) => resolveDepartureModel({ evidence: view?.evidence ?? null, stops: DAY_STOPS,
   now: new Date().toISOString(), timezone: "America/New_York", arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null });
-async function openDay(routes: TravelClient["routes"], at = "2026-09-21T11:00:00Z", settingsValue: typeof settings = settings) {
+async function openDay(routes: TravelClient["routes"], at = "2026-09-21T11:00:00Z", settingsValue: typeof settings = settings, first: { sourceKey?: string; sourceReady?: boolean } = {}) {
   vi.useFakeTimers({ now: new Date(at) });
   const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -583,14 +583,17 @@ async function openDay(routes: TravelClient["routes"], at = "2026-09-21T11:00:00
     configured: async () => true, readLocation: async () => ({ state: "denied" as const }), routes };
   const host = document.createElement("div"); document.body.append(host);
   let root = createRoot(host);
-  const open = async (props: { accountId?: string; localDate?: string } = {}) => {
+  type OpenProps = { accountId?: string; localDate?: string; sourceKey?: string; sourceReady?: boolean };
+  const render = (props: OpenProps = {}) => act(() => root.render(<Probe client={client} accountId={props.accountId ?? "account-a"} localDate={props.localDate}
+    sourceKey={props.sourceKey ?? "Dentist at 12 Main St"} sourceReady={props.sourceReady} />));
+  const open = async (props: OpenProps = {}) => {
     root = createRoot(host);
-    await act(() => root.render(<Probe client={client} accountId={props.accountId ?? "account-a"} localDate={props.localDate} sourceKey="Dentist at 12 Main St" />));
+    await render(props);
     await act(async () => vi.advanceTimersByTimeAsync(350));
   };
-  await open();
+  await open(first);
   const close = () => act(() => root.unmount());
-  return { focus, open, close, reload: async (props: { accountId?: string; localDate?: string } = {}) => {
+  return { focus, open, close, render, reload: async (props: OpenProps = {}) => {
     await close(); resetTravelViewCacheForTest({ keepSession: true }); await open(props);
   }, done: async () => { await close(); host.remove(); } };
 }
@@ -733,4 +736,48 @@ it("spends the call counts docs/COSTS.md records for a typical day of normal use
     expect(routedLegs).toEqual([3, 1, 1, 1, 1, 1]);
     expect(routedLegs.reduce((sum, legs) => sum + legs, 0)).toBe(8);
   } finally { await day.done(); }
+});
+
+
+it("waits for the Calendar to settle, so a late Calendar costs one whole-day request, not two (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  // First open: Calendar events are still loading, so the source key has no events yet.
+  const day = await openDay(routes, "2026-09-21T11:00:00Z", settings, { sourceKey: "no events yet", sourceReady: false });
+  try {
+    await advance(3_000);
+    await focusAndWait();
+    expect(routes).not.toHaveBeenCalled();
+    // The settled load is the first source, not a source change.
+    await day.render({ sourceReady: true });
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(1);
+    await advance(20_000);
+    expect(routes).toHaveBeenCalledTimes(1);
+    // A reload: the Calendar again arrives late, and the kept view needs no request at all.
+    await day.reload({ sourceKey: "no events yet", sourceReady: false });
+    await advance(3_000);
+    await day.render({ sourceReady: true });
+    await advance(350);
+    expect(routes).toHaveBeenCalledTimes(1);
+    expect(departureAt(latest().view).next).toMatchObject({ leaveAt: "2026-09-21T12:30:00Z" });
+  } finally { await day.done(); }
+});
+
+it("proceeds after 10 seconds when the Calendar never settles, and never delays Refresh travel (Ticket 268)", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes, "2026-09-21T11:00:00Z", settings, { sourceReady: false });
+  try {
+    await advance(9_000);
+    expect(routes).not.toHaveBeenCalled();
+    await advance(1_350);
+    expect(routes).toHaveBeenCalledTimes(1);
+  } finally { await day.done(); }
+  resetTravelViewCacheForTest();
+  const manualDay = await openDay(dayServer().routes, "2026-09-21T11:00:00Z", settings, { sourceReady: false });
+  try {
+    const before = Date.now();
+    await act(async () => { latest().refresh(); await vi.advanceTimersByTimeAsync(350); });
+    expect(Date.now() - before).toBe(350);
+    expect(latest().view?.evidence?.legs).toHaveLength(3);
+  } finally { await manualDay.done(); }
 });

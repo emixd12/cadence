@@ -147,6 +147,10 @@ const travelRefreshStates = new Map<string, TravelRefreshState>();
 const travelBudgets = new Map<string, TravelBudgetState>();
 /** Ticket 268: per account, when an automatic request last failed. Automatic requests wait 5 minutes after one. */
 const travelFailures = new Map<string, number>();
+/** Ticket 268: automatic requests wait this long at most for the Calendar reads that feed travel to settle. */
+export const TRAVEL_SOURCE_WAIT_MS = 10_000;
+/** Per account and date: when travel first waited for its sources, so a remount does not restart the wait. */
+const travelSourceWaits = new Map<string, number>();
 /** Accounts restored from the browser session, whose device sample was not kept. The next sample becomes the baseline. */
 const travelDeviceUnknown = new Set<string>();
 // A generated brief asks for the day once, including when the Timeline mounts later.
@@ -179,7 +183,7 @@ function clearTravelCacheForAccount(accountId: string): void {
 /** Settings and Behavior location saves fire this event from screens where no Timeline is mounted, so invalidate at module level too. */
 function invalidateAllTravel(): void {
   travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear();
-  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); removeTravelSession();
+  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); removeTravelSession();
 }
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
 /**
@@ -191,11 +195,11 @@ export function clearTravelSession(): void { invalidateAllTravel(); }
 export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: boolean }> = {}): void {
   if (options.keepSession) {
     travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
-    travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear();
+    travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear();
     return;
   }
   travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
-  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); removeTravelSession();
+  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); removeTravelSession();
 }
 
 /**
@@ -305,10 +309,16 @@ export function useTravelContext(input: Readonly<{
   client?: TravelClient | null; corrections?: readonly TravelCorrection[];
   /** The account's timezone, for the plan's local date. Defaults to America/New_York. */
   timezone?: string;
+  /**
+   * Ticket 268: false while a connected Calendar read that feeds travel has not settled.
+   * Automatic requests wait for it, at most 10 seconds; Refresh travel does not. Defaults to true.
+   */
+  sourceReady?: boolean;
 }>): TravelState {
   const client = input.client === undefined ? webTravelClient : input.client;
   const correctionsKey = JSON.stringify(input.corrections ?? []);
   const timezone = input.timezone ?? "America/New_York";
+  const sourceReady = input.sourceReady ?? true;
   const stateKey = JSON.stringify([input.accountId, input.localDate, input.sourceKey, correctionsKey]);
   const empty: Omit<StoredTravel, "key"> = { view: null, message: null, stale: false, pending: false, observedAt: null, resumesAt: null };
   const [stored, setStored] = useState<StoredTravel>({ key: "", ...empty });
@@ -336,6 +346,13 @@ export function useTravelContext(input: Readonly<{
     let expiry: ReturnType<typeof setTimeout> | undefined;
     let renewal: ReturnType<typeof setTimeout> | undefined;
     let planTimer: ReturnType<typeof setTimeout> | undefined;
+    let sourceTimer: ReturnType<typeof setTimeout> | undefined;
+    // Until the Calendar settles, the source key is partial: a request now would be spent again
+    // when the events arrive. Wait at most TRAVEL_SOURCE_WAIT_MS from the first wait for this day.
+    const waitKey = JSON.stringify([accountId, localDate]);
+    if (sourceReady) travelSourceWaits.delete(waitKey);
+    else if (!travelSourceWaits.has(waitKey)) travelSourceWaits.set(waitKey, Date.now());
+    const sourcesSettled = () => sourceReady || Date.now() - (travelSourceWaits.get(waitKey) ?? 0) >= TRAVEL_SOURCE_WAIT_MS;
     let permission: PermissionStatus | null = null;
     const foreground = () => !document.hidden && document.hasFocus() && navigator.onLine;
     const stop = () => { generation++; committed = false; controller?.abort(); clearTimeout(timer); if (inFlight) { inFlight = false; patch({ pending: false }); } };
@@ -405,6 +422,11 @@ export function useTravelContext(input: Readonly<{
       if (!active || inFlight) return;
       const reset = budgetReset();
       if (reset) { pauseBudget(reset); return; }
+      if (!options.refreshTravel && !sourcesSettled()) {
+        clearTimeout(sourceTimer);
+        sourceTimer = setTimeout(() => evaluate(), Math.max(0, (travelSourceWaits.get(waitKey) ?? Date.now()) + TRAVEL_SOURCE_WAIT_MS - Date.now()));
+        return;
+      }
       const now = new Date().toISOString();
       const cached = travelViewCache.get(stateKey);
       const last = travelRefreshStates.get(accountId) ?? null;
@@ -622,7 +644,7 @@ export function useTravelContext(input: Readonly<{
       active = false;
       // A committed request finishes and keeps its result for remount; anything earlier is cancelled.
       if (!committed) { generation++; controller?.abort(); }
-      clearTimeout(timer); clearTimeout(expiry); clearTimeout(renewal); clearTimeout(planTimer); clearInterval(movement);
+      clearTimeout(timer); clearTimeout(expiry); clearTimeout(renewal); clearTimeout(planTimer); clearTimeout(sourceTimer); clearInterval(movement);
       manual.current = () => undefined;
       permission?.removeEventListener("change", revoked);
       window.removeEventListener("cadence:brief-travel", briefReady);
@@ -631,7 +653,7 @@ export function useTravelContext(input: Readonly<{
       document.removeEventListener("visibilitychange", visibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- stateKey covers localDate, sourceKey and corrections.
-  }, [client, input.accountId, input.enabled, stateKey, timezone]);
+  }, [client, input.accountId, input.enabled, stateKey, timezone, sourceReady]);
   const visible = input.enabled && (!state.view || state.view.accountId === input.accountId);
   return visible
     ? { view: state.view, message: state.message, stale: state.stale, pending: state.pending, observedAt: state.observedAt, resumesAt: state.resumesAt, refresh }

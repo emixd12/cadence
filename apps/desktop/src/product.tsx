@@ -14,7 +14,7 @@ import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from ".
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
 import { openMacLocationSettings, readMacForegroundLocation, readMacLocationPermission } from "./foreground-location";
-import { useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
+import { DESKTOP_CALENDAR_NOT_LOADED_LABEL, useDesktopGoogleCalendar } from "./calendar/use-google-calendar";
 import { useDesktopConnectors } from "./calendar/use-connectors";
 import { ConnectorLibrary, ConnectorUnavailable, connectorUnavailableReason } from "@/components/settings/ConnectorLibrary";
 import { IcloudCalendarPanel } from "@/components/settings/IcloudCalendarPanel";
@@ -350,6 +350,8 @@ export function Product() {
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     timezone: profile?.timezone ?? "America/New_York",
+    // Ticket 268: automatic travel requests wait for the first Calendar read to settle.
+    sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} },
       bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null, locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? []) });
   const calendarContext = {

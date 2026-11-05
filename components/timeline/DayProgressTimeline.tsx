@@ -175,7 +175,9 @@ export function DayProgressTimeline({
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
-    localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone });
+    localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone,
+    // Ticket 268: automatic travel requests wait for the Google Calendar read that feeds travel to settle.
+    sourceReady: live.state !== "not_loaded" });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
   const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,

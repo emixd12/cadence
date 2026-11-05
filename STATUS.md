@@ -23,6 +23,9 @@ follow the trip refresh plan and keep every leave time they already know.
   text. Sign-out on web and Mac, account change, travel off, settings change and day change clear it.
 - From earlier reviews: resolving the last stop while an earlier stop remains shows the trip home as
   changed with Refresh travel. Timeline collisions mark a Behavior inside a trip after a late arrival.
+- Automatic requests wait for the Google Calendar read that feeds travel to settle, at most 10
+  seconds, on web and Mac. Refresh travel does not wait. A reload with a late Calendar makes no
+  second whole-day request.
 - A typical day with a fake clock makes 6 route requests and routes 8 legs, as `docs/COSTS.md` assumes.
 - Not decided: wording for the 80% automatic pause. It shows nothing new; a response reporting the
   whole budget used shows the approved paused line (P-018 note).
