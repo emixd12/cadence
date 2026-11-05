@@ -15876,6 +15876,10 @@ Implementation notes:
   `DEPARTURE_PHRASES_AWAITING_APPROVAL` in `packages/core/src/services/departure-phrases.ts`.
 - `TRAVEL_ESTIMATE_LIFETIME_SECONDS` in `travel-refresh-policy.ts` is the shipped 5-minute expiry,
   used by the provider adapter and the bench.
+- Verifier fixes: `tests/departure-wording-coverage.test.ts` fails on any builder sentence missing from
+  the review. The overlap label says "Return time unknown." only for a return leg that is not
+  current or an unknown return leg (`timeline-context.resolver.ts`). Travel timing shows a repeated
+  sentence once per view.
 - Tests: `tests/departure-states-bench.dom.test.tsx`. Test fixtures that check copy rather than
   timing keep their far-future expiry.
 Dependencies: Ticket 265.

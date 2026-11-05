@@ -89,6 +89,16 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "home-appears-by": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: at("12:00") }),
   "home-expired": () => line({ ...HOME_TRIP, state: "estimate_expired" }),
   "home-changed": () => line({ ...HOME_TRIP, state: "trip_changed" }),
+  "appears-later": () => detail({ state: "appears_later", appearsAt: null }),
+  "last-estimate-past-leave-home": () => detail({ ...old, ...HOME_TRIP, state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("15:40") }),
+  "line-late-before-leave": () => line({ state: "late", lateBasis: "evidence", minutesUntilLeave: 10, arriveAt: at("14:05") }),
+  "line-last-estimate-leave-now": () => line({ ...old, state: "leave_now", minutesUntilLeave: null }),
+  "line-last-estimate-late-before": () => line({ ...old, state: "late", lateBasis: "evidence", minutesUntilLeave: 10, arriveAt: at("14:05") }),
+  "line-last-estimate-late-after": () => line({ ...old, state: "late", lateBasis: "evidence", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "line-last-estimate-past-leave": () => line({ ...old, state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "home-appears-later": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: null }),
+  "home-ready": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: at("12:00"), appearsOverdue: true }),
+  "home-no-route": () => line({ ...HOME_TRIP, state: "no_route" }),
   "paused": () => detail({ state: "paused", resumesAt: null }),
 };
 

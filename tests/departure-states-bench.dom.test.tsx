@@ -83,6 +83,7 @@ it("walks the state switch through every state and shows the bench clock", async
     if (state.expected === "none") {
       expect(travelLines).toHaveLength(0);
       expect(statusLine()).toBe("");
+      expect(gymRow()).not.toContain("Return time unknown");
     } else {
       expect(container.querySelector("[data-bench-model-line]")?.textContent, state.id).not.toContain("None");
       // Ticket 273 adds the place, attendance and start steps to the drawer and dialog.
@@ -120,7 +121,9 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("The leave time for Dentist depends on Gym.");
   await choose("paused");
   expect(statusLine()).toContain("Travel estimates resume on December 1.");
-  expect(text("Dentist drawer")).toContain("Travel estimates resume on December 1.");
+  for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
+    expect(text(label).split("Travel estimates resume on December 1.").length - 1, label).toBe(1);
+  }
 });
 
 it("shows the drawer, dialog, Behavior row and bubble after the 5-minute expiry", async () => {

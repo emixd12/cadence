@@ -25,9 +25,19 @@ describe("shared Timeline travel occupancy", () => {
     const resolve = (scheduledFor: string) => resolveTimelineOccurrenceContext({ occurrenceId: "behavior", scheduledFor,
       runningStartedAt: null, estimate: { kind: "known", seconds: 900, durationLabel: "15 minutes", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
       events: [], freshness: { state: "current", refreshedAt: "2026-09-21T12:00:00Z", label: "Calendar current", canAssertNoOverlap: true },
-      now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel });
+      now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel: { ...travel, unknownLegs: [{ role: "return", originCommitmentRef: "event", destinationCommitmentRef: null, reason: "timing_unknown" }] } });
     expect(resolve("2026-09-21T13:45:00Z")).toMatchObject({ overlappingEventIds: ["event"] });
     expect(resolve("2026-09-21T18:30:00Z")).toMatchObject({ overlappingEventIds: [], overlapAssessment: "unknown", overlapLabel: "Return time unknown." });
+  });
+  it("says nothing about the trip home on a day with no trips (Ticket 266)", () => {
+    const resolve = (extra: Partial<TravelEvidenceResult>) => resolveTimelineOccurrenceContext({ occurrenceId: "behavior", scheduledFor: "2026-09-21T18:30:00Z",
+      runningStartedAt: null, estimate: { kind: "unknown", reason: "insufficient_samples", sampleCount: 0, requiredSampleCount: 3, lookbackDays: 90 },
+      events: [], freshness: { state: "current", refreshedAt: "2026-09-21T12:00:00Z", label: "Calendar current", canAssertNoOverlap: true },
+      now: Temporal.Instant.from("2026-09-21T12:00:00Z"), travel: { ...travel, segments: [], ...extra } }).overlapLabel;
+    expect(resolve({ legs: [], unknownLegs: [] })).not.toBe("Return time unknown.");
+    expect(resolve({ legs: [] })).not.toBe("Return time unknown.");
+    expect(resolve({ legs: [{ leg: { id: "return", role: "return" }, state: "unavailable", estimate: null }] as never })).toBe("Return time unknown.");
+    expect(resolve({ legs: [{ leg: { id: "return", role: "return" }, state: "current", estimate: null }] as never })).not.toBe("Return time unknown.");
   });
   it("names the overlapped trip and its span (Ticket 261)", () => {
     const legs = [{ leg: { id: "out", role: "outbound", destinationCommitmentRef: "event" }, state: "current", estimate: null },

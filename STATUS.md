@@ -19,6 +19,10 @@ real travel timing.
   production unavailable message.
 - The year-2999 expiries are gone from the bench fixtures. Captions say where a fixture holds the
   clock still on purpose. The 5-minute lifetime is one core constant used by the provider adapter.
+- Verifier fixes: the review lists 62 phrases, and a test runs both phrase builders over every state,
+  role and freshness and fails on any sentence missing from it. "Return time unknown." now shows only
+  when there is a trip home without a time, so a day with no trips shows no travel text. The drawer
+  and dialog show a repeated line, such as the pause, once.
 - Known gap, shown on the bench: no screen shows the place, attendance or start steps yet (Ticket
   273), and no screen shows the next-departure line (Ticket 269).
 

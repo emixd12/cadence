@@ -197,7 +197,7 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
   estimate: BehaviorDurationEstimate;
   events: readonly (NormalizedExternalEvent | ExternalEventSchedulingFact)[];
   freshness: ExternalEventFreshness;
-  travel?: Pick<TravelEvidenceResult, "segments" | "completeTrip"> & Partial<Pick<TravelEvidenceResult, "legs">> | null;
+  travel?: Pick<TravelEvidenceResult, "segments" | "completeTrip"> & Partial<Pick<TravelEvidenceResult, "legs" | "unknownLegs">> | null;
   /** Ticket 261: titles by commitment ref, to name the trip a Behavior overlaps. */
   travelLabels?: ReadonlyMap<string, string>;
   /** The account timezone for the trip's times. Defaults to America/New_York. */
@@ -295,12 +295,22 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     overlappingEventIds,
     overlapAssessment,
     overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel(input, travelCollision.segmentIds)
-      : overlapAssessment === "unknown" && input.travel && !input.travel.completeTrip ? RETURN_TIME_UNKNOWN
+      : overlapAssessment === "unknown" && returnTimeUnknown(input.travel) ? RETURN_TIME_UNKNOWN
       : overlapAssessment === "unknown" && hasUncertainTimedEvent
       ? `Event end unknown · ${input.freshness.label}`
       : overlapLabel(overlapAssessment, input.freshness, estimatedEnd !== null),
     freshness: input.freshness,
   };
+}
+
+/**
+ * Ticket 266: the trip home has no known time only when there is a trip home: a return leg that is
+ * not current, or an unknown return leg. A day with no trips says nothing about travel.
+ */
+function returnTimeUnknown(travel: Readonly<{ completeTrip: boolean; legs?: TravelEvidenceResult["legs"]; unknownLegs?: TravelEvidenceResult["unknownLegs"] }> | null | undefined): boolean {
+  if (!travel || travel.completeTrip) return false;
+  return (travel.legs ?? []).some((entry) => entry.leg.role === "return" && entry.state !== "current") ||
+    (travel.unknownLegs ?? []).some((leg) => leg.role === "return");
 }
 
 /** Names the trip a Behavior overlaps and that trip's travel span, from the colliding segments. */

@@ -257,12 +257,15 @@ function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh
   const developmentWarnings = developmentBuild ? [...new Set(legs.flatMap((item) => item.estimate?.warnings ?? []))] : [];
   const checked = trips.find((trip) => trip.checkedAt);
   const attribution = legs.find((item) => item.estimate?.attribution)?.estimate?.attribution;
+  // A trip leaving this stop names where it goes. The trip arriving here does not need to.
+  const text = (trip: DepartureTrip) => trip.originRef === eventId ? trip.linePhrase : trip.phrase;
+  // The same sentence once per view, such as the pause shared by every trip (Ticket 266).
+  const shown = trips.filter((trip, index) => trips.findIndex((other) => text(other) === text(trip)) === index);
   // One Refresh travel per view, on the first line that needs it.
-  const refreshKey = trips.find((trip) => trip.action === "refresh")?.key ?? null;
+  const refreshKey = shown.find((trip) => trips.some((other) => text(other) === text(trip) && other.action === "refresh"))?.key ?? null;
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
-    {trips.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
-      {/* A trip leaving this stop names where it goes. The trip arriving here does not need to. */}
-      {trip.originRef === eventId ? trip.linePhrase : trip.phrase}
+    {shown.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
+      {text(trip)}
       {trip.key === refreshKey && refresh ? <>{" "}<button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{DEPARTURE_REFRESH_LABEL}</button></> : null}
     </p>)}
     {margin ? <p>{margin}</p> : null}
