@@ -92,7 +92,8 @@ describe("DayProgressTimeline", () => {
     const link = container.querySelector<HTMLAnchorElement>('article[data-occurrence-id="occurrence-1"] [data-travel-navigation]')!;
     expect(link.textContent).toBe("Directions in Google Maps");
     expect(new URL(link.href).searchParams.get("destination")).toBe("Riverside track");
-    expect(new URL(link.href).searchParams.get("travelmode")).toBe("transit");
+    // The place was routed walking although usual travel is transit: Directions follows the route.
+    expect(new URL(link.href).searchParams.get("travelmode")).toBe("walking");
 
     // No place text, no link: the row never builds one from route content.
     input.timeline.daySections[0]!.occurrences = [occurrence];

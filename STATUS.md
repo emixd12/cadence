@@ -30,6 +30,11 @@ and details dialog now lead with the leave time, and Directions is one tap away 
   Directions from a resolved place, so an expired estimate keeps it (correction C2). The link
   carries only source-authored text. The row uses the Behavior's own place text, which the shared
   timeline service now passes as the optional `placeText` on the Timeline occurrence view.
+  Directions opens in the routed leg's mode, so a mode remembered for a place wins over usual
+  travel (verifier R2).
+- Ticket 269 follow-up (verifier R1): the next-departure line's live region also changes on the
+  next trip's freshness and action, so a refreshed "Last estimate" line is spoken. When Refresh
+  travel removes its own button, focus moves to the line.
 - The attendance and destination correction sits behind one native "Change for this trip"
   disclosure. Saving closes it and returns focus to it. `INT-TRAVEL-003` is kept.
 - The details dialog has no Duration row (from Ticket 262).

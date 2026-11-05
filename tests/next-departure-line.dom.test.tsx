@@ -168,13 +168,20 @@ it("keeps the screen-reader region silent on a countdown minute and speaks on a 
   // 9:05 AM: the trip to Gym became soon, so the region spoke once.
   expect(announced()).toBe("Last estimate: leave by 9:35 AM for Gym · checked 6:55 AM.");
   await moveClock(550);
-  await act(async () => refreshButtons()[0]!.click());
-  // Same state and trip: the fresh estimate is shown but not spoken.
-  expect(announced()).toBe("Last estimate: leave by 9:35 AM for Gym · checked 6:55 AM.");
+  const button = refreshButtons()[0]!;
+  button.focus();
+  await act(async () => button.click());
+  // The refresh replaced the last estimate, so the region speaks the fresh line (verifier R1).
+  const fresh = "Leave in 25 minutes, by 9:35 AM for Gym from Home · walking, arrive 9:55 AM.";
+  expect(announced()).toBe(fresh);
+  // The button is gone; focus moves to the line instead of the page.
+  expect(refreshButtons()).toHaveLength(0);
+  expect(document.activeElement).toBe(line());
   for (const m of [551, 552, 553, 554]) {
     await moveClock(m);
     expect(line()!.textContent).toContain(`Leave in ${575 - m} minutes`);
-    expect(announced(), clock(m)).toBe("Last estimate: leave by 9:35 AM for Gym · checked 6:55 AM.");
+    // A countdown minute stays silent.
+    expect(announced(), clock(m)).toBe(fresh);
   }
   await moveClock(575);
   expect(announced()).toBe("Last estimate: leave now for Gym · checked 9:10 AM.");

@@ -281,8 +281,9 @@ Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a
 verified route. Directions needs a resolved place: a route that reached this stop, even
-after its 5-minute estimate expired (Ticket 271, correction C2). The link carries only the
-source-authored text. The attendance and destination correction sits behind one native
+after its 5-minute estimate expired (Ticket 271, correction C2). Directions opens in the mode
+that route used, which can be a mode remembered for that place, and falls back to usual travel.
+The link carries only the source-authored text. The attendance and destination correction sits behind one native
 **Change for this trip** disclosure; saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
 predicted scheduled position. When location is unavailable, Home or the previous
 stop is the origin. Missing Home withholds only the trip back; current-location-

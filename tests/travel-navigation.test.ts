@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTravelNavigationLink, travelDestinationResolved } from "@cadence/core/services/travel-navigation";
+import { buildTravelNavigationLink, travelDestinationResolved, travelDestinationRoute } from "@cadence/core/services/travel-navigation";
 import type { TravelResolvedLegEvidence } from "@cadence/core/types/travel";
 import { validateForegroundLocation } from "@/lib/ui/foreground-location";
 import { Temporal } from "@js-temporal/polyfill";
@@ -56,6 +56,11 @@ describe("Directions needs a resolved place, not a current estimate (Ticket 271,
     expect(resolved([leg("current", { source: "correction" })])).toBe(false);
     expect(resolved([leg("current")], "behavior")).toBe(false);
     expect(resolved([leg("current", { source: "behavior" })], "behavior")).toBe(true);
+  });
+  it("gives the mode the place was routed in, which may be remembered for that place", () => {
+    const transit = { ...leg("current"), leg: { ...leg("current").leg, mode: "transit" as const } };
+    expect(travelDestinationRoute({ legs: [transit] }, "stop", "calendar")).toEqual({ mode: "transit" });
+    expect(travelDestinationRoute({ legs: [leg("unavailable", { estimate: false })] }, "stop", "calendar")).toBeNull();
   });
 });
 

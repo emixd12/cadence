@@ -1095,9 +1095,10 @@ Current source rules (`packages/core/src/services/travel-navigation.ts`,
 
 - Desktop always uses Apple Maps. Web uses Apple Maps when the platform or user
   agent names Mac, iPhone, iPad or iPod, and Google Maps elsewhere.
-- Directions replace Search only when a route has reached the stop's place and a
-  usual travel mode is set. An expired estimate still counts (Ticket 271, correction
-  C2). A missing, failed or withdrawn route says Search.
+- Directions replace Search only when a route has reached the stop's place. An
+  expired estimate still counts (Ticket 271, correction C2). Directions uses that
+  route's mode, which can be a mode remembered for the place. A missing, failed or
+  withdrawn route says Search.
 - Apple Maps uses `daddr` with `dirflg` `w`, `r` or `d`. Cycling has no flag; the
   details show "Choose cycling in Apple Maps; this link cannot preselect it."
   Google Maps uses `/maps/dir/?api=1&destination=…&travelmode=…`, with `bicycling`

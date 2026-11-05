@@ -81,7 +81,7 @@ describe("Calendar details order", () => {
     expect(labels(dialog)).toEqual(["Time", "Location", "Calendar", "Attendees", "Organizer", "Conference", "Attachments"]);
     expect(dialog.querySelector("article")!.firstElementChild?.getAttribute("aria-label")).toBe("Travel timing");
     const text = dialog.querySelector("article")!.textContent!;
-    const positions = ["Leave by", "Search in Google Maps", "Change for this trip", "Time", "12 Harbor Street", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form"]
+    const positions = ["Leave by", "Directions in Google Maps", "Change for this trip", "Time", "12 Harbor Street", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form"]
       .map((part) => text.indexOf(part));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -295,7 +295,7 @@ describe("Ticket 271: the leave line comes first", () => {
       expect(first.className).not.toMatch(/font-(bold|semibold|medium)/);
     }
     // The drawer answers under the title, before the calendar line.
-    expect(drawer.querySelector("h3")!.nextElementSibling?.querySelector('[aria-label="Travel timing"]')).not.toBeNull();
+    expect(drawer.querySelector("h3")!.nextElementSibling?.getAttribute("aria-label")).toBe("Travel timing");
     expect(drawer.textContent!.indexOf(first(drawer))).toBeLessThan(drawer.textContent!.indexOf("Work · "));
     expect(dialog.querySelector("[data-departure-lead]")!.className).toContain("text-base");
     expect(drawer.querySelector("[data-departure-lead]")!.className).toContain("text-sm");
@@ -313,6 +313,25 @@ describe("Ticket 271: the leave line comes first", () => {
       expect(url.searchParams.get("travelmode")).toBe("walking");
     }
     expect(drawer.textContent!.indexOf("Directions in Google Maps")).toBeLessThan(drawer.textContent!.indexOf("View details"));
+  });
+
+  it("opens Directions in the mode the place was routed in, not the usual mode (Ticket 217 remembered mode)", async () => {
+    const transit = { ...travel, legs: travel.legs.map((item) => ({ ...item, leg: { ...item.leg, mode: "transit" as const } })) };
+    const { drawer, dialog } = await renderBoth(transit, "2026-11-01T04:30:00Z", { mode: "walking" });
+    for (const view of [drawer, dialog]) {
+      const link = view.querySelector<HTMLAnchorElement>("[data-travel-navigation]")!;
+      expect(link.textContent).toBe("Directions in Google Maps");
+      expect(new URL(link.href).searchParams.get("travelmode")).toBe("transit");
+    }
+  });
+
+  it("renders no empty travel block in the drawer for an event with no trip", async () => {
+    const departure = modelAt({ ...travel, legs: [] }, "2026-11-01T04:30:00Z");
+    await act(() => root.render(<ExternalEventPreview id="preview" events={[full]} timezone="America/New_York" onDismiss={() => undefined} onOpen={() => undefined}
+      travel={{ ...travel, legs: [] }} departure={departure} now="2026-11-01T04:30:00Z" />));
+    const article = container.querySelector('[data-calendar-drawer="preview"] article')!;
+    expect(article.querySelector("h3")!.nextElementSibling?.tagName).toBe("P");
+    expect([...article.querySelectorAll("div")].every((element) => element.childElementCount > 0)).toBe(true);
   });
 
   it("says Search for a place no route has reached, and carries only the source text", async () => {

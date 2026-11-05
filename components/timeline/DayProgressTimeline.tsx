@@ -19,7 +19,6 @@ import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.reso
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
-import { travelDestinationResolved } from "@cadence/core/services/travel-navigation";
 import { DEPARTURE_REFRESH_LABEL } from "@cadence/core/services/departure-phrases";
 import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
@@ -760,8 +759,8 @@ function travelDetails({ occurrenceId, placeText, travel, departure, now, timezo
   const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh });
   if (!timing) return null;
   return <>{timing}
-    <TravelNavigationLink locationText={placeText} preference={navigationPreference} mode={usualMode}
-      resolved={travelDestinationResolved(travel, occurrenceId, "behavior")} onOpenExternal={onOpenExternal} />
+    <TravelNavigationLink locationText={placeText} preference={navigationPreference} usualMode={usualMode}
+      travel={travel} stopRef={occurrenceId} source="behavior" onOpenExternal={onOpenExternal} />
     <TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></>;
 }
 
@@ -779,7 +778,10 @@ export type TravelStatusLines = Readonly<{
   /** One status message or the weather state. Null: none. */
   note: string | null;
   noteRefresh: boolean;
-  /** Changes only when the next trip's state or key, the pause or the note changes. Never on a countdown minute. */
+  /**
+   * Changes only when the next trip's state, key, freshness or action, the pause or the note
+   * changes. Never on a countdown minute.
+   */
   signature: string;
 }>;
 
@@ -803,7 +805,9 @@ export function travelStatusLines({ departure, status, message = null, hasEviden
   // Ticket 218: say plainly when no weather margin could be added. A message comes first.
   const note = shown ?? (line ? travelWeatherStateText(status?.view?.evidence?.weather?.state) : null);
   const noteRefresh = !!shown && canRefresh && raw !== TRAVEL_CLEARANCE_MESSAGE && lineRefresh === null;
-  const signature = [next?.state ?? departure.state, next?.key ?? "", departure.resumesAt ?? "", note ?? ""].join("|");
+  // Freshness and action change once per expiry or refresh, so a refreshed "Last estimate" line is spoken.
+  const signature = [next?.state ?? departure.state, next?.key ?? "", next?.freshness ?? "", next?.action ?? "",
+    departure.resumesAt ?? "", note ?? ""].join("|");
   return { line, lineRefresh, note, noteRefresh, signature };
 }
 
@@ -818,12 +822,25 @@ export function TravelStatusLine({ departure, status, message = null, hasEvidenc
   // The polite region speaks only when the signature changes, so a countdown minute is silent.
   const [announced, setAnnounced] = useState({ signature: lines.signature, text: "" });
   if (announced.signature !== lines.signature) setAnnounced({ signature: lines.signature, text: announcement });
+  // A refresh that removes its own button would drop keyboard focus to the page. Keep it on the line.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLParagraphElement>(null);
+  const refreshedFromButton = useRef(false);
+  const hasButton = !!status && (lines.lineRefresh !== null || lines.noteRefresh);
+  const pending = status?.pending ?? false;
+  useEffect(() => {
+    if (!refreshedFromButton.current) return;
+    if (hasButton) { if (!pending) refreshedFromButton.current = false; return; }
+    refreshedFromButton.current = false;
+    const active = document.activeElement;
+    if (!active || active === document.body || !containerRef.current?.contains(active)) lineRef.current?.focus();
+  }, [hasButton, pending]);
   const refreshButton = (label: string) => status
-    ? <button type="button" className="text-link" disabled={status.pending} onClick={status.refresh}>{label}</button> : label;
+    ? <button type="button" className="text-link" disabled={status.pending} onClick={() => { refreshedFromButton.current = true; status.refresh(); }}>{label}</button> : label;
   const nextState = departure.next?.state ?? departure.state;
   return (
-    <div className={styles.travelStatus} data-travel-status>
-      {lines.line ? <p className={styles.departureLine} data-departure-line={nextState}
+    <div ref={containerRef} className={styles.travelStatus} data-travel-status>
+      {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState}
         data-departure-timed={TIMED_DEPARTURE_STATES.has(nextState) ? "true" : undefined}>
         {lines.lineRefresh === "lead"
           ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{lines.line.slice(DEPARTURE_REFRESH_LABEL.length)}</>

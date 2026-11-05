@@ -12,9 +12,22 @@ export function travelDestinationResolved(
   ref: string,
   source: Extract<TravelEndpointSource, "calendar" | "behavior">,
 ): boolean {
-  return (evidence?.legs ?? []).some((item) => item.leg.destinationCommitmentRef === ref &&
+  return travelDestinationRoute(evidence, ref, source) !== null;
+}
+
+/**
+ * The route that resolved this stop's place, with the mode it was routed in. That mode can be a
+ * remembered per-place choice (Ticket 217), so Directions opens in the same mode as the leave line.
+ */
+export function travelDestinationRoute(
+  evidence: Pick<TravelEvidenceResult, "legs"> | null | undefined,
+  ref: string,
+  source: Extract<TravelEndpointSource, "calendar" | "behavior">,
+): Readonly<{ mode: TravelMode }> | null {
+  const found = (evidence?.legs ?? []).find((item) => item.leg.destinationCommitmentRef === ref &&
     item.leg.provenance.destinationSource === source && item.estimate !== null &&
     (item.state === "current" || item.state === "stale"));
+  return found ? { mode: found.leg.mode } : null;
 }
 
 /** Only source-authored text belongs here, never provider-derived route content. */
