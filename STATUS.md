@@ -30,10 +30,17 @@ The owner approved the revamp on November 4, 2026 (`docs/DECISIONS.md`, 2026-11-
 "Travel advisory revamp"). Merges, deployments, hosted migrations, provider spending, Mac
 notarization and publication still wait for the owner's instruction each time.
 
+PR #189 merged on November 5, 2026 as `767e5bf`. Both Vercel projects built READY on that
+commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names marketing deployment
+`dpl_FEa4ooh58swsPGJF2oBsHFF61btS`. The app was redeployed as
+`dpl_8xfU1GASkj2zCNxGV4Bk6135X5Sr` and aliased to app.cadence-me.com. Login, trust evidence
+and marketing pages returned 200. Trust checks may read stale until the next scheduled
+collection.
+
 PR #182 merged on November 4 as `1a369e4`, on the owner's instruction. It carries the
 travel departure review, the rule that provider-terms questions are logged and never
 gate work, and Tickets 260–262. Main `1a369e4` deployed on November 4: both Vercel
-projects built READY on that commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names
+projects built READY on that commit. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` then named
 marketing deployment `dpl_9qRsEuWVTsV7869VeHSfNiPCpeGw`. The app was redeployed as
 `dpl_EWhEbMXHhZVLbe1TYuXtWcXcJUiN` and aliased to app.cadence-me.com. Login, trust evidence
 and marketing pages returned 200. Trust checks may read stale until the next scheduled
