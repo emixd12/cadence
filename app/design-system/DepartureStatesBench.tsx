@@ -78,7 +78,7 @@ export const DEPARTURE_BENCH_STATES: readonly DepartureBenchState[] = [
   { id: "late-clock", label: "Late: clock only", clock: "09:45", checked: "09:00", dentist: "located", gym: "located", expected: "late",
     description: "The route was on time, but the clock is 10 minutes past the leave time. Cadence cannot tell whether you left, so it says when you would arrive. The estimate is also old." },
   { id: "upcoming-dentist", label: "Upcoming: a trip crowds a Behavior", clock: "12:30", checked: "12:30", crowded: true, dentist: "located", gym: "located", expected: "upcoming",
-    description: "Gym is over. The next trip goes from Gym to Dentist, and Call Mom (1:30 PM, no place) falls inside it, so its collapsed row says so." },
+    description: "Gym has ended, so the next trip goes from Home to Dentist, and Call Mom (1:30 PM, no place) falls inside it, so its collapsed row says so." },
   { id: "head-home", label: "During the event: head home", clock: "14:15", checked: "14:15", dentist: "located", gym: "located", expected: "head_home",
     description: "Dentist is under way. The next trip is the trip home." },
   { id: "trip-changed", label: "Trip changed after resolving a stop", clock: "10:58", checked: "10:56", gymCompletedAt: "10:57", dentist: "located", gym: "located", expected: "trip_changed",
