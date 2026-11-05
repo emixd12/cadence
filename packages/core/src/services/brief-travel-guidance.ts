@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { travelLegsAfterLateArrival } from "../resolvers/travel.resolver";
 import type { TravelEvidenceResult, TravelMode } from "../types/travel";
 import type { TravelWeatherSummary, WeatherConditionId, WeatherModeSuggestion } from "../types/weather";
 
@@ -109,14 +110,29 @@ export function projectBriefTravelGuidance(input: Readonly<{
   const back: BriefTravelGuidanceItem[] = evidence.completeTrip && evidence.finalAvailabilityAt
     ? [{ kind: "return", at: evidence.finalAvailabilityAt }]
     : hasReturnLeg ? [] : [{ kind: "return_unknown" }];
+  const occupiedSpans = [...evidence.occupiedSpans.map((span) => ({ startAt: span.startAt, endAt: span.endAt })), ...unreliableTravelSpans(evidence)];
   return {
     localDate: input.localDate,
     observedAt,
     expiresAt,
     items: [...overlaps, ...departures, ...back].slice(0, MAX_ITEMS),
-    conflictingOptionIds: (input.options ?? []).filter((option) => overlapsTravelSpans(option, evidence.occupiedSpans)).map((option) => option.id),
-    occupiedSpans: evidence.occupiedSpans.map((span) => ({ startAt: span.startAt, endAt: span.endAt })),
+    conflictingOptionIds: (input.options ?? []).filter((option) => overlapsTravelSpans(option, occupiedSpans)).map((option) => option.id),
+    occupiedSpans,
     attribution: current.find((item) => item.estimate!.attribution)?.estimate!.attribution ?? null,
     weather: evidence.weather ? { state: evidence.weather.state, attribution: evidence.weather.attribution } : null,
   };
+}
+
+/**
+ * Ticket 265: a trip that would leave before the previous trip arrives may take anything from its
+ * ready time until its arrival delayed by that shortfall, the same span as the model projection.
+ */
+function unreliableTravelSpans(evidence: BriefTravelEvidence): Readonly<{ startAt: string; endAt: string }>[] {
+  const shortfalls = travelLegsAfterLateArrival(evidence.legs);
+  return evidence.legs.flatMap((entry) => {
+    const shortfall = shortfalls.get(entry.leg.id);
+    if (shortfall === undefined || !entry.estimate) return [];
+    const endAt = Temporal.Instant.from(entry.weather?.arrivalAt ?? entry.estimate.arrivalAt).add({ seconds: shortfall }).toString();
+    return [{ startAt: entry.leg.readyAt, endAt }];
+  });
 }

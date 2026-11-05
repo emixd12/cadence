@@ -226,3 +226,25 @@ it("shows the owner's approval on the wording review", async () => {
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-sample]')?.textContent).toBe("Refresh travel to get the leave time.");
   expect(container.querySelector('[data-wording-id="appears-overdue"] [data-wording-status]')?.textContent).toContain("owner change R1");
 });
+
+it("gives every line that starts with Refresh travel its own button when two trips are due (owner change R1)", async () => {
+  await render("fresh");
+  const leading = (root: Element) => [...root.querySelectorAll("p")].filter((line) => line.textContent?.startsWith("Refresh travel "));
+  for (const time of ["12:00", "13:30"]) {
+    await moveClock(time);
+    for (const label of ["Dentist drawer", "Dentist Calendar details"]) {
+      const lines = leading(surface(label));
+      expect(lines.map((line) => line.textContent), `${time} ${label}`).toEqual(["Refresh travel to get the leave time.", "Refresh travel to get the leave time for the trip home."]);
+      for (const line of lines) {
+        const buttons = line.querySelectorAll("button");
+        expect(buttons, `${time} ${label}`).toHaveLength(1);
+        expect(buttons[0]!.textContent).toBe("Refresh travel");
+        expect(line.textContent).not.toMatch(/Refresh travel\s*Refresh travel/);
+      }
+    }
+    const summary = surface("Timeline").querySelector<HTMLElement>('[data-occurrence-id="bench-gym"] summary');
+    if (summary && !summary.closest("details")?.open) await act(() => summary.click());
+    const row = surface("Timeline").querySelector('[data-occurrence-id="bench-gym"]')!;
+    for (const line of leading(row)) expect(line.querySelectorAll("button"), `${time} Gym row`).toHaveLength(1);
+  }
+});

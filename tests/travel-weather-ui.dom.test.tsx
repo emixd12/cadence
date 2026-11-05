@@ -239,6 +239,18 @@ describe("Ticket 261: a stop between two trips", () => {
     expect(lines()).toEqual(["Leave by 12:30 PM · walking, arrive 12:50 PM."]);
   });
 
+  it("gives each due trip's Refresh travel line its own button, all running the same refresh", async () => {
+    const onRefresh = vi.fn();
+    const due = { ...two(), legs: two().legs.map((entry) => ({ ...entry, state: "unavailable" as const, estimate: null, reason: "outside_route_window" })) };
+    const departure = resolveDepartureModel({ evidence: due, now: "2026-11-01T10:00:00Z", timezone: "UTC", arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null, stops });
+    await act(() => root.render(<>{renderTravelTiming({ eventId: "dentist", travel: due, departure, now: "2026-11-01T10:00:00Z", timezone: "UTC", refresh: { onRefresh, pending: false } })}</>));
+    expect(lines()).toEqual(["Refresh travel to get the leave time.", "Refresh travel to get the leave time for Gym."]);
+    const buttons = [...container.querySelectorAll("button")];
+    expect(buttons.map((button) => button.textContent)).toEqual(["Refresh travel", "Refresh travel"]);
+    for (const button of buttons) await act(() => button.click());
+    expect(onRefresh).toHaveBeenCalledTimes(2);
+  });
+
   it("shows each expired trip once, with one Refresh travel", async () => {
     const expired = two("2026-11-01T08:05:00Z");
     const stale = { ...expired, legs: expired.legs.map((entry) => ({ ...entry, state: "stale" as const, estimate: null, reason: "Route estimate expired." })) };

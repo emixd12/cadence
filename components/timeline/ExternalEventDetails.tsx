@@ -261,19 +261,21 @@ function TravelTiming({ eventId, trips, travel, context, onOpenExternal, refresh
   const text = (trip: DepartureTrip) => trip.originRef === eventId ? trip.linePhrase : trip.phrase;
   // The same sentence once per view, such as the pause shared by every trip (Ticket 266).
   const shown = trips.filter((trip, index) => trips.findIndex((other) => text(other) === text(trip)) === index);
-  // One Refresh travel per view. A line that starts with "Refresh travel" carries it as its own
-  // first words, so the words never repeat (Ticket 266, owner change R1).
+  // A line that starts with "Refresh travel" carries the button as its own first words, so the
+  // words never repeat (owner change R1). Every such line has one, and all run the same refresh.
+  // Lines that only need a refresh share one trailing button, and only when no line leads with it.
   const needsRefresh = (trip: DepartureTrip) => trips.some((other) => text(other) === text(trip) && other.action === "refresh");
   const leadsWithRefresh = (trip: DepartureTrip) => text(trip).startsWith(`${DEPARTURE_REFRESH_LABEL} `);
-  const refreshKey = (shown.find((trip) => needsRefresh(trip) && leadsWithRefresh(trip)) ?? shown.find(needsRefresh))?.key ?? null;
+  const anyLeads = shown.some(leadsWithRefresh);
+  const trailingKey = anyLeads ? null : shown.find(needsRefresh)?.key ?? null;
   const refreshButton = (label: string) => refresh
     ? <button type="button" className="text-link" disabled={refresh.pending} onClick={refresh.onRefresh}>{label}</button> : label;
   return <div className="grid gap-1 text-xs leading-5" aria-label="Travel timing">
     {shown.map((trip) => <p key={trip.key} data-departure-state={trip.state}>
-      {trip.key === refreshKey && leadsWithRefresh(trip)
+      {leadsWithRefresh(trip)
         ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{text(trip).slice(DEPARTURE_REFRESH_LABEL.length)}</>
         : text(trip)}
-      {trip.key === refreshKey && !leadsWithRefresh(trip) && refresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
+      {trip.key === trailingKey && refresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
     </p>)}
     {margin ? <p>{margin}</p> : null}
     {travel?.completeTrip && travel.finalAvailabilityAt ? <p>{departureFreeAgainPhrase(travel.finalAvailabilityAt, context)}</p> : null}
