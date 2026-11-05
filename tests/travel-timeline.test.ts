@@ -247,6 +247,52 @@ describe("Ticket 268: last estimates, unreliable trips and a trip home that chan
     expect(mergeTravelLastEstimates(first, next, now)).toBe(next);
   });
 
+  describe("an estimate carries over only from the same origin (PR #191 review)", () => {
+    type Display = Omit<TravelEvidenceResult, "modelProjection">;
+    type Entry = Display["legs"][number];
+    const failed = (entry: Entry, leg: Partial<Entry["leg"]>): Entry => ({ leg: { ...entry.leg, ...leg, id: `${entry.leg.id}-new` },
+      state: "unavailable", estimate: null, reason: "provider_unavailable" });
+    const respond = (value: Display, legs: Entry[]): Display => ({ ...value, legs, segments: value.segments.filter((segment) => !segment.legId), unknownLegs: [] });
+    const stateOf = (merged: Display) => merged.legs.map((entry) => [entry.leg.role, entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef, entry.state, !!entry.estimate]);
+
+    it("a stop inserted before an unchanged destination, with the new leg failing", () => {
+      const first = chain("2026-09-16T15:30:00Z");
+      const [outbound, onward, home] = first.legs as [Entry, Entry, Entry];
+      // Coffee now sits between standup and review; the trip to review starts at coffee and fails.
+      const next = respond(first, [{ ...outbound, leg: { ...outbound.leg, id: "out-new" } }, failed(onward, { originCommitmentRef: "coffee" }), { ...home, leg: { ...home.leg, id: "home-new" } }]);
+      const merged = mergeTravelLastEstimates(first, next, now);
+      expect(stateOf(merged)[1]).toEqual(["onward", "coffee", "review", "rejected_revision", false]);
+      expect(merged.segments.some((segment) => segment.legId === `${onward.leg.id}-new`)).toBe(false);
+      const model = resolveDepartureModel({ evidence: merged, stops: [...stops, { ref: "review", label: "Review", startAt: "2026-09-16T14:30:00Z", endAt: "2026-09-16T15:30:00Z" }],
+        now, timezone: "UTC", arrivalBufferSeconds: 0, preparationSeconds: 0, pausedUntil: null });
+      expect(model.trips.find((trip) => trip.destinationRef === "review")).toMatchObject({ state: "trip_changed", action: "refresh", leaveAt: null });
+    });
+
+    it("two stops reordered", () => {
+      const first = chain("2026-09-16T15:30:00Z");
+      const [outbound, onward, home] = first.legs as [Entry, Entry, Entry];
+      // Review now comes first, from Home, and standup follows it. Both routes fail.
+      const next = respond(first, [
+        failed(onward, { role: "outbound", originCommitmentRef: null }),
+        failed(outbound, { role: "onward", originCommitmentRef: "review" }),
+        { ...home, leg: { ...home.leg, id: "home-new" } },
+      ]);
+      const merged = mergeTravelLastEstimates(first, next, now);
+      expect(stateOf(merged).slice(0, 2)).toEqual([["outbound", null, "review", "rejected_revision", false], ["onward", "review", "standup", "rejected_revision", false]]);
+    });
+
+    it("an onward trip whose earlier stop has passed keeps its estimate as an outbound trip", () => {
+      const first = chain("2026-09-16T15:30:00Z");
+      const [, onward, home] = first.legs as [Entry, Entry, Entry];
+      // Standup has ended and left the plan: the trip to review now leaves from Home, and its route failed.
+      const next = respond(first, [failed(onward, { role: "outbound", originCommitmentRef: null }), { ...home, leg: { ...home.leg, id: "home-new" } }]);
+      const merged = mergeTravelLastEstimates(first, next, "2026-09-16T14:10:00Z");
+      expect(merged.legs[0]).toMatchObject({ state: "current", leg: { id: `${onward.leg.id}-new`, role: "outbound" } });
+      expect(merged.legs[0]!.estimate?.departureAt).toBe(onward.estimate!.departureAt);
+      expect(merged.segments.filter((segment) => segment.legId === `${onward.leg.id}-new`).length).toBeGreaterThan(0);
+    });
+  });
+
   it("withdraws a trip's times when its source changed, its trip has passed, or it cannot leave before its stop ends", () => {
     const first = chain("2026-09-16T15:30:00Z");
     const changed = chain("2026-09-16T15:30:00Z", "2");

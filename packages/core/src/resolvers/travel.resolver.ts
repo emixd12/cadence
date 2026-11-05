@@ -435,16 +435,24 @@ function tripIdentity(leg: TravelEvidenceLeg): string {
  * device is ready at request time, so its ready time and origin say nothing about the trip. A leg
  * from the same stop must keep that stop's revision and ready time.
  */
-function sameTrip(left: TravelEvidenceLeg, right: TravelEvidenceLeg): boolean {
+function sameTrip(left: TravelEvidenceLeg, right: TravelEvidenceLeg, plannedStops: ReadonlySet<string>): "same" | "origin_changed" | "different" {
   if (tripIdentity(left) !== tripIdentity(right) || left.mode !== right.mode ||
     left.provenance.destinationSource !== right.provenance.destinationSource ||
     left.provenance.destinationRevision !== right.provenance.destinationRevision ||
-    left.provenance.grantRevision !== right.provenance.grantRevision) return false;
+    left.provenance.grantRevision !== right.provenance.grantRevision) return "different";
+  // The same stop: nothing about it may have changed.
   if (left.originCommitmentRef && left.originCommitmentRef === right.originCommitmentRef) {
     return left.readyAt === right.readyAt && left.provenance.originSource === right.provenance.originSource &&
-      left.provenance.originRevision === right.provenance.originRevision;
+      left.provenance.originRevision === right.provenance.originRevision ? "same" : "origin_changed";
   }
-  return true;
+  // From Home or the device both times: ready at request time, so nothing to compare.
+  if (!left.originCommitmentRef && !right.originCommitmentRef) return "same";
+  // The one fallback: an onward trip whose earlier stop has passed, now outbound from Home or the
+  // device. A stop still in the new plan has not passed; the stops were reordered instead.
+  if (left.role === "onward" && right.role === "outbound" && !right.originCommitmentRef &&
+    !plannedStops.has(left.originCommitmentRef ?? "")) return "same";
+  // A stop inserted or reordered before this one: an estimate from another origin never carries over.
+  return "origin_changed";
 }
 
 function shownArrival(entry: TravelResolvedLegEvidence): Temporal.Instant | null {
@@ -472,17 +480,23 @@ export function mergeTravelLastEstimates(
     ? [[tripIdentity(entry.leg), entry] as const] : []));
   /** Previous leg ID to the new leg that carries its estimate. */
   const carried = new Map<string, string>();
+  const plannedStops = new Set([...next.legs.map(({ leg }) => leg), ...(next.unknownLegs ?? [])]
+    .flatMap((leg) => [leg.originCommitmentRef, leg.destinationCommitmentRef]).filter((ref): ref is string => !!ref));
   const legs = next.legs.map((entry): TravelResolvedLegEvidence => {
     if (entry.estimate || entry.state !== "unavailable" || entry.reason === TRAVEL_LEG_READY_AFTER_END) return entry;
     const last = known.get(tripIdentity(entry.leg));
-    if (!last || !sameTrip(last.leg, entry.leg)) return entry;
+    if (!last) return entry;
+    const match = sameTrip(last.leg, entry.leg, plannedStops);
+    // The trip now starts somewhere else: it reads as changed, with Refresh travel.
+    if (match === "origin_changed") return { leg: entry.leg, state: "rejected_revision", estimate: null, reason: "Trip origin changed." };
+    if (match === "different") return entry;
     const arrival = shownArrival(last);
     if (!arrival || Temporal.Instant.compare(arrival, at) <= 0) return entry;
     carried.set(last.leg.id, entry.leg.id);
     return { leg: entry.leg, state: "current", estimate: last.estimate, reason: null,
       ...(last.late ? { late: true } : {}), ...(last.weather ? { weather: last.weather } : {}) };
   });
-  if (!carried.size) return next;
+  if (!carried.size) return legs.some((entry, index) => entry !== next.legs[index]) ? { ...next, legs, completeTrip: false, finalAvailabilityAt: null } : next;
   const carriedIds = new Set(carried.values());
   const renamed = (id: string) => { for (const [from, to] of carried) if (id.includes(from)) return id.split(from).join(to); return id; };
   const kept = previous.segments.filter((value) => value.legId && carried.has(value.legId))

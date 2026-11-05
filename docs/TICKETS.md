@@ -15970,7 +15970,9 @@ Implementation notes:
   send `trips`; a Daily Brief still asks for the whole day, which alone carries the token.
 - `mergeTravelLastEstimates` (travel resolver) merges every response per trip, matched on the
   stop each trip serves (the stop it goes to, or for the trip home the stop it leaves), so an
-  onward trip that becomes outbound keeps its time. A trip keeps its last estimate unless
+  onward trip that becomes outbound keeps its time. An estimate carries over only from the
+  same origin stop, or from an onward trip whose earlier stop has left the plan; a stop
+  inserted or reordered before a trip makes that trip read as changed (PR #191 review). A trip keeps its last estimate unless
   anything it was planned from changed, the new plan rejects it, it cannot leave before its stop
   ends, or it has arrived. A failed refresh keeps the view.
 - A changed source shows the last view with every time marked "Last estimate" until its
