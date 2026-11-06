@@ -235,7 +235,8 @@ npm run desktop:release:acceptance -- --same-schema /Applications/Cadence.app /p
 ```
 
 Set the expected version from the candidate's actual schema. Take the initial
-checkpoint before sign-in, synchronization, or user edits. The checker requires
+checkpoint after a normal quit with 0 pending writes, before the candidate's first
+launch and before user edits. The checker requires
 identical schemas and retained row content across every table; its report names
 excluded launch-bookkeeping columns. It also excludes completed local receipts
 for `commitNativeReminderPlan` and `recordNativeReminderCoverage` from content
@@ -244,6 +245,26 @@ string and exact sequence revision result, with nonempty `created_at` equal to
 `synced_at`. The report retains total table counts and gives excluded receipt
 counts for each operation. Pending, malformed, domain, and unknown outbox rows
 must retain every stored value. New rows may appear; table counts cannot decrease.
+
+A signed-in launch runs an account sync, so the after snapshot may also hold
+these three bookkeeping changes. The checker accepts each one only when the before
+row was eligible and the after row has the shape that sync writes:
+
+| Table | Rows that may change | Columns that may change | Required after-row shape |
+|---|---|---|---|
+| `account_sync_baselines` | the profile's baseline | `idempotency_key`, the three fingerprints, `baseline_json`, `completed_at` | all three fingerprints equal and 64 characters, a 64-character `idempotency_key`, valid JSON, nonempty `completed_at` |
+| `sync_cursors` | `name = 'account-sync'` | `value`, `updated_at` | `value` and `updated_at` equal the baseline's fingerprint and `completed_at` |
+| `reminder_deliveries` | `status = 'pending'` | `status`, `error`, `sent_at`, `processing_started_at`, `updated_at` | a stored status: still pending, or sent, failed or cancelled by hosted processing |
+
+Every other column stays fixed: the baseline's profile, hosted account, `choice` and
+`backup_path`; the cursor's profile and name; each delivery's identity, Occurrence,
+channel, schedule and import link. Other cursors and sent, failed or cancelled
+deliveries must match exactly. A table without one of these columns, or with no
+`account_sync_baselines` for the cursor rule, gets no allowance. The report lists
+each rule with its changeable and sync-shaped row counts per snapshot, and
+`launchSyncChanges` gives the number of rows accepted under each rule. The account
+sync also marks pending outbox rows synced and deletes their tombstones. Those
+changes still fail, which is why the initial checkpoint needs 0 pending writes.
 Domain changes such as automatic archiving or occurrence regeneration must be
 classified, not silently excluded. Default mode still requires a schema increase.
 Synthetic canaries prove only the scanned synthetic values are absent; never claim
@@ -650,7 +671,8 @@ Mac to the published version from its protected copies.
    candidate, open it, save a second copy, and compare the two with
    `npm run desktop:release:acceptance` (see "Signing-only upgrade acceptance"; use
    `--same-schema` when the schema is unchanged). No table may lose rows, and every
-   change must be classified. Install from a browser download of the DMG, which also
+   change must be classified. The checker classifies the candidate's launch-sync
+   bookkeeping itself; record its `launchSyncChanges` in the packet. Install from a browser download of the DMG, which also
    covers the first open, unless check 4 applies.
 4. **Real updater.** When the SQLite schema changes, or the last published version
    changed its updater files, check 3 installs through the real updater: **Install
