@@ -15,7 +15,6 @@ import type { DepartureModel, DepartureState } from "@cadence/core/types/departu
 import type { TravelCommitment, TravelEndpoint, TravelEvidenceResult, TravelPlannedLeg, TravelRouteEstimate } from "@cadence/core/types/travel";
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
-import { NEXT_TRIP_PRESENTATION, type NextDepartureLineSize, type NextTripMarker } from "@/components/timeline/next-trip-presentation";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
 import { TravelOffOffer, type TravelStepActions } from "@/components/timeline/TravelNextStep";
 import type { TravelCorrection } from "@/lib/ui/travel";
@@ -212,23 +211,9 @@ function InlineSurface({ children, label }: Readonly<{ children: ReactNode; labe
   </section>;
 }
 
-/** Ticket 270: the owner compares three markers, each with the line at two sizes. */
-export const NEXT_TRIP_MARKER_OPTIONS: readonly Readonly<{ id: NextTripMarker; letter: string; label: string; description: string }>[] = [
-  { id: "rail_label", letter: "A", label: "A: label in the left rail", description: "\"Leave 1:15\" beside the axis, with a tick at the leave time. Below 576 px it moves clear of Calendar markers." },
-  { id: "behavior_row", letter: "B", label: "B: slim row among the Behaviors", description: "\"Leave 1:15 PM for Dentist\" as a text row in time order, before the first Behavior at or after the leave time." },
-  { id: "axis_tick", letter: "C", label: "C: axis tick only", description: "A tick on the axis at the leave time. The time is in the next-departure line." },
-];
-export const NEXT_DEPARTURE_LINE_OPTIONS: readonly Readonly<{ id: NextDepartureLineSize; label: string }>[] = [
-  { id: "status", label: "Small status size (today)" },
-  { id: "title", label: "Behavior title size" },
-];
-
 const idleAction = async () => ({ status: "idle" as const, message: "Bench only. Nothing is saved." });
 
-export function DepartureStatesBench({ initialStateId, initialMarker, initialLine }: Readonly<{ initialStateId?: string; initialMarker?: string; initialLine?: string }>) {
-  const [marker, setMarker] = useState<NextTripMarker>(NEXT_TRIP_MARKER_OPTIONS.find((option) => option.id === initialMarker || option.letter === initialMarker?.toUpperCase())?.id ?? NEXT_TRIP_PRESENTATION.marker);
-  const [lineSize, setLineSize] = useState<NextDepartureLineSize>(NEXT_DEPARTURE_LINE_OPTIONS.find((option) => option.id === initialLine)?.id ?? NEXT_TRIP_PRESENTATION.line);
-  const markerOption = NEXT_TRIP_MARKER_OPTIONS.find((option) => option.id === marker)!;
+export function DepartureStatesBench({ initialStateId }: Readonly<{ initialStateId?: string }>) {
   const initial = DEPARTURE_BENCH_STATES.find((state) => state.id === initialStateId) ?? DEPARTURE_BENCH_STATES[0]!;
   const [stateId, setStateId] = useState(initial.id);
   const [clock, setClock] = useState(initial.clock);
@@ -333,17 +318,7 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
             <option value="development">Development (shows text production never shows)</option>
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-bold">Next trip marker (Ticket 270)
-          <select className="min-h-11 border border-line bg-background font-normal" value={marker} onChange={(change) => setMarker(change.target.value as NextTripMarker)} data-bench-marker>
-            {NEXT_TRIP_MARKER_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}{option.id === NEXT_TRIP_PRESENTATION.marker ? " (production now)" : ""}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-2 text-sm font-bold">Next-departure line size
-          <select className="min-h-11 border border-line bg-background font-normal" value={lineSize} onChange={(change) => setLineSize(change.target.value as NextDepartureLineSize)} data-bench-line-size>
-            {NEXT_DEPARTURE_LINE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}{option.id === NEXT_TRIP_PRESENTATION.line ? " (production now)" : ""}</option>)}
-          </select>
-        </label>
-        <p className="text-xs leading-5 text-muted-readable sm:col-span-2" data-bench-marker-note>{markerOption.description} Every marker keeps the magenta span from get-ready or leave time to arrival, for the next trip only. The owner picks one; production uses the constant in next-trip-presentation.ts.</p>
+        <p className="text-xs leading-5 text-muted-readable sm:col-span-2" data-bench-marker-note>Next trip (Ticket 270, decision D13): a magenta span on the axis from the leave time to arrival, for the next trip only. A short magenta leader runs from the top of the span into the left rail, with the leave time at its end. Leave now, late and passed leave times use the line&apos;s own words instead of a past time.</p>
         <div className="grid gap-2 sm:col-span-2">
           <label htmlFor="departure-bench-clock" className="text-sm font-bold">Bench clock</label>
           <div className="flex flex-wrap items-center gap-3">
@@ -371,15 +346,14 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
       <p className="text-sm font-bold" data-bench-build={development ? "development" : "production"}>{development ? "Development build" : "Production build"}</p>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label="Timeline" className="grid min-w-0 content-start gap-2">
-          <h3 className="text-sm font-bold">Timeline: next-departure line, markers and the expanded Gym row</h3>
+          <h3 className="text-sm font-bold">Timeline: next-departure line, next trip marker and the expanded Gym row</h3>
           <div ref={gymRow} className="min-w-0 border border-line bg-background">
             <DayProgressTimeline timeline={timeline}
               context={{ events, freshness: { state: "current", refreshedAt: checkedAt, label: "Calendar current", canAssertNoOverlap: true },
                 now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking",
                 onTravelCorrection: correct, openTravelSettings: steps.settings && "onOpen" in steps.settings ? steps.settings.onOpen : undefined,
                 openBehavior: () => setStepNote("Opens Behaviors, where Gym's place is changed.") }}
-              statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction}
-              nextTripPresentation={{ marker, line: lineSize }} />
+              statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction} />
           </div>
         </section>
         <div className="grid min-w-0 content-start gap-8">

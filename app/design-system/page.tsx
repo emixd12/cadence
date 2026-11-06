@@ -370,8 +370,6 @@ type DesignSystemPageProps = Readonly<{
   searchParams?: Promise<{
     preview?: string | string[];
     state?: string | string[];
-    marker?: string | string[];
-    line?: string | string[];
   }>;
 }>;
 
@@ -408,8 +406,7 @@ export default async function DesignSystemPage({
         <main className="min-h-dvh bg-background text-foreground">
           <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
             <a href="/design-system" className="w-fit text-sm underline underline-offset-4">Back to the design-system bench</a>
-            <DepartureStatesBench initialStateId={selectedFixtureState ?? undefined}
-              initialMarker={firstSearchParam(params?.marker) ?? undefined} initialLine={firstSearchParam(params?.line) ?? undefined} />
+            <DepartureStatesBench initialStateId={selectedFixtureState ?? undefined} />
           </div>
         </main>
       </WebRuntimeProvider>
@@ -586,6 +583,7 @@ function Foundations() {
                 />
                 <Swatch name="Accent" className="bg-accent text-background" />
                 <Swatch name="Calendar overlap border" className="border border-[var(--calendar-overlap)] text-foreground" />
+                <Swatch name="Calendar overlap text" className="bg-background text-[var(--calendar-overlap-text)]" />
                 <Swatch
                   name="Readable muted"
                   className="bg-background text-muted-readable"

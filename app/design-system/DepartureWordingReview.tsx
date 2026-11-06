@@ -15,8 +15,7 @@ import {
   departureDetailPhrase,
   departureFreeAgainPhrase,
   departureLinePhrase,
-  departureMarkerRailPhrase,
-  departureMarkerRowPhrase,
+  departureMarkerRailLines,
   departureOverlapPhrase,
   departurePhraseContext,
   departureTravelOffPhrase,
@@ -46,6 +45,8 @@ const HOME_TRIP: Partial<DeparturePhraseInput> = { role: "return", fromHome: fal
 const detail = (input: Partial<DeparturePhraseInput>) => departureDetailPhrase({ ...BASE, ...input }, CONTEXT);
 const line = (input: Partial<DeparturePhraseInput>) => departureLinePhrase({ ...BASE, ...input }, CONTEXT);
 const old: Partial<DeparturePhraseInput> = { freshness: "last_estimate", checkedAt: at("08:55") };
+/** Ticket 270 (D13): the leader label, its lines joined as one phrase. */
+const marker = (input: Partial<DeparturePhraseInput>) => departureMarkerRailLines({ ...BASE, ...input }, TIMEZONE).join(" ");
 
 /** Sample renderings by phrase id. A test checks that every listed phrase has one and matches its template. */
 export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> = {
@@ -113,9 +114,12 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "brief-overlap": () => departureBriefOverlapPhrase("Walk", EVENT),
   "brief-overlap-trip-home": () => departureBriefOverlapPhrase("Walk", null),
   "brief-back": () => departureBriefBackPhrase(at("15:30"), CONTEXT),
-  "marker-rail": () => departureMarkerRailPhrase(at("13:20"), TIMEZONE),
-  "marker-row": () => departureMarkerRowPhrase({ leaveAt: at("13:20"), home: false, destinationLabel: EVENT }, CONTEXT),
-  "marker-row-home": () => departureMarkerRowPhrase({ leaveAt: at("15:00"), home: true, destinationLabel: null }, CONTEXT),
+  "marker-rail": () => marker({ state: "upcoming", minutesUntilLeave: 45 }),
+  "marker-rail-leave-now": () => marker({ state: "leave_now", minutesUntilLeave: null }),
+  "marker-rail-late": () => marker({ state: "late", lateBasis: "evidence", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "marker-rail-past-leave": () => marker({ state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "marker-rail-past-leave-home": () => marker({ ...HOME_TRIP, state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("15:40") }),
+  "marker-rail-head-home-now": () => marker({ ...HOME_TRIP, state: "head_home", minutesUntilLeave: null }),
   "return-home-missing": () => detail({ ...HOME_TRIP, state: "time_unknown", timeUnknownCause: "home_missing" }),
   "travel-off-offer": () => departureTravelOffPhrase(EVENT),
   "travel-off-dismiss": () => TRAVEL_OFF_DISMISS,

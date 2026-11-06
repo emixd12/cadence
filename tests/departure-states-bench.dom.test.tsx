@@ -277,24 +277,28 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 268 added one phrase; the owner approved it as written on November 5, 2026.
   // Ticket 271 adds the correction control's label, not yet approved (decision D7).
   // Ticket 272 lists the Daily Brief's overlap and return lines, not yet approved.
-  // Ticket 270 adds the rail label and the slim row's two forms, not yet approved.
   // Ticket 273 adds the Travel estimates offer, its Not now and the setup row's Estimates off.
   // Decision D12 removes the attendance question, rewords the blocked-stop step and adds the no-Home return step.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("12 of 73 phrases await the owner's approval.");
-  for (const id of ["travel-off-offer", "travel-off-dismiss", "setup-estimates-off", "needs-origin-blocked", "return-home-missing"]) {
+  // Decision D13 approves the Ticket 271, 272 and 273 wording on November 6, 2026, drops the slim row's two forms and adds
+  // the leader label's leave-now, late, passed and head-home forms, not yet approved. The D12 steps stay unapproved.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("8 of 76 phrases await the owner's approval.");
+  for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off"]) {
+    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Approved November 6, 2026");
+  }
+  for (const id of ["needs-origin-blocked", "return-home-missing", "marker-rail", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
+    "marker-rail-past-leave-home", "marker-rail-head-home-now"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
   }
+  expect(container.querySelector('[data-wording-id="marker-row"]')).toBeNull();
+  expect(container.querySelector('[data-wording-id="marker-row-home"]')).toBeNull();
   expect(container.querySelector('[data-wording-id="travel-off-offer"] [data-wording-sample]')?.textContent)
     .toBe("Turn on Travel estimates in Settings to get a leave time for Dentist.");
-  expect(container.querySelector('[data-wording-id="marker-rail"] [data-wording-sample]')?.textContent).toBe("Leave 1:20");
-  expect(container.querySelector('[data-wording-id="marker-row"] [data-wording-sample]')?.textContent).toBe("Leave 1:20 PM for Dentist");
-  expect(container.querySelector('[data-wording-id="marker-row-home"] [data-wording-sample]')?.textContent).toBe("Leave 3:00 PM for home");
-  for (const id of ["brief-overlap", "brief-overlap-trip-home", "brief-back", "marker-rail", "marker-row", "marker-row-home"]) {
-    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
-  }
+  const samples: ReadonlyArray<readonly [string, string]> = [["marker-rail", "Leave 1:20"], ["marker-rail-leave-now", "Leave now"],
+    ["marker-rail-late", "May arrive late"], ["marker-rail-past-leave", "Arrive about 2:05"], ["marker-rail-past-leave-home", "Home about 3:40"],
+    ["marker-rail-head-home-now", "Head home now"]];
+  for (const [id, sample] of samples) expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-sample]`)?.textContent, id).toBe(sample);
   expect(container.querySelector('[data-wording-id="brief-back"] [data-wording-sample]')?.textContent).toBe("Back around 3:30 PM.");
   expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-sample]')?.textContent).toBe("Change for this trip");
-  expect(container.querySelector('[data-wording-id="correction-toggle"] [data-wording-status]')?.textContent).toBe("Not yet approved");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-sample]')?.textContent).toBe("A planned trip changed.");
   expect(container.querySelector('[data-wording-id="line-changed-unnamed"] [data-wording-status]')?.textContent).toBe("Approved November 5, 2026");
   expect(container.querySelector('[data-wording-id="line-changed"] [data-wording-status]')?.textContent).toContain("Approved");
@@ -324,55 +328,49 @@ it("gives every line that starts with Refresh travel its own button when two tri
   }
 });
 
-// Ticket 270 (D2, "Next trip only"): the next trip's span and marker, in each bench variant.
-async function chooseSelect(attribute: string, value: string) {
-  const select = container.querySelector<HTMLSelectElement>(`select[${attribute}]`)!;
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-}
+// Ticket 270 (D2, "Next trip only"; D13): the next trip's span, leader and label.
 const timelineSurface = () => surface("Timeline");
 const marks = () => ({
   spans: [...timelineSurface().querySelectorAll("[data-next-trip-span]")].map((line) => line.getAttribute("data-next-trip-span")),
-  ticks: timelineSurface().querySelectorAll("[data-next-trip-tick]").length,
+  leaders: timelineSurface().querySelectorAll("[data-next-trip-leader]").length,
   labels: [...timelineSurface().querySelectorAll("[data-next-trip-label]")].map((label) => label.textContent),
-  rows: [...timelineSurface().querySelectorAll("[data-next-trip-row]")].map((row) => row.textContent),
   hoverSpans: timelineSurface().querySelectorAll("[data-travel-duration], [data-event-duration]").length,
 });
-const tabStops = () => [...timelineSurface().querySelectorAll<HTMLElement>("button, a[href], input, select, summary, [tabindex]")]
-  .filter((element) => element.tabIndex >= 0).length;
 
-it("marks the next trip only, without hovering, in each marker variant (Ticket 270)", async () => {
+it("marks the next trip only, without hovering, with one leader and label (Ticket 270, D13)", async () => {
   await render("fresh");
-  const stops: number[] = [];
-  for (const marker of ["rail_label", "behavior_row", "axis_tick"]) {
-    await chooseSelect("data-bench-marker", marker);
-    const shown = marks();
-    // One magenta span, for the trip to Gym; the other trips stay inspection-only.
-    expect(shown.spans, marker).toEqual(["outbound::bench-gym"]);
-    expect(shown.hoverSpans, marker).toBe(0);
-    expect(shown.ticks, marker).toBe(marker === "behavior_row" ? 0 : 1);
-    expect(shown.labels, marker).toEqual(marker === "rail_label" ? ["Leave 9:35"] : []);
-    expect(shown.rows, marker).toEqual(marker === "behavior_row" ? ["Leave 9:35 AM for Gym"] : []);
-    stops.push(tabStops());
-  }
-  // No marker adds a tab stop.
-  expect(new Set(stops).size).toBe(1);
-  expect(timelineSurface().querySelector("[data-next-trip-label], [data-next-trip-row]")?.closest("button, a")).toBeFalsy();
+  const shown = marks();
+  // One magenta span, for the trip to Gym; the other trips stay inspection-only.
+  expect(shown.spans).toEqual(["outbound::bench-gym"]);
+  expect(shown.hoverSpans).toBe(0);
+  expect(shown.leaders).toBe(1);
+  expect(shown.labels).toEqual(["Leave 9:35"]);
+  // The variants and their switch are gone; no marker row or axis tick remains.
+  expect(container.querySelector("select[data-bench-marker], select[data-bench-line-size]")).toBeNull();
+  expect(timelineSurface().querySelector("[data-next-trip-row], [data-next-trip-tick]")).toBeNull();
+  // The span starts at the leave time: the leader leaves from its top end.
+  const span = timelineSurface().querySelector("[data-next-trip-span]")!;
+  const leader = timelineSurface().querySelector("[data-next-trip-leader]")!;
+  expect(leader.getAttribute("d")).toMatch(new RegExp(`^M \\S+ ${span.getAttribute("y1")} H \\S+$`));
+  // Decorative, never a tab stop or a touch target: keyboard, focus and touch stay as they were.
+  const label = timelineSurface().querySelector("[data-next-trip-label]")!;
+  expect(label.getAttribute("aria-hidden")).toBe("true");
+  expect(label.closest("button, a, [tabindex]")).toBeFalsy();
+  expect(leader.closest("svg")?.getAttribute("aria-hidden")).toBe("true");
+  expect(leader.closest("button, a, [tabindex]")).toBeFalsy();
 });
 
-it("keeps the marks for late, leave now, last estimate and head home, and drops them without a time (Ticket 270)", async () => {
+it("names leave now, late and passed leave times instead of a past time, and drops the marks without a time (Ticket 270, D13)", async () => {
   await render("fresh");
-  await chooseSelect("data-bench-marker", "behavior_row");
   const cases: ReadonlyArray<readonly [string, string | null]> = [
-    ["expired", "Leave 9:35 AM for Gym"], ["leave-now", "Leave 9:35 AM for Gym"], ["late-clock", "Leave 9:35 AM for Gym"],
-    ["head-home", "Leave 3:00 PM for home"], ["needs-place", null], ["appears-later", null], ["no-trips", null], ["paused", null],
+    ["expired", "Leave 9:35"], ["soon", "Leave 9:35"], ["leave-now", "Leave now"], ["late-evidence", "May arrive late"],
+    ["late-clock", "Arrive about 10:05"], ["head-home", "Leave 3:00"], ["needs-place", null], ["appears-later", null], ["no-trips", null], ["paused", null],
   ];
-  for (const [state, row] of cases) {
+  for (const [state, label] of cases) {
     await choose(state);
-    expect(marks().rows, state).toEqual(row ? [row] : []);
-    expect(marks().spans.length, state).toBe(row ? 1 : 0);
+    expect(marks().labels, state).toEqual(label ? [label] : []);
+    expect(marks().spans.length, state).toBe(label ? 1 : 0);
+    expect(marks().leaders, state).toBe(label ? 1 : 0);
   }
 });
 
@@ -390,19 +388,16 @@ it("shows one muted line on a Behavior the next trip crowds, only while collapse
   expect(call().querySelector("[data-next-trip-crowded]")).toBeNull();
 });
 
-it("sets the next-departure line's size and keeps it regular weight (Ticket 270)", async () => {
+it("keeps the next-departure line at the small status size and regular weight (Ticket 270, D13)", async () => {
   await render("fresh");
-  const line = () => timelineSurface().querySelector<HTMLElement>("[data-departure-line]")!;
-  expect(line().getAttribute("data-line-size")).toBe("status");
-  await chooseSelect("data-bench-line-size", "title");
-  expect(line().getAttribute("data-line-size")).toBe("title");
-  expect(line().className).not.toMatch(/font-(bold|semibold|medium)/);
+  const line = timelineSurface().querySelector<HTMLElement>("[data-departure-line]")!;
+  expect(line.hasAttribute("data-line-size")).toBe(false);
+  expect(line.className).not.toMatch(/font-(bold|semibold|medium)/);
 });
 
 it("moves only the marks on a moving clock, never the rows (Ticket 270)", async () => {
   await render("soon");
-  await chooseSelect("data-bench-marker", "behavior_row");
-  const order = () => [...timelineSurface().querySelectorAll("[data-next-trip-row], [data-occurrence-id]")].map((node) => node.getAttribute("data-occurrence-id") ?? "trip");
+  const order = () => [...timelineSurface().querySelectorAll("[data-occurrence-id]")].map((node) => node.getAttribute("data-occurrence-id"));
   const before = order();
   for (const time of ["09:11", "09:20", "09:34"]) {
     await moveClock(time);

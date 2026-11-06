@@ -256,20 +256,19 @@ export type DayProgressDayLayout = Readonly<{
 export type DayProgressNextTripInput = Readonly<{
   key: string;
   legId: string | null;
-  /** Get-ready start for a trip from Home, otherwise the leave time. */
-  startAt: string;
+  /** D13: the span starts here, at the recommended leave time. */
   leaveAt: string;
   arriveAt: string;
 }>;
 
 export type DayProgressNextTripMarks = Readonly<{
   key: string;
-  /** The magenta span on the axis, clipped to this day. */
+  /** The magenta span on the axis, from the leave time to the arrival, clipped to this day. */
   startPosition: number;
   endPosition: number;
   /** The leave time on the axis. Null when the leave time falls on another day. */
   leavePosition: number | null;
-  /** Where a rail label sits: the leave position, moved clear of Calendar markers when they share the rail. */
+  /** Where the leader's label sits: the leave position, moved clear of Calendar markers when they share the rail. */
   labelPosition: number | null;
 }>;
 

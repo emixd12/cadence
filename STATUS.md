@@ -1,5 +1,27 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 3: Ticket 270 final marker (decision D13) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.**
+
+- The next trip's magenta span now starts at the recommended leave time, not get-ready time. A
+  14px magenta leader runs from its top end into the left rail, perpendicular to the axis, with
+  a small magenta label at its end ("Leave 9:35"). The label text uses a new token,
+  `--calendar-overlap-text` (`#C0286A`), for 4.5:1 contrast at 11px.
+- Leave now, late and passed leave times show "Leave now", "May arrive late", "Arrive about
+  {time}", "Home about {time}" or "Head home now", never a past leave time. These five phrases
+  are new and await the owner (D7); "Leave {time}" still does too.
+- Variants B and C, the title-size line, the bench's marker and line pickers and
+  `NEXT_TRIP_PRESENTATION` are removed. The bench keeps its state presets.
+- D13 approves "Change for this trip", the three Daily Brief lines, the Travel estimates offer,
+  "Not now" and "Estimates off" (November 6, 2026). The D12 phrases stay unapproved. The bench
+  review shows 8 of 76 awaiting.
+- No overlap with the current-time dot, rows or Calendar markers at 1440 or 390 px
+  (`.intent/artifacts/t270-final/`). The product has no dark theme, so the dark-preference
+  captures match the light ones.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web,
+  checked at 390 px. Messaging impact: P-021 (Ticket 270 note updated).
+
 ## Travel advisory revamp Wave 2 deployed — November 5, 2026
 
 PR #191 merged on November 5, 2026 as `e6a49c8`. Both Vercel projects built READY on that commit.

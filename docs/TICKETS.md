@@ -16079,11 +16079,12 @@ Verification: DOM test with a moving clock, bench at both widths,
 
 ## Ticket 270: Next trip's marker and span
 
-Status: bench built November 5, 2026 on branch `us-work`; waiting for the owner's marker choice.
-Not merged or deployed. Variants A, B and C, each with the line at two sizes, are on the
-"Travel timing states" bench. Production uses `NEXT_TRIP_PRESENTATION` in
-`components/timeline/next-trip-presentation.ts`, set to the recommended A with the small line.
-`DESIGN.md` and `docs/UI_SPEC.md` are updated after the choice.
+Status: implemented November 6, 2026 on branch `us-work` under owner decision D13. Not merged
+or deployed. The span starts at the leave time; a short magenta leader runs from its top end
+into the left rail with a small magenta label at its end. Leave now, late and passed leave
+times use the line's words. Variants B and C, the title-size line and
+`NEXT_TRIP_PRESENTATION` are removed. `DESIGN.md` ("Next trip marker (Ticket 270)") and
+`docs/UI_SPEC.md` describe the shipped form. The five new label phrases await approval (D7).
 Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).

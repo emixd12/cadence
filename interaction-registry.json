@@ -1027,9 +1027,9 @@
     {
       "path": "app/design-system/DepartureStatesBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 12,
+      "interaction_marker_count": 8,
       "interaction_ids": [],
-      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, Ticket 270's next-trip marker and line-size selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
     },
     {
       "path": "app/design-system/TravelBench.tsx",

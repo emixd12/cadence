@@ -763,6 +763,12 @@ cite has not changed.
   1:15", a slim row "Leave 1:15 PM for Dentist", or an axis tick only), so the guide text waits
   for that choice. A Behavior the next trip crowds shows its overlap line while collapsed. The
   three marker phrases are on the bench wording review, not yet approved (D7).
+- **Ticket 270 detail, decision D13 (November 6, 2026):** the owner chose the marker. The span
+  starts at the leave time; a short magenta leader runs from its top into the left rail with a
+  small label, "Leave 9:35". Leave now, late and passed times read "Leave now", "May arrive
+  late", "Arrive about {time}", "Home about {time}" or "Head home now". The slim-row phrases
+  are gone. The guide's Timeline text can now describe this form. The label phrases await
+  approval (D7).
 - **Ticket 273 detail (November 5, 2026):** a trip with no leave time now says why with one
   action. "Add a place for {event}" and "Fix {event}'s place or attendance" open that event's
   Change for this trip with the destination focused, or Behaviors for a Behavior. "Is {event}

@@ -251,8 +251,15 @@ or permanent duration fill. Unknown timing never creates a precise occupied span
 
 Exception, owner decision D2, "Next trip only" (`docs/DECISIONS.md`, 2026-11-04; Tickets
 269 and 270): the next trip alone gets one line at the top of the Timeline, one marker and
-one magenta span without hovering. The owner picks the marker's form on the bench. A
-Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
+one magenta span without hovering. Owner decision D13 (2026-11-06) set the marker: the span
+starts exactly at the recommended leave time and ends at arrival. From its top end a short
+magenta leader runs perpendicular to the axis into the left rail, with a small magenta label
+at its end, such as "Leave 9:35". A time that has passed is never shown as a leave time: the
+label reads "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}" or
+"Head home now", from the same states as the line. The label stays clear of the current-time
+dot, Behavior rows and Calendar markers at 1440 and 390 px. The leader and label are
+decorative, never a tab stop or touch target. The next-departure line keeps the small status
+size. A Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
 inspection-only. There is no collapsed Daily Brief strip.
 
 The next-departure line (Ticket 269) sits at the top of the Timeline, under the Calendar

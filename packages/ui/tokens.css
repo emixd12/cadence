@@ -6,6 +6,8 @@
   --card-foreground: var(--foreground);
   --primary: #3572b3;
   --calendar-overlap: #DA3278;
+  /* Ticket 270 (D13): the same magenta, darker, for small text such as the next trip's leader label (5.4:1 on the background). */
+  --calendar-overlap-text: #C0286A;
   --primary-foreground: oklch(99.16% 0.0017 67.8);
   --timeline-row-hover: #eef6ff;
   --timeline-needs-decision-hover: #e8f2ff;
