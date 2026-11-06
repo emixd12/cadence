@@ -849,8 +849,13 @@ its own channel. `createLeaveReminderCaller` in
 - `reserve_travel_provider_spend` reads `auth.uid()` from `sub`, so the job
   reserves against that user's month.
 - The due-account selection (`selectDueLeaveReminderAccounts` in
-  `lib/db/leave-reminders.repo.ts`) is the job's only service-role read. It
-  reads account IDs and next check times.
+  `lib/db/leave-reminders.repo.ts`) is the job's only service-role read of user
+  data. It reads account IDs and next check times.
+- Sealed Calendar credentials are the one other service-role path, the same
+  one every caller uses, signed-in sessions included. The job first reads its
+  connection through RLS as the user. `calendar_read_credential` and
+  `calendar_disconnect` then act only on that user, Google subject and
+  connection generation.
 
 Local proof: `tests/leave-reminder-caller.local-integration.test.ts` (same four
 variables as below) and `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`.
