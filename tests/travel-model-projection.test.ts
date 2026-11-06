@@ -101,11 +101,12 @@ describe("travel model projection", () => {
     const quiet = project({ commitments: [] }, [candidate("run", "2026-09-16T13:00:00Z", "2026-09-16T13:30:00Z")]);
     expect(quiet).toEqual({ version: "2.0", travelDay: "no", calendarEvents: false, trips: [], fits: [] });
 
-    const maybeRemote = project({ commitments: [{ ...commitment("event-1", "2026-09-16T18:30:00Z", "2026-09-16T20:30:00Z", place("dentist")), attendance: "unknown" }] },
+    // Decision D12: only the stop past the source window lacks attendance. Its trip is unknown, not left out.
+    const pastWindow = project({ commitments: [{ ...commitment("event-1", "2026-09-16T18:30:00Z", "2026-09-16T20:30:00Z", place("dentist")), attendance: "unknown" }] },
       [candidate("run", "2026-09-16T13:00:00Z", "2026-09-16T13:30:00Z")]);
-    expect(maybeRemote.travelDay).toBe("unknown");
-    expect(maybeRemote.trips).toEqual([]);
-    expect(maybeRemote.fits[0]).toMatchObject({ conclusion: "unknown", basis: "travel_unknown" });
+    expect(pastWindow.travelDay).toBe("unknown");
+    expect(pastWindow.trips).toEqual([{ destinationRef: "event-1", role: "outbound", mode: null, estimate: "unknown" }]);
+    expect(pastWindow.fits[0]).toMatchObject({ conclusion: "unknown", basis: "travel_unknown" });
   });
 
   it("Ticket 264: a late trip on foot keeps the same late_arrival conclusion as driving", () => {

@@ -195,7 +195,7 @@ In scope:
 - Travel advisory revamp under Tickets 263–285 (`docs/DECISIONS.md`, 2026-11-04): last
   estimates and per-trip refresh; a next-departure line, marker and magenta span for the
   next trip only, without hovering; opt-in leave reminders that reach the user with
-  Cadence closed; remembered places and attendance; tomorrow's first trip; and Outlook
+  Cadence closed; remembered places (decision D12 drops attendance); tomorrow's first trip; and Outlook
   and iCloud event locations read for routing
 - Workspace split only when explicitly ticketed
 

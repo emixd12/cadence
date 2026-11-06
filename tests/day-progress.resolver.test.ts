@@ -252,7 +252,7 @@ describe("next trip marks", () => {
     // Without get-ready time (the trip home, or an onward trip) the span starts at the leave time.
     expect(resolveNextTripMarkInput(trip({ getReadyAt: null }))?.startAt).toBe("2026-09-16T13:20:00Z");
     for (const state of ["soon", "leave_now", "late", "head_home"] as const) expect(resolveNextTripMarkInput(trip({ state })), state).not.toBeNull();
-    for (const state of ["appears_later", "needs_place", "needs_attendance", "needs_origin", "time_unknown", "no_route", "trip_changed", "estimate_expired", "paused"] as const) {
+    for (const state of ["appears_later", "needs_place", "needs_origin", "time_unknown", "no_route", "trip_changed", "estimate_expired", "paused"] as const) {
       expect(resolveNextTripMarkInput(trip({ state })), state).toBeNull();
     }
     expect(resolveNextTripMarkInput(trip({ leaveAt: null }))).toBeNull();

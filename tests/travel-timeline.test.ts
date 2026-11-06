@@ -195,7 +195,7 @@ describe("travel sourceKey", () => {
     expect(travelSourceKey(second.events as never, timeline)).toBe(travelSourceKey(first.events as never, timeline));
     expect(travelSourceKey([{ ...event, location: "2 St" }] as never, timeline)).not.toBe(travelSourceKey(first.events as never, timeline));
   });
-  it("ignores Calendar metadata but reacts to attendance and times", () => {
+  it("ignores Calendar metadata but reacts to the response and times", () => {
     const before = travelSourceKey([event] as never, timeline);
     expect(travelSourceKey([{ ...event, revision: { providerEtag: "2" }, title: "new title" }] as never, timeline)).toBe(before);
     expect(travelSourceKey([{ ...event, currentUserResponse: "declined" }] as never, timeline)).not.toBe(before);

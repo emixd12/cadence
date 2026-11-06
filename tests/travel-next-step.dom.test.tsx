@@ -91,33 +91,22 @@ describe("on the bench", () => {
     expect(surface("Dentist Calendar details").querySelector<HTMLDetailsElement>("[data-travel-correction]")?.open).toBe(true);
   });
 
-  it("asks In person or Remote in one tap, and Remote ends the question", async () => {
-    await render("needs-attendance");
-    expect(line()?.textContent).toBe("Is Dentist in person or remote? In person · Remote");
-    expect([...line()!.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["In person", "Remote"]);
-    const step = surface("Dentist Calendar details").querySelector("[data-travel-step='needs_attendance']")!;
-    expect([...step.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["In person", "Remote"]);
-    const remote = buttonIn(line()!, "Remote")!;
-    remote.focus();
-    await click(remote);
-    expect(container.querySelector("[data-departure-model-state]")?.getAttribute("data-departure-model-state")).not.toBe("needs_attendance");
-    for (const label of ["Timeline", "Dentist drawer", "Dentist Calendar details"]) expect(surface(label).textContent, label).not.toContain("Is Dentist in person or remote?");
-    // Focus stays in the travel status, not on the page body.
-    expect(document.activeElement?.closest("[data-travel-status]")).not.toBeNull();
-  });
-
-  it("answers In person from the line, so Dentist is routed for this trip", async () => {
-    await render("needs-attendance");
-    await click(buttonIn(line()!, "In person"));
-    expect(container.querySelector("[data-departure-model-state]")?.getAttribute("data-departure-model-state")).not.toMatch(/^needs_/);
-    for (const label of ["Timeline", "Dentist drawer", "Dentist Calendar details"]) expect(surface(label).textContent, label).not.toContain("Is Dentist in person or remote?");
+  it("asks nothing about attendance: a Calendar event without a location is not travel (decision D12)", async () => {
+    await render("no-trips");
+    expect(line()).toBeNull();
+    expect(container.querySelector("[data-departure-model-state]")?.getAttribute("data-departure-model-state")).toBe("none");
+    for (const label of ["Timeline", "Dentist drawer", "Dentist Calendar details"]) {
+      expect(surface(label).textContent, label).not.toMatch(/in person|remote/i);
+      expect(buttonIn(surface(label), "In person"), label).toBeUndefined();
+    }
+    expect(surface("Dentist Calendar details").querySelector('select[name="travel_attendance"]')).toBeNull();
   });
 
   it("names the blocking event and sends the action there", async () => {
     await render("needs-origin");
-    expect(line()?.textContent).toBe("Fix Gym's place or attendance to get a leave time for Dentist.");
+    expect(line()?.textContent).toBe("Fix Gym's place to get a leave time for Dentist.");
     const action = line()!.querySelector<HTMLButtonElement>("[data-travel-step-action]")!;
-    expect(action.textContent).toBe("Fix Gym's place or attendance");
+    expect(action.textContent).toBe("Fix Gym's place");
     await click(action);
     expect(container.querySelector("[data-bench-step-note]")?.textContent).toBe("Opens Behaviors, where Gym's place is changed.");
   });
@@ -135,7 +124,7 @@ describe("step links", () => {
   const trip = (overrides: Partial<DepartureTrip>): DepartureTrip => ({ key: "k", legId: null, role: "outbound", originRef: null, destinationRef: "gym",
     mode: null, fromHome: false, state: "needs_origin", lateBasis: null, freshness: null, checkedAt: null, leaveAt: null, arriveAt: null, getReadyAt: null,
     minutesUntilLeave: null, appearsAt: null, timeUnknownCause: null, blockingRef: null, blockingLabel: null, action: null, phrase: "", linePhrase: "", ...overrides });
-  const none: TravelStepActions = { correction: () => null, attendance: () => null, behavior: () => null, settings: null };
+  const none: TravelStepActions = { correction: () => null, behavior: () => null, settings: null };
 
   it("links Add Home in Settings to Travel settings, where Home and device location live", async () => {
     await act(() => root.render(<p><TravelStepText trip={trip({})} text="Add Home in Settings to get a leave time for Gym." actions={{ ...none, settings: { href: "/settings#travel" } }} /></p>));
@@ -143,6 +132,19 @@ describe("step links", () => {
     expect(link.getAttribute("href")).toBe("/settings#travel");
     expect(link.textContent).toBe("Add Home in Settings");
     expect(container.textContent).toBe("Add Home in Settings to get a leave time for Gym.");
+  });
+
+  it("makes the trip home with no Home one sentence whose first words link to Travel settings", async () => {
+    const text = "Add Home in Settings to estimate the return time.";
+    const home = trip({ role: "return", originRef: "gym", destinationRef: null, state: "time_unknown", timeUnknownCause: "home_missing" });
+    await act(() => root.render(<p><TravelStepText trip={home} text={text} actions={{ ...none, settings: { href: "/settings#travel" } }} /></p>));
+    const link = container.querySelector<HTMLAnchorElement>("a[data-travel-step-action]")!;
+    expect(link.getAttribute("href")).toBe("/settings#travel");
+    expect(link.textContent).toBe("Add Home in Settings");
+    expect(container.textContent).toBe(text);
+    // Another reason the return time is unknown has no action.
+    await act(() => root.render(<p><TravelStepText trip={{ ...home, timeUnknownCause: "no_known_end" }} text="Return time unknown." actions={{ ...none, settings: { href: "/settings#travel" } }} /></p>));
+    expect(container.querySelector("a, button")).toBeNull();
   });
 
   it("links a Behavior's place to Behaviors and shows the sentence alone without an action", async () => {
@@ -157,7 +159,7 @@ describe("step links", () => {
   it("uses the departure model's blocking stop, not the trip's own origin", async () => {
     const correction = vi.fn();
     await act(() => root.render(<p><TravelStepText trip={trip({ blockingRef: "lunch", blockingLabel: "Lunch" })}
-      text="Fix Lunch's place or attendance to get a leave time for Gym." actions={{ ...none, correction: (ref) => ref === "lunch" ? correction : null }} /></p>));
+      text="Fix Lunch's place to get a leave time for Gym." actions={{ ...none, correction: (ref) => ref === "lunch" ? correction : null }} /></p>));
     await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
     expect(correction).toHaveBeenCalledOnce();
   });

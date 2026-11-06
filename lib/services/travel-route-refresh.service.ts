@@ -277,21 +277,17 @@ function calendarCommitmentDrafts(
     const event = allTimed.find((candidate) => candidate.id === correction.eventId);
     if (!event || eventRevision(event) !== correction.revision) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
   }
-  const attendanceOf = (event: (typeof allTimed)[number]): TravelCommitment["attendance"] => {
-    const correction = correctionById.get(event.id);
-    return correction?.attendance ?? ((correction?.locationText ?? event.location) ? (event.conference ? "hybrid" : "physical") : "unknown");
-  };
-  // Ticket 264: a physical event under way stays the prior stop until its end.
+  // Decision D12: an event with a place is in person; an event without one is not travel. It asks
+  // nothing, gets no route and never blocks a later trip. It stays a normal Calendar event.
+  const placeOf = (event: (typeof allTimed)[number]): string | null => correctionById.get(event.id)?.locationText ?? (event.location || null);
+  // Ticket 264: an event under way stays the prior stop until its end.
   const prospective = allTimed
-    .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && correctionById.get(event.id)?.attendance !== "remote" &&
-      (afterNow(event.startAt, now) || (attendanceOf(event) === "physical" && notEnded(event.endUnspecified ? null : event.endAt, now))))
+    .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && placeOf(event) !== null &&
+      (afterNow(event.startAt, now) || notEnded(event.endUnspecified ? null : event.endAt, now)))
     .sort((left, right) => compareInstants(left.startAt, right.startAt));
   const timed = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
   return timed.map((event, index) => {
-    const correction = correctionById.get(event.id);
-    const locationText = correction?.locationText ?? (event.location || null);
     const overflow = prospective.length > 9 && index === 8;
-    const attendance = overflow ? "unknown" : attendanceOf(event);
     return {
       commitment: {
         ref: event.id,
@@ -299,12 +295,12 @@ function calendarCommitmentDrafts(
         kind: "calendar",
         startAt: event.startAt,
         endAt: event.endUnspecified ? null : event.endAt,
-        attendance,
+        attendance: overflow ? "unknown" : "physical",
         mode: null,
         excluded: event.state === "cancelled" || event.currentUserResponse === "declined",
       } as Omit<TravelCommitment, "endpoint">,
-      placeText: attendance === "physical" ? locationText : null,
-      endpointSource: correction ? "correction" : "calendar",
+      placeText: overflow ? null : placeOf(event),
+      endpointSource: correctionById.has(event.id) ? "correction" : "calendar",
     };
   });
 }
@@ -396,7 +392,7 @@ function eventRevision(event: { revision: { providerEtag: string | null; provide
 }
 
 function revision(settingsRevision: string, habitsRevision: string | null, generation: number, selectionRevision: number, commitments: readonly TravelCommitment[], corrections: TravelRouteRefreshRequest["corrections"]): string {
-  return createHash("sha256").update(JSON.stringify({ settingsRevision, habitsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, attendance, locationText }) => [eventId, correctionRevision, attendance, locationText]) })).digest("base64url");
+  return createHash("sha256").update(JSON.stringify({ settingsRevision, habitsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, locationText }) => [eventId, correctionRevision, locationText]) })).digest("base64url");
 }
 
 function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly TravelRouteBehavior[]): boolean {

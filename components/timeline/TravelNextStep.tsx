@@ -3,8 +3,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import {
-  TRAVEL_ATTENDANCE_IN_PERSON,
-  TRAVEL_ATTENDANCE_REMOTE,
   TRAVEL_OFF_DISMISS,
   departureStepLead,
   departureTravelOffPhrase,
@@ -21,22 +19,19 @@ export type TravelLinkTarget = Readonly<{ href: string }> | Readonly<{ onOpen: (
 export type TravelStepActions = Readonly<{
   /** Opens a Calendar event's details with its trip correction open. */
   correction: (ref: string) => (() => void) | null;
-  /** Answers In person or Remote for a Calendar event, for this trip. */
-  attendance: (ref: string) => ((attendance: "physical" | "remote") => void) | null;
   /** Where a Behavior's place is changed. */
   behavior: (ref: string) => TravelLinkTarget | null;
   /** Travel settings: Home and device location. */
   settings: TravelLinkTarget | null;
 }>;
 
-type TravelStep =
-  | Readonly<{ kind: "attendance"; answer: (attendance: "physical" | "remote") => void }>
-  | Readonly<{ kind: "lead"; target: TravelLinkTarget }>;
+type TravelStep = Readonly<{ kind: "lead"; target: TravelLinkTarget }>;
 
-const STEP_STATES: ReadonlySet<DepartureTrip["state"]> = new Set(["needs_place", "needs_attendance", "needs_origin"]);
+const STEP_STATES: ReadonlySet<DepartureTrip["state"]> = new Set(["needs_place", "needs_origin"]);
 
-export function isTravelStep(trip: Pick<DepartureTrip, "state">): boolean {
-  return STEP_STATES.has(trip.state);
+/** A missing estimate with one action. The trip home with no saved Home is one too (decision D12). */
+export function isTravelStep(trip: Pick<DepartureTrip, "state" | "timeUnknownCause">): boolean {
+  return STEP_STATES.has(trip.state) || (trip.state === "time_unknown" && trip.timeUnknownCause === "home_missing");
 }
 
 /** A stop's place is fixed through its trip correction (Calendar) or its Behavior. */
@@ -51,14 +46,12 @@ function placeStep(ref: string | null, actions: TravelStepActions): TravelStep |
 /** The one action for a trip's missing estimate. The blocking stop comes from the departure model. */
 export function resolveTravelStep(trip: DepartureTrip, actions: TravelStepActions): TravelStep | null {
   switch (trip.state) {
-    case "needs_attendance": {
-      const answer = trip.destinationRef ? actions.attendance(trip.destinationRef) : null;
-      return answer ? { kind: "attendance", answer } : null;
-    }
     case "needs_place": return placeStep(trip.destinationRef, actions);
     case "needs_origin":
       if (trip.blockingRef) return placeStep(trip.blockingRef, actions);
       return actions.settings ? { kind: "lead", target: actions.settings } : null;
+    case "time_unknown":
+      return trip.timeUnknownCause === "home_missing" && actions.settings ? { kind: "lead", target: actions.settings } : null;
     default: return null;
   }
 }
@@ -70,7 +63,7 @@ function TravelAction({ target, children }: Readonly<{ target: TravelLinkTarget;
 }
 
 /**
- * Keeps keyboard focus when an answer removes its own buttons: it moves to the nearest
+ * Keeps keyboard focus when an action removes its own control: it moves to the nearest
  * `data-travel-focus` container still on the page, or to its `data-travel-focus-target`.
  */
 function useKeepFocus() {
@@ -93,15 +86,11 @@ function useKeepFocus() {
 /**
  * Ticket 273: one sentence and one action for a missing estimate. A place, start or Home step
  * makes the sentence's own first words the action, as Refresh travel does (owner change R1).
- * Attendance asks In person or Remote in one tap. Key it by trip key and state.
+ * Key it by trip key and state.
  */
 export function TravelStepText({ trip, text, actions }: Readonly<{ trip: DepartureTrip; text: string; actions: TravelStepActions }>) {
   const ref = useKeepFocus();
   const step = resolveTravelStep(trip, actions);
-  if (step?.kind === "attendance") return <span ref={ref} data-travel-step={trip.state}>{text}{" "}
-    <button type="button" className="text-link" onClick={() => step.answer("physical")}>{TRAVEL_ATTENDANCE_IN_PERSON}</button>{" · "}
-    <button type="button" className="text-link" onClick={() => step.answer("remote")}>{TRAVEL_ATTENDANCE_REMOTE}</button>
-  </span>;
   const split = step ? departureStepLead(text) : null;
   if (!step || !split) return <>{text}</>;
   return <span ref={ref} data-travel-step={trip.state}><TravelAction target={step.target}>{split.lead}</TravelAction>{split.rest}</span>;

@@ -1578,3 +1578,28 @@ The owner answered two open items from Ticket 268 on November 5, 2026.
 
 Platform impact: web and desktop through the shared phrase module and travel hook.
 Marketing: not applicable. Future mobile: shared module. Messaging impact: P-018 updated.
+
+## 2026-11-05: Calendar events without a location are not travel (D12)
+
+The owner decided on November 5, 2026, as relayed by the travel coordinator after the Ticket
+273 verifier flagged the attendance question as too noisy:
+
+1. A Calendar event with no location is not travel. It never asks a question, never gets a
+   route and never blocks a later trip. It stays a normal event on the Timeline, and the Daily
+   Brief may still mention it as an event.
+2. A Calendar event with a location is in person. The attendance question is removed
+   entirely: the line, drawer and dialog question, In person and Remote, the attendance choice
+   in Change for this trip, and the needs-attendance state and its phrases.
+
+Also: the trip home with no saved Home reads one sentence, "Add Home in Settings to estimate the
+return time.", whose first words link to `/settings#travel`. It is not yet approved (D7). The
+stop before a trip can now block it only by having no usable place, so "Fix {event}'s place or
+attendance" becomes "Fix {event}'s place", also not yet approved.
+
+This changes Ticket 273 and removes attendance from Ticket 281 (decision D4's "remembered places
+and attendance" keeps only places). The Ticket 270 marker variants are unchanged.
+
+Platform impact: web and desktop through the hosted route, the shared departure model, phrase
+module and Timeline components. Marketing: not applicable. Future mobile: shared modules.
+Messaging impact: P-023, with notes on P-020 and P-021.
+

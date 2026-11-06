@@ -85,16 +85,15 @@ export function resolveTravelPlan(input: TravelPlanningInput): TravelPlanningRes
   let chained = Boolean(priorEndpoint);
 
   for (const commitment of futureCommitments) {
-    if (commitment.attendance === "remote") continue;
-
     const corrected = correctionFor(corrections, commitment.ref, commitment.revision);
     const destination = corrected?.endpoint ?? commitment.endpoint;
     if (commitment.attendance !== "physical") {
+      // The stop past the bounded source read (decision D12): no route and no time.
       unknownLegs.push(unknownLeg(
         priorCommitment ? "onward" : "outbound",
         priorCommitment?.ref ?? null,
         commitment.ref,
-        "attendance_unknown",
+        "leg_limit",
       ));
       priorEndpoint = null;
       priorCommitment = null;
@@ -537,7 +536,7 @@ function unknownLegsAfterDecisions(unknownLegs: readonly TravelUnknownLeg[], res
     if (leaves(leg)) return [];
     const previous = unknownLegs[index - 1];
     const blockerLeft = leg.reason === "origin_unknown" && !!previous && leaves(previous) &&
-      (previous.reason === "destination_unknown" || previous.reason === "attendance_unknown");
+      previous.reason === "destination_unknown";
     return [blockerLeft ? { ...leg, blockerResolved: true as const } : leg];
   });
 }
@@ -550,8 +549,6 @@ type ModelTripAnchor = Readonly<{
   anchor: Temporal.Instant | null;
   /** Time travel may occupy while its estimate is unknown. A `null` bound is open. */
   uncertain: OpenWindow | null;
-  /** Attendance may be remote, so the trip is uncertain rather than planned. */
-  possiblyRemote: boolean;
 }>;
 
 /**
@@ -600,7 +597,6 @@ function resolveTravelModelProjection(
       trip: { destinationRef: leg.destinationCommitmentRef, role: leg.role, mode: leg.mode, estimate: estimate ? "current" : "unknown" },
       anchor: anchorFor(leg.role, leg.originCommitmentRef, leg.destinationCommitmentRef),
       uncertain: estimate ? null : { startAt: instant(leg.readyAt, "Route ready time"), endAt: delayedArrival ?? startOf(leg.destinationCommitmentRef) },
-      possiblyRemote: false,
     };
     tripByLegId.set(leg.id, value);
     anchors.push(value);
@@ -611,11 +607,9 @@ function resolveTravelModelProjection(
       trip: { destinationRef: unknown.destinationCommitmentRef, role: unknown.role, mode: null, estimate: "unknown" },
       anchor: anchorFor(unknown.role, unknown.originCommitmentRef, unknown.destinationCommitmentRef),
       uncertain: { startAt: endOf(unknown.originCommitmentRef), endAt: startOf(unknown.destinationCommitmentRef) },
-      possiblyRemote: unknown.reason === "attendance_unknown",
     });
   }
   anchors.sort((left, right) => compareOptionalInstants(left.anchor, right.anchor));
-  const trips = anchors.filter((item) => !item.possiblyRemote);
   // An unreliable leg's segments are not known occupancy; its uncertain span stands in for them.
   const travelSegments = segments.filter((value) => value.kind !== "commitment" && value.legId && !unreliable.has(value.legId));
 
@@ -626,7 +620,7 @@ function resolveTravelModelProjection(
   };
   // The next trip after the occurrence starts, otherwise the last trip of the day.
   const nearest = (subject: Temporal.Instant) =>
-    trips.find((item) => item.anchor && Temporal.Instant.compare(item.anchor, subject) > 0) ?? trips.at(-1);
+    anchors.find((item) => item.anchor && Temporal.Instant.compare(item.anchor, subject) > 0) ?? anchors.at(-1);
 
   // A fit is about an occurrence's scheduled start, so one already under way has no conclusion.
   const behaviors = [...new Map(candidates.filter((candidate) => candidate.kind === "behavior" &&
@@ -650,7 +644,7 @@ function resolveTravelModelProjection(
     if (uncertain) return { ref, conclusion: "unknown", basis: "travel_unknown", ...about(from, uncertain) };
     return { ref, conclusion: "fits", basis: "travel_known", ...about(from, nearest(from)) };
   });
-  return { version: TRAVEL_MODEL_PROJECTION_VERSION, travelDay, calendarEvents, trips: trips.map((item) => item.trip), fits };
+  return { version: TRAVEL_MODEL_PROJECTION_VERSION, travelDay, calendarEvents, trips: anchors.map((item) => item.trip), fits };
 }
 
 /** Half-open overlap. Without an end the occurrence is checked as a point. */

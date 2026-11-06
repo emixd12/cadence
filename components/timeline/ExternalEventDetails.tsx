@@ -256,8 +256,9 @@ export function TravelNavigationLink({ locationText, preference, usualMode, trav
 }
 
 /**
- * Ticket 271: the attendance and destination correction (INT-TRAVEL-003), behind one short
- * native disclosure. Saving closes it and returns focus to the control.
+ * Ticket 271: the destination correction (INT-TRAVEL-003), behind one short native disclosure.
+ * Saving closes it and returns focus to the control. Decision D12: a located event is in person,
+ * so the correction asks no attendance.
  */
 function TravelCorrectionControl({ event, onTravelCorrection, openRequest = 0 }: Readonly<{
   event: Extract<NormalizedExternalEvent, { kind: "timed" }>; onTravelCorrection: (correction: TravelCorrection) => void;
@@ -279,15 +280,13 @@ function TravelCorrectionControl({ event, onTravelCorrection, openRequest = 0 }:
     <form className="grid gap-2 pt-1" onSubmit={(submit) => {
       submit.preventDefault();
       const data = new FormData(submit.currentTarget);
-      const attendance = data.get("travel_attendance");
-      if (attendance !== "physical" && attendance !== "remote") return;
-      onTravelCorrection({ eventId: event.id, revision: event.revision.providerEtag ?? event.revision.providerUpdatedAt!, attendance,
-        locationText: String(data.get("travel_location") ?? "").trim() || null });
+      const locationText = String(data.get("travel_location") ?? "").trim();
+      if (!locationText) return;
+      onTravelCorrection({ eventId: event.id, revision: event.revision.providerEtag ?? event.revision.providerUpdatedAt!, locationText });
       if (detailsRef.current) detailsRef.current.open = false;
       summaryRef.current?.focus();
     }}>
-      <label className="grid gap-1">Attendance<select name="travel_attendance" required defaultValue="" className="min-h-11 min-w-0 border-b border-line bg-background"><option value="">Choose attendance</option><option value="physical">In person</option><option value="remote">Remote, no travel</option></select></label>
-      <label className="grid gap-1">Destination for this journey<input name="travel_location" maxLength={500} defaultValue={event.location} className="min-h-11 min-w-0 border-b border-line bg-background" /></label>
+      <label className="grid gap-1">Destination for this journey<input name="travel_location" required maxLength={500} defaultValue={event.location} className="min-h-11 min-w-0 border-b border-line bg-background" /></label>
       <p className="text-muted-readable">{TRAVEL_CORRECTION_NOTE} Calendar and saved locations stay unchanged.</p>
       <button type="submit" className="product-action product-action-secondary min-h-11 w-fit">Use for this journey</button>
     </form>
@@ -299,7 +298,7 @@ type TravelTimingEvidence = Omit<TravelEvidenceResult, "modelProjection">;
 /** Ticket 261: the shared "Refresh travel" action (INT-TRAVEL-004), offered in a line that needs it. */
 export type TravelRefreshAction = Readonly<{ onRefresh: () => void; pending: boolean }>;
 
-/** The trips this event's views talk about. Ticket 273 adds the trips to it that need a place, attendance or a start. */
+/** The trips this event's views talk about. Ticket 273 adds the trips to it that need a place or a start. */
 function eventTrips(departure: DepartureModel | null | undefined, eventId: string): DepartureTrip[] {
   return (departure?.trips ?? []).filter((trip) => trip.legId !== null
     ? trip.originRef === eventId || trip.destinationRef === eventId

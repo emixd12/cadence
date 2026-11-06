@@ -260,16 +260,19 @@ status lines, and replaces "Travel as of". It shows the departure model's line p
 the next trip in every state; a day with no trips shows no travel text. While the travel
 budget is used up, the paused phrase follows a known time on the same line. Where the
 phrase starts with "Refresh travel", those words are the button (R1); otherwise Refresh
-travel ends the line only when the trip needs a new estimate. Steps that need a place,
-attendance or a start (Ticket 273) show one sentence and one action. A place step makes its
-first words the action, as R1 does: "Add a place for Dentist" opens that event's details with
-**Change for this trip** open and the destination focused, or, for a Behavior, opens
-Behaviors. Attendance ends with **In person** and **Remote**, which answer for this trip in one
-tap. A trip held up by another stop names that stop ("Fix Gym's place or attendance"), taken
-from the departure model, and its action goes to that stop. With no Home or device position,
-"Add Home in Settings" opens Travel settings. The drawer, the details dialog and expanded
-Behavior rows show the same sentence and action. When an answer removes its buttons, focus
-moves to the travel status, or to the dialog title. With Travel estimates off and a located
+travel ends the line only when the trip needs a new estimate. Decision D12: a Calendar event
+with a location is in person, and one without a location is not travel. It asks nothing, gets
+no route and never holds up a later trip; it stays a normal event on the Timeline. Nothing asks
+about attendance. Steps that need a place or a start (Ticket 273) show one sentence and one
+action. A place step makes its first words the action, as R1 does: "Add a place for Dentist"
+opens that event's details with **Change for this trip** open and the destination focused, or,
+for a Behavior, opens Behaviors. A trip held up by another stop names that stop ("Fix Gym's
+place"), taken from the departure model, and its action goes to that stop. With no Home or
+device position, "Add Home in Settings" opens Travel settings. A trip home with no saved Home
+reads "Add Home in Settings to estimate the return time.", and its first words open Travel
+settings too. The drawer, the details dialog and expanded Behavior rows show the same sentence
+and action. When an action removes its control, focus moves to the travel status, or to the
+dialog title. With Travel estimates off and a located
 event or Behavior still ahead today, one muted line under it reads "Turn on Travel estimates
 in Settings to get a leave time for {event}." with **Not now**; the first words open Travel
 settings and nothing turns on from the line. Below it, at
@@ -294,8 +297,8 @@ setting. Unresolved addresses can offer Search in maps without claiming a
 verified route. Directions needs a resolved place: a route that reached this stop, even
 after its 5-minute estimate expired (Ticket 271, correction C2). Directions opens in the mode
 that route used, which can be a mode remembered for that place, and falls back to usual travel.
-The link carries only the source-authored text. The attendance and destination correction sits behind one native
-**Change for this trip** disclosure; saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
+The link carries only the source-authored text. The destination correction sits behind one native
+**Change for this trip** disclosure; it asks only for the destination (decision D12); saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
 predicted scheduled position. When location is unavailable, Home or the previous
 stop is the origin. Missing Home withholds only the trip back; current-location-
 to-event and event-to-event advice remain available for usable points. Never

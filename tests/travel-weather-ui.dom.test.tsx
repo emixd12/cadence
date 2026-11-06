@@ -169,7 +169,7 @@ describe("travel timing with the Ticket 264 fields", () => {
       legs: base.legs.map((entry) => ({ ...entry, late: true, estimate: { ...entry.estimate!, warnings: ["Estimated arrival is after the planned arrival time."] } })) };
     await act(() => root.render(timing(late, "America/New_York")));
     expect(container.textContent).toContain("You may arrive late: leave by 1:30 PM · cycling, arrive 2:20 PM.");
-    expect(container.textContent).toContain("Return time unknown. Add Home in Settings to estimate it.");
+    expect(container.textContent).toContain("Add Home in Settings to estimate the return time.");
     expect(container.textContent).not.toContain("timing unavailable");
     expect(container.textContent).not.toContain("return_base_missing");
   });

@@ -16207,7 +16207,7 @@ Goal: replace silence with a reason and one action (G3, G4 and G10).
 Scope and acceptance:
 
 - Needs place: name the event and offer a place correction.
-- Needs attendance: ask In person or Remote in one tap.
+- Needs attendance: ask In person or Remote in one tap. Removed by decision D12.
 - Needs origin: link to Home and location settings.
 - When the blocking stop is a different event, name that event.
 - With travel off and a located event today, offer one dismissible line to turn it on. The
@@ -16216,6 +16216,16 @@ Scope and acceptance:
   `docs/USER_FLOWS.md` (Home and travel, Ticket 212) in the same change.
 - Each missing-estimate state shows one sentence and one action.
 - Consent still comes only from the Travel estimates toggle.
+
+Decision D12 follow-up (November 5, 2026, implemented on `us-work`, not merged): a Calendar
+event with a location is in person, and one without a location is not travel. The hosted route
+leaves location-less events out (`calendarCommitmentDrafts`), so they ask nothing, get no route
+and never block a later trip. The needs-attendance state, its phrase, In person and Remote, and
+the attendance choice in Change for this trip are removed; a correction carries only a
+destination. The stop past the bounded source window now reads as past the trip limit. "Fix
+{event}'s place or attendance" becomes "Fix {event}'s place", and the trip home with no Home
+reads "Add Home in Settings to estimate the return time." with its first words linking to
+`/settings#travel`. Both sentences await the owner's approval (D7). Messaging impact: P-023.
 
 References: next-departure line, drawer, `components/settings/TravelSettingsPanel.tsx`,
 first-run setup, `tests/onboarding-travel.dom.test.tsx`.
@@ -16499,7 +16509,9 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 
 ## Ticket 281: Remember places and attendance
 
-Status: filed November 4, 2026. Not started.
+Status: filed November 4, 2026. Not started. Decision D12 (November 5, 2026) removes the
+attendance part: a located event is in person and nothing asks about attendance, so only
+remembered places remain in scope.
 Dependencies: Ticket 273. Decision D4.
 
 Goal: stop asking the same question after every reload (G5).

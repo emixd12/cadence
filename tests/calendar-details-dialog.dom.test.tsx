@@ -241,9 +241,8 @@ describe("Calendar details actions", () => {
   it("keeps the correction form working", async () => {
     const corrected = vi.fn();
     const dialog = await open(full, { onTravelCorrection: corrected });
-    dialog.querySelector<HTMLSelectElement>('select[name="travel_attendance"]')!.value = "physical";
     await act(() => dialog.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(corrected).toHaveBeenCalledWith(expect.objectContaining({ eventId: full.id, attendance: "physical", locationText: "12 Harbor Street" }));
+    expect(corrected).toHaveBeenCalledWith(expect.objectContaining({ eventId: full.id, locationText: "12 Harbor Street" }));
   });
 });
 
@@ -358,20 +357,23 @@ describe("Ticket 271: the leave line comes first", () => {
     expect(document.activeElement).toBe(summary);
     await act(() => summary.click());
     expect(details.open).toBe(true);
-    details.querySelector<HTMLSelectElement>('select[name="travel_attendance"]')!.value = "remote";
+    // Decision D12: a located event is in person, so the correction asks only for the destination.
+    expect(details.querySelector("select")).toBeNull();
+    details.querySelector<HTMLInputElement>('input[name="travel_location"]')!.value = "14 Harbor Street";
     const save = [...details.querySelectorAll("button")].find((item) => item.textContent === "Use for this journey")!;
     expect(save.type).toBe("submit");
     await act(() => details.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(corrected).toHaveBeenCalledWith(expect.objectContaining({ eventId: full.id, attendance: "remote", locationText: "12 Harbor Street" }));
+    expect(corrected).toHaveBeenCalledWith({ eventId: full.id, revision: expect.any(String), locationText: "14 Harbor Street" });
     expect(details.open).toBe(false);
     expect(document.activeElement).toBe(summary);
   });
 
-  it("keeps the correction closed and unsaved until the form is complete", async () => {
+  it("keeps the correction open and unsaved until it has a destination", async () => {
     const corrected = vi.fn();
     const dialog = await open(full, { onTravelCorrection: corrected });
     const details = dialog.querySelector<HTMLDetailsElement>("[data-travel-correction]")!;
     await act(() => details.querySelector("summary")!.click());
+    details.querySelector<HTMLInputElement>('input[name="travel_location"]')!.value = "   ";
     await act(() => details.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(corrected).not.toHaveBeenCalled();
     expect(details.open).toBe(true);

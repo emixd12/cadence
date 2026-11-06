@@ -43,7 +43,8 @@ const WALK_MINUTES: Readonly<Record<string, number>> = { [GYM_ID]: 20, [DENTIST_
 const BUFFERS = resolveTravelHabits(null).buffers;
 const RESUMES_AT = "2026-12-01T05:00:00Z";
 
-type DentistVariant = "located" | "no_place" | "attendance_unknown" | "remote";
+/** `no_place`: the location cannot be placed on a map. `no_location`: no location, so no travel (decision D12). */
+type DentistVariant = "located" | "no_place" | "no_location";
 type GymVariant = "located" | "no_place" | "not_located";
 
 export type DepartureBenchState = Readonly<{
@@ -86,20 +87,18 @@ export const DEPARTURE_BENCH_STATES: readonly DepartureBenchState[] = [
   { id: "trip-changed", label: "Trip changed after resolving a stop", clock: "10:58", checked: "10:56", gymCompletedAt: "10:57", dentist: "located", gym: "located", expected: "trip_changed",
     description: "Gym was marked Completed after the check, so the trip from Gym to Dentist no longer holds. Refresh travel routes it again from Home." },
   { id: "needs-place", label: "Needs a place", clock: "10:15", checked: "10:15", dentist: "no_place", gym: "located", expected: "needs_place",
-    description: "Dentist has no location, so no route can be found." },
-  { id: "needs-attendance", label: "Needs attendance", clock: "10:15", checked: "10:15", dentist: "attendance_unknown", gym: "located", expected: "needs_attendance",
-    description: "Dentist has a location and a video link, so Cadence cannot tell whether it is in person." },
+    description: "Dentist's location cannot be placed on a map, so no route can be found." },
   { id: "needs-origin", label: "Needs a start", clock: "10:05", checked: "09:50", dentist: "located", gym: "no_place", expected: "needs_origin",
     description: "Gym has no place this time, so the trip to Dentist has no known start. Checked before Gym began; Refresh travel would route it from Home." },
-  { id: "no-trips", label: "No trips", clock: "07:00", checked: "07:00", dentist: "remote", gym: "not_located", expected: "none",
-    description: "Dentist is remote and Gym has no place. No travel text appears." },
+  { id: "no-trips", label: "No trips", clock: "07:00", checked: "07:00", dentist: "no_location", gym: "not_located", expected: "none",
+    description: "Dentist has no location, so it is not travel, and Gym has no place. No travel text appears." },
   { id: "paused", label: "Paused", clock: "10:15", checked: "07:00", paused: true, dentist: "located", gym: "located", expected: "paused",
     description: "The monthly travel budget is used up. The last plan stays, and trips waiting for an estimate say when estimates resume." },
 ];
 
 const MODEL_STATE_WORDS: Readonly<Record<DepartureState, string>> = {
   upcoming: "Upcoming", soon: "Soon", leave_now: "Leave now", late: "Late", head_home: "Head home",
-  appears_later: "Appears later", needs_place: "Needs a place", needs_attendance: "Needs attendance",
+  appears_later: "Appears later", needs_place: "Needs a place",
   needs_origin: "Needs a start", time_unknown: "Time unknown", no_route: "No route", trip_changed: "Trip changed",
   estimate_expired: "Estimate expired", paused: "Paused", none: "No trips",
 };
@@ -123,9 +122,9 @@ function benchEvent(variant: DentistVariant): NormalizedExternalEvent {
     kind: "timed", id: DENTIST_ID, providerEventId: "dentist", logicalInstanceId: DENTIST_ID, calendarId: "bench", source: "google_calendar",
     calendarName: "Personal", sourceTimezone: TIMEZONE, sourceTimezoneFallback: "none", state: "confirmed", availability: "busy",
     currentUserResponse: "accepted", revision: { availability: "available", providerUpdatedAt: "2026-11-09T12:00:00Z", providerEtag: `bench-${variant}` },
-    title: "Dentist", description: "", location: variant === "no_place" ? "" : "Synthetic dental office", sourceUrl: "https://calendar.google.com/",
+    title: "Dentist", description: "", location: variant === "no_location" ? "" : variant === "no_place" ? "Synthetic office, unclear" : "Synthetic dental office", sourceUrl: "https://calendar.google.com/",
     fieldAvailability: {}, detailCompleteness: {}, organizer: null, attendees: null, attendeesOmitted: false,
-    conference: variant === "attendance_unknown" || variant === "remote"
+    conference: variant === "no_location"
       ? { name: "Synthetic Meet", notes: null, entryPoints: [{ type: "video", uri: "https://meet.example.com/bench", label: "Join video" }] } : null,
     recurrence: null, attachments: null,
     startAt: instantAt("14:00"), endAt: instantAt("15:00"), endUnspecified: false, duration: { kind: "known", seconds: 3600 },
@@ -172,8 +171,8 @@ function benchEvidence(scenario: Scenario, checked: string): Omit<TravelEvidence
   if (scenario.gym !== "not_located" && !gymResolvedBeforeCheck) commitments.push({ ref: GYM_ID, revision: "bench", kind: "behavior", attendance: "physical",
     startAt: instantAt("10:00"), endAt: instantAt("11:00"), mode: null,
     endpoint: scenario.gym === "located" ? { ref: GYM_ID, point: point("bench-gym"), source: "behavior", sourceRevision: "bench" } : null });
-  commitments.push({ ref: DENTIST_ID, revision: "bench", kind: "calendar",
-    attendance: scenario.dentist === "remote" ? "remote" : scenario.dentist === "attendance_unknown" ? "unknown" : "physical",
+  // Decision D12: the hosted route plans only Calendar events with a location, all in person.
+  if (scenario.dentist !== "no_location") commitments.push({ ref: DENTIST_ID, revision: "bench", kind: "calendar", attendance: "physical",
     startAt: instantAt("14:00"), endAt: instantAt("15:00"), mode: null,
     endpoint: scenario.dentist === "no_place" ? null : { ref: DENTIST_ID, point: point("bench-dentist"), source: "calendar", sourceRevision: "bench" } });
   const plan = resolveTravelPlan({ journeyRef: DATE, journeyRevision: "bench", grantRevision: "bench", now: checkedAt.toString(), defaultMode: "walking",
@@ -286,14 +285,12 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
     arrivalBufferSeconds: BUFFERS.arrivalSeconds, preparationSeconds: BUFFERS.preparationSeconds, pausedUntil: resumesAt });
   const refresh = resumesAt ? null : { onRefresh: status.refresh, pending: false };
   // Ticket 273: a correction re-plans Dentist as the hosted route would, from the bench clock.
-  const correct = (correction: Pick<TravelCorrection, "attendance" | "locationText">) => {
-    setDentistOverride(correction.attendance === "remote" ? "remote"
-      : correction.locationText || dentistVariant === "attendance_unknown" || dentistVariant === "located" ? "located" : "no_place");
+  const correct = (correction: Pick<TravelCorrection, "locationText">) => {
+    if (correction.locationText) setDentistOverride("located");
     setChecked(clock);
   };
   const steps: TravelStepActions = {
     correction: (ref) => ref === DENTIST_ID ? () => setCorrectionRequest((count) => count + 1) : null,
-    attendance: (ref) => ref === DENTIST_ID ? (attendance) => correct({ attendance, locationText: null }) : null,
     behavior: (ref) => ref === GYM_ID ? { onOpen: () => setStepNote("Opens Behaviors, where Gym's place is changed.") } : null,
     settings: { onOpen: () => setStepNote("Opens Travel settings: Home and device location.") },
   };
@@ -362,7 +359,7 @@ export function DepartureStatesBench({ initialStateId, initialMarker, initialLin
           <dd data-departure-model-state={departure.state}>{MODEL_STATE_WORDS[departure.state]}{lateBasis}{freshness}</dd>
           <dt className="font-bold">Next-departure line</dt>
           <dd data-bench-model-line>{departure.phrase ?? "None: no travel text."}
-            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). A place, attendance or start step carries one action (Ticket 273).</span></dd>
+            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). A place, start or Home step carries one action (Ticket 273).</span></dd>
           <dt className="font-bold">This state</dt>
           <dd>{preset.description}</dd>
           {stepNote ? <><dt className="font-bold">Step action</dt><dd role="status" data-bench-step-note>{stepNote}</dd></> : null}

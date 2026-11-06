@@ -15,7 +15,8 @@ import {
 } from "@cadence/core/services/travel-refresh-policy";
 import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
 
-export type TravelCorrection = Readonly<{ eventId: string; revision: string; attendance: "physical" | "remote"; locationText: string | null }>;
+/** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
+export type TravelCorrection = Readonly<{ eventId: string; revision: string; locationText: string }>;
 export type TravelRoutesInput = Readonly<{
   startLocalDate: string; endLocalDate: string;
   scope?: "timeline" | "day";
@@ -132,7 +133,7 @@ export function travelSourceKey(events: readonly NormalizedExternalEvent[], time
 
 /**
  * Ticket 268: each stop's travel inputs, by commitment ref (event ID or Occurrence ID): its
- * times, place, attendance and response. The same inputs as `travelSourceKey`, per stop, so a
+ * times, place, video link and response. The same inputs as `travelSourceKey`, per stop, so a
  * kept view can withdraw only the trips whose stop changed or is gone. Kept in memory; the
  * browser session holds only digests.
  */

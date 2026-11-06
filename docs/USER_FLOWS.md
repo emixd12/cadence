@@ -55,7 +55,8 @@ release gate. Live and installed acceptance remain open in `qa/travel-release.md
    unknown.
 3. The user may add a designated location in the existing Behavior form. Calendar
    locations stay attached to their events. Missing/ambiguous points need correction;
-   Cadence does not infer a home address or in-person attendance for hybrid events.
+   Cadence does not infer a home address. A Calendar event with a location is in person;
+   one without a location is not travel and asks nothing (decision D12).
 4. Opening relevant context or changing meaningful inputs computes usable route
    pairs proactively. No per-trip approval is required. The itinerary includes
    direct A → B → C legs using event locations, times and mode. Changes recompute

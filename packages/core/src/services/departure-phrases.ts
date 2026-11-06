@@ -24,19 +24,16 @@ const PRIOR_STOP_FALLBACK = "your last stop";
 const TRIP_HOME = "the trip home";
 
 export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
-/** Ticket 271: the one short control that opens the attendance and destination correction. Not yet approved. */
+/** Ticket 271: the one short control that opens the destination correction. Not yet approved. */
 export const TRAVEL_CORRECTION_TOGGLE = "Change for this trip";
 /** The overlap label when the trip home has no known time. */
 export const RETURN_TIME_UNKNOWN = "Return time unknown.";
-/** Ticket 273: the one-tap answers after "Is {event} in person or remote?". Not yet approved. */
-export const TRAVEL_ATTENDANCE_IN_PERSON = "In person";
-export const TRAVEL_ATTENDANCE_REMOTE = "Remote";
 /** Ticket 273: dismisses the line offering Travel estimates. The leave-time question uses the same words. Not yet approved here. */
 export const TRAVEL_OFF_DISMISS = "Not now";
 /** Ticket 273: the first-run Home and travel row once both are saved but Travel estimates is off. Not yet approved. */
 export const SETUP_TRAVEL_ESTIMATES_OFF = "Estimates off";
-/** Ticket 273: in a step phrase, the words before this are the step's own action (as owner change R1 does for Refresh travel). */
-const DEPARTURE_STEP_SUFFIX = " to get a leave time";
+/** Ticket 273: in a step phrase, the words before these are the step's own action (as owner change R1 does for Refresh travel). */
+const DEPARTURE_STEP_SUFFIXES = [" to get a leave time", " to estimate"] as const;
 
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
@@ -178,14 +175,10 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "The event or Behavior has no place.",
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
-  { id: "needs-attendance", ticket: "265", template: "Is {event} in person or remote?",
-    situation: "Cadence cannot tell whether the event is in person.",
-    replaces: null,
-    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
-  { id: "needs-origin-blocked", ticket: "265", template: "Fix {other event}'s place or attendance to get a leave time for {event}.",
-    situation: "The stop before this one has no place or attendance, so the trip has no start.",
-    replaces: null,
-    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R2", before: "The leave time for {event} depends on {other event}." } },
+  { id: "needs-origin-blocked", ticket: "273", template: "Fix {other event}'s place to get a leave time for {event}.",
+    situation: "The stop before this one has no place, so the trip has no start. Decision D12: a located event is in person, so attendance is never the cause.",
+    replaces: "Fix {other event}'s place or attendance to get a leave time for {event}.",
+    approvedOn: null, ownerChange: null },
   { id: "needs-origin-home", ticket: "265", template: "Add Home in Settings to get a leave time for {event}.",
     situation: "No Home is saved and the device location is unknown.",
     replaces: null,
@@ -307,7 +300,7 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
   { id: "correction-toggle", ticket: "271", template: "Change for this trip",
-    situation: "Calendar details, the control that opens the attendance and destination correction for one journey.",
+    situation: "Calendar details, the control that opens the destination correction for one journey.",
     replaces: "Travel for this event",
     approvedOn: null, ownerChange: null },
   { id: "brief-overlap", ticket: "272", template: "Travel to {event} overlaps {behavior}.",
@@ -334,13 +327,9 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
     replaces: null,
     approvedOn: null, ownerChange: null },
-  { id: "step-in-person", ticket: "273", template: "In person",
-    situation: "Next-departure line, drawer and dialog: one tap after \"Is {event} in person or remote?\". Routes the event for this trip.",
-    replaces: null,
-    approvedOn: null, ownerChange: null },
-  { id: "step-remote", ticket: "273", template: "Remote",
-    situation: "Next-departure line, drawer and dialog: one tap after \"Is {event} in person or remote?\". No travel for the event on this trip.",
-    replaces: null,
+  { id: "return-home-missing", ticket: "273", template: "Add Home in Settings to estimate the return time.",
+    situation: "Event drawer, dialog, Behavior row or next-departure line, when the trip home has no time because no Home is saved. \"Add Home in Settings\" opens Travel settings.",
+    replaces: "Return time unknown. Add Home in Settings to estimate it.",
     approvedOn: null, ownerChange: null },
   { id: "travel-off-offer", ticket: "273", template: "Turn on Travel estimates in Settings to get a leave time for {event}.",
     situation: "Top of the Timeline, once, while Travel estimates is off and a located event is still ahead today. The words before \"to get\" open Travel settings; nothing turns on from here.",
@@ -430,7 +419,7 @@ export function departureBriefBackPhrase(at: string, context: DeparturePhraseCon
 
 /** Ticket 273: offered while Travel estimates is off and a located event is ahead today. Not yet approved. */
 export function departureTravelOffPhrase(eventLabel: string): string {
-  return `Turn on Travel estimates in Settings${DEPARTURE_STEP_SUFFIX} for ${eventLabel}.`;
+  return `Turn on Travel estimates in Settings to get a leave time for ${eventLabel}.`;
 }
 
 /**
@@ -439,8 +428,8 @@ export function departureTravelOffPhrase(eventLabel: string): string {
  * phrase has no such step.
  */
 export function departureStepLead(phrase: string): Readonly<{ lead: string; rest: string }> | null {
-  const index = phrase.indexOf(DEPARTURE_STEP_SUFFIX);
-  return index > 0 ? { lead: phrase.slice(0, index), rest: phrase.slice(index) } : null;
+  const index = Math.min(...DEPARTURE_STEP_SUFFIXES.map((suffix) => phrase.indexOf(suffix)).filter((found) => found > 0));
+  return Number.isFinite(index) ? { lead: phrase.slice(0, index), rest: phrase.slice(index) } : null;
 }
 
 /** Ticket 270, marker A: "Leave 1:15". The rail is narrow, so the time has no AM or PM. Not yet approved. */
@@ -506,11 +495,9 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
       return named ? `The leave time for ${destination} appears by ${time(input.appearsAt)}.` : `Leave time appears by ${time(input.appearsAt)}.`;
     case "needs_place":
       return `Add a place for ${destination} to get a leave time.`;
-    case "needs_attendance":
-      return `Is ${destination} in person or remote?`;
     case "needs_origin":
       return input.blockingLabel
-        ? `Fix ${input.blockingLabel}'s place or attendance to get a leave time for ${destination}.`
+        ? `Fix ${input.blockingLabel}'s place to get a leave time for ${destination}.`
         : `Add Home in Settings to get a leave time for ${destination}.`;
     case "time_unknown":
       return timeUnknown(input, destination, named);
@@ -578,7 +565,8 @@ function lowerFirst(text: string): string {
 
 function timeUnknown(input: DeparturePhraseInput, destination: string, named: boolean): string {
   if (input.role === "return") {
-    return input.timeUnknownCause === "home_missing" ? `${RETURN_TIME_UNKNOWN} Add Home in Settings to estimate it.` : RETURN_TIME_UNKNOWN;
+    // One sentence; its first words open Travel settings, as the other steps do.
+    return input.timeUnknownCause === "home_missing" ? "Add Home in Settings to estimate the return time." : RETURN_TIME_UNKNOWN;
   }
   if (input.timeUnknownCause === "late_arrival") {
     return `No leave time for ${named ? `the trip to ${destination}` : "this trip"}, because you may arrive late at ${input.blockingLabel ?? PRIOR_STOP_FALLBACK}.`;

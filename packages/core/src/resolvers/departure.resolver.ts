@@ -163,12 +163,11 @@ function fromUnknown(
     : destination ? Temporal.Instant.from(destination.startAt) : dayEnd;
   switch (unknown.reason) {
     case "destination_unknown": return { finishedAt, draft: { ...trip, state: "needs_place" } };
-    case "attendance_unknown": return { finishedAt, draft: { ...trip, state: "needs_attendance" } };
     case "origin_unknown": {
       if (unknown.blockerResolved) return { finishedAt, draft: { ...trip, state: "trip_changed", action: "refresh" } };
       // The plan loses its place at the unknown stop before this one, and names no origin itself.
       const blocker = previous && !("leg" in previous) &&
-        (previous.reason === "destination_unknown" || previous.reason === "attendance_unknown")
+        previous.reason === "destination_unknown"
         ? previous.destinationCommitmentRef
         : null;
       return { finishedAt, draft: { ...trip, state: "needs_origin", blockingRef: blocker,

@@ -11,6 +11,21 @@ describe("travel route request", () => {
 });
 
 
+describe("travel route corrections (decision D12)", () => {
+  const day = { startLocalDate: "2026-11-05", endLocalDate: "2026-11-05" };
+  it("accepts a destination for one event revision and asks no attendance", () => {
+    const corrections = [{ eventId: "event-1", revision: "r1", locationText: "12 Harbor Street" }];
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections }).corrections).toEqual(corrections);
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections: [{ ...corrections[0], attendance: "remote" }] }).corrections).toEqual(corrections);
+  });
+
+  it("rejects a correction without a destination", () => {
+    for (const locationText of [null, "", undefined, "x".repeat(513)]) {
+      expect(() => parseTravelRouteRefreshRequest({ ...day, corrections: [{ eventId: "event-1", revision: "r1", locationText }] })).toThrow("Travel correction");
+    }
+  });
+});
+
 describe("travel route scope", () => {
   const day = { startLocalDate: "2026-10-18", endLocalDate: "2026-10-18" };
   it("defaults older clients to Timeline scope and validates whole-day requests", () => {

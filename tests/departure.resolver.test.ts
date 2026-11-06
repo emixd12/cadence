@@ -235,11 +235,9 @@ describe("each state", () => {
     expect(travelEstimateAppearsAt({ role: "onward", readyAt: local("08:00"), destinationStartAt: null, arrivalBufferSeconds: 600 })).toBeNull();
   });
 
-  it("needs place and needs attendance name the event", () => {
+  it("needs place names the event", () => {
     const place = model(local("08:00"), [], { unknownLegs: [unknown("outbound", null, "dentist", "destination_unknown")] });
     expect(place).toMatchObject({ state: "needs_place", phrase: "Add a place for Dentist to get a leave time." });
-    const attendance = model(local("08:00"), [], { unknownLegs: [unknown("outbound", null, "dentist", "attendance_unknown")] });
-    expect(attendance).toMatchObject({ state: "needs_attendance", phrase: "Is Dentist in person or remote?" });
   });
 
   it("needs origin names the event that blocks it", () => {
@@ -249,12 +247,13 @@ describe("each state", () => {
       unknown("outbound", null, "lunch", "destination_unknown"),
     ] });
     expect(result.trips.map((trip) => trip.state)).toEqual(["needs_place", "needs_origin"]);
-    expect(result.trips[1]).toMatchObject({ blockingRef: "lunch", blockingLabel: "Lunch", phrase: "Fix Lunch's place or attendance to get a leave time for Dentist." });
-    const asked = model(local("08:00"), [], { stops: [DENTIST, lunch], unknownLegs: [
-      unknown("outbound", null, "lunch", "attendance_unknown"),
+    expect(result.trips[1]).toMatchObject({ blockingRef: "lunch", blockingLabel: "Lunch", phrase: "Fix Lunch's place to get a leave time for Dentist." });
+    // Decision D12: the stop past the trip limit gives no time, but it does not block a later trip.
+    const limited = model(local("08:00"), [], { stops: [DENTIST, lunch], unknownLegs: [
+      unknown("outbound", null, "lunch", "leg_limit"),
       unknown("outbound", null, "dentist", "origin_unknown"),
     ] });
-    expect(asked.trips[1]?.blockingRef).toBe("lunch");
+    expect(limited.trips[1]?.blockingRef).toBeNull();
   });
 
   it("needs origin without a blocker asks for Home", () => {
@@ -275,7 +274,7 @@ describe("each state", () => {
 
   it("states why a time cannot be given", () => {
     const home = model(local("14:45"), [], { unknownLegs: [unknown("return", "dentist", null, "return_base_missing")] });
-    expect(home).toMatchObject({ state: "time_unknown", phrase: "Return time unknown. Add Home in Settings to estimate it." });
+    expect(home).toMatchObject({ state: "time_unknown", phrase: "Add Home in Settings to estimate the return time." });
     expect(home.next?.timeUnknownCause).toBe("home_missing");
     const noEnd = model(local("08:00"), [], { unknownLegs: [unknown("return", "dentist", null, "timing_unknown")] });
     expect(noEnd).toMatchObject({ phrase: "Return time unknown." });
@@ -388,8 +387,8 @@ describe("choosing the next trip", () => {
   });
 
   it("orders unknown trips between routed ones", () => {
-    const result = model(local("09:00"), [toLunch(), tripHome()], { stops, unknownLegs: [unknown("onward", "lunch", "dentist", "attendance_unknown")] });
-    expect(result.trips.map((trip) => trip.state)).toEqual(["upcoming", "needs_attendance", "upcoming"]);
+    const result = model(local("09:00"), [toLunch(), tripHome()], { stops, unknownLegs: [unknown("onward", "lunch", "dentist", "destination_unknown")] });
+    expect(result.trips.map((trip) => trip.state)).toEqual(["upcoming", "needs_place", "upcoming"]);
   });
 
   it("a trip with no place stops being next when its event starts", () => {
@@ -643,14 +642,14 @@ describe("Ticket 261: a trip whose stop is missing from the input", () => {
 
 describe("Ticket 261: a plan with no routed legs", () => {
   it("drops a trip whose stop is missing, before and after midnight and days later", () => {
-    const run = (now: string) => model(now, [], { stops: [], unknownLegs: [unknown("outbound", null, "gone", "attendance_unknown")] });
+    const run = (now: string) => model(now, [], { stops: [], unknownLegs: [unknown("outbound", null, "gone", "destination_unknown")] });
     for (const now of [local("20:00"), local("23:59"), local("00:00", "2026-09-17"), local("12:00", "2026-09-17"), local("12:00", "2026-09-20")]) {
       expect(run(now)).toMatchObject({ state: "none", next: null, trips: [] });
     }
   });
 
   it("keeps a trip whose stop is in the input", () => {
-    expect(model(local("12:00"), [], { unknownLegs: [unknown("outbound", null, "dentist", "attendance_unknown")] }).next?.state).toBe("needs_attendance");
+    expect(model(local("12:00"), [], { unknownLegs: [unknown("outbound", null, "dentist", "destination_unknown")] }).next?.state).toBe("needs_place");
   });
 });
 

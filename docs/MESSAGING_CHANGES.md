@@ -92,6 +92,7 @@ Status values:
 | [P-020](#p-020-remembered-places-and-attendance) | Remembered places and attendance | logged | 281 | Privacy, user guide |
 | [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
 | [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
+| [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -706,6 +707,9 @@ cite has not changed.
 - **Change:** owner decision D4, November 4, 2026. Ticket 281 stores a corrected place ID
   under the original text's key, so later events with that text resolve too. It adds a
   hosted-only per-event attendance record keyed by a digest. Turning travel off deletes both.
+- **D12 note (November 5, 2026):** a located event is now in person and nothing asks about
+  attendance (P-023), so no attendance answer exists to remember. Only the remembered place
+  part of this entry still applies.
 - **Affected:** Ticket 281. Files: `components/settings/LegalContent.tsx`,
   `docs/user-guide/travel.md`.
 - **Surfaces:** Privacy, user guide.
@@ -771,6 +775,8 @@ cite has not changed.
   describe these steps. Five phrases are on the bench wording review, not yet approved (D7):
   In person, Remote, the offer, its Not now, and Estimates off. P-007 keeps the first-run
   row's label and purpose text unchanged.
+- **D12 note (November 5, 2026):** "Is {event} in person or remote?", In person and Remote are
+  gone, and "Fix {event}'s place or attendance" now reads "Fix {event}'s place". See P-023.
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later
@@ -789,4 +795,26 @@ cite has not changed.
   thunderstorms.", and a trip the margin makes late reads "You may arrive late: leave by
   1:20 PM from Home · walking, arrive 2:05 PM." before the leave time, or "You may arrive
   late: arrive 2:05 PM." after it.
+- **Status:** logged.
+
+## P-023: No attendance question, and no travel for events without a location
+
+- **Change:** owner decision D12, November 5, 2026. A Calendar event with a location is in
+  person; one without a location is not travel. It asks nothing, gets no route and never holds
+  up a later trip; the Timeline and Daily Brief still show it as an event. The attendance
+  question ("Is {event} in person or remote?" with In person and Remote) and the attendance
+  choice in Change for this trip are removed; the correction asks only for the destination.
+  "Fix {event}'s place or attendance to get a leave time for {event}." becomes "Fix {event}'s
+  place to get a leave time for {event}.". The trip home with no saved Home reads "Add Home in
+  Settings to estimate the return time.", whose first words open Travel settings, in place of
+  "Return time unknown. Add Home in Settings to estimate it.". The two new sentences are on the
+  bench wording review, not yet approved (D7).
+- **Affected:** decision D12. Files: `docs/user-guide/travel.md`.
+- **Surfaces:** user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md`, "Inspect travel and correct a
+  journey": "When routing is available, event details allow an in-person or remote choice and a
+  destination correction for that journey and event revision."; "Refresh travel estimates":
+  "an event's time, location or attendance changes".
+- **Update needed:** drop the in-person or remote choice; say an event without a location is not
+  travel; describe the no-Home return sentence and its Settings link.
 - **Status:** logged.

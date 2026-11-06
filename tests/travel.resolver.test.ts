@@ -138,18 +138,18 @@ describe("resolveTravelPlan", () => {
     expect(stale.legs[0]?.provenance.destinationRef).toBe("event-1-place");
   });
 
-  it("keeps hybrid and unknown stops explicit and interrupts automatic chaining", () => {
+  it("gives the stop past the source window no time and interrupts automatic chaining (decision D12)", () => {
     const plan = resolveTravelPlan(planningInput({
       base: null,
       commitments: [
-        { ...commitment("hybrid", "2026-09-16T18:00:00Z", "2026-09-16T19:00:00Z", endpoint("hybrid-place", "calendar", "h1", 2)), attendance: "hybrid" },
+        { ...commitment("boundary", "2026-09-16T18:00:00Z", "2026-09-16T19:00:00Z", endpoint("boundary-place", "calendar", "h1", 2)), attendance: "unknown" },
         commitment("later", "2026-09-16T21:00:00Z", "2026-09-16T22:00:00Z", endpoint("later-place", "calendar", "l1", 3)),
       ],
     }));
 
     expect(plan.legs).toEqual([]);
     expect(plan.unknownLegs.map((leg) => leg.reason)).toEqual([
-      "attendance_unknown",
+      "leg_limit",
       "origin_unknown",
       "return_base_missing",
     ]);
@@ -784,12 +784,11 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
       expect(resolveTravelPlan(walking({ commitments: [{ ...open, ref: "event-open" }, ongoing, later] })).legs[0]).toMatchObject({ role: "onward", originCommitmentRef: "event-now" });
     });
 
-    it("treats an ended event, a remote one and one with no place as no prior stop", () => {
+    it("treats an ended event, the stop past the source window and one with no place as no prior stop", () => {
       const ended = { ...ongoing, endAt: NOW };
-      const remote = { ...ongoing, attendance: "remote" as const };
-      const hybrid = { ...ongoing, attendance: "hybrid" as const };
+      const boundary = { ...ongoing, attendance: "unknown" as const };
       const nowhere = { ...ongoing, endpoint: null };
-      for (const value of [ended, remote, hybrid, nowhere]) {
+      for (const value of [ended, boundary, nowhere]) {
         const plan = resolveTravelPlan(walking({ commitments: [value, later] }));
         expect(plan.legs[0]).toMatchObject({ role: "outbound", readyAt: NOW, provenance: { originRef: "base" } });
         expect(plan.unknownLegs).toEqual([]);
@@ -830,14 +829,14 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
     ]);
   });
 
-  it("scenario G: a location plus a video link keeps the chaining rule and names both unknown legs", () => {
+  it("scenario G (decision D12): only the stop past the source window lacks attendance; it keeps the chaining rule", () => {
     const { evidence } = unknownReasons(walking({ commitments: [
-      { ...commitment("event-hybrid", "2026-09-16T17:00:00Z", "2026-09-16T18:00:00Z", place("hybrid", 2)), attendance: "hybrid" },
+      { ...commitment("event-hybrid", "2026-09-16T17:00:00Z", "2026-09-16T18:00:00Z", place("hybrid", 2)), attendance: "unknown" },
       commitment("event-clear", "2026-09-16T18:30:00Z", "2026-09-16T19:30:00Z", place("clear", 3)),
     ] }));
     expect(evidence.legs.map((entry) => entry.leg.role)).toEqual(["return"]);
     expect(evidence.unknownLegs).toEqual([
-      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-hybrid", reason: "attendance_unknown" },
+      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-hybrid", reason: "leg_limit" },
       { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-clear", reason: "origin_unknown" },
     ]);
   });

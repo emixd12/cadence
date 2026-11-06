@@ -87,7 +87,7 @@ it("walks the state switch through every state and shows the bench clock", async
       expect(gymRow()).not.toContain("Return time unknown");
     } else {
       expect(container.querySelector("[data-bench-model-line]")?.textContent, state.id).not.toContain("None");
-      // Ticket 273 adds the place, attendance and start steps to the drawer and dialog.
+      // Ticket 273 adds the place and start steps to the drawer and dialog.
       if (!state.expected.startsWith("needs_")) expect(travelLines.length, state.id).toBeGreaterThan(0);
     }
   }
@@ -119,11 +119,9 @@ it("renders each preset's sentences in the shared surfaces", async () => {
   expect(text("Dentist drawer")).toContain("Trip changed.");
   await choose("needs-place");
   expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Add a place for Dentist to get a leave time.");
-  await choose("needs-attendance");
-  expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Is Dentist in person or remote?");
   await choose("needs-origin");
   expect(container.querySelector("[data-departure-model-state]")?.textContent).toBe("Needs a start");
-  expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Fix Gym's place or attendance to get a leave time for Dentist.");
+  expect(container.querySelector("[data-bench-model-line]")?.textContent).toContain("Fix Gym's place to get a leave time for Dentist.");
   await choose("paused");
   // The trip to Dentist waits for an estimate, so the pause is the whole line, said once.
   expect(statusLine()).toBe("Travel estimates resume on December 1.");
@@ -280,9 +278,10 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 271 adds the correction control's label, not yet approved (decision D7).
   // Ticket 272 lists the Daily Brief's overlap and return lines, not yet approved.
   // Ticket 270 adds the rail label and the slim row's two forms, not yet approved.
-  // Ticket 273 adds In person, Remote, the Travel estimates offer, its Not now and the setup row's Estimates off.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("12 of 75 phrases await the owner's approval.");
-  for (const id of ["step-in-person", "step-remote", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off"]) {
+  // Ticket 273 adds the Travel estimates offer, its Not now and the setup row's Estimates off.
+  // Decision D12 removes the attendance question, rewords the blocked-stop step and adds the no-Home return step.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("12 of 73 phrases await the owner's approval.");
+  for (const id of ["travel-off-offer", "travel-off-dismiss", "setup-estimates-off", "needs-origin-blocked", "return-home-missing"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
   }
   expect(container.querySelector('[data-wording-id="travel-off-offer"] [data-wording-sample]')?.textContent)

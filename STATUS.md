@@ -17,6 +17,24 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
 
+## Travel advisory revamp Wave 3: decision D12 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Owner decision
+D12 (`docs/DECISIONS.md`) changes Ticket 273's attendance step.
+
+- A Calendar event without a location is not travel: the hosted route leaves it out
+  (`calendarCommitmentDrafts`), so it asks nothing, gets no route and never blocks a later trip.
+  It stays a normal event. A Calendar event with a location is in person.
+- The attendance question is gone: the needs-attendance state and phrase, In person and Remote,
+  and the attendance choice in Change for this trip. A correction carries only a destination
+  (`TravelCorrection`, the route request parser). The stop past the bounded source window reads
+  as past the trip limit (`leg_limit`).
+- "Fix {event}'s place" replaces "Fix {event}'s place or attendance". The trip home with no Home
+  reads "Add Home in Settings to estimate the return time.", whose first words link to
+  `/settings#travel` (INT-TRAVEL-011). Both await the owner's approval (D7); the bench review
+  shows 12 of 73 awaiting. Ticket 270's marker variants are unchanged.
+- Ticket 281 keeps only remembered places. Messaging impact: P-023, with notes on P-020 and P-021.
+
 ## Travel advisory revamp Wave 3: Ticket 273 implemented — November 5, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.** Every missing
@@ -150,7 +168,7 @@ of the Timeline now says when to leave next.
   replaces "Travel as of" and "may be stale". A day with no trips shows no travel text, paused or not.
 - Refresh travel follows R1: where the phrase starts with "Refresh travel", those words are the
   button. Otherwise the button ends the line only when the trip's action is refresh. `INT-TRAVEL-004`
-  is kept. Place, attendance and start steps show their sentence with no action (Ticket 273).
+  is kept. Place and start steps show their sentence with no action (Ticket 273).
 - While the budget is used up, the paused phrase follows a known time on the same line (D11).
 - At most one muted note follows: a message (unavailable, development-only provider review, changed
   stops) or else the weather state. One Refresh travel at most.

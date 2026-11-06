@@ -130,10 +130,9 @@ it("keeps journey corrections transient and builds a source-location search link
     await act(() => root.render(<ExternalEventDetails event={event} timezone="UTC" onClose={() => {}} onDismissAllDay={() => {}} onTravelCorrection={corrected} />));
     const link = [...container.querySelectorAll("a")].find((element) => element.textContent === "Search in Google Maps")!;
     expect(new URL(link.href).searchParams.get("query")).toBe("User source address");
-    const attendance = container.querySelector<HTMLSelectElement>('select[name="travel_attendance"]')!;
-    attendance.value = "remote";
+    expect(container.querySelector('select[name="travel_attendance"]')).toBeNull();
     await act(() => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(corrected).toHaveBeenCalledWith({ eventId: event.id, revision: "revision-1", attendance: "remote", locationText: "User source address" });
+    expect(corrected).toHaveBeenCalledWith({ eventId: event.id, revision: "revision-1", locationText: "User source address" });
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 

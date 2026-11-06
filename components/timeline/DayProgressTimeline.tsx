@@ -271,11 +271,6 @@ export function DayProgressTimeline({
           setCorrectionRequest((previous) => ({ eventId: event.id, count: previous.count + 1 }));
         } : null;
       },
-      attendance: (ref) => {
-        const event = correctable(ref);
-        return event && travelCorrection ? (attendance) => travelCorrection({ eventId: event.id,
-          revision: event.revision.providerEtag ?? event.revision.providerUpdatedAt!, attendance, locationText: null }) : null;
-      },
       behavior: (ref) => {
         const behaviorId = occurrences.find((occurrence) => occurrence.id === ref)?.behaviorId;
         if (!behaviorId) return null;
