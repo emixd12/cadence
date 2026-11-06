@@ -130,7 +130,7 @@ the Supabase project owner accepts that operational tradeoff.
 
 ## Cron Processing
 
-`vercel.json` owns both scheduled triggers:
+`vercel.json` owns the scheduled triggers:
 
 ```json
 {
@@ -142,10 +142,17 @@ the Supabase project owner accepts that operational tradeoff.
     {
       "path": "/api/occurrences/sync",
       "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/travel/leave-reminders/process",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
 ```
+
+The leave reminder job (Ticket 277) accepts only `CRON_SECRET` and stays off until
+`CADENCE_LEAVE_REMINDER_JOB=enabled`; `docs/ROUTE_MAP.md` has its contract.
 
 Vercel Cron calls the route with `GET`. The route also supports protected
 manual `POST` calls. Both paths require an `Authorization: Bearer ...` header

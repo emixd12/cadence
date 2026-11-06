@@ -83,6 +83,15 @@ describe("planLeaveReminderVisit", () => {
     expect(plan([{ ...later, updateSentAt: NOW, nextCheckAt: null }]).work).toEqual([]);
   });
 
+  it("closes an open check unrouted when Travel habits changed after sending", () => {
+    const sent = record({ status: "sent", sentAt: "2026-11-06T14:55:00Z", nextCheckAt: "2026-11-06T14:58:00Z", routeCount: 2 });
+    const withHabits = (habitsUpdatedAt: string | null) =>
+      planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: PREP, habitsUpdatedAt, records: [sent], trips: [trip] });
+    expect(withHabits("2026-11-06T14:57:00.000000Z")).toMatchObject({ work: [], closeCheck: [sent] });
+    expect(withHabits("2026-11-06T14:55:00.000000Z").work).toEqual([{ record: sent, trip, step: "update" }]);
+    expect(withHabits(null).work).toEqual([{ record: sent, trip, step: "update" }]);
+  });
+
   it("cancels pending records from an earlier date and purges older ones", () => {
     const yesterday = record({ id: "y", localDate: "2026-11-05", routeCount: 1 });
     const older = record({ id: "o", localDate: "2026-11-04", routeCount: 1 });

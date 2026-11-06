@@ -136,7 +136,7 @@ function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: n
   const port = (): LeaveReminderAccountPort => ({
     caller: { userId: USER_ID } as LeaveReminderCaller,
     store,
-    readContext: async () => ({ timezone: TZ, preparationSeconds: options.preparationSeconds ?? PREP_SECONDS, travelOn: true }),
+    readContext: async () => ({ timezone: TZ, preparationSeconds: options.preparationSeconds ?? PREP_SECONDS, travelOn: true, habitsUpdatedAt: null }),
     listTrips: async () => world.trips,
     routeTrips: async (_localDate, trips) => {
       if (world.routeThrows) throw new Error("provider_unavailable");
@@ -267,7 +267,7 @@ describe("leave reminder job", () => {
     const { store, world, sent, port, deliver, visit } = harness();
     await visit("2026-11-06T15:00:00Z");
     const listTrips = vi.fn(async () => world.trips);
-    const off = { ...port(), listTrips, readContext: async () => ({ timezone: TZ, preparationSeconds: PREP_SECONDS, travelOn: false }) };
+    const off = { ...port(), listTrips, readContext: async () => ({ timezone: TZ, preparationSeconds: PREP_SECONDS, travelOn: false, habitsUpdatedAt: null }) };
     await visitLeaveReminderAccount(off, { userId: USER_ID, nextCheckAt: store.accountNextCheckAt! }, Temporal.Instant.from("2026-11-06T17:06:00Z"), deliver);
     expect(listTrips).not.toHaveBeenCalled();
     expect(world.routes).toHaveLength(1);
@@ -394,5 +394,77 @@ describe("processLeaveReminders", () => {
     expect(result.selected).toBe(3);
     expect(result.skipped + result.failed).toBe(3);
     expect(result.skipped).toBeGreaterThan(0);
+  });
+});
+
+describe("decision D15 update threshold (verifier, Ticket 277)", () => {
+  // get-ready 30 min, named leave 18:00, so the stored check is the named reminder time 17:30.
+  async function sentReminder(options: Readonly<{ preparation?: { seconds: number } }> = {}) {
+    const preparation = options.preparation ?? { seconds: 30 * 60 };
+    const h = harness({ preparationSeconds: 30 * 60 });
+    const port = h.port;
+    h.world.leaveAt.set("event-1", "2026-11-06T18:00:00Z");
+    const visitWith = async (at: string, habitsUpdatedAt: string | null = null) => {
+      const base = port();
+      const custom = { ...base, readContext: async () => ({ timezone: TZ, preparationSeconds: preparation.seconds, travelOn: true, habitsUpdatedAt }) };
+      return visitLeaveReminderAccount(custom, { userId: USER_ID, nextCheckAt: h.store.accountNextCheckAt ?? at }, Temporal.Instant.from(at), h.deliver);
+    };
+    await visitWith("2026-11-06T15:00:00Z");
+    await visitWith("2026-11-06T17:26:00Z");
+    expect(h.sent.map((message) => [message.kind, message.leaveAt])).toEqual([["reminder", "2026-11-06T18:00:00Z"]]);
+    expect(only(h.store)).toMatchObject({ status: "sent", nextCheckAt: "2026-11-06T17:30:00Z", routeCount: 2 });
+    return { ...h, preparation, visitWith };
+  }
+
+  it("sends exactly one update when the leave time moves exactly 10 minutes earlier", async () => {
+    const { store, world, sent, visitWith } = await sentReminder();
+    world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
+    await visitWith("2026-11-06T17:31:00Z");
+    world.leaveAt.set("event-1", "2026-11-06T17:38:00Z");
+    await visitWith("2026-11-06T17:36:00Z");
+    await visitWith("2026-11-06T17:41:00Z");
+    expect(sent.map((message) => [message.kind, message.leaveAt])).toEqual([
+      ["reminder", "2026-11-06T18:00:00Z"], ["update", "2026-11-06T17:50:00Z"],
+    ]);
+    expect(only(store)).toMatchObject({ routeCount: 3, updateSentAt: "2026-11-06T17:31:00Z", nextCheckAt: null });
+    expect(world.routes).toHaveLength(3);
+  });
+
+  it("sends no update when the leave time moves 9 minutes earlier, and never routes again", async () => {
+    const { store, world, sent, visitWith } = await sentReminder();
+    world.leaveAt.set("event-1", "2026-11-06T17:51:00Z");
+    await visitWith("2026-11-06T17:31:00Z");
+    world.leaveAt.set("event-1", "2026-11-06T17:40:00Z");
+    await visitWith("2026-11-06T17:36:00Z");
+    expect(sent).toHaveLength(1);
+    expect(only(store)).toMatchObject({ routeCount: 3, updateSentAt: null, nextCheckAt: null });
+    expect(world.routes).toHaveLength(3);
+  });
+
+  it("sends no false update when get-ready time grows after sending and the leave time holds", async () => {
+    const { store, world, sent, preparation, visitWith } = await sentReminder();
+    preparation.seconds = 45 * 60; // the user adds 15 minutes of get-ready time at 17:28
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T17:28:00.000000Z");
+    expect(sent).toHaveLength(1);
+    expect(only(store)).toMatchObject({ updateSentAt: null, nextCheckAt: null });
+    // The named leave time is unknown, so the check closes without a route.
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("closes the check without a route when get-ready time shrinks after sending", async () => {
+    const { store, world, sent, preparation, visitWith } = await sentReminder();
+    preparation.seconds = 20 * 60;
+    world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T17:28:00.000000Z");
+    expect(sent).toHaveLength(1);
+    expect(only(store)).toMatchObject({ updateSentAt: null, nextCheckAt: null, routeCount: 2 });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("keeps the exact rule when habits last changed before the reminder was sent", async () => {
+    const { sent, world, visitWith } = await sentReminder();
+    world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T09:00:00.000000Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder", "update"]);
   });
 });

@@ -100,6 +100,11 @@ export function planLeaveReminderVisit(input: Readonly<{
   now: string;
   timezone: string;
   preparationSeconds: number;
+  /**
+   * When Travel habits last changed. A change after a reminder was sent may have changed
+   * its get-ready time, so the leave time it named is unknown and its check closes unrouted.
+   */
+  habitsUpdatedAt?: string | null;
   records: readonly LeaveReminderRecord[];
   trips: readonly LeaveReminderTrip[];
 }>): LeaveReminderVisitPlan {
@@ -137,6 +142,10 @@ export function planLeaveReminderVisit(input: Readonly<{
       if (due(record.nextCheckAt)) work.push({ record, trip, step: record.routeCount === 0 ? "plan" : "send" });
       continue;
     }
+    if (openCheck && habitsChangedAfter(input.habitsUpdatedAt, record.sentAt)) {
+      closeCheck.push(record);
+      continue;
+    }
     if (openCheck && record.routeCount < LEAVE_REMINDER_MAX_ROUTES) {
       const namedLeaveAt = Temporal.Instant.from(record.nextCheckAt!).add({ seconds: input.preparationSeconds });
       if (Temporal.Instant.compare(namedLeaveAt, now) <= 0) closeCheck.push(record);
@@ -146,6 +155,11 @@ export function planLeaveReminderVisit(input: Readonly<{
 
   const create = input.trips.filter((trip) => !recorded.has(trip.digest));
   return { localDate, create, restore, work, cancel, closeCheck, purgeBefore };
+}
+
+function habitsChangedAfter(habitsUpdatedAt: string | null | undefined, sentAt: string | null): boolean {
+  if (!habitsUpdatedAt || !sentAt) return false;
+  return Temporal.Instant.compare(Temporal.Instant.from(habitsUpdatedAt), Temporal.Instant.from(sentAt)) > 0;
 }
 
 function updateWaitOver(sentAt: string, now: Temporal.Instant): boolean {

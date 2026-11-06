@@ -507,7 +507,9 @@ ship, nothing reads or writes the new tables.
      once more. If the estimate moves the leave time 10 minutes or more earlier and it
      is still ahead, the job sends the one update at once. Otherwise the check closes
      and nothing more sends. Once the named leave time passes, the check closes without
-     a route. The job never routes a trip a fourth time.
+     a route. If Travel habits changed after sending, the get-ready time the reminder
+     used is unknown, so the check also closes without a route and no update sends.
+     The job never routes a trip a fourth time.
   If the plan route finds the reminder already due, it is also the send route, and
   the update route is the second. The update route adds up to half the job's route
   legs (`docs/COSTS.md`). Leave times stay in memory; only the check time is stored.
