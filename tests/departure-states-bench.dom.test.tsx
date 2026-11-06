@@ -280,20 +280,20 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 273 adds the Travel estimates offer, its Not now and the setup row's Estimates off.
   // Decision D12 removes the attendance question, rewords the blocked-stop step and adds the no-Home return step.
   // Decision D13 approves the Ticket 271, 272 and 273 wording on November 6, 2026, drops the slim row's two forms and adds
-  // the leader label's leave-now, late, passed and head-home forms, not yet approved. The D12 steps stay unapproved.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("8 of 76 phrases await the owner's approval.");
-  for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off"]) {
+  // the leader label's leave-now, late, passed and head-home forms. Decision D14 approves those forms and the two D12 steps on
+  // the same day and adds "Home {time}", approved. D14 does not name "Leave {time}", so it still awaits the owner.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("1 of 77 phrases await the owner's approval.");
+  for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off",
+    "needs-origin-blocked", "return-home-missing", "marker-rail-home", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
+    "marker-rail-past-leave-home", "marker-rail-head-home-now"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Approved November 6, 2026");
   }
-  for (const id of ["needs-origin-blocked", "return-home-missing", "marker-rail", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
-    "marker-rail-past-leave-home", "marker-rail-head-home-now"]) {
-    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
-  }
+  expect(container.querySelector('[data-wording-id="marker-rail"] [data-wording-status]')?.textContent).toBe("Not yet approved");
   expect(container.querySelector('[data-wording-id="marker-row"]')).toBeNull();
   expect(container.querySelector('[data-wording-id="marker-row-home"]')).toBeNull();
   expect(container.querySelector('[data-wording-id="travel-off-offer"] [data-wording-sample]')?.textContent)
     .toBe("Turn on Travel estimates in Settings to get a leave time for Dentist.");
-  const samples: ReadonlyArray<readonly [string, string]> = [["marker-rail", "Leave 1:20"], ["marker-rail-leave-now", "Leave now"],
+  const samples: ReadonlyArray<readonly [string, string]> = [["marker-rail", "Leave 1:20"], ["marker-rail-home", "Home 3:00"], ["marker-rail-leave-now", "Leave now"],
     ["marker-rail-late", "May arrive late"], ["marker-rail-past-leave", "Arrive about 2:05"], ["marker-rail-past-leave-home", "Home about 3:40"],
     ["marker-rail-head-home-now", "Head home now"]];
   for (const [id, sample] of samples) expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-sample]`)?.textContent, id).toBe(sample);
@@ -364,7 +364,7 @@ it("names leave now, late and passed leave times instead of a past time, and dro
   await render("fresh");
   const cases: ReadonlyArray<readonly [string, string | null]> = [
     ["expired", "Leave 9:35"], ["soon", "Leave 9:35"], ["leave-now", "Leave now"], ["late-evidence", "May arrive late"],
-    ["late-clock", "Arrive about 10:05"], ["head-home", "Leave 3:00"], ["needs-place", null], ["appears-later", null], ["no-trips", null], ["paused", null],
+    ["late-clock", "Arrive about 10:05"], ["head-home", "Home 3:00"], ["needs-place", null], ["appears-later", null], ["no-trips", null], ["paused", null],
   ];
   for (const [state, label] of cases) {
     await choose(state);
@@ -372,6 +372,78 @@ it("names leave now, late and passed leave times instead of a past time, and dro
     expect(marks().spans.length, state).toBe(label ? 1 : 0);
     expect(marks().leaders, state).toBe(label ? 1 : 0);
   }
+});
+
+// Decision D14: the rail geometry the Timeline reads from its CSS, wide (1440) or phone (390).
+function stubRail(layout: "wide" | "phone") {
+  const values: Record<string, string> = layout === "wide"
+    ? { "--timeline-axis-x": "104", "--calendar-node-x": "32", "--next-trip-label-stack": "0" }
+    : { "--timeline-axis-x": "56", "--calendar-node-x": "22", "--next-trip-label-stack": "1" };
+  const original = window.getComputedStyle.bind(window);
+  vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+    const style = original(element, pseudo);
+    return new Proxy(style, { get: (target, key) => key === "getPropertyValue"
+      ? (name: string) => values[name] ?? target.getPropertyValue(name)
+      : Reflect.get(target, key, target) });
+  });
+}
+
+const label = () => timelineSurface().querySelector<HTMLElement>("[data-next-trip-label]")!;
+const leaderEnds = () => {
+  const [, start, end] = timelineSurface().querySelector("[data-next-trip-leader]")!.getAttribute("d")!.match(/^M (\S+) \S+ H (\S+)/)!;
+  return { start: Number(start), end: Number(end) };
+};
+
+it("puts the label on one line on wide layouts and stacks it on phones (D14)", async () => {
+  stubRail("wide");
+  await render("fresh");
+  expect(label().getAttribute("data-label-lines")).toBe("1");
+  expect([...label().children].map((line) => line.textContent)).toEqual(["Leave 9:35"]);
+  expect(label().style.width).toBe("");
+  await act(() => root.unmount());
+  root = createRoot(container);
+  vi.restoreAllMocks();
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const isSection = this === this.closest("section");
+    const isTime = this.tagName === "TIME";
+    const top = isSection ? 0 : isTime ? 96 : 60;
+    const height = isSection ? 260 : isTime ? 20 : 48;
+    return { top, bottom: top + height, left: 160, right: 760, width: isTime ? 64 : 600, height, x: 160, y: top, toJSON() {} };
+  });
+  stubRail("phone");
+  await render("fresh");
+  expect(label().getAttribute("data-label-lines")).toBe("2");
+  expect([...label().children].map((line) => line.textContent?.trim())).toEqual(["Leave", "9:35"]);
+  expect(label().style.width).toBe("32px");
+});
+
+it("stacks a one-line label that would cross the Timeline's left edge (D14)", async () => {
+  stubRail("wide");
+  const rect = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
+  const base = rect.getMockImplementation()!;
+  rect.mockImplementation(function (this: HTMLElement) {
+    const box = base.call(this);
+    return this.matches("[data-next-trip-label][data-label-lines='1']") ? { ...box, left: 100, x: 100 } : box;
+  });
+  await render("late-clock");
+  expect(label().getAttribute("data-label-lines")).toBe("3");
+  expect(label().textContent).toBe("Arrive about 10:05");
+});
+
+it("keeps the leader its full 14px and ends the label at it, even beside the current-time dot (D14)", async () => {
+  stubRail("wide");
+  await render("fresh");
+  const starts: number[] = [];
+  for (const state of ["fresh", "soon", "leave-now", "late-evidence", "late-clock", "head-home"]) {
+    await choose(state);
+    const { start, end } = leaderEnds();
+    expect(start - end, state).toBe(14);
+    expect(label().style.right, state).toBe(`calc(100% - ${end - 2}px)`);
+    starts.push(start);
+  }
+  // The axis sits at 104px. The dot covers the leave point in at least one state, so the leader starts 8px out and still runs 14px.
+  expect(starts).toContain(96);
+  expect(starts).toContain(104);
 });
 
 it("shows one muted line on a Behavior the next trip crowds, only while collapsed (Ticket 270)", async () => {

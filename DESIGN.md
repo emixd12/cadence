@@ -716,7 +716,8 @@ Decision D13 keeps this small status size; the bench's title-size variant is gon
 
 ### Next trip marker (Ticket 270)
 
-Decision D13 (owner, 2026-11-06) chose a variant of bench marker A. `DayOverlay` in
+Decision D13 (owner, 2026-11-06) chose a variant of bench marker A, and decision D14 (same
+day) set the label's line count and the trip home's words. `DayOverlay` in
 `components/timeline/DayProgressTimeline.tsx` draws it for the departure model's next trip
 only, from `resolveNextTripMarkInput` and `resolveDayProgressLayout`:
 
@@ -724,15 +725,19 @@ only, from `resolveNextTripMarkInput` and `resolveDayProgressLayout`:
   arrival, clipped to each day and drawn under the current-time dot.
 - Leader: a 1px `--calendar-overlap` line, 14px long, perpendicular to the axis from the
   span's top end into the left rail. When the current-time dot sits within 8px of it, the
-  leader starts 8px from the axis so it never runs under the dot.
-- Label: at the leader's end, 2px clear, right-aligned in a 32px column, 11px text on 16px
-  lines, tabular numbers, regular weight, in `--calendar-overlap-text` (`#C0286A`, 5.4:1 on
-  the background; the `#DA3278` span color is 4.3:1, too low for 11px text). One short word
-  group per line: "Leave" over "9:35". A passed time never shows as "Leave": leave now reads
-  "Leave now", a late route "May arrive late", a passed leave time "Arrive about 10:05" (or
-  "Home about" for the trip home), and the trip home at its time "Head home now"
-  (`departureMarkerRailLines`).
-- Crowding: where the label shares the rail with Calendar markers (390 px), the resolver moves
+  leader starts 8px from the axis so it never runs under the dot, and it keeps its full 14px
+  (D14), so it never reads as a hyphen beside the label.
+- Label: at the leader's end, 2px clear, right-aligned, 11px text on 16px lines, tabular
+  numbers, regular weight, in `--calendar-overlap-text` (`#C0286A`, 5.4:1 on the background;
+  the `#DA3278` span color is 4.3:1, too low for 11px text). Wide layouts set it on one line,
+  "Leave 9:35", and the leader points straight at it (D14). Phones (`max-width: 575px`, the
+  `--next-trip-label-stack` custom property) stack one short word group per line in a 32px
+  column: "Leave" over "9:35". A one-line label that would cross the Timeline's left edge
+  stacks too, so it is never clipped. The trip home reads "Home 3:00" (D14). A passed time
+  never shows: leave now reads "Leave now", a late route "May arrive late", a passed leave time
+  "Arrive about 10:05" (or "Home about" for the trip home), and the trip home at its time
+  "Head home now" (`departureMarkerRailLines`).
+- Crowding: where the label shares the rail with Calendar markers, the resolver moves
   it to the nearest position clear of them. If that takes it off the leader's line, a short
   vertical segment at the leader's end reaches the label.
 - The leader and label are `aria-hidden` and take no pointer events; the next-departure line

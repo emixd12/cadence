@@ -254,7 +254,10 @@ Exception, owner decision D2, "Next trip only" (`docs/DECISIONS.md`, 2026-11-04;
 one magenta span without hovering. Owner decision D13 (2026-11-06) set the marker: the span
 starts exactly at the recommended leave time and ends at arrival. From its top end a short
 magenta leader runs perpendicular to the axis into the left rail, with a small magenta label
-at its end, such as "Leave 9:35". A time that has passed is never shown as a leave time: the
+at its end, such as "Leave 9:35". Owner decision D14 (2026-11-06): the label is one line on
+wide layouts, with the leader pointing straight at it, and two stacked lines on phones; the
+trip home reads "Home {time}"; and the leader keeps its full length when the current-time dot
+sits at the leave point. A time that has passed is never shown as a leave time: the
 label reads "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}" or
 "Head home now", from the same states as the line. The label stays clear of the current-time
 dot, Behavior rows and Calendar markers at 1440 and 390 px. The leader and label are

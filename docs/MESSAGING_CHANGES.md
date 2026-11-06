@@ -783,6 +783,10 @@ cite has not changed.
   row's label and purpose text unchanged.
 - **D12 note (November 5, 2026):** "Is {event} in person or remote?", In person and Remote are
   gone, and "Fix {event}'s place or attendance" now reads "Fix {event}'s place". See P-023.
+- **Ticket 270 detail, decision D14 (November 6, 2026):** the label is one line ("Leave 1:20")
+  on wide layouts and stacked on phones. The trip home's label reads "Home {time}". The owner
+  approved the late and passed forms, "Home {time}" and the two D12 steps; "Leave {time}" still
+  awaits approval (D7).
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later

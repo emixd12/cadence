@@ -45,7 +45,7 @@ const HOME_TRIP: Partial<DeparturePhraseInput> = { role: "return", fromHome: fal
 const detail = (input: Partial<DeparturePhraseInput>) => departureDetailPhrase({ ...BASE, ...input }, CONTEXT);
 const line = (input: Partial<DeparturePhraseInput>) => departureLinePhrase({ ...BASE, ...input }, CONTEXT);
 const old: Partial<DeparturePhraseInput> = { freshness: "last_estimate", checkedAt: at("08:55") };
-/** Ticket 270 (D13): the leader label, its lines joined as one phrase. */
+/** Ticket 270 (D13, D14): the leader label, its word groups joined as on wide layouts. */
 const marker = (input: Partial<DeparturePhraseInput>) => departureMarkerRailLines({ ...BASE, ...input }, TIMEZONE).join(" ");
 
 /** Sample renderings by phrase id. A test checks that every listed phrase has one and matches its template. */
@@ -115,6 +115,7 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "brief-overlap-trip-home": () => departureBriefOverlapPhrase("Walk", null),
   "brief-back": () => departureBriefBackPhrase(at("15:30"), CONTEXT),
   "marker-rail": () => marker({ state: "upcoming", minutesUntilLeave: 45 }),
+  "marker-rail-home": () => marker({ ...HOME_TRIP, state: "upcoming", minutesUntilLeave: 45 }),
   "marker-rail-leave-now": () => marker({ state: "leave_now", minutesUntilLeave: null }),
   "marker-rail-late": () => marker({ state: "late", lateBasis: "evidence", minutesUntilLeave: null, arriveAt: at("14:05") }),
   "marker-rail-past-leave": () => marker({ state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("14:05") }),

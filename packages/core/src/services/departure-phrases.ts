@@ -37,7 +37,7 @@ const DEPARTURE_STEP_SUFFIXES = [" to get a leave time", " to estimate"] as cons
 
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
-/** Decision D13: the owner approved the Ticket 271, 272 and 273 wording listed there on this date. */
+/** Decisions D13 and D14: the owner approved the wording each lists on this date. */
 export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
@@ -180,7 +180,7 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "needs-origin-blocked", ticket: "273", template: "Fix {other event}'s place to get a leave time for {event}.",
     situation: "The stop before this one has no place, so the trip has no start. Decision D12: a located event is in person, so attendance is never the cause.",
     replaces: "Fix {other event}'s place or attendance to get a leave time for {event}.",
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "needs-origin-home", ticket: "265", template: "Add Home in Settings to get a leave time for {event}.",
     situation: "No Home is saved and the device location is unknown.",
     replaces: null,
@@ -317,26 +317,30 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "Timeline left rail: the label at the end of the magenta leader from the next trip's span, at its leave time. The time has no AM or PM.",
     replaces: null,
     approvedOn: null, ownerChange: null },
+  { id: "marker-rail-home", ticket: "270", template: "Home {time}",
+    situation: "Timeline left rail: the trip home's label at its leave time, while that time is still ahead. Decision D14. The time has no AM or PM.",
+    replaces: "Leave {time}",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "marker-rail-leave-now", ticket: "270", template: "Leave now",
     situation: "Timeline left rail: the next trip's label in the leave-now state, instead of a leave time that has just passed.",
     replaces: null,
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "marker-rail-late", ticket: "270", template: "May arrive late",
     situation: "Timeline left rail: the next trip's label when the route says it may arrive late. Short for the line's \"You may arrive late\".",
     replaces: null,
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "marker-rail-past-leave", ticket: "270", template: "Arrive about {time}",
     situation: "Timeline left rail: the next trip's label once its leave time has passed (clock only). Short for the line's \"you'd arrive about {time}\". The time has no AM or PM.",
     replaces: null,
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "marker-rail-past-leave-home", ticket: "270", template: "Home about {time}",
     situation: "Timeline left rail: the trip home's label once its leave time has passed (clock only). Short for the line's \"you'd be home about {time}\".",
     replaces: null,
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "marker-rail-head-home-now", ticket: "270", template: "Head home now",
     situation: "Timeline left rail: the trip home's label once its leave time has come, instead of a leave time that has passed.",
     replaces: null,
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "brief-back", ticket: "272", template: "Back around {time}.",
     situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
     replaces: null,
@@ -344,7 +348,7 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "return-home-missing", ticket: "273", template: "Add Home in Settings to estimate the return time.",
     situation: "Event drawer, dialog, Behavior row or next-departure line, when the trip home has no time because no Home is saved. \"Add Home in Settings\" opens Travel settings.",
     replaces: "Return time unknown. Add Home in Settings to estimate it.",
-    approvedOn: null, ownerChange: null },
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "travel-off-offer", ticket: "273", template: "Turn on Travel estimates in Settings to get a leave time for {event}.",
     situation: "Top of the Timeline, once, while Travel estimates is off and a located event is still ahead today. The words before \"to get\" open Travel settings; nothing turns on from here.",
     replaces: null,
@@ -447,9 +451,10 @@ export function departureStepLead(phrase: string): Readonly<{ lead: string; rest
 }
 
 /**
- * Ticket 270 (D13): the label at the end of the next trip's leader, one short word group per
- * line. The rail is narrow, so a time has no AM or PM. A time that has passed is never shown as
- * "Leave": leave now, late and passed leave times use the line's own words. Not yet approved.
+ * Ticket 270 (D13, D14): the label at the end of the next trip's leader, as short word groups.
+ * Wide layouts join them on one line; phones stack one group per line. The rail is narrow, so a
+ * time has no AM or PM. A time that has passed is never shown: leave now, late and passed leave
+ * times use the line's own words. The trip home reads "Home {time}" (D14).
  */
 export function departureMarkerRailLines(
   trip: Pick<DepartureTrip, "state" | "lateBasis" | "role" | "leaveAt" | "arriveAt" | "minutesUntilLeave">,
@@ -461,7 +466,7 @@ export function departureMarkerRailLines(
   };
   // Clock only: the user may well have left, so say when they would arrive, not that they are late.
   if (trip.lateBasis === "clock" && trip.arriveAt) return [trip.role === "return" ? "Home" : "Arrive", "about", short(trip.arriveAt)];
-  if (trip.role === "return") return trip.minutesUntilLeave === null || !trip.leaveAt ? ["Head", "home", "now"] : ["Leave", short(trip.leaveAt)];
+  if (trip.role === "return") return trip.minutesUntilLeave === null || !trip.leaveAt ? ["Head", "home", "now"] : ["Home", short(trip.leaveAt)];
   if (trip.state === "late") return ["May", "arrive", "late"];
   if (trip.state === "leave_now" || !trip.leaveAt) return ["Leave", "now"];
   return ["Leave", short(trip.leaveAt)];

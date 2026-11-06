@@ -107,20 +107,27 @@ type DayProgressTimelineProps = Readonly<{
 }>;
 
 /**
- * Ticket 270 (D13): a short magenta leader runs from the top of the next trip's span, at the
- * leave time, perpendicular to the axis into the left rail. Its label, one short word group per
- * line ("Leave" over "1:15"), sits at the leader's end.
+ * Ticket 270 (D13, D14): a short magenta leader runs from the top of the next trip's span, at the
+ * leave time, perpendicular to the axis into the left rail. Its label sits at the leader's end:
+ * one line ("Leave 1:15") on wide layouts, one short word group per line on phones (D14).
  */
 const LEADER_LENGTH = 14;
 const LEADER_LABEL_GAP = 2;
+/** The stacked label's column. A one-line label takes its own width. */
 const LEADER_LABEL_WIDTH = 32;
 const LEADER_LABEL_LINE = 16;
+/** A one-line label's width per character at 11px, rounded up, used only to decide whether it meets the Calendar markers. */
+const LEADER_LABEL_CHAR_WIDTH = 6;
 /** The current-time dot's radius plus its stroke and 1px of air: the leader starts here when the dot sits on it. */
 const CURRENT_TIME_CLEARANCE = 8;
+/** The most room the leader and its gap take from the axis, when the dot sits on the leave point. */
+const LEADER_REACH = CURRENT_TIME_CLEARANCE + LEADER_LENGTH + LEADER_LABEL_GAP;
 
 type MeasuredDay = Parameters<typeof resolveDayProgressLayout>[0]["days"][number] & Readonly<{
   axisX: number;
   iconX: number;
+  /** D14: the phone layout stacks the next trip's label, one word group per line. */
+  stackLabel: boolean;
 }>;
 
 type Preview = Readonly<{ ids: string[]; launcher: HTMLElement }>;
@@ -308,9 +315,18 @@ export function DayProgressTimeline({
 
   // Ticket 270 (D2, D13): the next trip alone gets a span, a leader and a label without hovering.
   const nextTrip = useMemo(() => resolveNextTripMarkInput(departure.next), [departure.next]);
-  const nextTripLabel = useMemo(() => nextTrip && departure.next ? departureMarkerRailLines(departure.next, timeline.timezone) : null,
+  const nextTripWords = useMemo(() => nextTrip && departure.next ? departureMarkerRailLines(departure.next, timeline.timezone) : null,
     [nextTrip, departure.next, timeline.timezone]);
+  // D14: one line on wide layouts, the stack on phones. A one-line label that would cross the
+  // Timeline's left edge also stacks, so it is never clipped.
+  const [overflowingLabel, setOverflowingLabel] = useState<string | null>(null);
+  const railDay = visibleSections.map((section) => measured[section.localDate]).find(Boolean);
+  const nextTripLine = nextTripWords?.join(" ") ?? null;
+  const nextTripLabel = useMemo(() => !nextTripWords ? null
+    : railDay?.stackLabel || overflowingLabel === nextTripLine ? nextTripWords : [nextTripLine!],
+  [nextTripWords, nextTripLine, railDay?.stackLabel, overflowingLabel]);
   const nextTripLabelHeight = (nextTripLabel?.length ?? 2) * LEADER_LABEL_LINE;
+  const nextTripLabelWidth = nextTripLabel?.length === 1 ? nextTripLabel[0]!.length * LEADER_LABEL_CHAR_WIDTH : LEADER_LABEL_WIDTH;
   const layout = useMemo(() => {
     const days = visibleSections.flatMap((section) => measured[section.localDate] ? [measured[section.localDate]!] : []);
     if (days.length !== visibleSections.length) return null;
@@ -327,9 +343,9 @@ export function DayProgressTimeline({
       nextTrip,
       // The label clears the Calendar markers when both sit in the same part of the rail (narrow layouts).
       nextTripLabel: { height: nextTripLabelHeight,
-        avoidIcons: !!first && first.axisX - LEADER_LENGTH - LEADER_LABEL_GAP - LEADER_LABEL_WIDTH < first.iconX + 22 },
+        avoidIcons: !!first && first.axisX - LEADER_REACH - nextTripLabelWidth < first.iconX + 22 },
     });
-  }, [travel, events, measured, now, timeline.timezone, visibleSections, nextTrip, nextTripLabelHeight]);
+  }, [travel, events, measured, now, timeline.timezone, visibleSections, nextTrip, nextTripLabelHeight, nextTripLabelWidth]);
 
   const activeIds = preview?.ids ?? EMPTY_IDS;
   const previewEvents = useMemo(() => activeIds.flatMap((id) => {
@@ -435,6 +451,7 @@ export function DayProgressTimeline({
         previewId={preview ? "calendar-preview" : undefined}
         onPreview={openPreview}
         nextTripLabel={nextTripLabel}
+        onLabelOverflow={setOverflowingLabel}
       /> : null}
       {visibleSections.map((section) => <DayProgressDay
         key={section.key}
@@ -617,6 +634,7 @@ function DayProgressDay({
         rows: measuredRows,
         axisX,
         iconX,
+        stackLabel: style.getPropertyValue("--next-trip-label-stack").trim() === "1",
       };
     };
     if (typeof ResizeObserver === "undefined") return;
@@ -705,6 +723,7 @@ function DayOverlay({
   previewId,
   onPreview,
   nextTripLabel,
+  onLabelOverflow,
 }: Readonly<{
   layout: ReturnType<typeof resolveDayProgressLayout>;
   measured: Readonly<Record<string, MeasuredDay>>;
@@ -713,13 +732,23 @@ function DayOverlay({
   previewId?: string;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
   nextTripLabel: readonly string[] | null;
+  /** D14: a one-line label that crosses the Timeline's left edge reports its text, so it stacks instead. */
+  onLabelOverflow: (line: string) => void;
 }>) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const label = labelRef.current;
+    const overlay = overlayRef.current;
+    if (!label || !overlay || nextTripLabel?.length !== 1) return;
+    if (label.getBoundingClientRect().left < overlay.getBoundingClientRect().left - 0.5) onLabelOverflow(nextTripLabel[0]!);
+  });
   const controls = layout.days.flatMap((day) => [
     ...day.timedEventSpans.filter((span) => span.iconLane !== null && !span.overflowGroupId).map((span) => ({ id: span.eventId, position: span.iconPosition, eventIds: [span.eventId], count: 1, iconX: 0, axisX: 0 })),
     ...day.iconOverflowGroups.map((group) => ({ id: group.id, position: group.position, eventIds: group.eventIds, count: group.count, iconX: 0, axisX: 0 })),
   ].map((control) => ({ ...control, iconX: measured[day.localDate]!.iconX, axisX: measured[day.localDate]!.axisX })));
   return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden={false}>
+    <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden={false}>
       <svg className="absolute inset-0 h-full w-full overflow-visible text-muted-readable" aria-hidden="true">
         {controls.map((control) => <line key={control.id} data-calendar-stem={control.id} x1={control.iconX} x2={control.axisX} y1={control.position} y2={control.position} stroke="currentColor" />)}
         {layout.days.flatMap((day) => day.timedEventSpans.filter((span) => activeIds.includes(span.eventId) && span.endPosition !== null).map((span) => <line key={`${day.localDate}-${span.eventId}`} data-event-duration={span.eventId} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={span.continuesBefore && span.iconLane === null && !span.overflowGroupId ? day.top : span.iconPosition} y2={span.continuesAfter ? day.bottom : Math.min(day.bottom, span.iconPosition + Math.max(2, span.endPosition! - span.startPosition))} stroke="var(--calendar-overlap)" strokeWidth={1} />))}
@@ -743,22 +772,34 @@ function DayOverlay({
             : <CalendarDays size={16} aria-hidden="true" />}
           {control.count > 1 ? <span className={styles.countBadge}>×{control.count}</span> : null}</span></button>;
       })}
-      {/* Ticket 270 (D13): the leader's label. Decorative: the next-departure line already says it. */}
-      {nextTripLabel ? layout.days.flatMap((day) => day.nextTrip?.leavePosition != null && day.nextTrip.labelPosition != null ? [<span key={`next-trip-label-${day.localDate}`} aria-hidden="true" data-next-trip-label={day.nextTrip.key}
-        className={styles.leaderLabel} style={{ right: `calc(100% - ${measured[day.localDate]!.axisX - LEADER_LENGTH - LEADER_LABEL_GAP}px)`, top: day.nextTrip.labelPosition, width: LEADER_LABEL_WIDTH, height: nextTripLabel.length * LEADER_LABEL_LINE }}>
+      {/* Ticket 270 (D13, D14): the leader's label. Decorative: the next-departure line already says it. */}
+      {nextTripLabel ? layout.days.flatMap((day) => day.nextTrip?.leavePosition != null && day.nextTrip.labelPosition != null ? [<span key={`next-trip-label-${day.localDate}`} ref={labelRef} aria-hidden="true" data-next-trip-label={day.nextTrip.key}
+        data-label-lines={nextTripLabel.length}
+        className={styles.leaderLabel} style={{ right: `calc(100% - ${leaderEnd(measured[day.localDate]!.axisX, day.nextTrip.leavePosition, day.movingDot?.displayPosition ?? null) - LEADER_LABEL_GAP}px)`, top: day.nextTrip.labelPosition, width: nextTripLabel.length > 1 ? LEADER_LABEL_WIDTH : undefined, height: nextTripLabel.length * LEADER_LABEL_LINE }}>
         {nextTripLabel.map((words, index) => <span key={index} className="block">{index ? ` ${words}` : words}</span>)}</span>] : []) : null}
     </div>
   );
 }
 
+/** The leader's start: the axis, or clear of the current-time dot when the dot sits on the leave point. */
+function leaderStart(axisX: number, leave: number, dot: number | null): number {
+  return dot !== null && Math.abs(dot - leave) < CURRENT_TIME_CLEARANCE ? axisX - CURRENT_TIME_CLEARANCE : axisX;
+}
+
+/** D14: the leader keeps its full length past the dot, so it never reads as a hyphen. */
+function leaderEnd(axisX: number, leave: number, dot: number | null): number {
+  return leaderStart(axisX, leave, dot) - LEADER_LENGTH;
+}
+
 /**
- * Ticket 270 (D13): the leader, perpendicular to the axis at the leave time. It starts clear of
- * the current-time dot when the dot sits on it. When a Calendar marker pushed the label off the
- * leader's line, a short vertical segment at the leader's end reaches the label's nearest edge.
+ * Ticket 270 (D13, D14): the leader, perpendicular to the axis at the leave time. It starts clear
+ * of the current-time dot when the dot sits on it and keeps its full length. When a Calendar
+ * marker pushed the label off the leader's line, a short vertical segment at the leader's end
+ * reaches the label's nearest edge.
  */
 function leaderPath(axisX: number, leave: number, label: number, labelHeight: number, dot: number | null): string {
-  const start = dot !== null && Math.abs(dot - leave) < CURRENT_TIME_CLEARANCE ? axisX - CURRENT_TIME_CLEARANCE : axisX;
-  const end = axisX - LEADER_LENGTH;
+  const start = leaderStart(axisX, leave, dot);
+  const end = leaderEnd(axisX, leave, dot);
   const reach = labelHeight / 2 - 4;
   const elbow = Math.abs(label - leave) <= reach ? "" : ` V ${label + (label < leave ? reach : -reach)}`;
   return `M ${start} ${leave} H ${end}${elbow}`;
@@ -796,7 +837,7 @@ function resolveContexts(
 }
 
 function sameDay(left: MeasuredDay | undefined, right: MeasuredDay): boolean {
-  return !!left && left.top === right.top && left.bottom === right.bottom && left.axisX === right.axisX && left.iconX === right.iconX && left.rows.length === right.rows.length && left.rows.every((row, index) => row.occurrenceId === right.rows[index]?.occurrenceId && row.center === right.rows[index]?.center && row.scheduledFor === right.rows[index]?.scheduledFor);
+  return !!left && left.top === right.top && left.bottom === right.bottom && left.axisX === right.axisX && left.iconX === right.iconX && left.stackLabel === right.stackLabel && left.rows.length === right.rows.length && left.rows.every((row, index) => row.occurrenceId === right.rows[index]?.occurrenceId && row.center === right.rows[index]?.center && row.scheduledFor === right.rows[index]?.scheduledFor);
 }
 
 function sameIconState(left: Record<string, boolean>, right: Record<string, boolean>): boolean {

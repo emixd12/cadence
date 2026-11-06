@@ -16084,7 +16084,10 @@ or deployed. The span starts at the leave time; a short magenta leader runs from
 into the left rail with a small magenta label at its end. Leave now, late and passed leave
 times use the line's words. Variants B and C, the title-size line and
 `NEXT_TRIP_PRESENTATION` are removed. `DESIGN.md` ("Next trip marker (Ticket 270)") and
-`docs/UI_SPEC.md` describe the shipped form. The five new label phrases await approval (D7).
+`docs/UI_SPEC.md` describe the shipped form. Decision D14 (November 6, 2026): the label is
+one line on wide layouts and stacked on phones, the trip home reads "Home {time}", the leader
+keeps its full 14px beside the current-time dot, and the label phrases except "Leave {time}"
+are approved.
 Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).

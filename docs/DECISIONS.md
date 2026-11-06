@@ -1627,3 +1627,24 @@ contrast; strokes keep `--calendar-overlap`.
 Platform impact: web and desktop through the shared Timeline component, day-progress resolver
 and phrase module. Marketing: not applicable. Future mobile: shared modules. Messaging impact:
 P-021 note.
+
+
+## 2026-11-06: Next-trip label lines, trip-home words and wording approvals (D14)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the Ticket
+270 verifier's notes on the D13 marker:
+
+1. The next-trip label is one line ("Leave 1:20") on wide layouts, with the leader pointing
+   straight at it. Phones keep the two-line stack. A one-line label that would cross the
+   Timeline's left edge also stacks, so it is never clipped.
+2. The trip home's label reads "Home {time}" instead of "Leave {time}". Approved as written.
+3. Approved: "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}", "Head
+   home now", "Add Home in Settings to estimate the return time." and "Fix {event}'s place to
+   get a leave time for {event}." `DEPARTURE_PHRASE_REVIEW` carries the date as
+   `OWNER_APPROVED_2026_11_06`. D14 does not name "Leave {time}", so it stays unapproved (D7).
+4. When the current-time dot sits at the leave point, the leader keeps its full 14px past the
+   dot, so it does not read as a hyphen beside the label.
+
+Platform impact: web and desktop through the shared Timeline component and phrase module.
+Marketing: not applicable. Future mobile: mobile web keeps the stacked label at 390 px; native
+mobile is deferred. Messaging impact: P-021 note.
