@@ -39,7 +39,7 @@ import type { CalendarReadCaller } from "@/lib/services/google-calendar.service"
 import type { LeaveReminderDelivery, LeaveReminderMessage } from "@/lib/services/leave-reminder-delivery";
 import type { TravelProviderConfig } from "@/lib/services/travel-provider";
 import { readTravelCalendarConnections, readTravelCalendarEvents } from "@/lib/services/travel-calendar-sources";
-import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
+import { refreshTravelRoutes, refreshTravelRoutesReportingCalendars } from "@/lib/services/travel-route-refresh.service";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 
@@ -67,6 +67,12 @@ export type LeaveReminderPlannedTrip = LeaveReminderTrip & Readonly<{
   mode: TravelMode;
 }>;
 
+/**
+ * The current plan's trips. `calendarsLeftOut`: a connected Outlook or iCloud Calendar's read
+ * failed, so its trips may be missing; the visit keeps their records (Ticket 283).
+ */
+export type LeaveReminderTripList = Readonly<{ trips: LeaveReminderPlannedTrip[]; calendarsLeftOut: boolean }>;
+
 export type LeaveReminderRouted = Readonly<{
   result: LeaveReminderRouteResult;
   estimate: Readonly<{ departureAt: string; arrivalAt: string; durationSeconds: number }> | null;
@@ -90,7 +96,7 @@ export type LeaveReminderAccountPort = Readonly<{
    */
   readContext(): Promise<Readonly<{ timezone: string; preparationSeconds: number; travelOn: boolean; habitsUpdatedAt: string | null;
     preparationChangedAt?: string | null }>>;
-  listTrips(localDate: string): Promise<LeaveReminderPlannedTrip[]>;
+  listTrips(localDate: string): Promise<LeaveReminderTripList>;
   routeTrips(localDate: string, trips: readonly LeaveReminderPlannedTrip[]): Promise<ReadonlyMap<string, LeaveReminderRouted>>;
   readSendDetails(localDate: string, trip: LeaveReminderPlannedTrip, originRef: string | null): Promise<LeaveReminderSendDetails | null>;
   /** Decision D16: true from 80% of the monthly budget. */
@@ -179,9 +185,10 @@ export async function visitLeaveReminderAccount(
     timezone = context.timezone;
     const records = await store.listRecords();
     const localDate = Temporal.Instant.from(nowText).toZonedDateTimeISO(timezone).toPlainDate().toString();
-    const trips = context.travelOn ? await port.listTrips(localDate) : [];
+    // A failed Google read fails listTrips, and with it this visit: nothing is cancelled and the account is retried.
+    const { trips, calendarsLeftOut } = context.travelOn ? await port.listTrips(localDate) : { trips: [], calendarsLeftOut: false };
     const plan = planLeaveReminderVisit({ now: nowText, timezone, preparationSeconds: context.preparationSeconds, habitsUpdatedAt: context.habitsUpdatedAt,
-      preparationChangedAt: context.preparationChangedAt ?? null, records, trips });
+      preparationChangedAt: context.preparationChangedAt ?? null, records, trips, calendarsLeftOut });
     const tripByDigest = new Map(trips.map((trip) => [trip.digest, trip]));
     const staleBefore = leaveReminderStaleClaimBefore(nowText);
 
@@ -369,9 +376,11 @@ export function createHostedLeaveReminderAccountPort(
     },
     async listTrips(localDate) {
       const calendarReader = await calendar();
-      const response = await refreshTravelRoutes(calendarReader, routeRequest(localDate, [LIST_ONLY_TRIP]), config, now);
-      const destinations = await readDestinations(calendarReader, localDate, false);
-      return (response.evidence?.legs ?? []).flatMap(({ leg }): LeaveReminderPlannedTrip[] => {
+      // Ticket 283: the refresh and the destination read each leave out an Outlook or iCloud
+      // Calendar whose read failed. Either one leaving a Calendar out keeps its records.
+      const { response, calendarsLeftOut } = await refreshTravelRoutesReportingCalendars(calendarReader, routeRequest(localDate, [LIST_ONLY_TRIP]), config, now);
+      const { destinations, calendarsLeftOut: destinationsLeftOut } = await readDestinations(calendarReader, localDate, false);
+      const trips = (response.evidence?.legs ?? []).flatMap(({ leg }): LeaveReminderPlannedTrip[] => {
         // The trip home gets no reminder (decision D15).
         if (leg.role === "return" || !leg.destinationCommitmentRef) return [];
         const destination = destinations.get(leg.destinationCommitmentRef);
@@ -385,6 +394,7 @@ export function createHostedLeaveReminderAccountPort(
           mode: leg.mode,
         }];
       });
+      return { trips, calendarsLeftOut: calendarsLeftOut.length > 0 || destinationsLeftOut };
     },
     async routeTrips(localDate, trips) {
       const calendarReader = await calendar();
@@ -417,7 +427,7 @@ export function createHostedLeaveReminderAccountPort(
       return routed;
     },
     async readSendDetails(localDate, trip, originRef) {
-      const destinations = await readDestinations(await calendar(), localDate, true);
+      const { destinations } = await readDestinations(await calendar(), localDate, true);
       const destination = destinations.get(trip.destinationRef);
       if (!destination?.title || leaveReminderTripDigest(destination.kind, trip.destinationRef, destination.startAt) !== trip.digest) return null;
       if (originRef === null) return { title: destination.title, origin: { kind: "home" } };
@@ -443,7 +453,8 @@ export function createHostedLeaveReminderAccountPort(
    * Occurrences whose Where routes. Titles are read only when sending. Ticket 283: Google,
    * Outlook and iCloud events alike, read as the user; locations and titles stay in memory.
    */
-  async function readDestinations(calendarReader: CalendarReadCaller, localDate: string, withTitles: boolean): Promise<ReadonlyMap<string, Destination>> {
+  async function readDestinations(calendarReader: CalendarReadCaller, localDate: string, withTitles: boolean):
+    Promise<Readonly<{ destinations: ReadonlyMap<string, Destination>; calendarsLeftOut: boolean }>> {
     const client: AppSupabaseClient = caller.client;
     const [connections, source, occurrences, behaviors] = await Promise.all([
       readTravelCalendarConnections(calendarReader),
@@ -463,7 +474,7 @@ export function createHostedLeaveReminderAccountPort(
       if (occurrence.status !== "unresolved" || !routes(whereById.get(occurrence.behavior_id), source.settings.baseLocationText)) continue;
       destinations.set(occurrence.id, { kind: "behavior", startAt: occurrence.scheduled_for, title: withTitles ? titleById.get(occurrence.behavior_id) ?? null : null });
     }
-    return destinations;
+    return { destinations, calendarsLeftOut: calendarEvents.unavailable.length > 0 };
   }
 }
 

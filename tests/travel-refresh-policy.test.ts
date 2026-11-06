@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TRAVEL_LEG_OUTSIDE_WINDOW,
+  firstTravelStopAwayFromHome,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
   recordTravelRefresh,
@@ -208,6 +209,15 @@ describe("trip refresh plan (Ticket 267)", () => {
       { ...DENTIST_TRIP, key: DENTIST, leaveAt: at("13:55"), checkedAt: at("08:00"), fallbackAt: null },
       { role: "return", originRef: "dentist", destinationRef: null, key: "return:dentist:", leaveAt: null, checkedAt: null, fallbackAt: at("12:40") },
     ]);
+  });
+});
+
+describe("first stop away from Home (Ticket 282)", () => {
+  const stops = [{ ref: "blank", place: "  " }, { ref: "home", place: " 1  HOME st" }, { ref: "none", place: null }, { ref: "dentist", place: "Dentist St" }];
+  it("skips stops at Home's text or with no place, and takes the first stop with a place when there is no Home", () => {
+    expect(firstTravelStopAwayFromHome(stops, (stop) => stop.place, "1 Home St")?.ref).toBe("dentist");
+    expect(firstTravelStopAwayFromHome(stops, (stop) => stop.place, null)?.ref).toBe("home");
+    expect(firstTravelStopAwayFromHome(stops.slice(0, 3), (stop) => stop.place, "1 Home St")).toBeNull();
   });
 });
 

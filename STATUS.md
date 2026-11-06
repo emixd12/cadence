@@ -62,6 +62,8 @@ the hosted push waits for the owner.**
 - The hosted route fences Outlook and iCloud connections and event revisions like Google's.
   A failed Google read fails the request; a failed Outlook or iCloud read leaves that Calendar
   out and routes the others (verifier fix). A plan with a left-out Calendar carries no token.
+  Review fix (PR #194): the leave reminder job keeps, rather than cancels, today's reminders
+  whose trip a left-out Calendar may hold, and decides them once every Calendar reads again.
   Decision D18 (entry above) extends signed conclusions to Outlook and iCloud stops.
 - The Ticket 279 line limiting reminders to Google Calendar events is removed.
 - Messaging: P-026 (new), notes on P-017, P-019 and P-024. No cost table change.
@@ -83,6 +85,8 @@ the hosted push waits for the owner.**
 - Verifier fixes: the request reads Calendar from today, as every Calendar read must, and
   keeps tomorrow's events (`readTravelCalendarRange`, shared with Ticket 283). A failed
   request is tried once more after 5 minutes. DST and late-night tests added.
+- Review fix (PR #194): tomorrow's estimate is keyed on the first stop away from Home, the
+  stop the server routes, through one shared helper. An edit to that stop asks again.
 - Tests: `tests/travel-route-refresh.service.test.ts`, `tests/travel-lifecycle.dom.test.tsx`,
   `tests/travel-refresh-policy.test.ts`, `tests/departure.resolver.test.ts`,
   `tests/travel-route-request.test.ts`, `tests/next-departure-line.dom.test.tsx`,

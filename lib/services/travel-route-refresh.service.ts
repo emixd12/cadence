@@ -9,6 +9,7 @@ import {
   TRAVEL_ESTIMATE_LIFETIME_SECONDS,
   TRAVEL_LEG_OUTSIDE_WINDOW,
   TRAVEL_LEG_READY_AFTER_END,
+  firstTravelStopAwayFromHome,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
   travelPlaceLookupReusable,
@@ -28,7 +29,7 @@ import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAd
 import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import type { CalendarReadCaller } from "@/lib/services/google-calendar.service";
-import { readTravelCalendarConnections, readTravelCalendarEvents, sameTravelCalendarConnections, travelConnectorFence } from "@/lib/services/travel-calendar-sources";
+import { readTravelCalendarConnections, readTravelCalendarEvents, sameTravelCalendarConnections, travelConnectorFence, type TravelConnectorName } from "@/lib/services/travel-calendar-sources";
 import type { NormalizedExternalEvent, NormalizedTimedExternalEvent } from "@cadence/core/types/day-progress";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 import { readTravelWeather } from "@/lib/services/weather-forecast.service";
@@ -65,6 +66,25 @@ export async function refreshTravelRoutes(
   weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
   conclusionsSecret: string | null = null,
 ): Promise<TravelRoutesResponse> {
+  return (await refreshTravelRoutesReportingCalendars(caller, raw, config, now, weatherConfig, conclusionsSecret)).response;
+}
+
+/** The response, and the connected Outlook or iCloud Calendars whose read failed and were left out. */
+export type TravelRoutesRefresh = Readonly<{ response: TravelRoutesResponse; calendarsLeftOut: readonly TravelConnectorName[] }>;
+
+/**
+ * `refreshTravelRoutes`, also naming the Calendars a failed read left out. The leave reminder
+ * job keeps those Calendars' trips rather than cancel them (Ticket 283). The Timeline route
+ * returns only the response.
+ */
+export async function refreshTravelRoutesReportingCalendars(
+  caller: CalendarReadCaller,
+  raw: unknown,
+  config: TravelProviderConfig,
+  now = Temporal.Now.instant(),
+  weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
+  conclusionsSecret: string | null = null,
+): Promise<TravelRoutesRefresh> {
   assertTravelProviderReady(config);
   const request = parseTravelRouteRefreshRequest(raw);
   const source = await readTravelRouteSource(caller.client, caller.user.id);
@@ -231,7 +251,7 @@ export async function refreshTravelRoutes(
       calendar: calendar, connectors: travelConnectorFence(calendars), behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
   const budget = await readTravelBudget(caller, timezone, now);
-  return response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
+  return { calendarsLeftOut: calendarEvents.unavailable, response: response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now) ||
       (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
         notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
@@ -239,7 +259,7 @@ export async function refreshTravelRoutes(
       return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
         ...(occurrence.schedule_kind === "exact" ? { durationSeconds: duration?.kind === "known" ? duration.seconds : null } : {}) };
     }),
-  });
+  }) };
 }
 
 /**
@@ -392,11 +412,10 @@ function calendarCommitmentDrafts(prospective: readonly CalendarStop[]): Commitm
 
 /**
  * Ticket 282: tomorrow's first stop away from Home, alone, so the request makes one route call and
- * at most two place lookups. A stop at Home's text needs no trip. With no Home, the first stop.
+ * at most two place lookups. The Timeline's tomorrow key picks its stop with the same helper.
  */
 function firstTripDrafts(drafts: readonly CommitmentDraft[], homeText: string | null): CommitmentDraft[] {
-  const home = homeText ? placeTextKey(homeText) : null;
-  const first = drafts.find((draft) => draft.placeText && placeTextKey(draft.placeText) !== home);
+  const first = firstTravelStopAwayFromHome(drafts, (draft) => draft.placeText, homeText);
   return first ? [first] : [];
 }
 

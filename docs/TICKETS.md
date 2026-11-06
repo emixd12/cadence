@@ -16589,9 +16589,9 @@ original is not remembered. Calendar details show "Applies to every event, Behav
 with the same location. Turning off Travel estimates forgets it." for a located event, approved
 with an owner change on November 6, 2026 (decision D20); an event without a location keeps the
 approved note. Owner isolation:
-`tests/sql/ticket-281-remembered-places-smoke.sql`. Known limit: correcting back to the
-original text keeps the remembered place; correct to another description of the place, or turn
-travel off, to forget it.
+`tests/sql/ticket-281-remembered-places-smoke.sql`. Correcting back to the original text
+forgets the remembered place: the refresh looks that text up again and the result replaces the
+remembered row. This costs one place lookup per refresh while the correction stays.
 
 Scope and acceptance:
 
@@ -16669,6 +16669,10 @@ Implementation notes (November 6, 2026):
   trips or corrections, and keeps the result in `TravelState.tomorrow`, apart from today's view.
   The browser session keeps it with the first stop as a digest. The Mac passes the same stop
   key through `travelTomorrowStopKey`.
+- Review fix (November 6, 2026, PR #194): the stop key lists tomorrow's located stops, and
+  the hook keys the estimate on the first one away from Home, read from travel settings. The
+  server and the hook pick it with one helper, `firstTravelStopAwayFromHome`, so an edit to
+  the routed destination asks again and a stop at Home does not.
 - `refreshTravelRoutes` accepts `first_trip` only for tomorrow in the account's timezone. It
   plans tomorrow's first stop away from Home alone and routes that one leg from Home, with no
   weather call and no signed conclusions.
@@ -16691,6 +16695,12 @@ Verifier fix (November 6, 2026): a failed Outlook or iCloud read (a connector er
 than `invalid_request`) now leaves that Calendar out of the request and routes the others, as
 before this ticket; the final revision check reads the same Calendars, and such a plan carries
 no signed conclusions. A failed Google read still fails the request.
+Review fix (November 6, 2026, PR #194): the leave reminder job no longer cancels a trip a failed
+Outlook or iCloud read left out. `refreshTravelRoutesReportingCalendars` names the left-out
+Calendars, and `planLeaveReminderVisit` keeps today's records with a missing trip while any
+Calendar is left out. A failed Google read fails the visit, which cancels nothing. Tests:
+`tests/leave-reminder-plan.test.ts`, `tests/leave-reminder-job.service.test.ts`,
+`tests/leave-reminder-hosted-port.test.ts`.
 Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
 cover Outlook and iCloud stops. The token names those events by source, and its source key
 binds the Outlook and iCloud connections that took part. The brief accepts it only when each

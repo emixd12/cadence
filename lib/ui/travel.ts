@@ -10,11 +10,11 @@ import { webTravelSettingsClient } from "./travel-settings";
 import { clearTravelLeaveMemory } from "./travel-habits";
 import { readBrowserForegroundLocation, type ForegroundLocation } from "./foreground-location";
 import {
-  recordTravelRefresh, resolveTravelRefreshPlan, resolveTravelTomorrowPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
+  firstTravelStopAwayFromHome, recordTravelRefresh, resolveTravelRefreshPlan, resolveTravelTomorrowPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
   type TravelBudgetState, type TravelDeviceSample, type TravelRefreshRequest, type TravelRefreshState, type TravelTripRef,
 } from "@cadence/core/services/travel-refresh-policy";
 import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
-import { firstLocatedStopAhead } from "@cadence/core/services/departure-stops";
+import { locatedStopsAhead } from "@cadence/core/services/departure-stops";
 
 /** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
 export type TravelCorrection = Readonly<{ eventId: string; revision: string; locationText: string }>;
@@ -149,10 +149,14 @@ export function travelStopRevisions(events: readonly NormalizedExternalEvent[], 
   ]);
 }
 
+/** Ticket 282: one of tomorrow's located stops in a tomorrow key: its ref, place text and travel inputs. */
+type TravelTomorrowStop = readonly [ref: string, placeText: string, revision: string | null];
+
 /**
- * Ticket 282: identifies tomorrow's first located stop and its travel inputs, so tomorrow's first
- * trip is estimated once per stop and revision. Null when tomorrow has none. Kept in memory; the
- * browser session holds only its digest.
+ * Ticket 282: tomorrow's located stops in start order, each with its place text and travel inputs.
+ * The travel hook picks the first one away from Home, as the hosted first-trip request does, so
+ * tomorrow's first trip is estimated once per routed stop and revision. Null when tomorrow has
+ * none. Kept in memory; the browser session holds only the chosen stop's digest.
  */
 export function travelTomorrowStopKey(events: readonly NormalizedExternalEvent[],
   timeline: Pick<TimelineView, "daySections" | "todayLocalDate" | "timezone">, behaviors: readonly TravelBehaviorRevision[] = []): string | null {
@@ -160,10 +164,22 @@ export function travelTomorrowStopKey(events: readonly NormalizedExternalEvent[]
   const section = timeline.daySections.find((day) => day.localDate === tomorrow.toString());
   // Every stop on tomorrow's date starts after this instant, so no clock is needed.
   const start = tomorrow.toZonedDateTime({ timeZone: timeline.timezone }).toInstant().subtract({ nanoseconds: 1 }).toString();
-  const stop = firstLocatedStopAhead({ events, occurrences: section?.occurrences ?? [], now: start, localDate: tomorrow.toString(), timezone: timeline.timezone });
-  if (!stop) return null;
+  const stops = locatedStopsAhead({ events, occurrences: section?.occurrences ?? [], now: start, localDate: tomorrow.toString(), timezone: timeline.timezone });
+  if (!stops.length) return null;
   const revisions = travelStopRevisions(events, { daySections: section ? [section] : [] }, behaviors);
-  return JSON.stringify([tomorrow.toString(), stop.ref, revisions[stop.ref] ?? null]);
+  return JSON.stringify([tomorrow.toString(), stops.map((stop): TravelTomorrowStop => [stop.ref, stop.placeText, revisions[stop.ref] ?? null])]);
+}
+
+/**
+ * Ticket 282: the digest of the stop the hosted first-trip request routes: tomorrow's first stop
+ * away from Home. Null when there is none; undefined while Home is not known yet.
+ */
+function travelTomorrowDigest(tomorrowStopKey: string | null, homeText: string | null | undefined): string | null | undefined {
+  if (!tomorrowStopKey) return null;
+  if (homeText === undefined) return undefined;
+  const [localDate, stops] = JSON.parse(tomorrowStopKey) as [string, TravelTomorrowStop[]];
+  const stop = firstTravelStopAwayFromHome(stops, ([, placeText]) => placeText, homeText);
+  return stop ? travelDigest(JSON.stringify([localDate, stop[0], stop[2]])) : null;
 }
 
 /** Ticket 282: tomorrow's first trip, from its own request. Never merged into today's view. */
@@ -193,6 +209,8 @@ const travelRefreshStates = new Map<string, TravelRefreshState>();
 const travelBudgets = new Map<string, TravelBudgetState>();
 /** Ticket 282: per account, the last request for tomorrow's first trip and its view, recorded when sent. */
 const travelTomorrowTrips = new Map<string, TravelTomorrowEntry>();
+/** Ticket 282: per account, Home's text from the last settings read, to pick tomorrow's routed stop. Page memory only; null is no Home. */
+const travelHomeTexts = new Map<string, string | null>();
 /** Ticket 268: per account, when an automatic request last failed. Automatic requests wait 5 minutes after one. */
 const travelFailures = new Map<string, number>();
 /** Ticket 268: automatic requests wait this long at most for the Calendar reads that feed travel to settle. */
@@ -273,7 +291,7 @@ function forgetTravelAccount(accountId: string): void {
   for (const key of [...travelInFlight.keys()]) if ((JSON.parse((JSON.parse(key) as string[])[0]!) as unknown[])[0] === accountId) travelInFlight.delete(key);
   for (const key of [...travelConclusionTokens.keys()]) if ((JSON.parse(key) as unknown[])[0] === accountId) travelConclusionTokens.delete(key);
   travelRefreshStates.delete(accountId); travelBudgets.delete(accountId); travelFailures.delete(accountId); travelDeviceUnknown.delete(accountId);
-  travelTomorrowTrips.delete(accountId);
+  travelTomorrowTrips.delete(accountId); travelHomeTexts.delete(accountId);
   if (readTravelSession()?.accountId === accountId) removeTravelSession();
 }
 function clearTravelCacheForAccount(accountId: string): void {
@@ -283,7 +301,7 @@ function clearTravelCacheForAccount(accountId: string): void {
 /** Settings and Behavior location saves fire this event from screens where no Timeline is mounted, so invalidate at module level too. */
 function invalidateAllTravel(): void {
   travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear(); travelOffAccounts.clear();
-  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelTomorrowTrips.clear(); removeTravelSession();
+  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelTomorrowTrips.clear(); travelHomeTexts.clear(); removeTravelSession();
 }
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
 /**
@@ -297,12 +315,12 @@ export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: bo
   if (options.keepSession) {
     travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
     travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear();
-    travelTomorrowTrips.clear();
+    travelTomorrowTrips.clear(); travelHomeTexts.clear();
     return;
   }
   travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
   travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear(); removeTravelSession();
-  travelTomorrowTrips.clear();
+  travelTomorrowTrips.clear(); travelHomeTexts.clear();
 }
 
 /**
@@ -471,7 +489,8 @@ export function useTravelContext(input: Readonly<{
     const stateDigest = travelDigest(stateKey);
     const stopDigests = input.stopRevisions
       ? Object.fromEntries(Object.entries(input.stopRevisions).map(([ref, revision]) => [ref, travelDigest(revision)])) : null;
-    const tomorrowDigest = tomorrowStopKey ? travelDigest(tomorrowStopKey) : null;
+    /** Ticket 282: the routed stop's digest from Home's last known text; undefined until Home is known. */
+    const tomorrowDigest = () => travelTomorrowDigest(tomorrowStopKey, travelHomeTexts.has(accountId) ? travelHomeTexts.get(accountId) ?? null : undefined);
     const tomorrowLocalDate = Temporal.PlainDate.from(localDate).add({ days: 1 }).toString();
     const setState = (value: Omit<StoredTravel, "key">) => { const next = { ...value, key: stateKey }; storedRef.current = next; setStored(next); };
     const current = () => storedRef.current.key === stateKey ? storedRef.current : { key: stateKey, ...empty };
@@ -487,6 +506,7 @@ export function useTravelContext(input: Readonly<{
     let planTimer: ReturnType<typeof setTimeout> | undefined;
     let sourceTimer: ReturnType<typeof setTimeout> | undefined;
     let tomorrowTimer: ReturnType<typeof setTimeout> | undefined;
+    let homeLoading = false;
     // Until the Calendar settles, the source key is partial: a request now would be spent again
     // when the events arrive. Wait at most TRAVEL_SOURCE_WAIT_MS from the first wait for this day.
     const waitKey = JSON.stringify([accountId, localDate]);
@@ -531,7 +551,19 @@ export function useTravelContext(input: Readonly<{
     /** Ticket 282: tomorrow's first trip, when its request was for the current first stop. */
     const showTomorrow = () => {
       const entry = travelTomorrowTrips.get(accountId);
-      if (entry?.view && entry.localDate === tomorrowLocalDate && entry.stopDigest === tomorrowDigest) patch({ tomorrow: { localDate: entry.localDate, view: entry.view } });
+      const stopDigest = tomorrowDigest();
+      if (entry?.view && stopDigest && entry.localDate === tomorrowLocalDate && entry.stopDigest === stopDigest) patch({ tomorrow: { localDate: entry.localDate, view: entry.view } });
+    };
+    /** Ticket 282: reads Home once when tomorrow has stops and no request this page has read it yet, such as after a reload. */
+    const learnHome = () => {
+      if (homeLoading) return;
+      homeLoading = true;
+      void client.settings.load().then((settings) => {
+        homeLoading = false;
+        if (!active) return;
+        travelHomeTexts.set(accountId, settings.baseLocationText);
+        showTomorrow(); planTomorrow();
+      }, () => { homeLoading = false; });
     };
     /**
      * Ticket 282: after 5 PM, or once today has no trips left, asks once for tomorrow's first trip
@@ -542,21 +574,23 @@ export function useTravelContext(input: Readonly<{
       clearTimeout(tomorrowTimer);
       const failedAt = travelFailures.get(accountId);
       if (failedAt !== undefined && Date.now() - failedAt < FAILURE_REUSE_MS) return;
+      const stopKey = tomorrowDigest();
+      if (stopKey === undefined) { learnHome(); return; }
       const today = travelViewCache.get(stateKey)?.view ?? null;
       const last = travelTomorrowTrips.get(accountId);
       const plan = resolveTravelTomorrowPlan({ now: new Date().toISOString(), timezone, localDate,
         todayTrips: today ? today.evidence ? travelRefreshTripsFromEvidence(today.evidence) : [] : null,
-        stopKey: tomorrowDigest, last: last ? { localDate: last.localDate, stopKey: last.stopDigest, retryAt: last.retryAt ?? null } : null,
+        stopKey, last: last ? { localDate: last.localDate, stopKey: last.stopDigest, retryAt: last.retryAt ?? null } : null,
         budget: travelBudgets.get(accountId) ?? null });
       if (plan.nextDueAt) tomorrowTimer = setTimeout(() => evaluate(), Math.min(Math.max(0, Date.parse(plan.nextDueAt) - Date.now()), 2_147_483_647));
       if (plan.dueLocalDate && today) requestTomorrow(plan.dueLocalDate, today);
     };
     const requestTomorrow = (dueLocalDate: string, today: TravelRoutesView) => {
-      if (!active || inFlight || !foreground() || !tomorrowDigest) return;
+      const stopDigest = tomorrowDigest();
+      if (!active || inFlight || !foreground() || !stopDigest) return;
       inFlight = true; committed = true; generation++;
       const run = generation;
       const epoch = travelEpoch;
-      const stopDigest = tomorrowDigest;
       const previous = travelTomorrowTrips.get(accountId);
       const retried = !!previous?.retryAt && previous.localDate === dueLocalDate && previous.stopDigest === stopDigest;
       // Recorded when sent: one request per first stop and revision, plus one retry after a failure.
@@ -690,6 +724,7 @@ export function useTravelContext(input: Readonly<{
         try {
           const settings = await client.settings.load();
           if (!valid()) return;
+          travelHomeTexts.set(accountId, settings.baseLocationText);
           if (!settings.enabled || !settings.routingConsentAt || !settings.mode) {
             // Travel turned off: nothing of today's travel stays in the session.
             forgetTravelAccount(accountId);

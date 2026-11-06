@@ -135,13 +135,17 @@ type World = {
   updatePaused: boolean;
   routeThrows: boolean;
   titleGone: boolean;
+  /** A connected Outlook or iCloud Calendar's read failed. */
+  calendarsLeftOut: boolean;
+  /** Google Calendar's read fails, which fails the whole trip list. */
+  googleFails: boolean;
   routes: string[];
 };
 
 function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: number }> = {}) {
   const store = options.store ?? new MemoryStore();
   const world: World = { trips: [tripFor("event-1", EVENT_START)], leaveAt: new Map([["event-1", "2026-11-06T17:20:00Z"]]),
-    budgetRefused: false, updatePaused: false, routeThrows: false, titleGone: false, routes: [] };
+    budgetRefused: false, updatePaused: false, routeThrows: false, titleGone: false, calendarsLeftOut: false, googleFails: false, routes: [] };
   const preparation = { seconds: options.preparationSeconds ?? PREP_SECONDS };
   const sent: LeaveReminderMessage[] = [];
   const deliver = vi.fn<LeaveReminderDelivery>(async (_caller, message) => { sent.push(message); return { status: "sent" }; });
@@ -149,7 +153,10 @@ function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: n
     caller: { userId: USER_ID } as LeaveReminderCaller,
     store,
     readContext: async () => ({ timezone: TZ, preparationSeconds: preparation.seconds, travelOn: true, habitsUpdatedAt: null }),
-    listTrips: async () => world.trips,
+    listTrips: async () => {
+      if (world.googleFails) throw new Error("google_calendar_unavailable");
+      return { trips: world.trips, calendarsLeftOut: world.calendarsLeftOut };
+    },
     routeTrips: async (_localDate, trips) => {
       if (world.routeThrows) throw new Error("provider_unavailable");
       const routed = new Map<string, LeaveReminderRouted>();
@@ -278,13 +285,53 @@ describe("leave reminder job", () => {
   it("skips routing and drops pending trips while Travel estimates is off", async () => {
     const { store, world, sent, port, deliver, visit } = harness();
     await visit("2026-11-06T15:00:00Z");
-    const listTrips = vi.fn(async () => world.trips);
+    const listTrips = vi.fn(async () => ({ trips: world.trips, calendarsLeftOut: false }));
     const off = { ...port(), listTrips, readContext: async () => ({ timezone: TZ, preparationSeconds: PREP_SECONDS, travelOn: false, habitsUpdatedAt: null }) };
     await visitLeaveReminderAccount(off, { userId: USER_ID, nextCheckAt: store.accountNextCheckAt! }, Temporal.Instant.from("2026-11-06T17:06:00Z"), deliver);
     expect(listTrips).not.toHaveBeenCalled();
     expect(world.routes).toHaveLength(1);
     expect(sent).toEqual([]);
     expect(only(store)).toMatchObject({ status: "cancelled" });
+  });
+
+  it("keeps a planned trip through an Outlook or iCloud outage and sends it once the Calendar reads again (Ticket 283)", async () => {
+    const { store, world, sent, visit } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    const planned = only(store);
+
+    // The trip's Calendar read fails: the trip is missing from the list, but nothing is cancelled or routed.
+    world.trips = [];
+    world.calendarsLeftOut = true;
+    await visit("2026-11-06T15:30:00Z");
+    await visit("2026-11-06T17:06:00Z");
+    expect(only(store)).toMatchObject({ id: planned.id, status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T17:10:00Z" });
+    expect(world.routes).toHaveLength(1);
+    expect(sent).toEqual([]);
+    // The check is due, so the next run visits again.
+    expect(store.accountNextCheckAt).toBe("2026-11-06T17:10:00Z");
+
+    // The Calendar reads again: the kept record's send route runs while the leave time is ahead.
+    world.trips = [tripFor("event-1", EVENT_START)];
+    world.calendarsLeftOut = false;
+    await visit("2026-11-06T17:11:00Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder"]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2 });
+  });
+
+  it("cancels nothing and retries later when Google Calendar's read fails", async () => {
+    const { store, world, sent, visit } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    const planned = only(store);
+    world.googleFails = true;
+    store.accountNextCheckAt = "2026-11-06T17:06:00Z";
+    await expect(visit("2026-11-06T17:06:00Z")).resolves.toMatchObject({ kind: "failed", cancelled: 0 });
+    expect(only(store)).toEqual(planned);
+    expect(store.accountNextCheckAt).toBe("2026-11-06T17:16:00Z");
+    expect(world.routes).toHaveLength(1);
+
+    world.googleFails = false;
+    await visit("2026-11-06T17:16:00Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder"]);
   });
 
   it("does not send when the event is gone at send time", async () => {

@@ -38,6 +38,21 @@ export function normalizeTravelPlaceText(text: string): string {
   return text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/**
+ * Ticket 282: the first stop, in the order given, whose place is away from Home. A stop at
+ * Home's text needs no trip, and a stop with blank text has no place. With no Home, the first
+ * stop with a place. The hosted first-trip request routes this stop, and the Timeline keys
+ * tomorrow's estimate on it, so both pick the same one.
+ */
+export function firstTravelStopAwayFromHome<Stop>(stops: readonly Stop[], placeText: (stop: Stop) => string | null | undefined,
+  homeText: string | null): Stop | null {
+  const home = homeText ? normalizeTravelPlaceText(homeText) : null;
+  return stops.find((stop) => {
+    const text = normalizeTravelPlaceText(placeText(stop) ?? "");
+    return !!text && text !== home;
+  }) ?? null;
+}
+
 export function travelPlaceLookupReusable(
   entry: Readonly<{ outcome: TravelPlaceLookupOutcome; lookedUpAt: string }>,
   now: Temporal.Instant,
