@@ -22,6 +22,14 @@ export const TRAVEL_LEG_OUTSIDE_WINDOW = "outside_route_window";
  * ends. The server passes it to the resolver without a route call. The text is the resolver's own.
  */
 export const TRAVEL_LEG_READY_AFTER_END = "Route is ready only after its destination ends.";
+/**
+ * Ticket 284 finding: times are shown to the minute, so a route is late only when its arrival
+ * shows a later minute than its target. An arrival seconds past a 2:15 target reads 2:15, never late.
+ */
+export function travelArrivalAfterTarget(arrivalAt: string, targetAt: string): boolean {
+  const minute = (at: string) => Math.floor(Temporal.Instant.from(at).epochMilliseconds / 60_000);
+  return minute(arrivalAt) > minute(targetAt);
+}
 /** Ticket 267: a trip with a known leave time is refreshed once within this long of it... */
 export const TRAVEL_TRIP_FIRST_REFRESH_SECONDS = 3 * 60 * 60;
 /** ...and once more within this long of it. */

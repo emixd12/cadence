@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import { sha256 } from "../hash";
 import { TRAVEL_PLACE_KEY_PATTERN } from "../services/travel-place-key";
-import { TRAVEL_LEG_READY_AFTER_END } from "../services/travel-refresh-policy";
+import { TRAVEL_LEG_READY_AFTER_END, travelArrivalAfterTarget } from "../services/travel-refresh-policy";
 import type { BehaviorDurationEstimate } from "../types/day-progress";
 import type { TimelineOccurrenceView } from "../types/timeline";
 
@@ -232,9 +232,8 @@ export function resolveTravelEvidence(input: TravelEvidenceInput): TravelEvidenc
     }
     const timed = fromReadyTime(leg, result.estimate);
     if (!timed) return rejected(publicLeg(leg), "unavailable", "Route departs before its ready time.");
-    const late = leg.request.timing.kind === "arrive_by" && Temporal.Instant.compare(
-      instant(timed.arrivalAt, "Route arrival"), instant(leg.request.timing.at, "Arrival target"),
-    ) > 0;
+    const late = leg.request.timing.kind === "arrive_by" &&
+      travelArrivalAfterTarget(instant(timed.arrivalAt, "Route arrival").toString(), instant(leg.request.timing.at, "Arrival target").toString());
     const estimate = late ? { ...timed, warnings: [...timed.warnings,
       "Estimated arrival is after the planned arrival time."] } : timed;
     return { leg: publicLeg(leg), state: "current", estimate, reason: null, ...(late ? { late: true } : {}) };

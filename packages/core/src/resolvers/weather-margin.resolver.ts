@@ -18,6 +18,7 @@ import type {
   WeatherModeSuggestion,
 } from "../types/weather";
 import { WEATHER_MARGIN_TABLE_VERSION } from "../types/weather";
+import { travelArrivalAfterTarget } from "../services/travel-refresh-policy";
 
 /** Device positions are rounded to this grid before any weather request (about 11 km of latitude). */
 export const WEATHER_AREA_GRID_DEGREES = 0.1;
@@ -223,7 +224,7 @@ export function resolveTravelWeather(input: Readonly<{
     }
     // Ticket 265: a margin that has to follow the arrival can make the trip late.
     const pushedLate = !!arrivalAt && fixedDeparture && !entry.late && planned.request.timing.kind === "arrive_by" &&
-      Temporal.Instant.compare(instant(arrivalAt, "Weather-adjusted time"), instant(planned.request.timing.at, "Arrival target")) > 0;
+      travelArrivalAfterTarget(instant(arrivalAt, "Weather-adjusted time").toString(), instant(planned.request.timing.at, "Arrival target").toString());
     return { ...entry, ...(pushedLate ? { late: true, estimate: { ...estimate!, warnings: [...estimate!.warnings, "Estimated arrival is after the planned arrival time."] } } : {}),
       weather: { ...margin, departureAt, arrivalAt } };
   });

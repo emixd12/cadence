@@ -589,6 +589,19 @@ describe("Ticket 264: late trips, trips home and missing estimates", () => {
     expect(evidence.segments.find((segment) => segment.kind === "route")).toMatchObject({ startAt: NOW, endAt: "2026-09-16T16:30:00Z" });
   });
 
+  it("Ticket 284 finding: an arrival in the target's own minute is not late, as times show minutes", () => {
+    const plan = resolveTravelPlan(walking({ commitments: [
+      commitment("event-1", "2026-09-16T16:15:00Z", "2026-09-16T17:15:00Z", place("near", 2)),
+    ] }));
+    const outbound = plan.legs.find((leg) => leg.role === "outbound")!;
+    const arriving = (seconds: number) => resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(outbound, countedBack("2026-09-16T16:10:00Z", seconds))], []), buffers: WALK }).legs[0]!;
+    const sameMinute = arriving(659);
+    expect(sameMinute).toMatchObject({ state: "current", estimate: { departureAt: NOW, arrivalAt: "2026-09-16T16:10:59Z" } });
+    expect(sameMinute).not.toHaveProperty("late");
+    expect(sameMinute.estimate?.warnings).not.toContain(LATE_WARNING);
+    expect(arriving(660)).toMatchObject({ late: true, estimate: { arrivalAt: "2026-09-16T16:11:00Z" } });
+  });
+
   it("scenario C: two events too close keep a usable late onward leg", () => {
     const plan = resolveTravelPlan(walking({ now: "2026-09-16T12:00:00Z", commitments: [
       commitment("event-1", "2026-09-16T14:00:00Z", "2026-09-16T15:00:00Z", place("first", 2)),

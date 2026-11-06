@@ -85,6 +85,27 @@ describe("OccurrenceRow resolved summary alignment", () => {
   });
 });
 
+describe("OccurrenceRow time range (Ticket 284 finding)", () => {
+  it("lets a range break only after its dash, so a narrow time column wraps it instead of running into the title", () => {
+    const render = (scheduledTimeLabel: string) => renderToStaticMarkup(
+      <OccurrenceRow
+        occurrence={resolvedOccurrence({ scheduledTimeLabel })}
+        statusAction={occurrenceAction}
+        noteAction={occurrenceAction}
+        startTimeTrackingAction={timeTrackingAction}
+        stopTimeTrackingAction={timeTrackingAction}
+        resetTimeTrackingAction={timeTrackingAction}
+      />,
+    );
+    const range = render("2:30 PM - 3:00 PM");
+    const time = range.match(/<time[^>]*class="([^"]*)"[^>]*>(.*?)<\/time>/)!;
+    expect(time[1]).toContain("timeline-occurrence-time");
+    expect(time[1]).not.toContain("whitespace-nowrap");
+    expect(time[2]).toBe('<span class="whitespace-nowrap">2:30 PM -</span> <span class="whitespace-nowrap" data-time-range-end="true">3:00 PM</span>');
+    expect(render("Morning").match(/<time[^>]*>(.*?)<\/time>/)![1]).toBe('<span class="whitespace-nowrap">Morning</span>');
+  });
+});
+
 function resolvedOccurrence(
   overrides: Partial<TimelineOccurrenceView>,
 ): TimelineOccurrenceView {

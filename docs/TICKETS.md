@@ -16757,6 +16757,8 @@ verification with fixtures. D18: `tests/briefing-account-context.test.ts`,
 
 Status: filed November 4, 2026. Run on production November 6, 2026; evidence recorded, awaiting
 verification. Decision D5 closed: the owner set a US$5 cap for this test; US$0.48 was reserved.
+The seven web findings were fixed on `travel-wave6` the same day, each with a test (`STATUS.md`);
+fixes await verification and ship in the Mac acceptance build for Ticket 285.
 Dependencies: Tickets 266, 270, 271, 272, 273, 274, 279, 281, 282 and 283.
 
 Goal: check the whole feature on production through a full day, including Ticket 165's

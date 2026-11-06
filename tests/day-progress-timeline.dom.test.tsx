@@ -257,6 +257,18 @@ describe("DayProgressTimeline", () => {
     // Today's departure model, which feeds Mac reminders and the Daily Brief, has no trip.
     expect(onDeparture).toHaveBeenLastCalledWith(expect.objectContaining({ localDate: "2026-09-16", trips: [] }));
     expect(JSON.stringify(brief.mock.lastCall?.[0] ?? null)).not.toMatch(/event-dentist|12:10|8:10|Dentist/);
+    // Ticket 284 finding: the event's own dialog shows the same leave time, with Directions.
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><BriefProbe /><DayProgressTimeline {...input} context={{ ...input.context,
+      events: [allDayEvent(), dentist], travel: empty, onDeparture, openEvent: { eventId: "event-dentist", requestKey: 1 },
+      travelStatus: { view: view(empty), message: null, stale: false, pending: false, observedAt: "2026-09-16T23:00:00Z", resumesAt: null, refresh: () => undefined,
+        tomorrow: { localDate: "2026-09-17", view: view({ ...empty, journeyRef: "tomorrow", legs: [routed] }) } } }} /></RefreshProvider>));
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector("[data-departure-lead]")?.textContent).toBe("Leave by Sep 17, 8:10 AM from Home · walking, arrive Sep 17, 8:50 AM.");
+    expect(dialog.querySelector("[data-travel-navigation]")?.getAttribute("data-travel-navigation")).toBe("directions");
+    expect(dialog.textContent).not.toContain("Free again");
+    expect(onDeparture).toHaveBeenLastCalledWith(expect.objectContaining({ localDate: "2026-09-16", trips: [] }));
+    expect(JSON.stringify(brief.mock.lastCall?.[0] ?? null)).not.toMatch(/event-dentist|12:10|8:10|Dentist/);
     // A view for another day is not tomorrow's.
     await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{ ...input.context,
       events: [allDayEvent(), dentist], travel: empty, travelStatus: { view: view(empty), message: null, stale: false, pending: false,

@@ -233,6 +233,17 @@ describe("live region", () => {
     await show(model(trip("soon", "Leave in 20 minutes, by 1:20 PM for Dentist.", "onward:gym:dentist")));
     expect(announced()).toBe("Leave in 20 minutes, by 1:20 PM for Dentist.");
   });
+  it("announces late before leaving becoming late after leaving, and a new leave time (Ticket 284 finding)", async () => {
+    const late = (linePhrase: string, leaveAt: string, minutesUntilLeave: number | null) =>
+      ({ ...trip("late", linePhrase), lateBasis: "evidence", freshness: "current", leaveAt, minutesUntilLeave }) as DepartureTrip;
+    await show(model(late("You may arrive late at Gym: leave by 4:36 PM, arrive 5:21 PM.", "2026-11-06T21:36:00Z", 2)));
+    await show(model(late("You may arrive late at Gym: arrive 5:21 PM.", "2026-11-06T21:36:00Z", null)));
+    expect(announced()).toBe("You may arrive late at Gym: arrive 5:21 PM.");
+    await show(model(late("You may arrive late at Gym: leave by 4:40 PM, arrive 5:25 PM.", "2026-11-06T21:40:00Z", 3)));
+    expect(announced()).toBe("You may arrive late at Gym: leave by 4:40 PM, arrive 5:25 PM.");
+    await show(model(late("You may arrive late at Gym: leave by 4:40 PM, arrive 5:25 PM.", "2026-11-06T21:40:00Z", 2)));
+    expect(announced()).toBe("You may arrive late at Gym: leave by 4:40 PM, arrive 5:25 PM.");
+  });
   it("announces when the next trip's action changes within one state (Ticket 270)", async () => {
     const appears = (linePhrase: string, action: DepartureTrip["action"]) => ({ ...trip("appears_later", linePhrase), action }) as DepartureTrip;
     await show(model(appears("Leave time for Dentist appears by 10:55 AM.", null)));

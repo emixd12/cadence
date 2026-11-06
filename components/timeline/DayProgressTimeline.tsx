@@ -276,6 +276,16 @@ export function DayProgressTimeline({
       stops: departureStops({ events: travelEvents, occurrences: section?.occurrences ?? [], durationEstimates: durations, timezone: timeline.timezone }),
       arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds });
   }, [tomorrowView, now, timeline.todayLocalDate, timeline.daySections, timeline.timezone, travelEvents, durations, habitsForModel]);
+  // Ticket 284 finding: tomorrow's first stop shows the line's leave time in its own drawer, dialog
+  // and row, from the same response, with Directions. Nothing else from tomorrow joins today's views.
+  const tomorrowViews = useMemo(() => {
+    const evidence = tomorrowView?.view.evidence;
+    if (!tomorrowTrip || !evidence) return null;
+    const { trip } = tomorrowTrip;
+    const model: DepartureModel = { state: trip.state, next: trip, phrase: trip.linePhrase, trips: [trip], resumesAt: null, pausedPhrase: null };
+    return { ref: tomorrowTrip.ref, localDate: tomorrowView.localDate, departure: model,
+      travel: { ...evidence, legs: evidence.legs.filter((entry) => entry.leg.id === trip.legId), completeTrip: false, finalAvailabilityAt: null } };
+  }, [tomorrowTrip, tomorrowView]);
   const onDeparture = context?.onDeparture;
   useEffect(() => {
     onDeparture?.({ localDate: timeline.todayLocalDate, preparationSeconds, trips: travel ? departure.trips : null, stops: todayStops });
@@ -496,6 +506,8 @@ export function DayProgressTimeline({
     ...(outlookActive ? [outlookStateLabel(outlook, timeline.timezone, "Outlook Calendar")] : []),
     ...(icloudActive ? [outlookStateLabel(icloud, timeline.timezone, "iCloud Calendar")] : []),
   ].filter(Boolean);
+  const previewTomorrow = tomorrowViews && previewEvents.some((event) => event.id === tomorrowViews.ref) ? tomorrowViews : null;
+  const detailTomorrow = tomorrowViews && detailEvent?.id === tomorrowViews.ref ? tomorrowViews : null;
   const dayProgressStyle = firstMeasured ? { "--day-progress-axis-left": `${firstMeasured.axisX}px` } as CSSProperties : undefined;
 
   return (
@@ -525,7 +537,7 @@ export function DayProgressTimeline({
         nextTripLabel={nextTripLabel}
         onLabelOverflow={setOverflowingLabel}
       /> : null}
-      {visibleSections.map((section) => <DayProgressDay
+      {visibleSections.map((section) => { const tomorrowDay = tomorrowViews?.localDate === section.localDate ? tomorrowViews : null; return <DayProgressDay
         key={section.key}
         root={rootRef}
         section={section}
@@ -534,9 +546,9 @@ export function DayProgressTimeline({
         dismissedAllDay={dismissedAllDay}
         activeIds={activeIds}
         activity={section.localDate === timeline.todayLocalDate ? (context ? context.recordedActivity ?? null : hevy) : null}
-        travel={travel}
-        departure={departure}
-        refresh={refreshTravel}
+        travel={tomorrowDay?.travel ?? travel}
+        departure={tomorrowDay?.departure ?? departure}
+        refresh={tomorrowDay ? null : refreshTravel}
         steps={stepActions}
         now={now}
         travelHabits={travelHabits}
@@ -556,16 +568,16 @@ export function DayProgressTimeline({
         startTimeTrackingAction={startTimeTrackingAction}
         stopTimeTrackingAction={stopTimeTrackingAction}
         resetTimeTrackingAction={resetTimeTrackingAction}
-      />)}
+      />; })}
       {preview && previewEvents.length ? <ExternalEventPreview
         id="calendar-preview"
         events={previewEvents}
         timezone={timeline.timezone}
         onDismiss={() => dismissPreview(true)}
         onOpen={openDetails}
-        travel={travel}
-        departure={departure}
-        refresh={refreshTravel}
+        travel={previewTomorrow?.travel ?? travel}
+        departure={previewTomorrow?.departure ?? departure}
+        refresh={previewTomorrow ? null : refreshTravel}
         now={now}
         navigationPreference={context?.navigationPreference}
         travelMode={usualTravelMode}
@@ -581,13 +593,13 @@ export function DayProgressTimeline({
           closeDetails();
         }}
         onOpenExternal={onOpenExternal}
-        travel={travel}
+        travel={detailTomorrow?.travel ?? travel}
         navigationPreference={context?.navigationPreference}
         travelMode={context?.travelMode ?? liveTravel.view?.mode}
         onTravelCorrection={travelCorrection}
         travelHabits={travelHabits}
-        departure={departure}
-        refresh={refreshTravel}
+        departure={detailTomorrow?.departure ?? departure}
+        refresh={detailTomorrow ? null : refreshTravel}
         now={now}
         steps={stepActions}
         correctionRequest={correctionRequest.eventId === detailEvent?.id ? correctionRequest.count : 0}
@@ -1003,8 +1015,8 @@ export type TravelStatusLines = Readonly<{
   note: string | null;
   noteRefresh: boolean;
   /**
-   * Changes only when the next trip's state, key, freshness or action, the pause or the note
-   * changes. Never on a countdown minute.
+   * Changes only when the next trip's state, key, freshness, action, leave time, late basis or
+   * whether its leave time has arrived, the pause or the note changes. Never on a countdown minute.
    */
   signature: string;
 }>;
@@ -1038,7 +1050,10 @@ export function travelStatusLines({ departure, status, message = null, hasEviden
   const note = shown ?? (line ? travelWeatherStateText(status?.view?.evidence?.weather?.state) : null);
   const noteRefresh = !!shown && canRefresh && raw !== TRAVEL_CLEARANCE_MESSAGE && lineRefresh === null;
   // Freshness and action change once per expiry or refresh, so a refreshed "Last estimate" line is spoken.
+  // A new leave time, the leave time arriving and the late basis change the words within one state
+  // (Ticket 284 finding: late before leaving to late after leaving kept the old leave time).
   const signature = [next?.state ?? departure.state, next?.key ?? "", next?.freshness ?? "", next?.action ?? "",
+    next?.leaveAt ?? "", next ? String(next.minutesUntilLeave === null) : "", next?.lateBasis ?? "",
     departure.resumesAt ?? "", note ?? ""].join("|");
   return { line, lineRefresh, note, noteRefresh, signature };
 }

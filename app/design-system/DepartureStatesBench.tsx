@@ -138,7 +138,7 @@ const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {
 function benchTimeline(gymStatus: "unresolved" | "completed", gym: GymVariant, crowded = false) {
   return resolveTimeline({ timezone: TIMEZONE, now: Temporal.Instant.from(instantAt("06:00")), futureDays: 0,
     occurrences: [{ id: GYM_ID, behaviorId: "bench-gym-behavior", title: "Gym", description: "Synthetic located Behavior.", categoryName: "Health",
-      scheduleSummary: "Weekdays", scheduledFor: instantAt("10:00"), scheduledTimeLabel: "10:00 AM", scheduleKind: "range", scheduleEndTime: "11:00",
+      scheduleSummary: "Weekdays", scheduledFor: instantAt("10:00"), scheduledTimeLabel: "10:00 AM - 11:00 AM", scheduleKind: "range", scheduleEndTime: "11:00",
       ...(gym === "located" ? { placeText: "Synthetic gym" } : {}),
       localDate: DATE, status: gymStatus, statusMarkedAt: gymStatus === "completed" ? instantAt("10:57") : null, note: "", canStartTimeTracking: false,
       timeTracking: { recordedSeconds: 0, runningStartedAt: null } }, ...crowded ? [{ id: CALL_ID, behaviorId: "bench-call-behavior", title: "Call Mom", description: "Synthetic Behavior with no place.", categoryName: "Family",

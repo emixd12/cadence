@@ -1,5 +1,22 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 6: Ticket 284 findings fixed — November 6, 2026
+
+**On branch `travel-wave6`. Awaiting verification.** Each finding has a test that fails without
+its fix. No new wording, no schema change and no provider call.
+
+- Late compares at the displayed minute: an arrival seconds past a 2:15 target is not late (core
+  `travelArrivalAfterTarget`, used by the travel and weather-margin resolvers).
+- A route checked at or after its leave time reads "Leave now" while it arrives less than 5
+  minutes after its target, as it did before the check (departure model). The fresh "If you
+  haven't left yet, you'd be home about" form stays unreachable by design: an estimate lives 5
+  minutes, the same as leave now, and a refresh after the event's end no longer plans the trip home.
+- Directions stays once an event is under way: the trip leaving the stop counts as its resolved place.
+- The screen-reader status speaks a new leave time, the leave time arriving and a new late basis.
+- A Behavior's time range wraps after its dash instead of running into its title at 1280 px.
+- The web setup panel reads this device's notification state again when the tab returns.
+- Tomorrow's first stop shows the line's leave time and Directions in its own drawer, dialog and row.
+
 ## Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026
 
 **On branch `travel-wave6`. Evidence only; no app change. Awaiting verification.**

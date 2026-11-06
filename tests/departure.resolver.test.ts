@@ -135,6 +135,23 @@ describe("each state", () => {
     expect(model(local("14:15"), [late]).next?.linePhrase).toBe("You may arrive late at Dentist: arrive 2:40 PM.");
   });
 
+  it("Ticket 284 finding: a route checked after its leave time reads leave now, not late, within the leave-now window", () => {
+    // Refreshed at 1:57:20 PM: the route leaves at once and arrives 2:22:20 PM, 2 min 20 s after the 2:20 PM target.
+    const checkedAt = local("13:57:20");
+    const refreshed = (arriveAt: string, readyAt = checkedAt) => timed(leg("outbound", null, "dentist", { readyAt }), checkedAt, arriveAt, { late: true,
+      estimate: { durationSeconds: 1500, departureAt: checkedAt, arrivalAt: arriveAt, warnings: [], fallback: false, attribution: "Google Maps", observedAt: checkedAt, expiresAt: local("14:02:20") } });
+    const fresh = model(local("13:57:30"), [refreshed(local("14:22:20"))]).next;
+    expect(fresh).toMatchObject({ state: "leave_now", lateBasis: null, freshness: "current", arriveAt: local("14:22:30") });
+    expect(fresh?.linePhrase).toBe("Leave now for Dentist from Home · walking, arrive 2:22 PM.");
+    // Past the window the clock speaks, as it would have without the check.
+    expect(model(local("14:02:20"), [refreshed(local("14:22:20"))]).next).toMatchObject({ state: "late", lateBasis: "clock" });
+    // Five minutes or more past the target is late.
+    expect(model(local("13:57:30"), [refreshed(local("14:25"))]).next).toMatchObject({ state: "late", lateBasis: "evidence" });
+    // A route that waits for a later ready time, such as the end of the previous stop, stays late.
+    const waits = timed(leg("outbound", null, "dentist", { readyAt: checkedAt }), checkedAt, local("14:22:20"), { late: true });
+    expect(model(local("13:57:30"), [waits]).next).toMatchObject({ state: "late", lateBasis: "evidence" });
+  });
+
   it("late from the clock: the words hold whether or not the user has left", () => {
     const { next } = model(local("14:05"), [onTime()]);
     expect(next).toMatchObject({ state: "late", lateBasis: "clock", arriveAt: local("14:30") });
@@ -722,9 +739,14 @@ describe("tomorrow's first trip (Ticket 282)", () => {
       arrivalBufferSeconds: 600, preparationSeconds: 0 });
 
   it("reads the line with the time and the event, without a date", () => {
-    expect(first([routed, later])).toEqual({ ref: "dentist", leaveAt: local("08:10", "2026-09-17"), phrase: "Tomorrow: leave by 8:10 AM for Dentist." });
+    expect(first([routed, later])).toMatchObject({ ref: "dentist", leaveAt: local("08:10", "2026-09-17"), phrase: "Tomorrow: leave by 8:10 AM for Dentist." });
     // The estimate is long expired by 11 PM; the line still names the leave time.
     expect(first([routed, later], local("23:00"))?.phrase).toBe("Tomorrow: leave by 8:10 AM for Dentist.");
+  });
+
+  it("gives the trip itself, so the stop's own views show the same leave time (Ticket 284 finding)", () => {
+    expect(first([routed, later])?.trip).toMatchObject({ legId: routed.leg.id, destinationRef: "dentist", state: "upcoming",
+      leaveAt: local("08:10", "2026-09-17"), phrase: "Leave by Sep 17, 8:10 AM from Home · walking, arrive Sep 17, 8:50 AM." });
   });
 
   it("shows nothing without a leave time, for another day, or once tomorrow has come", () => {
