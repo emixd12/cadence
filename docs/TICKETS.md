@@ -16125,8 +16125,8 @@ tests/day-progress-bench.dom.test.tsx`, bench at both widths,
 
 ## Ticket 271: Drawer and dialog lead with the leave time
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The
-"Change for this trip" label is not yet approved (decision D7).
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+approved the "Change for this trip" label on November 6, 2026 (decision D13).
 Dependencies: Tickets 261, 262 and 268.
 
 Goal: the event views answer the question first, with directions one tap away (proposal
@@ -16167,8 +16167,8 @@ tests/day-progress-timeline.dom.test.tsx`, bench at both widths,
 
 ## Ticket 272: Daily Brief travel block stays useful
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Three
-Daily Brief lines are listed for review, not yet approved (decision D7).
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+approved its three Daily Brief lines on November 6, 2026 (decision D13).
 Dependencies: Tickets 265 and 268.
 
 Goal: the block stops vanishing after 5 minutes, and the first brief gets its trip facts
@@ -16202,8 +16202,9 @@ tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 273: A next step for every missing estimate
 
-Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Five new
-phrases await the owner's approval (D7).
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Decision
+D12 removed In person and Remote and reworded two steps. The owner approved the offer, Not now
+and Estimates off (D13) and the two D12 steps (D14) on November 6, 2026.
 Dependencies: Ticket 269.
 
 Goal: replace silence with a reason and one action (G3, G4 and G10).
