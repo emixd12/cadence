@@ -1,11 +1,14 @@
 import { Temporal } from "@js-temporal/polyfill";
 import type { TravelOccupiedSegment } from "../types/travel";
+import type { DepartureState, DepartureTrip } from "../types/departure";
 
 import type {
   DayProgressDayGeometry,
   DayProgressDayLayout,
   DayProgressIconOverflowGroup,
   DayProgressLayout,
+  DayProgressNextTripInput,
+  DayProgressNextTripMarks,
   DayProgressPositionAnchor,
   DayProgressTimedEventSpan,
   NormalizedExternalEvent,
@@ -14,6 +17,32 @@ import type {
 
 export const DAY_PROGRESS_MAX_ICON_LANES = 1;
 export const DAY_PROGRESS_DEFAULT_ICON_SPACING = 44;
+
+/** Ticket 270: trip states with a leave time worth marking. Steps the user must take have none. */
+const NEXT_TRIP_MARKED_STATES: ReadonlySet<DepartureState> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
+
+/**
+ * Ticket 270 (D2, "Next trip only"; D13): the next trip's marks, or null. Only a trip with a leave
+ * time and an arrival gets them; a last estimate keeps them (D1). The span starts at the leave
+ * time and ends at the arrival.
+ */
+export function resolveNextTripMarkInput(
+  next: Pick<DepartureTrip, "key" | "legId" | "state" | "leaveAt" | "arriveAt"> | null | undefined,
+): DayProgressNextTripInput | null {
+  if (!next || !NEXT_TRIP_MARKED_STATES.has(next.state) || !next.leaveAt || !next.arriveAt) return null;
+  const leaveAt = Temporal.Instant.from(next.leaveAt);
+  const arriveAt = Temporal.Instant.from(next.arriveAt);
+  if (Temporal.Instant.compare(arriveAt, leaveAt) <= 0) return null;
+  return { key: next.key, legId: next.legId, leaveAt: leaveAt.toString(), arriveAt: arriveAt.toString() };
+}
+
+/** Ticket 270: a Behavior is crowded by the next trip when that trip's leg created its travel overlap. */
+export function nextTripCrowdsBehavior(
+  context: Readonly<{ travelOverlapLegIds?: readonly string[] }> | undefined,
+  trip: DayProgressNextTripInput | null,
+): boolean {
+  return !!trip?.legId && !!context?.travelOverlapLegIds?.includes(trip.legId);
+}
 
 export function resolveDayProgressLayout(input: Readonly<{
   timezone: string;
@@ -25,6 +54,13 @@ export function resolveDayProgressLayout(input: Readonly<{
   now?: Temporal.Instant;
   minIconSpacing?: number;
   maxIconLanes?: 1 | 2;
+  /** Ticket 270: the next trip, from `resolveNextTripMarkInput`. */
+  nextTrip?: DayProgressNextTripInput | null;
+  /**
+   * Ticket 270 (D13): the leader label's height. With `avoidIcons`, the label and the Calendar
+   * markers share the rail (narrow layouts), so the label moves clear of them.
+   */
+  nextTripLabel?: Readonly<{ height: number; avoidIcons: boolean }>;
 }>): DayProgressLayout {
   validateTimezone(input.timezone);
   const minIconSpacing = input.minIconSpacing ?? DAY_PROGRESS_DEFAULT_ICON_SPACING;
@@ -84,6 +120,8 @@ export function resolveDayProgressLayout(input: Readonly<{
       minIconSpacing,
       day.localDate === firstVisibleDate,
       input.travelSegments ?? [],
+      input.nextTrip ?? null,
+      input.nextTripLabel ?? null,
     );
   });
 
@@ -98,6 +136,8 @@ function resolveDay(
   minIconSpacing: number,
   includeContinuingMarkers: boolean,
   travelSegments: readonly TravelOccupiedSegment[],
+  nextTrip: DayProgressNextTripInput | null,
+  nextTripLabel: Readonly<{ height: number; avoidIcons: boolean }> | null,
 ): DayProgressDayLayout {
   validateGeometry(day);
   const date = parseDate(day.localDate, "Day-progress local date");
@@ -242,7 +282,52 @@ function resolveDay(
     iconLayoutOverflow,
     allDayEventIds,
     iconOverflowGroups,
+    nextTrip: resolveNextTripMarks(nextTrip, dayStart, dayEnd, mapPosition, day,
+      nextTripLabel, [...timedEventSpans.filter((span) => span.iconLane !== null && !span.overflowGroupId).map((span) => span.iconPosition),
+        ...iconOverflowGroups.map((group) => group.position)], minIconSpacing),
   };
+}
+
+function resolveNextTripMarks(
+  trip: DayProgressNextTripInput | null,
+  dayStart: Temporal.Instant,
+  dayEnd: Temporal.Instant,
+  mapPosition: (instant: Temporal.Instant) => number,
+  day: DayProgressDayGeometry,
+  label: Readonly<{ height: number; avoidIcons: boolean }> | null,
+  iconPositions: readonly number[],
+  iconSpacing: number,
+): DayProgressNextTripMarks | null {
+  if (!trip) return null;
+  const leave = parseInstant(trip.leaveAt, "Next trip leave time");
+  const end = parseInstant(trip.arriveAt, "Next trip arrival");
+  if (Temporal.Instant.compare(end, leave) <= 0) throw new Error("The next trip must leave before it arrives.");
+  if (Temporal.Instant.compare(leave, dayEnd) >= 0 || Temporal.Instant.compare(end, dayStart) <= 0) return null;
+  const leaveToday = Temporal.Instant.compare(leave, dayStart) >= 0;
+  const leavePosition = leaveToday ? mapPosition(leave) : null;
+  return {
+    key: trip.key,
+    startPosition: leavePosition ?? mapPosition(dayStart),
+    endPosition: mapPosition(Temporal.Instant.compare(end, dayEnd) > 0 ? dayEnd : end),
+    leavePosition,
+    labelPosition: leavePosition === null ? null
+      : label ? placeRailLabel(leavePosition, label.height, label.avoidIcons ? iconPositions : [], iconSpacing, day.top, day.bottom) : leavePosition,
+  };
+}
+
+/**
+ * The nearest position to `target` where a label of `height` clears every Calendar marker (each
+ * `spacing` tall) and stays inside the day. Without a clear position, the target.
+ */
+function placeRailLabel(target: number, height: number, icons: readonly number[], spacing: number, top: number, bottom: number): number {
+  if (!Number.isFinite(height) || height <= 0) throw new Error("The rail label height must be positive.");
+  const reach = height / 2 + spacing / 2;
+  const clear = (position: number) => position - height / 2 >= top && position + height / 2 <= bottom &&
+    icons.every((icon) => Math.abs(icon - position) >= reach);
+  if (clear(target)) return target;
+  const candidates = icons.flatMap((icon) => [icon - reach, icon + reach]).filter(clear)
+    .sort((left, right) => Math.abs(left - target) - Math.abs(right - target) || left - right);
+  return candidates[0] ?? target;
 }
 
 function clipTimedEvent(

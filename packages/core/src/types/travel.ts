@@ -108,7 +108,12 @@ export type TravelRouteEstimate = Readonly<{
 }>;
 
 export type TravelCommitmentKind = "behavior" | "calendar" | "explicit_base_stop";
-export type TravelAttendance = "physical" | "remote" | "hybrid" | "unknown";
+/**
+ * Decision D12: a stop with a place is in person, and an event without a place is not travel, so
+ * nothing asks about attendance. `unknown` marks only the stop past the bounded source read:
+ * it gets no route and no time.
+ */
+export type TravelAttendance = "physical" | "unknown";
 
 export type TravelCommitment = Readonly<{
   ref: string;
@@ -194,7 +199,6 @@ export type TravelUnknownLeg = Readonly<{
   reason:
     | "origin_unknown"
     | "destination_unknown"
-    | "attendance_unknown"
     | "timing_unknown"
     | "return_base_missing"
     | "leg_limit";

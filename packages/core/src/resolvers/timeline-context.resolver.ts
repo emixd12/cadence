@@ -302,6 +302,9 @@ export function resolveTimelineOccurrenceContext(input: Readonly<{
     activitySignals,
     overlappingEventIds,
     overlapAssessment,
+    ...(travelCollision?.travelCreated ? { travelOverlapLegIds: [...new Set(travelSegments
+      .filter((segment) => travelCollision.segmentIds.includes(segment.id) && segment.legId)
+      .map((segment) => segment.legId!))].sort() } : {}),
     overlapLabel: travelCollision?.travelCreated ? travelOverlapLabel({ ...input, travel: { ...input.travel!, segments: travelSegments } }, travelCollision.segmentIds)
       : overlapAssessment === "unknown" && returnTimeUnknown(input.travel, input.departure) ? RETURN_TIME_UNKNOWN
       : overlapAssessment === "unknown" && hasUncertainTimedEvent

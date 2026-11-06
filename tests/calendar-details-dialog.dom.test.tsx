@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
-import { ExternalEventDetails } from "@/components/timeline/ExternalEventDetails";
+import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
 import { validateExternalEventSnapshot, validateVersionedExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
@@ -76,11 +76,12 @@ const labels = (scope: Element) => [...scope.querySelectorAll("dt")].map((item) 
 const row = (scope: Element, label: string) => [...scope.querySelectorAll("dt")].find((item) => item.textContent === label)?.nextElementSibling?.textContent;
 
 describe("Calendar details order", () => {
-  it("leads with time, place and travel, then the source and people", async () => {
+  it("leads with the leave line and the Maps link, then time, place, the source and people (Ticket 271)", async () => {
     const dialog = await open(full, { withTravel: true, onTravelCorrection: () => undefined });
     expect(labels(dialog)).toEqual(["Time", "Location", "Calendar", "Attendees", "Organizer", "Conference", "Attachments"]);
+    expect(dialog.querySelector("article")!.firstElementChild?.getAttribute("aria-label")).toBe("Travel timing");
     const text = dialog.querySelector("article")!.textContent!;
-    const positions = ["Time", "12 Harbor Street", "Leave by", "Search in Google Maps", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form", "Travel for this event"]
+    const positions = ["Leave by", "Directions in Google Maps", "Change for this trip", "Time", "12 Harbor Street", "Google Calendar · Work", "Attendees", "Organizer", "Conference", "Attachments", "Bring the signed form"]
       .map((part) => text.indexOf(part));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -171,10 +172,10 @@ describe("Calendar details duration and time", () => {
     for (const event of [timed, full, outlook[0]!, icloud[0]!, allDay, outlook[1]!]) expect(labels(await open(event))).not.toContain("Duration");
   });
 
-  it("shows Duration when the end is unspecified", async () => {
+  it("drops Duration when the end is unspecified too: the time row already says End unknown (Ticket 271)", async () => {
     const dialog = await open(openEnded);
     expect(row(dialog, "Time")).toContain("End unknown");
-    expect(row(dialog, "Duration")).toBe("Unknown");
+    expect(labels(dialog)).not.toContain("Duration");
   });
 
   it("keeps the all-day label and its dismiss control", async () => {
@@ -240,8 +241,141 @@ describe("Calendar details actions", () => {
   it("keeps the correction form working", async () => {
     const corrected = vi.fn();
     const dialog = await open(full, { onTravelCorrection: corrected });
-    dialog.querySelector<HTMLSelectElement>('select[name="travel_attendance"]')!.value = "physical";
     await act(() => dialog.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(corrected).toHaveBeenCalledWith(expect.objectContaining({ eventId: full.id, attendance: "physical", locationText: "12 Harbor Street" }));
+    expect(corrected).toHaveBeenCalledWith(expect.objectContaining({ eventId: full.id, locationText: "12 Harbor Street" }));
+  });
+});
+
+/**
+ * Ticket 271: the drawer and the dialog lead with the departure model's phrase. The fixture event
+ * starts 1:30 AM (05:30Z) with a 10-minute arrival buffer; the walk leaves 05:10Z and arrives 05:20Z.
+ */
+describe("Ticket 271: the leave line comes first", () => {
+  type Estimate = NonNullable<TravelEvidenceResult["legs"][number]["estimate"]>;
+  const withEstimate = (estimate: Partial<Estimate>, extra: Partial<TravelEvidenceResult["legs"][number]> = {}): Omit<TravelEvidenceResult, "modelProjection"> =>
+    ({ ...travel, legs: travel.legs.map((item) => ({ ...item, ...extra, estimate: { ...item.estimate!, ...estimate } })) });
+  const modelAt = (evidence: Omit<TravelEvidenceResult, "modelProjection">, now: string) => resolveDepartureModel({ evidence, now, timezone: "America/New_York",
+    arrivalBufferSeconds: 600, preparationSeconds: 0, pausedUntil: null,
+    stops: [{ ref: full.id, label: full.title, startAt: "2026-11-01T05:30:00Z", endAt: "2026-11-01T06:30:00Z" }] });
+  const states = [
+    { name: "soon", now: "2026-11-01T04:50:00Z", evidence: withEstimate({ observedAt: "2026-11-01T04:48:00Z", expiresAt: "2026-11-01T04:53:00Z" }),
+      state: "soon", lead: /^Leave in 20 minutes, by 1:10 AM from Home · walking, arrive 1:20 AM\.$/ },
+    { name: "leave now", now: "2026-11-01T05:11:00Z", evidence: withEstimate({ observedAt: "2026-11-01T05:09:00Z", expiresAt: "2026-11-01T05:14:00Z" }),
+      state: "leave_now", lead: /^Leave now from Home · walking, arrive 1:21 AM\.$/ },
+    { name: "last estimate", now: "2026-11-01T04:30:00Z", evidence: travel,
+      state: "upcoming", lead: /^Last estimate: leave by 1:10 AM · checked 12:00 AM\.$/ },
+    { name: "late from the route", now: "2026-11-01T04:58:00Z",
+      evidence: withEstimate({ arrivalAt: "2026-11-01T05:25:00Z", observedAt: "2026-11-01T04:57:00Z", expiresAt: "2026-11-01T05:02:00Z" }, { late: true }),
+      state: "late", lead: /^You may arrive late: leave by 1:10 AM from Home · walking, arrive 1:25 AM\.$/ },
+    { name: "late by the clock only", now: "2026-11-01T05:20:00Z", evidence: withEstimate({ observedAt: "2026-11-01T05:19:00Z", expiresAt: "2026-11-01T05:24:00Z" }),
+      state: "late", lead: /^If you haven't left yet, you'd arrive about 1:30 AM\.$/ },
+  ] as const;
+
+  const first = (view: Element) => view.querySelector("[data-departure-lead]")!.textContent!;
+
+  async function renderBoth(evidence: Omit<TravelEvidenceResult, "modelProjection">, now: string, extra: Readonly<{ mode?: "walking" | null }> = {}) {
+    const departure = modelAt(evidence, now);
+    await act(() => root.render(<>
+      <ExternalEventPreview id="preview" events={[full]} timezone="America/New_York" onDismiss={() => undefined} onOpen={() => undefined}
+        travel={evidence} departure={departure} now={now} navigationPreference="google_maps" travelMode={extra.mode ?? null} />
+      <ExternalEventDetails event={full} timezone="America/New_York" onClose={() => undefined} onDismissAllDay={() => undefined}
+        travel={evidence} departure={departure} now={now} navigationPreference="google_maps" travelMode={extra.mode ?? null} />
+    </>));
+    return { drawer: container.querySelector('[data-calendar-drawer="preview"]')!, dialog: container.querySelector("dialog")! };
+  }
+
+  it.each(states)("puts the $name line first in the drawer and the dialog", async ({ now, evidence, state, lead }) => {
+    const { drawer, dialog } = await renderBoth(evidence, now);
+    for (const view of [drawer, dialog]) {
+      const first = view.querySelector("[data-departure-lead]")!;
+      expect(first.getAttribute("data-departure-state")).toBe(state);
+      expect(first.textContent).toMatch(lead);
+      // Regular weight: emphasis comes from position and wording, never from bold.
+      expect(first.className).not.toMatch(/font-(bold|semibold|medium)/);
+    }
+    // The drawer answers under the title, before the calendar line.
+    expect(drawer.querySelector("h3")!.nextElementSibling?.getAttribute("aria-label")).toBe("Travel timing");
+    expect(drawer.textContent!.indexOf(first(drawer))).toBeLessThan(drawer.textContent!.indexOf("Work · "));
+    expect(dialog.querySelector("[data-departure-lead]")!.className).toContain("text-base");
+    expect(drawer.querySelector("[data-departure-lead]")!.className).toContain("text-sm");
+  });
+
+  it("keeps Directions after the estimate expires, for a place a route reached (correction C2)", async () => {
+    const { drawer, dialog } = await renderBoth(travel, "2026-11-01T04:30:00Z", { mode: "walking" });
+    for (const view of [drawer, dialog]) {
+      expect(view.querySelector("[data-departure-lead]")!.textContent).toMatch(/^Last estimate/);
+      const link = view.querySelector<HTMLAnchorElement>("[data-travel-navigation]")!;
+      expect(link.textContent).toBe("Directions in Google Maps");
+      const url = new URL(link.href);
+      expect(url.pathname).toBe("/maps/dir/");
+      expect(url.searchParams.get("destination")).toBe("12 Harbor Street");
+      expect(url.searchParams.get("travelmode")).toBe("walking");
+    }
+    expect(drawer.textContent!.indexOf("Directions in Google Maps")).toBeLessThan(drawer.textContent!.indexOf("View details"));
+  });
+
+  it("opens Directions in the mode the place was routed in, not the usual mode (Ticket 217 remembered mode)", async () => {
+    const transit = { ...travel, legs: travel.legs.map((item) => ({ ...item, leg: { ...item.leg, mode: "transit" as const } })) };
+    const { drawer, dialog } = await renderBoth(transit, "2026-11-01T04:30:00Z", { mode: "walking" });
+    for (const view of [drawer, dialog]) {
+      const link = view.querySelector<HTMLAnchorElement>("[data-travel-navigation]")!;
+      expect(link.textContent).toBe("Directions in Google Maps");
+      expect(new URL(link.href).searchParams.get("travelmode")).toBe("transit");
+    }
+  });
+
+  it("renders no empty travel block in the drawer for an event with no trip", async () => {
+    const departure = modelAt({ ...travel, legs: [] }, "2026-11-01T04:30:00Z");
+    await act(() => root.render(<ExternalEventPreview id="preview" events={[full]} timezone="America/New_York" onDismiss={() => undefined} onOpen={() => undefined}
+      travel={{ ...travel, legs: [] }} departure={departure} now="2026-11-01T04:30:00Z" />));
+    const article = container.querySelector('[data-calendar-drawer="preview"] article')!;
+    expect(article.querySelector("h3")!.nextElementSibling?.tagName).toBe("P");
+    expect([...article.querySelectorAll("div")].every((element) => element.childElementCount > 0)).toBe(true);
+  });
+
+  it("says Search for a place no route has reached, and carries only the source text", async () => {
+    const unrouted: Omit<TravelEvidenceResult, "modelProjection"> = { ...travel, legs: travel.legs.map((item) => ({ ...item, state: "unavailable", estimate: null, reason: "Route result is missing." })) };
+    for (const evidence of [unrouted, withEstimate({}, { state: "rejected_revision" })]) {
+      const { drawer, dialog } = await renderBoth(evidence, "2026-11-01T04:30:00Z", { mode: "walking" });
+      for (const view of [drawer, dialog]) {
+        const link = view.querySelector<HTMLAnchorElement>("[data-travel-navigation]")!;
+        expect(link.textContent).toBe("Search in Google Maps");
+        expect([...new URL(link.href).searchParams.values()]).toEqual(["1", "12 Harbor Street"]);
+      }
+    }
+  });
+
+  it("opens, saves and closes the correction from one keyboard-reachable control (INT-TRAVEL-003)", async () => {
+    const corrected = vi.fn();
+    const dialog = await open(full, { onTravelCorrection: corrected });
+    const details = dialog.querySelector<HTMLDetailsElement>("[data-travel-correction]")!;
+    const summary = details.querySelector("summary")!;
+    expect(summary.textContent).toBe("Change for this trip");
+    expect(details.open).toBe(false);
+    // A native summary is in the tab order and opens with Enter or Space.
+    summary.focus();
+    expect(document.activeElement).toBe(summary);
+    await act(() => summary.click());
+    expect(details.open).toBe(true);
+    // Decision D12: a located event is in person, so the correction asks only for the destination.
+    expect(details.querySelector("select")).toBeNull();
+    details.querySelector<HTMLInputElement>('input[name="travel_location"]')!.value = "14 Harbor Street";
+    const save = [...details.querySelectorAll("button")].find((item) => item.textContent === "Use for this journey")!;
+    expect(save.type).toBe("submit");
+    await act(() => details.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(corrected).toHaveBeenCalledWith({ eventId: full.id, revision: expect.any(String), locationText: "14 Harbor Street" });
+    expect(details.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+  });
+
+  it("keeps the correction open and unsaved until it has a destination", async () => {
+    const corrected = vi.fn();
+    const dialog = await open(full, { onTravelCorrection: corrected });
+    const details = dialog.querySelector<HTMLDetailsElement>("[data-travel-correction]")!;
+    await act(() => details.querySelector("summary")!.click());
+    details.querySelector<HTMLInputElement>('input[name="travel_location"]')!.value = "   ";
+    await act(() => details.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(corrected).not.toHaveBeenCalled();
+    expect(details.open).toBe(true);
   });
 });

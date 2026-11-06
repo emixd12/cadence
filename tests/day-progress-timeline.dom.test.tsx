@@ -78,6 +78,30 @@ describe("DayProgressTimeline", () => {
     expect(timing?.textContent).toContain("Google Maps · checked Nov 1, 8:00 AM.");
     for (const internal of ["Outbound", "Return home", "Origin:", "Available again", "Estimates depend on"]) expect(timing?.textContent).not.toContain(internal);
   });
+  it("offers Directions in a located Behavior row, from its own place text, after the estimate expires (Ticket 271)", async () => {
+    const input = props();
+    const occurrence = input.timeline.daySections[0]!.occurrences[0]!;
+    input.timeline.daySections[0]!.occurrences = [{ ...occurrence, placeText: "Riverside track" }];
+    const routed = travelBenchEvidence("occurrence-1", true);
+    // The fixture's estimates expired at 13:05Z; the clock reads 14:00Z.
+    const evidence = { ...routed, legs: routed.legs.map((item) => ({ ...item, leg: { ...item.leg,
+      provenance: { ...item.leg.provenance, destinationSource: item.leg.destinationCommitmentRef === "occurrence-1" ? "behavior" as const : item.leg.provenance.destinationSource } } })) };
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input}
+      context={{ ...input.context, events: [], travel: evidence, travelMode: "transit", navigationPreference: "google_maps" }} /></RefreshProvider>));
+    await act(() => container.querySelector<HTMLElement>('article[data-occurrence-id="occurrence-1"] summary')!.click());
+    const link = container.querySelector<HTMLAnchorElement>('article[data-occurrence-id="occurrence-1"] [data-travel-navigation]')!;
+    expect(link.textContent).toBe("Directions in Google Maps");
+    expect(new URL(link.href).searchParams.get("destination")).toBe("Riverside track");
+    // The place was routed walking although usual travel is transit: Directions follows the route.
+    expect(new URL(link.href).searchParams.get("travelmode")).toBe("walking");
+
+    // No place text, no link: the row never builds one from route content.
+    input.timeline.daySections[0]!.occurrences = [occurrence];
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input}
+      context={{ ...input.context, events: [], travel: evidence, travelMode: "transit", navigationPreference: "google_maps" }} /></RefreshProvider>));
+    expect(container.querySelector('[aria-label="Travel timing"]')).not.toBeNull();
+    expect(container.querySelector('article[data-occurrence-id="occurrence-1"] [data-travel-navigation]')).toBeNull();
+  });
   it("withdraws omitted-stop guidance and offers manual refresh after clearing a decision", async () => {
     const input = props();
     const evidence = { ...travelBenchEvidence("occurrence-1", true),

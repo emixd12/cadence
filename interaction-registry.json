@@ -324,7 +324,9 @@
         "INT-PLACE-004",
         "INT-PLACE-005",
         "INT-PLACE-006",
-        "INT-PLACE-007"
+        "INT-PLACE-007",
+        "INT-TRAVEL-011",
+        "INT-TRAVEL-012"
       ]
     },
     {
@@ -822,6 +824,16 @@
       ]
     },
     {
+      "path": "components/timeline/TravelNextStep.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 5,
+      "interaction_ids": [
+        "INT-TRAVEL-003",
+        "INT-TRAVEL-011",
+        "INT-TRAVEL-012"
+      ]
+    },
+    {
       "path": "app/design-system/CalendarBench.tsx",
       "classification": "excluded",
       "interaction_marker_count": 14,
@@ -1015,9 +1027,9 @@
     {
       "path": "app/design-system/DepartureStatesBench.tsx",
       "classification": "excluded",
-      "interaction_marker_count": 6,
+      "interaction_marker_count": 8,
       "interaction_ids": [],
-      "reason": "Ticket 266 development-only travel timing states bench: state and build selects, a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. No provider call, account access or product write."
+      "reason": "Ticket 266 development-only travel timing states bench: state and build selects (decision D13 removed Ticket 270's marker and line-size selects), a bench clock slider and Refresh travel that re-checks synthetic routes at the bench clock. Ticket 273 adds a Show the offer again control beside the Travel estimates offer example; the bench's step actions only say where they go or re-plan Dentist. No provider call, account access or product write."
     },
     {
       "path": "app/design-system/TravelBench.tsx",
@@ -12170,7 +12182,7 @@
           "control": "Open source event, attachment, meeting or navigation link"
         }
       ],
-      "availability": "Available for a safe external URL or structured Google Maps/Apple Maps location link.",
+      "availability": "Available for a safe external URL or structured Google Maps/Apple Maps location link. Ticket 271: the Calendar drawer, Calendar details and expanded located Behavior rows carry the Maps link with source-authored place text only; Directions needs a resolved place and survives estimate expiry, otherwise Search.",
       "success_result": "Opens the external source through the browser or desktop system-browser boundary.",
       "failure_result": "Unsafe or missing URLs are not actionable.",
       "effects": [
@@ -12180,13 +12192,16 @@
       "confirmation": "none",
       "implementation": [
         "components/timeline/ExternalEventDetails.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
         "packages/core/src/services/travel-navigation.ts"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/day-progress-timeline.dom.test.tsx",
-          "tests/travel-navigation.test.ts"
+          "tests/travel-navigation.test.ts",
+          "tests/calendar-details-dialog.dom.test.tsx",
+          "tests/departure-states-bench.dom.test.tsx"
         ],
         "notes": "Synthetic integration checks; live provider/native release acceptance remains in Ticket 137."
       },
@@ -12195,10 +12210,12 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/timeline/ExternalEventDetails.tsx"
+            "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/DayProgressTimeline.tsx"
           ],
           "evidence": [
-            "tests/day-progress-timeline.dom.test.tsx"
+            "tests/day-progress-timeline.dom.test.tsx",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ]
         },
         "desktop": {
@@ -12211,7 +12228,8 @@
           ],
           "evidence": [
             "tests/day-progress-timeline.dom.test.tsx",
-            "tests/desktop-calendar.test.ts"
+            "tests/desktop-calendar.test.ts",
+            "tests/calendar-details-dialog.dom.test.tsx"
           ],
           "reason": "Shared controls and native adapter contracts; live provider/native release acceptance remains open in Ticket 137."
         },
@@ -13616,15 +13634,23 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Use an explicit attendance and destination correction for one event revision while the Timeline stays open.",
+      "intent": "Use an explicit destination correction for one event revision while the Timeline stays open.",
       "triggers": [
         {
           "kind": "activate",
+          "control": "Change for this trip"
+        },
+        {
+          "kind": "activate",
           "control": "Use for this journey"
+        },
+        {
+          "kind": "activate",
+          "control": "Add a place for {event}"
         }
       ],
-      "availability": "Versioned timed Calendar event details while routing context is available.",
-      "success_result": "Use an explicit attendance and destination correction for one event revision while the Timeline stays open.",
+      "availability": "Versioned timed Calendar event details while routing context is available. Ticket 271 puts the form behind one native Change for this trip disclosure; saving closes it and returns focus to that control. Decision D12: a Calendar event with a location is in person and one without a location is not travel, so the form asks only for the destination and nothing asks about attendance. Ticket 273: where the next-departure line, the Calendar drawer, the details dialog or an expanded Behavior row says a Calendar event's place cannot be found, the sentence's first words (Add a place for {event}, or Fix {event}'s place for the event holding up a later trip) open that event's details with this correction open and the destination focused.",
+      "success_result": "Use an explicit destination correction for one event revision while the Timeline stays open.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
@@ -13633,11 +13659,15 @@
       "risk": "moderate",
       "confirmation": "none",
       "implementation": [
-        "components/timeline/ExternalEventDetails.tsx"
+        "components/timeline/DayProgressTimeline.tsx",
+        "components/timeline/ExternalEventDetails.tsx",
+        "components/timeline/TravelNextStep.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
+          "tests/calendar-details-dialog.dom.test.tsx",
+          "tests/travel-next-step.dom.test.tsx",
           "tests/travel-settings.dom.test.tsx"
         ],
         "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
@@ -13647,9 +13677,12 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "components/timeline/ExternalEventDetails.tsx"
+            "components/timeline/ExternalEventDetails.tsx",
+            "components/timeline/TravelNextStep.tsx"
           ],
           "evidence": [
+            "tests/calendar-details-dialog.dom.test.tsx",
+            "tests/travel-next-step.dom.test.tsx",
             "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
@@ -13658,10 +13691,13 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
+            "apps/desktop/src/product.tsx",
             "components/timeline/ExternalEventDetails.tsx",
-            "apps/desktop/src/product.tsx"
+            "components/timeline/TravelNextStep.tsx"
           ],
           "evidence": [
+            "tests/calendar-details-dialog.dom.test.tsx",
+            "tests/travel-next-step.dom.test.tsx",
             "tests/travel-settings.dom.test.tsx"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
@@ -13704,8 +13740,8 @@
           "control": "Refresh travel"
         }
       ],
-      "availability": "Timeline status line while travel is enabled and a view, a retryable failure, or a changed-stop/duration message is shown; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213), including when a route response reports the whole month's ceiling reserved (Ticket 268); available again at renewal without a reload. Ticket 261 also places it at the end of a travel line in the Calendar drawer, the Calendar details dialog and the expanded Behavior row when that trip shows a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival, under the same pending and budget rules.",
-      "success_result": "Replaces the travel estimates and shows the observation time.",
+      "availability": "Timeline next-departure line (Ticket 269): where the next trip's phrase starts with Refresh travel, those words are the button (R1); otherwise the button ends the line only when the next trip needs a new estimate (a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival). Without such a line, the note under it carries the button for a retryable failure or a changed-stop/duration message. At most one Refresh travel shows there; disabled while a request is in flight; hidden until the server reset instant while the monthly travel budget is used up (Ticket 213), including when a route response reports the whole month's ceiling reserved (Ticket 268); available again at renewal without a reload. Ticket 261 also places it at the end of a travel line in the Calendar drawer, the Calendar details dialog and the expanded Behavior row when that trip shows a last estimate, an expired estimate, a changed trip, an overdue estimate or a trip held up by a late arrival, under the same pending and budget rules.",
+      "success_result": "Replaces the travel estimates; the next-departure line shows the next trip's current leave time, or its next step.",
       "failure_result": "When the monthly budget is used up, keeps the last plan as stale and names the date estimates resume; otherwise shows the unavailable message and keeps every leave time already known (Ticket 268). Tracking data is preserved; offline desktop shows the unavailable message without a request.",
       "effects": [
         "network_request",
@@ -13722,7 +13758,9 @@
         "level": "direct",
         "references": [
           "tests/travel-lifecycle.dom.test.tsx",
-          "tests/travel-weather-ui.dom.test.tsx"
+          "tests/travel-weather-ui.dom.test.tsx",
+          "tests/next-departure-line.dom.test.tsx",
+          "tests/travel-timeline.test.ts"
         ],
         "notes": "Provider-free tests. Live provider acceptance remains open."
       },
@@ -13737,7 +13775,9 @@
           ],
           "evidence": [
             "tests/travel-lifecycle.dom.test.tsx",
-            "tests/travel-weather-ui.dom.test.tsx"
+            "tests/travel-weather-ui.dom.test.tsx",
+            "tests/next-departure-line.dom.test.tsx",
+            "tests/travel-timeline.test.ts"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -13751,7 +13791,9 @@
           ],
           "evidence": [
             "tests/travel-lifecycle.dom.test.tsx",
-            "tests/travel-weather-ui.dom.test.tsx"
+            "tests/travel-weather-ui.dom.test.tsx",
+            "tests/next-departure-line.dom.test.tsx",
+            "tests/travel-timeline.test.ts"
           ],
           "reason": "Shared implementation; live provider and installed desktop acceptance remain open."
         },
@@ -13978,7 +14020,7 @@
           "control": "Not now"
         }
       ],
-      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this page session. Hidden after an answer that day or after Not now in this session.",
+      "availability": "Timeline status area, at most once per local day, after the end of a Calendar event or Behavior whose outbound leg had a current estimate in this tab's browser session (Ticket 274: kept as digests and end times through a reload; the title comes from the current read, and a deleted event asks nothing). Hidden after an answer that day in any tab or after Not now in this tab's session.",
       "success_result": "Stores the answer with an event digest, local date, time and rules version, updates the arrival buffer, names the new buffer and refreshes estimates when the buffer changed. Not now records nothing.",
       "failure_result": "Keeps the question and says the answer could not save. Tracking data and estimates are unchanged.",
       "effects": [
@@ -14001,7 +14043,7 @@
           "tests/travel-habits.dom.test.tsx",
           "tests/travel-habits.test.ts"
         ],
-        "notes": "Provider-free tests. No position, route duration or event title is stored."
+        "notes": "Provider-free tests, including reload, deleted event, sign-out and day change (Ticket 274). No position, route duration or event title is stored."
       },
       "platforms": {
         "web": {
@@ -14390,6 +14432,190 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "macOS System Settings is desktop-specific; native mobile is deferred."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-011",
+      "name": "Open the next step for a missing estimate",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#inspect-travel-and-correct-a-journey"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline",
+        "/settings#travel",
+        "/behaviors"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "When a trip has no leave time, or the trip home has no time, because Home or the device position is missing, or because a Behavior's place could not be found, follow the sentence's own first words to where it is fixed.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Add Home in Settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Add a place for {Behavior}"
+        },
+        {
+          "kind": "activate",
+          "control": "Fix {Behavior}'s place"
+        }
+      ],
+      "availability": "Ticket 273. The next-departure line, the Calendar drawer and details dialog, and expanded Behavior rows, for a trip that needs a start with no blocking stop, or a trip home with no saved Home (decision D12: \"Add Home in Settings to estimate the return time.\"); Add Home in Settings opens Travel settings, where Home and device location live; or whose place step belongs to a Behavior (opens Behaviors; on the Mac the Behaviors screen). The blocking stop comes from the departure model. Steps for Calendar events use INT-TRAVEL-003. On the Mac the Travel settings link needs a linked account.",
+      "success_result": "Opens Travel settings or Behaviors. Nothing is saved and no estimate is requested.",
+      "failure_result": "The sentence shows without an action when no destination is available.",
+      "effects": [
+        "ui_state"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelNextStep.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "components/timeline/ExternalEventDetails.tsx",
+        "apps/desktop/src/product.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-next-step.dom.test.tsx"
+        ],
+        "notes": "Provider-free DOM tests on the bench and the shared component. Installed desktop navigation is not yet verified."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelNextStep.tsx",
+            "components/timeline/DayProgressTimeline.tsx"
+          ],
+          "evidence": [
+            "tests/travel-next-step.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; live provider acceptance remains open."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelNextStep.tsx",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/travel-next-step.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; installed desktop acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing has no Timeline."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred. Mobile web inherits the web Timeline."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-012",
+      "name": "Offer Travel estimates while they are off",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#set-up-travel"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "timeline"
+      ],
+      "routes": [
+        "/timeline",
+        "/settings#travel"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "With Travel estimates off and a located Calendar event or Behavior still ahead today, one line names it and opens Travel settings. Not now hides the line on this device.",
+      "triggers": [
+        {
+          "kind": "activate",
+          "control": "Turn on Travel estimates in Settings"
+        },
+        {
+          "kind": "activate",
+          "control": "Not now"
+        }
+      ],
+      "availability": "Ticket 273. Timeline status area, under the next-departure line, while the Travel settings read says estimates are off and no travel evidence is shown. The Mac app shows it only with a linked account. Consent still comes only from the Travel estimates toggle (INT-TRAVEL-002); this line turns nothing on and stays hidden after Not now.",
+      "success_result": "Opens Travel settings at the Travel estimates toggle and its disclosure. Not now stores one flag in local storage, never event text.",
+      "failure_result": "Shows nothing when Travel settings cannot load.",
+      "effects": [
+        "ui_state",
+        "local_preference"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/timeline/TravelNextStep.tsx",
+        "components/timeline/DayProgressTimeline.tsx",
+        "packages/core/src/services/departure-stops.ts",
+        "apps/desktop/src/product.tsx"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-next-step.dom.test.tsx"
+        ],
+        "notes": "Provider-free DOM tests: the offer, its link, Not now across a remount, no consent save, and the off, unlocated and local-mode cases."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelNextStep.tsx",
+            "components/timeline/DayProgressTimeline.tsx"
+          ],
+          "evidence": [
+            "tests/travel-next-step.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; live provider acceptance remains open."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/timeline/TravelNextStep.tsx",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/travel-next-step.dom.test.tsx"
+          ],
+          "reason": "Shared implementation; installed desktop acceptance remains open."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot read account travel settings."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred. Mobile web inherits the web Timeline."
         }
       }
     },

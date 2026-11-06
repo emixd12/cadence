@@ -12,7 +12,6 @@ export type DepartureState =
   | "head_home"
   | "appears_later"
   | "needs_place"
-  | "needs_attendance"
   | "needs_origin"
   /** No time can be stated. `timeUnknownCause` says why. */
   | "time_unknown"

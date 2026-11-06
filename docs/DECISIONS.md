@@ -1578,3 +1578,74 @@ The owner answered two open items from Ticket 268 on November 5, 2026.
 
 Platform impact: web and desktop through the shared phrase module and travel hook.
 Marketing: not applicable. Future mobile: shared module. Messaging impact: P-018 updated.
+
+## 2026-11-05: Calendar events without a location are not travel (D12)
+
+The owner decided on November 5, 2026, as relayed by the travel coordinator after the Ticket
+273 verifier flagged the attendance question as too noisy:
+
+1. A Calendar event with no location is not travel. It never asks a question, never gets a
+   route and never blocks a later trip. It stays a normal event on the Timeline, and the Daily
+   Brief may still mention it as an event.
+2. A Calendar event with a location is in person. The attendance question is removed
+   entirely: the line, drawer and dialog question, In person and Remote, the attendance choice
+   in Change for this trip, and the needs-attendance state and its phrases.
+
+Also: the trip home with no saved Home reads one sentence, "Add Home in Settings to estimate the
+return time.", whose first words link to `/settings#travel`. It is not yet approved (D7). The
+stop before a trip can now block it only by having no usable place, so "Fix {event}'s place or
+attendance" becomes "Fix {event}'s place", also not yet approved.
+
+This changes Ticket 273 and removes attendance from Ticket 281 (decision D4's "remembered places
+and attendance" keeps only places). The Ticket 270 marker variants are unchanged.
+
+Platform impact: web and desktop through the hosted route, the shared departure model, phrase
+module and Timeline components. Marketing: not applicable. Future mobile: shared modules.
+Messaging impact: P-023, with notes on P-020 and P-021.
+
+
+## 2026-11-06: Next-trip marker and Wave 3 wording (D13)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after reviewing the
+Ticket 270 bench:
+
+1. The next-trip marker is a variant of A. The magenta span starts at the recommended leave
+   time, not at get-ready time. A magenta leader projects perpendicular to the axis from the
+   top of the span, with the leave-time label at its end, also magenta. Variants B and C and
+   the title-size line are removed.
+2. The next-departure line keeps the small status size.
+3. Approved wording: "Change for this trip"; the three Daily Brief lines "Travel to {event}
+   overlaps {behavior}.", "Planned travel overlaps {behavior}." and "Back around {time}.";
+   "Turn on Travel estimates in Settings to get a leave time for {event}."; "Not now"; and
+   "Estimates off". `DEPARTURE_PHRASE_REVIEW` carries the date as `OWNER_APPROVED_2026_11_06`.
+
+The label's own words ("Leave {time}", "Leave now", "May arrive late", "Arrive about {time}",
+"Home about {time}", "Head home now") are not yet approved (D7). They never show a leave time
+that has passed. Small magenta text uses `--calendar-overlap-text` (`#C0286A`) for 4.5:1
+contrast; strokes keep `--calendar-overlap`.
+
+Platform impact: web and desktop through the shared Timeline component, day-progress resolver
+and phrase module. Marketing: not applicable. Future mobile: shared modules. Messaging impact:
+P-021 note.
+
+
+## 2026-11-06: Next-trip label lines, trip-home words and wording approvals (D14)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the Ticket
+270 verifier's notes on the D13 marker:
+
+1. The next-trip label is one line ("Leave 1:20") on wide layouts, with the leader pointing
+   straight at it. Phones keep the two-line stack. A one-line label that would cross the
+   Timeline's left edge also stacks, so it is never clipped.
+2. The trip home's label reads "Home {time}" instead of "Leave {time}". Approved as written.
+3. Approved: "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}", "Head
+   home now", "Add Home in Settings to estimate the return time." and "Fix {event}'s place to
+   get a leave time for {event}." `DEPARTURE_PHRASE_REVIEW` carries the date as
+   `OWNER_APPROVED_2026_11_06`. Choosing the one-line "Leave 1:20" also approves "Leave
+   {time}", as the coordinator confirmed. Every travel phrase on the bench is now approved.
+4. When the current-time dot sits at the leave point, the leader keeps its full 14px past the
+   dot, so it does not read as a hyphen beside the label.
+
+Platform impact: web and desktop through the shared Timeline component and phrase module.
+Marketing: not applicable. Future mobile: mobile web keeps the stacked label at 390 px; native
+mobile is deferred. Messaging impact: P-021 note.

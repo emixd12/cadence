@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-023` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-024` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -92,6 +92,7 @@ Status values:
 | [P-020](#p-020-remembered-places-and-attendance) | Remembered places and attendance | logged | 281 | Privacy, user guide |
 | [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
 | [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
+| [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -665,6 +666,12 @@ cite has not changed.
 - **Update needed:** say that estimates stay in browser session storage until the session
   ends or the listed events clear them. Describe the whole-day pass, the near-departure
   refresh, and the "Last estimate" label.
+- **Ticket 272 note, November 5, 2026:** the brief block now keeps last estimates and late
+  trips. The day's first brief waits up to 5 seconds for the first whole-day travel result,
+  so it usually carries the signed conclusions. The guide's "When the Timeline has current
+  travel estimates, the brief request also carries Cadence's signed trip and weather
+  conclusions" stays true; it could add that the first brief waits briefly for them. The
+  model still receives no times. Not yet edited.
 - **Ticket 267 note, November 5, 2026:** the plan is in source. The quoted words did not
   change. The guide should also say that at 80% of the month's travel budget Cadence stops
   refreshing on its own, and Refresh travel still works.
@@ -700,6 +707,9 @@ cite has not changed.
 - **Change:** owner decision D4, November 4, 2026. Ticket 281 stores a corrected place ID
   under the original text's key, so later events with that text resolve too. It adds a
   hosted-only per-event attendance record keyed by a digest. Turning travel off deletes both.
+- **D12 note (November 5, 2026):** a located event is now in person and nothing asks about
+  attendance (P-023), so no attendance answer exists to remember. Only the remembered place
+  part of this entry still applies.
 - **Affected:** Ticket 281. Files: `components/settings/LegalContent.tsx`,
   `docs/user-guide/travel.md`.
 - **Surfaces:** Privacy, user guide.
@@ -724,11 +734,59 @@ cite has not changed.
 - **Surfaces:** user guide.
 - **Conflicting current text:** `docs/user-guide/travel.md`:
   - "Refresh travel estimates": "The status line shows Travel as of and the time the
-    estimates were observed."
+    estimates were observed." Also, from Ticket 269: "After the estimates expire, the line
+    says they may be stale", and "the Timeline keeps the last estimates, marked as possibly
+    stale". The line now shows the next trip, marked "Last estimate" with its check time, and
+    Refresh travel shows only when that trip needs it.
   - "Learned travel habits": "Cadence remembers such trips only while the app stays open,
     so a reload before the event ends means no question that day."
+  - From Ticket 271, "Open navigation": "Event details show available Calendar location
+    text and a Search in maps link" and "A verified route can offer Directions". The drawer
+    and located Behavior rows now have the link too, and Directions stays after an estimate
+    expires. "Inspect travel and correct a journey": "event details allow an in-person or
+    remote choice and a destination correction"; that form now opens from Change for this
+    trip.
 - **Update needed:** describe the line, the marker, Directions on rows and the drawer,
   tomorrow's first trip, and the remembered question.
+- **Ticket 274 detail (November 5, 2026):** the question now survives a reload. Today's
+  candidates stay in the tab's browser session as event digests and end times only, so a
+  reload or new Timeline view in that tab still asks once after the event ends. A new tab
+  does not inherit them. Not now now also lasts through a reload in that tab. The title comes
+  from the current Calendar or Behavior read; a deleted event asks nothing. Sign-out, another
+  account, travel turned off and a new day clear them. The guide sentence "Cadence remembers
+  such trips only while the app stays open, so a reload before the event ends means no
+  question that day" is now wrong. The Privacy Google Calendar section ("The web app holds
+  returned event details in memory") still holds as written: only digests of event IDs and
+  end times are stored, so no Privacy edit is proposed.
+- **Ticket 270 detail (November 5, 2026):** the Timeline shows the next trip's magenta span
+  and one marker without hovering. The owner has not yet picked the marker (rail label "Leave
+  1:15", a slim row "Leave 1:15 PM for Dentist", or an axis tick only), so the guide text waits
+  for that choice. A Behavior the next trip crowds shows its overlap line while collapsed. The
+  three marker phrases are on the bench wording review, not yet approved (D7).
+- **Ticket 270 detail, decision D13 (November 6, 2026):** the owner chose the marker. The span
+  starts at the leave time; a short magenta leader runs from its top into the left rail with a
+  small label, "Leave 9:35". Leave now, late and passed times read "Leave now", "May arrive
+  late", "Arrive about {time}", "Home about {time}" or "Head home now". The slim-row phrases
+  are gone. The guide's Timeline text can now describe this form. The label phrases await
+  approval (D7).
+- **Ticket 273 detail (November 5, 2026):** a trip with no leave time now says why with one
+  action. "Add a place for {event}" and "Fix {event}'s place or attendance" open that event's
+  Change for this trip with the destination focused, or Behaviors for a Behavior. "Is {event}
+  in person or remote?" ends with In person and Remote, which answer for this trip in one tap.
+  "Add Home in Settings" opens Travel settings. With Travel estimates off and a located event
+  ahead today, the Timeline offers once "Turn on Travel estimates in Settings to get a leave
+  time for {event}." with Not now; it only opens Settings, so consent stays with the toggle.
+  The first-run Home and travel row reads Estimates off, not Saved, while the toggle is off.
+  The guide's "Inspect travel and correct a journey" and "Set up travel" sections do not
+  describe these steps. Five phrases are on the bench wording review, not yet approved (D7):
+  In person, Remote, the offer, its Not now, and Estimates off. P-007 keeps the first-run
+  row's label and purpose text unchanged.
+- **D12 note (November 5, 2026):** "Is {event} in person or remote?", In person and Remote are
+  gone, and "Fix {event}'s place or attendance" now reads "Fix {event}'s place". See P-023.
+- **Ticket 270 detail, decision D14 (November 6, 2026):** the label is one line ("Leave 1:20")
+  on wide layouts and stacked on phones. The trip home's label reads "Home {time}". The owner
+  approved "Leave {time}", the late and passed forms, "Home {time}" and the two D12 steps. No
+  travel phrase awaits approval.
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later
@@ -747,4 +805,26 @@ cite has not changed.
   thunderstorms.", and a trip the margin makes late reads "You may arrive late: leave by
   1:20 PM from Home · walking, arrive 2:05 PM." before the leave time, or "You may arrive
   late: arrive 2:05 PM." after it.
+- **Status:** logged.
+
+## P-023: No attendance question, and no travel for events without a location
+
+- **Change:** owner decision D12, November 5, 2026. A Calendar event with a location is in
+  person; one without a location is not travel. It asks nothing, gets no route and never holds
+  up a later trip; the Timeline and Daily Brief still show it as an event. The attendance
+  question ("Is {event} in person or remote?" with In person and Remote) and the attendance
+  choice in Change for this trip are removed; the correction asks only for the destination.
+  "Fix {event}'s place or attendance to get a leave time for {event}." becomes "Fix {event}'s
+  place to get a leave time for {event}.". The trip home with no saved Home reads "Add Home in
+  Settings to estimate the return time.", whose first words open Travel settings, in place of
+  "Return time unknown. Add Home in Settings to estimate it.". The two new sentences are on the
+  bench wording review, not yet approved (D7).
+- **Affected:** decision D12. Files: `docs/user-guide/travel.md`.
+- **Surfaces:** user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md`, "Inspect travel and correct a
+  journey": "When routing is available, event details allow an in-person or remote choice and a
+  destination correction for that journey and event revision."; "Refresh travel estimates":
+  "an event's time, location or attendance changes".
+- **Update needed:** drop the in-person or remote choice; say an event without a location is not
+  travel; describe the no-Home return sentence and its Settings link.
 - **Status:** logged.

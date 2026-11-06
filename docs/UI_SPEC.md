@@ -251,14 +251,64 @@ or permanent duration fill. Unknown timing never creates a precise occupied span
 
 Exception, owner decision D2, "Next trip only" (`docs/DECISIONS.md`, 2026-11-04; Tickets
 269 and 270): the next trip alone gets one line at the top of the Timeline, one marker and
-one magenta span without hovering. The owner picks the marker's form on the bench. A
-Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
+one magenta span without hovering. Owner decision D13 (2026-11-06) set the marker: the span
+starts exactly at the recommended leave time and ends at arrival. From its top end a short
+magenta leader runs perpendicular to the axis into the left rail, with a small magenta label
+at its end, such as "Leave 9:35". Owner decision D14 (2026-11-06): the label is one line on
+wide layouts, with the leader pointing straight at it, and two stacked lines on phones; the
+trip home reads "Home {time}"; and the leader keeps its full length when the current-time dot
+sits at the leave point. A time that has passed is never shown as a leave time: the
+label reads "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}" or
+"Head home now", from the same states as the line. The label stays clear of the current-time
+dot, Behavior rows and Calendar markers at 1440 and 390 px. The leader and label are
+decorative, never a tab stop or touch target. The next-departure line keeps the small status
+size. A Behavior crowded by that trip shows one muted line while collapsed. Other trips stay
 inspection-only. There is no collapsed Daily Brief strip.
+
+The next-departure line (Ticket 269) sits at the top of the Timeline, under the Calendar
+status lines, and replaces "Travel as of". It shows the departure model's line phrase for
+the next trip in every state; a day with no trips shows no travel text. While the travel
+budget is used up, the paused phrase follows a known time on the same line. Where the
+phrase starts with "Refresh travel", those words are the button (R1); otherwise Refresh
+travel ends the line only when the trip needs a new estimate. Decision D12: a Calendar event
+with a location is in person, and one without a location is not travel. It asks nothing, gets
+no route and never holds up a later trip; it stays a normal event on the Timeline. Nothing asks
+about attendance. Steps that need a place or a start (Ticket 273) show one sentence and one
+action. A place step makes its first words the action, as R1 does: "Add a place for Dentist"
+opens that event's details with **Change for this trip** open and the destination focused, or,
+for a Behavior, opens Behaviors. A trip held up by another stop names that stop ("Fix Gym's
+place"), taken from the departure model, and its action goes to that stop. With no Home or
+device position, "Add Home in Settings" opens Travel settings. A trip home with no saved Home
+reads "Add Home in Settings to estimate the return time.", and its first words open Travel
+settings too. The drawer, the details dialog and expanded Behavior rows show the same sentence
+and action. When an action removes its control, focus moves to the travel status, or to the
+dialog title. With Travel estimates off and a located
+event or Behavior still ahead today, one muted line under it reads "Turn on Travel estimates
+in Settings to get a leave time for {event}." with **Not now**; the first words open Travel
+settings and nothing turns on from the line. Below it, at
+most one muted note: the unavailable message, the development-only provider review, a
+changed-stop message or the weather state, in that order of preference. A polite live
+region announces the line only when the next trip or its state changes, never a
+countdown minute. Web and Mac share `TravelStatusLine` in `DayProgressTimeline`.
+
+The drawer and the details dialog lead with the leave time (Ticket 271). The drawer puts the
+departure model's phrase for this event directly under the title, then the calendar and time
+line, the location, and a row with the Maps link and **View details**. The dialog's body starts
+with the same phrase, then the Maps link, the journey mode choice and **Change for this trip**,
+then Time and Location. The first line is one step larger than the lines under it, at regular
+weight: emphasis comes from position and wording, never bold. It covers the countdown within
+30 minutes, leave now, both late forms and the last-estimate form after expiry. The details
+dialog has no Duration row. An expanded located Behavior row adds the same Maps link after its
+travel lines, built from the Behavior's own place text.
 
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a
-verified route. Current position is the default immediate origin, ahead of a
+verified route. Directions needs a resolved place: a route that reached this stop, even
+after its 5-minute estimate expired (Ticket 271, correction C2). Directions opens in the mode
+that route used, which can be a mode remembered for that place, and falls back to usual travel.
+The link carries only the source-authored text. The destination correction sits behind one native
+**Change for this trip** disclosure; it asks only for the destination (decision D12); saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
 predicted scheduled position. When location is unavailable, Home or the previous
 stop is the origin. Missing Home withholds only the trip back; current-location-
 to-event and event-to-event advice remain available for usable points. Never
@@ -1134,8 +1184,11 @@ changed ("Refresh brief"). Close stays a 44px control in every state.
 A ready brief may add two quiet sections below the text, separated by a hairline:
 "Pattern tip" (the model's tip plus a muted deterministic evidence line and one
 limitation) and "Travel" (up to four calculated lines: travel-created Behavior
-overlaps, departures, the return or an unknown-return note, then a muted "Calculated
-by Cadence … Not written by the model." line). A hypothetical option that overlaps
+overlaps, up to two departures, then the return or an unknown-return note, then a muted
+"Calculated by Cadence · Google Maps · {time}." line). Since Ticket 272 the departure and
+trip-home lines are the departure model's line forms, which name the event, including
+"Last estimate" after expiry and the late forms; the block does not disappear when an
+estimate expires. A hypothetical option that overlaps
 travel adds "This time overlaps planned travel." No new buttons; no apply action.
 When the model's facts held weather trips (Ticket 219 stage 2), a muted Open-Meteo
 credit line ("Weather data by Open-Meteo.com (CC BY 4.0)" with site and licence

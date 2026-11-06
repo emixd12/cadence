@@ -42,9 +42,10 @@ const client: DailyBriefClient = {
 const briefTravel = (weather: "applied" | "no_position"): BriefTravelGuidance => ({
   localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2026-09-20T13:05:00Z", attribution: "Google Maps",
   items: [
-    { kind: "departure", at: weather === "applied" ? "2026-09-20T18:05:00Z" : "2026-09-20T18:20:00Z", label: "Dentist", mode: "cycling",
+    // Ticket 272: the departure model's line form, which names the event.
+    { kind: "departure", phrase: `Leave by ${weather === "applied" ? "2:05 PM" : "2:20 PM"} for Dentist from Home · cycling, arrive 2:50 PM.`,
       weather: weather === "applied" ? { marginMinutes: 15, conditions: ["thunderstorm", "heavy_rain", "rain"], suggestion: { instead: "cycling", alternatives: ["transit", "driving"] } } : null },
-    { kind: "return", at: "2026-09-20T21:10:00Z" },
+    { kind: "return", phrase: "Back around 5:10 PM.", weather: null },
   ],
   conflictingOptionIds: [], occupiedSpans: [],
   weather: weather === "applied" ? { state: "applied", attribution: OPEN_METEO_ATTRIBUTION } : { state: "no_position", attribution: null },

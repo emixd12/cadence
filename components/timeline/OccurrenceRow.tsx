@@ -33,6 +33,8 @@ type OccurrenceRowProps = Readonly<{
   statusIconsOnly?: boolean;
   context?: TimelineOccurrenceContext;
   travelDetails?: ReactNode;
+  /** Ticket 270: one muted line while collapsed, when the next trip crowds this Behavior. */
+  crowdedLine?: string | null;
 }>;
 
 type KeyedOptimisticStatusState = Readonly<{
@@ -75,6 +77,7 @@ export function OccurrenceRow({
   statusIconsOnly = false,
   context,
   travelDetails,
+  crowdedLine = null,
 }: OccurrenceRowProps) {
   const serverStatusKey = [
     occurrence.id,
@@ -186,6 +189,9 @@ export function OccurrenceRow({
               >
                 {visibleOccurrence.title}
               </h3>
+              {crowdedLine ? <p className="timeline-occurrence-crowded col-start-2 min-w-0 text-xs font-normal leading-5 text-muted-readable group-open:hidden" data-next-trip-crowded>
+                {crowdedLine}
+              </p> : null}
             </div>
           </summary>
 

@@ -19,7 +19,6 @@ const APPROVED_TICKET_261 = [
   "Estimate expired.",
   "Trip changed.",
   "No route found.",
-  "Return time unknown. Add Home in Settings to estimate it.",
   "Travel estimates resume on {date}.",
 ];
 
@@ -33,7 +32,7 @@ const TZ = "America/New_York";
 const at = (time: string) => `2026-11-10T${time}:00-05:00`;
 const context = departurePhraseContext(at("09:00"), TZ);
 const STATES: Exclude<DepartureState, "none">[] = ["upcoming", "soon", "leave_now", "late", "head_home", "appears_later", "needs_place",
-  "needs_attendance", "needs_origin", "time_unknown", "no_route", "trip_changed", "estimate_expired", "paused"];
+  "needs_origin", "time_unknown", "no_route", "trip_changed", "estimate_expired", "paused"];
 const CAUSES: (DepartureTimeUnknownCause | null)[] = [null, "home_missing", "late_arrival", "no_known_end", "leg_limit"];
 
 /** Countdowns each state can carry in the model: soon always has one, leave now never. */

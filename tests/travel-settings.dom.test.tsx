@@ -3,6 +3,7 @@ import { act, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
+import { dismissTravelLeaveQuestion, resetTravelHabitMemoryForTest, travelLeaveQuestionDismissed } from "@/lib/ui/travel-habits";
 import type { TravelSettings } from "@cadence/core/types/travel";
 import { ExternalEventDetails } from "@/components/timeline/ExternalEventDetails";
 import { validateExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
@@ -70,6 +71,21 @@ it("saves Home and usual travel without changing the toggle", async () => {
   } finally { await unmount(); }
 });
 
+it("turning travel off in Settings removes the leave-question record with no Timeline mounted (Ticket 274)", async () => {
+  mockPermissions(null);
+  resetTravelHabitMemoryForTest();
+  dismissTravelLeaveQuestion("owner", "2026-09-21");
+  expect(window.sessionStorage.getItem("cadence:travel-leave-question")).not.toBeNull();
+  const settings: TravelSettings = { enabled: true, baseLocationText: "1 Example Street", mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
+  const save = vi.fn(async () => ({ ...settings, enabled: false, routingConsentAt: null }));
+  const { container, unmount } = await renderPanel({ readLocation: vi.fn(async () => ({ state: "prompt" as const })), save, settings });
+  try {
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    expect(window.sessionStorage.getItem("cadence:travel-leave-question")).toBeNull();
+    expect(travelLeaveQuestionDismissed("owner", "2026-09-21")).toBe(false);
+  } finally { await unmount(); }
+});
+
 it("turns travel off without asking for location", async () => {
   mockPermissions(null);
   const settings: TravelSettings = { enabled: true, baseLocationText: "1 Example Street", mode: "walking", navigationPreference: null, routingConsentAt: "2026-09-21T12:00:00Z", onboardingCompletedAt: null, updatedAt: "2026-09-21T12:00:00Z" };
@@ -114,10 +130,9 @@ it("keeps journey corrections transient and builds a source-location search link
     await act(() => root.render(<ExternalEventDetails event={event} timezone="UTC" onClose={() => {}} onDismissAllDay={() => {}} onTravelCorrection={corrected} />));
     const link = [...container.querySelectorAll("a")].find((element) => element.textContent === "Search in Google Maps")!;
     expect(new URL(link.href).searchParams.get("query")).toBe("User source address");
-    const attendance = container.querySelector<HTMLSelectElement>('select[name="travel_attendance"]')!;
-    attendance.value = "remote";
+    expect(container.querySelector('select[name="travel_attendance"]')).toBeNull();
     await act(() => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(corrected).toHaveBeenCalledWith({ eventId: event.id, revision: "revision-1", attendance: "remote", locationText: "User source address" });
+    expect(corrected).toHaveBeenCalledWith({ eventId: event.id, revision: "revision-1", locationText: "User source address" });
   } finally { await act(() => root.unmount()); container.remove(); }
 });
 

@@ -11,6 +11,32 @@ describe("travel route request", () => {
 });
 
 
+describe("travel route corrections (decision D12)", () => {
+  const day = { startLocalDate: "2026-11-05", endLocalDate: "2026-11-05" };
+  it("accepts a destination for one event revision and asks no attendance", () => {
+    const corrections = [{ eventId: "event-1", revision: "r1", locationText: "12 Harbor Street" }];
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections }).corrections).toEqual(corrections);
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections: [{ ...corrections[0], attendance: "remote" }] }).corrections).toEqual(corrections);
+  });
+
+  it("skips an older Mac build's attendance-only correction, so the refresh still runs", () => {
+    const legacy = [
+      { eventId: "event-1", revision: "r1", attendance: "physical", locationText: null },
+      { eventId: "event-2", revision: "r2", attendance: "remote", locationText: null },
+      { eventId: "event-3", revision: "r3", attendance: "physical", locationText: "12 Harbor Street" },
+    ];
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections: legacy }).corrections).toEqual([
+      { eventId: "event-3", revision: "r3", locationText: "12 Harbor Street" },
+    ]);
+  });
+
+  it("rejects a correction with an empty, missing or oversized destination", () => {
+    for (const locationText of ["", undefined, "x".repeat(513)]) {
+      expect(() => parseTravelRouteRefreshRequest({ ...day, corrections: [{ eventId: "event-1", revision: "r1", locationText }] })).toThrow("Travel correction");
+    }
+  });
+});
+
 describe("travel route scope", () => {
   const day = { startLocalDate: "2026-10-18", endLocalDate: "2026-10-18" };
   it("defaults older clients to Timeline scope and validates whole-day requests", () => {

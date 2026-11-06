@@ -18,10 +18,15 @@ policy is defined in `plans/first-external-consumer.md`.
 Tips and travel (Tickets 170–173): a brief may carry at most one pattern tip when a
 calculated finding bears on today; Cadence shows the evidence line beside it. Tips
 repeat at most once per cooldown. Travel lines beside the brief come from existing
-travel evidence and never regenerate the brief. Today they disappear when the evidence
-expires. Owner decisions D1 and D2 (`docs/DECISIONS.md`, 2026-11-04; Ticket 272) change
-that: the block marks a last estimate instead of disappearing, and there is no collapsed
-strip. Reminder
+travel evidence and never regenerate the brief. Since Ticket 272 (owner decisions D1 and
+D2, `docs/DECISIONS.md`, 2026-11-04) they come from the departure model, in the line
+forms that name the event, so they match the Timeline's next-departure line. The block
+no longer disappears when an estimate expires: a time older than 5 minutes stays,
+marked "Last estimate … checked {time}". A late trip stays and says when you would
+arrive. During the last event the trip home says when to head home; before that, a
+known whole trip says when you are back. A trip after a late arrival says it has no time.
+A trip leaves the block once it has arrived, and with no trips today there is no block.
+There is no collapsed strip, and the once-a-day and dismissal rules are unchanged. Reminder
 history and Notes need their own Settings disclosure; turning Daily Brief off revokes both.
 
 Navigation during loading keeps the attempt; returning to Timeline shows its result.
@@ -50,7 +55,8 @@ release gate. Live and installed acceptance remain open in `qa/travel-release.md
    unknown.
 3. The user may add a designated location in the existing Behavior form. Calendar
    locations stay attached to their events. Missing/ambiguous points need correction;
-   Cadence does not infer a home address or in-person attendance for hybrid events.
+   Cadence does not infer a home address. A Calendar event with a location is in person;
+   one without a location is not travel and asks nothing (decision D12).
 4. Opening relevant context or changing meaningful inputs computes usable route
    pairs proactively. No per-trip approval is required. The itinerary includes
    direct A → B → C legs using event locations, times and mode. Changes recompute
@@ -211,8 +217,11 @@ is configured; that report calls no provider. The row opens the Travel settings
 section, where the user enters Home and chooses usual travel, then chooses Save
 travel settings. Saving sends nothing to Google, requests no device location and
 leaves the Travel estimates toggle unchanged. The row reads Saved once both
-values exist. The
-setup read carries only whether each value exists, never the Home text. On
+values exist and Travel estimates is on. With both saved and Travel estimates off, it reads
+Estimates off, because nothing appears until the toggle is on (Ticket 273). The row only
+opens Travel settings; consent still comes only from the Travel estimates toggle. The
+setup read carries only whether each value exists and whether estimates are on, never the
+Home text. On
 desktop the row needs a linked account to ask the deployment; local mode omits
 it, and Travel settings still saves both values offline.
 If browser notifications are denied or already blocked, that permission state
@@ -902,7 +911,12 @@ not promote it into the daily configuration. Legacy drafts load with timing disa
 ### Travel refresh completion (Tickets 213–214)
 
 A delivered Daily Brief requests the day's travel once through the shared web and
-desktop client. Requests still require travel consent and provider clearance.
+desktop client. Since Ticket 272 the day's first automatic brief waits for the first
+whole-day travel result, at most 5 seconds, so it carries Cadence's signed trip
+conclusions; the bubble shows its loading state meanwhile. It does not wait when travel is
+off or not configured, when no Timeline travel view is open, or on a retry. That request
+also serves the delivered brief, so the day is not routed twice. Requests still require
+travel consent and provider clearance.
 The existing eight-leg limit applies. Travel remains outside model input.
 A foreground minute check reads an already-allowed device position; only movement
 beyond 500 m plus both accuracy radii requests routing. Manual decisions reproject
@@ -974,6 +988,19 @@ setup (Ticket 212) links to the same Home and usual travel controls at
    fills the form; the user saves to apply it. Dismiss hides it until six more labels.
 5. Settings deletes labels or markers on request; Turn off deletes both and every
    dismissal. A shorter retention asks first and deletes older labels.
+
+### Leave-time question (Tickets 217 and 274)
+
+1. While the Timeline shows a trip from Home or the current position with a current
+   estimate, Cadence keeps that event as a candidate for today: a one-way digest and the
+   event's end time, in this tab's browser session. No title or place is kept.
+2. After the event ends, the Timeline asks once: the leave time was too early, about
+   right or too late. A reload, or reopening the Mac app's Timeline in the same app
+   session, still asks. The title comes from the current Calendar or Behavior read; if
+   the event is gone, Cadence skips the question.
+3. An answer is saved with the account, so no tab or device asks again that day. Not now
+   saves nothing and hides the question in this tab until the tab or app session ends.
+4. Sign-out, another account, travel turned off and a new day clear the kept candidates.
 
 ## Connect and disconnect an AI client
 

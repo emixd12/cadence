@@ -1,7 +1,13 @@
-.timeline { --timeline-gutter: 8rem; --timeline-gap: 24px; --calendar-node-x: -96px; --timeline-axis-x: -24px; --drawer-height: 0px; position: relative; container: dayProgress / inline-size; }
+.timeline { --next-trip-label-stack: 0; --timeline-gutter: 8rem; --timeline-gap: 24px; --calendar-node-x: -96px; --timeline-axis-x: -24px; --drawer-height: 0px; position: relative; container: dayProgress / inline-size; }
 .timeline[data-drawer-open="true"] { padding-bottom: calc(var(--drawer-height) + 1rem); }
 .spine { position: absolute; top: 1rem; bottom: 1rem; width: 1px; background: var(--muted-readable); pointer-events: none; }
 .calendarState { margin: 0 0 0.5rem var(--timeline-gutter); color: var(--muted-readable); font-size: var(--text-xs); line-height: 1.25rem; }
+/* Ticket 269: the next-departure line. Regular weight; foreground text sets it above the muted notes. A trip with a time gets the 1px magenta rule shared with its span (D2). */
+.travelStatus { display: contents; }
+.departureLine { max-width: 40rem; margin: 0 0 0.5rem var(--timeline-gutter); color: var(--foreground); font-size: var(--text-sm); line-height: 1.25rem; overflow-wrap: anywhere; }
+.departureLine[data-departure-timed="true"] { border-left: 1px solid var(--calendar-overlap); padding-left: 0.5rem; }
+/* Ticket 270 (D13, D14): the leader's label, small magenta text right-aligned at the leader's end. One line on wide layouts; `--next-trip-label-stack` stacks it on phones. The text tone is the darker magenta so 11px text keeps 4.5:1. */
+.leaderLabel { position: absolute; display: grid; align-content: center; transform: translateY(-50%); color: var(--calendar-overlap-text); font-size: 11px; line-height: 16px; text-align: right; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
 .day { position: relative; padding-block: 1.25rem; }
 .day:first-child { padding-top: 0; }
 .day:last-child { padding-bottom: 0; }
@@ -31,7 +37,7 @@
 .details::backdrop { background: rgb(0 0 0 / 20%); }
 .drawerEvents { display: grid; flex: 1; min-width: 0; min-height: 0; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 1rem 2rem; overflow-y: auto; }
 .currentTime { transition: none; }
-@media (max-width: 575px) { .timeline { --timeline-gutter: 4.5rem; --timeline-gap: 16px; --calendar-node-x: -50px; --timeline-axis-x: -16px; } .timeline :global(.timeline-occurrence-summary) { padding-left: 0.5rem; } .timeline :global(.timeline-occurrence-main) { grid-template-columns: max-content minmax(0, 1fr); gap: 0.375rem; } .timeline :global(.timeline-occurrence-time) { font-size: var(--text-xs); } .timeline :global(.timeline-occurrence-title) { font-size: var(--text-base); } .timeline :global(.timeline-occurrence-status) { margin-right: 0.75rem; } }
+@media (max-width: 575px) { .timeline { --next-trip-label-stack: 1; --timeline-gutter: 4.5rem; --timeline-gap: 16px; --calendar-node-x: -50px; --timeline-axis-x: -16px; } .timeline :global(.timeline-occurrence-summary) { padding-left: 0.5rem; } .timeline :global(.timeline-occurrence-main) { grid-template-columns: max-content minmax(0, 1fr); gap: 0.375rem; } .timeline :global(.timeline-occurrence-time) { font-size: var(--text-xs); } .timeline :global(.timeline-occurrence-title) { font-size: var(--text-base); } .timeline :global(.timeline-occurrence-status) { margin-right: 0.75rem; } }
 /* Ticket 238: recorded activity is a plain list under the day title, never an axis marker or overlap cue. */
 .activity { margin-top: 0.75rem; font-size: var(--text-xs); line-height: 1.25rem; color: var(--muted-readable); }
 .activity ul { display: grid; gap: 0.25rem; margin-top: 0.25rem; }

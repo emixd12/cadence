@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   DAY_PROGRESS_MAX_ICON_LANES,
+  nextTripCrowdsBehavior,
   resolveDayProgressLayout,
+  resolveNextTripMarkInput,
 } from "../packages/core/src/resolvers/day-progress.resolver";
 import type {
   NormalizedAllDayExternalEvent,
@@ -233,6 +235,74 @@ describe("resolveDayProgressLayout", () => {
       events: [timedEvent("zero", "2026-09-16T10:00:00Z", "2026-09-16T10:00:00Z")],
       days: [{ localDate: "2026-09-16", top: 0, bottom: 100, rows: [] }],
     })).toThrow("end after");
+  });
+});
+
+// Ticket 270 (D2, "Next trip only"; D13): the next trip's span, leader and label.
+describe("next trip marks", () => {
+  type MarkTrip = NonNullable<Parameters<typeof resolveNextTripMarkInput>[0]>;
+  const trip = (overrides: Partial<MarkTrip> = {}): MarkTrip => ({ key: "outbound::dentist", legId: "leg-1", state: "upcoming",
+    leaveAt: "2026-09-16T13:20:00Z", arriveAt: "2026-09-16T13:55:00Z", ...overrides });
+  const day = (localDate = "2026-09-16") => ({ localDate, top: 0, bottom: 2400, rows: [] as ReturnType<typeof row>[] });
+
+  it("marks only a next trip with a leave time and an arrival", () => {
+    expect(resolveNextTripMarkInput(trip())).toEqual({ key: "outbound::dentist", legId: "leg-1",
+      leaveAt: "2026-09-16T13:20:00Z", arriveAt: "2026-09-16T13:55:00Z" });
+    for (const state of ["soon", "leave_now", "late", "head_home"] as const) expect(resolveNextTripMarkInput(trip({ state })), state).not.toBeNull();
+    for (const state of ["appears_later", "needs_place", "needs_origin", "time_unknown", "no_route", "trip_changed", "estimate_expired", "paused"] as const) {
+      expect(resolveNextTripMarkInput(trip({ state })), state).toBeNull();
+    }
+    expect(resolveNextTripMarkInput(trip({ leaveAt: null }))).toBeNull();
+    expect(resolveNextTripMarkInput(trip({ arriveAt: null }))).toBeNull();
+    expect(resolveNextTripMarkInput(null)).toBeNull();
+  });
+
+  it("starts the span exactly at the leave time and ends it at arrival (D13)", () => {
+    const layout = resolveDayProgressLayout({ timezone: "UTC", days: [day()], nextTrip: resolveNextTripMarkInput(trip()) }).days[0]!;
+    // 100 px per hour on an empty day: 13:20 is 1333.3, 13:55 is 1391.7.
+    expect(layout.nextTrip?.key).toBe("outbound::dentist");
+    expect(layout.nextTrip?.startPosition).toBeCloseTo(1333.33, 1);
+    expect(layout.nextTrip?.leavePosition).toBe(layout.nextTrip?.startPosition);
+    expect(layout.nextTrip?.endPosition).toBeCloseTo(1391.67, 1);
+    expect(layout.nextTrip?.labelPosition).toBe(layout.nextTrip?.leavePosition);
+    expect(resolveDayProgressLayout({ timezone: "UTC", days: [day()] }).days[0]!.nextTrip).toBeNull();
+  });
+
+  it("clips the span to each day and keeps the leader on the leave day", () => {
+    const late = resolveNextTripMarkInput(trip({ leaveAt: "2026-09-16T23:40:00Z", arriveAt: "2026-09-17T00:20:00Z" }));
+    const [first, second] = resolveDayProgressLayout({ timezone: "UTC", days: [day(), { ...day("2026-09-17"), top: 2400, bottom: 4800 }], nextTrip: late }).days;
+    expect(first!.nextTrip).toMatchObject({ endPosition: 2400 });
+    expect(first!.nextTrip?.leavePosition).toBeCloseTo(2366.67, 1);
+    expect(second!.nextTrip).toMatchObject({ startPosition: 2400, leavePosition: null, labelPosition: null });
+    const third = resolveDayProgressLayout({ timezone: "UTC", days: [{ ...day("2026-09-18") }], nextTrip: late }).days[0]!;
+    expect(third.nextTrip).toBeNull();
+  });
+
+  it("moves the leader's label clear of Calendar markers only when they share the rail", () => {
+    const events = [timedEvent("dentist", "2026-09-16T13:30:00Z", "2026-09-16T14:30:00Z")];
+    const input = { timezone: "UTC", days: [day()], events, nextTrip: resolveNextTripMarkInput(trip()) };
+    const shared = resolveDayProgressLayout({ ...input, nextTripLabel: { height: 32, avoidIcons: true } }).days[0]!;
+    const icon = shared.timedEventSpans[0]!.iconPosition;
+    // The marker sits at 1350; the label (32 px) keeps 38 px from its centre and stays nearest the leave time.
+    expect(Math.abs(shared.nextTrip!.labelPosition! - icon)).toBeGreaterThanOrEqual(38);
+    expect(shared.nextTrip!.labelPosition).toBeCloseTo(icon - 38, 5);
+    const apart = resolveDayProgressLayout({ ...input, nextTripLabel: { height: 32, avoidIcons: false } }).days[0]!;
+    expect(apart.nextTrip!.labelPosition).toBe(apart.nextTrip!.leavePosition);
+    expect(() => resolveDayProgressLayout({ ...input, nextTripLabel: { height: 0, avoidIcons: true } })).toThrow("rail label height");
+  });
+
+  it("rejects a next trip that arrives before it leaves", () => {
+    expect(() => resolveDayProgressLayout({ timezone: "UTC", days: [day()],
+      nextTrip: { key: "k", legId: null, leaveAt: "2026-09-16T13:55:00Z", arriveAt: "2026-09-16T13:20:00Z" } })).toThrow("leave before it arrives");
+  });
+
+  it("says a Behavior is crowded only by the next trip's own leg", () => {
+    const next = resolveNextTripMarkInput(trip());
+    expect(nextTripCrowdsBehavior({ travelOverlapLegIds: ["leg-1"] }, next)).toBe(true);
+    expect(nextTripCrowdsBehavior({ travelOverlapLegIds: ["leg-2"] }, next)).toBe(false);
+    expect(nextTripCrowdsBehavior({}, next)).toBe(false);
+    expect(nextTripCrowdsBehavior({ travelOverlapLegIds: ["leg-1"] }, null)).toBe(false);
+    expect(nextTripCrowdsBehavior({ travelOverlapLegIds: ["leg-1"] }, resolveNextTripMarkInput(trip({ legId: null })))).toBe(false);
   });
 });
 

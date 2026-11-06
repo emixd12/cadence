@@ -1,5 +1,51 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 3: decision D14 applied to the Ticket 270 marker — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.**
+
+- The next trip's label is one line ("Leave 9:35") on wide layouts, with the leader pointing
+  straight at it. Phones (`max-width: 575px`) keep the stack. A one-line label that would cross
+  the Timeline's left edge stacks too.
+- The trip home's label reads "Home {time}" (new, approved).
+- When the current-time dot sits at the leave point, the leader starts 8px out and keeps its
+  full 14px.
+- D14 approves "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}", "Head
+  home now", the two D12 steps and, through the chosen one-line "Leave 1:20", "Leave {time}".
+  The bench review shows all 77 phrases approved.
+- Screenshots refreshed in `.intent/artifacts/t270-final/`. Messaging impact: P-021 note.
+
+## Travel advisory revamp Wave 3: Ticket 270 final marker (decision D13) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.**
+
+- The next trip's magenta span now starts at the recommended leave time, not get-ready time. A
+  14px magenta leader runs from its top end into the left rail, perpendicular to the axis, with
+  a small magenta label at its end ("Leave 9:35"). The label text uses a new token,
+  `--calendar-overlap-text` (`#C0286A`), for 4.5:1 contrast at 11px.
+- Leave now, late and passed leave times show "Leave now", "May arrive late", "Arrive about
+  {time}", "Home about {time}" or "Head home now", never a past leave time. These five phrases
+  are new and await the owner (D7); "Leave {time}" still does too.
+- Variants B and C, the title-size line, the bench's marker and line pickers and
+  `NEXT_TRIP_PRESENTATION` are removed. The bench keeps its state presets.
+- D13 approves "Change for this trip", the three Daily Brief lines, the Travel estimates offer,
+  "Not now" and "Estimates off" (November 6, 2026). The D12 phrases stay unapproved. The bench
+  review shows 8 of 76 awaiting.
+- No overlap with the current-time dot, rows or Calendar markers at 1440 or 390 px
+  (`.intent/artifacts/t270-final/`). The product has no dark theme, so the dark-preference
+  captures match the light ones.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web,
+  checked at 390 px. Messaging impact: P-021 (Ticket 270 note updated).
+
+## Travel advisory revamp Wave 2 deployed — November 5, 2026
+
+PR #191 merged on November 5, 2026 as `e6a49c8`. Both Vercel projects built READY on that commit.
+`CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now names `dpl_E6SKhPfv7ppZQTA6oR4upfTHPQWT`. The app was
+redeployed as `dpl_7677PW7SHrd1wMJcAeBskXQET3F5` and aliased to app.cadence-me.com. Login, trust
+evidence and marketing pages returned 200. The required CI check failed once on a Chrome start
+timeout in `acceptance-web-client` and passed on rerun. As the coordinator reported; not rechecked
+here.
+
 ## Travel advisory revamp Wave 1 deployed — November 5, 2026
 
 PR #190 merged on November 5, 2026 as `c599d24`. Both Vercel projects built READY on that commit;
@@ -7,6 +53,177 @@ the app build took about 15 minutes. `CADENCE_TRUST_MARKETING_DEPLOYMENT_ID` now
 `dpl_F7zQrqAKvxDJYyCHaXQVVSSMXHWS`. The app was redeployed as `dpl_KApfWgWqkedC5kLkc3SFj9aihu68`
 and aliased to app.cadence-me.com. Login, trust evidence and marketing pages returned 200. As the
 coordinator reported; not rechecked here.
+
+## Travel advisory revamp Wave 3: decision D12 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Owner decision
+D12 (`docs/DECISIONS.md`) changes Ticket 273's attendance step.
+
+- A Calendar event without a location is not travel: the hosted route leaves it out
+  (`calendarCommitmentDrafts`), so it asks nothing, gets no route and never blocks a later trip.
+  It stays a normal event. A Calendar event with a location is in person.
+- The attendance question is gone: the needs-attendance state and phrase, In person and Remote,
+  and the attendance choice in Change for this trip. A correction carries only a destination
+  (`TravelCorrection`, the route request parser). The parser skips a correction with a null
+  destination, which a Mac build from before D12 sends for an attendance answer, so that build's
+  refresh still succeeds. The stop past the bounded source window reads as past the trip limit
+  (`leg_limit`).
+- "Fix {event}'s place" replaces "Fix {event}'s place or attendance". The trip home with no Home
+  reads "Add Home in Settings to estimate the return time.", whose first words link to
+  `/settings#travel` (INT-TRAVEL-011). Both await the owner's approval (D7); the bench review
+  shows 12 of 73 awaiting. Ticket 270's marker variants are unchanged.
+- Ticket 281 keeps only remembered places. Messaging impact: P-023, with notes on P-020 and P-021.
+
+## Travel advisory revamp Wave 3: Ticket 273 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** Every missing
+estimate now says why in one sentence and offers one action (G3, G4, G10).
+
+- Needs place: "Add a place for {event}" is the action. For a Calendar event it opens the
+  details with Change for this trip open and the destination focused; for a Behavior it opens
+  Behaviors. Needs attendance: In person and Remote answer for this trip in one tap, with the
+  event's own location (INT-TRAVEL-003). Needs a start: the blocking stop comes from the
+  departure model's `blockingRef`, so "Fix {event}'s place or attendance" goes to that stop;
+  with none, "Add Home in Settings" opens Travel settings (INT-TRAVEL-011).
+- The next-departure line, the drawer, the details dialog and expanded Behavior rows share
+  `TravelStepText` (`components/timeline/TravelNextStep.tsx`). Focus moves to the travel status
+  or the dialog title when an answer removes its buttons.
+- With Travel estimates off and a located event or Behavior ahead today, one line offers to turn
+  them on and opens Travel settings; Not now hides it on that device with one `localStorage`
+  flag (INT-TRAVEL-012). Consent still comes only from the toggle. The Mac shows it only with a
+  linked account.
+- The first-run Home and travel row reads Estimates off, not Saved, while the toggle is off; the
+  setup read now carries `enabled`. `docs/USER_FLOWS.md` says so.
+- New wording, not yet approved (D7): "In person", "Remote", "Turn on Travel estimates in
+  Settings to get a leave time for {event}.", "Not now" and "Estimates off". Wording review is
+  now 12 of 75 awaiting.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web,
+  checked at 390 px. Messaging impact: P-021 (Ticket 273 note).
+
+## Travel advisory revamp Wave 3: Ticket 270 bench built — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed. Waiting for the owner to pick a marker.**
+
+- The next trip alone gets a magenta span on the axis, from get-ready (or leave) time to arrival,
+  without hovering (D2). Other trips stay inspection-only. A last estimate keeps the marks; steps
+  without a time have none.
+- Three markers are on the "Travel timing states" bench, each with the next-departure line at the
+  small status size and at the Behavior title size: A, "Leave 1:15" in the left rail with a tick;
+  B, a slim row "Leave 1:15 PM for Dentist" among the Behaviors; C, an axis tick only. Production
+  uses one constant, `NEXT_TRIP_PRESENTATION`, set to the recommended A with the small line.
+- A Behavior the next trip crowds shows its overlap line, muted, while collapsed.
+- No marker is a tab stop. The live region speaks when the next trip's action changes.
+- Layout rules live in `day-progress.resolver.ts`: the span, the leave tick, the rail label kept
+  clear of Calendar markers in a shared rail, and marker B's place in the list.
+- New wording, not yet approved (D7): "Leave {time}", "Leave {time} for {event}" and "Leave {time}
+  for home". `DESIGN.md` and `docs/UI_SPEC.md` change after the owner's choice.
+- Web and Mac share the components. Marketing: not applicable. Future mobile: mobile web, checked
+  at 390 px. Messaging impact: P-021 (Ticket 270 note).
+
+## Travel advisory revamp Wave 3: Ticket 274 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The leave-time
+question now survives a reload.
+
+- Today's candidates live in `sessionStorage` under `cadence:travel-leave-question`, beside the
+  Ticket 268 travel session: one account, one local date, at most 32 `{eventRef, endsAt}` pairs
+  and the Not now flag. `eventRef` is the existing SHA-256 digest; no title, place or event
+  text is stored. A reload in the tab still asks once after the event ends; a new tab does not
+  inherit candidates. `sessionStorage` was chosen to match Ticket 268 and to end with the tab.
+- `restoreTravelLeaveCandidates` (core) matches kept digests to the current Calendar and
+  Behavior read for the title. A deleted event asks nothing. Not now now lasts through a reload
+  in that tab. An About right answer tells other tabs to reload habits, so an answered day never
+  asks again in another tab.
+- Sign-out (web and Mac, through `clearTravelSession`), an account change, travel turned off and
+  a new local date clear the entry. The Mac uses the same code; nothing reaches SQLite.
+- `docs/DATA_MODEL.md` and `docs/USER_FLOWS.md` describe the store and flow. P-021 has a Ticket
+  274 note for the user-guide sentence that says a reload means no question; the guide and
+  Privacy are unchanged.
+
+## Travel advisory revamp Wave 3: Ticket 272 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Daily Brief
+travel block now stays useful through the day, and the first brief gets its trip facts.
+
+- `projectBriefTravelGuidance` reads the departure model. Departure and trip-home lines are the
+  model's line forms, which name the event and match the next-departure line. An expired estimate
+  stays, marked "Last estimate … checked {time}". A late trip stays and says when you would arrive
+  (the old filter dropped it). During the last event the trip home says when to head home;
+  before that, a known whole trip says "Back around {time}". A trip after a late arrival says it
+  has no time. Unreliable spans stay in `conflictingOptionIds` and `occupiedSpans` (Ticket 268).
+- The day's first automatic brief waits for the first whole-day travel result, at most 5 seconds
+  (`waitForDailyBriefTravel` in `lib/ui/travel.ts`). No wait with travel off or not configured,
+  with no Timeline travel view mounted, or on a retry. The bubble shows its loading state while
+  it waits. The same request serves the delivered brief, so the day is not routed twice.
+- Model input is unchanged: the request carries only the opaque signed token. Tests check the
+  request body and that no model-input module imports the block or the departure model (L-001).
+- No collapsed strip (D2). Once-a-day, dismissal and the footer are unchanged.
+- Wording: "Travel to {event} overlaps {behavior}." and "Back around {time}." move into
+  `departure-phrases.ts` unchanged. The trip-home overlap now reads "Planned travel overlaps
+  {behavior}." instead of "Travel to planned travel overlaps {behavior}.". All three are on the
+  bench wording review, not yet approved (D7). "Return time is unknown." now uses the approved
+  "Return time unknown.".
+- `docs/USER_FLOWS.md` and `docs/UI_SPEC.md` describe the block and the wait; P-018 has a Ticket
+  272 note. Screenshots at 1440 and 390 px are in `.intent/artifacts/t272/` (local, not committed).
+
+## Travel advisory revamp Wave 3: Ticket 271 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** The Calendar drawer
+and details dialog now lead with the leave time, and Directions is one tap away in more places.
+
+- The drawer shows the departure model's phrase under the event title; the dialog's body starts
+  with it. The first line is one step larger, at weight 400. It covers the countdown, leave now,
+  both late forms and the last-estimate form.
+- Directions: the drawer, the dialog and expanded located Behavior rows have the Maps link.
+  `travelDestinationResolved` in `packages/core/src/services/travel-navigation.ts` decides
+  Directions from a resolved place, so an expired estimate keeps it (correction C2). The link
+  carries only source-authored text. The row uses the Behavior's own place text, which the shared
+  timeline service now passes as the optional `placeText` on the Timeline occurrence view.
+  Directions opens in the routed leg's mode, so a mode remembered for a place wins over usual
+  travel (verifier R2).
+- Ticket 269 follow-up (verifier R1): the next-departure line's live region also changes on the
+  next trip's freshness and action, so a refreshed "Last estimate" line is spoken. When Refresh
+  travel removes its own button, focus moves to the line.
+- The attendance and destination correction sits behind one native "Change for this trip"
+  disclosure. Saving closes it and returns focus to it. `INT-TRAVEL-003` is kept.
+- The details dialog has no Duration row (from Ticket 262).
+- New wording: "Change for this trip", in `departure-phrases.ts` and the bench wording review,
+  not yet approved (D7). It replaces the "Travel for this event" heading.
+- `docs/qa/travel-release.md` no longer says expiry reverts Directions to Search, and B1 now
+  expects Directions. Screenshots at 1440 and 390 px are in `.intent/artifacts/t271/` (local,
+  not committed).
+
+Platform impact: web `components/timeline/ExternalEventDetails.tsx` and `DayProgressTimeline.tsx`;
+desktop renders the same components through `apps/desktop/src/product.tsx`, and Ticket 285 checks
+the installed app. Marketing: not applicable. Future mobile: mobile web inherits it, checked at
+390 px. Messaging impact: P-021 (stale user-guide sentences added).
+
+## Travel advisory revamp Wave 3: Ticket 269 implemented — November 5, 2026
+
+**On branch `us-work`. Not merged or deployed, and no provider call was made.** One line at the top
+of the Timeline now says when to leave next.
+
+- `TravelStatusLine` shows the departure model's line phrase for the next trip in every state and
+  replaces "Travel as of" and "may be stale". A day with no trips shows no travel text, paused or not.
+- Refresh travel follows R1: where the phrase starts with "Refresh travel", those words are the
+  button. Otherwise the button ends the line only when the trip's action is refresh. `INT-TRAVEL-004`
+  is kept. Place and start steps show their sentence with no action (Ticket 273).
+- While the budget is used up, the paused phrase follows a known time on the same line (D11).
+- At most one muted note follows: a message (unavailable, development-only provider review, changed
+  stops) or else the weather state. One Refresh travel at most.
+- A visually hidden polite region speaks only when the next trip's state or key, the pause or the
+  note changes. A countdown minute is silent. A fresh estimate for the same state is also silent.
+- Weight 400. A trip with a time gets a 1px magenta left rule, the color of its span (D2).
+- No new wording: the line uses approved phrases only. The bench's model-line note now says the
+  Timeline shows the line.
+- Evidence: `tests/next-departure-line.dom.test.tsx` walks the bench day from 6:00 AM to 6:00 PM in
+  5-minute steps and asserts the exact line at each step. Screenshots at 1440 and 390 px are in
+  `.intent/artifacts/t269/` (local, not committed).
+
+Platform impact: web `components/timeline/DayProgressTimeline.tsx`; desktop renders the same
+component through `apps/desktop/src/product.tsx`, and Ticket 285 checks the installed app.
+Marketing: not applicable. Future mobile: mobile web inherits it, checked at 390 px. Messaging
+impact: P-021 (stale user-guide sentences added).
 
 ## Travel advisory revamp Wave 2: Ticket 268 implemented — November 5, 2026
 

@@ -16043,7 +16043,7 @@ Verification: `npx vitest run tests/travel-lifecycle.dom.test.tsx` and
 
 ## Ticket 269: Next-departure line
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed.
 Dependencies: Tickets 265, 268 and 261.
 
 Goal: one line at the top of the Timeline answers "when do I leave next?" (proposal P1,
@@ -16079,7 +16079,14 @@ Verification: DOM test with a moving clock, bench at both widths,
 
 ## Ticket 270: Next trip's marker and span
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work` under owner decision D13. Not merged
+or deployed. The span starts at the leave time; a short magenta leader runs from its top end
+into the left rail with a small magenta label at its end. Leave now, late and passed leave
+times use the line's words. Variants B and C, the title-size line and
+`NEXT_TRIP_PRESENTATION` are removed. `DESIGN.md` ("Next trip marker (Ticket 270)") and
+`docs/UI_SPEC.md` describe the shipped form. Decision D14 (November 6, 2026): the label is
+one line on wide layouts and stacked on phones, the trip home reads "Home {time}", the leader
+keeps its full 14px beside the current-time dot, and every label phrase is approved.
 Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).
@@ -16117,7 +16124,8 @@ tests/day-progress-bench.dom.test.tsx`, bench at both widths,
 
 ## Ticket 271: Drawer and dialog lead with the leave time
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+approved the "Change for this trip" label on November 6, 2026 (decision D13).
 Dependencies: Tickets 261, 262 and 268.
 
 Goal: the event views answer the question first, with directions one tap away (proposal
@@ -16134,6 +16142,8 @@ Scope and acceptance:
 - Navigation links still use only source-authored text.
 - Do not use the mockup's weather advice or bold type.
 - Update `interaction-registry.json`.
+- From Ticket 262: drop the Duration row when the end is unknown. The time row already
+  says "End unknown".
 
 References: `components/timeline/ExternalEventDetails.tsx`,
 `components/timeline/OccurrenceRow.tsx`, `components/timeline/DayProgressTimeline.tsx`,
@@ -16156,7 +16166,8 @@ tests/day-progress-timeline.dom.test.tsx`, bench at both widths,
 
 ## Ticket 272: Daily Brief travel block stays useful
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. The owner
+approved its three Daily Brief lines on November 6, 2026 (decision D13).
 Dependencies: Tickets 265 and 268.
 
 Goal: the block stops vanishing after 5 minutes, and the first brief gets its trip facts
@@ -16190,7 +16201,9 @@ tests/daily-brief-ui.dom.test.tsx tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 273: A next step for every missing estimate
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Decision
+D12 removed In person and Remote and reworded two steps. The owner approved the offer, Not now
+and Estimates off (D13) and the two D12 steps (D14) on November 6, 2026.
 Dependencies: Ticket 269.
 
 Goal: replace silence with a reason and one action (G3, G4 and G10).
@@ -16198,7 +16211,7 @@ Goal: replace silence with a reason and one action (G3, G4 and G10).
 Scope and acceptance:
 
 - Needs place: name the event and offer a place correction.
-- Needs attendance: ask In person or Remote in one tap.
+- Needs attendance: ask In person or Remote in one tap. Removed by decision D12.
 - Needs origin: link to Home and location settings.
 - When the blocking stop is a different event, name that event.
 - With travel off and a located event today, offer one dismissible line to turn it on. The
@@ -16207,6 +16220,17 @@ Scope and acceptance:
   `docs/USER_FLOWS.md` (Home and travel, Ticket 212) in the same change.
 - Each missing-estimate state shows one sentence and one action.
 - Consent still comes only from the Travel estimates toggle.
+
+Decision D12 follow-up (November 5, 2026, implemented on `us-work`, not merged): a Calendar
+event with a location is in person, and one without a location is not travel. The hosted route
+leaves location-less events out (`calendarCommitmentDrafts`), so they ask nothing, get no route
+and never block a later trip. The needs-attendance state, its phrase, In person and Remote, and
+the attendance choice in Change for this trip are removed; a correction carries only a
+destination. The stop past the bounded source window now reads as past the trip limit. "Fix
+{event}'s place or attendance" becomes "Fix {event}'s place", and the trip home with no Home
+reads "Add Home in Settings to estimate the return time." with its first words linking to
+`/settings#travel`. The owner approved both sentences on November 6, 2026 (D14). Messaging
+impact: P-023.
 
 References: next-departure line, drawer, `components/settings/TravelSettingsPanel.tsx`,
 first-run setup, `tests/onboarding-travel.dom.test.tsx`.
@@ -16227,7 +16251,8 @@ tests/travel-settings.dom.test.tsx`, bench at both widths, `npm run interactions
 
 ## Ticket 274: Leave-time question survives a reload
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 5, 2026 on branch `us-work`. Not merged or deployed. Candidates
+are kept in `sessionStorage` (`cadence:travel-leave-question`) as digests and end times.
 Dependencies: Ticket 263.
 
 Goal: the question that teaches Cadence survives a page reload (report image 6).
@@ -16489,7 +16514,9 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 
 ## Ticket 281: Remember places and attendance
 
-Status: filed November 4, 2026. Not started.
+Status: filed November 4, 2026. Not started. Decision D12 (November 5, 2026) removes the
+attendance part: a located event is in person and nothing asks about attendance, so only
+remembered places remain in scope.
 Dependencies: Ticket 273. Decision D4.
 
 Goal: stop asking the same question after every reload (G5).

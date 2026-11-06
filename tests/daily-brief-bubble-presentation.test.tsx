@@ -31,7 +31,7 @@ const briefing: DailyBriefing = {
 const weatherTravel: BriefTravelGuidance = {
   localDate: briefing.localDate, observedAt: "2026-11-01T16:00:00Z", expiresAt: "2026-11-01T19:04:00Z",
   attribution: "Google Maps", conflictingOptionIds: [], occupiedSpans: [option.intervals.proposed],
-  items: [{ kind: "departure", at: "2026-11-01T17:00:00Z", label: "Dentist", mode: "walking",
+  items: [{ kind: "departure", phrase: "Leave by 12:00 PM for Dentist · walking, arrive 12:30 PM.",
     weather: { marginMinutes: 15, conditions: ["rain"], suggestion: null } }],
   weather: { state: "applied", attribution: OPEN_METEO_ATTRIBUTION },
 };
@@ -156,7 +156,7 @@ describe("Daily Brief visible text and quote validation", () => {
     expect(moves.textContent).toContain("New suggested time");
     expect(moves.querySelector("strong")?.textContent).toBe("Walk");
     expect(moves.textContent).toContain("overlaps planned travel.");
-    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist (walking). 15 min added for rain.");
+    expect(container.textContent).toContain("Leave by 12:00 PM for Dentist · walking, arrive 12:30 PM. 15 min added for rain.");
     expect(container.querySelectorAll("[data-weather-credit]")).toHaveLength(1);
     expect(container.querySelector("[data-brief-weather-credit]")).toBeNull();
     expect(container.querySelector(`a[href="${OPEN_METEO_ATTRIBUTION.url}"]`)).not.toBeNull();

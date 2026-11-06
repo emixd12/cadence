@@ -464,20 +464,50 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(result.evidence?.legs.map((entry) => [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([
       ["ongoing", "future1"], ...Array.from({ length: 6 }, (_, index) => [`future${index + 1}`, `future${index + 2}`]),
     ]);
-    expect(result.evidence?.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "future7", destinationCommitmentRef: "future8", reason: "attendance_unknown" }]);
+    expect(result.evidence?.unknownLegs).toEqual([{ role: "onward", originCommitmentRef: "future7", destinationCommitmentRef: "future8", reason: "leg_limit" }]);
     expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("future8 St");
     expect(JSON.stringify(result.evidence)).not.toContain("future9");
   });
 
-  it("leaves ended, remote-looking and unplaced events under way out of the plan", async () => {
+  it("leaves ended and unplaced events under way out of the plan", async () => {
     withEvents([
       event("ended", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z"),
-      event("video", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", "video St", { conference: { url: "https://example.test" } }),
-      event("blank", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", ""),
+      event("blank", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", "", { conference: { url: "https://example.test" } }),
     ]);
     const result = await refreshTravelRoutes(caller, day, config, now);
     expect(result.evidence).toMatchObject({ legs: [], unknownLegs: [], segments: [] });
     expect(mocks.geocode.mock.calls.map(([text]) => text)).toEqual([]);
+  });
+
+  it("decision D12: a located event with a video link is in person, and an event without a location is not travel", async () => {
+    withEvents([
+      event("video", "2026-09-22T07:30:00Z", "2026-09-22T08:30:00Z", "video St", { conference: { url: "https://example.test" } }),
+      event("call", "2026-09-22T09:00:00Z", "2026-09-22T09:30:00Z", "", { conference: { url: "https://example.test" } }),
+      event("hybrid", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Hybrid Hall", { conference: { url: "https://example.test" } }),
+    ]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    expect(result.evidence?.unknownLegs).toEqual([]);
+    expect(result.evidence?.legs.map((entry) => [entry.leg.role, entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([
+      ["onward", "video", "hybrid"], ["return", "hybrid", null],
+    ]);
+    expect(JSON.stringify(result.evidence)).not.toContain("call");
+  });
+
+  it("decision D12: refreshes an older Mac build's request whose correction has a null destination", async () => {
+    // Before D12 an In person or Remote tap sent attendance with locationText null. The server skips it.
+    withEvents([event("call", "2026-09-22T09:00:00Z", "2026-09-22T09:30:00Z", ""), event("hall", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Hall St")]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const legacy = { ...day, scope: "day", corrections: [
+      { eventId: "call", revision: "call", attendance: "physical", locationText: null },
+      { eventId: "hall", revision: "hall", attendance: "remote", locationText: null },
+    ] };
+    const result = await refreshTravelRoutes(caller, legacy, config, now);
+    expect(result.evidence?.unknownLegs).toEqual([]);
+    expect(result.evidence?.legs.map((entry) => [entry.leg.role, entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([
+      ["outbound", null, "hall"], ["return", "hall", null],
+    ]);
+    expect(JSON.stringify(result.evidence)).not.toContain("call");
   });
 
   it("keeps a Behavior under way until its end, and its source for later decisions", async () => {
@@ -495,10 +525,10 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(result.evidence?.behaviorSources).toEqual([]);
   });
 
-  it("scenarios E to G: returns the reasons, and no place text, to the client", async () => {
+  it("scenarios E and F: returns the reasons, and no place text, to the client", async () => {
     withEvents([
       event("vague", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Somewhere vague"),
-      event("hybrid", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "Hybrid Hall", { conference: { url: "https://example.test" } }),
+      event("call", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "", { conference: { url: "https://example.test" } }),
       event("clear", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z", "Clear Hall"),
     ], { baseLocationText: null });
     mocks.geocode.mockImplementation(async (text: string) => text === "Somewhere vague"
@@ -507,7 +537,6 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(result.evidence?.legs).toEqual([]);
     expect(result.evidence?.unknownLegs).toEqual([
       { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "vague", reason: "destination_unknown" },
-      { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "hybrid", reason: "attendance_unknown" },
       { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "clear", reason: "origin_unknown" },
       { role: "return", originCommitmentRef: "clear", destinationCommitmentRef: null, reason: "return_base_missing" },
     ]);

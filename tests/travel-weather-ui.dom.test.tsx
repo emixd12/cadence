@@ -4,7 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
-import { travelStatusText } from "@/components/timeline/DayProgressTimeline";
+import { travelStatusLines } from "@/components/timeline/DayProgressTimeline";
+import type { DepartureModel, DepartureTrip } from "@cadence/core/types/departure";
 import { renderTravelTiming } from "@/components/timeline/ExternalEventDetails";
 import { TravelWeatherCredit, travelWeatherMarginText, travelWeatherStateText } from "@/components/timeline/TravelWeather";
 import { OPEN_METEO_ATTRIBUTION } from "@cadence/core/resolvers/weather-margin.resolver";
@@ -72,17 +73,21 @@ describe("travel weather copy", () => {
     expect(travelWeatherStateText(undefined)).toBeNull();
   });
 
-  it("adds the weather sentence to the travel status line only when no margin could be added", () => {
+  it("adds the weather sentence under the next-departure line only when no margin could be added", () => {
     const status = (summary: TravelWeatherSummary | undefined): TravelState => ({ view: { accountId: "a", mode: "cycling", navigationPreference: null,
       settingsRevision: "s", expiresAt: "2999-01-01T00:00:00Z", evidence: evidence(undefined, summary) }, message: null, stale: false, pending: false,
     observedAt: "2026-11-01T13:00:00Z", resumesAt: null, refresh: () => undefined });
-    expect(travelStatusText(status(undefined), null, "UTC")).toBe("Travel as of 1:00 PM");
-    expect(travelStatusText(status(applied), null, "UTC")).toBe("Travel as of 1:00 PM");
-    expect(travelStatusText(status({ ...applied, state: "no_position", forecastAt: null, attribution: null }), null, "UTC"))
-      .toBe("Travel as of 1:00 PM. No weather margin: device location is unavailable.");
-    // Ticket 261: a day with no trips gets no line, and only a message can be said.
-    expect(travelStatusText(status(applied), null, "UTC", { hasTrips: false })).toBeNull();
-    expect(travelStatusText({ ...status(applied), resumesAt: "2026-12-01T05:00:00Z" }, null, "UTC", { hasTrips: false })).toBe("Travel estimates resume on December 1.");
+    const next = { key: "k", state: "upcoming", action: null, linePhrase: "Leave by 1:30 PM for Gym · cycling, arrive 1:50 PM." } as DepartureTrip;
+    const departure: DepartureModel = { state: "upcoming", next, phrase: next.linePhrase, trips: [next], resumesAt: null, pausedPhrase: null };
+    const none: DepartureModel = { state: "none", next: null, phrase: null, trips: [], resumesAt: null, pausedPhrase: null };
+    const lines = (value: TravelState, model = departure) => travelStatusLines({ departure: model, status: value, hasEvidence: true, developmentBuild: false });
+    expect(lines(status(undefined))).toMatchObject({ line: "Leave by 1:30 PM for Gym · cycling, arrive 1:50 PM.", note: null });
+    expect(lines(status(applied)).note).toBeNull();
+    expect(lines(status({ ...applied, state: "no_position", forecastAt: null, attribution: null })).note)
+      .toBe("No weather margin: device location is unavailable.");
+    // Ticket 261: a day with no trips gets no line, paused or not.
+    expect(lines(status(applied), none)).toMatchObject({ line: null, note: null });
+    expect(lines({ ...status(applied), resumesAt: "2026-12-01T05:00:00Z" }, none)).toMatchObject({ line: null, note: null });
   });
 });
 
@@ -120,7 +125,7 @@ describe("travel timing with a weather margin", () => {
 describe("Daily Brief travel block with weather", () => {
   const guidance = (weather: BriefTravelGuidance["weather"], withMargin: boolean): BriefTravelGuidance => ({
     localDate: "2026-09-20", observedAt: "2026-09-20T13:00:00Z", expiresAt: "2999-09-20T16:00:00Z", attribution: "Google Maps",
-    items: [{ kind: "departure", at: "2026-09-20T18:05:00Z", label: "Dentist", mode: "cycling",
+    items: [{ kind: "departure", phrase: "Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM.",
       weather: withMargin ? { marginMinutes: 10, conditions: ["rain"], suggestion: { instead: "cycling", alternatives: ["transit"] } } : null }],
     conflictingOptionIds: [], occupiedSpans: [], weather,
   });
@@ -130,14 +135,14 @@ describe("Daily Brief travel block with weather", () => {
   it("shows the margin beside the departure with the credit", async () => {
     await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
       travel={guidance({ state: "applied", attribution: OPEN_METEO_ATTRIBUTION }, true)} />));
-    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling). 10 min added for rain.");
+    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM. 10 min added for rain.");
     expect(container.querySelector("[data-weather-credit]")?.textContent).toContain("Weather data by Open-Meteo.com (CC BY 4.0).");
   });
 
   it("says plainly when there is no device location and shows no credit", async () => {
     await act(() => root.render(<DailyBriefBubble state="ready" briefing={briefing} onDismiss={() => undefined}
       travel={guidance({ state: "no_position", attribution: null }, false)} />));
-    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist (cycling).");
+    expect(container.textContent).toContain("Leave by 2:05 PM for Dentist · cycling, arrive 2:35 PM.");
     expect(container.textContent).toContain("No weather margin: device location is unavailable.");
     expect(container.querySelector("[data-weather-credit]")).toBeNull();
   });
@@ -164,15 +169,16 @@ describe("travel timing with the Ticket 264 fields", () => {
       legs: base.legs.map((entry) => ({ ...entry, late: true, estimate: { ...entry.estimate!, warnings: ["Estimated arrival is after the planned arrival time."] } })) };
     await act(() => root.render(timing(late, "America/New_York")));
     expect(container.textContent).toContain("You may arrive late: leave by 1:30 PM · cycling, arrive 2:20 PM.");
-    expect(container.textContent).toContain("Return time unknown. Add Home in Settings to estimate it.");
+    expect(container.textContent).toContain("Add Home in Settings to estimate the return time.");
     expect(container.textContent).not.toContain("timing unavailable");
     expect(container.textContent).not.toContain("return_base_missing");
   });
 
-  it("shows nothing new for an event with only unknown legs", async () => {
+  it("gives an event with only unknown legs its next step (Ticket 273)", async () => {
     const only: Omit<TravelEvidenceResult, "modelProjection"> = { ...evidence(undefined, undefined), legs: [],
       unknownLegs: [{ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "event-1", reason: "origin_unknown" }] };
-    expect(timing(only, "America/New_York")).toBeNull();
+    await act(() => root.render(<>{timing(only, "America/New_York")}</>));
+    expect(container.querySelector('[data-departure-state="needs_origin"]')?.textContent).toBe("Add Home in Settings to get a leave time for Dentist.");
   });
 });
 

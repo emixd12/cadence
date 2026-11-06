@@ -273,6 +273,34 @@ export function routedOutboundCandidates(
   });
 }
 
+/**
+ * Ticket 274: a leave-time candidate as the browser keeps it, a digest of the event's
+ * identity and its end time. It keeps no title, place or other event text.
+ */
+export type StoredTravelLeaveCandidate = Readonly<{ eventRef: string; endsAt: string }>;
+
+export function storedTravelLeaveCandidate(candidate: TravelLeaveCandidate): StoredTravelLeaveCandidate {
+  return { eventRef: travelEventRef(candidate.kind, candidate.ref), endsAt: candidate.endsAt };
+}
+
+/**
+ * Ticket 274: kept candidates matched to the current Calendar and Behavior read. The title
+ * and end time come from that read, so a moved event asks after its new end. A candidate
+ * whose event is gone from the read is dropped, so it asks nothing.
+ */
+export function restoreTravelLeaveCandidates(
+  stored: readonly StoredTravelLeaveCandidate[],
+  subjects: readonly TravelLeaveSubject[],
+): TravelLeaveCandidate[] {
+  if (!stored.length) return [];
+  const byRef = new Map(subjects.map((subject) => [travelEventRef(subject.kind, subject.ref), subject] as const));
+  return stored.flatMap((entry) => {
+    const subject = byRef.get(entry.eventRef);
+    return subject ? [{ kind: subject.kind, ref: subject.ref, title: subject.title, localDate: subject.localDate,
+      endsAt: subject.endAt ?? subject.startAt }] : [];
+  });
+}
+
 export type TravelLeavePrompt = TravelLeaveCandidate & Readonly<{ eventRef: string }>;
 
 /**

@@ -7,6 +7,7 @@ import { CompletionPlacesSection, PlaceMarkerControl } from "@/components/travel
 import { readBrowserForegroundLocation, readBrowserLocationPermission, type ForegroundLocation, type LocationPermission } from "@/lib/ui/foreground-location";
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import { TravelHabitsSection } from "./TravelHabitsSection";
+import { clearTravelLeaveMemory } from "@/lib/ui/travel-habits";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -80,6 +81,8 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
       if (current !== sequence.current) return;
       adopt(saved);
       setMessage("Travel settings saved.");
+      // Ticket 274: travel turned off removes today's leave-time candidates, even with no Timeline open.
+      if (!saved.enabled) clearTravelLeaveMemory();
       notifyTravelSettingsChanged();
     } catch { if (current === sequence.current) setMessage("Travel settings could not save. Reload settings if another device changed them."); }
     finally { if (current === sequence.current) { setPending(false); refreshPermission(); } }

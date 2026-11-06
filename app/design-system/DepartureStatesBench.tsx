@@ -16,6 +16,8 @@ import type { TravelCommitment, TravelEndpoint, TravelEvidenceResult, TravelPlan
 import { DailyBriefBubble } from "@/components/briefing/DailyBriefBubble";
 import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { ExternalEventDetails, ExternalEventPreview } from "@/components/timeline/ExternalEventDetails";
+import { TravelOffOffer, type TravelStepActions } from "@/components/timeline/TravelNextStep";
+import type { TravelCorrection } from "@/lib/ui/travel";
 import { useBriefTravel } from "@/lib/ui/brief-travel";
 import type { TravelState } from "@/lib/ui/travel";
 import { DepartureWordingReview } from "./DepartureWordingReview";
@@ -33,13 +35,15 @@ const DATE = "2026-11-10";
 const DAY_START_MINUTES = 6 * 60;
 const DAY_END_MINUTES = 18 * 60;
 const GYM_ID = "bench-gym";
+const CALL_ID = "bench-call";
 const DENTIST_ID = "google_calendar/bench/dentist";
 /** Walking minutes to each destination. The provider is synthetic; the timing rules are real. */
 const WALK_MINUTES: Readonly<Record<string, number>> = { [GYM_ID]: 20, [DENTIST_ID]: 35, home: 30 };
 const BUFFERS = resolveTravelHabits(null).buffers;
 const RESUMES_AT = "2026-12-01T05:00:00Z";
 
-type DentistVariant = "located" | "no_place" | "attendance_unknown" | "remote";
+/** `no_place`: the location cannot be placed on a map. `no_location`: no location, so no travel (decision D12). */
+type DentistVariant = "located" | "no_place" | "no_location";
 type GymVariant = "located" | "no_place" | "not_located";
 
 export type DepartureBenchState = Readonly<{
@@ -54,6 +58,8 @@ export type DepartureBenchState = Readonly<{
   /** Gym was marked Completed at this local time, after the routes were checked. */
   gymCompletedAt?: string;
   paused?: boolean;
+  /** Ticket 270: adds Call Mom (1:30 PM, no place), which the trip to Dentist crowds. */
+  crowded?: boolean;
   /** The model state this preset produces. Tests walk every preset. */
   expected: DepartureState;
 }>;
@@ -73,25 +79,25 @@ export const DEPARTURE_BENCH_STATES: readonly DepartureBenchState[] = [
     description: "Routes checked after the leave time. The route arrives after the planned arrival, so Cadence gives the late arrival." },
   { id: "late-clock", label: "Late: clock only", clock: "09:45", checked: "09:00", dentist: "located", gym: "located", expected: "late",
     description: "The route was on time, but the clock is 10 minutes past the leave time. Cadence cannot tell whether you left, so it says when you would arrive. The estimate is also old." },
+  { id: "upcoming-dentist", label: "Upcoming: a trip crowds a Behavior", clock: "12:30", checked: "12:30", crowded: true, dentist: "located", gym: "located", expected: "upcoming",
+    description: "Gym has ended, so the next trip goes from Home to Dentist, and Call Mom (1:30 PM, no place) falls inside it, so its collapsed row says so." },
   { id: "head-home", label: "During the event: head home", clock: "14:15", checked: "14:15", dentist: "located", gym: "located", expected: "head_home",
     description: "Dentist is under way. The next trip is the trip home." },
   { id: "trip-changed", label: "Trip changed after resolving a stop", clock: "10:58", checked: "10:56", gymCompletedAt: "10:57", dentist: "located", gym: "located", expected: "trip_changed",
     description: "Gym was marked Completed after the check, so the trip from Gym to Dentist no longer holds. Refresh travel routes it again from Home." },
   { id: "needs-place", label: "Needs a place", clock: "10:15", checked: "10:15", dentist: "no_place", gym: "located", expected: "needs_place",
-    description: "Dentist has no location, so no route can be found." },
-  { id: "needs-attendance", label: "Needs attendance", clock: "10:15", checked: "10:15", dentist: "attendance_unknown", gym: "located", expected: "needs_attendance",
-    description: "Dentist has a location and a video link, so Cadence cannot tell whether it is in person." },
+    description: "Dentist's location cannot be placed on a map, so no route can be found." },
   { id: "needs-origin", label: "Needs a start", clock: "10:05", checked: "09:50", dentist: "located", gym: "no_place", expected: "needs_origin",
     description: "Gym has no place this time, so the trip to Dentist has no known start. Checked before Gym began; Refresh travel would route it from Home." },
-  { id: "no-trips", label: "No trips", clock: "07:00", checked: "07:00", dentist: "remote", gym: "not_located", expected: "none",
-    description: "Dentist is remote and Gym has no place. No travel text appears." },
+  { id: "no-trips", label: "No trips", clock: "07:00", checked: "07:00", dentist: "no_location", gym: "not_located", expected: "none",
+    description: "Dentist has no location, so it is not travel, and Gym has no place. No travel text appears." },
   { id: "paused", label: "Paused", clock: "10:15", checked: "07:00", paused: true, dentist: "located", gym: "located", expected: "paused",
     description: "The monthly travel budget is used up. The last plan stays, and trips waiting for an estimate say when estimates resume." },
 ];
 
 const MODEL_STATE_WORDS: Readonly<Record<DepartureState, string>> = {
   upcoming: "Upcoming", soon: "Soon", leave_now: "Leave now", late: "Late", head_home: "Head home",
-  appears_later: "Appears later", needs_place: "Needs a place", needs_attendance: "Needs attendance",
+  appears_later: "Appears later", needs_place: "Needs a place",
   needs_origin: "Needs a start", time_unknown: "Time unknown", no_route: "No route", trip_changed: "Trip changed",
   estimate_expired: "Estimate expired", paused: "Paused", none: "No trips",
 };
@@ -115,23 +121,30 @@ function benchEvent(variant: DentistVariant): NormalizedExternalEvent {
     kind: "timed", id: DENTIST_ID, providerEventId: "dentist", logicalInstanceId: DENTIST_ID, calendarId: "bench", source: "google_calendar",
     calendarName: "Personal", sourceTimezone: TIMEZONE, sourceTimezoneFallback: "none", state: "confirmed", availability: "busy",
     currentUserResponse: "accepted", revision: { availability: "available", providerUpdatedAt: "2026-11-09T12:00:00Z", providerEtag: `bench-${variant}` },
-    title: "Dentist", description: "", location: variant === "no_place" ? "" : "Synthetic dental office", sourceUrl: "https://calendar.google.com/",
+    title: "Dentist", description: "", location: variant === "no_location" ? "" : variant === "no_place" ? "Synthetic office, unclear" : "Synthetic dental office", sourceUrl: "https://calendar.google.com/",
     fieldAvailability: {}, detailCompleteness: {}, organizer: null, attendees: null, attendeesOmitted: false,
-    conference: variant === "attendance_unknown" || variant === "remote"
+    conference: variant === "no_location"
       ? { name: "Synthetic Meet", notes: null, entryPoints: [{ type: "video", uri: "https://meet.example.com/bench", label: "Join video" }] } : null,
     recurrence: null, attachments: null,
     startAt: instantAt("14:00"), endAt: instantAt("15:00"), endUnspecified: false, duration: { kind: "known", seconds: 3600 },
   };
 }
 
-const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {};
+/** Ticket 270: Call Mom's default duration, so the trip to Dentist can crowd it. */
+const DURATIONS: Readonly<Record<string, BehaviorDurationEstimate>> = {
+  "bench-call-behavior": { kind: "known", seconds: 15 * 60, durationLabel: "15 min", sampleCount: 0, lookbackDays: 90, provenance: "behavior_default" },
+};
 
-function benchTimeline(gymStatus: "unresolved" | "completed") {
+function benchTimeline(gymStatus: "unresolved" | "completed", gym: GymVariant, crowded = false) {
   return resolveTimeline({ timezone: TIMEZONE, now: Temporal.Instant.from(instantAt("06:00")), futureDays: 0,
     occurrences: [{ id: GYM_ID, behaviorId: "bench-gym-behavior", title: "Gym", description: "Synthetic located Behavior.", categoryName: "Health",
       scheduleSummary: "Weekdays", scheduledFor: instantAt("10:00"), scheduledTimeLabel: "10:00 AM", scheduleKind: "range", scheduleEndTime: "11:00",
+      ...(gym === "located" ? { placeText: "Synthetic gym" } : {}),
       localDate: DATE, status: gymStatus, statusMarkedAt: gymStatus === "completed" ? instantAt("10:57") : null, note: "", canStartTimeTracking: false,
-      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }] });
+      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }, ...crowded ? [{ id: CALL_ID, behaviorId: "bench-call-behavior", title: "Call Mom", description: "Synthetic Behavior with no place.", categoryName: "Family",
+      scheduleSummary: "Weekly", scheduledFor: instantAt("13:30"), scheduledTimeLabel: "1:30 PM", scheduleKind: "exact" as const,
+      localDate: DATE, status: "unresolved" as const, statusMarkedAt: null, note: "", canStartTimeTracking: false,
+      timeTracking: { recordedSeconds: 0, runningStartedAt: null } }] : []] });
 }
 
 /** The provider rule for walking as shipped: arrive-by legs count back from the target, depart-at legs forward. */
@@ -157,8 +170,8 @@ function benchEvidence(scenario: Scenario, checked: string): Omit<TravelEvidence
   if (scenario.gym !== "not_located" && !gymResolvedBeforeCheck) commitments.push({ ref: GYM_ID, revision: "bench", kind: "behavior", attendance: "physical",
     startAt: instantAt("10:00"), endAt: instantAt("11:00"), mode: null,
     endpoint: scenario.gym === "located" ? { ref: GYM_ID, point: point("bench-gym"), source: "behavior", sourceRevision: "bench" } : null });
-  commitments.push({ ref: DENTIST_ID, revision: "bench", kind: "calendar",
-    attendance: scenario.dentist === "remote" ? "remote" : scenario.dentist === "attendance_unknown" ? "unknown" : "physical",
+  // Decision D12: the hosted route plans only Calendar events with a location, all in person.
+  if (scenario.dentist !== "no_location") commitments.push({ ref: DENTIST_ID, revision: "bench", kind: "calendar", attendance: "physical",
     startAt: instantAt("14:00"), endAt: instantAt("15:00"), mode: null,
     endpoint: scenario.dentist === "no_place" ? null : { ref: DENTIST_ID, point: point("bench-dentist"), source: "calendar", sourceRevision: "bench" } });
   const plan = resolveTravelPlan({ journeyRef: DATE, journeyRevision: "bench", grantRevision: "bench", now: checkedAt.toString(), defaultMode: "walking",
@@ -206,9 +219,16 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
   const [clock, setClock] = useState(initial.clock);
   const [checked, setChecked] = useState(initial.checked);
   const [development, setDevelopment] = useState(false);
+  // Ticket 273: an answer from a step changes Dentist until another preset is chosen. Links only say where they go.
+  const [dentistOverride, setDentistOverride] = useState<DentistVariant | null>(null);
+  const [stepNote, setStepNote] = useState("");
+  const [correctionRequest, setCorrectionRequest] = useState(0);
+  const [offerShown, setOfferShown] = useState(true);
   const preset = DEPARTURE_BENCH_STATES.find((state) => state.id === stateId) ?? initial;
   const choose = (id: string) => {
     const next = DEPARTURE_BENCH_STATES.find((state) => state.id === id) ?? initial;
+    setDentistOverride(null);
+    setStepNote("");
     setStateId(next.id);
     setClock(next.clock);
     setChecked(next.checked);
@@ -220,10 +240,12 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
     if (minutes < minutesOf(checked)) setChecked(next);
   };
 
-  const scenario: Scenario = useMemo(() => ({ dentist: preset.dentist, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
-    [preset.dentist, preset.gym, preset.gymCompletedAt]);
+  const dentistVariant = dentistOverride ?? preset.dentist;
+  const scenario: Scenario = useMemo(() => ({ dentist: dentistVariant, gym: preset.gym, gymCompletedAt: preset.gymCompletedAt ?? null }),
+    [dentistVariant, preset.gym, preset.gymCompletedAt]);
   const gymStatus = scenario.gymCompletedAt && minutesOf(clock) >= minutesOf(scenario.gymCompletedAt) ? "completed" as const : "unresolved" as const;
-  const timeline = useMemo(() => benchTimeline(gymStatus), [gymStatus]);
+  const crowded = preset.crowded ?? false;
+  const timeline = useMemo(() => benchTimeline(gymStatus, scenario.gym, crowded), [gymStatus, scenario.gym, crowded]);
   const event = useMemo(() => benchEvent(scenario.dentist), [scenario.dentist]);
   const events = useMemo(() => [event], [event]);
   const evidence = useMemo(() => benchEvidence(scenario, checked), [scenario, checked]);
@@ -247,6 +269,16 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
       durationEstimates: DURATIONS, timezone: TIMEZONE }),
     arrivalBufferSeconds: BUFFERS.arrivalSeconds, preparationSeconds: BUFFERS.preparationSeconds, pausedUntil: resumesAt });
   const refresh = resumesAt ? null : { onRefresh: status.refresh, pending: false };
+  // Ticket 273: a correction re-plans Dentist as the hosted route would, from the bench clock.
+  const correct = (correction: Pick<TravelCorrection, "locationText">) => {
+    if (correction.locationText) setDentistOverride("located");
+    setChecked(clock);
+  };
+  const steps: TravelStepActions = {
+    correction: (ref) => ref === DENTIST_ID ? () => setCorrectionRequest((count) => count + 1) : null,
+    behavior: (ref) => ref === GYM_ID ? { onOpen: () => setStepNote("Opens Behaviors, where Gym's place is changed.") } : null,
+    settings: { onOpen: () => setStepNote("Opens Travel settings: Home and device location.") },
+  };
   const context = departurePhraseContext(now, TIMEZONE);
   const briefTravel = useBriefTravel();
   const briefing = { text: "Gym this morning, Dentist at 2 PM.", localDate: DATE, timezone: TIMEZONE, generatedAt: instantAt("06:00"),
@@ -286,6 +318,7 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
             <option value="development">Development (shows text production never shows)</option>
           </select>
         </label>
+        <p className="text-xs leading-5 text-muted-readable sm:col-span-2" data-bench-marker-note>Next trip (Ticket 270, decision D13): a magenta span on the axis from the leave time to arrival, for the next trip only. A short magenta leader runs from the top of the span into the left rail, with the leave time at its end. Leave now, late and passed leave times use the line&apos;s own words instead of a past time.</p>
         <div className="grid gap-2 sm:col-span-2">
           <label htmlFor="departure-bench-clock" className="text-sm font-bold">Bench clock</label>
           <div className="flex flex-wrap items-center gap-3">
@@ -301,9 +334,10 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
           <dd data-departure-model-state={departure.state}>{MODEL_STATE_WORDS[departure.state]}{lateBasis}{freshness}</dd>
           <dt className="font-bold">Next-departure line</dt>
           <dd data-bench-model-line>{departure.phrase ?? "None: no travel text."}
-            <span className="block text-xs leading-5 text-muted-readable">From the departure model. No screen shows this line until Ticket 269. The drawer and dialog show the place, attendance and start steps from Ticket 273.</span></dd>
+            <span className="block text-xs leading-5 text-muted-readable">From the departure model. The Timeline shows it at the top, with the paused phrase beside a known time (Ticket 269). A place, start or Home step carries one action (Ticket 273).</span></dd>
           <dt className="font-bold">This state</dt>
           <dd>{preset.description}</dd>
+          {stepNote ? <><dt className="font-bold">Step action</dt><dd role="status" data-bench-step-note>{stepNote}</dd></> : null}
         </dl>
       </div>
     </section>
@@ -312,26 +346,34 @@ export function DepartureStatesBench({ initialStateId }: Readonly<{ initialState
       <p className="text-sm font-bold" data-bench-build={development ? "development" : "production"}>{development ? "Development build" : "Production build"}</p>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label="Timeline" className="grid min-w-0 content-start gap-2">
-          <h3 className="text-sm font-bold">Timeline: status line, markers and the expanded Gym row</h3>
+          <h3 className="text-sm font-bold">Timeline: next-departure line, next trip marker and the expanded Gym row</h3>
           <div ref={gymRow} className="min-w-0 border border-line bg-background">
             <DayProgressTimeline timeline={timeline}
               context={{ events, freshness: { state: "current", refreshedAt: checkedAt, label: "Calendar current", canAssertNoOverlap: true },
-                now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking" }}
+                now, durationEstimates: DURATIONS, travel: evidence, travelStatus: status, travelMode: "walking",
+                onTravelCorrection: correct, openTravelSettings: steps.settings && "onOpen" in steps.settings ? steps.settings.onOpen : undefined,
+                openBehavior: () => setStepNote("Opens Behaviors, where Gym's place is changed.") }}
               statusAction={idleAction} noteAction={idleAction} startTimeTrackingAction={idleAction} stopTimeTrackingAction={idleAction} resetTimeTrackingAction={idleAction} />
           </div>
         </section>
         <div className="grid min-w-0 content-start gap-8">
           <InlineSurface label="Dentist drawer">
             <ExternalEventPreview key={`${stateId}-${scenario.dentist}`} id="departure-bench-drawer" events={events} timezone={TIMEZONE}
-              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} />
+              onDismiss={() => undefined} onOpen={() => undefined} travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" steps={steps} />
           </InlineSurface>
           <InlineSurface label="Dentist Calendar details">
-            <ExternalEventDetails event={event} timezone={TIMEZONE} onClose={() => undefined} onDismissAllDay={() => undefined} onTravelCorrection={() => undefined}
-              travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" />
+            <ExternalEventDetails event={event} timezone={TIMEZONE} onClose={() => undefined} onDismissAllDay={() => undefined} onTravelCorrection={correct}
+              travel={travel} departure={departure} refresh={refresh} now={now} travelMode="walking" steps={steps} correctionRequest={correctionRequest} />
           </InlineSurface>
+          <section aria-label="Travel estimates off" className="grid min-w-0 content-start gap-2" data-bench-travel-off>
+            <h3 className="text-sm font-bold">Travel estimates off (Ticket 273)</h3>
+            <p className="text-xs leading-5 text-muted-readable">With Travel estimates off and Dentist ahead today, the Timeline offers this once. It opens Travel settings; consent stays with the Travel estimates toggle.</p>
+            {offerShown ? <TravelOffOffer label="Dentist" target={steps.settings!} onDismiss={() => setOfferShown(false)} className="text-sm leading-6" />
+              : <button type="button" className="text-link w-fit text-sm" onClick={() => setOfferShown(true)}>Show the offer again</button>}
+          </section>
           <section aria-label="Daily Brief" className="grid min-w-0 content-start gap-2">
             <h3 className="text-sm font-bold">Daily Brief</h3>
-            {briefTravel ? null : <p className="text-xs leading-5 text-muted-readable" data-bench-brief-note>No travel block: the brief shows travel only while an estimate is current.</p>}
+            {briefTravel?.items.length ? null : <p className="text-xs leading-5 text-muted-readable" data-bench-brief-note>No travel block: no trip has a time or a known return yet.</p>}
             <div className="pt-8"><DailyBriefBubble state="ready" briefing={briefing} travel={briefTravel} onDismiss={() => undefined} /></div>
           </section>
         </div>

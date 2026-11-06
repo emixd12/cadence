@@ -17,22 +17,25 @@ import {
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
-import { departureStops } from "@cadence/core/services/departure-stops";
+import { departureStops, firstLocatedStopAhead } from "@cadence/core/services/departure-stops";
 import type { DepartureModel } from "@cadence/core/types/departure";
-import { resolveDayProgressLayout } from "@cadence/core/resolvers/day-progress.resolver";
+import { DEPARTURE_REFRESH_LABEL, departureMarkerRailLines } from "@cadence/core/services/departure-phrases";
+import { nextTripCrowdsBehavior, resolveDayProgressLayout, resolveNextTripMarkInput } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
 import type {
   BehaviorDurationEstimate,
   ExternalEventFreshness,
   NormalizedExternalEvent,
+  DayProgressNextTripInput,
   TimelineOccurrenceContext,
 } from "@cadence/core/types/day-progress";
 
-import { ExternalEventDetails, ExternalEventPreview, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
+import { ExternalEventDetails, ExternalEventPreview, TravelNavigationLink, externalEventSourceName, renderTravelTiming, type TravelRefreshAction } from "./ExternalEventDetails";
 import { travelWeatherStateText } from "./TravelWeather";
 import { RecordedActivityList } from "./RecordedActivityList";
 import { TravelLeaveQuestion } from "./TravelLeaveQuestion";
 import { TravelModeChoice } from "./TravelModeChoice";
+import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
 import styles from "./day-progress-timeline.module.css";
@@ -53,6 +56,7 @@ import {
 import {
   resolveTravelHabits,
   resolveTravelLeavePrompt,
+  restoreTravelLeaveCandidates,
   routedOutboundCandidates,
   travelArrivalPhrase,
   travelLeaveSubjects,
@@ -81,6 +85,10 @@ export type DayProgressContext = Readonly<{
   recordedActivity?: HevyTimelineState | null;
   /** Ticket 238: status lines for calendar sources other than Google. */
   sourceMessages?: readonly string[];
+  /** Ticket 273 (Mac): opens Travel settings. Without it no step links there and Travel estimates are not offered. */
+  openTravelSettings?: () => void;
+  /** Ticket 273 (Mac): opens the Behaviors screen, where a Behavior's place is changed. */
+  openBehavior?: (behaviorId: string) => void;
 }>;
 
 type DayProgressTimelineProps = Readonly<{
@@ -98,9 +106,28 @@ type DayProgressTimelineProps = Readonly<{
   travelAccountId?: string | null;
 }>;
 
+/**
+ * Ticket 270 (D13, D14): a short magenta leader runs from the top of the next trip's span, at the
+ * leave time, perpendicular to the axis into the left rail. Its label sits at the leader's end:
+ * one line ("Leave 1:15") on wide layouts, one short word group per line on phones (D14).
+ */
+const LEADER_LENGTH = 14;
+const LEADER_LABEL_GAP = 2;
+/** The stacked label's column. A one-line label takes its own width. */
+const LEADER_LABEL_WIDTH = 32;
+const LEADER_LABEL_LINE = 16;
+/** A one-line label's width per character at 11px, rounded up, used only to decide whether it meets the Calendar markers. */
+const LEADER_LABEL_CHAR_WIDTH = 6;
+/** The current-time dot's radius plus its stroke and 1px of air: the leader starts here when the dot sits on it. */
+const CURRENT_TIME_CLEARANCE = 8;
+/** The most room the leader and its gap take from the axis, when the dot sits on the leave point. */
+const LEADER_REACH = CURRENT_TIME_CLEARANCE + LEADER_LENGTH + LEADER_LABEL_GAP;
+
 type MeasuredDay = Parameters<typeof resolveDayProgressLayout>[0]["days"][number] & Readonly<{
   axisX: number;
   iconX: number;
+  /** D14: the phone layout stacks the next trip's label, one word group per line. */
+  stackLabel: boolean;
 }>;
 
 type Preview = Readonly<{ ids: string[]; launcher: HTMLElement }>;
@@ -188,20 +215,20 @@ export function DayProgressTimeline({
   const invalidTravelMessage = routeEvidence && !travel ? "Travel changed. Refresh travel to update estimates." : null;
   const displayedTravelStatus = invalidTravelMessage && travelStatus
     ? { ...travelStatus, view: null, message: invalidTravelMessage, stale: true } : travelStatus;
-  // The bubble projects current evidence; Ticket 214 requests the day when a brief is generated.
-  const briefTravel = useMemo(() => {
-    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
-    return projectBriefTravelGuidance({
-      evidence: travel, localDate: timeline.todayLocalDate, now,
-      ...briefTravelSubjects(today?.occurrences ?? [], travelEvents),
-    });
-  }, [travel, travelEvents, now, timeline.daySections, timeline.todayLocalDate]);
-  useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
-  useEffect(() => () => publishBriefTravel(null), []);
 
   // Ticket 217: learned habits, the journey mode choice and the once-a-day leave-time question.
   const habitsClient = context ? context.travelSettingsClient ?? null : liveCalendar ? webTravelSettingsClient : null;
-  const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence));
+  // Ticket 273: with no travel evidence, a located event ahead today loads settings to learn whether estimates are off.
+  const offerStop = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return firstLocatedStopAhead({ events: travelEvents, occurrences: today?.occurrences ?? [], now,
+      localDate: timeline.todayLocalDate, timezone: timeline.timezone });
+  }, [travelEvents, timeline.daySections, timeline.todayLocalDate, timeline.timezone, now]);
+  const [offerDismissed, setOfferDismissed] = useState(() => typeof window !== "undefined" && travelOfferDismissed());
+  const offerTarget: TravelLinkTarget | null = context ? context.openTravelSettings ? { onOpen: context.openTravelSettings } : null : { href: "/settings#travel" };
+  const offerWanted = !!offerStop && !!offerTarget && !offerDismissed && !routeEvidence;
+  const travelHabits = useTravelHabits(habitsClient, Boolean(routeEvidence) || offerWanted);
+  const travelOffer = offerWanted && travelHabits.settings?.enabled === false ? offerStop : null;
   const usualTravelMode = context?.travelMode ?? liveTravel.view?.mode ?? null;
   // Ticket 261: one departure model for every travel line. Components only show its phrases.
   const habitsForModel = travelHabits.settings?.habits ?? null;
@@ -213,23 +240,68 @@ export function DayProgressTimeline({
       arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds,
       pausedUntil: travelStatus?.resumesAt ?? null });
   }, [travel, now, timeline.timezone, timeline.daySections, timeline.todayLocalDate, travelEvents, durations, habitsForModel, travelStatus?.resumesAt]);
+  // Ticket 272: the bubble reads the same departure model, so it keeps last estimates and late trips.
+  // Ticket 214 requests the day when a brief is generated.
+  const briefTravel = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return projectBriefTravelGuidance({
+      evidence: travel, departure, localDate: timeline.todayLocalDate, now, timezone: timeline.timezone,
+      ...briefTravelSubjects(today?.occurrences ?? [], travelEvents),
+    });
+  }, [travel, departure, travelEvents, now, timeline.daySections, timeline.todayLocalDate, timeline.timezone]);
+  useEffect(() => { publishBriefTravel(briefTravel); }, [briefTravel]);
+  useEffect(() => () => publishBriefTravel(null), []);
   const refreshTravel: TravelRefreshAction | null = travelStatus && !travelStatus.resumesAt
     ? { onRefresh: travelStatus.refresh, pending: travelStatus.pending } : null;
   const travelLabels = useMemo(() => new Map(departure.trips.length ? [...travelEvents.map((event) => [event.id, event.title || "Untitled event"] as const),
     ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.title] as const))] : []),
   [departure.trips.length, travelEvents, timeline.daySections]);
   const travelAccountKey = travelStatus?.view?.accountId ?? travelAccountId;
+  // Ticket 273: one action for each missing estimate. Corrections apply to this trip only, as INT-TRAVEL-003 does.
+  const travelCorrection = context?.onTravelCorrection ?? (liveTravel.view ? (correction: TravelCorrection) => {
+    setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
+  } : undefined);
+  const [correctionRequest, setCorrectionRequest] = useState<Readonly<{ eventId: string; count: number }>>({ eventId: "", count: 0 });
+  const stepActions: TravelStepActions = (() => {
+    const correctable = (ref: string) => {
+      const event = travelEvents.find((item) => item.id === ref);
+      return travelCorrection && event?.kind === "timed" && (event.revision.providerEtag || event.revision.providerUpdatedAt) ? event : null;
+    };
+    const occurrences = timeline.daySections.flatMap((section) => section.occurrences);
+    return {
+      correction: (ref) => {
+        const event = correctable(ref);
+        return event ? () => {
+          if (!detailEvent) drawerLauncher.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          setPreview(null);
+          setDetailEvent(event);
+          setCorrectionRequest((previous) => ({ eventId: event.id, count: previous.count + 1 }));
+        } : null;
+      },
+      behavior: (ref) => {
+        const behaviorId = occurrences.find((occurrence) => occurrence.id === ref)?.behaviorId;
+        if (!behaviorId) return null;
+        if (!context) return { href: `/behaviors?behavior=${encodeURIComponent(behaviorId)}` };
+        const open = context.openBehavior;
+        return open ? { onOpen: () => open(behaviorId) } : null;
+      },
+      settings: offerTarget,
+    };
+  })();
   const [, setLeaveDismissals] = useState(0);
   const [leaveConfirmation, setLeaveConfirmation] = useState<string | null>(null);
+  // Ticket 274: today's Calendar events and Behaviors as the current read; kept candidates take their titles from it.
+  const leaveSubjects = useMemo(() => {
+    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return travelLeaveSubjects({ localDate: timeline.todayLocalDate, evidence: travel, events: travelEvents, occurrences: today?.occurrences ?? [] });
+  }, [travel, travelEvents, timeline.daySections, timeline.todayLocalDate]);
   useEffect(() => {
     if (!travelAccountKey || !travel) return;
-    const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
-    rememberTravelLeaveCandidates(travelAccountKey, timeline.todayLocalDate, routedOutboundCandidates(travel, travelLeaveSubjects({
-      localDate: timeline.todayLocalDate, evidence: travel, events: travelEvents, occurrences: today?.occurrences ?? [] })));
-  }, [travel, travelAccountKey, travelEvents, timeline.daySections, timeline.todayLocalDate]);
+    rememberTravelLeaveCandidates(travelAccountKey, timeline.todayLocalDate, routedOutboundCandidates(travel, leaveSubjects));
+  }, [travel, travelAccountKey, leaveSubjects, timeline.todayLocalDate]);
   const leavePrompt = travelAccountKey && travelHabits.save && travelHabits.settings ? resolveTravelLeavePrompt({
     now, localDate: timeline.todayLocalDate, habits: travelHabits.settings.habits,
-    candidates: travelLeaveCandidates(travelAccountKey, timeline.todayLocalDate),
+    candidates: restoreTravelLeaveCandidates(travelLeaveCandidates(travelAccountKey, timeline.todayLocalDate), leaveSubjects),
     dismissed: travelLeaveQuestionDismissed(travelAccountKey, timeline.todayLocalDate),
   }) : null;
   const answerLeaveTime = async (answer: TravelLeaveAnswer) => {
@@ -241,9 +313,24 @@ export function DayProgressTimeline({
     return confirmation;
   };
 
+  // Ticket 270 (D2, D13): the next trip alone gets a span, a leader and a label without hovering.
+  const nextTrip = useMemo(() => resolveNextTripMarkInput(departure.next), [departure.next]);
+  const nextTripWords = useMemo(() => nextTrip && departure.next ? departureMarkerRailLines(departure.next, timeline.timezone) : null,
+    [nextTrip, departure.next, timeline.timezone]);
+  // D14: one line on wide layouts, the stack on phones. A one-line label that would cross the
+  // Timeline's left edge also stacks, so it is never clipped.
+  const [overflowingLabel, setOverflowingLabel] = useState<string | null>(null);
+  const railDay = visibleSections.map((section) => measured[section.localDate]).find(Boolean);
+  const nextTripLine = nextTripWords?.join(" ") ?? null;
+  const nextTripLabel = useMemo(() => !nextTripWords ? null
+    : railDay?.stackLabel || overflowingLabel === nextTripLine ? nextTripWords : [nextTripLine!],
+  [nextTripWords, nextTripLine, railDay?.stackLabel, overflowingLabel]);
+  const nextTripLabelHeight = (nextTripLabel?.length ?? 2) * LEADER_LABEL_LINE;
+  const nextTripLabelWidth = nextTripLabel?.length === 1 ? nextTripLabel[0]!.length * LEADER_LABEL_CHAR_WIDTH : LEADER_LABEL_WIDTH;
   const layout = useMemo(() => {
     const days = visibleSections.flatMap((section) => measured[section.localDate] ? [measured[section.localDate]!] : []);
     if (days.length !== visibleSections.length) return null;
+    const first = days[0];
     return resolveDayProgressLayout({
       timezone: timeline.timezone,
       firstVisibleDate: visibleSections[0]?.localDate,
@@ -253,8 +340,12 @@ export function DayProgressTimeline({
       now: Temporal.Instant.from(now),
       minIconSpacing: 44,
       maxIconLanes: 1,
+      nextTrip,
+      // The label clears the Calendar markers when both sit in the same part of the rail (narrow layouts).
+      nextTripLabel: { height: nextTripLabelHeight,
+        avoidIcons: !!first && first.axisX - LEADER_REACH - nextTripLabelWidth < first.iconX + 22 },
     });
-  }, [travel, events, measured, now, timeline.timezone, visibleSections]);
+  }, [travel, events, measured, now, timeline.timezone, visibleSections, nextTrip, nextTripLabelHeight, nextTripLabelWidth]);
 
   const activeIds = preview?.ids ?? EMPTY_IDS;
   const previewEvents = useMemo(() => activeIds.flatMap((id) => {
@@ -345,7 +436,10 @@ export function DayProgressTimeline({
       {firstMeasured ? <div className={styles.spine} style={{ left: firstMeasured.axisX }} aria-hidden="true" /> : null}
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
-      <TravelStatusLine status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} timezone={timeline.timezone} hasTrips={departure.trips.length > 0} />
+      <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel}
+        steps={stepActions} />
+      {travelOffer && offerTarget ? <TravelOffOffer label={travelOffer.label} target={offerTarget} className={styles.calendarState}
+        onDismiss={() => { dismissTravelOffer(); setOfferDismissed(true); }} /> : null}
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
         onDismiss={() => { if (travelAccountKey) dismissTravelLeaveQuestion(travelAccountKey, timeline.todayLocalDate); setLeaveDismissals((count) => count + 1); }} />
         : leaveConfirmation ? <p className={styles.calendarState} role="status">{leaveConfirmation}</p> : null}
@@ -356,6 +450,8 @@ export function DayProgressTimeline({
         activeIds={activeIds}
         previewId={preview ? "calendar-preview" : undefined}
         onPreview={openPreview}
+        nextTripLabel={nextTripLabel}
+        onLabelOverflow={setOverflowingLabel}
       /> : null}
       {visibleSections.map((section) => <DayProgressDay
         key={section.key}
@@ -369,12 +465,15 @@ export function DayProgressTimeline({
         travel={travel}
         departure={departure}
         refresh={refreshTravel}
+        steps={stepActions}
         now={now}
         travelHabits={travelHabits}
         usualTravelMode={usualTravelMode}
+        navigationPreference={context?.navigationPreference}
         timezone={timeline.timezone}
         onOpenExternal={onOpenExternal}
         contexts={resolveContexts(section, events, fresh, now, context?.durationEstimates ?? timeline.durationEstimates, travel, travelLabels, timeline.timezone, departure)}
+        nextTrip={nextTrip}
         shortcutsByBehavior={shortcutsByBehavior}
         onMeasure={measureDays}
         registerMeasurement={registerMeasurement}
@@ -396,6 +495,10 @@ export function DayProgressTimeline({
         departure={departure}
         refresh={refreshTravel}
         now={now}
+        navigationPreference={context?.navigationPreference}
+        travelMode={usualTravelMode}
+        onOpenExternal={onOpenExternal}
+        steps={stepActions}
       /> : null}
       <ExternalEventDetails
         event={detailEvent}
@@ -409,13 +512,13 @@ export function DayProgressTimeline({
         travel={travel}
         navigationPreference={context?.navigationPreference}
         travelMode={context?.travelMode ?? liveTravel.view?.mode}
-        onTravelCorrection={context?.onTravelCorrection ?? (liveTravel.view ? (correction) => {
-          setCorrections((previous) => [...previous.filter((item) => item.eventId !== correction.eventId).slice(-7), correction]);
-        } : undefined)}
+        onTravelCorrection={travelCorrection}
         travelHabits={travelHabits}
         departure={departure}
         refresh={refreshTravel}
         now={now}
+        steps={stepActions}
+        correctionRequest={correctionRequest.eventId === detailEvent?.id ? correctionRequest.count : 0}
       />
       {layout?.days.some((day) => day.movingDot) ? <p className="sr-only">Current time position updates while this timeline is visible.</p> : null}
     </div>
@@ -434,14 +537,17 @@ type DayProgressDayProps = Omit<DayProgressTimelineProps, "timeline" | "context"
   travel?: Omit<TravelEvidenceResult, "modelProjection"> | null;
   departure: DepartureModel;
   refresh: TravelRefreshAction | null;
+  steps: TravelStepActions;
   now: string;
   travelHabits?: TravelHabitsState | null;
   usualTravelMode?: TravelMode | null;
+  navigationPreference?: TravelNavigationPreference | null;
   timezone: string;
   onMeasure: () => void;
   registerMeasurement: (date: string, measure: () => MeasuredDay) => () => void;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
   onRestoreAllDay: () => void;
+  nextTrip: DayProgressNextTripInput | null;
 }>;
 
 function DayProgressDay({
@@ -456,15 +562,18 @@ function DayProgressDay({
   travel,
   departure,
   refresh,
+  steps,
   now,
   travelHabits,
   usualTravelMode,
+  navigationPreference,
   timezone,
   onOpenExternal,
   onMeasure,
   registerMeasurement,
   onPreview,
   onRestoreAllDay,
+  nextTrip,
   statusAction,
   noteAction,
   startTimeTrackingAction,
@@ -525,6 +634,7 @@ function DayProgressDay({
         rows: measuredRows,
         axisX,
         iconX,
+        stackLabel: style.getPropertyValue("--next-trip-label-stack").trim() === "1",
       };
     };
     if (typeof ResizeObserver === "undefined") return;
@@ -574,6 +684,7 @@ function DayProgressDay({
           {section.occurrences.length === 0 ? <p className="bg-surface p-3 text-base leading-7 text-muted-readable">{section.emptyMessage}</p> : <div className="grid gap-1">
             {section.occurrences.map((occurrence) => {
               const highlighted = contexts.get(occurrence.id)?.overlappingEventIds.some((id) => activeIds.includes(id));
+              const context = contexts.get(occurrence.id);
               return <div
                 key={occurrence.id}
                 ref={(node) => { if (node) rows.current.set(occurrence.id, node); else rows.current.delete(occurrence.id); }}
@@ -584,8 +695,8 @@ function DayProgressDay({
               >
                 <OccurrenceRow
                   occurrence={occurrence}
-                  context={contexts.get(occurrence.id)}
-                  travelDetails={travelDetails({ occurrenceId: occurrence.id, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, onOpenExternal, refresh })}
+                  context={context}
+                  travelDetails={travelDetails({ occurrenceId: occurrence.id, placeText: occurrence.placeText, travel, departure, now, timezone, habits: travelHabits, usualMode: usualTravelMode, navigationPreference, onOpenExternal, refresh, steps })}
                   statusAction={statusAction}
                   noteAction={noteAction}
                   startTimeTrackingAction={startTimeTrackingAction}
@@ -593,6 +704,7 @@ function DayProgressDay({
                   resetTimeTrackingAction={resetTimeTrackingAction}
                   shortcuts={shortcutsByBehavior?.[occurrence.behaviorId]}
                   statusIconsOnly={iconsOnly[occurrence.id] ?? false}
+                  crowdedLine={context && nextTripCrowdsBehavior(context, nextTrip) ? context.overlapLabel : null}
                 />
               </div>;
             })}
@@ -610,6 +722,8 @@ function DayOverlay({
   activeIds,
   previewId,
   onPreview,
+  nextTripLabel,
+  onLabelOverflow,
 }: Readonly<{
   layout: ReturnType<typeof resolveDayProgressLayout>;
   measured: Readonly<Record<string, MeasuredDay>>;
@@ -617,17 +731,33 @@ function DayOverlay({
   activeIds: readonly string[];
   previewId?: string;
   onPreview: (ids: string[], launcher: HTMLElement) => void;
+  nextTripLabel: readonly string[] | null;
+  /** D14: a one-line label that crosses the Timeline's left edge reports its text, so it stacks instead. */
+  onLabelOverflow: (line: string) => void;
 }>) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const label = labelRef.current;
+    const overlay = overlayRef.current;
+    if (!label || !overlay || nextTripLabel?.length !== 1) return;
+    if (label.getBoundingClientRect().left < overlay.getBoundingClientRect().left - 0.5) onLabelOverflow(nextTripLabel[0]!);
+  });
   const controls = layout.days.flatMap((day) => [
     ...day.timedEventSpans.filter((span) => span.iconLane !== null && !span.overflowGroupId).map((span) => ({ id: span.eventId, position: span.iconPosition, eventIds: [span.eventId], count: 1, iconX: 0, axisX: 0 })),
     ...day.iconOverflowGroups.map((group) => ({ id: group.id, position: group.position, eventIds: group.eventIds, count: group.count, iconX: 0, axisX: 0 })),
   ].map((control) => ({ ...control, iconX: measured[day.localDate]!.iconX, axisX: measured[day.localDate]!.axisX })));
   return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden={false}>
+    <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden={false}>
       <svg className="absolute inset-0 h-full w-full overflow-visible text-muted-readable" aria-hidden="true">
         {controls.map((control) => <line key={control.id} data-calendar-stem={control.id} x1={control.iconX} x2={control.axisX} y1={control.position} y2={control.position} stroke="currentColor" />)}
         {layout.days.flatMap((day) => day.timedEventSpans.filter((span) => activeIds.includes(span.eventId) && span.endPosition !== null).map((span) => <line key={`${day.localDate}-${span.eventId}`} data-event-duration={span.eventId} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={span.continuesBefore && span.iconLane === null && !span.overflowGroupId ? day.top : span.iconPosition} y2={span.continuesAfter ? day.bottom : Math.min(day.bottom, span.iconPosition + Math.max(2, span.endPosition! - span.startPosition))} stroke="var(--calendar-overlap)" strokeWidth={1} />))}
         {layout.days.flatMap((day) => day.travelSpans.filter((span) => span.sourceRefs.some((ref) => activeIds.includes(ref))).map((span) => <line key={`${day.localDate}-${span.segmentId}`} data-travel-duration={span.segmentId} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={span.startPosition} y2={span.endPosition} stroke="var(--calendar-overlap)" strokeWidth={1} />))}
+        {/* Ticket 270 (D2, D13): the next trip's span, from the leave time, and its leader show without hovering, under the current-time dot. */}
+        {layout.days.flatMap((day) => day.nextTrip ? [<line key={`next-trip-${day.localDate}`} data-next-trip-span={day.nextTrip.key} x1={measured[day.localDate]!.axisX + 0.5} x2={measured[day.localDate]!.axisX + 0.5} y1={day.nextTrip.startPosition} y2={day.nextTrip.endPosition} stroke="var(--calendar-overlap)" strokeWidth={1} />] : [])}
+        {nextTripLabel ? layout.days.flatMap((day) => day.nextTrip?.leavePosition != null && day.nextTrip.labelPosition != null
+          ? [<path key={`next-trip-leader-${day.localDate}`} data-next-trip-leader={day.nextTrip.key} fill="none" stroke="var(--calendar-overlap)" strokeWidth={1}
+            d={leaderPath(measured[day.localDate]!.axisX, day.nextTrip.leavePosition, day.nextTrip.labelPosition, nextTripLabel.length * LEADER_LABEL_LINE, day.movingDot?.displayPosition ?? null)} />] : []) : null}
         {layout.days.flatMap((day) => day.movingDot ? [<circle key={day.localDate} className={styles.currentTime} data-current-time-marker cx={measured[day.localDate]!.axisX} cy={day.movingDot.displayPosition} r={5} fill="var(--primary)" stroke="var(--background)" strokeWidth={2} />] : [])}
       </svg>
       {controls.map((control) => {
@@ -642,8 +772,37 @@ function DayOverlay({
             : <CalendarDays size={16} aria-hidden="true" />}
           {control.count > 1 ? <span className={styles.countBadge}>×{control.count}</span> : null}</span></button>;
       })}
+      {/* Ticket 270 (D13, D14): the leader's label. Decorative: the next-departure line already says it. */}
+      {nextTripLabel ? layout.days.flatMap((day) => day.nextTrip?.leavePosition != null && day.nextTrip.labelPosition != null ? [<span key={`next-trip-label-${day.localDate}`} ref={labelRef} aria-hidden="true" data-next-trip-label={day.nextTrip.key}
+        data-label-lines={nextTripLabel.length}
+        className={styles.leaderLabel} style={{ right: `calc(100% - ${leaderEnd(measured[day.localDate]!.axisX, day.nextTrip.leavePosition, day.movingDot?.displayPosition ?? null) - LEADER_LABEL_GAP}px)`, top: day.nextTrip.labelPosition, width: nextTripLabel.length > 1 ? LEADER_LABEL_WIDTH : undefined, height: nextTripLabel.length * LEADER_LABEL_LINE }}>
+        {nextTripLabel.map((words, index) => <span key={index} className="block">{index ? ` ${words}` : words}</span>)}</span>] : []) : null}
     </div>
   );
+}
+
+/** The leader's start: the axis, or clear of the current-time dot when the dot sits on the leave point. */
+function leaderStart(axisX: number, leave: number, dot: number | null): number {
+  return dot !== null && Math.abs(dot - leave) < CURRENT_TIME_CLEARANCE ? axisX - CURRENT_TIME_CLEARANCE : axisX;
+}
+
+/** D14: the leader keeps its full length past the dot, so it never reads as a hyphen. */
+function leaderEnd(axisX: number, leave: number, dot: number | null): number {
+  return leaderStart(axisX, leave, dot) - LEADER_LENGTH;
+}
+
+/**
+ * Ticket 270 (D13, D14): the leader, perpendicular to the axis at the leave time. It starts clear
+ * of the current-time dot when the dot sits on it and keeps its full length. When a Calendar
+ * marker pushed the label off the leader's line, a short vertical segment at the leader's end
+ * reaches the label's nearest edge.
+ */
+function leaderPath(axisX: number, leave: number, label: number, labelHeight: number, dot: number | null): string {
+  const start = leaderStart(axisX, leave, dot);
+  const end = leaderEnd(axisX, leave, dot);
+  const reach = labelHeight / 2 - 4;
+  const elbow = Math.abs(label - leave) <= reach ? "" : ` V ${label + (label < leave ? reach : -reach)}`;
+  return `M ${start} ${leave} H ${end}${elbow}`;
 }
 
 function resolveContexts(
@@ -678,7 +837,7 @@ function resolveContexts(
 }
 
 function sameDay(left: MeasuredDay | undefined, right: MeasuredDay): boolean {
-  return !!left && left.top === right.top && left.bottom === right.bottom && left.axisX === right.axisX && left.iconX === right.iconX && left.rows.length === right.rows.length && left.rows.every((row, index) => row.occurrenceId === right.rows[index]?.occurrenceId && row.center === right.rows[index]?.center && row.scheduledFor === right.rows[index]?.scheduledFor);
+  return !!left && left.top === right.top && left.bottom === right.bottom && left.axisX === right.axisX && left.iconX === right.iconX && left.stackLabel === right.stackLabel && left.rows.length === right.rows.length && left.rows.every((row, index) => row.occurrenceId === right.rows[index]?.occurrenceId && row.center === right.rows[index]?.center && row.scheduledFor === right.rows[index]?.scheduledFor);
 }
 
 function sameIconState(left: Record<string, boolean>, right: Record<string, boolean>): boolean {
@@ -739,53 +898,116 @@ function calendarFreshnessLabel(freshness: ExternalEventFreshness, timezone: str
   }
 }
 
-/** A located Behavior's travel timing and, for a journey to a place, its mode choice (Ticket 217). */
-function travelDetails({ occurrenceId, travel, departure, now, timezone, habits, usualMode, onOpenExternal, refresh }: Readonly<{
-  occurrenceId: string; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
+/**
+ * A located Behavior's travel timing, its Maps link (Ticket 271) and, for a journey to a place, its
+ * mode choice (Ticket 217). The link carries only the Behavior's own place text.
+ */
+function travelDetails({ occurrenceId, placeText, travel, departure, now, timezone, habits, usualMode, navigationPreference, onOpenExternal, refresh, steps }: Readonly<{
+  occurrenceId: string; placeText: string | undefined; travel: Omit<TravelEvidenceResult, "modelProjection"> | null | undefined; departure: DepartureModel; now: string;
   timezone: string; habits: TravelHabitsState | null | undefined; usualMode: TravelMode | null | undefined;
-  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null;
+  navigationPreference: TravelNavigationPreference | null | undefined;
+  onOpenExternal?: (url: string) => void | Promise<void>; refresh: TravelRefreshAction | null; steps: TravelStepActions;
 }>) {
-  const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh });
-  return timing ? <>{timing}<TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></> : null;
+  const timing = renderTravelTiming({ eventId: occurrenceId, travel, departure, now, timezone, onOpenExternal, refresh, steps });
+  if (!timing) return null;
+  return <>{timing}
+    <TravelNavigationLink locationText={placeText} preference={navigationPreference} usualMode={usualMode}
+      travel={travel} stopRef={occurrenceId} source="behavior" onOpenExternal={onOpenExternal} />
+    <TravelModeChoice eventId={occurrenceId} travel={travel} habits={habits} usualMode={usualMode} /></>;
 }
 
 /**
- * One status line for travel: observation time or failure copy, plus a manual refresh link.
- * Ticket 261: no line on a day with no trips unless there is a message to give. Production
- * builds show the plain unavailable message in place of the provider-review text.
+ * Ticket 269: the next-departure line. It answers "when do I leave next?" with the departure
+ * model's line phrase for the next trip, and replaces "Travel as of". Below it, at most one short
+ * status note: unavailable, development-only provider review, or the weather state. A day with
+ * no trips shows nothing. Web and Mac share this component.
  */
-export function TravelStatusLine({ status, message, timezone, hasTrips = true }: Readonly<{ status: TravelState | null; message?: string | null; timezone: string; hasTrips?: boolean }>) {
-  const developmentBuild = useDevelopmentBuild();
-  // The provider-review text is for development builds. Swap it before the line is composed,
-  // so no composed line can carry it into production.
-  const productionMessage = (value: string | null) => !developmentBuild && value === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : value;
-  const shown = status && status.message !== productionMessage(status.message) ? { ...status, message: productionMessage(status.message) } : status;
-  const text = travelStatusText(shown, productionMessage(message ?? null), timezone, { hasTrips });
-  if (!text) return null;
-  const showRefresh = !!status && !status.resumesAt && (!!status.view?.evidence || (!!status.message && status.message !== TRAVEL_CLEARANCE_MESSAGE));
-  return (
-    <p className={styles.calendarState} role="status">
-      {text}
-      {showRefresh ? <>{" "}<button type="button" className="text-link" disabled={status.pending} onClick={status.refresh}>Refresh travel</button></> : null}
-    </p>
-  );
+export type TravelStatusLines = Readonly<{
+  /** The next trip's line phrase, with the paused phrase beside a known time. Null: no line. */
+  line: string | null;
+  /** "lead": the phrase starts with Refresh travel and those words are the button (R1). "end": a button after the line. */
+  lineRefresh: "lead" | "end" | null;
+  /** One status message or the weather state. Null: none. */
+  note: string | null;
+  noteRefresh: boolean;
+  /**
+   * Changes only when the next trip's state, key, freshness or action, the pause or the note
+   * changes. Never on a countdown minute.
+   */
+  signature: string;
+}>;
+
+const NO_STATUS_LINES: TravelStatusLines = { line: null, lineRefresh: null, note: null, noteRefresh: false, signature: "none" };
+
+export function travelStatusLines({ departure, status, message = null, hasEvidence, developmentBuild }: Readonly<{
+  departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean; developmentBuild: boolean;
+}>): TravelStatusLines {
+  // Evidence with no trips: nothing to time, so nothing to say (G9).
+  if (!departure.phrase && hasEvidence) return NO_STATUS_LINES;
+  const next = departure.next;
+  // D11: the paused line appears beside a known time only when the budget is used up.
+  const line = departure.phrase && next && next.state !== "paused" && departure.pausedPhrase
+    ? `${departure.phrase} ${departure.pausedPhrase}` : departure.phrase;
+  const canRefresh = !!status && !status.resumesAt;
+  const lineRefresh = !line || !canRefresh ? null
+    : line.startsWith(DEPARTURE_REFRESH_LABEL) ? "lead" : next?.action === "refresh" ? "end" : null;
+  // The provider-review text is for development builds. Swap it before the note is composed.
+  const raw = status ? status.message : message;
+  const shown = !developmentBuild && raw === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : raw;
+  // Ticket 218: say plainly when no weather margin could be added. A message comes first.
+  const note = shown ?? (line ? travelWeatherStateText(status?.view?.evidence?.weather?.state) : null);
+  const noteRefresh = !!shown && canRefresh && raw !== TRAVEL_CLEARANCE_MESSAGE && lineRefresh === null;
+  // Freshness and action change once per expiry or refresh, so a refreshed "Last estimate" line is spoken.
+  const signature = [next?.state ?? departure.state, next?.key ?? "", next?.freshness ?? "", next?.action ?? "",
+    departure.resumesAt ?? "", note ?? ""].join("|");
+  return { line, lineRefresh, note, noteRefresh, signature };
 }
 
-export function travelStatusText(status: TravelState | null, fallbackMessage: string | null, timezone: string,
-  { hasTrips = true }: Readonly<{ hasTrips?: boolean }> = {}): string | null {
-  if (!status) return fallbackMessage;
-  const resumes = status.resumesAt
-    ? `Travel estimates resume on ${Temporal.Instant.from(status.resumesAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { month: "long", day: "numeric" })}.`
-    : null;
-  const message = resumes ?? status.message;
-  // A day with no trips has nothing to time, so only a message can be said.
-  if (status.view?.evidence && status.observedAt && hasTrips) {
-    const time = Temporal.Instant.from(status.observedAt).toZonedDateTimeISO(timezone).toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
-    const prefix = status.stale ? `Travel estimates from ${time} may be stale.` : `Travel as of ${time}`;
-    const text = message ? `${prefix} ${message}` : prefix;
-    // Ticket 218: say plainly when no weather margin could be added.
-    const weather = travelWeatherStateText(status.view.evidence.weather?.state);
-    return weather ? `${text.endsWith(".") ? text : `${text}.`} ${weather}` : text;
-  }
-  return message;
+const TIMED_DEPARTURE_STATES: ReadonlySet<string> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
+
+export function TravelStatusLine({ departure, status, message = null, hasEvidence, steps = null }: Readonly<{
+  departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean;
+  /** Ticket 273: the one action for a missing estimate. */
+  steps?: TravelStepActions | null;
+}>) {
+  const developmentBuild = useDevelopmentBuild();
+  const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild });
+  const announcement = [lines.line, lines.note].filter(Boolean).join(" ");
+  // The polite region speaks only when the signature changes, so a countdown minute is silent.
+  const [announced, setAnnounced] = useState({ signature: lines.signature, text: "" });
+  if (announced.signature !== lines.signature) setAnnounced({ signature: lines.signature, text: announcement });
+  // A refresh that removes its own button would drop keyboard focus to the page. Keep it on the line.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLParagraphElement>(null);
+  const refreshedFromButton = useRef(false);
+  const hasButton = !!status && (lines.lineRefresh !== null || lines.noteRefresh);
+  const pending = status?.pending ?? false;
+  useEffect(() => {
+    if (!refreshedFromButton.current) return;
+    if (hasButton) { if (!pending) refreshedFromButton.current = false; return; }
+    refreshedFromButton.current = false;
+    const active = document.activeElement;
+    if (!active || active === document.body || !containerRef.current?.contains(active)) lineRef.current?.focus();
+  }, [hasButton, pending]);
+  const refreshButton = (label: string) => status
+    ? <button type="button" className="text-link" disabled={status.pending} onClick={() => { refreshedFromButton.current = true; status.refresh(); }}>{label}</button> : label;
+  const nextState = departure.next?.state ?? departure.state;
+  return (
+    <div ref={containerRef} className={styles.travelStatus} data-travel-status data-travel-focus tabIndex={-1}>
+      {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState}
+        data-departure-timed={TIMED_DEPARTURE_STATES.has(nextState) ? "true" : undefined}>
+        {lines.lineRefresh === "lead"
+          ? <>{refreshButton(DEPARTURE_REFRESH_LABEL)}{lines.line.slice(DEPARTURE_REFRESH_LABEL.length)}</>
+          : steps && departure.next && isTravelStep(departure.next)
+            ? <TravelStepText key={`${departure.next.key}|${departure.next.state}`} trip={departure.next} text={lines.line} actions={steps} />
+            : lines.line}
+        {lines.lineRefresh === "end" ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
+      </p> : null}
+      {lines.note ? <p className={styles.calendarState} data-travel-note>
+        {lines.note}
+        {lines.noteRefresh ? <>{" "}{refreshButton(DEPARTURE_REFRESH_LABEL)}</> : null}
+      </p> : null}
+      <span className="sr-only" role="status" aria-live="polite" data-departure-announcement>{announced.text}</span>
+    </div>
+  );
 }

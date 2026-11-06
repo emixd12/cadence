@@ -461,8 +461,8 @@ Future offline/PWA work is tracked in `/docs/FUTURE_UPDATES.md`.
   Tickets 233–241
 - Travel advisory revamp under Tickets 263–285: last estimates and per-trip refresh,
   next-trip marks without hovering, opt-in leave reminders with Cadence closed,
-  remembered places and attendance, tomorrow's first trip, and Outlook and iCloud event
-  locations read for routing
+  remembered places (decision D12 drops attendance), tomorrow's first trip, and Outlook and
+  iCloud event locations read for routing
 
 ## Day-progress timeline and gated Calendar context (Tickets 132–137)
 
@@ -647,7 +647,8 @@ recalculate affected legs when those inputs change. Never insert a return to bas
 between successive events automatically. See `plans/travel-departure-discovery.md`
 for precedence and consent.
 
-Departure, attendance, onward travel and return define derived occupied time.
+Departure, attendance, onward travel and return define derived occupied time. Decision D12:
+a Calendar event with a location is attended in person; one without a location is not travel.
 For example, a 2:30–4:30 event may occupy 1:30–6:30. Timeline collisions and advisor
 findings use all known outbound and event-to-event intervals, plus return travel
 when known. Unknown return timing never removes known occupancy or collisions,
@@ -692,9 +693,9 @@ these rules are not yet shipped unless the ticket says so.
   update only if the leave time moves 10 minutes or more earlier. On web a
   hosted job acts as the user with no session, under Row Level Security, starting from Home
   or the previous stop. On Mac a native scheduled notification uses the last estimate and
-  names its estimate time. A moved, cancelled, declined or remote event, or a resolved
+  names its estimate time. A moved, cancelled or declined event, an event without a location (decision D12), or a resolved
   Occurrence, sends no reminder.
-- Wider coverage (decision D4): remembered places and attendance, tomorrow's first trip,
+- Wider coverage (decision D4): remembered places, tomorrow's first trip,
   and Outlook and iCloud events read for their location.
 - What stays banned: storing device positions, route durations or Google event details on
   the server (Ticket 216's user-recorded place markers stay the one stored device

@@ -88,7 +88,7 @@ export function DailyBriefBubble({
             {travelToday?.items.length ? <div className="mt-3 border-t border-line pt-2">
               <p className="text-xs font-bold text-muted-readable">Travel</p>
               <ul className="text-sm leading-6">
-                {travelToday.items.map((item, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">{travelLine(item, briefing.timezone, developmentBuild)}</li>)}
+                {travelToday.items.map((item, index) => <li key={index} className="break-words [overflow-wrap:anywhere]">{travelLine(item, developmentBuild)}</li>)}
               </ul>
               <p className="text-xs leading-5 text-muted-readable">{departureBriefFooterPhrase(travelToday.attribution, travelToday.observedAt, departurePhraseContext(travelToday.observedAt, briefing.timezone))}</p>
               {weatherShown && travelToday.weather?.attribution ? <div className="text-xs leading-5 text-muted-readable"><TravelWeatherCredit attribution={travelToday.weather.attribution} /></div> : null}
@@ -120,15 +120,7 @@ function NamedText({ text, names }: Readonly<{ text: string; names: readonly str
     : <Fragment key={index}>{segment.text}</Fragment>)}</>;
 }
 
-function travelLine(item: BriefTravelGuidanceItem, timezone: string, developmentBuild: boolean): string {
-  switch (item.kind) {
-    case "overlap": return `Travel to ${item.travelLabel} overlaps ${item.behaviorLabel}.`;
-    case "departure": {
-      const line = `Leave by ${formatBriefingTime(item.at, timezone)} for ${item.label} (${item.mode}).`;
-      // The mode advice shows in development builds only (Ticket 260).
-      return item.weather ? `${line} ${travelWeatherMarginText(item.weather, { developmentBuild })}` : line;
-    }
-    case "return": return `Back around ${formatBriefingTime(item.at, timezone)}.`;
-    case "return_unknown": return "Return time is unknown.";
-  }
+/** Ticket 272: the departure model's sentence. The mode advice shows in development builds only (Ticket 260). */
+function travelLine(item: BriefTravelGuidanceItem, developmentBuild: boolean): string {
+  return item.weather ? `${item.phrase} ${travelWeatherMarginText(item.weather, { developmentBuild })}` : item.phrase;
 }

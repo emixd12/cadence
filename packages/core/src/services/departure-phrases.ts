@@ -24,16 +24,26 @@ const PRIOR_STOP_FALLBACK = "your last stop";
 const TRIP_HOME = "the trip home";
 
 export const DEPARTURE_REFRESH_LABEL = "Refresh travel";
+/** Ticket 271: the one short control that opens the destination correction. Approved under D13. */
+export const TRAVEL_CORRECTION_TOGGLE = "Change for this trip";
 /** The overlap label when the trip home has no known time. */
 export const RETURN_TIME_UNKNOWN = "Return time unknown.";
+/** Ticket 273: dismisses the line offering Travel estimates. The leave-time question uses the same words. Approved under D13. */
+export const TRAVEL_OFF_DISMISS = "Not now";
+/** Ticket 273: the first-run Home and travel row once both are saved but Travel estimates is off. Approved under D13. */
+export const SETUP_TRAVEL_ESTIMATES_OFF = "Estimates off";
+/** Ticket 273: in a step phrase, the words before these are the step's own action (as owner change R1 does for Refresh travel). */
+const DEPARTURE_STEP_SUFFIXES = [" to get a leave time", " to estimate"] as const;
 
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
+/** Decisions D13 and D14: the owner approved the wording each lists on this date. */
+export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -167,14 +177,10 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "The event or Behavior has no place.",
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
-  { id: "needs-attendance", ticket: "265", template: "Is {event} in person or remote?",
-    situation: "Cadence cannot tell whether the event is in person.",
-    replaces: null,
-    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
-  { id: "needs-origin-blocked", ticket: "265", template: "Fix {other event}'s place or attendance to get a leave time for {event}.",
-    situation: "The stop before this one has no place or attendance, so the trip has no start.",
-    replaces: null,
-    approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: { id: "R2", before: "The leave time for {event} depends on {other event}." } },
+  { id: "needs-origin-blocked", ticket: "273", template: "Fix {other event}'s place to get a leave time for {event}.",
+    situation: "The stop before this one has no place, so the trip has no start. Decision D12: a located event is in person, so attendance is never the cause.",
+    replaces: "Fix {other event}'s place or attendance to get a leave time for {event}.",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "needs-origin-home", ticket: "265", template: "Add Home in Settings to get a leave time for {event}.",
     situation: "No Home is saved and the device location is unknown.",
     replaces: null,
@@ -295,6 +301,66 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "The travel budget is used up and its renewal date is unknown.",
     replaces: null,
     approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+  { id: "correction-toggle", ticket: "271", template: "Change for this trip",
+    situation: "Calendar details, the control that opens the destination correction for one journey.",
+    replaces: "Travel for this event",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "brief-overlap", ticket: "272", template: "Travel to {event} overlaps {behavior}.",
+    situation: "Daily Brief travel block, when a trip crowds an Unresolved Behavior. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "brief-overlap-trip-home", ticket: "272", template: "Planned travel overlaps {behavior}.",
+    situation: "Daily Brief travel block, when the trip home crowds an Unresolved Behavior. Shipped with Ticket 170 as \"Travel to planned travel overlaps {behavior}.\"",
+    replaces: "Travel to planned travel overlaps {behavior}.",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail", ticket: "270", template: "Leave {time}",
+    situation: "Timeline left rail: the label at the end of the magenta leader from the next trip's span, at its leave time. The time has no AM or PM. Decision D14 chose the one-line \"Leave 1:20\".",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-home", ticket: "270", template: "Home {time}",
+    situation: "Timeline left rail: the trip home's label at its leave time, while that time is still ahead. Decision D14. The time has no AM or PM.",
+    replaces: "Leave {time}",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-leave-now", ticket: "270", template: "Leave now",
+    situation: "Timeline left rail: the next trip's label in the leave-now state, instead of a leave time that has just passed.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-late", ticket: "270", template: "May arrive late",
+    situation: "Timeline left rail: the next trip's label when the route says it may arrive late. Short for the line's \"You may arrive late\".",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-past-leave", ticket: "270", template: "Arrive about {time}",
+    situation: "Timeline left rail: the next trip's label once its leave time has passed (clock only). Short for the line's \"you'd arrive about {time}\". The time has no AM or PM.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-past-leave-home", ticket: "270", template: "Home about {time}",
+    situation: "Timeline left rail: the trip home's label once its leave time has passed (clock only). Short for the line's \"you'd be home about {time}\".",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "marker-rail-head-home-now", ticket: "270", template: "Head home now",
+    situation: "Timeline left rail: the trip home's label once its leave time has come, instead of a leave time that has passed.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "brief-back", ticket: "272", template: "Back around {time}.",
+    situation: "Daily Brief travel block, when the whole day's trip is known and the trip home is not yet the next trip. Shipped with Ticket 170 and never reviewed; the words are unchanged.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "return-home-missing", ticket: "273", template: "Add Home in Settings to estimate the return time.",
+    situation: "Event drawer, dialog, Behavior row or next-departure line, when the trip home has no time because no Home is saved. \"Add Home in Settings\" opens Travel settings.",
+    replaces: "Return time unknown. Add Home in Settings to estimate it.",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "travel-off-offer", ticket: "273", template: "Turn on Travel estimates in Settings to get a leave time for {event}.",
+    situation: "Top of the Timeline, once, while Travel estimates is off and a located event is still ahead today. The words before \"to get\" open Travel settings; nothing turns on from here.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "travel-off-dismiss", ticket: "273", template: "Not now",
+    situation: "After the Travel estimates offer. Hides it on this device. The leave-time question already uses the same words.",
+    replaces: null,
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "setup-estimates-off", ticket: "273", template: "Estimates off",
+    situation: "First-run setup, Home and travel row, when both are saved but Travel estimates is off. Replaces Saved there.",
+    replaces: "Saved",
+    approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
@@ -359,6 +425,53 @@ export function departureBriefFooterPhrase(attribution: string | null, at: strin
   return ["Calculated by Cadence", attribution, departureTimeLabel(at, context)].filter(Boolean).join(" · ") + ".";
 }
 
+/** Ticket 272: the Daily Brief's overlap line. A trip with no named destination is the trip home. Approved under D13. */
+export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLabel: string | null): string {
+  return destinationLabel ? `Travel to ${destinationLabel} overlaps ${behaviorLabel}.` : `Planned travel overlaps ${behaviorLabel}.`;
+}
+
+/** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Approved under D13. */
+export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
+  return `Back around ${departureTimeLabel(at, context)}.`;
+}
+
+/** Ticket 273: offered while Travel estimates is off and a located event is ahead today. Approved under D13. */
+export function departureTravelOffPhrase(eventLabel: string): string {
+  return `Turn on Travel estimates in Settings to get a leave time for ${eventLabel}.`;
+}
+
+/**
+ * Ticket 273: splits a step phrase into its action words and the rest, so the action is the
+ * sentence's own first words: "Add a place for Dentist" + " to get a leave time." Null when the
+ * phrase has no such step.
+ */
+export function departureStepLead(phrase: string): Readonly<{ lead: string; rest: string }> | null {
+  const index = Math.min(...DEPARTURE_STEP_SUFFIXES.map((suffix) => phrase.indexOf(suffix)).filter((found) => found > 0));
+  return Number.isFinite(index) ? { lead: phrase.slice(0, index), rest: phrase.slice(index) } : null;
+}
+
+/**
+ * Ticket 270 (D13, D14): the label at the end of the next trip's leader, as short word groups.
+ * Wide layouts join them on one line; phones stack one group per line. The rail is narrow, so a
+ * time has no AM or PM. A time that has passed is never shown: leave now, late and passed leave
+ * times use the line's own words. The trip home reads "Home {time}" (D14).
+ */
+export function departureMarkerRailLines(
+  trip: Pick<DepartureTrip, "state" | "lateBasis" | "role" | "leaveAt" | "arriveAt" | "minutesUntilLeave">,
+  timezone: string,
+): readonly string[] {
+  const short = (at: string) => {
+    const zoned = Temporal.Instant.from(at).toZonedDateTimeISO(timezone);
+    return `${zoned.hour % 12 === 0 ? 12 : zoned.hour % 12}:${String(zoned.minute).padStart(2, "0")}`;
+  };
+  // Clock only: the user may well have left, so say when they would arrive, not that they are late.
+  if (trip.lateBasis === "clock" && trip.arriveAt) return [trip.role === "return" ? "Home" : "Arrive", "about", short(trip.arriveAt)];
+  if (trip.role === "return") return trip.minutesUntilLeave === null || !trip.leaveAt ? ["Head", "home", "now"] : ["Home", short(trip.leaveAt)];
+  if (trip.state === "late") return ["May", "arrive", "late"];
+  if (trip.state === "leave_now" || !trip.leaveAt) return ["Leave", "now"];
+  return ["Leave", short(trip.leaveAt)];
+}
+
 /** A Behavior crowded by a trip: names the trip and its span. */
 export function departureOverlapPhrase(input: Readonly<{ home: boolean; destinationLabel: string | null; startAt: string; endAt: string }>,
   context: DeparturePhraseContext): string {
@@ -410,11 +523,9 @@ function build(input: DeparturePhraseInput, context: DeparturePhraseContext, nam
       return named ? `The leave time for ${destination} appears by ${time(input.appearsAt)}.` : `Leave time appears by ${time(input.appearsAt)}.`;
     case "needs_place":
       return `Add a place for ${destination} to get a leave time.`;
-    case "needs_attendance":
-      return `Is ${destination} in person or remote?`;
     case "needs_origin":
       return input.blockingLabel
-        ? `Fix ${input.blockingLabel}'s place or attendance to get a leave time for ${destination}.`
+        ? `Fix ${input.blockingLabel}'s place to get a leave time for ${destination}.`
         : `Add Home in Settings to get a leave time for ${destination}.`;
     case "time_unknown":
       return timeUnknown(input, destination, named);
@@ -482,7 +593,8 @@ function lowerFirst(text: string): string {
 
 function timeUnknown(input: DeparturePhraseInput, destination: string, named: boolean): string {
   if (input.role === "return") {
-    return input.timeUnknownCause === "home_missing" ? `${RETURN_TIME_UNKNOWN} Add Home in Settings to estimate it.` : RETURN_TIME_UNKNOWN;
+    // One sentence; its first words open Travel settings, as the other steps do.
+    return input.timeUnknownCause === "home_missing" ? "Add Home in Settings to estimate the return time." : RETURN_TIME_UNKNOWN;
   }
   if (input.timeUnknownCause === "late_arrival") {
     return `No leave time for ${named ? `the trip to ${destination}` : "this trip"}, because you may arrive late at ${input.blockingLabel ?? PRIOR_STOP_FALLBACK}.`;

@@ -7,6 +7,7 @@ import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { TimelineView } from "@/lib/types/timeline";
 import type { TravelSettingsClient } from "./travel-settings";
 import { webTravelSettingsClient } from "./travel-settings";
+import { clearTravelLeaveMemory } from "./travel-habits";
 import { readBrowserForegroundLocation, type ForegroundLocation } from "./foreground-location";
 import {
   recordTravelRefresh, resolveTravelRefreshPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
@@ -14,7 +15,8 @@ import {
 } from "@cadence/core/services/travel-refresh-policy";
 import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
 
-export type TravelCorrection = Readonly<{ eventId: string; revision: string; attendance: "physical" | "remote"; locationText: string | null }>;
+/** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
+export type TravelCorrection = Readonly<{ eventId: string; revision: string; locationText: string }>;
 export type TravelRoutesInput = Readonly<{
   startLocalDate: string; endLocalDate: string;
   scope?: "timeline" | "day";
@@ -131,7 +133,7 @@ export function travelSourceKey(events: readonly NormalizedExternalEvent[], time
 
 /**
  * Ticket 268: each stop's travel inputs, by commitment ref (event ID or Occurrence ID): its
- * times, place, attendance and response. The same inputs as `travelSourceKey`, per stop, so a
+ * times, place, video link and response. The same inputs as `travelSourceKey`, per stop, so a
  * kept view can withdraw only the trips whose stop changed or is gone. Kept in memory; the
  * browser session holds only digests.
  */
@@ -173,9 +175,60 @@ const travelSourceWaits = new Map<string, number>();
 const travelDeviceUnknown = new Set<string>();
 // A generated brief asks for the day once, including when the Timeline mounts later.
 const briefTravelRequests = new Map<string, { generation: string; pending: boolean }>();
+/** Ticket 272: the day's first brief asked for the day before it was requested. */
+const BRIEF_FIRST_GENERATION = "first-brief";
+/** Ticket 272: the day's first Daily Brief waits at most this long for the first whole-day travel result. */
+export const DAILY_BRIEF_TRAVEL_WAIT_MS = 5_000;
+/** Ticket 272: travel hooks mounted per account and date. With none, no travel result is coming. */
+const travelHooksActive = new Map<string, number>();
+/** Ticket 272: accounts whose last request found travel off or not configured. Their brief does not wait. */
+const travelOffAccounts = new Set<string>();
+/** Ticket 272: first briefs waiting per account and date for a whole-day travel result. */
+const briefTravelWaiters = new Map<string, Set<() => void>>();
+function settleBriefTravelWait(key: string): void {
+  const waiters = briefTravelWaiters.get(key);
+  if (!waiters) return;
+  briefTravelWaiters.delete(key);
+  for (const finish of waiters) finish();
+}
+/**
+ * Ticket 272: the signed conclusions for the day's first Daily Brief. Returns at once with a
+ * token already held, with travel off or not configured, or with no Timeline travel mounted.
+ * Otherwise it asks the Timeline for the whole day and waits for that result, at most
+ * `timeoutMs`. It resolves with the token, or null, and never rejects.
+ */
+export function waitForDailyBriefTravel(accountId: string | null, localDate: string, signal?: AbortSignal,
+  timeoutMs = DAILY_BRIEF_TRAVEL_WAIT_MS): Promise<string | null> {
+  if (!accountId) return Promise.resolve(null);
+  const held = travelConclusionsToken(accountId, localDate);
+  const key = JSON.stringify([accountId, localDate]);
+  if (held || signal?.aborted || travelOffAccounts.has(accountId) || !travelHooksActive.get(key)) return Promise.resolve(held);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      briefTravelWaiters.get(key)?.delete(finish);
+      resolve(travelConclusionsToken(accountId, localDate));
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    signal?.addEventListener("abort", finish, { once: true });
+    briefTravelWaiters.set(key, (briefTravelWaiters.get(key) ?? new Set()).add(finish));
+    if (!briefTravelRequests.get(key)?.pending) {
+      briefTravelRequests.set(key, { generation: BRIEF_FIRST_GENERATION, pending: true });
+      while (briefTravelRequests.size > TRAVEL_CACHE_CAP) briefTravelRequests.delete(briefTravelRequests.keys().next().value!);
+    }
+    window.dispatchEvent(new Event("cadence:brief-travel"));
+  });
+}
 export function requestDailyBriefTravel(accountId: string, localDate: string, generatedAt: string): void {
   const key = JSON.stringify([accountId, localDate]);
-  if (briefTravelRequests.get(key)?.generation === generatedAt) return;
+  const existing = briefTravelRequests.get(key);
+  if (existing?.generation === generatedAt) return;
+  // Ticket 272: the first brief already asked for the day; that request serves this brief too.
+  if (existing?.generation === BRIEF_FIRST_GENERATION) { existing.generation = generatedAt; return; }
   briefTravelRequests.set(key, { generation: generatedAt, pending: true });
   while (briefTravelRequests.size > TRAVEL_CACHE_CAP) briefTravelRequests.delete(briefTravelRequests.keys().next().value!);
   window.dispatchEvent(new Event("cadence:brief-travel"));
@@ -200,24 +253,25 @@ function clearTravelCacheForAccount(accountId: string): void {
 }
 /** Settings and Behavior location saves fire this event from screens where no Timeline is mounted, so invalidate at module level too. */
 function invalidateAllTravel(): void {
-  travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear();
+  travelEpoch++; travelViewCache.clear(); travelInFlight.clear(); travelConclusionTokens.clear(); travelOffAccounts.clear();
   travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); removeTravelSession();
 }
 if (typeof window !== "undefined") window.addEventListener("cadence:travel-changed", invalidateAllTravel);
 /**
  * Ticket 268: forgets every travel view, estimate and refresh record in page memory and the
- * browser session. Sign-out calls it on web and Mac.
+ * browser session. Sign-out calls it on web and Mac. Ticket 274: it also removes today's
+ * leave-time candidates.
  */
-export function clearTravelSession(): void { invalidateAllTravel(); }
+export function clearTravelSession(): void { invalidateAllTravel(); clearTravelLeaveMemory(); }
 /** Test-only reset of the in-memory travel view cache. `keepSession` simulates a page reload. */
 export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: boolean }> = {}): void {
   if (options.keepSession) {
     travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
-    travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear();
+    travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear();
     return;
   }
   travelViewCache.clear(); travelInFlight.clear(); travelBudgetResets.clear(); briefTravelRequests.clear(); travelConclusionTokens.clear();
-  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); removeTravelSession();
+  travelRefreshStates.clear(); travelBudgets.clear(); travelFailures.clear(); travelDeviceUnknown.clear(); travelSourceWaits.clear(); travelOffAccounts.clear(); removeTravelSession();
 }
 
 /**
@@ -228,8 +282,13 @@ export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: bo
  * webview keeps sessionStorage in memory for the app session; it never reaches SQLite.
  */
 const TRAVEL_SESSION_KEY = "cadence:travel-session";
+/**
+ * Raise this when the stored view's shape or meaning changes. Version 2: decision D12 removed the
+ * `attendance_unknown` trip reason, so a record from before it is discarded, not restored.
+ */
+const TRAVEL_SESSION_VERSION = 2;
 type TravelSessionRecord = Readonly<{
-  version: 1; accountId: string; localDate: string; stateDigest: string;
+  version: typeof TRAVEL_SESSION_VERSION; accountId: string; localDate: string; stateDigest: string;
   view: TravelRoutesView | null; at: number; stops?: Readonly<Record<string, string>> | null;
   refresh: Omit<TravelRefreshState, "device"> | null; budget: TravelBudgetState | null;
 }>;
@@ -240,10 +299,12 @@ function readTravelSession(): TravelSessionRecord | null {
   const storage = travelSessionStorage();
   try {
     const value = JSON.parse(storage?.getItem(TRAVEL_SESSION_KEY) ?? "null") as Partial<TravelSessionRecord> | null;
-    if (!value || value.version !== 1 || typeof value.accountId !== "string" || typeof value.localDate !== "string" ||
-      typeof value.stateDigest !== "string" || typeof value.at !== "number") return null;
+    if (!value) return null;
+    // An older version or a damaged record is removed, so nothing else reads it either.
+    if (value.version !== TRAVEL_SESSION_VERSION || typeof value.accountId !== "string" || typeof value.localDate !== "string" ||
+      typeof value.stateDigest !== "string" || typeof value.at !== "number") { removeTravelSession(); return null; }
     return value as TravelSessionRecord;
-  } catch { return null; }
+  } catch { removeTravelSession(); return null; }
 }
 function writeTravelSession(record: TravelSessionRecord): void {
   try { travelSessionStorage()?.setItem(TRAVEL_SESSION_KEY, JSON.stringify(record)); } catch { /* A full or blocked store keeps memory only. */ }
@@ -363,6 +424,9 @@ export function useTravelContext(input: Readonly<{
     const accountId = input.accountId;
     const localDate = input.localDate;
     const briefKey = JSON.stringify([accountId, localDate]);
+    travelHooksActive.set(briefKey, (travelHooksActive.get(briefKey) ?? 0) + 1);
+    /** Ticket 272: a waiting first brief stops waiting when this hook will not ask for the day it wanted. */
+    const releaseBrief = () => { if (briefTravelRequests.get(briefKey)?.pending) settleBriefTravelWait(briefKey); };
     // The plan's source key covers Calendar, Behaviors and corrections. A settings change clears the plan instead.
     const planKey = travelDigest(JSON.stringify([input.sourceKey, correctionsKey]));
     const stateDigest = travelDigest(stateKey);
@@ -415,7 +479,7 @@ export function useTravelContext(input: Readonly<{
       const refreshState = travelRefreshStates.get(accountId) ?? null;
       // The Daily Brief token stays in page memory; JSON omits the undefined field.
       const view = cached?.view ? { ...cached.view, conclusionsToken: undefined } : null;
-      writeTravelSession({ version: 1, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(), stops: cached?.stops ?? null,
+      writeTravelSession({ version: TRAVEL_SESSION_VERSION, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(), stops: cached?.stops ?? null,
         refresh: refreshState ? { localDate: refreshState.localDate, sourceKey: refreshState.sourceKey, tripAttempts: refreshState.tripAttempts,
           ...(refreshState.deviceRoutedAt ? { deviceRoutedAt: refreshState.deviceRoutedAt } : {}) } : null,
         budget: travelBudgets.get(accountId) ?? null });
@@ -473,7 +537,7 @@ export function useTravelContext(input: Readonly<{
     const evaluate = (options: Readonly<{ refreshTravel?: boolean; device?: TravelDeviceSample | null }> = {}) => {
       if (!active || inFlight) return;
       const reset = budgetReset();
-      if (reset) { pauseBudget(reset); return; }
+      if (reset) { pauseBudget(reset); releaseBrief(); return; }
       if (!options.refreshTravel && !sourcesSettled()) {
         clearTimeout(sourceTimer);
         sourceTimer = setTimeout(() => evaluate(), Math.max(0, (travelSourceWaits.get(waitKey) ?? Date.now()) + TRAVEL_SOURCE_WAIT_MS - Date.now()));
@@ -494,24 +558,24 @@ export function useTravelContext(input: Readonly<{
       let planned: TravelRefreshRequest | null = plan.request;
       // A generated brief asks for the whole day once, for its signed conclusions.
       if (briefTravelRequests.get(briefKey)?.pending && !plan.automaticPaused && planned?.kind !== "day") planned = { kind: "day", trigger: "first_open" };
-      if (!planned) return;
+      if (!planned) { releaseBrief(); return; }
       if (!options.refreshTravel) {
         // After midnight the Timeline moves to the new date; this day's view does not request.
         const today = Temporal.Instant.from(now).toZonedDateTimeISO(timezone).toPlainDate().toString();
-        if (today !== localDate) return;
+        if (today !== localDate) { releaseBrief(); return; }
         const failedAt = travelFailures.get(accountId);
-        if (failedAt !== undefined && Date.now() - failedAt < FAILURE_REUSE_MS) return;
+        if (failedAt !== undefined && Date.now() - failedAt < FAILURE_REUSE_MS) { releaseBrief(); return; }
       }
       request(planned, !!options.refreshTravel);
     };
 
     const request = (planned: TravelRefreshRequest, manualRequest: boolean) => {
       if (!active || inFlight) return;
-      if (!foreground()) return; // Planned again on return to the window.
+      if (!foreground()) { releaseBrief(); return; } // Planned again on return to the window.
       inFlight = true; generation++;
       patch({ pending: true });
       const run = generation;
-      timer = setTimeout(async () => {
+      const routeOnce = async () => {
         const epoch = travelEpoch;
         const sameEpoch = () => travelEpoch === epoch;
         controller = new AbortController();
@@ -526,11 +590,13 @@ export function useTravelContext(input: Readonly<{
           if (!settings.enabled || !settings.routingConsentAt || !settings.mode) {
             // Travel turned off: nothing of today's travel stays in the session.
             forgetTravelAccount(accountId);
+            clearTravelLeaveMemory();
+            travelOffAccounts.add(accountId);
             settle({ view: null, message: null, resumesAt: null, stale: false, observedAt: null }); return;
           }
           const configured = await client.configured(signal);
           if (!valid()) return;
-          if (!configured) { if (!manualRequest) travelFailures.set(accountId, Date.now()); if (sameEpoch()) cacheTravel(stateKey, { view: null, message: CLEARANCE_MESSAGE, at: Date.now() }); settle({ view: null, message: CLEARANCE_MESSAGE, resumesAt: null, stale: false, observedAt: null }); return; }
+          if (!configured) { travelOffAccounts.add(accountId); if (!manualRequest) travelFailures.set(accountId, Date.now()); if (sameEpoch()) cacheTravel(stateKey, { view: null, message: CLEARANCE_MESSAGE, at: Date.now() }); settle({ view: null, message: CLEARANCE_MESSAGE, resumesAt: null, stale: false, observedAt: null }); return; }
           // Device position is read only inside a request.
           const position = await client.readLocation(false);
           if (!valid()) return;
@@ -585,6 +651,10 @@ export function useTravelContext(input: Readonly<{
             // Trip requests carry no conclusions; only a whole-day response replaces the token.
             if (planned.kind === "day") {
               rememberTravelConclusions(accountId, localDate, view);
+              travelOffAccounts.delete(accountId);
+              // Ticket 272: this response serves a first brief that asked while it was in flight.
+              const firstBrief = briefTravelRequests.get(briefKey);
+              if (firstBrief?.generation === BRIEF_FIRST_GENERATION) firstBrief.pending = false;
               travelRefreshStates.set(accountId, recordTravelRefresh(travelRefreshStates.get(accountId) ?? null, planned,
                 { now: sentAt, timezone, sourceKey: planKey, device: sampleOf(device) }));
               travelDeviceUnknown.delete(accountId);
@@ -627,7 +697,9 @@ export function useTravelContext(input: Readonly<{
           if (sameEpoch()) cacheTravel(stateKey, { view: null, message, at: Date.now() });
           settle({ view: null, message, resumesAt: null, stale: false, observedAt: null });
         }
-      }, 350);
+      };
+      // Ticket 272: whatever happens to a whole-day request, a first brief waiting for it stops waiting.
+      timer = setTimeout(() => { void routeOnce().finally(() => { if (planned.kind === "day") settleBriefTravelWait(briefKey); }); }, 350);
     };
     manual.current = () => {
       if (!active || inFlight || budgetReset()) return;
@@ -705,6 +777,8 @@ export function useTravelContext(input: Readonly<{
     return () => {
       channel?.close();
       active = false;
+      const hooks = (travelHooksActive.get(briefKey) ?? 1) - 1;
+      if (hooks > 0) travelHooksActive.set(briefKey, hooks); else travelHooksActive.delete(briefKey);
       // A committed request finishes and keeps its result for remount; anything earlier is cancelled.
       if (!committed) { generation++; controller?.abort(); }
       clearTimeout(timer); clearTimeout(expiry); clearTimeout(renewal); clearTimeout(planTimer); clearTimeout(sourceTimer); clearInterval(movement);

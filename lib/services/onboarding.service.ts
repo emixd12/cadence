@@ -20,7 +20,7 @@ export function createFirstRunOnboardingState(input: {
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     ),
     travel: input.travel
-      ? { hasHome: input.travel.hasHome, hasMode: input.travel.hasMode }
+      ? { hasHome: input.travel.hasHome, hasMode: input.travel.hasMode, enabled: input.travel.enabled }
       : null,
   };
 }

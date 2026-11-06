@@ -3,15 +3,23 @@
 import {
   DEPARTURE_PHRASE_REVIEW,
   OWNER_APPROVED_2026_11_05,
+  OWNER_APPROVED_2026_11_06,
   RETURN_TIME_UNKNOWN,
+  SETUP_TRAVEL_ESTIMATES_OFF,
+  TRAVEL_CORRECTION_TOGGLE,
+  TRAVEL_OFF_DISMISS,
   allDayRangeLabel,
+  departureBriefBackPhrase,
   departureBriefFooterPhrase,
+  departureBriefOverlapPhrase,
   departureCheckedPhrase,
   departureDetailPhrase,
   departureFreeAgainPhrase,
   departureLinePhrase,
+  departureMarkerRailLines,
   departureOverlapPhrase,
   departurePhraseContext,
+  departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
   type DeparturePhraseInput,
@@ -38,6 +46,8 @@ const HOME_TRIP: Partial<DeparturePhraseInput> = { role: "return", fromHome: fal
 const detail = (input: Partial<DeparturePhraseInput>) => departureDetailPhrase({ ...BASE, ...input }, CONTEXT);
 const line = (input: Partial<DeparturePhraseInput>) => departureLinePhrase({ ...BASE, ...input }, CONTEXT);
 const old: Partial<DeparturePhraseInput> = { freshness: "last_estimate", checkedAt: at("08:55") };
+/** Ticket 270 (D13, D14): the leader label, its word groups joined as on wide layouts. */
+const marker = (input: Partial<DeparturePhraseInput>) => departureMarkerRailLines({ ...BASE, ...input }, TIMEZONE).join(" ");
 
 /** Sample renderings by phrase id. A test checks that every listed phrase has one and matches its template. */
 export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> = {
@@ -68,7 +78,6 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "last-estimate-head-home": () => detail({ ...old, ...HOME_TRIP, state: "head_home", minutesUntilLeave: 20 }),
   "appears-overdue": () => detail({ state: "appears_later", appearsAt: at("10:55"), appearsOverdue: true }),
   "needs-place": () => detail({ state: "needs_place" }),
-  "needs-attendance": () => detail({ state: "needs_attendance" }),
   "needs-origin-blocked": () => detail({ state: "needs_origin", blockingLabel: "Gym" }),
   "needs-origin-home": () => detail({ state: "needs_origin" }),
   "time-unknown": () => detail({ state: "time_unknown", timeUnknownCause: "leg_limit" }),
@@ -102,6 +111,21 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "home-ready": () => line({ ...HOME_TRIP, state: "appears_later", appearsAt: at("12:00"), appearsOverdue: true }),
   "home-no-route": () => line({ ...HOME_TRIP, state: "no_route" }),
   "paused": () => detail({ state: "paused", resumesAt: null }),
+  "correction-toggle": () => TRAVEL_CORRECTION_TOGGLE,
+  "brief-overlap": () => departureBriefOverlapPhrase("Walk", EVENT),
+  "brief-overlap-trip-home": () => departureBriefOverlapPhrase("Walk", null),
+  "brief-back": () => departureBriefBackPhrase(at("15:30"), CONTEXT),
+  "marker-rail": () => marker({ state: "upcoming", minutesUntilLeave: 45 }),
+  "marker-rail-home": () => marker({ ...HOME_TRIP, state: "upcoming", minutesUntilLeave: 45 }),
+  "marker-rail-leave-now": () => marker({ state: "leave_now", minutesUntilLeave: null }),
+  "marker-rail-late": () => marker({ state: "late", lateBasis: "evidence", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "marker-rail-past-leave": () => marker({ state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("14:05") }),
+  "marker-rail-past-leave-home": () => marker({ ...HOME_TRIP, state: "late", lateBasis: "clock", minutesUntilLeave: null, arriveAt: at("15:40") }),
+  "marker-rail-head-home-now": () => marker({ ...HOME_TRIP, state: "head_home", minutesUntilLeave: null }),
+  "return-home-missing": () => detail({ ...HOME_TRIP, state: "time_unknown", timeUnknownCause: "home_missing" }),
+  "travel-off-offer": () => departureTravelOffPhrase(EVENT),
+  "travel-off-dismiss": () => TRAVEL_OFF_DISMISS,
+  "setup-estimates-off": () => SETUP_TRAVEL_ESTIMATES_OFF,
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;
@@ -113,7 +137,7 @@ export function departureWordingRows(): DepartureWordingRow[] {
     ...DEPARTURE_PHRASE_REVIEW.map((entry) => ({ ...entry, source: "departure-phrases.ts",
       sample: DEPARTURE_WORDING_SAMPLES[entry.id]?.() ?? "" })),
     { id: "correction-note", ticket: "261", source: "ExternalEventDetails.tsx", sample: TRAVEL_CORRECTION_NOTE, template: TRAVEL_CORRECTION_NOTE,
-      situation: "Calendar details, under the form that corrects attendance or the destination for one journey.",
+      situation: "Calendar details, under the form that corrects the destination for one journey.",
       replaces: "Applies only to this event revision while the Timeline is open.", approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
     { id: "production-unavailable", ticket: "261", source: "lib/ui/travel.ts", sample: TRAVEL_UNAVAILABLE_MESSAGE, template: TRAVEL_UNAVAILABLE_MESSAGE,
       situation: "Travel status line in production builds while travel waits for the deployment's provider review.",
@@ -128,7 +152,7 @@ export function DepartureWordingReview() {
     <div className="grid gap-2">
       <h2 id="departure-wording-title" className="text-xl font-bold">Travel wording</h2>
       <p className="max-w-3xl text-sm leading-6 text-muted-readable" data-wording-approval>
-        {pending ? `${pending} of ${rows.length} phrases await the owner's approval. ` : `All ${rows.length} phrases approved by the owner on ${approvalDate(OWNER_APPROVED_2026_11_05)}, with changes R1–R3. `}
+        {pending ? `${pending} of ${rows.length} phrases await the owner's approval. ` : `All ${rows.length} phrases approved by the owner: the Wave 1 wording on ${approvalDate(OWNER_APPROVED_2026_11_05)}, with changes R1–R3, and the rest on ${approvalDate(OWNER_APPROVED_2026_11_06)}. `}
         Each sentence is rendered by the product code with sample values: Dentist at 2 PM, leaving Home at 1:20 PM on foot,
         and Gym as the stop before it. Times on November 10 show without a date.
       </p>

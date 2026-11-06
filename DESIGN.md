@@ -162,9 +162,9 @@ only. Use centered perpendicular stems without axis nodes for Calendar events;
 group only identical original start instants in one event lane. Nearby starts remain separate. Timed-event hover/focus previews show actual
 duration as a solid 1px magenta axis segment from the displayed original-day perpendicular-stem contact. It preserves mapped
 length to the day body bottom. An overnight continuation starts at the next section top above its heading, continues to the event end without another marker or stem; details retain actual times. No
-permanent duration bars appear, with one planned exception: owner decision D2, "Next trip
-only" (`docs/DECISIONS.md`, 2026-11-04; Ticket 270), keeps the next trip's magenta span and
-one marker visible without hover. Ticket 270 records the final form here from the code. The current-time dot uses brand blue without a
+permanent duration bars appear, with one exception: owner decision D2, "Next trip only"
+(`docs/DECISIONS.md`, 2026-11-04; Ticket 270), keeps the next trip's marks visible without
+hover, in the form owner decision D13 chose (see "Next trip marker (Ticket 270)"). The current-time dot uses brand blue without a
 row tint. No persistent overlap fill or edge appears. Hover/focus changes only overlapping Behavior borders to the owner-selected Poline facet `#DA3278`. Point
 overlap uses `start <= activation < end`; estimated-duration overlap is half-open.
 Completed and Not Completed fills remain unchanged. Preserve all other layout, colors, and
@@ -572,8 +572,16 @@ across web and desktop. `ExternalEventDetails` owns persistent preview and nativ
 dialog presentation. `GoogleCalendarPanel` reuses SettingsPanel and native form
 controls. Synthetic Calendar bench adapters perform no provider or account reads.
 
-Calendar details lead with Time and Location, then the travel lines, Directions and
-the journey mode choice. The source and calendar share one row, followed by Attendees,
+Calendar details lead with the travel lines (Ticket 271), then Directions, the journey mode
+choice and the **Change for this trip** disclosure, then Time and Location. The first travel
+line is `text-base` in the dialog and `text-sm` in the drawer, both weight 400, with the
+other travel lines at `text-xs`. There is no Duration row. The drawer shows the travel lines
+under the title, then the calendar and time line, the location, and one wrapping row with
+the Maps link and View details. Maps links use the shared `text-link` underline; the global
+anchor reset hides the Tailwind `underline` utility. The correction disclosure is a native
+`summary` with the shared disclosure trigger and indicator. An expanded located Behavior row
+adds the same Maps link after its travel lines. Screenshots at 1440 and 390 px:
+`.intent/artifacts/t271/` (local, not committed). The source and calendar share one row, followed by Attendees,
 Organizer, Conference and Attachments, then the description. A row with no value is
 removed from the grid. State, Source timezone, Recurrence, Updated and completeness
 lines appear only in development builds, under a "Development" label, with times in
@@ -692,6 +700,54 @@ retain source location text and structured map links. Temporary travel spans use
 the existing 1px magenta Timeline axis and overlap borders; markers remain at
 scheduled starts. Known gaps remain unfilled. Unknown returns cannot claim full
 availability. Live provider and installed native acceptance remain separate.
+
+### Next-departure line (Ticket 269)
+
+`TravelStatusLine` in `components/timeline/DayProgressTimeline.tsx` is one paragraph at
+the Timeline gutter: `--text-sm`, line height 1.25rem, weight 400, `--foreground`, at most
+40rem wide, wrapping anywhere. Emphasis comes from the wording, not weight. A trip with a
+time (upcoming, soon, leave now, late, head home) adds a 1px `--calendar-overlap` left
+rule with 0.5rem padding, the magenta of the next trip's span (D2). Other states have no
+rule. Refresh travel is the shared `text-link`, leading the sentence when the phrase
+starts with it (R1) or ending it. At most one muted `calendarState` note follows. A
+visually hidden polite status region carries the announcement. At 390 px the longest
+phrases wrap to three rows with no horizontal overflow (`.intent/artifacts/t269/`).
+Decision D13 keeps this small status size; the bench's title-size variant is gone.
+
+### Next trip marker (Ticket 270)
+
+Decision D13 (owner, 2026-11-06) chose a variant of bench marker A, and decision D14 (same
+day) set the label's line count and the trip home's words. `DayOverlay` in
+`components/timeline/DayProgressTimeline.tsx` draws it for the departure model's next trip
+only, from `resolveNextTripMarkInput` and `resolveDayProgressLayout`:
+
+- Span: a 1px `--calendar-overlap` segment on the axis from the recommended leave time to
+  arrival, clipped to each day and drawn under the current-time dot.
+- Leader: a 1px `--calendar-overlap` line, 14px long, perpendicular to the axis from the
+  span's top end into the left rail. When the current-time dot sits within 8px of it, the
+  leader starts 8px from the axis so it never runs under the dot, and it keeps its full 14px
+  (D14), so it never reads as a hyphen beside the label.
+- Label: at the leader's end, 2px clear, right-aligned, 11px text on 16px lines, tabular
+  numbers, regular weight, in `--calendar-overlap-text` (`#C0286A`, 5.4:1 on the background;
+  the `#DA3278` span color is 4.3:1, too low for 11px text). Wide layouts set it on one line,
+  "Leave 9:35", and the leader points straight at it (D14). Phones (`max-width: 575px`, the
+  `--next-trip-label-stack` custom property) stack one short word group per line in a 32px
+  column: "Leave" over "9:35". A one-line label that would cross the Timeline's left edge
+  stacks too, so it is never clipped. The trip home reads "Home 3:00" (D14). A passed time
+  never shows: leave now reads "Leave now", a late route "May arrive late", a passed leave time
+  "Arrive about 10:05" (or "Home about" for the trip home), and the trip home at its time
+  "Head home now" (`departureMarkerRailLines`).
+- Crowding: where the label shares the rail with Calendar markers, the resolver moves
+  it to the nearest position clear of them. If that takes it off the leader's line, a short
+  vertical segment at the leader's end reaches the label.
+- The leader and label are `aria-hidden` and take no pointer events; the next-departure line
+  says the same thing. Keyboard, focus and touch are unchanged. No tick, slim row or variant
+  switch remains.
+
+The product has no dark theme (`design-system.config.json`, `themes.support: none`), so a dark
+system preference renders the same light tokens. Screenshots for upcoming, leave now, late
+(route and clock), and head home at 1440 and 390 px, light and dark preference:
+`.intent/artifacts/t270-final/`.
 
 ## Historical completion timing control
 
