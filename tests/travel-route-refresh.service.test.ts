@@ -1132,6 +1132,7 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
   const connected = (generation = 1) => ({ status: "connected", generation, selectionRevision: 1, preferences: { selectedSourceIds: ["cal-1"] } });
   const event = (id: string, startAt: string, endAt: string, location = `${id} St`, extra: Record<string, unknown> = {}) => ({
     id, kind: "timed", state: "unknown", currentUserResponse: null, calendarId: "cal-1", providerEventId: id, startAt, endAt,
+    source: id.startsWith("outlook_calendar/") ? "outlook_calendar" : id.startsWith("icloud_calendar/") ? "icloud_calendar" : "google_calendar",
     endUnspecified: false, location, conference: null, revision: { providerEtag: id, providerUpdatedAt: null }, ...extra,
   });
   const snapshot = (events: readonly Record<string, unknown>[]) => ({ requestedRange: { timezone: "America/New_York" }, events });
@@ -1236,12 +1237,37 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
     await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
   });
 
-  it("signs the Daily Brief's conclusions only when every Calendar stop is a Google event", async () => {
+  it("signs the Daily Brief's conclusions for a day mixing all three Calendars, naming each event by its source (decision D18)", async () => {
     const secret = "s".repeat(64);
-    setUp({ google: [google], outlook: [outlook] });
+    setUp({ google: [google], outlook: [outlook], icloud: [icloud] });
     const mixed = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
-    expect(mixed).not.toHaveProperty("conclusionsToken");
+    const payload = verifyTravelConclusionsToken(mixed.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!;
+    const outlookName = "event:outlook_calendar\0cal-1\0outlook_calendar/o1", icloudName = "event:icloud_calendar\0cal-1\0icloud_calendar/i1";
+    expect(payload.events).toEqual({
+      "event:primary\0g1": JSON.stringify(google.revision),
+      [outlookName]: `outlook_calendar\0${JSON.stringify(outlook.revision)}`,
+      [icloudName]: `icloud_calendar\0${JSON.stringify(icloud.revision)}`,
+    });
+    expect(payload.conclusions.trips.map((trip) => trip.destinationRef)).toEqual(["event:primary\0g1", outlookName, icloudName, null]);
+    // Conclusions only: no place text, time or duration of any stop.
+    for (const leaked of ["Outlook St", "iCloud St", "Google St", "12:00", "600"]) expect(JSON.stringify(payload.conclusions)).not.toContain(leaked);
+  });
 
+  it("binds the signed conclusions to the Outlook and iCloud Calendars that took part (decision D18)", async () => {
+    const secret = "s".repeat(64);
+    const key = async () => {
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+      return verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!.src;
+    };
+    setUp({ google: [google] });
+    const googleOnly = await key();
+    setUp({ google: [google], outlook: [] });
+    const withOutlook = await key();
+    expect(withOutlook).not.toBe(googleOnly);
+  });
+
+  it("still signs a Google-only day with an Outlook Calendar that has no located event", async () => {
+    const secret = "s".repeat(64);
     vi.clearAllMocks();
     setUp({ google: [google], outlook: [{ ...outlook, location: "" }] });
     mocks.icloud.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
@@ -1253,7 +1279,7 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
     mocks.historySessions.mockResolvedValue([]);
     const googleOnly = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
     const payload = verifyTravelConclusionsToken(googleOnly.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
-    expect(Object.keys(payload!.events)).toEqual(["event:primary\0g1"]);
+    expect(Object.keys(payload!.events)).toEqual(["event:primary\0g1", "event:outlook_calendar\0cal-1\0outlook_calendar/o1"]);
   });
 
   it("reads Outlook from today for tomorrow's first trip and keeps only tomorrow's events (Ticket 282)", async () => {

@@ -285,6 +285,9 @@ HMAC-signed and bound to the user, local date, stored travel inputs and the view
 expiry. Clients keep it in page memory only and return it unchanged as
 `travelConclusions` in `POST /api/advisor/brief`. The server verifies it there; any
 failure leaves trip and weather facts `not_supplied` and never fails the brief.
+Decision D18: the token covers stops from every Calendar. It names Outlook and iCloud events
+by source, and the brief accepts it only when each named event is in its own context, which
+holds Outlook or iCloud only under that Calendar's Daily Brief disclosure.
 
 `GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
 or the Behavior's own place text, keyed by place key. Calendar-only places get no

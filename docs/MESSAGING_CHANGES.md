@@ -955,8 +955,12 @@ cite has not changed.
     not Outlook or iCloud events." is removed.
   - The Mac's disposable Outlook and iCloud caches now hold event locations, as the Google
     Calendar cache already does.
-  - The Daily Brief gets no signed travel conclusions for a day whose plan includes an Outlook
-    or iCloud event. Its in-app travel block on the Timeline still shows those trips.
+  - Decision D18 (November 6, 2026) replaces the earlier note that such days lose the Daily
+    Brief's signed travel conclusions. The brief now gets them for Outlook and iCloud stops when
+    that Calendar's Daily Brief disclosure is on: yes/no fits, trip states and weather margins
+    about those events, never times or places. With the disclosure off, a day with a stop from
+    that Calendar gets none. No disclosure text changes; text describing the brief's travel
+    facts should not say they cover Google Calendar events only.
 - **Affected:** Ticket 283, with P-016, P-017, P-019 and P-024. Files:
   `components/settings/LegalContent.tsx`, `docs/user-guide/travel.md`, Microsoft connector
   submission materials.

@@ -98,6 +98,11 @@ describe("travel conclusions token", () => {
     };
     const key = travelConclusionsSourceKey(base);
     expect(travelConclusionsSourceKey({ ...base, occurrences: [...base.occurrences].reverse() })).toBe(key);
+    // Decision D18: a Google-only key is unchanged; an Outlook or iCloud Calendar taking part changes it.
+    expect(travelConclusionsSourceKey({ ...base, connectors: null })).toBe(key);
+    const withOutlook = travelConclusionsSourceKey({ ...base, connectors: JSON.stringify([["outlook", 1, 1]]) });
+    expect(withOutlook).not.toBe(key);
+    expect(travelConclusionsSourceKey({ ...base, connectors: JSON.stringify([["outlook", 1, 2]]) })).not.toBe(withOutlook);
     expect(key).not.toContain("Gym");
     for (const changed of [
       { ...base, settingsRevision: "s2" },

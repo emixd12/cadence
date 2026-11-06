@@ -28,7 +28,9 @@ export const NO_TRAVEL_CONCLUSIONS_SECRETS: TravelConclusionsSecrets = Object.fr
 
 /**
  * Commitments are named by data the brief can turn into its own opaque refs:
- * `occurrence:<occurrence id>` or `event:<calendar id>\0<provider event id>`.
+ * `occurrence:<occurrence id>` or `event:<calendar id>\0<provider event id>`. Decision D18:
+ * an Outlook or iCloud event's name and revision start with its source and a NUL
+ * (`event:outlook_calendar\0<calendar id>\0<provider event id>`), as the brief's own refs do.
  */
 export type TravelConclusionsPayload = Readonly<{
   v: typeof TRAVEL_CONCLUSIONS_TOKEN_VERSION;
@@ -106,9 +108,12 @@ export function travelConclusionsSourceKey(input: Readonly<{
   timezone: string;
   durationRevision: string;
   calendar: Readonly<{ status: string; generation: number | null; selectionRevision: number | null }>;
+  /** Decision D18: `travelConnectorFence`, the Outlook and iCloud Calendars that take part; null while only Google can. */
+  connectors?: string | null;
   behaviors: readonly Readonly<{ id: string; whereKind: string | null; locationText: string | null; updatedAt: string }>[];
   occurrences: readonly Readonly<{ id: string; behavior_id: string; scheduled_for: string; local_date: string; schedule_kind: string; schedule_end_time: string | null; status: string }>[];
 }>): string {
+  // Appended only when Outlook or iCloud takes part, so a Google-only key is unchanged.
   return createHash("sha256").update(JSON.stringify([
     input.settingsRevision, input.habitsRevision, input.enabled, input.mode, input.routingConsentAt, input.timezone, input.durationRevision,
     input.baseLocationText, input.habits,
@@ -117,6 +122,7 @@ export function travelConclusionsSourceKey(input: Readonly<{
       .map((behavior) => [behavior.id, behavior.whereKind, behavior.locationText, behavior.updatedAt]),
     [...input.occurrences].sort((left, right) => left.id.localeCompare(right.id)).map((occurrence) => [occurrence.id, occurrence.behavior_id,
       occurrence.scheduled_for, occurrence.local_date, occurrence.schedule_kind, occurrence.schedule_end_time, occurrence.status]),
+    ...(input.connectors ? [input.connectors] : []),
   ])).digest("base64url");
 }
 

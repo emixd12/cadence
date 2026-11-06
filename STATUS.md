@@ -1,5 +1,22 @@
 # Implementation Status
 
+## Travel advisory revamp: signed Daily Brief travel lines for all Calendars (D18) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- Ticket 283 follow-up, decision D18: the travel route now signs a one-day plan whose stops
+  come from Google, Outlook or iCloud. Outlook and iCloud events are named by source, as the
+  brief names them, and the source key binds the Outlook and iCloud connections that took part.
+- The Daily Brief accepts the conclusions only when each named event is in its context with the
+  same revision. Outlook and iCloud are in that context only under their own disclosure, so a
+  stop from an undisclosed Calendar withholds the conclusions. A left-out Calendar still does.
+- The brief pipeline projects travel beside the Google-only view, so a trip to a disclosed
+  Outlook or iCloud event stays visible to the model. Before this change such a context failed
+  validation. Model input is unchanged: no leave time, duration or place.
+- Messaging impact: note on P-026; no disclosure text changes. Tests:
+  `tests/briefing-account-context.test.ts`, `tests/briefing-travel.test.ts`,
+  `tests/travel-route-refresh.service.test.ts`, `tests/travel-conclusions-token.test.ts`.
+
 ## Travel advisory revamp: a get-ready change brings the next reminder visit forward (D19) — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. New migration
@@ -31,9 +48,8 @@ the hosted push waits for the owner.**
   detail.
 - The hosted route fences Outlook and iCloud connections and event revisions like Google's.
   A failed Google read fails the request; a failed Outlook or iCloud read leaves that Calendar
-  out and routes the others (verifier fix). The Daily Brief's signed conclusions stay
-  Google-only: a plan with an Outlook or iCloud stop, or with one left out, carries no token.
-  Known limit, follow-up: the Daily Brief has no signed travel conclusions on such days.
+  out and routes the others (verifier fix). A plan with a left-out Calendar carries no token.
+  Decision D18 (entry above) extends signed conclusions to Outlook and iCloud stops.
 - The Ticket 279 line limiting reminders to Google Calendar events is removed.
 - Messaging: P-026 (new), notes on P-017, P-019 and P-024. No cost table change.
 - Tests: connector providers and services, `tests/external-event-contract.test.ts`,

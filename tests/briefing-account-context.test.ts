@@ -4,6 +4,13 @@ import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import fixture from "./fixtures/advisor-day-context.valid.json";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { issueTravelConclusionsToken, travelConclusionsSourceKey, travelDurationRevision, type TravelConclusionsPayload, type TravelConclusionsSecrets } from "@/lib/services/travel-conclusions-token";
+import { travelConnectorFence } from "@/lib/services/travel-calendar-sources";
+import {
+  projectUnavailableVersionedAdvisorCalendar,
+  projectVersionedAdvisorCalendarConnector,
+  validateVersionedAdvisorDayContext,
+} from "@cadence/core/services/advisor-day-context";
+import { outlookDaySnapshot } from "./helpers/connector-day-context";
 
 const mocks = vi.hoisted(() => ({
   preferences: vi.fn(),
@@ -16,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   analysis: vi.fn(),
   analysisRevision: vi.fn(),
   outlook: vi.fn(),
+  icloud: vi.fn(),
   connector: vi.fn(),
   travelSettings: vi.fn(),
   whereKinds: vi.fn(),
@@ -31,6 +39,7 @@ vi.mock("@/lib/db/timeSessions.repo", () => ({ listTimeSessionHistory: mocks.his
 vi.mock("@/lib/db/travelSettings.repo", () => ({ readTravelSettingsRow: mocks.travelSettings, readTravelBehaviorLocations: mocks.whereKinds }));
 vi.mock("@/lib/db/placeLabels.repo", () => ({ readPlaceLabelSettingsRow: mocks.labelSettings, readCompletionPlaceLabelRows: mocks.labels }));
 vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook }));
+vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud }));
 vi.mock("@/lib/services/connector-credentials", () => ({ getConnectorConnection: mocks.connector }));
 vi.mock("@/lib/db/advisor-analysis.repo", async (original) => ({
   ...await original<typeof import("@/lib/db/advisor-analysis.repo")>(),
@@ -189,10 +198,11 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
   const calendar = { status: "connected", generation: 1, selectionRevision: 1 };
   const dayOccurrence = { id: "fixture", behavior_id: "fixture", scheduled_for: fixture.cadence.occurrences[0]!.scheduledFor, local_date: fixture.localDate,
     schedule_kind: "exact", schedule_end_time: null, status: "unresolved", updated_at: "2026-10-01T00:00:00Z" };
-  const sourceKey = () => travelConclusionsSourceKey({ settingsRevision: routeSource.settingsRevision, habitsRevision: null, enabled: true, mode: "transit",
+  const disconnected = { status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } };
+  const sourceKey = (connectors: string | null = null) => travelConclusionsSourceKey({ settingsRevision: routeSource.settingsRevision, habitsRevision: null, enabled: true, mode: "transit",
     timezone: fixture.timezone, durationRevision: travelDurationRevision([], []),
     baseLocationText: routeSource.settings.baseLocationText, habits: null,
-    routingConsentAt: routeSource.settings.routingConsentAt, calendar, behaviors: routeSource.behaviors, occurrences: [dayOccurrence] });
+    routingConsentAt: routeSource.settings.routingConsentAt, calendar, connectors, behaviors: routeSource.behaviors, occurrences: [dayOccurrence] });
   const payload = (overrides: Partial<Omit<TravelConclusionsPayload, "v">> = {}): Omit<TravelConclusionsPayload, "v"> => ({
     sub: "owner-1", date: fixture.localDate, src: sourceKey(), iat: "2026-11-01T11:58:00Z", exp: "2026-11-01T12:03:00Z",
     conclusions: { version: "2.0", travelDay: "yes", calendarEvents: true,
@@ -215,6 +225,8 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
     mocks.whereKinds.mockResolvedValue([{ id: "fixture", where_kind: "home", location_text: null }]);
     mocks.routeSource.mockResolvedValue(routeSource);
     mocks.calendar.mockResolvedValue(calendar);
+    mocks.outlook.mockResolvedValue(disconnected);
+    mocks.icloud.mockResolvedValue(disconnected);
     mocks.dayOccurrences.mockImplementation(async (_client, _owner, start) => start === fixture.localDate ? [dayOccurrence] : []);
   });
 
@@ -306,6 +318,63 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
       version: "2.0", travelDay: "no", calendarEvents: false, trips: [], fits: [],
     }, weather: null, events: {} }), SECRET));
     expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+  });
+
+  describe("stops from Outlook and iCloud (decision D18)", () => {
+    const outlookConnection = { status: "connected", generation: 2, selectionRevision: 3, preferences: { selectedSourceIds: ["calendar-1"] } };
+    const fence = travelConnectorFence({ google: calendar, outlook: outlookConnection, icloud: disconnected } as never);
+    const testRef = (kind: string, value: string) => kind === "revision" ? `revision_${value}` : `${kind}_${value}`;
+    const outlookEvent = outlookDaySnapshot().events[0];
+    const outlookName = `event:outlook_calendar\0calendar-1\0${outlookEvent.providerEventId}`;
+    const outlookRevision = `outlook_calendar\0${JSON.stringify(outlookEvent.revision)}`;
+    const withOutlook = (connector: unknown) => validateVersionedAdvisorDayContext({ ...fixture, version: "1.1",
+      status: (connector as { complete: boolean }).complete ? "complete" : "partial", connectors: [fixture.connectors[0], connector] });
+    const currentOutlook = () => projectVersionedAdvisorCalendarConnector({ snapshot: outlookDaySnapshot(), selectionRevision: 3,
+      now: Temporal.Instant.from(fixture.capturedAt), makeOpaqueRef: testRef });
+    const mixed = payload({ src: sourceKey(fence),
+      conclusions: { version: "2.0", travelDay: "yes", calendarEvents: true,
+        trips: [{ destinationRef: "event:fixture", role: "outbound", mode: "transit", estimate: "current" },
+          { destinationRef: outlookName, role: "onward", mode: "transit", estimate: "current" },
+          { destinationRef: null, role: "return", mode: "transit", estimate: "current" }],
+        fits: [{ ref: "occurrence:fixture", conclusion: "fits", basis: "travel_known", trip: { destinationRef: outlookName, role: "onward" }, position: "before" }] },
+      weather: null,
+      events: { "event:fixture": "event", [outlookName]: outlookRevision } });
+    beforeEach(() => mocks.outlook.mockResolvedValue(outlookConnection));
+
+    it("maps a mixed Google and Outlook day to this context's refs when Outlook is disclosed", async () => {
+      mocks.contexts.mockResolvedValue([withOutlook(currentOutlook())]);
+      const prepared = await prepare(issueTravelConclusionsToken(mixed, SECRET));
+      const outlookRef = `event_outlook_calendar\0calendar-1\0${outlookEvent.providerEventId}`;
+      expect(prepared.contexts[0]!.travel?.route).toMatchObject({ state: "available", conclusions: {
+        trips: [{ destinationRef: "event_fixture" }, { destinationRef: outlookRef, role: "onward" }, { destinationRef: null }],
+        fits: [{ ref: "occurrence_fixture", trip: { destinationRef: outlookRef } }] } });
+      expect(JSON.stringify(prepared.contexts)).not.toContain("event:outlook_calendar");
+      await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+    });
+
+    it("supplies nothing when the token names an Outlook stop the brief's Outlook disclosure leaves out", async () => {
+      const prepared = await prepare(issueTravelConclusionsToken(mixed, SECRET));
+      expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+    });
+
+    it("keeps a Google-only day's conclusions while an undisclosed Outlook Calendar has no event", async () => {
+      const prepared = await prepare(issueTravelConclusionsToken(payload({ src: sourceKey(fence) }), SECRET));
+      expect(prepared.contexts[0]!.travel?.route.state).toBe("available");
+    });
+
+    it("requires a current Outlook snapshot when Outlook is disclosed and took part", async () => {
+      mocks.contexts.mockResolvedValue([withOutlook(projectUnavailableVersionedAdvisorCalendar({ source: "outlook_calendar", connectionGeneration: 2,
+        selectionRevision: 3, failure: { code: "timeout", retryable: true, retryAfterSeconds: null } }))]);
+      const prepared = await prepare(issueTravelConclusionsToken(payload({ src: sourceKey(fence) }), SECRET));
+      expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+    });
+
+    it("rejects a token issued before Outlook took part, and a changed Outlook event", async () => {
+      mocks.contexts.mockResolvedValue([withOutlook(currentOutlook())]);
+      expect((await prepare(issueTravelConclusionsToken({ ...mixed, src: sourceKey() }, SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
+      const moved = { ...mixed, events: { ...mixed.events, [outlookName]: "outlook_calendar\0older" } };
+      expect((await prepare(issueTravelConclusionsToken(moved, SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
+    });
   });
 
   it("withholds conclusions when the complete Calendar event set changes", async () => {

@@ -25,9 +25,9 @@ export type TravelCalendarConnections = Readonly<{
 export type TravelConnectorName = "outlook" | "icloud";
 
 export type TravelCalendarEvents = Readonly<{
-  /** The Google snapshot's events. The Daily Brief's signed conclusions name only these. */
+  /** The Google snapshot's events. */
   google: readonly NormalizedExternalEvent[];
-  /** Every Calendar's events, Google first. */
+  /** Every Calendar's events, Google first. The Daily Brief's signed conclusions name all of them (decision D18). */
   all: readonly NormalizedExternalEvent[];
   /** The Google snapshot's timezone, when Google was read. */
   timezone: string | null;
@@ -78,6 +78,18 @@ export async function readTravelCalendarEvents(caller: CalendarReadCaller, conne
     timezone: google?.requestedRange.timezone ?? null,
     unavailable: [...(previous?.unavailable ?? []), ...[outlook, icloud].flatMap((entry) => "failed" in entry ? [entry.name] : [])],
   };
+}
+
+/**
+ * Decision D18: the Calendars a travel plan reads, named as the Daily Brief names its sources.
+ * Google takes part while connected; Outlook and iCloud while connected with a calendar selected.
+ */
+export function travelCalendarSourcesTakingPart(connections: TravelCalendarConnections): Array<"google_calendar" | "outlook_calendar" | "icloud_calendar"> {
+  return [
+    ...(connections.google.status === "connected" ? ["google_calendar" as const] : []),
+    ...(connectorReadable(connections.outlook) ? ["outlook_calendar" as const] : []),
+    ...(connectorReadable(connections.icloud) ? ["icloud_calendar" as const] : []),
+  ];
 }
 
 /** Which Calendars took part, for fences and the journey revision. Unchanged while only Google is connected. */

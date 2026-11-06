@@ -16683,17 +16683,20 @@ Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed
 opt-in read (`fields=location`, `includeLocation`) used by the Timeline, the travel route
 and the leave reminder job, never the Daily Brief; released clients keep the first-slice
 shape. `lib/services/travel-calendar-sources.ts` reads and fences all three Calendars.
-Outlook drops an online meeting's placeholder location. The Daily Brief's signed conclusions
-stay Google-only, so a plan with an Outlook or iCloud stop carries none. The Ticket 279
+Outlook drops an online meeting's placeholder location. The Ticket 279
 Google-only line is removed. No cost table change.
 Verifier fix (November 6, 2026): a failed Outlook or iCloud read (a connector error other
 than `invalid_request`) now leaves that Calendar out of the request and routes the others, as
 before this ticket; the final revision check reads the same Calendars, and such a plan carries
 no signed conclusions. A failed Google read still fails the request.
-Known limit: on a day with an Outlook or iCloud stop, or with one of those Calendars left out,
-the Daily Brief gets no signed travel conclusions and shows its travel block without them.
-Covering those stops needs the brief verifier to accept Outlook and iCloud event refs, only
-when the brief's own Outlook or iCloud disclosure is on; that is follow-up work.
+Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
+cover Outlook and iCloud stops. The token names those events by source, and its source key
+binds the Outlook and iCloud connections that took part. The brief accepts it only when each
+named event is in its own context, which holds Outlook or iCloud only under that Calendar's
+Daily Brief disclosure; a stop from an undisclosed Calendar withholds the conclusions. A
+disclosed Calendar that took part needs a current, complete read. A left-out Calendar still
+withholds the token. The brief pipeline projects travel beside its Google-only view, so trips
+to disclosed Outlook or iCloud events stay visible. Leave times never reach the model.
 Dependencies: Tickets 281, 277 and 279. Decision D4.
 
 Goal: people whose events are not in Google Calendar get leave times too (G6).
@@ -16723,10 +16726,12 @@ Platform impact:
 | Marketing | Not applicable until release. P-019 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
 
-Messaging impact: P-019, P-026 (notes on P-017 and P-024).
+Messaging impact: P-019, P-026 (notes on P-017 and P-024; D18 note on P-026).
 
 Verification: connector and route service tests, `npm run interactions:check`, local
-verification with fixtures.
+verification with fixtures. D18: `tests/briefing-account-context.test.ts`,
+`tests/briefing-travel.test.ts`, `tests/travel-route-refresh.service.test.ts`,
+`tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 284: Web acceptance with the real clock
 

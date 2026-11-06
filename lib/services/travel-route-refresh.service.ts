@@ -54,8 +54,8 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 282: a `first_trip` request routes only tomorrow's first trip from Home, with no weather
  * and no signed conclusions, so today's conclusions and the Daily Brief never include it.
  * Ticket 283: Outlook and iCloud events route under the same rules as Google Calendar events.
- * Their locations are read for this request only. The Daily Brief's signed conclusions stay
- * Google-only, so a view whose plan includes an Outlook or iCloud event carries none.
+ * Their locations are read for this request only. Decision D18: the signed conclusions name
+ * every Calendar's events, so a day mixing Calendars keeps them.
  */
 export async function refreshTravelRoutes(
   caller: CalendarReadCaller,
@@ -215,19 +215,17 @@ export async function refreshTravelRoutes(
     ...doomed.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_READY_AFTER_END })),
   ];
   // A trip request leaves the other trips unrouted, so its conclusions would not describe the day.
-  // Ticket 283: the brief names only Google Calendar events, so an Outlook or iCloud stop withholds the token,
-  // and so does a left-out Outlook or iCloud Calendar, whose stops the conclusions would miss.
-  const googleIds = new Set(calendarEvents.google.map((event) => event.id));
+  // A left-out Outlook or iCloud Calendar withholds the token too: the conclusions would miss its stops.
   const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip &&
-    calendarEvents.unavailable.length === 0 && commitments.every((commitment) => commitment.kind !== "calendar" || googleIds.has(commitment.ref));
+    calendarEvents.unavailable.length === 0;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
-    events: calendarEvents.google, occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    events, occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
     sourceKey: travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
       enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
       baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
-      calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
+      calendar: calendar, connectors: travelConnectorFence(calendars), behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
   const budget = await readTravelBudget(caller, timezone, now);
   return response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
@@ -581,7 +579,8 @@ function response(accountId: string, source: Awaited<ReturnType<typeof readTrave
 /**
  * Signs Cadence's conclusions for this view (Ticket 219 Option A). Commitments are named
  * by occurrence ID or Calendar event identity so the brief can map them to its own refs.
- * Any commitment it cannot name withholds the whole token.
+ * Decision D18: `events` is every Calendar's snapshot; Outlook and iCloud names carry their
+ * source, as the brief's refs do. Any commitment it cannot name withholds the whole token.
  */
 function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   secret: string; userId: string; localDate: string; now: Temporal.Instant; expiresAt: string; sourceKey: string;
@@ -591,10 +590,10 @@ function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   if (!conclusions || Temporal.Instant.compare(Temporal.Instant.from(input.expiresAt), input.now) <= 0) return null;
   const occurrences = new Set(input.occurrenceIds);
   const events = new Map(input.events.map((event) => [event.id, event]));
-  const named = new Map(input.events.map((event) => [`event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision)]));
+  const named = new Map(input.events.map((event) => [conclusionEventName(event), conclusionEventRevision(event)]));
   const rename = (ref: string) => {
     const event = events.get(ref);
-    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? `event:${event.calendarId}\0${event.providerEventId}` : null;
+    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? conclusionEventName(event) : null;
     if (!key) throw new Error("Unnamed travel commitment.");
     return key;
   };
@@ -605,4 +604,17 @@ function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   } catch {
     return null;
   }
+}
+
+/** Matches the brief's own event ref input: Google unscoped, Outlook and iCloud led by their source. */
+function conclusionEventScope(event: NormalizedExternalEvent, value: string): string {
+  return event.source === "outlook_calendar" || event.source === "icloud_calendar" ? `${event.source}\0${value}` : value;
+}
+
+function conclusionEventName(event: NormalizedExternalEvent): string {
+  return `event:${conclusionEventScope(event, `${event.calendarId}\0${event.providerEventId}`)}`;
+}
+
+function conclusionEventRevision(event: NormalizedExternalEvent): string {
+  return conclusionEventScope(event, JSON.stringify(event.revision));
 }

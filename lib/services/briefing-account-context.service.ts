@@ -41,9 +41,13 @@ import { assertBriefContextFresh, DailyBriefError } from "./daily-brief-consumer
 import { getCalendarConnection, type CalendarCaller } from "./google-calendar.service";
 import { getConnectorConnection } from "./connector-credentials";
 import { getOutlookCalendarConnection } from "./outlook-calendar.service";
+import { readTravelCalendarConnections, travelCalendarSourcesTakingPart, travelConnectorFence } from "./travel-calendar-sources";
 
 const CLIENT_ID = "cadence-daily-brief";
-type VerifiedTravelConclusions = TravelConclusionsPayload & Readonly<{ calendarRequired: boolean }>;
+type TravelCalendarSource = "google_calendar" | "outlook_calendar" | "icloud_calendar";
+const TRAVEL_CALENDAR_SOURCES: readonly string[] = ["google_calendar", "outlook_calendar", "icloud_calendar"] satisfies TravelCalendarSource[];
+/** `takingPart`: the Calendars the current travel inputs read (decision D18). */
+type VerifiedTravelConclusions = TravelConclusionsPayload & Readonly<{ takingPart: readonly TravelCalendarSource[] }>;
 
 export function briefingAccountRef(userId: string): string {
   return createHash("sha256").update(`cadence-daily-brief-account\0${userId}`).digest("base64url");
@@ -332,14 +336,14 @@ async function readSuppliedTravelConclusions(caller: CalendarCaller, supplied: R
   const payload = verifyTravelConclusionsToken(supplied.token, { secrets: supplied.secrets, userId: caller.user.id, localDate, now });
   if (!payload) return null;
   const current = await readCurrentTravelSource(caller, localDate, now);
-  return current.key === payload.src ? { ...payload, calendarRequired: current.calendarRequired } : null;
+  return current.key === payload.src ? { ...payload, takingPart: current.takingPart } : null;
 }
 
-async function readCurrentTravelSource(caller: CalendarCaller, localDate: string, now: Temporal.Instant): Promise<Readonly<{ key: string; calendarRequired: boolean }>> {
+async function readCurrentTravelSource(caller: CalendarCaller, localDate: string, now: Temporal.Instant): Promise<Readonly<{ key: string; takingPart: readonly TravelCalendarSource[] }>> {
   const historyRange = travelDurationHistoryRange(localDate);
-  const [source, calendar, occurrences, timezone, historyOccurrences, historySessions] = await Promise.all([
+  const [source, calendars, occurrences, timezone, historyOccurrences, historySessions] = await Promise.all([
     readTravelRouteSource(caller.client, caller.user.id),
-    getCalendarConnection(caller),
+    readTravelCalendarConnections(caller),
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, localDate, localDate),
     readAdvisorProfileTimezone(caller.client, caller.user.id),
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
@@ -349,19 +353,30 @@ async function readCurrentTravelSource(caller: CalendarCaller, localDate: string
   const key = travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
     enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
     baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
-    calendar, behaviors: source.behaviors, occurrences, timezone, durationRevision: travelDurationRevision(historyOccurrences, historySessions) });
-  return { key, calendarRequired: calendar.status === "connected" };
+    calendar: calendars.google, connectors: travelConnectorFence(calendars), behaviors: source.behaviors, occurrences, timezone,
+    durationRevision: travelDurationRevision(historyOccurrences, historySessions) });
+  return { key, takingPart: travelCalendarSourcesTakingPart(calendars) };
 }
 
-/** Maps the token's commitments to this context's opaque refs; a changed Calendar event throws. */
+/**
+ * Maps the token's commitments to this context's opaque refs; a changed Calendar event throws.
+ * Decision D18: the token names events from every Calendar the plan read. Each Outlook or
+ * iCloud event must be in this context, which holds that Calendar only under its own brief
+ * disclosure, so a day with a stop from an undisclosed Calendar gets no conclusions.
+ */
 function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
   makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
-  const calendar = context.connectors.find((connector) => connector.source === "google_calendar");
-  if (supplied.calendarRequired && (!calendar || calendar.state !== "current" || !calendar.complete)) {
-    throw new Error("Current Calendar snapshot is required for travel conclusions.");
+  const calendars = context.connectors.filter((connector) => TRAVEL_CALENDAR_SOURCES.includes(connector.source));
+  for (const source of supplied.takingPart) {
+    const calendar = calendars.find((connector) => connector.source === source);
+    // Google is required, as before D18. Outlook or iCloud is checked when disclosed; undisclosed, it must name no event.
+    const required = source === "google_calendar" || (!!calendar && calendar.state !== "not_requested");
+    if (required && (!calendar || calendar.state !== "current" || !("complete" in calendar) || !calendar.complete)) {
+      throw new Error("Current Calendar snapshot is required for travel conclusions.");
+    }
   }
-  const eventRevisions = new Map(context.connectors.flatMap((connector) =>
-    connector.source === "google_calendar" && connector.state !== "not_requested" && "events" in connector
+  const eventRevisions = new Map(calendars.flatMap((connector) =>
+    connector.state !== "not_requested" && "events" in connector
       ? connector.events.map((event) => [event.ref, event.revision] as const) : []));
   if (Object.keys(supplied.events).length !== eventRevisions.size || Object.entries(supplied.events).some(([key, revision]) =>
     !key.startsWith("event:") || eventRevisions.get(makeOpaqueRef("event", key.slice("event:".length))) !== makeOpaqueRef("revision", revision))) {

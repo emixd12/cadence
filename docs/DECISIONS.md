@@ -1721,3 +1721,25 @@ Platform impact: web through the hosted job (Tickets 275 and 277). Desktop: a li
 synced get-ready change reaches the hosted row and moves the visit too; the Mac's own
 notifications already move at once (Ticket 280). Marketing: not applicable. Future mobile: the
 hosted contract is portable; native mobile is deferred. Messaging impact: none.
+
+## 2026-11-06: Signed Daily Brief travel lines cover every Calendar's stops (D18)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the Ticket 283
+verifier recorded that a day with an Outlook or iCloud stop lost its signed travel conclusions:
+
+1. Signed Daily Brief travel conclusions cover every routed stop, including Outlook and iCloud
+   stops, so days that mix Calendars keep their lines.
+
+The route signs a one-day plan whatever Calendar its stops come from. The token names an
+Outlook or iCloud event by its source, calendar and provider event ID, as the brief's own refs
+do, and its source key adds the Outlook and iCloud connections that took part. The brief accepts
+the token only when each named event is in its own context with the same revision. An Outlook or
+iCloud Calendar is in that context only under its own Daily Brief disclosure, so the disclosure
+still decides what the brief may say: a stop from an undisclosed Calendar withholds all signed
+conclusions. A disclosed Calendar that took part must have a current, complete read, as Google
+must. A left-out Calendar (Ticket 283 verifier fix) still withholds the token. The model input
+keeps the same closed shape: yes/no fits, trip states and weather margins, never a time.
+
+Platform impact: web through the hosted route and the Daily Brief. Desktop: a linked Mac uses the
+same hosted route and brief. Marketing: not applicable. Future mobile: the hosted contract is
+portable; native mobile is deferred. Messaging impact: note on P-026.

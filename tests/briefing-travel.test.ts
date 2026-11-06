@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { validateAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
+import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "@cadence/core/services/advisor-day-context";
+import { EXTERNAL_EVENT_SOURCE_VERSIONS } from "@cadence/core/types/external-event";
 import { DEFAULT_BRIEFING_CONFIG, projectBriefingContext, scopeBriefingContext } from "@cadence/core/services/briefing-config";
 import type { BriefingConfig } from "@cadence/core/types/briefing-config";
 import { briefingFixture } from "@/lib/services/briefing-fixtures";
@@ -99,6 +100,24 @@ describe("Daily Brief travel facts", () => {
     const unknown = projectBriefingContext(briefingFixture("travel_unknown", narrowed), narrowed).facts;
     expect(unknown.travel?.behaviors).toEqual([{ behaviorRef: "behavior_fixture", where: "anywhere" }]);
     expect(Object.keys(fit(unknown))).toEqual(["occurrence_travel_run"]);
+  });
+
+  it("keeps conclusions about a disclosed Outlook stop, and withholds them without Calendar (decision D18)", () => {
+    // The dentist is an Outlook event; Google Calendar is not part of this brief.
+    const day = briefingFixture("travel_day", config);
+    const google = day.connectors[0]!;
+    const outlook = { ...google, source: "outlook_calendar", ...EXTERNAL_EVENT_SOURCE_VERSIONS.outlook_calendar };
+    const context = validateVersionedAdvisorDayContext({ ...day, version: "1.1", connectors: [{ source: "google_calendar", state: "not_requested" }, outlook] });
+    const prepared = prepareBriefing(context, config, context.capturedAt);
+    expect(prepared.facts.travel?.route).toMatchObject({ state: "available", conclusions: { calendarEvents: true,
+      trips: [{ destinationRef: "event_travel_dentist", role: "outbound" }, { destinationRef: "occurrence_travel_stretch", role: "onward" }] } });
+    expect(prepared.facts.travel?.weather).toMatchObject({ state: "applied" });
+    expect(prepared.contextControls.travel).toEqual({ route: "available" });
+    expect("connectorSources" in prepared.facts && prepared.facts.connectorSources?.calendars?.map((item) => item.source)).toEqual(["outlook_calendar"]);
+
+    const excluded = prepareBriefing(context, withScope({ includeCalendar: false }), context.capturedAt);
+    expect(excluded.facts.travel?.route).toEqual({ state: "unavailable", reason: "calendar_not_included" });
+    expect(excluded.facts.travel?.weather).toMatchObject({ state: "calendar_not_included", trips: [] });
   });
 
   it("keeps travel out of the planner and out of contexts without it", () => {
