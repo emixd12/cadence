@@ -360,25 +360,33 @@ async function readCurrentTravelSource(caller: CalendarCaller, localDate: string
 
 /**
  * Maps the token's commitments to this context's opaque refs; a changed Calendar event throws.
- * Decision D18: the token names events from every Calendar the plan read. Each Outlook or
- * iCloud event must be in this context, which holds that Calendar only under its own brief
- * disclosure, so a day with a stop from an undisclosed Calendar gets no conclusions.
+ * Decision D18: the token names events from every Calendar the plan read. A disclosed Outlook or
+ * iCloud Calendar must match its snapshot here. An undisclosed one is absent from this context:
+ * when the token says it had a stop, the conclusions reflect events the brief may not use, so
+ * nothing is supplied; when it had none (only unlocated or past events, which D12 keeps out of
+ * travel), its events are left out of the comparison and the other Calendars' lines stay.
  */
 function withSuppliedConclusions(context: AdvisorDayContext, travel: AdvisorTravelContext, supplied: VerifiedTravelConclusions,
   makeOpaqueRef: AdvisorOpaqueRef): AdvisorTravelContext {
   const calendars = context.connectors.filter((connector) => TRAVEL_CALENDAR_SOURCES.includes(connector.source));
+  const ignored: TravelCalendarSource[] = [];
   for (const source of supplied.takingPart) {
     const calendar = calendars.find((connector) => connector.source === source);
-    // Google is required, as before D18. Outlook or iCloud is checked when disclosed; undisclosed, it must name no event.
-    const required = source === "google_calendar" || (!!calendar && calendar.state !== "not_requested");
-    if (required && (!calendar || calendar.state !== "current" || !("complete" in calendar) || !calendar.complete)) {
+    // Google is required, as before D18. Outlook or iCloud is checked when disclosed.
+    if (source !== "google_calendar" && (!calendar || calendar.state === "not_requested")) {
+      if (supplied.stops[source]) throw new Error("An undisclosed Calendar had a travel stop.");
+      ignored.push(source);
+      continue;
+    }
+    if (!calendar || calendar.state !== "current" || !("complete" in calendar) || !calendar.complete) {
       throw new Error("Current Calendar snapshot is required for travel conclusions.");
     }
   }
+  const compared = Object.entries(supplied.events).filter(([key]) => !ignored.some((source) => key.startsWith(`event:${source}\0`)));
   const eventRevisions = new Map(calendars.flatMap((connector) =>
     connector.state !== "not_requested" && "events" in connector
       ? connector.events.map((event) => [event.ref, event.revision] as const) : []));
-  if (Object.keys(supplied.events).length !== eventRevisions.size || Object.entries(supplied.events).some(([key, revision]) =>
+  if (compared.length !== eventRevisions.size || compared.some(([key, revision]) =>
     !key.startsWith("event:") || eventRevisions.get(makeOpaqueRef("event", key.slice("event:".length))) !== makeOpaqueRef("revision", revision))) {
     throw new Error("Calendar event set changed after travel was planned.");
   }

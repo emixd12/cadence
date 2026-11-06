@@ -212,6 +212,7 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
     weather: { source: "open_meteo", tableVersion: "weather-margin@1", state: "applied", calendarEvents: true, trips: [
       { destinationRef: "event:fixture", role: "outbound", mode: "transit", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null }] },
     events: { "event:fixture": "event" },
+    stops: { outlook_calendar: false, icloud_calendar: false },
     ...overrides,
   });
   const prepare = (token: unknown, tokenSecrets: { current: string | null; previous: string | null } = secrets, clock = now) =>
@@ -338,7 +339,8 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
           { destinationRef: null, role: "return", mode: "transit", estimate: "current" }],
         fits: [{ ref: "occurrence:fixture", conclusion: "fits", basis: "travel_known", trip: { destinationRef: outlookName, role: "onward" }, position: "before" }] },
       weather: null,
-      events: { "event:fixture": "event", [outlookName]: outlookRevision } });
+      events: { "event:fixture": "event", [outlookName]: outlookRevision },
+      stops: { outlook_calendar: true, icloud_calendar: false } });
     beforeEach(() => mocks.outlook.mockResolvedValue(outlookConnection));
 
     it("maps a mixed Google and Outlook day to this context's refs when Outlook is disclosed", async () => {
@@ -362,10 +364,37 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
       expect(prepared.contexts[0]!.travel?.route.state).toBe("available");
     });
 
-    it("supplies nothing when an undisclosed Outlook Calendar has any event, even one that is not a stop (known limit)", async () => {
+    it("keeps a Google day's conclusions when an undisclosed Outlook Calendar had only events that were not stops", async () => {
       const unlocated = payload({ src: sourceKey(fence), events: { "event:fixture": "event", [outlookName]: outlookRevision } });
       const prepared = await prepare(issueTravelConclusionsToken(unlocated, SECRET));
-      expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+      expect(prepared.contexts[0]!.travel?.route).toMatchObject({ state: "available", conclusions: {
+        trips: [{ destinationRef: "event_fixture" }, { destinationRef: null }], fits: [{ ref: "occurrence_fixture" }] } });
+      // Nothing about the undisclosed event reaches the context.
+      expect(JSON.stringify(prepared.contexts)).not.toContain("outlook");
+      expect(JSON.stringify(prepared.contexts)).not.toContain(outlookEvent.providerEventId);
+      await expect(prepared.assertCurrent()).resolves.toBeUndefined();
+    });
+
+    it("supplies nothing when an undisclosed Outlook Calendar had a stop, even one the conclusions do not name", async () => {
+      const unnamed = payload({ src: sourceKey(fence), events: { "event:fixture": "event", [outlookName]: outlookRevision },
+        stops: { outlook_calendar: true, icloud_calendar: false } });
+      expect((await prepare(issueTravelConclusionsToken(unnamed, SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
+    });
+
+    it("still compares a disclosed Outlook Calendar's events whatever its stop flag says", async () => {
+      mocks.contexts.mockResolvedValue([withOutlook(currentOutlook())]);
+      const noStop = payload({ src: sourceKey(fence), events: { "event:fixture": "event", [outlookName]: outlookRevision } });
+      expect((await prepare(issueTravelConclusionsToken(noStop, SECRET))).contexts[0]!.travel?.route.state).toBe("available");
+      // A disclosed Outlook event missing from the token, or one the token names but this context lacks, withholds the lines.
+      expect((await prepare(issueTravelConclusionsToken(payload({ src: sourceKey(fence) }), SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
+      const extra = payload({ src: sourceKey(fence), events: { "event:fixture": "event", [outlookName]: outlookRevision,
+        "event:outlook_calendar\0calendar-1\0added": "outlook_calendar\0{}" } });
+      expect((await prepare(issueTravelConclusionsToken(extra, SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
+    });
+
+    it("still compares every Google event while an undisclosed Outlook Calendar is left out of the comparison", async () => {
+      const extra = payload({ src: sourceKey(fence), events: { "event:fixture": "event", "event:other": "event" } });
+      expect((await prepare(issueTravelConclusionsToken(extra, SECRET))).contexts[0]!.travel).toMatchObject(notSupplied);
     });
 
     it("requires a current Outlook snapshot when Outlook is disclosed and took part", async () => {

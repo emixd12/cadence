@@ -755,7 +755,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
         { destinationRef: "occurrence:occurrence-1", role: "outbound", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
         { destinationRef: null, role: "return", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
       ] },
-      events: {} });
+      events: {}, stops: { outlook_calendar: false, icloud_calendar: false } });
     // The view itself stays free of model conclusions.
     expect(result.evidence).not.toHaveProperty("modelProjection");
     const body = decode(result.conclusionsToken!);
@@ -1249,6 +1249,7 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
       [icloudName]: `icloud_calendar\0${JSON.stringify(icloud.revision)}`,
     });
     expect(payload.conclusions.trips.map((trip) => trip.destinationRef)).toEqual(["event:primary\0g1", outlookName, icloudName, null]);
+    expect(payload.stops).toEqual({ outlook_calendar: true, icloud_calendar: true });
     // Conclusions only: no place text, time or duration of any stop.
     for (const leaked of ["Outlook St", "iCloud St", "Google St", "12:00", "600"]) expect(JSON.stringify(payload.conclusions)).not.toContain(leaked);
   });
@@ -1280,6 +1281,26 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
     const googleOnly = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
     const payload = verifyTravelConclusionsToken(googleOnly.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
     expect(Object.keys(payload!.events)).toEqual(["event:primary\0g1", "event:outlook_calendar\0cal-1\0outlook_calendar/o1"]);
+    // Decision D18: the unlocated Outlook event is no stop, so the brief may keep these lines with Outlook undisclosed.
+    expect(payload!.stops).toEqual({ outlook_calendar: false, icloud_calendar: false });
+  });
+
+  it("flags only the Calendars that had a stop, counting a stop past the nine-stop bound but not an ended or declined event (decision D18)", async () => {
+    const secret = "s".repeat(64);
+    const googleStops = Array.from({ length: 9 }, (_, index) => event(`g${index}`, `2026-09-22T1${index}:00:00Z`, `2026-09-22T1${index}:30:00Z`, `G${index} St`,
+      { state: "confirmed", currentUserResponse: "accepted", calendarId: "primary" }));
+    const stopsFor = async (input: Parameters<typeof setUp>[0]) => {
+      setUp(input);
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+      return verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!.stops;
+    };
+    // An Outlook stop after nine Google stops is left out of the plan but still marks the boundary stop, so it counts.
+    expect(await stopsFor({ google: googleStops, outlook: [event("outlook_calendar/late", "2026-09-22T20:00:00Z", "2026-09-22T21:00:00Z")] }))
+      .toEqual({ outlook_calendar: true, icloud_calendar: false });
+    // A located iCloud event that already ended, and a declined one, are not stops; nor is an Outlook Calendar with no event.
+    expect(await stopsFor({ google: [google], outlook: [], icloud: [event("icloud_calendar/past", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z"),
+      event("icloud_calendar/declined", "2026-09-22T16:00:00Z", "2026-09-22T17:00:00Z", "Declined St", { currentUserResponse: "declined" })] }))
+      .toEqual({ outlook_calendar: false, icloud_calendar: false });
   });
 
   it("reads Outlook from today for tomorrow's first trip and keeps only tomorrow's events (Ticket 282)", async () => {

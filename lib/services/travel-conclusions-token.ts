@@ -47,7 +47,15 @@ export type TravelConclusionsPayload = Readonly<{
   weather: AdvisorWeatherOutlook | null;
   /** Complete Calendar snapshot, including events that did not become a named trip. */
   events: Readonly<Record<string, string>>;
+  /**
+   * Decision D18: per Outlook and iCloud Calendar, whether any of its events was a stop the plan
+   * routed or counted. One boolean each and nothing else about the events. The brief ignores the
+   * events of an undisclosed Calendar only when it had no stop; with a stop it withholds every line.
+   */
+  stops: TravelConclusionsStops;
 }>;
+
+export type TravelConclusionsStops = Readonly<{ outlook_calendar: boolean; icloud_calendar: boolean }>;
 
 /** A secret shorter than 32 characters counts as not configured. */
 export function readTravelConclusionsSecrets(env: Readonly<Record<string, string | undefined>>): TravelConclusionsSecrets {
@@ -159,7 +167,7 @@ const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 function isPayload(value: unknown): value is TravelConclusionsPayload {
   if (!record(value)) return false;
   const keys = Object.keys(value).sort().join();
-  return keys === "conclusions,date,events,exp,iat,src,sub,v,weather"
+  return keys === "conclusions,date,events,exp,iat,src,stops,sub,v,weather"
     && value.v === TRAVEL_CONCLUSIONS_TOKEN_VERSION
     && typeof value.sub === "string" && !!value.sub
     && typeof value.date === "string" && LOCAL_DATE.test(value.date)
@@ -168,7 +176,9 @@ function isPayload(value: unknown): value is TravelConclusionsPayload {
     && typeof value.exp === "string" && INSTANT.test(value.exp)
     && record(value.conclusions)
     && (value.weather === null || record(value.weather))
-    && record(value.events) && Object.values(value.events).every((revision) => typeof revision === "string");
+    && record(value.events) && Object.values(value.events).every((revision) => typeof revision === "string")
+    && record(value.stops) && Object.keys(value.stops).sort().join() === "icloud_calendar,outlook_calendar"
+    && typeof value.stops.outlook_calendar === "boolean" && typeof value.stops.icloud_calendar === "boolean";
 }
 
 function record(value: unknown): value is Record<string, unknown> {
