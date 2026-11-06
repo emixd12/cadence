@@ -432,7 +432,7 @@ all four tables (export inclusion is a backlog decision, not Ticket 216).
 ### Leave reminders (Ticket 275)
 
 Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables for
-leave reminders (decision D3). `docs/NOTIFICATION_SPEC.md`, "Leave reminders", has the
+leave reminders (decisions D3 and D15). `docs/NOTIFICATION_SPEC.md`, "Leave reminders", has the
 rules. Nothing reads or writes them until Tickets 276–280 ship.
 
 ```sql
@@ -453,13 +453,15 @@ create table travel_leave_reminders (
   status text not null default 'pending'
     check (status in ('pending', 'sent', 'failed', 'cancelled')),
   next_check_at timestamptz,
-  route_count smallint not null default 0 check (route_count between 0 and 2),
+  route_count smallint not null default 0 check (route_count between 0 and 3),
   processing_started_at timestamptz,
   sent_at timestamptz,
+  update_sent_at timestamptz,  -- the one update (D15); set once
   error text,                  -- ^[a-z][a-z0-9_]{0,63}$
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (user_id, trip_digest, local_date)
+  unique (user_id, trip_digest, local_date),
+  check (route_count < 3 or status = 'sent')
 );
 ```
 
@@ -472,13 +474,18 @@ create table travel_leave_reminders (
   new trip. The rows hold no title, place, position, route duration, leave time or
   provider result. `error` accepts only a short code, so free text cannot be stored.
 - Shape checks: `pending` needs `next_check_at` and no `sent_at`; `sent` needs
-  `sent_at`; `failed` needs `error`; terminal rows have no `next_check_at` or claim.
+  `sent_at`; `failed` needs `error`. A `sent` row may keep `next_check_at` for the
+  update route and be claimed only while it does; once `update_sent_at` is set it has
+  neither. `failed` and `cancelled` rows have no `next_check_at`, claim or
+  `update_sent_at`. A third route is allowed only on a `sent` row.
   The settings row has `enabled_at` exactly when on, and no times when off.
 - Triggers: turning reminders on sets `enabled_at` and `next_check_at` to now; a
   later save cannot change `enabled_at`. Turning them off clears both times and
   deletes the account's reminder rows. A reminder can become `pending` only while
-  reminders are on. `sent` and `failed` are final, `route_count` never goes down,
-  and a reminder keeps its owner, trip and date.
+  reminders are on, and that check locks the settings row, so a concurrent switch to
+  off cannot leave a pending row. `sent` and `failed` are final, `route_count` never
+  goes down, `update_sent_at` is set at most once, a `sent` row cannot reopen its
+  check, and a reminder keeps its owner, trip and date.
 - Row Level Security: owners read, insert and update their own settings row, and
   read, insert, update and delete their own reminders. The job acts as the user
   (Ticket 276), so it uses these same policies. `anon` has no access.

@@ -1649,3 +1649,23 @@ The owner decided on November 6, 2026, as relayed by the travel coordinator afte
 Platform impact: web and desktop through the shared Timeline component and phrase module.
 Marketing: not applicable. Future mobile: mobile web keeps the stacked label at 390 px; native
 mobile is deferred. Messaging impact: P-021 note.
+
+## 2026-11-06: Web leave reminders send the one update (D15)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator, while Ticket 275
+was under verification:
+
+1. Web leave reminders also send the one update. The hosted job estimates each trip up to
+   three times: to plan, before sending, and once after sending to catch a leave time that
+   moved 10 minutes or more earlier. It sends at most one update.
+2. The trip home gets no reminder.
+3. Turning reminders off deletes the reminder records.
+
+This replaces Ticket 275's first settlement, in which the web job routed twice and only the
+Mac sent updates. It changes Tickets 275 and 277 and `docs/COSTS.md`: the reminder job's
+route legs rise by up to half.
+
+Platform impact: web through the hosted job (Tickets 277 and 278). Desktop: unchanged; the
+Mac still sends its one update from its own estimates (Ticket 280). Marketing: not applicable
+until release. Future mobile: the hosted contract is portable; native mobile is deferred.
+Messaging impact: P-016 note.

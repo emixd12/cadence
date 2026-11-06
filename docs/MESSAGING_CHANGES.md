@@ -627,9 +627,11 @@ cite has not changed.
   row holds the switch, when it was turned on and the job's next check time. Each reminder
   row also holds a route count and a claim time. Turning reminders off deletes the reminder
   rows; otherwise rows older than the previous local date are deleted. Only trips to a
-  located destination get a reminder (D12), and the trip home gets none. Web reminders
-  never send an update; a Mac may send one when its own later estimate moves the leave time
-  10 minutes or more earlier.
+  located destination get a reminder (D12), and the trip home gets none. Under D15, web
+  and Mac each send at most one update when a later estimate moves the leave time 10
+  minutes or more earlier; the web job estimates the trip once more after sending to check,
+  and the reminder row records when the update sent. Turning reminders off and on the same
+  day can repeat a reminder.
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session

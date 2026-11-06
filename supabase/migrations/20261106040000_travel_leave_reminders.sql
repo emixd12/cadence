@@ -6,6 +6,8 @@
 -- result. trip_digest is a hex SHA-256 over the destination's event reference
 -- (Ticket 217's travelEventRef) and its start instant, so a moved event is a
 -- new trip. error holds a short code, never text from Calendar or a provider.
+-- Decision D15: the job routes a trip at most three times, the third only after
+-- the reminder sent, and sends at most one update (update_sent_at, set once).
 -- docs/NOTIFICATION_SPEC.md, "Leave reminders", has the rules.
 begin;
 
@@ -31,20 +33,30 @@ create table public.travel_leave_reminders (
   status text not null default 'pending'
     check (status in ('pending', 'sent', 'failed', 'cancelled')),
   next_check_at timestamptz,
-  route_count smallint not null default 0 check (route_count between 0 and 2),
+  route_count smallint not null default 0 check (route_count between 0 and 3),
   processing_started_at timestamptz,
   sent_at timestamptz,
+  update_sent_at timestamptz,
   error text check (error ~ '^[a-z][a-z0-9_]{0,63}$'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint travel_leave_reminders_one_per_trip unique (user_id, trip_digest, local_date),
+  -- A sent reminder may keep a next check for its one post-send route, and may
+  -- be claimed only while that check is open. Once the update sends, or the
+  -- check closes, nothing is left to do.
   constraint travel_leave_reminders_status_shape check (
-    (status = 'pending' and next_check_at is not null and sent_at is null)
-    or (status = 'sent' and next_check_at is null and sent_at is not null and processing_started_at is null)
+    (status = 'pending' and next_check_at is not null and sent_at is null and update_sent_at is null)
+    or (status = 'sent' and sent_at is not null
+      and (processing_started_at is null or next_check_at is not null)
+      and (update_sent_at is null or (update_sent_at >= sent_at and next_check_at is null
+        and processing_started_at is null)))
     or (status = 'failed' and next_check_at is null and sent_at is null and error is not null
-      and processing_started_at is null)
-    or (status = 'cancelled' and next_check_at is null and sent_at is null and processing_started_at is null)
-  )
+      and processing_started_at is null and update_sent_at is null)
+    or (status = 'cancelled' and next_check_at is null and sent_at is null and processing_started_at is null
+      and update_sent_at is null)
+  ),
+  -- Two routes before sending (plan, then send); the third only after sending.
+  constraint travel_leave_reminders_third_route_after_send check (route_count < 3 or status = 'sent')
 );
 
 -- The account selection reads only enabled accounts by next check time.
@@ -148,7 +160,8 @@ for each row execute function cadence_private.travel_leave_reminder_setting_chan
 
 -- A reminder becomes pending only while its account has reminders on. Sent
 -- and failed reminders are final. The route count never goes down, so a trip
--- is routed at most twice. A cancelled reminder may return to pending when its
+-- is routed at most three times. The one update is recorded once and never
+-- changes. A cancelled reminder may return to pending when its
 -- trip comes back. Identity never changes. The setting read takes a share lock,
 -- so a concurrent switch to off either waits for this write and then deletes
 -- the row, or commits first and this write sees reminders off.
@@ -178,6 +191,12 @@ begin
   end if;
   if old.status in ('sent', 'failed') and (new.status <> old.status or new.sent_at is distinct from old.sent_at) then
     raise exception 'A sent or failed leave reminder is final.' using errcode = 'check_violation';
+  end if;
+  if old.update_sent_at is not null and new.update_sent_at is distinct from old.update_sent_at then
+    raise exception 'A leave reminder sends at most one update.' using errcode = 'check_violation';
+  end if;
+  if old.status = 'sent' and old.next_check_at is null and new.next_check_at is not null then
+    raise exception 'A sent leave reminder gets one check after sending.' using errcode = 'check_violation';
   end if;
   return new;
 end;

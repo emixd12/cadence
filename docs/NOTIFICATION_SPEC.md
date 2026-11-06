@@ -443,7 +443,7 @@ arrived in its timezone, even when a bounded archive batch has not processed it.
 
 ## Leave reminders
 
-Owner decisions D3 and D12 (`docs/DECISIONS.md`). Ticket 275 sets these rules and the
+Owner decisions D3, D12 and D15 (`docs/DECISIONS.md`). Ticket 275 sets these rules and the
 schema. Ticket 276 adds the job's caller, Ticket 277 the job, Ticket 278 web push
 delivery, Ticket 279 the setting and Ticket 280 the Mac app. Until those tickets
 ship, nothing reads or writes the new tables.
@@ -472,7 +472,8 @@ ship, nothing reads or writes the new tables.
 - One reminder per trip. A trip is one destination on one local date at one start
   time. A moved event is a new trip, and the old trip is dropped.
 - At most one update, and only if the leave time moves 10 minutes or more earlier
-  after the reminder fired. Only the Mac sends updates (see below).
+  after the reminder fired. Web and Mac both send it (decision D15): the web job from
+  one route after sending, the Mac from its own later estimates (see below).
 - If the reminder time has passed when Cadence first knows it, the reminder sends at
   once while the leave time is still ahead. After the leave time, no reminder sends.
 - A trip is dropped, and nothing sends, when its event is cancelled, declined, moved
@@ -486,28 +487,37 @@ ship, nothing reads or writes the new tables.
 - The job runs every 5 minutes with a bounded batch. It treats work due within the
   next 5 minutes as due, so a reminder arrives up to 5 minutes early rather than late.
   Push service delays can add latency.
-- The job routes each trip at most twice, and each route reserves spend first:
+- The job routes each trip at most three times (decision D15), and each route
+  reserves spend first:
   1. The plan route runs at the first visit that sees the trip on its local date. It
      sets the trip's next check time to the reminder time.
   2. The send route runs at that check. The notification uses its estimate, read in
-     memory, and sends at once, even if the new reminder time is a little later.
-  The job never routes after sending, so a web reminder gets no update. Settled for
-  Ticket 275: the send route already runs at the reminder time, so it carries the
-  latest estimate the two-route budget allows. A third route after sending would
-  raise the job's route legs by half (`docs/COSTS.md`). If the plan route finds the
-  reminder already due, it is also the send route, and the second route goes unused.
+     memory, and sends at once, even if the new reminder time is a little later. If
+     the leave time it named is still ahead, the send sets one more check, 5 minutes
+     later, for the update.
+  3. The update route runs at that check, while the leave time the reminder named is
+     still ahead. If its estimate moves the leave time 10 minutes or more earlier, the
+     job sends the one update at once. Otherwise the check closes and nothing more
+     sends. The job never routes a trip a fourth time.
+  If the plan route finds the reminder already due, it is also the send route, and
+  the update route is the second. The update route adds up to half the job's route
+  legs (`docs/COSTS.md`). Leave times stay in memory; only the check time is stored.
 - The job re-reads Calendar at least every 30 minutes for an account with pending
   trips, and again at send time. It reads the event title only at send time, in
   memory, and never stores it.
 - A budget refusal fails that reminder with `budget_refused`. Automatic refreshes stop
   at 80% of the monthly ceiling, but reminder checks continue (Ticket 267).
+- The text names the start (Home or the previous stop) and the leave time, as D3
+  requires. An update names the new, earlier leave time. Ticket 278 owns the
+  wording, which waits for the owner's approval (D7).
 - Delivery goes to the account's active push subscriptions through the existing
   sender, at high urgency, and expires when the trip has started (Ticket 278).
   Behavior reminders keep their 24-hour lifetime. With no active subscription, the
   reminder fails with `no_subscription`.
 - The job claims a reminder before routing or sending, as Behavior reminder
   processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
-  is final, so overlapping runs cannot send twice.
+  is final and its update is recorded once, so overlapping runs cannot send either
+  twice.
 - A server flag keeps the job off until it is set. The rollback is to unset it.
 
 ### Mac: native notifications
@@ -534,17 +544,20 @@ Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only table
 - `travel_leave_reminder_settings`: the switch, when it was turned on, and the job's
   next visit to the account.
 - `travel_leave_reminders`: one row per trip with the owner, trip digest, local date,
-  status, next check time, route count, claim time, sent time and an error code.
-  Statuses are `pending`, `sent`, `failed` and `cancelled`, as for Behavior
-  reminders. A dropped trip is `cancelled`, and may return to `pending` if it comes
-  back. `sent` and `failed` are final. The database refuses a third route, a pending
-  row while reminders are off, and a second row for one trip.
+  status, next check time, route count, claim time, sent time, update sent time and
+  an error code. Statuses are `pending`, `sent`, `failed` and `cancelled`, as for
+  Behavior reminders. A dropped trip is `cancelled`, and may return to `pending` if it
+  comes back. `sent` and `failed` are final. A `sent` row may keep one next check,
+  set when it sends, for the update route; dropping the trip after sending clears it.
+  The database refuses a fourth route, a third route before sending, a second update,
+  a pending row while reminders are off, and a second row for one trip.
 - Neither table holds a title, place, position, route duration, leave time or
   provider result. Error values are short codes such as `budget_refused`.
 - Account sync never reads either table. The synced profile contract is unchanged,
   so released Mac builds keep syncing.
 - Turning reminders off deletes the account's reminder rows. While reminders are on,
   the job deletes rows dated before the account's previous local date. Account
-  deletion removes both tables' rows.
+  deletion removes both tables' rows. Because off deletes the record, turning
+  reminders off and on again the same day can send a trip's reminder a second time.
 - `docs/LEGAL.md` L-015 and L-016 log the provider-terms questions. P-016 and P-017
   in `docs/MESSAGING_CHANGES.md` log the text changes.

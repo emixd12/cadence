@@ -1532,6 +1532,7 @@ export type Database = {
           sent_at: string | null
           status: string
           trip_digest: string
+          update_sent_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1546,6 +1547,7 @@ export type Database = {
           sent_at?: string | null
           status?: string
           trip_digest: string
+          update_sent_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1560,6 +1562,7 @@ export type Database = {
           sent_at?: string | null
           status?: string
           trip_digest?: string
+          update_sent_at?: string | null
           updated_at?: string
           user_id?: string
         }

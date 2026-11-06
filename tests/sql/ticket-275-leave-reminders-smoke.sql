@@ -1,7 +1,8 @@
 -- Local-only: psql "postgresql://postgres:postgres@127.0.0.1:55322/postgres" -X -v ON_ERROR_STOP=1 -f tests/sql/ticket-275-leave-reminders-smoke.sql
 -- Ticket 275: leave reminder setting and reminder records.
 -- Covers off by default, turning on and off (which deletes the account's
--- reminders), one reminder per trip, the two-route cap, final sent and failed
+-- reminders), one reminder per trip, the three-route cap with the third only
+-- after sending (D15), at most one update, final sent and failed
 -- rows, the no-text error code, owner isolation, the service role's column
 -- limit, account sync exclusion and account deletion. Everything rolls back.
 \set ON_ERROR_STOP on
@@ -75,7 +76,7 @@ begin
   end;
   begin
     update public.travel_leave_reminders set route_count = 3 where id = reminder.id;
-    raise exception 'A third route was accepted.';
+    raise exception 'A third route was accepted before sending.';
   exception when check_violation then null;
   end;
   begin
@@ -97,12 +98,41 @@ begin
     if sqlerrm <> 'A leave reminder keeps its trip.' then raise; end if;
   end;
 
-  -- Claim, second route, send. A sent reminder is final.
+  -- Claim, second route, send, keeping one check for the post-send route (D15).
   update public.travel_leave_reminders set processing_started_at = statement_timestamp() where id = reminder.id;
   update public.travel_leave_reminders
-  set status = 'sent', route_count = 2, next_check_at = null, processing_started_at = null,
+  set status = 'sent', route_count = 2, next_check_at = '2026-11-06T14:10:00Z', processing_started_at = null,
     sent_at = '2026-11-06T14:00:05Z'
   where id = reminder.id;
+  begin
+    update public.travel_leave_reminders
+    set update_sent_at = '2026-11-06T14:10:05Z' where id = reminder.id;
+    raise exception 'An update was recorded while its check was still open.';
+  exception when check_violation then null;
+  end;
+  -- Claim the post-send check, route a third time and send the one update.
+  update public.travel_leave_reminders set processing_started_at = statement_timestamp() where id = reminder.id;
+  update public.travel_leave_reminders
+  set route_count = 3, next_check_at = null, processing_started_at = null, update_sent_at = '2026-11-06T14:10:05Z'
+  where id = reminder.id;
+  begin
+    update public.travel_leave_reminders set route_count = 4 where id = reminder.id;
+    raise exception 'A fourth route was accepted.';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.travel_leave_reminders set update_sent_at = '2026-11-06T14:20:00Z' where id = reminder.id;
+    raise exception 'A second update was accepted.';
+  exception when check_violation then
+    if sqlerrm <> 'A leave reminder sends at most one update.' then raise; end if;
+  end;
+  begin
+    update public.travel_leave_reminders set next_check_at = '2026-11-06T14:20:00Z' where id = reminder.id;
+    raise exception 'A sent reminder reopened its check.';
+  exception when check_violation then
+    if sqlerrm <> 'A sent leave reminder gets one check after sending.' then raise; end if;
+  end;
+  -- A sent reminder is final.
   begin
     update public.travel_leave_reminders
     set status = 'pending', next_check_at = '2026-11-06T14:30:00Z', sent_at = null where id = reminder.id;
@@ -120,6 +150,13 @@ begin
   insert into public.travel_leave_reminders (user_id, trip_digest, local_date, next_check_at)
   values ('27500000-0000-4000-8000-000000000001', repeat('c', 64), '2026-11-06', '2026-11-06T16:00:00Z')
   returning * into reminder;
+  begin
+    update public.travel_leave_reminders
+    set status = 'failed', next_check_at = null, error = 'budget_refused', update_sent_at = statement_timestamp()
+    where id = reminder.id;
+    raise exception 'A failed reminder recorded an update.';
+  exception when check_violation then null;
+  end;
   update public.travel_leave_reminders
   set status = 'failed', next_check_at = null, error = 'budget_refused' where id = reminder.id;
   begin

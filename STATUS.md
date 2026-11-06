@@ -7,15 +7,16 @@
 - `docs/NOTIFICATION_SPEC.md` gains "Leave reminders": off by default, leave time minus
   get-ready time, one reminder per trip, located destinations only (D12), no reminder for
   the trip home, and start from the previous stop or Home.
-- Settled the Wave 0 open point: the web job routes twice per trip, plans then sends, and
-  never routes after sending. Web reminders get no update. The one update comes from the
-  Mac app's own estimates. Ticket 277 and `docs/COSTS.md` now say so; the cost row is
-  unchanged.
+- Open point settled by owner decision D15: the web job routes a trip at most three
+  times (plan, send, and once after sending) and sends at most one update. The Mac sends
+  its update from its own estimates. Ticket 277 and `docs/COSTS.md` now say so; the
+  reminder job's route legs rise by up to half, to 24, 120 and 312 a month.
 - Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables:
   `travel_leave_reminder_settings` and `travel_leave_reminders`. Owner Row Level Security.
-  No title, place, position, duration or leave time. The database refuses a third route,
-  a pending row while off and a second row per trip. Turning off deletes the rows. The
-  service role may read only account IDs, the switch and next check times.
+  No title, place, position, duration or leave time. The database refuses a fourth route,
+  a third before sending, a second update, a pending row while off (race-safe) and a
+  second row per trip. Turning off deletes the rows. The service role may read only
+  account IDs, the switch and next check times.
 - Account sync never reads the tables, so released Mac builds keep syncing.
 - Messaging impact: P-016 note. No new user-facing wording.
 
