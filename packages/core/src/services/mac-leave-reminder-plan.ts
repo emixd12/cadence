@@ -157,12 +157,16 @@ export function planMacLeaveReminders(input: Readonly<{
     // Before it fires, a new estimate replaces the scheduled reminder. That is not an update.
     const { title, body } = text(candidate, false);
     const existing = pendingById.get(id);
-    if (record && existing && record.leaveAt === candidate.leaveAt.toString() && existing.title === title && existing.body === body) {
+    const reminderAt = candidate.leaveAt.subtract({ seconds: Math.max(0, Math.ceil(input.preparationSeconds)) });
+    const dueNow = Temporal.Instant.compare(reminderAt, immediate) < 0;
+    // A changed get-ready time moves the fire time; a reminder already due within seconds stays.
+    const sameFireTime = record && (record.reminderAt === reminderAt.toString()
+      || (dueNow && Temporal.Instant.compare(Temporal.Instant.from(record.reminderAt), immediate) <= 0));
+    if (record && existing && sameFireTime && record.leaveAt === candidate.leaveAt.toString() && existing.title === title && existing.body === body) {
       records.push(record);
       continue;
     }
-    const reminderAt = candidate.leaveAt.subtract({ seconds: Math.max(0, Math.ceil(input.preparationSeconds)) });
-    const fireAt = (Temporal.Instant.compare(reminderAt, immediate) < 0 ? immediate : reminderAt).toString();
+    const fireAt = (dueNow ? immediate : reminderAt).toString();
     schedule.push({ id, digest: candidate.digest, title, body, fireAt });
     records.push({ digest: candidate.digest, localDate: today, reminderAt: fireAt, leaveAt: candidate.leaveAt.toString(), update: null });
   }

@@ -69,6 +69,17 @@ describe("Mac leave reminder planner (Ticket 280)", () => {
     expect(moved.records[0]?.update).toBeNull();
   });
 
+  it("moves a pending reminder when the get-ready time changes, and keeps one already due", () => {
+    const first = plan({ now: at("12:45") });
+    const pending = first.schedule.map(({ id, title, body, fireAt }) => ({ id, title, body, fireAt }));
+    const longer = plan({ now: at("12:46"), records: first.records, pending, preparationSeconds: 1200 });
+    expect(longer.schedule).toMatchObject([{ id: ID, fireAt: at("12:55") }]);
+    expect(longer.records[0]?.reminderAt).toBe(at("12:55"));
+    const due = plan({ now: at("13:00"), preparationSeconds: 1800 });
+    const duePending = due.schedule.map(({ id, title, body, fireAt }) => ({ id, title, body, fireAt }));
+    expect(plan({ now: at("13:00:05"), records: due.records, pending: duePending, preparationSeconds: 1800 }).schedule).toEqual([]);
+  });
+
   it("sends one update after the reminder fired, only for a leave time 10+ minutes earlier and still ahead (D15)", () => {
     const fired: MacLeaveReminderRecord = { digest: DIGEST, localDate: "2026-11-10", reminderAt: at("13:05"), leaveAt: at("13:15"), update: null };
     const later = (leaveAt: string, now = at("13:06")) => plan({ now, records: [fired],
