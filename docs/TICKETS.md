@@ -16618,8 +16618,9 @@ Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
 
 ## Ticket 282: Tomorrow's first trip
 
-Status: implemented November 6, 2026 on branch `us-work`; not merged or deployed. No
-migration.
+Status: implemented and verified November 6, 2026 on branch `us-work`; not merged or
+deployed. No migration. The verifier fixed the Calendar read range for tomorrow and added one
+retry after a failed request.
 Dependencies: Tickets 268 and 269. Decision D4.
 
 Goal: warn the evening before an early start (G7).

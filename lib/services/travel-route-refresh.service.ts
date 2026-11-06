@@ -26,6 +26,7 @@ import { measurePerformanceSpan } from "@/lib/services/performance-timing";
 import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/services/travel-display.service";
 import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAddress, type TravelProviderConfig } from "@/lib/services/travel-provider";
 import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
+import { readTravelCalendarRange } from "@/lib/services/travel-calendar-range";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
 import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
@@ -67,9 +68,9 @@ export async function refreshTravelRoutes(
     throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
   }
   const calendar = await getCalendarConnection(caller);
-  const snapshot = calendar.status === "connected"
-    ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate)
-    : null;
+  // Ticket 282: Calendar reads start today, so a first_trip read covers today and keeps tomorrow.
+  const readCalendar = () => readTravelCalendarRange(request, (start, end) => getCalendarEvents(caller, start, end));
+  const snapshot = calendar.status === "connected" ? await readCalendar() : null;
   const [behaviorOccurrences, behaviors, timezone] = await Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
     listUserBehaviors(caller.client, caller.user.id),
@@ -113,7 +114,7 @@ export async function refreshTravelRoutes(
   };
   // Calendar event revisions are checked once more before returning.
   const assertAllCurrent = async () => {
-    const currentEvents = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
+    const currentEvents = snapshot ? await readCalendar() : null;
     if (snapshot && (!currentEvents || !sameCalendarRevisions(snapshot.events, currentEvents.events))) throw changed();
     await assertSourcesCurrent();
     if (deadline.aborted) throw changed();

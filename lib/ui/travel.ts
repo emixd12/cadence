@@ -168,7 +168,10 @@ export function travelTomorrowStopKey(events: readonly NormalizedExternalEvent[]
 
 /** Ticket 282: tomorrow's first trip, from its own request. Never merged into today's view. */
 export type TravelTomorrow = Readonly<{ localDate: string; view: TravelRoutesView }>;
-type TravelTomorrowEntry = Readonly<{ localDate: string; stopDigest: string; view: TravelRoutesView | null }>;
+/** `retryAt`: after a first failure worth retrying, when the one retry is due. */
+type TravelTomorrowEntry = Readonly<{ localDate: string; stopDigest: string; view: TravelRoutesView | null; retryAt?: string | null }>;
+/** Ticket 282: failures worth one more try; quota, clearance and sign-in failures are not. */
+const TOMORROW_RETRY_CODES: ReadonlySet<TravelClientErrorCode> = new Set(["provider_unavailable", "context_changed", "unknown"]);
 
 type TravelCacheEntry = Readonly<{
   view: TravelRoutesView | null; message: string | null; at: number;
@@ -543,7 +546,8 @@ export function useTravelContext(input: Readonly<{
       const last = travelTomorrowTrips.get(accountId);
       const plan = resolveTravelTomorrowPlan({ now: new Date().toISOString(), timezone, localDate,
         todayTrips: today ? today.evidence ? travelRefreshTripsFromEvidence(today.evidence) : [] : null,
-        stopKey: tomorrowDigest, last: last ? { localDate: last.localDate, stopKey: last.stopDigest } : null, budget: travelBudgets.get(accountId) ?? null });
+        stopKey: tomorrowDigest, last: last ? { localDate: last.localDate, stopKey: last.stopDigest, retryAt: last.retryAt ?? null } : null,
+        budget: travelBudgets.get(accountId) ?? null });
       if (plan.nextDueAt) tomorrowTimer = setTimeout(() => evaluate(), Math.min(Math.max(0, Date.parse(plan.nextDueAt) - Date.now()), 2_147_483_647));
       if (plan.dueLocalDate && today) requestTomorrow(plan.dueLocalDate, today);
     };
@@ -553,7 +557,9 @@ export function useTravelContext(input: Readonly<{
       const run = generation;
       const epoch = travelEpoch;
       const stopDigest = tomorrowDigest;
-      // Recorded when sent: one request per first stop and revision, even if it fails.
+      const previous = travelTomorrowTrips.get(accountId);
+      const retried = !!previous?.retryAt && previous.localDate === dueLocalDate && previous.stopDigest === stopDigest;
+      // Recorded when sent: one request per first stop and revision, plus one retry after a failure.
       travelTomorrowTrips.set(accountId, { localDate: dueLocalDate, stopDigest, view: null });
       persist();
       controller = new AbortController();
@@ -569,9 +575,16 @@ export function useTravelContext(input: Readonly<{
             noteBudget(response.budget);
             persist();
           }
-        } catch { /* No line for tomorrow. It is not asked again for this stop. */ }
+        } catch (error) {
+          // No line for tomorrow. A first failure worth retrying is tried once more after the failure wait.
+          if (!retried && !signal.aborted && epoch === travelEpoch && error instanceof TravelClientError && TOMORROW_RETRY_CODES.has(error.code)) {
+            travelTomorrowTrips.set(accountId, { localDate: dueLocalDate, stopDigest, view: null, retryAt: new Date(Date.now() + FAILURE_REUSE_MS).toISOString() });
+            persist();
+          }
+        }
         if (run !== generation) return;
         inFlight = false; committed = false;
+        if (active && !view) planTomorrow();
         if (active && view && dueLocalDate === tomorrowLocalDate) patch({ tomorrow: { localDate: dueLocalDate, view } });
       })();
     };

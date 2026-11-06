@@ -333,8 +333,11 @@ export type TravelTomorrowPlanInput = Readonly<{
   todayTrips: readonly TravelRefreshTrip[] | null;
   /** Identifies tomorrow's first located stop and its revision. Null when tomorrow has none. */
   stopKey: string | null;
-  /** The last request for tomorrow's first trip: its date and stop key. */
-  last: Readonly<{ localDate: string; stopKey: string }> | null;
+  /**
+   * The last request for tomorrow's first trip: its date and stop key. `retryAt` is set after a
+   * first request failed for a reason worth one more try; the retry is due from then.
+   */
+  last: Readonly<{ localDate: string; stopKey: string; retryAt?: string | null }> | null;
   budget: TravelBudgetState | null;
 }>;
 
@@ -348,7 +351,7 @@ export type TravelTomorrowPlan = Readonly<{
 /**
  * Ticket 282 (decision D4): whether to estimate tomorrow's first trip now. Pure; `now` is
  * injected. A request is due once per tomorrow's first stop and its revision, after 5 PM local
- * time or once today has no trips left. It is a request of its own, so today's signed
+ * time or once today has no trips left. A failed request is tried once more at `retryAt`. It is a request of its own, so today's signed
  * conclusions never cover it. Automatic, so it stops at 80% of the monthly ceiling.
  */
 export function resolveTravelTomorrowPlan(input: TravelTomorrowPlanInput): TravelTomorrowPlan {
@@ -357,8 +360,13 @@ export function resolveTravelTomorrowPlan(input: TravelTomorrowPlanInput): Trave
   const today = now.toZonedDateTimeISO(input.timezone).toPlainDate();
   if (today.toString() !== input.localDate || !input.stopKey || !input.todayTrips) return none;
   const tomorrow = today.add({ days: 1 }).toString();
-  if (input.last?.localDate === tomorrow && input.last.stopKey === input.stopKey) return none;
+  const retryAt = input.last?.localDate === tomorrow && input.last.stopKey === input.stopKey
+    ? input.last.retryAt ? Temporal.Instant.from(input.last.retryAt) : null : undefined;
+  // Asked already: once, plus one retry after a failure, under the 5-minute failure wait.
+  if (retryAt === null) return none;
   if (travelBudgetPausesAutomatic(input.budget, now)) return none;
+  if (retryAt && Temporal.Instant.compare(now, retryAt) < 0) return { dueLocalDate: null, nextDueAt: retryAt.toString() };
+  if (retryAt) return { dueLocalDate: tomorrow, nextDueAt: null };
   const evening = today.toPlainDateTime({ hour: TRAVEL_TOMORROW_FROM_HOUR }).toZonedDateTime(input.timezone).toInstant();
   const ahead = (at: string) => Temporal.Instant.compare(Temporal.Instant.from(at), now) > 0;
   const tripsLeft = input.todayTrips.filter((trip) => !trip.leaveAt || ahead(trip.leaveAt));

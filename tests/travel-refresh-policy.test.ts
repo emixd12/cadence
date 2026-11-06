@@ -241,6 +241,19 @@ describe("tomorrow's first trip plan (Ticket 282)", () => {
     expect(resolveTravelTomorrowPlan(input("18:00", { last: { ...last, localDate: "2026-10-17" } })).dueLocalDate).toBe("2026-10-18");
   });
 
+  it("tries a failed request once more from its retry time, and then stops", () => {
+    const failed = { localDate: "2026-10-18", stopKey: "dentist-r1", retryAt: Temporal.Instant.from(at("18:05")).toString() };
+    expect(resolveTravelTomorrowPlan(input("18:01", { last: failed }))).toEqual({ dueLocalDate: null, nextDueAt: failed.retryAt });
+    expect(resolveTravelTomorrowPlan(input("18:05", { last: failed }))).toEqual({ dueLocalDate: "2026-10-18", nextDueAt: null });
+    // The retry is recorded without a retry time, so nothing more is asked for this stop.
+    expect(resolveTravelTomorrowPlan(input("18:30", { last: { ...failed, retryAt: null } }))).toEqual({ dueLocalDate: null, nextDueAt: null });
+    // A retry time for another stop does not apply; the new stop is asked now.
+    expect(resolveTravelTomorrowPlan(input("18:01", { last: failed, stopKey: "dentist-r2" })).dueLocalDate).toBe("2026-10-18");
+    // At 80% of the budget the retry waits like every automatic request.
+    const budget = { reservedMicrodollars: 4_000_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-11-01T04:00:00Z" };
+    expect(resolveTravelTomorrowPlan(input("18:05", { last: failed, budget })).dueLocalDate).toBeNull();
+  });
+
   it("asks nothing without a located stop tomorrow, without today's view, after midnight or at 80% of the budget", () => {
     expect(resolveTravelTomorrowPlan(input("18:00", { stopKey: null })).dueLocalDate).toBeNull();
     expect(resolveTravelTomorrowPlan(input("18:00", { todayTrips: null })).dueLocalDate).toBeNull();
@@ -248,5 +261,29 @@ describe("tomorrow's first trip plan (Ticket 282)", () => {
     const budget = { reservedMicrodollars: 4_000_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-11-01T04:00:00Z" };
     expect(resolveTravelTomorrowPlan(input("18:00", { budget })).dueLocalDate).toBeNull();
     expect(resolveTravelTomorrowPlan(input("18:00", { budget: { ...budget, reservedMicrodollars: 3_999_999 } })).dueLocalDate).toBe("2026-10-18");
+  });
+});
+
+describe("tomorrow's first trip plan across clock changes (Ticket 282)", () => {
+  const plan = (now: string, localDate: string) => resolveTravelTomorrowPlan({ now, timezone: "America/New_York", localDate,
+    todayTrips: [{ role: "outbound", originRef: null, destinationRef: "late", key: "outbound::late", leaveAt: "2026-12-31T23:00:00Z", checkedAt: null, fallbackAt: null }],
+    stopKey: "dentist-r1", last: null, budget: null });
+
+  it("uses 5 PM local time on the days the clocks change", () => {
+    // November 1, 2026: clocks fall back at 2 AM, so 5 PM is 22:00Z (EST), not 21:00Z.
+    expect(plan("2026-11-01T21:30:00Z", "2026-11-01")).toEqual({ dueLocalDate: null, nextDueAt: "2026-11-01T22:00:00Z" });
+    expect(plan("2026-11-01T22:00:00Z", "2026-11-01").dueLocalDate).toBe("2026-11-02");
+    // The evening before, still EDT: 5 PM is 21:00Z and tomorrow is the change day.
+    expect(plan("2026-10-31T21:00:00Z", "2026-10-31").dueLocalDate).toBe("2026-11-01");
+    // March 8, 2026: clocks spring forward, so 5 PM is 21:00Z (EDT).
+    expect(plan("2026-03-08T20:59:00Z", "2026-03-08")).toEqual({ dueLocalDate: null, nextDueAt: "2026-03-08T21:00:00Z" });
+    expect(plan("2026-03-08T21:00:00Z", "2026-03-08").dueLocalDate).toBe("2026-03-09");
+  });
+
+  it("names tomorrow by the local date late at night, when UTC is already on the next day", () => {
+    // 11:30 PM on October 17 in New York is October 18 in UTC.
+    expect(plan("2026-10-18T03:30:00Z", "2026-10-17").dueLocalDate).toBe("2026-10-18");
+    // After local midnight the old day view asks nothing.
+    expect(plan("2026-10-18T04:00:00Z", "2026-10-17").dueLocalDate).toBeNull();
   });
 });

@@ -965,6 +965,48 @@ describe("tomorrow's first trip (Ticket 282)", () => {
     } finally { await unmount(); }
   });
 
+  it("tries a failed request once more after 5 minutes, and not after a quota refusal", async () => {
+    const { routes, firstTripCalls, unmount } = await mountTomorrow();
+    try {
+      const today = routes.getMockImplementation()!;
+      routes.mockImplementation(async (input: TravelRoutesInput) => input.scope === "first_trip" ? Promise.reject(new TravelClientError("provider_unavailable")) : today(input));
+      // 5 PM: the first request fails. 5:05 PM: the one retry fails too.
+      await act(async () => vi.advanceTimersByTimeAsync(64 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60_000));
+      expect(firstTripCalls()).toHaveLength(2);
+      expect(latest().tomorrow ?? null).toBeNull();
+      // Both failed: nothing more this evening.
+      await focusAndWait();
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(2);
+    } finally { await unmount(); }
+
+    resetTravelViewCacheForTest();
+    const second = await mountTomorrow("dentist-r1");
+    try {
+      const today = second.routes.getMockImplementation()!;
+      second.routes.mockImplementation(async (input: TravelRoutesInput) => input.scope === "first_trip"
+        ? Promise.reject(new TravelClientError("quota_exceeded", null, "2026-10-01T04:00:00Z")) : today(input));
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60 * 60_000));
+      expect(second.firstTripCalls()).toHaveLength(1);
+    } finally { await second.unmount(); }
+  });
+
+  it("shows tomorrow's first trip from the retry when the first request failed", async () => {
+    const { routes, firstTripCalls, unmount } = await mountTomorrow();
+    try {
+      const today = routes.getMockImplementation()!;
+      routes.mockImplementationOnce(async (input: TravelRoutesInput) => input.scope === "first_trip" ? Promise.reject(new TravelClientError("unknown")) : today(input));
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000 - 1));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(latest().tomorrow ?? null).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(5 * 60_000 + 1));
+      expect(firstTripCalls()).toHaveLength(2);
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22" });
+    } finally { await unmount(); }
+  });
+
   it("forgets tomorrow's first trip when travel settings change", async () => {
     const { unmount } = await mountTomorrow();
     try {

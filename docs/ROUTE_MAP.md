@@ -273,6 +273,8 @@ timezone; any other day returns `context_changed` before a provider call. It tak
 corrections and ignores any device sample. It routes one leg, from saved Home to tomorrow's
 first stop away from Home, with no weather and no `conclusionsToken`, so today's signed
 conclusions and the Daily Brief never include it.
+Calendar reads must start today, so this scope reads today through tomorrow and keeps
+only the events that start tomorrow (`readTravelCalendarRange`).
 Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
 state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
 leg may carry its fixed weather margin. The server derives the weather area from the

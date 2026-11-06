@@ -271,7 +271,9 @@ Assumptions and limits:
   the lookup row is unchanged. It makes no weather call and is automatic, so it stops at 80% of
   the monthly ceiling. It asks once per browser tab session and once per Mac app session, so a
   second tab or a linked Mac open the same evening makes another call. A changed first stop, or the same stop with a new time or place,
-  asks again, one leg each. A failed request is not retried that evening. Assumed: one per
+  asks again, one leg each. A failed request is tried once more after 5 minutes, the
+  existing failure wait; a quota, clearance or sign-in failure is not. A failure usually makes
+  no route call, so a retry adds at most one leg. Assumed: one per
   travel day. Measured by Ticket 284. Transit doubles each figure.
 - Not counted yet: Outlook and iCloud legs (Ticket 283), which adds its own count.
 - Ticket 264 adds two kinds of route call, both assumed and not in the table:

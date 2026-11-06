@@ -1066,6 +1066,25 @@ describe("tomorrow's first trip (Ticket 282)", () => {
     expect(atHome.evidence).toMatchObject({ legs: [], unknownLegs: [] });
   });
 
+  it("reads Calendar from today, as every Calendar read must, and keeps only tomorrow's events", async () => {
+    tomorrowDay();
+    mocks.occurrences.mockResolvedValue([]);
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+    const event = (id: string, startAt: string, endAt: string, location: string) => ({ id, calendarId: "primary", providerEventId: id, kind: "timed",
+      state: "confirmed", currentUserResponse: "accepted", startAt, endAt, endUnspecified: false, location, conference: null,
+      revision: { providerEtag: `etag-${id}`, providerUpdatedAt: null } });
+    // 11:30 PM today in New York is already tomorrow in UTC; it is still today's event.
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [
+      event("late-tonight", "2026-09-23T03:30:00Z", "2026-09-23T04:30:00Z", "9 Tonight St"),
+      event("dentist", "2026-09-23T13:00:00Z", "2026-09-23T14:00:00Z", "4 Dentist St"),
+    ] });
+    const result = await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.events.mock.calls.map(([, start, end]) => [start, end])).toEqual([["2026-09-22", "2026-09-23"], ["2026-09-22", "2026-09-23"]]);
+    expect(routedLegs()).toBe(1);
+    expect(result.evidence!.legs.find((entry) => entry.estimate)!.leg).toMatchObject({ role: "outbound", destinationCommitmentRef: "dentist" });
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("9 Tonight St");
+  });
+
   it("refuses a first-trip request for any day but tomorrow, before any provider call", async () => {
     tomorrowDay();
     for (const date of ["2026-09-22", "2026-09-24"]) {
@@ -1074,6 +1093,17 @@ describe("tomorrow's first trip (Ticket 282)", () => {
     }
     expect(mocks.geocode).not.toHaveBeenCalled();
     expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("checks tomorrow in the account's timezone late at night, when UTC is already on the next day", async () => {
+    // 11:30 PM on September 22 in New York is September 23 in UTC.
+    const lateNight = Temporal.Instant.from("2026-09-23T03:30:00Z");
+    tomorrowDay();
+    await expect(refreshTravelRoutes(caller, { ...tomorrow, startLocalDate: "2026-09-24", endLocalDate: "2026-09-24" }, config, lateNight))
+      .rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).not.toHaveBeenCalled();
+    await refreshTravelRoutes(caller, tomorrow, config, lateNight);
+    expect(routedLegs()).toBe(1);
   });
 
   it("leaves today's signed conclusions unchanged", async () => {

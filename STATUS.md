@@ -11,6 +11,9 @@
   trip left. The wording is not yet approved (decision D7).
 - Web and the linked Mac share the hook and the hosted route. Cost: one leg per travel day,
   in `docs/COSTS.md`. Messaging: a Ticket 282 note on P-021.
+- Verifier fixes: the request reads Calendar from today, as every Calendar read must, and
+  keeps tomorrow's events (`readTravelCalendarRange`, shared with Ticket 283). A failed
+  request is tried once more after 5 minutes. DST and late-night tests added.
 - Tests: `tests/travel-route-refresh.service.test.ts`, `tests/travel-lifecycle.dom.test.tsx`,
   `tests/travel-refresh-policy.test.ts`, `tests/departure.resolver.test.ts`,
   `tests/travel-route-request.test.ts`, `tests/next-departure-line.dom.test.tsx`,
