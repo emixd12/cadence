@@ -189,6 +189,32 @@ describe("push service worker, leave reminders", () => {
     expect(options).toMatchObject({ tag: `cadence-leave-${DIGEST}`, renotify: true, data: { url: `/timeline?leave=${DIGEST}` } });
   });
 
+  async function click(tabUrl: string, url: string) {
+    const listeners = new Map<string, (event: unknown) => void>();
+    const navigate = vi.fn().mockResolvedValue(null);
+    const focus = vi.fn();
+    vm.runInNewContext(readFileSync("public/push-service-worker.js", "utf8"), {
+      self: { addEventListener: (name: string, handler: (event: unknown) => void) => listeners.set(name, handler),
+        registration: { showNotification: vi.fn() }, location: { origin: "https://cadence.example" },
+        clients: { matchAll: vi.fn().mockResolvedValue([{ url: tabUrl, navigate, focus }]), openWindow: vi.fn() } },
+      URL,
+    });
+    const waitUntil = vi.fn();
+    listeners.get("notificationclick")?.({ notification: { close: vi.fn(), data: { url } }, waitUntil });
+    await waitUntil.mock.calls[0]?.[0];
+    return { navigate, focus };
+  }
+
+  it("reloads a tab already at the same leave link, so the drawer opens again", async () => {
+    const link = `https://cadence.example/timeline?leave=${DIGEST}`;
+    const { navigate, focus } = await click(link, `/timeline?leave=${DIGEST}`);
+    expect(navigate).toHaveBeenCalledWith(link);
+    expect(focus).toHaveBeenCalledTimes(1);
+    const behavior = await click("https://cadence.example/timeline", "/timeline");
+    expect(behavior.navigate).not.toHaveBeenCalled();
+    expect(behavior.focus).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves Behavior reminder options unchanged", () => {
     const [, options] = showNotification({ title: "Morning walk", body: "Scheduled for 9:00 AM.", tag: "cadence-reminder-1", url: "/timeline" });
     expect(options).not.toHaveProperty("renotify");

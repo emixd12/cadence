@@ -597,7 +597,8 @@ reminders' web push sender with its own options. Behavior reminders are unchange
   and its older leave time. The update sets `renotify`, so it alerts again. Behavior
   notification options are unchanged.
 - The link is `/timeline?leave=<trip digest>`, absolute when `NEXT_PUBLIC_SITE_URL` is set.
-  It never carries a title or place. The service worker's same-origin rule applies.
+  It never carries a title or place. The service worker's same-origin rule applies. A tab
+  already at the same leave link is reloaded, so the drawer opens again.
 - The Timeline reads a well-formed digest only. It opens the drawer of the Calendar event
   whose digest (event ID and start) matches, once the Calendar read has it, and only once
   per digest. A Behavior destination scrolls its Occurrence into view. A moved or removed

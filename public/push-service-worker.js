@@ -43,9 +43,11 @@ self.addEventListener("notificationclick", (event) => {
         });
 
         if (existingClient) {
+          // Ticket 278: a leave reminder link reloads even at the same URL, so its drawer opens again.
           if (
             typeof existingClient.navigate === "function" &&
-            existingClient.url !== targetUrl.href
+            (existingClient.url !== targetUrl.href ||
+              (targetUrl.pathname === "/timeline" && targetUrl.searchParams.has("leave")))
           ) {
             return existingClient.navigate(targetUrl.href).then((client) => {
               return (client || existingClient).focus();
