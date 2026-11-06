@@ -499,7 +499,13 @@ ship, nothing reads or writes the new tables.
      minutes it used. If the get-ready time changes before the reminder sends, the job
      moves the check by the difference at its next visit, with no route, so the
      reminder fires at the new reminder time. If the moved check is already due, the
-     send route runs at once and sends while the leave time is still ahead.
+     send route runs at once and sends while the leave time is still ahead. A saved
+     get-ready change brings that visit forward to now (decision D19, migration
+     `20261106080000_leave_reminder_visit_after_preparation_change.sql`), so the next
+     5-minute run moves the check and a moved reminder goes out within about 5 minutes
+     of its new time. Only a real change to `preparation_minutes` counts, from any
+     client, and only for an account with reminders on. The earlier visit adds no
+     route: each trip is still routed at most three times, and D16 is unchanged.
   2. The send route runs at that check. The notification uses its estimate, read in
      memory, and sends at once, even if the new reminder time is a little later. If
      the leave time it named is more than 4 minutes ahead, the send keeps one more

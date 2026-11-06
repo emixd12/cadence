@@ -511,6 +511,14 @@ create table travel_leave_reminders (
   off cannot leave a pending row. `sent` and `failed` are final, `route_count` never
   goes down, `update_sent_at` is set at most once, a `sent` row cannot reopen its
   check, and a reminder keeps its owner, trip and date.
+- A real change to `travel_settings.preparation_minutes` sets the settings row's
+  `next_check_at` to now when reminders are on and the visit is later (decision D19,
+  migration `20261106080000_leave_reminder_visit_after_preparation_change.sql`). The
+  trigger runs as the writer, so owner RLS limits it to that account's row, and it
+  changes nothing else. A visit already due stays. A running visit's lease is replaced,
+  so that visit's release misses and the next run visits again; each reminder keeps
+  its own claim. `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`
+  covers it.
 - Row Level Security: owners read, insert and update their own settings row, and
   read, insert, update and delete their own reminders. The job acts as the user
   (Ticket 276), so it uses these same policies. `anon` has no access.

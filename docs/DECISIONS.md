@@ -1702,3 +1702,22 @@ The owner decided on November 6, 2026, as relayed by the travel coordinator afte
 Platform impact: web and desktop through the shared phrase module, Settings and the two
 notification paths. Marketing: not applicable until release. Future mobile: mobile web
 inherits the web text; native mobile is deferred. Messaging impact: P-016 and P-024 notes.
+
+## 2026-11-06: A get-ready change brings the next leave reminder visit forward (D19)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the PR #193
+verifier noted that a moved web reminder could arrive up to about 30 minutes late:
+
+1. A get-ready change brings the account's next leave reminder job visit forward, so a moved
+   web reminder goes out within about 5 minutes of its new time.
+
+A trigger on `travel_settings` sets `travel_leave_reminder_settings.next_check_at` to now when
+`preparation_minutes` changes on an account with reminders on (migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql`). The visit moves pending
+checks without a route, so the three-route cap per trip and D16 are unchanged.
+`docs/NOTIFICATION_SPEC.md` and `docs/DATA_MODEL.md` record it.
+
+Platform impact: web through the hosted job (Tickets 275 and 277). Desktop: a linked Mac's
+synced get-ready change reaches the hosted row and moves the visit too; the Mac's own
+notifications already move at once (Ticket 280). Marketing: not applicable. Future mobile: the
+hosted contract is portable; native mobile is deferred. Messaging impact: none.

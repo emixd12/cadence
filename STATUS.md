@@ -1,5 +1,21 @@
 # Implementation Status
 
+## Travel advisory revamp: a get-ready change brings the next reminder visit forward (D19) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql` is applied locally only;
+the hosted push waits for the owner.**
+
+- Ticket 277, decision D19: a real change to the get-ready time sets the account's
+  `travel_leave_reminder_settings.next_check_at` to now when reminders are on, so the next
+  5-minute job run moves the pending check. A moved web reminder goes out within about 5
+  minutes of its new time, instead of up to about 30 minutes late.
+- The trigger runs as the writer under owner RLS and changes only `next_check_at`. A visit
+  already due stays. The visit adds no route: the three-route cap and D16 are unchanged.
+  The job planner did not change.
+- Messaging impact: none. Tests: `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`,
+  `tests/travel-leave-reminders-migration.test.ts`.
+
 ## Travel advisory revamp Wave 5: Ticket 283 Outlook and iCloud events route — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No migration.**

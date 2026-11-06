@@ -72,3 +72,18 @@ describe("planned get-ready time (Ticket 277, Codex review)", () => {
     expect(code).not.toMatch(/title|location|latitude|longitude|place_id|address|duration|leave_at|arrive|account_sync|grant/i);
   });
 });
+
+// tests/sql/ticket-277-visit-after-preparation-change-smoke.sql runs these rules against a local database.
+describe("job visit after a get-ready change (decision D19)", () => {
+  const visitMigration = resolve(process.cwd(), "supabase/migrations/20261106080000_leave_reminder_visit_after_preparation_change.sql");
+
+  it("moves only an enabled account's later visit to now, and only on a real get-ready change", async () => {
+    const sql = await readFile(visitMigration, "utf8");
+    expect(sql).toContain("after insert or update of preparation_minutes on public.travel_settings");
+    expect(sql).toContain("if tg_op = 'UPDATE' and new.preparation_minutes is not distinct from old.preparation_minutes then\n    return null;");
+    expect(sql).toContain("set next_check_at = statement_timestamp()\n  where settings.user_id = new.user_id\n    and settings.enabled\n    and settings.next_check_at > statement_timestamp();");
+    expect(sql).toContain("revoke all on function cadence_private.bring_leave_reminder_visit_forward() from public, anon, authenticated");
+    const code = sql.replace(/^\s*--.*$/gm, "");
+    expect(code).not.toMatch(/security definer|grant|travel_leave_reminders\b|route_count|location|latitude|longitude|duration|leave_at/i);
+  });
+});

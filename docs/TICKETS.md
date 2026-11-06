@@ -16390,7 +16390,11 @@ reserves again before every provider call, so spend stays under the monthly ceil
 Codex review fix, November 6, 2026: migration
 `20261106070000_leave_reminder_planned_preparation.sql` keeps the get-ready minutes a
 pending check used, so a later get-ready change moves the check without a route.
-Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
+Decision D19, November 6, 2026: migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql` moves the account's next
+job visit to now when the get-ready time changes, so a moved reminder goes out within about
+5 minutes of its new time. No route is added.
+Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15, D16 and D19.
 
 Goal: check each opted-in account and send a reminder at the right time.
 
@@ -16439,6 +16443,7 @@ Messaging impact: P-016 and P-017.
 Verification: `npx vitest run tests/leave-reminder-plan.test.ts
 tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test.ts`,
 `tests/leave-reminder-store.local-integration.test.ts` on an isolated local project,
+`tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`,
 `npm run resolvers:check`, `npm run agents:check`.
 
 ## Ticket 278: Leave reminders through web push
