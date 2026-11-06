@@ -16495,7 +16495,12 @@ Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
 
 ## Ticket 280: Leave reminders on the Mac
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`, not merged or released. A linked Mac
+schedules `cadence.leave.<trip digest>` notifications from the departure model's last estimate
+(`packages/core/src/services/mac-leave-reminder-plan.ts`,
+`apps/desktop/src/local-leave-reminder.service.ts`), with one D15 update and activation into the
+event's drawer. Behavior reminder coverage is unchanged. Three new phrases wait for the owner
+(D7). Installed acceptance waits for a dev-signed build; a release waits for the owner.
 Dependencies: Tickets 265, 268 and 279. Decision D3.
 
 Goal: a native reminder fires from the last estimate, even if the app has quit.

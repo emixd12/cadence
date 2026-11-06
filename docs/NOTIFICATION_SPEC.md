@@ -537,9 +537,22 @@ ship, nothing reads or writes the new tables.
   the leave time 10 minutes or more earlier, and the leave time is still ahead, the
   app posts one update. It posts no second update.
 - Leave reminders stay out of the Behavior reminder coverage calculation and use
-  their own identifier (Ticket 280).
+  their own identifiers, `cadence.leave.<trip digest>` and
+  `cadence.leave.<trip digest>.update` (Ticket 280).
 - The Mac reads the hosted preference on a linked account. An unlinked Mac has no
-  hosted travel and no leave reminders.
+  hosted travel and no leave reminders. Travel estimates off on the Mac also means no
+  leave reminders. Turning either off, signing out or changing account removes every
+  pending and delivered leave reminder.
+- The Mac reminds only for trips with a known leave time still ahead, toward a Calendar
+  event or a Behavior; never for the trip home. A reminder whose time has passed when
+  the Mac first knows the trip fires at once (10 seconds later).
+- The Mac remembers each trip's digest, fire time and named leave time on the device
+  only, so a dismissed reminder is not sent again and a second update is never sent.
+- Text, not yet approved (D7): "Leave by {time} for {event}", or "Leave earlier: by
+  {time} for {event}" for the update, with the body "{Mode} from {start}, arrive {time}.
+  Estimate checked {time}." The start is Home, your previous stop or your position.
+- Activating a leave reminder opens the Timeline and that event's drawer, or the
+  Behavior's Occurrence.
 
 ### Storage
 

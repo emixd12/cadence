@@ -633,6 +633,11 @@ cite has not changed.
   minutes or more earlier; the web job estimates the trip once more after sending to check,
   and the reminder row records when the update sent. Turning reminders off and on the same
   day can repeat a reminder.
+- **Ticket 280 note (November 6, 2026):** the Mac keeps, on the device only, each trip's digest,
+  fire time and the leave time its reminder named, so a dismissed reminder is not sent again.
+  Its text names the start (Home, your previous stop or your position) and when the estimate was
+  checked, with no route duration. Travel estimates off on the Mac also stops its reminders.
+  The three Mac phrases are listed in `departure-phrases.ts`, not yet approved (D7).
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session

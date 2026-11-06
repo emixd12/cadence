@@ -1,5 +1,31 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Ticket 280 leave reminders on the Mac — November 6, 2026
+
+**On branch `us-work`. Not merged and not released. No schema change, no provider call and no
+route call of its own. A desktop release waits for the owner.**
+
+- A linked Mac schedules a native notification from its last estimate, at the leave time minus
+  the get-ready time, so it fires with Cadence quit. No background helper. It reconciles on
+  launch, resume and wake, account change, each new estimate or trip, a local day change, and
+  after the switch saves.
+- On only with the hosted switch (Ticket 279) and Travel estimates both on. Off, sign-out or
+  another account removes every pending and delivered leave reminder. The trip home gets none.
+- Decision D15: after the reminder fires, one update if a later estimate moves the leave time 10
+  minutes or more earlier and it is still ahead. Never a second update.
+- Own identifiers, `cadence.leave.<trip digest>[.update]`, allowed in the Rust check and the
+  native adapter. Behavior reminder coverage reads only `cadence.local.` identifiers, so its
+  results are unchanged (tested).
+- Activation opens the Timeline and the event's drawer, or the Behavior's Occurrence.
+- Device-only memory in WKWebView `localStorage`: trip digests, fire times and named leave
+  times. No title, place, position or duration; nothing in SQLite, sync or on the server.
+- Planner `packages/core/src/services/mac-leave-reminder-plan.ts`, separate from Ticket 277's
+  hosted planner. Interaction INT-NOTIFICATION-001 and INT-TRAVEL-013 updated.
+- Not verified: installed delivery with the app quit, the update and activation on a dev-signed
+  build.
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, not yet approved
+  (D7).
+
 ## Travel advisory revamp Wave 4: Ticket 279 leave reminder setting and readiness list — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No schema change and no provider call.**
