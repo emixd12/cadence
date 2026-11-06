@@ -282,6 +282,14 @@ describe("each state", () => {
     expect(limit.next).toMatchObject({ timeUnknownCause: "leg_limit", phrase: "No leave time for this trip.", linePhrase: "No leave time for the trip to Dentist." });
   });
 
+  it("skips an unknown trip whose reason this version does not know, such as attendance_unknown saved before D12", () => {
+    const legacy = { ...unknown("outbound", null, "dentist", "destination_unknown"), reason: "attendance_unknown" } as unknown as TravelUnknownLeg;
+    expect(() => model(local("08:00"), [], { unknownLegs: [legacy] })).not.toThrow();
+    expect(model(local("08:00"), [], { unknownLegs: [legacy] })).toMatchObject({ state: "none", trips: [] });
+    const withHome = model(local("08:00"), [tripHome()], { unknownLegs: [legacy] });
+    expect(withHome.trips.map((trip) => trip.role)).toEqual(["return"]);
+  });
+
   it("gives one line for each reason an estimate is missing", () => {
     expect(model(local("08:00"), [missing(OUTBOUND, "unavailable", "Route unavailable.")]).next).toMatchObject({ state: "no_route", phrase: "No route found.", action: null });
     expect(model(local("08:00"), [missing(OUTBOUND, "rejected_revision", "Journey or grant revision changed.")]).next).toMatchObject({ state: "trip_changed", phrase: "Trip changed.", action: "refresh" });

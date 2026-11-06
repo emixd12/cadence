@@ -645,6 +645,25 @@ it("keeps last estimates through a reload, marked Last estimate, without another
   } finally { await day.done(); }
 });
 
+it("discards a session record saved before decision D12 instead of restoring its attendance trips", async () => {
+  const { routes } = dayServer();
+  const day = await openDay(routes);
+  try {
+    // The previous version wrote version 1 and could hold an `attendance_unknown` trip.
+    const saved = JSON.parse(storedTravel()!) as { version: number; view: TravelRoutesView };
+    const evidence = saved.view.evidence!;
+    const legacy = { ...saved, version: 1, view: { ...saved.view, evidence: { ...evidence, unknownLegs: [
+      { role: "onward", originCommitmentRef: "dentist", destinationCommitmentRef: "gym", reason: "attendance_unknown" }] } } };
+    window.sessionStorage.setItem("cadence:travel-session", JSON.stringify(legacy));
+    await day.reload();
+    expect(routes).toHaveBeenCalledTimes(2);
+    expect(() => departureAt(latest().view)).not.toThrow();
+    expect(departureAt(latest().view).next).toMatchObject({ freshness: "current" });
+    expect(storedTravel()).not.toContain("attendance_unknown");
+    expect(JSON.parse(storedTravel()!)).toMatchObject({ version: 2 });
+  } finally { await day.done(); }
+});
+
 it("merges a trip response per trip, so other trips keep their times (Ticket 268)", async () => {
   const { routes } = dayServer();
   const day = await openDay(routes);

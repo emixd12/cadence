@@ -282,8 +282,13 @@ export function resetTravelViewCacheForTest(options: Readonly<{ keepSession?: bo
  * webview keeps sessionStorage in memory for the app session; it never reaches SQLite.
  */
 const TRAVEL_SESSION_KEY = "cadence:travel-session";
+/**
+ * Raise this when the stored view's shape or meaning changes. Version 2: decision D12 removed the
+ * `attendance_unknown` trip reason, so a record from before it is discarded, not restored.
+ */
+const TRAVEL_SESSION_VERSION = 2;
 type TravelSessionRecord = Readonly<{
-  version: 1; accountId: string; localDate: string; stateDigest: string;
+  version: typeof TRAVEL_SESSION_VERSION; accountId: string; localDate: string; stateDigest: string;
   view: TravelRoutesView | null; at: number; stops?: Readonly<Record<string, string>> | null;
   refresh: Omit<TravelRefreshState, "device"> | null; budget: TravelBudgetState | null;
 }>;
@@ -294,10 +299,12 @@ function readTravelSession(): TravelSessionRecord | null {
   const storage = travelSessionStorage();
   try {
     const value = JSON.parse(storage?.getItem(TRAVEL_SESSION_KEY) ?? "null") as Partial<TravelSessionRecord> | null;
-    if (!value || value.version !== 1 || typeof value.accountId !== "string" || typeof value.localDate !== "string" ||
-      typeof value.stateDigest !== "string" || typeof value.at !== "number") return null;
+    if (!value) return null;
+    // An older version or a damaged record is removed, so nothing else reads it either.
+    if (value.version !== TRAVEL_SESSION_VERSION || typeof value.accountId !== "string" || typeof value.localDate !== "string" ||
+      typeof value.stateDigest !== "string" || typeof value.at !== "number") { removeTravelSession(); return null; }
     return value as TravelSessionRecord;
-  } catch { return null; }
+  } catch { removeTravelSession(); return null; }
 }
 function writeTravelSession(record: TravelSessionRecord): void {
   try { travelSessionStorage()?.setItem(TRAVEL_SESSION_KEY, JSON.stringify(record)); } catch { /* A full or blocked store keeps memory only. */ }
@@ -472,7 +479,7 @@ export function useTravelContext(input: Readonly<{
       const refreshState = travelRefreshStates.get(accountId) ?? null;
       // The Daily Brief token stays in page memory; JSON omits the undefined field.
       const view = cached?.view ? { ...cached.view, conclusionsToken: undefined } : null;
-      writeTravelSession({ version: 1, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(), stops: cached?.stops ?? null,
+      writeTravelSession({ version: TRAVEL_SESSION_VERSION, accountId, localDate, stateDigest, view, at: cached?.at ?? Date.now(), stops: cached?.stops ?? null,
         refresh: refreshState ? { localDate: refreshState.localDate, sourceKey: refreshState.sourceKey, tripAttempts: refreshState.tripAttempts,
           ...(refreshState.deviceRoutedAt ? { deviceRoutedAt: refreshState.deviceRoutedAt } : {}) } : null,
         budget: travelBudgets.get(accountId) ?? null });

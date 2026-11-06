@@ -38,6 +38,7 @@ export function resolveDepartureModel(input: DepartureModelInput): DepartureMode
         const candidate = "leg" in trip
           ? fromLeg(trip, input, now, stops, afterLate.get(trip.leg.id) ?? 0)
           : fromUnknown(trip, all[index - 1] ?? null, stops, unknownDayEnd);
+        if (!candidate) return [];
         return candidate.finishedAt && Temporal.Instant.compare(now, candidate.finishedAt) >= 0 ? [] : [candidate];
       })
     : [];
@@ -153,7 +154,7 @@ function fromUnknown(
   previous: EvidenceTrip | null,
   stops: ReadonlyMap<string, DepartureStop>,
   dayEnd: Temporal.Instant,
-): Candidate {
+): Candidate | null {
   const trip = baseDraft(unknown.role, unknown.originCommitmentRef, unknown.destinationCommitmentRef, null);
   const origin = stops.get(unknown.originCommitmentRef ?? "");
   const destination = stops.get(unknown.destinationCommitmentRef ?? "");
@@ -176,6 +177,9 @@ function fromUnknown(
     case "return_base_missing": return { finishedAt, draft: { ...trip, state: "time_unknown", timeUnknownCause: "home_missing" } };
     case "timing_unknown": return { finishedAt, draft: { ...trip, state: "time_unknown", timeUnknownCause: "no_known_end" } };
     case "leg_limit": return { finishedAt, draft: { ...trip, state: "time_unknown", timeUnknownCause: "leg_limit" } };
+    // A reason this version does not know, such as `attendance_unknown` from evidence saved
+    // before decision D12, says nothing usable. The trip is skipped rather than breaking the day.
+    default: return null;
   }
 }
 
