@@ -500,6 +500,25 @@ create table travel_leave_reminders (
   database; `tests/travel-leave-reminders-migration.test.ts` checks the migration
   text.
 
+#### The job's caller (Ticket 276)
+
+Migration `20261106050000_leave_reminder_google_subject.sql` adds one function and no
+table. The job acts as the user with a minted leave reminder token
+(`lib/integrations/leave-reminder-caller.ts`; `docs/SUPABASE_WORKFLOW.md`, "Leave
+reminder token channel"). That client has no Auth user, but the Calendar service checks
+the connection's Google subject, so:
+
+```sql
+public.leave_reminder_google_subject() returns text  -- security definer
+```
+
+- Returns the caller's own Google provider id from `auth.identities`, or null unless the
+  account has exactly one Google identity. It reads no other field and no other account.
+- Raises `leave_reminder_token_required` unless `auth.jwt() ->> 'cadence_channel'` is
+  `leave_reminder`, so normal sessions and MCP tokens cannot call it.
+- Execute is granted to `authenticated` only; `anon` and the service role have none.
+- `tests/sql/ticket-276-leave-reminder-identity-smoke.sql` checks these rules.
+
 ### `behavior_definition_events`
 
 ```sql

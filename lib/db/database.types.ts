@@ -2123,6 +2123,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      leave_reminder_google_subject: { Args: never; Returns: string }
       list_my_occurrence_time_session_history: {
         Args: {
           cursor_session_id: string

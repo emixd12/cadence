@@ -7,14 +7,20 @@ import {
   type KeyObject,
 } from "node:crypto";
 
-// Server-only. Mints short-lived Supabase access tokens for verified
-// integration grants so integration requests reach Postgres as that user
-// under RLS. Tokens never leave the server and must never be logged.
+// Server-only. Mints short-lived Supabase access tokens so server work reaches
+// Postgres as one user under RLS. Two separate channels exist:
+// - "mcp": a verified MCP integration grant (carries the grant and client ids).
+// - "leave_reminder": the leave reminder job (Ticket 276, decision D3). It
+//   carries no grant claims, so MCP grant functions refuse it, and MCP tokens
+//   never carry this channel.
+// Tokens never leave the server and must never be logged.
 
 export const INTEGRATION_SIGNING_KEY_ENV = "CADENCE_INTEGRATION_JWT_SIGNING_KEY";
 export const INTEGRATION_TOKEN_MAX_TTL_SECONDS = 300;
 
 export type IntegrationTokenChannel = "mcp";
+export const LEAVE_REMINDER_TOKEN_CHANNEL = "leave_reminder";
+export type LeaveReminderTokenChannel = typeof LEAVE_REMINDER_TOKEN_CHANNEL;
 
 export type IntegrationSigningKey = {
   kid: string;
@@ -40,6 +46,22 @@ export type IntegrationTokenClaims = {
   cadence_channel: IntegrationTokenChannel;
   cadence_grant_id: string;
   cadence_client_id: string;
+};
+
+export type LeaveReminderTokenInput = {
+  userId: string;
+  now: Date;
+  ttlSeconds?: number;
+};
+
+export type LeaveReminderTokenClaims = {
+  sub: string;
+  role: "authenticated";
+  aud: "authenticated";
+  iat: number;
+  exp: number;
+  jti: string;
+  cadence_channel: LeaveReminderTokenChannel;
 };
 
 export type MintedIntegrationToken = {
@@ -149,6 +171,45 @@ export function mintIntegrationAccessToken(
   key: IntegrationSigningKey,
   input: IntegrationTokenInput,
 ): MintedIntegrationToken {
+  if (input.channel !== "mcp") {
+    throw new TypeError("Integration token channel must be mcp.");
+  }
+
+  for (const [name, value] of [
+    ["grantId", input.grantId],
+    ["clientId", input.clientId],
+  ] as const) {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new TypeError(`Integration token ${name} is required.`);
+    }
+  }
+
+  return signUserToken(key, input, (base) => ({
+    ...base,
+    cadence_channel: input.channel,
+    cadence_grant_id: input.grantId,
+    cadence_client_id: input.clientId,
+  }) satisfies IntegrationTokenClaims);
+}
+
+// The leave reminder job's own channel (Ticket 276). It never uses an MCP grant.
+export function mintLeaveReminderAccessToken(
+  key: IntegrationSigningKey,
+  input: LeaveReminderTokenInput,
+): MintedIntegrationToken {
+  return signUserToken(key, input, (base) => ({
+    ...base,
+    cadence_channel: LEAVE_REMINDER_TOKEN_CHANNEL,
+  }) satisfies LeaveReminderTokenClaims);
+}
+
+type BaseUserClaims = Omit<IntegrationTokenClaims, "cadence_channel" | "cadence_grant_id" | "cadence_client_id">;
+
+function signUserToken(
+  key: IntegrationSigningKey,
+  input: { userId: string; now: Date; ttlSeconds?: number },
+  withChannel: (base: BaseUserClaims) => Record<string, unknown>,
+): MintedIntegrationToken {
   const ttlSeconds = input.ttlSeconds ?? INTEGRATION_TOKEN_MAX_TTL_SECONDS;
 
   if (
@@ -165,15 +226,6 @@ export function mintIntegrationAccessToken(
     throw new TypeError("Integration token subject must be a user UUID.");
   }
 
-  for (const [name, value] of [
-    ["grantId", input.grantId],
-    ["clientId", input.clientId],
-  ] as const) {
-    if (typeof value !== "string" || value.trim().length === 0) {
-      throw new TypeError(`Integration token ${name} is required.`);
-    }
-  }
-
   const nowMs = input.now.getTime();
 
   if (!Number.isFinite(nowMs)) {
@@ -182,17 +234,14 @@ export function mintIntegrationAccessToken(
 
   const iat = Math.floor(nowMs / 1000);
   const exp = iat + ttlSeconds;
-  const claims: IntegrationTokenClaims = {
+  const claims = withChannel({
     sub: input.userId,
     role: "authenticated",
     aud: "authenticated",
     iat,
     exp,
     jti: randomUUID(),
-    cadence_channel: input.channel,
-    cadence_grant_id: input.grantId,
-    cadence_client_id: input.clientId,
-  };
+  });
   const header = { alg: "ES256", typ: "JWT", kid: key.kid };
   const signingInput = `${base64UrlJson(header)}.${base64UrlJson(claims)}`;
   const signature = sign("sha256", Buffer.from(signingInput), {

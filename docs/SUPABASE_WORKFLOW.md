@@ -814,7 +814,7 @@ caller verifies an opaque Cadence access token and an active grant,
 internal Supabase access token with `lib/supabase/integration-token.ts`. The
 context's Supabase client sends that token with the publishable key.
 
-The internal token:
+The internal MCP token:
 
 - is an ES256 JWT whose header `kid` matches a signing key Supabase trusts;
 - carries `sub` (user id), `role: "authenticated"`, `aud: "authenticated"`,
@@ -827,6 +827,33 @@ The client uses the supabase-js `accessToken` option, which disables
 `supabase.auth`. The token therefore cannot reach the Auth user API through the
 context client. Requests reuse `fetchWithJwtIssuedAtFutureRetry` for
 `JWT issued at future` clock skew.
+
+### Leave reminder token channel (Ticket 276)
+
+The leave reminder job (decision D3) acts as one user with no session through
+its own channel. `createLeaveReminderCaller` in
+`lib/integrations/leave-reminder-caller.ts` mints the token with
+`mintLeaveReminderAccessToken`. It uses the same signing key and the same
+5-minute cap, but it never uses an MCP grant:
+
+- claims are `sub`, `role`, `aud`, `iat`, `exp`, `jti` and
+  `cadence_channel: "leave_reminder"` only. Without `cadence_grant_id`, every
+  MCP grant function refuses it with `integration_grant_required`.
+- `mintIntegrationAccessToken` refuses any channel except `mcp`.
+- The client has no Auth user. The Calendar service needs the account's Google
+  identity, so `leaveReminderCalendarCaller` calls
+  `public.leave_reminder_google_subject()` (migration
+  `20261106050000_leave_reminder_google_subject.sql`). It returns only the
+  caller's single Google provider id, or null, and refuses every token whose
+  `cadence_channel` is not `leave_reminder`.
+- `reserve_travel_provider_spend` reads `auth.uid()` from `sub`, so the job
+  reserves against that user's month.
+- The due-account selection (`selectDueLeaveReminderAccounts` in
+  `lib/db/leave-reminders.repo.ts`) is the job's only service-role read. It
+  reads account IDs and next check times.
+
+Local proof: `tests/leave-reminder-caller.local-integration.test.ts` (same four
+variables as below) and `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`.
 
 ### Key custody
 

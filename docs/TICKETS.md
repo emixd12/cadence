@@ -16328,7 +16328,12 @@ Verification: `npm run supabase -- db reset`, the new migration test, `npm run t
 
 ## Ticket 276: A background job acts as the user
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
+applied to local Supabase only; the hosted push waits for the owner. The leave reminder
+token is its own channel with no MCP grant claims. The Google identity comes from
+`public.leave_reminder_google_subject()`. Open for Ticket 277: Vercel's documentation does
+not say whether cron requests carry `x-vercel-oidc-token`; check it in production before
+the job routes (STATUS.md, Ticket 276).
 Dependencies: Ticket 275. Decision D3.
 
 Goal: a job reads Calendar and reserves spend under Row Level Security, with no user

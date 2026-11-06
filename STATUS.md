@@ -1,5 +1,35 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Ticket 276 the leave reminder job acts as the user — November 6, 2026
+
+**On branch `us-work`. Not merged. The new migration is applied to local Supabase only; the
+hosted push waits for the owner.**
+
+- `mintLeaveReminderAccessToken` adds a separate `leave_reminder` token channel: 5 minutes
+  or less, no MCP grant or client claims, so MCP grant functions refuse it. The MCP minter
+  now refuses any channel except `mcp`.
+- `createLeaveReminderCaller` (`lib/integrations/leave-reminder-caller.ts`) builds the
+  job's client from the publishable key and that token. It never uses the service role,
+  and the token is not returned, stored or logged.
+- Migration `20261106050000_leave_reminder_google_subject.sql` adds
+  `public.leave_reminder_google_subject()`, the smallest read the Calendar check needs: the
+  caller's single Google provider id, for leave reminder tokens only.
+  `leaveReminderCalendarCaller` uses it; the Calendar service accepts this narrower caller.
+- `reserve_travel_provider_spend` charges the token's user. `selectDueLeaveReminderAccounts`
+  is the job's one service-role read: account IDs and next check times.
+- Local proof on an isolated project: `tests/leave-reminder-caller.local-integration.test.ts`
+  (own rows only, no cross-account reads or writes, spend charged to the right month,
+  MCP grant functions refuse the token, expired token refused, due-account selection
+  limited to its columns) and `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`.
+- Not confirmed: whether Vercel cron requests carry `x-vercel-oidc-token`, which hosted
+  routing needs. Vercel documents the header on function requests but says nothing about
+  cron. Ticket 277 should log only whether the header is present on its first production
+  cron run. If it is absent, the job needs another documented token source before it routes.
+- Known limits: the Calendar credential read still uses the existing service-role
+  functions, as it does for every caller. The token is a full `authenticated` token for
+  that user, held only on the server.
+- Messaging impact: P-017, no change. No new user-facing wording.
+
 ## Travel advisory revamp Wave 4: Ticket 275 leave reminder specification and schema — November 6, 2026
 
 **On branch `us-work`. Not merged. Applied to local Supabase only; the hosted push waits for the owner.**
