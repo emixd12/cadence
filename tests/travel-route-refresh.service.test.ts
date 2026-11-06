@@ -494,6 +494,22 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(JSON.stringify(result.evidence)).not.toContain("call");
   });
 
+  it("decision D12: refreshes an older Mac build's request whose correction has a null destination", async () => {
+    // Before D12 an In person or Remote tap sent attendance with locationText null. The server skips it.
+    withEvents([event("call", "2026-09-22T09:00:00Z", "2026-09-22T09:30:00Z", ""), event("hall", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Hall St")]);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+    const legacy = { ...day, scope: "day", corrections: [
+      { eventId: "call", revision: "call", attendance: "physical", locationText: null },
+      { eventId: "hall", revision: "hall", attendance: "remote", locationText: null },
+    ] };
+    const result = await refreshTravelRoutes(caller, legacy, config, now);
+    expect(result.evidence?.unknownLegs).toEqual([]);
+    expect(result.evidence?.legs.map((entry) => [entry.leg.role, entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([
+      ["outbound", null, "hall"], ["return", "hall", null],
+    ]);
+    expect(JSON.stringify(result.evidence)).not.toContain("call");
+  });
+
   it("keeps a Behavior under way until its end, and its source for later decisions", async () => {
     located("2026-09-22T07:50:00Z");
     mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));

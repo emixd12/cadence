@@ -43,10 +43,13 @@ function device(value: unknown): TravelRouteRefreshRequest["device"] {
 function correctionArray(value: unknown): TravelRouteRefreshRequest["corrections"] {
   if (!Array.isArray(value) || value.length > 8) throw new TypeError("Travel corrections are invalid.");
   const ids = new Set<string>();
-  return value.map((item) => {
+  return value.flatMap((item) => {
+    // Decision D12: a Mac build from before D12 sends an attendance answer with a null destination.
+    // Attendance no longer exists, so that correction is skipped and the refresh still runs.
+    if (record(item) && item.locationText === null) return [];
     if (!record(item) || !boundedText(item.eventId, 256) || !boundedText(item.revision, 512) || !boundedText(item.locationText, 512) || ids.has(item.eventId)) throw new TypeError("Travel correction is invalid.");
     ids.add(item.eventId);
-    return { eventId: item.eventId, revision: item.revision, locationText: item.locationText };
+    return [{ eventId: item.eventId, revision: item.revision, locationText: item.locationText }];
   });
 }
 

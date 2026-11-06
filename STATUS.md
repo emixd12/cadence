@@ -27,8 +27,10 @@ D12 (`docs/DECISIONS.md`) changes Ticket 273's attendance step.
   It stays a normal event. A Calendar event with a location is in person.
 - The attendance question is gone: the needs-attendance state and phrase, In person and Remote,
   and the attendance choice in Change for this trip. A correction carries only a destination
-  (`TravelCorrection`, the route request parser). The stop past the bounded source window reads
-  as past the trip limit (`leg_limit`).
+  (`TravelCorrection`, the route request parser). The parser skips a correction with a null
+  destination, which a Mac build from before D12 sends for an attendance answer, so that build's
+  refresh still succeeds. The stop past the bounded source window reads as past the trip limit
+  (`leg_limit`).
 - "Fix {event}'s place" replaces "Fix {event}'s place or attendance". The trip home with no Home
   reads "Add Home in Settings to estimate the return time.", whose first words link to
   `/settings#travel` (INT-TRAVEL-011). Both await the owner's approval (D7); the bench review

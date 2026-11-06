@@ -19,8 +19,19 @@ describe("travel route corrections (decision D12)", () => {
     expect(parseTravelRouteRefreshRequest({ ...day, corrections: [{ ...corrections[0], attendance: "remote" }] }).corrections).toEqual(corrections);
   });
 
-  it("rejects a correction without a destination", () => {
-    for (const locationText of [null, "", undefined, "x".repeat(513)]) {
+  it("skips an older Mac build's attendance-only correction, so the refresh still runs", () => {
+    const legacy = [
+      { eventId: "event-1", revision: "r1", attendance: "physical", locationText: null },
+      { eventId: "event-2", revision: "r2", attendance: "remote", locationText: null },
+      { eventId: "event-3", revision: "r3", attendance: "physical", locationText: "12 Harbor Street" },
+    ];
+    expect(parseTravelRouteRefreshRequest({ ...day, corrections: legacy }).corrections).toEqual([
+      { eventId: "event-3", revision: "r3", locationText: "12 Harbor Street" },
+    ]);
+  });
+
+  it("rejects a correction with an empty, missing or oversized destination", () => {
+    for (const locationText of ["", undefined, "x".repeat(513)]) {
       expect(() => parseTravelRouteRefreshRequest({ ...day, corrections: [{ eventId: "event-1", revision: "r1", locationText }] })).toThrow("Travel correction");
     }
   });
