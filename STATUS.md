@@ -8,8 +8,9 @@
   come from Google, Outlook or iCloud. Outlook and iCloud events are named by source, as the
   brief names them, and the source key binds the Outlook and iCloud connections that took part.
 - The Daily Brief accepts the conclusions only when each named event is in its context with the
-  same revision. Outlook and iCloud are in that context only under their own disclosure, so a
-  stop from an undisclosed Calendar withholds the conclusions. A left-out Calendar still does.
+  same revision. Outlook and iCloud are in that context only under their own disclosure, so any
+  event that day from an undisclosed Calendar, a stop or not, withholds the conclusions (known
+  limit). A left-out Calendar still does.
 - The brief pipeline projects travel beside the Google-only view, so a trip to a disclosed
   Outlook or iCloud event stays visible to the model. Before this change such a context failed
   validation. Model input is unchanged: no leave time, duration or place.

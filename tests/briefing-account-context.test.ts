@@ -362,6 +362,12 @@ describe("signed travel conclusions (Ticket 219 Option A)", () => {
       expect(prepared.contexts[0]!.travel?.route.state).toBe("available");
     });
 
+    it("supplies nothing when an undisclosed Outlook Calendar has any event, even one that is not a stop (known limit)", async () => {
+      const unlocated = payload({ src: sourceKey(fence), events: { "event:fixture": "event", [outlookName]: outlookRevision } });
+      const prepared = await prepare(issueTravelConclusionsToken(unlocated, SECRET));
+      expect(prepared.contexts[0]!.travel).toMatchObject(notSupplied);
+    });
+
     it("requires a current Outlook snapshot when Outlook is disclosed and took part", async () => {
       mocks.contexts.mockResolvedValue([withOutlook(projectUnavailableVersionedAdvisorCalendar({ source: "outlook_calendar", connectionGeneration: 2,
         selectionRevision: 3, failure: { code: "timeout", retryable: true, retryAfterSeconds: null } }))]);

@@ -16693,7 +16693,8 @@ Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclu
 cover Outlook and iCloud stops. The token names those events by source, and its source key
 binds the Outlook and iCloud connections that took part. The brief accepts it only when each
 named event is in its own context, which holds Outlook or iCloud only under that Calendar's
-Daily Brief disclosure; a stop from an undisclosed Calendar withholds the conclusions. A
+Daily Brief disclosure. Known limit: any event that day from an undisclosed Calendar that took
+part, a stop or not, withholds the conclusions. A
 disclosed Calendar that took part needs a current, complete read. A left-out Calendar still
 withholds the token. The brief pipeline projects travel beside its Google-only view, so trips
 to disclosed Outlook or iCloud events stay visible. Leave times never reach the model.

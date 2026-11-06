@@ -1735,8 +1735,10 @@ Outlook or iCloud event by its source, calendar and provider event ID, as the br
 do, and its source key adds the Outlook and iCloud connections that took part. The brief accepts
 the token only when each named event is in its own context with the same revision. An Outlook or
 iCloud Calendar is in that context only under its own Daily Brief disclosure, so the disclosure
-still decides what the brief may say: a stop from an undisclosed Calendar withholds all signed
-conclusions. A disclosed Calendar that took part must have a current, complete read, as Google
+still decides what the brief may say. Known limit: any event that day from an undisclosed Calendar
+that took part, a stop or not, withholds all signed conclusions, because the brief cannot check
+that Calendar's events. Signing only the disclosed stops would need a second plan, since an
+undisclosed stop changes the trips after it. A disclosed Calendar that took part must have a current, complete read, as Google
 must. A left-out Calendar (Ticket 283 verifier fix) still withholds the token. The model input
 keeps the same closed shape: yes/no fits, trip states and weather margins, never a time.
 
