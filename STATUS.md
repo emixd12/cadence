@@ -1,5 +1,14 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: wording approved (D17) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed.**
+
+- Decision D17: the owner approved all Wave 4 wording, the twelve reminder-setting phrases
+  (Ticket 279) and the web and Mac reminder text (Tickets 278 and 280). The bench wording
+  review shows all 95 phrases approved, none awaiting. Recorded in `docs/DECISIONS.md`.
+- Messaging impact: P-016 and P-024 notes.
+
 ## Travel advisory revamp Wave 4: Ticket 278 leave reminders through web push — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No schema change. No real notification was
@@ -18,8 +27,8 @@ sent; a real send waits for an owner-approved test account.**
 - The link is `/timeline?leave=<trip digest>`, never a title or place. The Timeline opens that
   event's drawer once the Calendar read has it at the same start, or scrolls to the Behavior's
   Occurrence. Interaction INT-NOTIFICATION-001 updated.
-- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, not yet approved
-  (D7).
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, approved
+  November 6, 2026 (D17).
 
 ## Travel advisory revamp Wave 4: Ticket 280 leave reminders on the Mac — November 6, 2026
 
@@ -44,8 +53,8 @@ route call of its own. A desktop release waits for the owner.**
   hosted planner. Interaction INT-NOTIFICATION-001 and INT-TRAVEL-013 updated.
 - Not verified: installed delivery with the app quit, the update and activation on a dev-signed
   build.
-- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, not yet approved
-  (D7).
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, approved
+  November 6, 2026 (D17).
 
 ## Travel advisory revamp Wave 4: Ticket 277 leave reminder job — November 6, 2026
 
@@ -92,7 +101,7 @@ route call of its own. A desktop release waits for the owner.**
 - Built before Ticket 278 (its listed dependency), at the coordinator's direction. The Mac
   posts no leave reminder until Ticket 280.
 - Messaging impact: P-024 logged; P-016 unchanged. The twelve new phrases are in
-  `departure-phrases.ts`, not yet approved (D7).
+  `departure-phrases.ts`, approved November 6, 2026 (D17).
 
 ## Travel advisory revamp Wave 4: Ticket 276 the leave reminder job acts as the user — November 6, 2026
 

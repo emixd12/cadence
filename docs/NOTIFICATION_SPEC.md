@@ -589,7 +589,7 @@ reminders' web push sender with its own options. Behavior reminders are unchange
 - Urgency is `high`. The push lifetime (TTL) is the whole seconds until `expiresAt`, the
   leave time, so a push service stops delivering once the trip has started. At or after
   that time the delivery sends nothing and returns `delivery_failed`.
-- Title, not yet approved (D7): "Leave by {time} for {event}", or "Leave earlier: by
+- Title, approved November 6, 2026 (D17): "Leave by {time} for {event}", or "Leave earlier: by
   {time} for {event}" for the update. Body: "{Mode}, {minutes} min from {start}. Arrive
   {time}." The start is Home or the previous stop's title. Times are in the account's
   timezone; a time on another date shows its date. Labels over 120 characters are cut.
@@ -629,7 +629,7 @@ reminders' web push sender with its own options. Behavior reminders are unchange
   the Mac first knows the trip fires at once (10 seconds later).
 - The Mac remembers each trip's digest, fire time and named leave time on the device
   only, so a dismissed reminder is not sent again and a second update is never sent.
-- Text, not yet approved (D7): "Leave by {time} for {event}", or "Leave earlier: by
+- Text, approved November 6, 2026 (D17): "Leave by {time} for {event}", or "Leave earlier: by
   {time} for {event}" for the update, with the body "{Mode} from {start}, arrive {time}.
   Estimate checked {time}." The start is Home, your previous stop or your position.
 - Activating a leave reminder opens the Timeline and that event's drawer, or the

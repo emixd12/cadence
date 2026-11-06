@@ -1687,3 +1687,18 @@ records it. It answers the Ticket 275 verifier's open question about the update 
 Platform impact: web through the hosted job (Ticket 277). Desktop: not applicable; the Mac
 makes no route call for reminders (Ticket 280). Marketing: not applicable. Future mobile:
 the hosted contract is portable; native mobile is deferred. Messaging impact: none.
+
+## 2026-11-06: All Wave 4 wording approved (D17)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after Tickets
+275–280 were verified:
+
+1. All Wave 4 wording is approved as written: the twelve reminder-setting phrases (Ticket
+   279), the three web push reminder phrases (Ticket 278) and the three Mac reminder phrases
+   (Ticket 280).
+2. `DEPARTURE_PHRASE_REVIEW` carries the date as `OWNER_APPROVED_2026_11_06`. The bench
+   wording review shows every phrase approved, with none awaiting.
+
+Platform impact: web and desktop through the shared phrase module, Settings and the two
+notification paths. Marketing: not applicable until release. Future mobile: mobile web
+inherits the web text; native mobile is deferred. Messaging impact: P-016 and P-024 notes.

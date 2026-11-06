@@ -16440,7 +16440,7 @@ notification was sent. Delivery `lib/services/leave-reminder-web-push.ts`, wired
 `createLeaveReminderDelivery`; link helpers `lib/ui/leave-reminder-link.ts`. The sender gains
 optional lifetime and urgency; Behavior reminders keep 24 hours at normal urgency. The link is
 `/timeline?leave=<trip digest>`. The update shares the first notification's tag and alerts
-again. Three phrases in `departure-phrases.ts`, not yet approved (D7). The Ticket 277 payload
+again. Three phrases in `departure-phrases.ts`, approved November 6, 2026 (D17). The Ticket 277 payload
 contract is unchanged; the delivery reads the profile timezone itself.
 Dependencies: Ticket 277. Decision D3.
 
@@ -16480,8 +16480,8 @@ Verification: `npx vitest run` on the push and reminder service tests,
 Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alongside
 Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
 saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
-token). It cannot turn on while Travel estimates is off. The twelve new phrases wait for
-the owner (D7). The Mac posts no leave reminder until Ticket 280.
+token). It cannot turn on while Travel estimates is off. The owner approved the twelve new
+phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280.
 Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
@@ -16520,8 +16520,8 @@ Status: implemented November 6, 2026 on branch `us-work`, not merged or released
 schedules `cadence.leave.<trip digest>` notifications from the departure model's last estimate
 (`packages/core/src/services/mac-leave-reminder-plan.ts`,
 `apps/desktop/src/local-leave-reminder.service.ts`), with one D15 update and activation into the
-event's drawer. Behavior reminder coverage is unchanged. Three new phrases wait for the owner
-(D7). Installed acceptance waits for a dev-signed build; a release waits for the owner.
+event's drawer. Behavior reminder coverage is unchanged. The owner approved its three phrases on
+November 6, 2026 (D17). Installed acceptance waits for a dev-signed build; a release waits for the owner.
 Dependencies: Tickets 265, 268 and 279. Decision D3.
 
 Goal: a native reminder fires from the last estimate, even if the app has quit.

@@ -648,6 +648,9 @@ cite has not changed.
   the arrival time. The titles travel only in the encrypted push payload; the link carries the
   trip digest only. The push service holds the notification at most until the leave time. The
   three web phrases are listed in `departure-phrases.ts`, not yet approved (D7).
+- **D17 note (November 6, 2026):** the owner approved all Wave 4 wording: the three web and three
+  Mac reminder phrases above and the twelve P-024 setting phrases. No travel phrase awaits
+  approval.
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session
@@ -877,4 +880,5 @@ cite has not changed.
 - **Update needed:** describe the switch, the readiness list, the Travel estimates
   requirement, that it applies to every device on the account, and which sources get
   reminders. P-016 carries the Privacy and retention wording.
+- **D17 note (November 6, 2026):** the owner approved all twelve phrases as written.
 - **Status:** logged.

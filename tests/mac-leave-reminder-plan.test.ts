@@ -143,10 +143,10 @@ describe("Mac leave reminder planner (Ticket 280)", () => {
     expect(withLeave).toEqual(without);
   });
 
-  it("lists its wording as not yet approved", () => {
+  it("lists its wording as approved under decision D17", () => {
     const rows = DEPARTURE_PHRASE_REVIEW.filter((row) => row.ticket === "280");
     expect(rows.map((row) => row.template)).toEqual(["Leave by {time} for {event}", "Leave earlier: by {time} for {event}",
       "{Mode} from {start}, arrive {time}. Estimate checked {time}."]);
-    expect(rows.every((row) => row.approvedOn === null)).toBe(true);
+    expect(rows.every((row) => row.approvedOn === "2026-11-06")).toBe(true);
   });
 });
