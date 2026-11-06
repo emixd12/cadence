@@ -484,11 +484,16 @@ ship, nothing reads or writes the new tables.
 - A trip is dropped, and nothing sends, when its event is cancelled, declined, moved
   or loses its location, when its Occurrence is resolved or its Behavior's Where stops
   routing, or when the user turns reminders off.
-- A failed Calendar read drops nothing. A failed Google Calendar read fails the visit and the
-  job retries the account later. A failed Outlook or iCloud read leaves that Calendar's trips
-  out of the visit, so the job keeps every record for today whose trip is missing and decides
-  it once the Calendars read again. A kept reminder whose time passed during the outage sends
-  then if its leave time is still ahead.
+- A failed Calendar read while the job lists trips drops nothing. A failed Google Calendar
+  read fails the visit and the job retries the account later. A failed Outlook or iCloud read
+  leaves that Calendar's trips out of the visit, so the job keeps every record for today whose
+  trip is missing and decides it once the Calendars read again. A kept reminder whose time
+  passed during the outage sends then if its leave time is still ahead.
+- Known limit: the job reads Calendar once more after the send route, to name the event. If
+  the destination's or previous stop's Outlook or iCloud read fails at that moment, after the
+  same visit read it successfully, that reminder is cancelled. A retry would need another
+  route before sending, and the database allows a third route only after a reminder is sent
+  (decision D15).
 - No action buttons, snooze or email leave reminders in this version.
 - Leave times never reach Daily Brief model input or MCP.
 

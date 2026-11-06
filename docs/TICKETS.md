@@ -16700,7 +16700,11 @@ Outlook or iCloud read left out. `refreshTravelRoutesReportingCalendars` names t
 Calendars, and `planLeaveReminderVisit` keeps today's records with a missing trip while any
 Calendar is left out. A failed Google read fails the visit, which cancels nothing. Tests:
 `tests/leave-reminder-plan.test.ts`, `tests/leave-reminder-job.service.test.ts`,
-`tests/leave-reminder-hosted-port.test.ts`.
+`tests/leave-reminder-hosted-port.test.ts`. Known limit: the send-time Calendar read that names
+the event still cancels that reminder if an Outlook or iCloud read fails there, after the same
+visit read it successfully; a retry would need a third route before sending, which the
+`travel_leave_reminders_third_route_after_send` check refuses (`docs/NOTIFICATION_SPEC.md`,
+"Leave reminders").
 Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
 cover Outlook and iCloud stops. The token names those events by source, and its source key
 binds the Outlook and iCloud connections that took part. The brief accepts it only when each
