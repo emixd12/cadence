@@ -1603,3 +1603,27 @@ Platform impact: web and desktop through the hosted route, the shared departure 
 module and Timeline components. Marketing: not applicable. Future mobile: shared modules.
 Messaging impact: P-023, with notes on P-020 and P-021.
 
+
+## 2026-11-06: Next-trip marker and Wave 3 wording (D13)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after reviewing the
+Ticket 270 bench:
+
+1. The next-trip marker is a variant of A. The magenta span starts at the recommended leave
+   time, not at get-ready time. A magenta leader projects perpendicular to the axis from the
+   top of the span, with the leave-time label at its end, also magenta. Variants B and C and
+   the title-size line are removed.
+2. The next-departure line keeps the small status size.
+3. Approved wording: "Change for this trip"; the three Daily Brief lines "Travel to {event}
+   overlaps {behavior}.", "Planned travel overlaps {behavior}." and "Back around {time}.";
+   "Turn on Travel estimates in Settings to get a leave time for {event}."; "Not now"; and
+   "Estimates off". `DEPARTURE_PHRASE_REVIEW` carries the date as `OWNER_APPROVED_2026_11_06`.
+
+The label's own words ("Leave {time}", "Leave now", "May arrive late", "Arrive about {time}",
+"Home about {time}", "Head home now") are not yet approved (D7). They never show a leave time
+that has passed. Small magenta text uses `--calendar-overlap-text` (`#C0286A`) for 4.5:1
+contrast; strokes keep `--calendar-overlap`.
+
+Platform impact: web and desktop through the shared Timeline component, day-progress resolver
+and phrase module. Marketing: not applicable. Future mobile: shared modules. Messaging impact:
+P-021 note.
