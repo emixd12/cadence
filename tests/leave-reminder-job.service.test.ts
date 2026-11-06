@@ -263,6 +263,18 @@ describe("leave reminder job", () => {
     expect(sent).toEqual([]);
   });
 
+  it("skips routing and drops pending trips while Travel estimates is off", async () => {
+    const { store, world, sent, port, deliver, visit } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    const listTrips = vi.fn(async () => world.trips);
+    const off = { ...port(), listTrips, readContext: async () => ({ timezone: TZ, preparationSeconds: PREP_SECONDS, travelOn: false }) };
+    await visitLeaveReminderAccount(off, { userId: USER_ID, nextCheckAt: store.accountNextCheckAt! }, Temporal.Instant.from("2026-11-06T17:06:00Z"), deliver);
+    expect(listTrips).not.toHaveBeenCalled();
+    expect(world.routes).toHaveLength(1);
+    expect(sent).toEqual([]);
+    expect(only(store)).toMatchObject({ status: "cancelled" });
+  });
+
   it("does not send when the event is gone at send time", async () => {
     const { store, world, sent, visit } = harness();
     await visit("2026-11-06T15:00:00Z");
