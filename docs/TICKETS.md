@@ -16284,7 +16284,11 @@ tests/travel-habits.dom.test.tsx`.
 
 ## Ticket 275: Leave reminder specification and schema
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
+applied to local Supabase only; the hosted push waits for the owner. Settled here: the
+web job routes twice per trip and never after sending, so web reminders get no update;
+the one update comes from the Mac app's own estimates (`docs/NOTIFICATION_SPEC.md`,
+"Leave reminders"). Under D12, only trips to located destinations get reminders.
 Dependencies: Ticket 263. Decision D3.
 
 Goal: write the contract before building the job (proposal P3).
@@ -16377,10 +16381,12 @@ Scope and acceptance:
 - Run every 5 minutes with a bounded batch. Look 5 minutes ahead so reminders are not late.
 - Select due accounts as Ticket 276 states. Everything else runs as that user.
 - Start from Home or the previous stop. Never use a stored position.
-- Route at most twice per trip: once to set the check time, once when due. Store no
-  durations.
+- Route at most twice per trip: once to set the check time, once when due. Send from the
+  second route and never route after sending, so web reminders get no update (Ticket 275).
+  The database refuses a third route. Store no durations.
 - Re-read Calendar at least every 30 minutes. Drop a trip when its event moves, is
-  cancelled or declined, is marked remote, or its Occurrence is resolved.
+  cancelled or declined, loses its location (decision D12), or its Occurrence is
+  resolved.
 - Read the title only at send time, in memory.
 - Stay off until a new server flag is set. Add it to `.env.example`.
 - Tests cover no duplicate sends, overlapping runs, budget refusal, removed events and

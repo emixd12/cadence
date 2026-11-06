@@ -14,6 +14,10 @@ Email reminders default to off and are enabled per behavior.
 Public launch does not include marketing or product lifecycle emails. Reminder
 emails remain transactional behavior reminders.
 
+Leave reminders are a separate, opt-in reminder kind for travel. They have their
+own records and rules; see "Leave reminders" at the end of this document. Nothing
+else in this document applies to them unless that section says so.
+
 ## Automatic archive notice
 
 Automatic end-date archival creates a durable in-app notice from the
@@ -436,3 +440,111 @@ reminders retain their OS scheduling and verified coverage behavior.
 
 Send-time email and browser-push checks reject a Behavior whose end date has
 arrived in its timezone, even when a bounded archive batch has not processed it.
+
+## Leave reminders
+
+Owner decisions D3 and D12 (`docs/DECISIONS.md`). Ticket 275 sets these rules and the
+schema. Ticket 276 adds the job's caller, Ticket 277 the job, Ticket 278 web push
+delivery, Ticket 279 the setting and Ticket 280 the Mac app. Until those tickets
+ship, nothing reads or writes the new tables.
+
+### What gets a reminder
+
+- A trip to a located destination: a Google Calendar event with a location, or a
+  Behavior Occurrence whose Where routes (Home or a place). Outlook and iCloud events
+  join when Ticket 283 routes them.
+- Under D12, an event with no location is outside travel and gets no reminder. A
+  located event is treated as in person; nothing asks about attendance.
+- The trip home gets no reminder in this version. Getting ready applies to leaving
+  for an event, not to leaving one.
+- A trip needs a start. The web job starts from the previous stop, or from Home when
+  no stop comes first. It never uses a device position, because none is stored. With
+  neither, the trip gets no reminder; Ticket 279's readiness list shows the missing
+  Home.
+
+### Rules
+
+- Off by default. One switch per account (Ticket 279). Leave reminders do not use
+  the Behavior's `browser_reminder_enabled` or email settings.
+- The reminder time is the leave time minus the get-ready time from Travel habits
+  (`travel-habit-defaults@1`; 10 minutes when nothing is learned). A get-ready time
+  of 0 fires at the leave time. There is no separate minutes setting.
+- One reminder per trip. A trip is one destination on one local date at one start
+  time. A moved event is a new trip, and the old trip is dropped.
+- At most one update, and only if the leave time moves 10 minutes or more earlier
+  after the reminder fired. Only the Mac sends updates (see below).
+- If the reminder time has passed when Cadence first knows it, the reminder sends at
+  once while the leave time is still ahead. After the leave time, no reminder sends.
+- A trip is dropped, and nothing sends, when its event is cancelled, declined, moved
+  or loses its location, when its Occurrence is resolved or its Behavior's Where stops
+  routing, or when the user turns reminders off.
+- No action buttons, snooze or email leave reminders in this version.
+- Leave times never reach Daily Brief model input or MCP.
+
+### Web: the hosted job
+
+- The job runs every 5 minutes with a bounded batch. It treats work due within the
+  next 5 minutes as due, so a reminder arrives up to 5 minutes early rather than late.
+  Push service delays can add latency.
+- The job routes each trip at most twice, and each route reserves spend first:
+  1. The plan route runs at the first visit that sees the trip on its local date. It
+     sets the trip's next check time to the reminder time.
+  2. The send route runs at that check. The notification uses its estimate, read in
+     memory, and sends at once, even if the new reminder time is a little later.
+  The job never routes after sending, so a web reminder gets no update. Settled for
+  Ticket 275: the send route already runs at the reminder time, so it carries the
+  latest estimate the two-route budget allows. A third route after sending would
+  raise the job's route legs by half (`docs/COSTS.md`). If the plan route finds the
+  reminder already due, it is also the send route, and the second route goes unused.
+- The job re-reads Calendar at least every 30 minutes for an account with pending
+  trips, and again at send time. It reads the event title only at send time, in
+  memory, and never stores it.
+- A budget refusal fails that reminder with `budget_refused`. Automatic refreshes stop
+  at 80% of the monthly ceiling, but reminder checks continue (Ticket 267).
+- Delivery goes to the account's active push subscriptions through the existing
+  sender, at high urgency, and expires when the trip has started (Ticket 278).
+  Behavior reminders keep their 24-hour lifetime. With no active subscription, the
+  reminder fails with `no_subscription`.
+- The job claims a reminder before routing or sending, as Behavior reminder
+  processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
+  is final, so overlapping runs cannot send twice.
+- A server flag keeps the job off until it is set. The rollback is to unset it.
+
+### Mac: native notifications
+
+- The Mac app schedules a native notification from its last estimate, so it fires
+  with Cadence quit. The text names the estimate time, because a quit app cannot
+  re-route. It adds no background helper and makes no route call of its own.
+- Reconcile on launch, resume, local day change and each travel update. A new
+  estimate before the reminder fires replaces the scheduled notification; that is
+  not an update.
+- After a reminder fires, if a later estimate from the app's own refreshes moves
+  the leave time 10 minutes or more earlier, and the leave time is still ahead, the
+  app posts one update. It posts no second update.
+- Leave reminders stay out of the Behavior reminder coverage calculation and use
+  their own identifier (Ticket 280).
+- The Mac reads the hosted preference on a linked account. An unlinked Mac has no
+  hosted travel and no leave reminders.
+
+### Storage
+
+Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables.
+`docs/DATA_MODEL.md` has the columns.
+
+- `travel_leave_reminder_settings`: the switch, when it was turned on, and the job's
+  next visit to the account.
+- `travel_leave_reminders`: one row per trip with the owner, trip digest, local date,
+  status, next check time, route count, claim time, sent time and an error code.
+  Statuses are `pending`, `sent`, `failed` and `cancelled`, as for Behavior
+  reminders. A dropped trip is `cancelled`, and may return to `pending` if it comes
+  back. `sent` and `failed` are final. The database refuses a third route, a pending
+  row while reminders are off, and a second row for one trip.
+- Neither table holds a title, place, position, route duration, leave time or
+  provider result. Error values are short codes such as `budget_refused`.
+- Account sync never reads either table. The synced profile contract is unchanged,
+  so released Mac builds keep syncing.
+- Turning reminders off deletes the account's reminder rows. While reminders are on,
+  the job deletes rows dated before the account's previous local date. Account
+  deletion removes both tables' rows.
+- `docs/LEGAL.md` L-015 and L-016 log the provider-terms questions. P-016 and P-017
+  in `docs/MESSAGING_CHANGES.md` log the text changes.

@@ -1,5 +1,24 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Ticket 275 leave reminder specification and schema — November 6, 2026
+
+**On branch `us-work`. Not merged. Applied to local Supabase only; the hosted push waits for the owner.**
+
+- `docs/NOTIFICATION_SPEC.md` gains "Leave reminders": off by default, leave time minus
+  get-ready time, one reminder per trip, located destinations only (D12), no reminder for
+  the trip home, and start from the previous stop or Home.
+- Settled the Wave 0 open point: the web job routes twice per trip, plans then sends, and
+  never routes after sending. Web reminders get no update. The one update comes from the
+  Mac app's own estimates. Ticket 277 and `docs/COSTS.md` now say so; the cost row is
+  unchanged.
+- Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables:
+  `travel_leave_reminder_settings` and `travel_leave_reminders`. Owner Row Level Security.
+  No title, place, position, duration or leave time. The database refuses a third route,
+  a pending row while off and a second row per trip. Turning off deletes the rows. The
+  service role may read only account IDs, the switch and next check times.
+- Account sync never reads the tables, so released Mac builds keep syncing.
+- Messaging impact: P-016 note. No new user-facing wording.
+
 ## Travel advisory revamp Wave 3: decision D14 applied to the Ticket 270 marker — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.**

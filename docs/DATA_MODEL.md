@@ -429,6 +429,70 @@ labels whose merged occurrence is not Completed and every row while labels are
 off, matching the triggers, so the post-apply fingerprint matches. Exports omit
 all four tables (export inclusion is a backlog decision, not Ticket 216).
 
+### Leave reminders (Ticket 275)
+
+Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables for
+leave reminders (decision D3). `docs/NOTIFICATION_SPEC.md`, "Leave reminders", has the
+rules. Nothing reads or writes them until Tickets 276–280 ship.
+
+```sql
+create table travel_leave_reminder_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  enabled boolean not null default false,
+  enabled_at timestamptz,      -- set by trigger when turned on
+  next_check_at timestamptz,   -- the job's next visit; null while off
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table travel_leave_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  trip_digest text not null,   -- ^[a-f0-9]{64}$
+  local_date date not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'sent', 'failed', 'cancelled')),
+  next_check_at timestamptz,
+  route_count smallint not null default 0 check (route_count between 0 and 2),
+  processing_started_at timestamptz,
+  sent_at timestamptz,
+  error text,                  -- ^[a-z][a-z0-9_]{0,63}$
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, trip_digest, local_date)
+);
+```
+
+- The preference lives outside `travel_settings` and outside the synced profile.
+  `travel_settings` is an account-sync row, so a new column there would need a new
+  sync contract, and the last contract change stopped older Mac builds from syncing.
+  Account sync never reads either table, so contracts 1 and 2 are unchanged.
+- `trip_digest` is a lowercase hex SHA-256 over the destination's event reference
+  (Ticket 217's `travelEventRef`) and its start instant. A moved event is therefore a
+  new trip. The rows hold no title, place, position, route duration, leave time or
+  provider result. `error` accepts only a short code, so free text cannot be stored.
+- Shape checks: `pending` needs `next_check_at` and no `sent_at`; `sent` needs
+  `sent_at`; `failed` needs `error`; terminal rows have no `next_check_at` or claim.
+  The settings row has `enabled_at` exactly when on, and no times when off.
+- Triggers: turning reminders on sets `enabled_at` and `next_check_at` to now; a
+  later save cannot change `enabled_at`. Turning them off clears both times and
+  deletes the account's reminder rows. A reminder can become `pending` only while
+  reminders are on. `sent` and `failed` are final, `route_count` never goes down,
+  and a reminder keeps its owner, trip and date.
+- Row Level Security: owners read, insert and update their own settings row, and
+  read, insert, update and delete their own reminders. The job acts as the user
+  (Ticket 276), so it uses these same policies. `anon` has no access.
+- The service role is revoked from both tables except `select (user_id, enabled,
+  next_check_at)` on the settings table. That is the job's one cross-account read:
+  it selects due accounts and sees nothing else.
+- Indexes: enabled settings by `next_check_at`, and pending reminders by owner and
+  `next_check_at`.
+- Retention: turning reminders off deletes the rows. While on, the job deletes rows
+  dated before the account's previous local date. Account deletion cascades.
+- `tests/sql/ticket-275-leave-reminders-smoke.sql` runs these rules against a local
+  database; `tests/travel-leave-reminders-migration.test.ts` checks the migration
+  text.
+
 ### `behavior_definition_events`
 
 ```sql
@@ -1440,8 +1504,8 @@ writes the receipt in the same transaction as accepted hosted product changes.
 The hosted snapshot function reads the Ticket 116 boundary in one transaction,
 orders typed entities deterministically, rejects more than 100,000 rows in any
 collection, and rejects a complete result above 64 MiB. It excludes Auth
-secrets, push subscriptions, occurrence-generation state, and device-local
-native notification state.
+secrets, push subscriptions, occurrence-generation state, device-local
+native notification state, and the hosted-only leave reminder tables (Ticket 275).
 
 ### `launch_rate_limits`
 
@@ -1620,6 +1684,11 @@ product rows. Consent, Connected apps, and integration bookkeeping functions
 are `authenticated`-only and check `auth.uid()`. Integration operations reach
 product data through the user's RLS with the internal token from Ticket 223.
 See [OAuth and integration persistence](#oauth-and-integration-persistence-ticket-222).
+
+`travel_leave_reminder_settings` has no delete policy or grant; turning reminders off
+is an update. Its service-role access is the column-level select described under
+[Leave reminders](#leave-reminders-ticket-275), the leave reminder job's one
+cross-account read.
 
 ## Abuse and public-product protections
 

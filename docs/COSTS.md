@@ -245,7 +245,10 @@ Assumptions and limits:
   US$0.0085 for the driving upper bound.
 - Not routing a trip home from Home, or a leg ready only after its destination ends,
   saves one call each, and two by transit. Not counted in the table.
-- Reminder job: two route calls per trip, with every trip's account opted in.
+- Reminder job: two route calls per trip, with every trip's account opted in. The job
+  never routes after a reminder sends, so the one update adds no call: only the Mac sends
+  it, from estimates its own refreshes already made (Ticket 275, November 6, 2026). The
+  database refuses a third route per trip.
 - Not counted yet: tomorrow's first trip (Ticket 282) and Outlook and iCloud legs
   (Ticket 283). Each ticket adds its own count.
 - Ticket 264 adds two kinds of route call, both assumed and not in the table:
@@ -444,6 +447,8 @@ arrives, fees reduce the US$5:
   acceptance runners. They are excluded from the per-user totals.
 - 2026-11-04: Recorded the assumed usage model for the travel advisory revamp (Tickets
   267, 268 and 277) and the November 4 production readback.
+- 2026-11-06: Ticket 275 settled the leave reminder update within the job's two route
+  calls per trip. The reminder job row is unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
