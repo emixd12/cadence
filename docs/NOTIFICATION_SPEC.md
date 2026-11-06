@@ -531,9 +531,9 @@ ship, nothing reads or writes the new tables.
   requires. An update names the new, earlier leave time. Ticket 278 owns the
   wording, which waits for the owner's approval (D7).
 - Delivery goes to the account's active push subscriptions through the existing
-  sender, at high urgency, and expires when the trip has started (Ticket 278).
-  Behavior reminders keep their 24-hour lifetime. With no active subscription, the
-  reminder fails with `no_subscription`.
+  sender, at high urgency, and expires when the trip has started (Ticket 278; see
+  "Web: push notification"). Behavior reminders keep their 24-hour lifetime. With no
+  active subscription, the reminder fails with `no_subscription`.
 - The job claims a reminder before routing or sending, as Behavior reminder
   processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
   is final and its update is recorded once, so overlapping runs cannot send either
@@ -558,7 +558,8 @@ ship, nothing reads or writes the new tables.
 
 `LeaveReminderMessage` in `lib/services/leave-reminder-delivery.ts`. The job builds it
 in memory at send time and passes it to the delivery, which Ticket 278 builds on web
-push. Until then the delivery is absent and the job route reports it unavailable.
+push. The delivery is absent, and the job route reports it unavailable, while browser
+push sending is not configured (no VAPID keys).
 
 - `kind`: `reminder`, or `update` for the one update.
 - `tripDigest` and `localDate`: the record's identity. The notification link carries
@@ -574,6 +575,35 @@ push. Until then the delivery is absent and the job route reports it unavailable
   error code.
 - The delivery returns `sent`, or `failed` with `no_subscription` or
   `delivery_failed`. It reads push subscriptions as the user.
+
+### Web: push notification (Ticket 278)
+
+`lib/services/leave-reminder-web-push.ts` sends the message through the Behavior
+reminders' web push sender with its own options. Behavior reminders are unchanged.
+
+- The delivery reads the account's active push subscriptions and profile timezone as the
+  user, on the job's minted client. It sends to at most 20 subscriptions, four at a time,
+  as Behavior reminders do. A subscription the push service reports gone is marked
+  inactive. One accepted send is `sent`; none is `delivery_failed`; no subscription is
+  `no_subscription`.
+- Urgency is `high`. The push lifetime (TTL) is the whole seconds until `expiresAt`, the
+  leave time, so a push service stops delivering once the trip has started. At or after
+  that time the delivery sends nothing and returns `delivery_failed`.
+- Title, not yet approved (D7): "Leave by {time} for {event}", or "Leave earlier: by
+  {time} for {event}" for the update. Body: "{Mode}, {minutes} min from {start}. Arrive
+  {time}." The start is Home or the previous stop's title. Times are in the account's
+  timezone; a time on another date shows its date. Labels over 120 characters are cut.
+- The tag is `cadence-leave-<trip digest>`, so the update replaces the first notification
+  and its older leave time. The update sets `renotify`, so it alerts again. Behavior
+  notification options are unchanged.
+- The link is `/timeline?leave=<trip digest>`, absolute when `NEXT_PUBLIC_SITE_URL` is set.
+  It never carries a title or place. The service worker's same-origin rule applies.
+- The Timeline reads a well-formed digest only. It opens the drawer of the Calendar event
+  whose digest (event ID and start) matches, once the Calendar read has it, and only once
+  per digest. A Behavior destination scrolls its Occurrence into view. A moved or removed
+  trip matches nothing, and the Timeline opens as usual.
+- No action buttons, snooze or email. Nothing is logged. A real send waits for an
+  owner-approved test account.
 
 ### Mac: native notifications
 

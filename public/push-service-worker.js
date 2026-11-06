@@ -11,6 +11,11 @@ self.addEventListener("push", (event) => {
     },
   };
 
+  // Ticket 278: a leave reminder's update replaces the first notification and alerts again.
+  if (payload.renotify === true && payload.tag) {
+    options.renotify = true;
+  }
+
   event.waitUntil(self.registration.showNotification(title, options));
 });
 

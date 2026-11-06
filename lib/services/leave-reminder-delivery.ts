@@ -1,9 +1,12 @@
 import type { TravelMode } from "@cadence/core/types/travel";
 
 import type { LeaveReminderCaller } from "@/lib/integrations/leave-reminder-caller";
+import { createLeaveReminderWebPushDelivery } from "@/lib/services/leave-reminder-web-push";
+import { BrowserPushConfigurationError, createWebPushReminderSender } from "@/lib/services/web-push.service";
 
 /**
- * Ticket 277 defines this contract; Ticket 278 delivers it through web push.
+ * Ticket 277 defines this contract; Ticket 278 delivers it through web push
+ * (`lib/services/leave-reminder-web-push.ts`).
  * `docs/NOTIFICATION_SPEC.md`, "Leave reminders", "Send payload", documents it.
  *
  * The message lives in memory for one send. The titles are read from Calendar or the
@@ -45,9 +48,16 @@ export type LeaveReminderDelivery = (
 ) => Promise<LeaveReminderDeliveryResult>;
 
 /**
- * The hosted delivery. Null until Ticket 278 builds web push delivery; the job route
- * then reports `delivery_unavailable` and visits no account.
+ * The hosted delivery: web push (Ticket 278). Null when browser push sending is not
+ * configured; the job route then reports `delivery_unavailable` and visits no account.
  */
 export function createLeaveReminderDelivery(): LeaveReminderDelivery | null {
-  return null;
+  let sendBrowserPush;
+  try {
+    sendBrowserPush = createWebPushReminderSender();
+  } catch (error) {
+    if (error instanceof BrowserPushConfigurationError) return null;
+    throw error;
+  }
+  return createLeaveReminderWebPushDelivery({ sendBrowserPush, siteUrl: process.env.NEXT_PUBLIC_SITE_URL });
 }

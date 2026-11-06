@@ -24,6 +24,8 @@ type TimelineProps = Readonly<{
   onDayChange?: () => void;
   liveCalendar?: boolean;
   travelAccountId?: string | null;
+  /** Ticket 278: the trip digest from a web leave reminder's link. */
+  leaveReminderDigest?: string | null;
 }>;
 
 export function Timeline({
@@ -38,6 +40,7 @@ export function Timeline({
   onDayChange,
   liveCalendar = false,
   travelAccountId,
+  leaveReminderDigest = null,
 }: TimelineProps) {
   return (
     <MobileTimelinePullToRefresh>
@@ -93,6 +96,7 @@ export function Timeline({
           onDayChange={onDayChange}
           liveCalendar={liveCalendar}
           travelAccountId={travelAccountId}
+          leaveReminderDigest={leaveReminderDigest}
         />
 
         {timeline.nextFutureDays ? (

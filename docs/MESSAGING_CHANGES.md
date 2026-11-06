@@ -643,6 +643,11 @@ cite has not changed.
   of the monthly travel budget (D16), so near month end an update may not arrive. A trip
   that was dropped after its first estimate and then comes back gets no reminder. Failed
   reminders record a short code such as `no_subscription`.
+- **Ticket 278 note (November 6, 2026):** the web notification names the leave time, the event
+  title, the mode, the route time in minutes, the start (Home or the previous stop's title) and
+  the arrival time. The titles travel only in the encrypted push payload; the link carries the
+  trip digest only. The push service holds the notification at most until the leave time. The
+  three web phrases are listed in `departure-phrases.ts`, not yet approved (D7).
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session

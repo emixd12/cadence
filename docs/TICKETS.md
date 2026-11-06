@@ -16435,7 +16435,13 @@ tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test
 
 ## Ticket 278: Leave reminders through web push
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed, and no real
+notification was sent. Delivery `lib/services/leave-reminder-web-push.ts`, wired through
+`createLeaveReminderDelivery`; link helpers `lib/ui/leave-reminder-link.ts`. The sender gains
+optional lifetime and urgency; Behavior reminders keep 24 hours at normal urgency. The link is
+`/timeline?leave=<trip digest>`. The update shares the first notification's tag and alerts
+again. Three phrases in `departure-phrases.ts`, not yet approved (D7). The Ticket 277 payload
+contract is unchanged; the delivery reads the profile timezone itself.
 Dependencies: Ticket 277. Decision D3.
 
 Goal: the notification is short-lived, plain and able to open the right event.

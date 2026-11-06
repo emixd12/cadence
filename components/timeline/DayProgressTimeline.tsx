@@ -38,6 +38,7 @@ import { TravelModeChoice } from "./TravelModeChoice";
 import { TravelOffOffer, TravelStepText, dismissTravelOffer, isTravelStep, travelOfferDismissed, type TravelLinkTarget, type TravelStepActions } from "./TravelNextStep";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { useDayProgressClock } from "./day-progress-clock";
+import { leaveReminderLinkTarget } from "@/lib/ui/leave-reminder-link";
 import styles from "./day-progress-timeline.module.css";
 import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
@@ -119,6 +120,8 @@ type DayProgressTimelineProps = Readonly<{
   onOpenExternal?: (url: string) => void | Promise<void>;
   liveCalendar?: boolean;
   travelAccountId?: string | null;
+  /** Ticket 278: the trip digest from a web leave reminder's link. */
+  leaveReminderDigest?: string | null;
 }>;
 
 /**
@@ -178,6 +181,7 @@ export function DayProgressTimeline({
   onOpenExternal,
   liveCalendar = false,
   travelAccountId = null,
+  leaveReminderDigest = null,
 }: DayProgressTimelineProps) {
   const runtimeRefresh = useRefresh();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -408,6 +412,27 @@ export function DayProgressTimeline({
       setDetailEvent(event);
     }
   }
+  // Ticket 278: a web leave reminder opens its event's drawer once, as soon as the Calendar read has
+  // the event at the same start. A Behavior destination scrolls to its Occurrence. A moved or removed
+  // trip matches nothing and leaves the Timeline as it is.
+  const leaveTarget = useMemo(() => leaveReminderDigest
+    ? leaveReminderLinkTarget(leaveReminderDigest, { events, occurrences: visibleSections.flatMap((section) => section.occurrences) })
+    : null, [leaveReminderDigest, events, visibleSections]);
+  const [openedLeaveDigest, setOpenedLeaveDigest] = useState<string | null>(null);
+  if (leaveTarget && leaveReminderDigest && openedLeaveDigest !== leaveReminderDigest) {
+    setOpenedLeaveDigest(leaveReminderDigest);
+    if (leaveTarget.kind === "event") {
+      setPreview(null);
+      setDetailEvent(leaveTarget.event);
+    }
+  }
+  const leaveOccurrenceId = leaveTarget?.kind === "occurrence" ? leaveTarget.occurrenceId : null;
+  useEffect(() => {
+    if (!leaveOccurrenceId) return;
+    const row = [...(rootRef.current?.querySelectorAll<HTMLElement>("[data-occurrence-id]") ?? [])]
+      .find((element) => element.dataset.occurrenceId === leaveOccurrenceId);
+    if (typeof row?.scrollIntoView === "function") row.scrollIntoView({ block: "center" });
+  }, [leaveOccurrenceId]);
   const closeDetails = useCallback(() => {
     setDetailEvent(null);
     restoringFocus.current = true;

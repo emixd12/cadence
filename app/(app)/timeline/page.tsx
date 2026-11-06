@@ -8,6 +8,7 @@ import { timelineBriefKey } from "@/lib/ui/daily-brief";
 import { FirstRunOnboardingPanel } from "@/components/onboarding/FirstRunOnboardingPanel";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getCurrentUserClaims } from "@/lib/auth/current-user";
+import { LEAVE_REMINDER_LINK_PARAM, parseLeaveReminderDigest } from "@/lib/ui/leave-reminder-link";
 import { withPerformanceRoute } from "@/lib/services/performance-timing";
 import { getTimelinePageBundle } from "@/lib/services/timeline.service";
 import { listAcceptedNoteShortcutsForCurrentUser } from "@/lib/services/note-shortcut.service";
@@ -41,12 +42,15 @@ const TIMELINE_BANNER_IMAGES = {
 type TimelinePageProps = Readonly<{
   searchParams?: Promise<{
     days?: string | string[];
+    [LEAVE_REMINDER_LINK_PARAM]?: string | string[];
   }>;
 }>;
 
 export default async function TimelinePage({ searchParams }: TimelinePageProps) {
   const params = await searchParams;
   const futureDays = parseFutureDays(params?.days);
+  // Ticket 278: a leave reminder's link names its trip by digest only.
+  const leaveReminderDigest = parseLeaveReminderDigest(params?.[LEAVE_REMINDER_LINK_PARAM]);
 
   return (
     <div className="flex w-full flex-col">
@@ -58,7 +62,7 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
 
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-10">
         <Suspense fallback={<ScreenContentLoading label="Loading timeline" />}>
-          <TimelineContent futureDays={futureDays} />
+          <TimelineContent futureDays={futureDays} leaveReminderDigest={leaveReminderDigest} />
         </Suspense>
       </div>
     </div>
@@ -67,8 +71,10 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
 
 async function TimelineContent({
   futureDays,
+  leaveReminderDigest,
 }: Readonly<{
   futureDays?: number;
+  leaveReminderDigest: string | null;
 }>) {
   const { timeline, onboarding } = await withPerformanceRoute(
     "/timeline",
@@ -103,6 +109,7 @@ async function TimelineContent({
         resetTimeTrackingAction={resetTimeTrackingAction}
         shortcutsByBehavior={shortcutsByBehavior}
         liveCalendar
+        leaveReminderDigest={leaveReminderDigest}
       />
     </>
   );

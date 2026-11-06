@@ -1,5 +1,26 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Ticket 278 leave reminders through web push — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change. No real notification was
+sent; a real send waits for an owner-approved test account.**
+
+- `createLeaveReminderDelivery` now returns a web push delivery
+  (`lib/services/leave-reminder-web-push.ts`) when VAPID keys are set, so the Ticket 277 job
+  route no longer reports delivery unavailable once both are configured. The job stays off
+  until `CADENCE_LEAVE_REMINDER_JOB=enabled`.
+- Each send reads push subscriptions and the profile timezone as the user, at high urgency,
+  with a push lifetime that ends at the leave time. Behavior reminders keep 24 hours at normal
+  urgency (tested).
+- Text: "Leave by 1:15 PM for Dentist", then "Walking, 65 min from Home. Arrive 2:20 PM." The
+  update reads "Leave earlier: by {time} for {event}", replaces the first notification by tag
+  and alerts again. No action buttons or snooze.
+- The link is `/timeline?leave=<trip digest>`, never a title or place. The Timeline opens that
+  event's drawer once the Calendar read has it at the same start, or scrolls to the Behavior's
+  Occurrence. Interaction INT-NOTIFICATION-001 updated.
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, not yet approved
+  (D7).
+
 ## Travel advisory revamp Wave 4: Ticket 280 leave reminders on the Mac — November 6, 2026
 
 **On branch `us-work`. Not merged and not released. No schema change, no provider call and no

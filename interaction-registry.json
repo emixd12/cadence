@@ -9329,10 +9329,14 @@
         {
           "kind": "activate",
           "control": "Delivered Cadence native leave reminder"
+        },
+        {
+          "kind": "activate",
+          "control": "Delivered Cadence browser leave reminder"
         }
       ],
-      "availability": "Available after a Cadence notification is delivered. Web protected routes may require sign-in. Desktop accepts only a native product notification with an exact cadence.local UUID target, or a leave reminder with an exact cadence.leave trip digest (Ticket 280).",
-      "success_result": "Web focuses or opens the same-origin target. Desktop opens Timeline, reads the owned Occurrence independently of the visible date range, expands and focuses its existing row or a reminder context row, and preserves the current status, Note, and timing controls. Exact native delivery evidence is retained for local history without claiming user receipt or reading. A leave reminder opens Timeline and, once today's Calendar read has the event at the same start, that event's drawer; a Behavior destination opens its Occurrence as above.",
+      "availability": "Available after a Cadence notification is delivered. Web protected routes may require sign-in. Desktop accepts only a native product notification with an exact cadence.local UUID target, or a leave reminder with an exact cadence.leave trip digest (Ticket 280). A browser leave reminder links to /timeline?leave=<trip digest>; the Timeline reads only a 64-character lowercase hex digest (Ticket 278).",
+      "success_result": "Web focuses or opens the same-origin target. Desktop opens Timeline, reads the owned Occurrence independently of the visible date range, expands and focuses its existing row or a reminder context row, and preserves the current status, Note, and timing controls. Exact native delivery evidence is retained for local history without claiming user receipt or reading. A leave reminder opens Timeline and, once today's Calendar read has the event at the same start, that event's drawer; a Behavior destination opens its Occurrence as above. On web, a leave reminder opens that event's drawer once per digest, or scrolls its Behavior's Occurrence into view (Ticket 278).",
       "failure_result": "Web cross-origin targets fall back to /timeline. Desktop ignores malformed or bench identifiers; a missing Occurrence shows unavailable text and a storage error remains an error. Failed delivery-history persistence keeps evidence for retry and leaves reminder verification unavailable. A leave reminder whose event moved or is gone leaves Timeline open with no drawer.",
       "effects": [
         "navigation",
@@ -9349,12 +9353,15 @@
         "apps/desktop/src/local-reminder.service.ts",
         "packages/core/src/services/timeline.service.ts#resolvePersistedTimelineOccurrence",
         "packages/core/src/services/mac-leave-reminder-plan.ts",
-        "components/timeline/DayProgressTimeline.tsx"
+        "components/timeline/DayProgressTimeline.tsx",
+        "lib/ui/leave-reminder-link.ts",
+        "app/(app)/timeline/page.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/push-service-worker.test.ts",
+          "tests/leave-reminder-web-push.test.ts",
           "tests/desktop-notification-activation.test.tsx",
           "tests/desktop-leave-reminders.test.ts",
           "tests/day-progress-timeline.dom.test.tsx",
@@ -9369,10 +9376,14 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "public/push-service-worker.js"
+            "public/push-service-worker.js",
+            "lib/ui/leave-reminder-link.ts",
+            "components/timeline/DayProgressTimeline.tsx"
           ],
           "evidence": [
-            "tests/push-service-worker.test.ts"
+            "tests/push-service-worker.test.ts",
+            "tests/leave-reminder-web-push.test.ts",
+            "tests/day-progress-timeline.dom.test.tsx"
           ]
         },
         "desktop": {

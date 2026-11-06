@@ -13,6 +13,8 @@ export type BrowserPushReminderPayload = {
   url: string;
   icon?: string;
   badge?: string;
+  /** Ticket 278: alert again when this replaces a shown notification with the same tag. */
+  renotify?: boolean;
 };
 
 export type BrowserPushReminderSendInput = {
@@ -22,10 +24,22 @@ export type BrowserPushReminderSendInput = {
   payload: BrowserPushReminderPayload;
 };
 
+/**
+ * Behavior reminders use the defaults: a 24-hour lifetime at normal urgency. A leave reminder
+ * (Ticket 278) passes its own lifetime, ending when the trip starts, at high urgency.
+ */
+export type BrowserPushSendOptions = {
+  signal?: AbortSignal;
+  ttlSeconds?: number;
+  urgency?: "normal" | "high";
+};
+
 export type BrowserPushReminderSender = (
   input: BrowserPushReminderSendInput,
-  options?: { signal?: AbortSignal },
+  options?: BrowserPushSendOptions,
 ) => Promise<void>;
+
+const BEHAVIOR_REMINDER_TTL_SECONDS = 60 * 60 * 24;
 
 export class BrowserPushConfigurationError extends Error {
   constructor() {
@@ -52,8 +66,8 @@ export function createWebPushReminderSender(): BrowserPushReminderSender {
             toWebPushSubscription(input),
             JSON.stringify(input.payload),
             {
-              TTL: 60 * 60 * 24,
-              urgency: "normal",
+              TTL: options?.ttlSeconds ?? BEHAVIOR_REMINDER_TTL_SECONDS,
+              urgency: options?.urgency ?? "normal",
               timeout: PROVIDER_CALL_TIMEOUT_MS,
               vapidDetails,
             },

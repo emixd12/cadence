@@ -97,6 +97,34 @@ export function macLeaveReminderPhrases(input: Readonly<{
   return { title, body };
 }
 
+/**
+ * Ticket 278 (decision D3): the web push leave reminder. Not yet approved (decision D7).
+ * The hosted job routes at send time, so the body names the start and the route time instead
+ * of an estimate time. The update (decision D15) names the new, earlier leave time. The
+ * notification link carries the trip digest only; these words travel only in the payload.
+ */
+export type WebLeaveReminderStart = Readonly<{ kind: "home" }> | Readonly<{ kind: "previous_stop"; title: string }>;
+export function webLeaveReminderPhrases(input: Readonly<{
+  update: boolean;
+  destinationLabel: string;
+  leaveAt: string;
+  arriveAt: string;
+  travelMinutes: number;
+  mode: TravelMode;
+  start: WebLeaveReminderStart;
+}>, context: DeparturePhraseContext): Readonly<{ title: string; body: string }> {
+  const time = (at: string) => departureTimeLabel(at, context);
+  const label = (text: string, fallback: string) => {
+    const trimmed = text.trim() || fallback;
+    return trimmed.length > MAC_LEAVE_REMINDER_LABEL_LIMIT ? `${trimmed.slice(0, MAC_LEAVE_REMINDER_LABEL_LIMIT - 1)}…` : trimmed;
+  };
+  const start = input.start.kind === "home" ? MAC_LEAVE_REMINDER_STARTS.home : label(input.start.title, MAC_LEAVE_REMINDER_STARTS.previous_stop);
+  const minutes = Math.max(1, Math.round(input.travelMinutes));
+  const title = `${input.update ? "Leave earlier: by" : "Leave by"} ${time(input.leaveAt)} for ${label(input.destinationLabel, "Untitled event")}`;
+  const body = `${MAC_LEAVE_REMINDER_MODES[input.mode]}, ${minutes} min from ${start}. Arrive ${time(input.arriveAt)}.`;
+  return { title, body };
+}
+
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** Decisions D13 and D14: the owner approved the wording each lists on this date. */
@@ -105,7 +133,7 @@ export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "279" | "280";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -467,6 +495,15 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null, approvedOn: null, ownerChange: null },
   { id: "mac-leave-reminder-body", ticket: "280", template: "{Mode} from {start}, arrive {time}. Estimate checked {time}.",
     situation: "Mac notification body for both. {start} is Home, your previous stop or your position. A quit app cannot re-route, so it names when the estimate was checked.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "web-leave-reminder-title", ticket: "278", template: "Leave by {time} for {event}",
+    situation: "Browser notification title, at the leave time minus the get-ready time, from the hosted job's estimate at send time. Expires when the trip starts.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "web-leave-reminder-update-title", ticket: "278", template: "Leave earlier: by {time} for {event}",
+    situation: "Browser notification title for the one update, when the job's estimate after sending moves the leave time 10 minutes or more earlier (D15). It replaces the first notification.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "web-leave-reminder-body", ticket: "278", template: "{Mode}, {minutes} min from {start}. Arrive {time}.",
+    situation: "Browser notification body for both. {start} is Home or the previous stop's title; the web job never starts from a device position.",
     replaces: null, approvedOn: null, ownerChange: null },
 ];
 
