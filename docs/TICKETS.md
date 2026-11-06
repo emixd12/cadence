@@ -16612,7 +16612,7 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Hosted route service and one additive migration. Pushing it waits for the owner. |
+| Web | Hosted route service. No migration: the existing `travel_place_cache` holds the remembered place. |
 | Desktop | Shares the hosted route on a linked Mac. Nothing is added to the synced profile. |
 | Marketing | Not applicable until release. P-020 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
