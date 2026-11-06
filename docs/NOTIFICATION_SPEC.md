@@ -555,7 +555,12 @@ ship, nothing reads or writes the new tables.
   processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
   is final and its update is recorded once, so overlapping runs cannot send either
   twice. Each account visit also leases the account's next check for 15 minutes, so
-  two runs never visit one account at once. Writes are compare-and-set on the claim.
+  two runs do not visit one account at once. A get-ready change (decision D19) can
+  replace that lease, and the next run may then visit while the first is still running.
+  The per-reminder claims keep that overlap from routing or sending one reminder
+  twice. When a visit finds its lease gone, its release only brings a later next check
+  forward to its own, so a reminder it just planned is not visited late. Writes are
+  compare-and-set on the claim.
   A visit that fails releases its claims and retries 10 minutes later.
 - To list the plan's trips, the job sends a route request that names no planned trip,
   so it makes no route call. Place lookups the plan needs reserve spend first and are

@@ -517,7 +517,8 @@ create table travel_leave_reminders (
   trigger runs as the writer, so owner RLS limits it to that account's row, and it
   changes nothing else. A visit already due stays. A running visit's lease is replaced,
   so that visit's release misses and the next run visits again; each reminder keeps
-  its own claim. `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`
+  its own claim. A release that misses its lease still brings a later `next_check_at`
+  forward to that visit's own next check, never later. `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`
   covers it.
 - Row Level Security: owners read, insert and update their own settings row, and
   read, insert, update and delete their own reminders. The job acts as the user

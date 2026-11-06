@@ -34,9 +34,16 @@ class MemoryStore implements LeaveReminderStore {
     return true;
   }
   async releaseAccount(lease: string, next: string) {
-    if (!this.enabled || !sameInstant(this.accountNextCheckAt, lease)) return false;
-    this.accountNextCheckAt = next;
-    return true;
+    if (!this.enabled) return false;
+    if (sameInstant(this.accountNextCheckAt, lease)) {
+      this.accountNextCheckAt = next;
+      return true;
+    }
+    // Decision D19: a lost lease only brings a later next check forward.
+    if (this.accountNextCheckAt && Temporal.Instant.compare(Temporal.Instant.from(this.accountNextCheckAt), Temporal.Instant.from(next)) > 0) {
+      this.accountNextCheckAt = next;
+    }
+    return false;
   }
   async remindersEnabled() { return this.enabled; }
   async listRecords() { return [...this.rows.values()].map((row) => this.strip(row)); }
@@ -600,5 +607,119 @@ describe("spend after a routing failure (Wave 4 final check)", () => {
     expect(sent).toHaveLength(0);
     expect(store.rows.get(only(store).id)).toMatchObject({ status: "failed", error: "budget_refused", routeCount: 2 });
     expect(world.routes).toHaveLength(1);
+  });
+});
+
+describe("a get-ready change during a running visit (decision D19)", () => {
+  // The D19 trigger sets the account's next check to now, replacing a running visit's
+  // lease. The next run then visits while the first is still running. Each record's own
+  // claim must keep the two visits from routing or sending one reminder twice.
+  const gate = () => {
+    let open!: () => void;
+    const opened = new Promise<void>((resolve) => { open = resolve; });
+    let reached!: () => void;
+    const waiting = new Promise<void>((resolve) => { reached = resolve; });
+    return { open, opened, reached, waiting };
+  };
+
+  it("does not route or send again while the first visit holds the record", async () => {
+    const { store, world, sent, visit, port, deliver, preparation } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    store.accountNextCheckAt = "2026-11-06T17:10:00Z";
+
+    const routing = gate();
+    const first = port();
+    const route = first.routeTrips;
+    const firstPort: LeaveReminderAccountPort = { ...first, routeTrips: async (localDate, trips) => {
+      routing.reached();
+      await routing.opened;
+      return route(localDate, trips);
+    } };
+    const running = visitLeaveReminderAccount(firstPort, { userId: USER_ID, nextCheckAt: "2026-11-06T17:10:00Z" },
+      Temporal.Instant.from("2026-11-06T17:06:00Z"), deliver);
+    await routing.waiting;
+    const lease = store.accountNextCheckAt;
+
+    // The user saves a new get-ready time; the trigger moves the visit to now.
+    preparation.seconds = 20 * 60;
+    store.accountNextCheckAt = "2026-11-06T17:07:00Z";
+    const overlapping = await visit("2026-11-06T17:07:00Z");
+    expect(overlapping.kind).toBe("visited");
+    expect(world.routes).toHaveLength(1);
+    expect(sent).toEqual([]);
+
+    routing.open();
+    expect((await running).kind).toBe("visited");
+    expect(sent).toHaveLength(1);
+    expect(world.routes).toHaveLength(2);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2, processingStartedAt: null });
+    // The first visit's release missed: the account keeps the overlapping visit's next check.
+    expect(store.accountNextCheckAt).not.toBe(lease);
+  });
+
+  it("keeps the first visit's own next check when its release misses, so the reminder is not late", async () => {
+    const { store, world, sent, visit, port, deliver, preparation } = harness();
+    // Leave 15:16, 10 minutes to get ready: the reminder is at 15:06.
+    world.leaveAt.set("event-1", "2026-11-06T15:16:00Z");
+
+    const routing = gate();
+    const first = port();
+    const route = first.routeTrips;
+    const firstPort: LeaveReminderAccountPort = { ...first, routeTrips: async (localDate, trips) => {
+      routing.reached();
+      await routing.opened;
+      return route(localDate, trips);
+    } };
+    const running = visitLeaveReminderAccount(firstPort, { userId: USER_ID, nextCheckAt: "2026-11-06T15:00:00Z" },
+      Temporal.Instant.from("2026-11-06T15:00:00Z"), deliver);
+    await routing.waiting;
+
+    // A get-ready change moves the visit to now. The overlapping visit sees the record
+    // held, so it sets the next check from that claim, 20 minutes on.
+    preparation.seconds = 12 * 60;
+    store.accountNextCheckAt = "2026-11-06T15:01:00Z";
+    await visit("2026-11-06T15:01:00Z");
+    expect(store.accountNextCheckAt).toBe("2026-11-06T15:20:00Z");
+
+    routing.open();
+    await running;
+    expect(only(store)).toMatchObject({ status: "pending", nextCheckAt: "2026-11-06T15:06:00Z", plannedPreparationMinutes: 10 });
+    // The first visit's lease was replaced, but its own next check still counts.
+    expect(store.accountNextCheckAt).toBe("2026-11-06T15:06:00Z");
+
+    await visit("2026-11-06T15:05:00Z");
+    expect(sent.map((message) => [message.kind, message.leaveAt])).toEqual([["reminder", "2026-11-06T15:16:00Z"]]);
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("does not route or send from a stale read after the overlapping visit sent", async () => {
+    const { store, world, sent, visit, port, deliver, preparation } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    store.accountNextCheckAt = "2026-11-06T17:10:00Z";
+
+    const listing = gate();
+    const first = port();
+    const list = first.listTrips;
+    const firstPort: LeaveReminderAccountPort = { ...first, listTrips: async (localDate) => {
+      listing.reached();
+      await listing.opened;
+      return list(localDate);
+    } };
+    const running = visitLeaveReminderAccount(firstPort, { userId: USER_ID, nextCheckAt: "2026-11-06T17:10:00Z" },
+      Temporal.Instant.from("2026-11-06T17:06:00Z"), deliver);
+    await listing.waiting;
+
+    preparation.seconds = 20 * 60;
+    store.accountNextCheckAt = "2026-11-06T17:07:00Z";
+    await visit("2026-11-06T17:07:00Z");
+    expect(sent).toHaveLength(1);
+    expect(world.routes).toHaveLength(2);
+
+    // The first visit read the records before the overlapping visit sent.
+    listing.open();
+    await running;
+    expect(sent).toHaveLength(1);
+    expect(world.routes).toHaveLength(2);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2 });
   });
 });
