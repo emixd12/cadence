@@ -26,7 +26,7 @@ export class DesktopConnectorBroker {
     return this.transport.request("/api/outlook-calendar/calendars", { method: "PUT", body: JSON.stringify(preferences) });
   }
   outlookEvents(range: ConnectorEventRange): Promise<ExternalEventSnapshotV1_1> {
-    return this.transport.request(`/api/outlook-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`);
+    return this.transport.request(`/api/outlook-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate, fields: "location" })}`);
   }
   outlookDisconnect(): Promise<ConnectorDisconnectResult> { return this.disconnect("/api/outlook-calendar/connection"); }
 
@@ -41,7 +41,7 @@ export class DesktopConnectorBroker {
     return this.transport.request("/api/icloud-calendar/calendars", { method: "PUT", body: JSON.stringify(preferences) });
   }
   icloudEvents(range: ConnectorEventRange): Promise<ExternalEventSnapshotV1_1> {
-    return this.transport.request(`/api/icloud-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`);
+    return this.transport.request(`/api/icloud-calendar/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate, fields: "location" })}`);
   }
   icloudDisconnect(): Promise<ConnectorDisconnectResult> { return this.disconnect("/api/icloud-calendar/connection"); }
 

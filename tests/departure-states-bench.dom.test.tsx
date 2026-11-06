@@ -287,7 +287,7 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 278 the three web push leave reminder phrases. Decision D17 approves all 18 on November 6, 2026.
   // Ticket 281 adds the remembered-place correction note, not yet approved (decision D7).
   // Ticket 282 adds the line for tomorrow's first trip, not yet approved.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("2 of 97 phrases await the owner's approval.");
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("2 of 96 phrases await the owner's approval.");
   for (const id of ["correction-note-remembered", "line-tomorrow"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
   }

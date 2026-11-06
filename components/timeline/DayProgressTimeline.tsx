@@ -216,16 +216,16 @@ export function DayProgressTimeline({
   const contextEvents = context?.events;
   const events = useMemo(() => contextEvents ?? (outlookEvents.length || icloudEvents.length ? [...googleEvents, ...outlookEvents, ...icloudEvents] : googleEvents),
     [contextEvents, googleEvents, outlookEvents, icloudEvents]);
-  // Travel estimates and their brief guidance stay Google-only (Ticket 238 adds no new routing disclosure).
-  const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
+  // Ticket 283: Google, Outlook and iCloud events route under the same rules.
+  const travelEvents = events;
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
   const stopRevisions = useMemo(() => travelStopRevisions(travelEvents, timeline), [travelEvents, timeline]);
   const tomorrowStopKey = useMemo(() => travelTomorrowStopKey(travelEvents, timeline), [travelEvents, timeline]);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone,
-    // Ticket 268: automatic travel requests wait for the Google Calendar read that feeds travel to settle.
-    sourceReady: live.state !== "not_loaded", stopRevisions, tomorrowStopKey });
+    // Ticket 268: automatic travel requests wait for the Calendar reads that feed travel to settle (Ticket 283: all three).
+    sourceReady: live.state !== "not_loaded" && outlook.state !== "not_loaded" && icloud.state !== "not_loaded", stopRevisions, tomorrowStopKey });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
   const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,

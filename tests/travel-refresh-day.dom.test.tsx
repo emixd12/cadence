@@ -14,9 +14,13 @@ const mocks = vi.hoisted(() => ({
   source: vi.fn(), calendar: vi.fn(), events: vi.fn(), spend: vi.fn(), readPlaces: vi.fn(), writePlaces: vi.fn(),
   occurrences: vi.fn(), behaviors: vi.fn(), timezone: vi.fn(), geocode: vi.fn(), route: vi.fn(),
   historySessions: vi.fn(), weather: vi.fn(), monthSpend: vi.fn(),
+  outlook: vi.fn(), outlookEvents: vi.fn(), icloud: vi.fn(), icloudEvents: vi.fn(),
 }));
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.source }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar, getCalendarEvents: mocks.events }));
+// Ticket 283: Outlook and iCloud are disconnected unless a test connects them.
+vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook, getOutlookCalendarEvents: mocks.outlookEvents }));
+vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud, getIcloudCalendarEvents: mocks.icloudEvents }));
 vi.mock("@/lib/db/travelSpend.repo", async (load) => ({ ...(await load<Record<string, unknown>>()), reserveTravelProviderSpend: mocks.spend, readTravelMonthSpend: mocks.monthSpend }));
 vi.mock("@/lib/db/travelPlaceCache.repo", () => ({ readTravelPlaceCache: mocks.readPlaces, writeTravelPlaceCache: mocks.writePlaces }));
 vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: mocks.occurrences }));
@@ -57,6 +61,9 @@ beforeEach(() => {
   world.events = []; world.device = null; world.fail = false; world.quota = false; world.log = [];
   mocks.source.mockResolvedValue(source);
   mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+  const disconnected = { status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } };
+  mocks.outlook.mockResolvedValue(disconnected);
+  mocks.icloud.mockResolvedValue(disconnected);
   mocks.events.mockImplementation(async () => ({ requestedRange: { timezone: "America/New_York" }, events: calendarEvents() }));
   mocks.spend.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, resetsAt: null });
   mocks.readPlaces.mockResolvedValue([]); mocks.writePlaces.mockResolvedValue(undefined);

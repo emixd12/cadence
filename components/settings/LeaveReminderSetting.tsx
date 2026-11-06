@@ -8,7 +8,6 @@ import {
   LEAVE_REMINDER_NOTIFICATIONS_STEP,
   LEAVE_REMINDER_SAVED,
   LEAVE_REMINDER_SAVE_FAILED,
-  LEAVE_REMINDER_SOURCES,
   LEAVE_REMINDER_START_MAC,
   LEAVE_REMINDER_START_WEB,
   LEAVE_REMINDER_SWITCH,
@@ -80,7 +79,6 @@ export function LeaveReminderSetting({ client, readDeviceNotifications, homeSave
         <li>{homeSaved ? LEAVE_REMINDER_HOME_SAVED : LEAVE_REMINDER_HOME_MISSING}</li>
         <li>{desktop ? LEAVE_REMINDER_START_MAC : LEAVE_REMINDER_START_WEB}</li>
       </ul>
-      <p>{LEAVE_REMINDER_SOURCES}</p>
     </div>
     {message ? <p role="status" className="pl-7">{message}</p> : null}
   </div>;

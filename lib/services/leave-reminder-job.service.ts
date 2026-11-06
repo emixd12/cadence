@@ -35,9 +35,10 @@ import {
   leaveReminderCalendarCaller,
   type LeaveReminderCaller,
 } from "@/lib/integrations/leave-reminder-caller";
-import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
+import type { CalendarReadCaller } from "@/lib/services/google-calendar.service";
 import type { LeaveReminderDelivery, LeaveReminderMessage } from "@/lib/services/leave-reminder-delivery";
 import type { TravelProviderConfig } from "@/lib/services/travel-provider";
+import { readTravelCalendarConnections, readTravelCalendarEvents } from "@/lib/services/travel-calendar-sources";
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
@@ -439,23 +440,22 @@ export function createHostedLeaveReminderAccountPort(
   /**
    * The located destinations on the local date, by commitment ref: Calendar events that
    * are not cancelled or declined and have a location (decision D12), and unresolved
-   * Occurrences whose Where routes. Titles are read only when sending.
+   * Occurrences whose Where routes. Titles are read only when sending. Ticket 283: Google,
+   * Outlook and iCloud events alike, read as the user; locations and titles stay in memory.
    */
   async function readDestinations(calendarReader: CalendarReadCaller, localDate: string, withTitles: boolean): Promise<ReadonlyMap<string, Destination>> {
     const client: AppSupabaseClient = caller.client;
-    const [connection, source, occurrences, behaviors] = await Promise.all([
-      getCalendarConnection(calendarReader),
+    const [connections, source, occurrences, behaviors] = await Promise.all([
+      readTravelCalendarConnections(calendarReader),
       readTravelRouteSource(client, userId),
       listOccurrencesBetweenLocalDates(client, userId, localDate, localDate),
       withTitles ? listUserBehaviors(client, userId) : Promise.resolve(null),
     ]);
     const destinations = new Map<string, Destination>();
-    if (connection.status === "connected") {
-      const snapshot = await getCalendarEvents(calendarReader, localDate, localDate);
-      for (const event of snapshot.events) {
-        if (event.kind !== "timed" || event.state === "cancelled" || event.currentUserResponse === "declined" || !event.location.trim()) continue;
-        destinations.set(event.id, { kind: "calendar", startAt: event.startAt, title: withTitles ? event.title : null });
-      }
+    const calendarEvents = await readTravelCalendarEvents(calendarReader, connections, { scope: "day", startLocalDate: localDate, endLocalDate: localDate });
+    for (const event of calendarEvents.all) {
+      if (event.kind !== "timed" || event.state === "cancelled" || event.currentUserResponse === "declined" || !event.location.trim()) continue;
+      destinations.set(event.id, { kind: "calendar", startAt: event.startAt, title: withTitles ? event.title : null });
     }
     const whereById = new Map(source.behaviors.map((behavior) => [behavior.id, behavior]));
     const titleById = new Map((behaviors ?? []).map((behavior) => [behavior.id, behavior.title]));

@@ -386,7 +386,8 @@ it("puts one off-by-default reminder switch in How you travel and saves it at on
     expect(view.readiness()?.textContent).toContain("Notifications: Enabled on this device.");
     expect(view.readiness()?.textContent).toContain("Home: saved.");
     expect(view.readiness()?.textContent).toContain("Reminders estimate from Home or your previous stop, never from this device's position.");
-    expect(view.container.textContent).toContain("For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.");
+    // Ticket 283 removed the Google-only sentence: Outlook and iCloud events get reminders too.
+    expect(view.container.textContent).not.toContain("only Google Calendar events");
     expect(view.box()!.getAttribute("aria-describedby")).toBe(view.readiness()!.parentElement!.id);
     await act(async () => view.box()!.click());
     expect(view.reminders!.save).toHaveBeenLastCalledWith(true);
@@ -440,6 +441,6 @@ it("names the Mac's start and System Settings on a linked Mac, and hides the swi
   const unlinked = await renderReminders({ desktop: true, reminders: null });
   try {
     expect(unlinked.box()).toBeUndefined();
-    expect(unlinked.container.textContent).not.toContain("For now, only Google Calendar events");
+    expect(unlinked.container.textContent).not.toContain("Remind me when it is time to get ready to leave.");
   } finally { await unlinked.unmount(); }
 });

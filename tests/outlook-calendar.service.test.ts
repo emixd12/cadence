@@ -362,6 +362,16 @@ describe("reads, rotation, and fences", () => {
     for (const call of ms.calls.filter((entry) => entry.auth)) expect(call.url.origin).toBe("https://graph.microsoft.com");
   });
 
+  it("selects event locations only for a travel read (Ticket 283)", async () => {
+    await connectAndSelect();
+    const selects = () => ms.calls.filter((call) => call.url.pathname.endsWith("/calendarView")).map((call) => call.url.searchParams.get("$select")!.split(","));
+    await getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-03", options);
+    expect(selects().at(-1)).not.toContain("location");
+    const snapshot = await getOutlookCalendarEvents(caller(OWNER), "2026-11-01", "2026-11-03", { ...options, includeLocation: true });
+    expect(selects().at(-1)).toEqual(expect.arrayContaining(["location", "isOnlineMeeting"]));
+    expect(snapshot.events[0]).toMatchObject({ location: "", fieldAvailability: { location: "not_provided" } });
+  });
+
   it("validates the range and selection before provider reads", async () => {
     await connectWeb();
     const before = ms.calls.length;

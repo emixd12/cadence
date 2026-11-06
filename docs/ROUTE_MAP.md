@@ -173,10 +173,10 @@ Tauri-origin rules, and expose no provider write.
 | `/api/outlook-calendar/connection` | GET, POST, PUT, DELETE | 224 | Status; start consent; desktop completion with the desktop session and Keychain client state; disconnect with the Microsoft removal instruction |
 | `/auth/outlook-calendar/callback` | GET | 224 | Web: consume one-use state, require the initiating cookie user, PKCE, nonce, issuer, `tid`/`sub` binding, sealed install. Desktop: forward code and state to `cadence://outlook-calendar/callback` without consuming the attempt |
 | `/api/outlook-calendar/calendars` | GET, PUT | 224 | List readable calendars; save selection |
-| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30. `fields=location` adds event locations (Ticket 283) |
 | `/api/icloud-calendar/connection` | GET, POST, DELETE | 227 | Status, accept credential once, disconnect |
 | `/api/icloud-calendar/calendars` | GET, PUT | 227 | Discover `VEVENT` calendars; save selection |
-| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30. `fields=location` adds event locations (Ticket 283) |
 | `/api/hevy/connection` | GET, POST, DELETE | 223 | Status, accept API key once, disconnect |
 | `/api/hevy/activities?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot `1.0.0`; inclusive local days, end no later than today, at most 31 days |
 

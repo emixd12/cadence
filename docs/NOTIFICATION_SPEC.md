@@ -450,9 +450,9 @@ ship, nothing reads or writes the new tables.
 
 ### What gets a reminder
 
-- A trip to a located destination: a Google Calendar event with a location, or a
-  Behavior Occurrence whose Where routes (Home or a place). Outlook and iCloud events
-  join when Ticket 283 routes them.
+- A trip to a located destination: a Google, Outlook or iCloud Calendar event with a
+  location, or a Behavior Occurrence whose Where routes (Home or a place). Ticket 283 added
+  Outlook and iCloud events; the job reads them as the user, like Google Calendar.
 - Under D12, an event with no location is outside travel and gets no reminder. A
   located event is treated as in person; nothing asks about attendance.
 - The trip home gets no reminder in this version. Getting ready applies to leaving

@@ -265,6 +265,28 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("[data-departure-line]")).toBeNull();
   });
 
+  it("routes an Outlook event like a Google one: the line, the Mac reminders' trips and its stop (Ticket 283)", async () => {
+    // 8 AM on September 16; the Outlook event is 11 AM to noon with a location.
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"));
+    const input = props();
+    const planning = { ...outlookEvent(), location: "Main St" };
+    const routed: TravelResolvedLegEvidence = { state: "current", reason: null,
+      leg: { id: "leg-planning", role: "outbound", journeyRef: "today", originCommitmentRef: null, destinationCommitmentRef: planning.id,
+        mode: "walking", readyAt: "2026-09-16T12:00:00Z", provenance: { originRef: "base", originSource: "saved_base", originRevision: "1",
+          destinationRef: planning.id, destinationSource: "calendar", destinationRevision: "1", grantRevision: "one" } },
+      estimate: { durationSeconds: 1200, departureAt: "2026-09-16T14:30:00Z", arrivalAt: "2026-09-16T14:50:00Z", warnings: [], fallback: false,
+        attribution: "Google Maps", observedAt: "2026-09-16T12:00:00Z", expiresAt: "2026-09-16T12:05:00Z" } };
+    const evidence = { version: "1.0" as const, journeyRef: "today", legs: [routed], segments: [], occupiedSpans: [], collisions: [], completeTrip: false, finalAvailabilityAt: null };
+    const onDeparture = vi.fn();
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{ ...input.context,
+      events: [allDayEvent(), planning], travel: evidence, onDeparture }} /></RefreshProvider>));
+    expect(container.querySelector("[data-departure-line]")?.textContent).toContain("Planning review");
+    expect(onDeparture).toHaveBeenLastCalledWith(expect.objectContaining({
+      trips: [expect.objectContaining({ destinationRef: planning.id })],
+      stops: expect.arrayContaining([expect.objectContaining({ ref: planning.id, label: "Planning review" })]),
+    }));
+  });
+
   it("opens a web leave reminder's event drawer once from its trip digest (Ticket 278)", async () => {
     const input = props();
     const dentist = { ...outlookEvent(), id: "event-dentist", providerEventId: "event-dentist", logicalInstanceId: "event-dentist",

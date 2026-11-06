@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-026` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-027` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -95,6 +95,7 @@ Status values:
 | [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
 | [P-024](#p-024-leave-reminder-switch-and-readiness-list-in-travel-settings) | Leave reminder switch and readiness list in Travel Settings | logged | 279 | Travel Settings, user guide |
 | [P-025](#p-025-corrected-places-are-remembered-for-their-location-text) | Corrected places are remembered for their location text | logged | 281 | Privacy, in-app copy, user guide |
+| [P-026](#p-026-outlook-and-icloud-events-get-leave-reminders-and-mac-cached-locations) | Outlook and iCloud events get leave reminders, and Mac-cached locations | logged | 283 | Privacy, Travel Settings, user guide, provider submissions |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -674,6 +675,8 @@ cite has not changed.
 - **Ticket 277 note (November 6, 2026):** the job reads Calendar, Behaviors and Occurrences
   for an opted-in account at least every 30 minutes, and again at send time, all day
   while reminders stay on. It reads titles only at send time.
+- **Ticket 283 note (November 6, 2026):** the job now reads Outlook and iCloud Calendar the same
+  way, with no user session. See P-026.
 - **Status:** logged.
 
 ## P-018: Last estimates and per-trip refresh
@@ -732,7 +735,17 @@ cite has not changed.
     discards unsupported details."
 - **Update needed:** add locations to both connector descriptions and name Google Maps as
   their recipient. Say that Outlook and iCloud events now get leave times.
-- **Status:** logged.
+- **Ticket 283 note (November 6, 2026):** implemented, not merged. The travel route, the leave
+  reminder job and the Timeline's own Outlook and iCloud reads now ask for locations. Outlook
+  adds `location` and `isOnlineMeeting` to its Graph `$select`; Cadence joins the location's
+  display name and address into one text and treats an online meeting's placeholder (such as
+  "Microsoft Teams Meeting", with no address) as no location. iCloud keeps the VEVENT's
+  `LOCATION` text it already received. Located events then route under the Google rules: the
+  text goes to Google Maps for a place lookup, and an event without a location is not travel
+  (D12). The hosted server stores no event detail; the place lookup keeps only the one-way key
+  and place ID Ticket 214 already stores. The Daily Brief read never asks for locations, so
+  its Outlook and iCloud model input is unchanged. The Privacy sentences quoted above become
+  untrue once this ships. P-026 covers the reminder, Mac cache and Settings changes.
 
 ## P-020: Remembered places and attendance
 
@@ -891,6 +904,9 @@ cite has not changed.
   requirement, that it applies to every device on the account, and which sources get
   reminders. P-016 carries the Privacy and retention wording.
 - **D17 note (November 6, 2026):** the owner approved all twelve phrases as written.
+- **Ticket 283 note (November 6, 2026):** the line "For now, only Google Calendar events and
+  Behaviors get reminders, not Outlook or iCloud events." is removed, because Outlook and
+  iCloud events now get reminders. Eleven phrases remain. See P-026.
 - **Status:** logged.
 
 ## P-025: Corrected places are remembered for their location text
@@ -924,4 +940,39 @@ cite has not changed.
   including for Behaviors and Home with the same text, that only a place identifier and a
   one-way key are stored, for how long, and that turning travel off or correcting back to the
   original text forgets it. The owner approves the new in-app note.
+- **Status:** logged.
+
+## P-026: Outlook and iCloud events get leave reminders, and Mac-cached locations
+
+- **Change:** Ticket 283 (decision D4), implemented November 6, 2026, not merged. Outlook and
+  iCloud events with a location get leave times, trips and leave reminders under the same
+  rules as Google Calendar events (P-019 covers the location read itself).
+  - The hosted leave reminder job (Tickets 276 and 277) reads Outlook and iCloud Calendar for an
+    opted-in account with no user session, through its own token channel. It decrypts the
+    sealed Outlook refresh token or iCloud app-specific password the same way a signed-in read
+    does. It reads locations for routing and titles only at send time, in memory.
+  - The Travel Settings line "For now, only Google Calendar events and Behaviors get reminders,
+    not Outlook or iCloud events." is removed.
+  - The Mac's disposable Outlook and iCloud caches now hold event locations, as the Google
+    Calendar cache already does.
+  - The Daily Brief gets no signed travel conclusions for a day whose plan includes an Outlook
+    or iCloud event. Its in-app travel block on the Timeline still shows those trips.
+- **Affected:** Ticket 283, with P-016, P-017, P-019 and P-024. Files:
+  `components/settings/LegalContent.tsx`, `docs/user-guide/travel.md`, Microsoft connector
+  submission materials.
+- **Surfaces:** Privacy, Travel Settings, user guide, provider submissions.
+- **Conflicting current text:**
+  - Privacy, "Outlook Calendar, iCloud Calendar, and Hevy": "Cadence requests only event
+    titles, times, timezone, availability, response, and calendar names." and "It discards
+    unsupported details." Locations are now requested and kept for travel.
+  - Privacy, retention table, "Desktop Outlook, iCloud, and Hevy caches": does not say the
+    caches can hold event locations.
+  - Privacy, Google Calendar processing moments (P-017) name only Google Calendar for the
+    sessionless reminder check.
+  - `docs/user-guide/travel.md`: names Google Calendar as the travel source. Not checked line
+    by line.
+- **Update needed:** say Outlook and iCloud events get leave times and reminders; name the
+  sessionless reminder check for both connectors; add locations to the desktop cache row;
+  describe the Teams-placeholder rule. Update the Microsoft connector materials before the next
+  submission.
 - **Status:** logged.

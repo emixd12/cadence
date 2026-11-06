@@ -1,5 +1,27 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 5: Ticket 283 Outlook and iCloud events route — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- Outlook and iCloud events with a location now get routes, leave times, trips and leave
+  reminders under the same rules as Google Calendar events (decisions D4 and D12). Web and the
+  linked Mac route every Calendar's events; automatic requests wait for all three reads.
+- Locations are an opt-in read (`fields=location` on the events routes, `includeLocation` in
+  the services). The Timeline, the travel route and the leave reminder job ask; the Daily Brief
+  read does not. Clients that never ask, such as released Mac builds, keep the first-slice shape.
+  Outlook adds `location` and `isOnlineMeeting` to its Graph select and drops an online meeting's
+  placeholder location. iCloud keeps the `LOCATION` text. The hosted server stores no event
+  detail.
+- The hosted route fences Outlook and iCloud connections and event revisions like Google's.
+  A failed read of a connected Calendar fails the request. The Daily Brief's signed conclusions
+  stay Google-only: a plan with an Outlook or iCloud stop carries no token.
+- The Ticket 279 line limiting reminders to Google Calendar events is removed.
+- Messaging: P-026 (new), notes on P-017, P-019 and P-024. No cost table change.
+- Tests: connector providers and services, `tests/external-event-contract.test.ts`,
+  `tests/travel-route-refresh.service.test.ts` (7 new), `tests/leave-reminder-hosted-port.test.ts`,
+  `tests/day-progress-timeline.dom.test.tsx`, client URL checks.
+
 ## Travel advisory revamp Wave 5: Ticket 282 tomorrow's first trip — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No migration.**

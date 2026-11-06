@@ -16489,7 +16489,8 @@ Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alon
 Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
 saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
 token). It cannot turn on while Travel estimates is off. The owner approved the twelve new
-phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280.
+phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280. Ticket 283
+removed the Google-only sources line, leaving eleven phrases.
 Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
@@ -16673,7 +16674,13 @@ Implementation notes (November 6, 2026):
 
 ## Ticket 283: Route Outlook and iCloud events
 
-Status: filed November 4, 2026. Not started. Planned last in Wave 5.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Locations are an
+opt-in read (`fields=location`, `includeLocation`) used by the Timeline, the travel route
+and the leave reminder job, never the Daily Brief; released clients keep the first-slice
+shape. `lib/services/travel-calendar-sources.ts` reads and fences all three Calendars.
+Outlook drops an online meeting's placeholder location. The Daily Brief's signed conclusions
+stay Google-only, so a plan with an Outlook or iCloud stop carries none. The Ticket 279
+Google-only line is removed. No cost table change.
 Dependencies: Tickets 281, 277 and 279. Decision D4.
 
 Goal: people whose events are not in Google Calendar get leave times too (G6).
@@ -16703,7 +16710,7 @@ Platform impact:
 | Marketing | Not applicable until release. P-019 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
 
-Messaging impact: P-019.
+Messaging impact: P-019, P-026 (notes on P-017 and P-024).
 
 Verification: connector and route service tests, `npm run interactions:check`, local
 verification with fixtures.

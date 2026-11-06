@@ -275,7 +275,12 @@ Assumptions and limits:
   existing failure wait; a quota, clearance or sign-in failure is not. A failure usually makes
   no route call, so a retry adds at most one leg. Assumed: one per
   travel day. Measured by Ticket 284. Transit doubles each figure.
-- Not counted yet: Outlook and iCloud legs (Ticket 283), which adds its own count.
+- Outlook and iCloud events (Ticket 283, November 6, 2026) route under the same plan as Google
+  Calendar events, so the planned legs per travel day above already count them; the table does
+  not change. A person whose located events are only in Outlook or iCloud moves from no travel
+  days into the matching profile. Microsoft Graph and iCloud CalDAV reads cost nothing per
+  call. Each route request reads each connected Calendar twice, at the start and in the final
+  check.
 - Ticket 264 adds two kinds of route call, both assumed and not in the table:
   - A late transit leg makes one more call, from the ready time, reserved first at
     US$0.010. Other modes make no extra call. Assumed: rare, at most a few a month.

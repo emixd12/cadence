@@ -78,7 +78,7 @@ export class ExternalEventValidationError extends Error {
 
 const V1_1_SOURCES = new Set<ExternalEventSource>(["outlook_calendar", "icloud_calendar"]);
 const V1_1_UNSUPPORTED_DETAILS = [
-  "description", "location", "organizer", "attendees", "conference", "attachments",
+  "description", "organizer", "attendees", "conference", "attachments",
 ] as const;
 
 /**
@@ -274,12 +274,19 @@ function validateV1_1Identity(value: unknown, source: ExternalEventSource, path:
   }
 }
 
-/** Outlook and iCloud first slices read the subject only; every other detail is unsupported. */
+/**
+ * Outlook and iCloud first slices read the subject only; every other detail is unsupported.
+ * Ticket 283: a travel read also carries the location. Without one it stays `""` and
+ * `unsupported`, so a client that never asks for locations sees the first-slice shape.
+ */
 function validateV1_1Event(event: Record<string, unknown>, source: ExternalEventSource, path: string): void {
   validateV1_1Identity(event.id, source, `${path}.id`);
   validateV1_1Identity(event.logicalInstanceId, source, `${path}.logicalInstanceId`);
   literal(event.description, "", `${path}.description`);
-  literal(event.location, "", `${path}.location`);
+  const location = (event.fieldAvailability as Record<string, unknown>).location;
+  if (location === "unsupported" || location === "not_provided") literal(event.location, "", `${path}.location`);
+  else if (location !== undefined) fail(`${path}.fieldAvailability.location`, "must be unsupported, not_provided or absent for this source");
+  else if (!event.location) fail(`${path}.location`, "must be non-empty when available");
   for (const key of ["organizer", "attendees", "conference", "attachments"] as const) {
     if (event[key] !== null) fail(`${path}.${key}`, "is unsupported for this source");
   }

@@ -8,6 +8,7 @@ import {
   listOutlookCalendars,
   outlookCalendarViewUrl,
   outlookGraphUrlAllowed,
+  outlookLocationText,
   readOutlookCalendarEvents,
   resolveOutlookTimezone,
   type OutlookCalendar,
@@ -463,5 +464,60 @@ describe("calendar listing", () => {
     const malformed = harness([json({ value: [{ id: "", name: "x" }] })]);
     await expect(listOutlookCalendars({ accessToken: TOKEN, deadlineAt: 25_000, now: malformed.time.now, fetch: malformed.fetch }))
       .rejects.toMatchObject({ failure: { code: "malformed_provider_response" } });
+  });
+});
+
+describe("travel location read (Ticket 283)", () => {
+  const LOCATION_FIELDS = ["id", "subject", "isAllDay", "isCancelled", "showAs", "type", "seriesMasterId", "originalStart", "originalStartTimeZone",
+    "responseStatus", "changeKey", "webLink", "start", "end", "location", "isOnlineMeeting"];
+
+  it("adds location and isOnlineMeeting to the select only for a travel read, including next links", async () => {
+    expect(outlookCalendarViewUrl("calendar-1", RANGE, true).searchParams.get("$select")!.split(",").sort()).toEqual([...LOCATION_FIELDS].sort());
+    const next = `https://graph.microsoft.com${VIEW_PATH}?$select=id,location&$skip=1000`;
+    expect(outlookGraphUrlAllowed(next, "calendarView", true)?.toString()).toBe(next);
+    expect(outlookGraphUrlAllowed(next, "calendarView")).toBeNull();
+    expect(outlookGraphUrlAllowed(`https://graph.microsoft.com${VIEW_PATH}?$select=id,body`, "calendarView", true)).toBeNull();
+    const h = harness([page([], `https://graph.microsoft.com${VIEW_PATH}?$skip=1000`), page([])]);
+    expect((await readOutlookCalendarEvents(input(h, { includeLocation: true }))).ok).toBe(true);
+    for (const call of h.calls) expect(new URL(call.url).searchParams.get("$select")!.split(",").sort()).toEqual([...LOCATION_FIELDS].sort());
+  });
+
+  it("reads the location text and keeps every other detail out", async () => {
+    const marker = "SYNTHETIC-PRIVATE-DETAIL";
+    const h = harness([page([
+      timed("evt-1", "2026-11-01T14:00:00.0000000", "2026-11-01T15:00:00.0000000", { body: { content: marker },
+        location: { displayName: "Dentist", locationType: "localBusiness", address: { street: "1 Main St", city: "Springfield", state: "IL", postalCode: "62701", countryOrRegion: "United States" } } }),
+      timed("evt-2", "2026-11-01T16:00:00.0000000", "2026-11-01T17:00:00.0000000", { isOnlineMeeting: true,
+        location: { displayName: "Microsoft Teams Meeting", locationType: "default", uniqueIdType: "private" } }),
+      timed("evt-3", "2026-11-01T18:00:00.0000000", "2026-11-01T19:00:00.0000000"),
+    ])]);
+    const result = await readOutlookCalendarEvents(input(h, { includeLocation: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(() => validateVersionedExternalEventSnapshot(result.snapshot)).not.toThrow();
+    expect(JSON.stringify(result.snapshot)).not.toContain(marker);
+    const byId = new Map(result.snapshot.events.map((event) => [event.providerEventId, event]));
+    expect(byId.get("evt-1")).toMatchObject({ location: "Dentist, 1 Main St, Springfield, IL, 62701, United States", description: "" });
+    expect(byId.get("evt-1")!.fieldAvailability.location).toBeUndefined();
+    expect(byId.get("evt-2")).toMatchObject({ location: "", fieldAvailability: { location: "not_provided" } });
+    expect(byId.get("evt-3")).toMatchObject({ location: "", fieldAvailability: { location: "not_provided" } });
+  });
+
+  it("keeps the first-slice shape when no location is asked for", async () => {
+    const h = harness([page([timed("evt-1", "2026-11-01T14:00:00.0000000", "2026-11-01T15:00:00.0000000", { location: { displayName: "Dentist" } })])]);
+    const result = await readOutlookCalendarEvents(input(h));
+    expect(result.ok && result.snapshot.events[0]).toMatchObject({ location: "", fieldAvailability: { location: "unsupported" } });
+  });
+
+  it("builds one routable text and reads an online meeting's placeholder as no place", () => {
+    expect(outlookLocationText({ displayName: "1 Main St, Springfield", address: { street: "1 Main St", city: "Springfield" } })).toBe("1 Main St, Springfield");
+    expect(outlookLocationText({ displayName: "Room 5", locationType: "conferenceRoom" }, true)).toBe("Room 5");
+    expect(outlookLocationText({ displayName: "Office", address: { city: "Chicago" } }, true)).toBe("Office, Chicago");
+    expect(outlookLocationText({ displayName: "Microsoft Teams Meeting" }, true)).toBe("");
+    expect(outlookLocationText({ displayName: "Microsoft Teams Meeting" })).toBe("Microsoft Teams Meeting");
+    expect(outlookLocationText({ displayName: "  " })).toBe("");
+    expect(outlookLocationText("Room 4")).toBe("");
+    expect(outlookLocationText(null)).toBe("");
+    expect(outlookLocationText([{ displayName: "Room" }])).toBe("");
   });
 });

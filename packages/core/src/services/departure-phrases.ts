@@ -46,7 +46,6 @@ export const LEAVE_REMINDER_HOME_SAVED = "Home: saved.";
 export const LEAVE_REMINDER_HOME_MISSING = "Home: not saved. The day's first trip needs Home to get a reminder.";
 export const LEAVE_REMINDER_START_WEB = "Reminders estimate from Home or your previous stop, never from this device's position.";
 export const LEAVE_REMINDER_START_MAC = "This Mac reminds from its last estimate, which starts from your position, Home or your previous stop, and names when that estimate was checked.";
-export const LEAVE_REMINDER_SOURCES = "For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.";
 export const LEAVE_REMINDER_TRAVEL_OFF = "Turn on Travel estimates to use reminders.";
 export const LEAVE_REMINDER_SAVED = "Reminder setting saved.";
 export const LEAVE_REMINDER_SAVE_FAILED = "The reminder setting could not save.";
@@ -471,9 +470,6 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "leave-reminder-start-mac", ticket: "279", template: LEAVE_REMINDER_START_MAC,
     situation: "Leave reminder readiness on a linked Mac: native reminders use the last estimate and name its time (decision D3, Ticket 280).",
-    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
-  { id: "leave-reminder-sources", ticket: "279", template: LEAVE_REMINDER_SOURCES,
-    situation: "Leave reminder readiness: which trips get reminders until Ticket 283 routes Outlook and iCloud events.",
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "leave-reminder-travel-off", ticket: "279", template: LEAVE_REMINDER_TRAVEL_OFF,
     situation: "Leave reminder readiness while Travel estimates is off. The checkbox cannot turn on until it is on.",

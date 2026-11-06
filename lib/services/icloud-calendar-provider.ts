@@ -48,8 +48,9 @@ import {
 // operations: discover the principal and calendar home, list VEVENT calendars,
 // and read selected calendars with a server-expanded calendar-query. The first
 // slice keeps only identity, interval, state, availability, revision, and the
-// SUMMARY text. It never expands RRULE locally: an unexpanded series marks that
-// calendar incomplete. All transport rules live in icloud-calendar-request.ts.
+// SUMMARY text. Ticket 283 keeps the LOCATION text too, only for a travel read. It
+// never expands RRULE locally: an unexpanded series marks that calendar incomplete.
+// All transport rules live in icloud-calendar-request.ts.
 
 export {
   IcloudCalendarProviderError,
@@ -65,7 +66,8 @@ const MAX_HOME_RESPONSES = 256;
 const MAX_EVENT_RESPONSES = 5_000;
 const MAX_ICAL_LINES = 50_000;
 const MAX_ICAL_DEPTH = 8;
-const UNSUPPORTED_DETAILS = ["description", "location", "organizer", "attendees", "conference", "attachments", "source_url"] as const;
+const UNSUPPORTED_DETAILS = ["description", "organizer", "attendees", "conference", "attachments", "source_url"] as const;
+const MAX_LOCATION_TEXT = 2_048;
 
 export type IcloudCalendar = Readonly<{ id: string; name: string; isDefault: boolean }>;
 /** Server-only calendar facts; the href and timezone never leave the service. */
@@ -79,6 +81,8 @@ export type IcloudCalendarReadInput = IcloudRequestOptions & Readonly<{
   calendars: readonly IcloudCalendarCollection[];
   range: ExternalEventRequestedRange;
   fetchedAt: string;
+  /** Ticket 283: also keep each event's LOCATION text, for travel. Off for every other read. */
+  includeLocation?: boolean;
 }>;
 
 export type IcloudCalendarReadResult =
@@ -335,6 +339,7 @@ export type IcloudAdapterContext = Readonly<{
   calendar: IcloudCalendarCollection;
   range: ExternalEventRequestedRange;
   etag: string | null;
+  includeLocation?: boolean;
 }>;
 export type IcloudAdaptedItem =
   | Readonly<{ kind: "event"; event: NormalizedExternalEvent }>
@@ -459,14 +464,17 @@ function adaptComponent(component: IcalComponent, context: IcloudAdapterContext)
   }
   const summary = single(component, "SUMMARY");
   const title = summary ? sanitizeGoogleCalendarText(unescapeText(summary.value), MAX_TEXT, false) : "";
+  const location = context.includeLocation ? icloudLocationText(component) : "";
   const fieldAvailability: Partial<Record<ExternalEventField, ExternalEventFieldAvailability>> = {};
   for (const field of UNSUPPORTED_DETAILS) fieldAvailability[field] = "unsupported";
+  if (!context.includeLocation) fieldAvailability.location = "unsupported";
+  else if (!location) fieldAvailability.location = "not_provided";
   if (!title) fieldAvailability.title = "not_provided";
   const base = {
     id, providerEventId: uid, logicalInstanceId: id, calendarId: calendar.id, source: "icloud_calendar" as const, calendarName: calendar.name,
     sourceTimezone: zone, sourceTimezoneFallback: timezoneFallback,
     state, availability: eventAvailability(single(component, "TRANSP")?.value), currentUserResponse: null,
-    revision, title, description: "", location: "", sourceUrl: null, fieldAvailability, detailCompleteness: {},
+    revision, title, description: "", location, sourceUrl: null, fieldAvailability, detailCompleteness: {},
     organizer: null, attendees: null, attendeesOmitted: false, conference: null, recurrence, attachments: null,
   };
   const event: NormalizedExternalEvent = interval.kind === "timed"
@@ -474,6 +482,16 @@ function adaptComponent(component: IcalComponent, context: IcloudAdapterContext)
       duration: interval.unspecified ? { kind: "unknown", reason: "end_unspecified" } : { kind: "known", seconds: interval.startAt.until(interval.endAt).total({ unit: "seconds" }) } }
     : { ...base, kind: "all_day", startLocalDate: interval.first.toString(), endLocalDate: interval.last.toString(), duration: { kind: "calendar_days", days: interval.first.until(interval.last).days } };
   return { kind: "event", event };
+}
+
+/**
+ * Ticket 283: the VEVENT's LOCATION text, unescaped and sanitized. Missing, repeated or blank
+ * reads as no location; it never quarantines the event.
+ */
+function icloudLocationText(component: IcalComponent): string {
+  const locations = component.properties.filter((property) => property.name === "LOCATION");
+  if (locations.length !== 1) return "";
+  return sanitizeGoogleCalendarText(unescapeText(locations[0]!.value), MAX_LOCATION_TEXT, false).trim();
 }
 
 function utcStamp(instant: Temporal.Instant): string {
@@ -592,7 +610,7 @@ export async function readIcloudCalendarEvents(input: IcloudCalendarReadInput): 
         const uids = new Set(vevents.map((component) => component.properties.find((property) => property.name === "UID")?.value ?? ""));
         if (vevents.length === 0 || uids.size !== 1) { count("malformed_item"); continue; }
         for (const vevent of vevents) {
-          const adapted = adaptIcloudEvent(vevent, { accountId: input.accountId, calendar, range: input.range, etag });
+          const adapted = adaptIcloudEvent(vevent, { accountId: input.accountId, calendar, range: input.range, etag, includeLocation: input.includeLocation });
           if (adapted.kind === "event" || adapted.kind === "tombstone") {
             const value = adapted.kind === "event" ? adapted.event : adapted.tombstone;
             const previous = events.get(value.id) ?? tombstones.get(value.id);

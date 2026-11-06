@@ -47,9 +47,16 @@ const MAX_TEXT = 1_024;
 // so the revision normally comes from changeKey; a returned lastModifiedDateTime is still used.
 const CALENDAR_SELECT = "id,name,isDefaultCalendar";
 const EVENT_SELECT = "id,subject,isAllDay,isCancelled,showAs,type,seriesMasterId,originalStart,originalStartTimeZone,responseStatus,changeKey,webLink,start,end";
+/**
+ * Ticket 283: a travel read adds the event's location and whether it is an online meeting. Only
+ * the travel route and the Timeline ask for it; the Daily Brief read keeps the list above.
+ */
+const EVENT_SELECT_WITH_LOCATION = `${EVENT_SELECT},location,isOnlineMeeting`;
 /** Outlook on the web hosts that Graph returns in `webLink`. Any other host is dropped. */
 const WEB_LINK_HOSTS = new Set(["outlook.office365.com", "outlook.office.com", "outlook.live.com"]);
-const UNSUPPORTED_DETAILS = ["description", "location", "organizer", "attendees", "conference", "attachments"] as const;
+const UNSUPPORTED_DETAILS = ["description", "organizer", "attendees", "conference", "attachments"] as const;
+const MAX_LOCATION_TEXT = 2_048;
+const ADDRESS_PARTS = ["street", "city", "state", "postalCode", "countryOrRegion"] as const;
 
 export type OutlookCalendar = Readonly<{ id: string; name: string; isDefault: boolean }>;
 export type OutlookGraphFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -72,6 +79,8 @@ export type OutlookCalendarReadInput = OutlookGraphRequestOptions & Readonly<{
   calendars: readonly OutlookCalendar[];
   range: ExternalEventRequestedRange;
   fetchedAt: string;
+  /** Ticket 283: also read each event's location, for travel. Off for every other read. */
+  includeLocation?: boolean;
 }>;
 
 export type OutlookCalendarReadResult =
@@ -96,7 +105,7 @@ function failure(code: ExternalEventErrorCode, calendarId: string | null, retrya
  * calendars. Callers validate every provider-supplied next link with this
  * before any credential is sent.
  */
-export function outlookGraphUrlAllowed(value: string, kind: "calendars" | "calendarView"): URL | null {
+export function outlookGraphUrlAllowed(value: string, kind: "calendars" | "calendarView", includeLocation = false): URL | null {
   let url: URL;
   try { url = new URL(value); } catch { return null; }
   if (url.origin !== GRAPH_ORIGIN || url.protocol !== "https:" || url.port || url.username || url.password || url.hash) return null;
@@ -105,7 +114,7 @@ export function outlookGraphUrlAllowed(value: string, kind: "calendars" | "calen
   const prefix = `${CALENDARS_PATH.toLowerCase()}/`;
   if (!path.startsWith(prefix) || !path.endsWith("/calendarview")) return null;
   const middle = path.slice(prefix.length, -"/calendarview".length);
-  return middle && !middle.includes("/") ? minimalSelect(url, EVENT_SELECT) : null;
+  return middle && !middle.includes("/") ? minimalSelect(url, includeLocation ? EVENT_SELECT_WITH_LOCATION : EVENT_SELECT) : null;
 }
 
 /**
@@ -336,7 +345,7 @@ function webLink(value: unknown): string | null {
   } catch { return null; }
 }
 
-export type OutlookAdapterContext = Readonly<{ calendar: OutlookCalendar; range: ExternalEventRequestedRange }>;
+export type OutlookAdapterContext = Readonly<{ calendar: OutlookCalendar; range: ExternalEventRequestedRange; includeLocation?: boolean }>;
 export type OutlookAdaptedItem =
   | Readonly<{ kind: "event"; event: NormalizedExternalEvent }>
   | Readonly<{ kind: "tombstone"; tombstone: ExternalEventCancellationTombstoneV1_1 }>
@@ -408,8 +417,11 @@ function adaptRecord(item: Record<string, unknown>, context: OutlookAdapterConte
   }
   const title = typeof item.subject === "string" ? sanitizeGoogleCalendarText(item.subject, MAX_TEXT, false) : "";
   const sourceUrl = webLink(item.webLink);
+  const location = context.includeLocation ? outlookLocationText(item.location, item.isOnlineMeeting === true) : "";
   const fieldAvailability: Partial<Record<ExternalEventField, ExternalEventFieldAvailability>> = {};
   for (const field of UNSUPPORTED_DETAILS) fieldAvailability[field] = "unsupported";
+  if (!context.includeLocation) fieldAvailability.location = "unsupported";
+  else if (!location) fieldAvailability.location = "not_provided";
   if (!title) fieldAvailability.title = "not_provided";
   if (!sourceUrl) fieldAvailability.source_url = "not_provided";
   const base = {
@@ -417,7 +429,7 @@ function adaptRecord(item: Record<string, unknown>, context: OutlookAdapterConte
     sourceTimezone: zone ?? range.timezone, sourceTimezoneFallback: zone ? "none" as const : "request" as const,
     // Graph has no confirmed/tentative event status.
     state: "unknown" as const, availability: availability(item.showAs), currentUserResponse: userResponse(item.responseStatus),
-    revision: eventRevision, title, description: "", location: "", sourceUrl, fieldAvailability, detailCompleteness: {},
+    revision: eventRevision, title, description: "", location, sourceUrl, fieldAvailability, detailCompleteness: {},
     organizer: null, attendees: null, attendeesOmitted: false, conference: null, recurrence, attachments: null,
   };
   const event: NormalizedExternalEvent = interval.kind === "timed"
@@ -426,15 +438,38 @@ function adaptRecord(item: Record<string, unknown>, context: OutlookAdapterConte
   return { kind: "event", event };
 }
 
+/**
+ * Ticket 283: one routable text from Graph's `location`: its display name, then any address
+ * parts it does not already contain. An online meeting's placeholder (a default-type location
+ * with no address or coordinates, such as "Microsoft Teams Meeting") is not a place, so it reads
+ * as no location (decision D12). A malformed value reads as no location; it never quarantines the event.
+ */
+export function outlookLocationText(value: unknown, onlineMeeting = false): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const entry = value as Record<string, unknown>;
+  const clean = (part: unknown) => typeof part === "string" ? sanitizeGoogleCalendarText(part, MAX_TEXT, false).trim() : "";
+  const address = entry.address && typeof entry.address === "object" && !Array.isArray(entry.address) ? entry.address as Record<string, unknown> : {};
+  const addressParts = ADDRESS_PARTS.map((key) => clean(address[key])).filter(Boolean);
+  const coordinates = !!entry.coordinates && typeof entry.coordinates === "object" &&
+    Object.values(entry.coordinates as Record<string, unknown>).some((part) => typeof part === "number");
+  const defaultType = entry.locationType === undefined || entry.locationType === null || entry.locationType === "default";
+  if (onlineMeeting && defaultType && !addressParts.length && !coordinates) return "";
+  const parts: string[] = [];
+  for (const part of [clean(entry.displayName), ...addressParts]) {
+    if (part && !parts.some((existing) => existing.toLowerCase().includes(part.toLowerCase()))) parts.push(part);
+  }
+  return sanitizeGoogleCalendarText(parts.join(", "), MAX_LOCATION_TEXT, false).trim();
+}
+
 /** Query bounds carry explicit offsets and are widened by one day on each side for all-day events in distant zones. */
-export function outlookCalendarViewUrl(calendarId: string, range: ExternalEventRequestedRange): URL {
+export function outlookCalendarViewUrl(calendarId: string, range: ExternalEventRequestedRange, includeLocation = false): URL {
   const start = Temporal.PlainDate.from(range.startLocalDate).subtract({ days: 1 }).toZonedDateTime(range.timezone);
   const end = Temporal.PlainDate.from(range.endLocalDate).add({ days: 2 }).toZonedDateTime(range.timezone);
   const url = new URL(`${GRAPH_ORIGIN}${CALENDARS_PATH}/${encodeURIComponent(calendarId)}/calendarView`);
   url.searchParams.set("startDateTime", start.toString({ timeZoneName: "never" }));
   url.searchParams.set("endDateTime", end.toString({ timeZoneName: "never" }));
   url.searchParams.set("$top", "1000");
-  url.searchParams.set("$select", EVENT_SELECT);
+  url.searchParams.set("$select", includeLocation ? EVENT_SELECT_WITH_LOCATION : EVENT_SELECT);
   return url;
 }
 
@@ -502,7 +537,7 @@ export async function readOutlookCalendarEvents(input: OutlookCalendarReadInput)
   for (const calendar of input.calendars) {
     let itemCount = 0;
     const quarantined = new Map<OutlookQuarantineReason, number>();
-    let url: URL | null = outlookCalendarViewUrl(calendar.id, input.range);
+    let url: URL | null = outlookCalendarViewUrl(calendar.id, input.range, input.includeLocation);
     const seen = new Set<string>();
     try {
       for (let page = 0; ; page += 1) {
@@ -521,14 +556,14 @@ export async function readOutlookCalendarEvents(input: OutlookCalendarReadInput)
         }
         itemCount += items.length;
         for (const raw of items) {
-          const adapted = adaptOutlookEvent(raw, { calendar, range: input.range });
+          const adapted = adaptOutlookEvent(raw, { calendar, range: input.range, includeLocation: input.includeLocation });
           if (adapted.kind === "event") { events.set(adapted.event.id, adapted.event); tombstones.delete(adapted.event.id); }
           else if (adapted.kind === "tombstone") { tombstones.set(adapted.tombstone.id, adapted.tombstone); events.delete(adapted.tombstone.id); }
           else if (adapted.kind === "quarantine") quarantined.set(adapted.reason, (quarantined.get(adapted.reason) ?? 0) + 1);
         }
         if (!link) break;
         // Validate the provider-supplied destination before the bearer token is attached.
-        url = outlookGraphUrlAllowed(link, "calendarView");
+        url = outlookGraphUrlAllowed(link, "calendarView", input.includeLocation);
         if (!url || outlookCalendarIdFromViewUrl(url) !== calendar.id) {
           throw new OutlookCalendarProviderError(failure("malformed_provider_response", calendar.id, false, null, "Outlook Calendar returned a next page outside this calendar."));
         }

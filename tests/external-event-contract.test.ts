@@ -28,6 +28,10 @@ import {
 const fixtureUrl = new URL("./fixtures/external-event-snapshot.valid.json", import.meta.url);
 const schemaUrl = new URL("../packages/core/src/external-event.schema.json", import.meta.url);
 
+function withoutLocation(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "location"));
+}
+
 describe("external event contract", () => {
   it("validates the versioned fixture and projects only scheduling facts", async () => {
     const fixture = JSON.parse(await readFile(fixtureUrl, "utf8"));
@@ -222,7 +226,9 @@ describe("external event contract 1.1.0 (Outlook and iCloud)", () => {
       [{ ...outlook, events: [{ ...timed, location: "Room 4" }] }, "location"],
       [{ ...outlook, events: [{ ...timed, attendees: [] }] }, "attendees"],
       [{ ...outlook, events: [{ ...timed, organizer: { displayName: null, email: "a@example.com", self: false } }] }, "organizer"],
-      [{ ...outlook, events: [{ ...timed, fieldAvailability: { ...timed.fieldAvailability, location: "not_provided" } }] }, "fieldAvailability.location"],
+      [{ ...outlook, events: [{ ...timed, fieldAvailability: { ...timed.fieldAvailability, location: "restricted" } }] }, "fieldAvailability.location"],
+      [{ ...outlook, events: [{ ...timed, location: "Room 4", fieldAvailability: { ...timed.fieldAvailability, location: "not_provided" } }] }, "location"],
+      [{ ...icloud, events: [{ ...instance, location: "", fieldAvailability: withoutLocation(instance.fieldAvailability) }] }, "non-empty"],
       [{ ...outlook, events: [{ ...timed, state: "confirmed" }] }, "state"],
       [{ ...icloud, events: [{ ...instance, sourceUrl: "https://www.icloud.com/calendar" }] }, "sourceUrl"],
       [{ ...icloud, events: [{ ...instance, currentUserResponse: "accepted" }] }, "currentUserResponse"],
@@ -231,6 +237,19 @@ describe("external event contract 1.1.0 (Outlook and iCloud)", () => {
     for (const [snapshot, message] of invalid) {
       expect(() => validateVersionedExternalEventSnapshot(snapshot)).toThrow(message);
     }
+  });
+
+  it("accepts a travel read's location for Outlook and iCloud (Ticket 283)", async () => {
+    const outlook = await readJson(outlookFixtureUrl);
+    const icloud = await readJson(icloudFixtureUrl);
+    const [timed] = outlook.events;
+    const [instance] = icloud.events;
+    const located = validateVersionedExternalEventSnapshot({ ...outlook, events: [{ ...timed, location: "Main Campus, 1 Main St",
+      fieldAvailability: withoutLocation(timed.fieldAvailability) }] });
+    expect(located.events[0]!.location).toBe("Main Campus, 1 Main St");
+    const unlocated = validateVersionedExternalEventSnapshot({ ...icloud, events: [{ ...instance, location: "",
+      fieldAvailability: { ...instance.fieldAvailability, location: "not_provided" } }] });
+    expect(unlocated.events[0]!.location).toBe("");
   });
 
   it("preserves overnight DST, 45-minute, all-day, recurrence, cancellation, and unknown-end facts", async () => {
