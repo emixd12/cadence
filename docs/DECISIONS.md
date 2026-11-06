@@ -1770,3 +1770,31 @@ and 282 were verified:
 Platform impact: web and desktop through the shared phrase module and Calendar details.
 Marketing: not applicable until release. Future mobile: mobile web inherits the web text;
 native mobile is deferred. Messaging impact: P-025 and P-021 notes.
+
+## 2026-11-06: Agents act as the test accounts, end to end
+
+The owner decided on November 6, 2026, during Ticket 284, that live acceptance must not need
+the owner's hands for test accounts A (`cadence.testing.is@gmail.com`) and B
+(`brittlebeliefs@gmail.com`). For those two accounts only, these become agent steps:
+
+1. Google sign-in in the Cadence QA Chrome profile, from the account's Login item in the
+   "Cadence Agents" vault (password and authenticator seed), through
+   `scripts/acceptance/google-signin.mjs`. Cadence sign-in from the kept sessions stays as it was.
+2. Consent screens, including Google Maps routing consent and Calendar connector consent.
+3. Settings that change synced data or send the account's data to a provider, such as Travel
+   estimates, Home and leave reminders.
+4. Test Calendar fixtures: creating and deleting events in the account's own test Calendars,
+   in the browser or through a QA Calendar API client (Cloud project `cadence-qa-498717`, kept
+   apart from the production sign-in and Calendar projects).
+5. Browser permission grants and denials in the Cadence QA Chrome profile, such as
+   notifications and location.
+
+The owner still sets each paid test's spend cap, creates vault items, keys and OAuth clients'
+secrets, keeps the owner's own accounts, and decides releases and publication. A Google check a
+script cannot pass (a phone prompt, a CAPTCHA, a recovery prompt) stops the run with a named
+reason; the agent then asks the owner for that one step. The agent never reads or prints the
+password, a one-time code or a session token.
+
+Platform impact: web acceptance only; no product change. Desktop: installed acceptance keeps
+its owner steps for the owner's Mac (quitting Cadence, macOS prompts). Marketing and future
+mobile: not applicable. Messaging impact: none.
