@@ -149,7 +149,9 @@ for each row execute function cadence_private.travel_leave_reminder_setting_chan
 -- A reminder becomes pending only while its account has reminders on. Sent
 -- and failed reminders are final. The route count never goes down, so a trip
 -- is routed at most twice. A cancelled reminder may return to pending when its
--- trip comes back. Identity never changes.
+-- trip comes back. Identity never changes. The setting read takes a share lock,
+-- so a concurrent switch to off either waits for this write and then deletes
+-- the row, or commits first and this write sees reminders off.
 create or replace function cadence_private.guard_travel_leave_reminder_write()
 returns trigger
 language plpgsql
@@ -160,6 +162,7 @@ begin
     and not exists (
       select 1 from public.travel_leave_reminder_settings settings
       where settings.user_id = new.user_id and settings.enabled
+      for share
     )
   then
     raise exception 'Leave reminders are off.' using errcode = 'check_violation';

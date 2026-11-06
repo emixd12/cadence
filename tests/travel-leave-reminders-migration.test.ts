@@ -25,6 +25,8 @@ describe("leave reminder migration (Ticket 275)", () => {
     expect(sql).toContain(
       "grant select (user_id, enabled, next_check_at) on table public.travel_leave_reminder_settings to service_role",
     );
+    // The pending guard locks the setting row, so a concurrent switch to off cannot leave a pending row.
+    expect(sql).toMatch(/settings\.user_id = new\.user_id and settings\.enabled\s+for share/);
     const code = sql.replace(/^\s*--.*$/gm, "");
     expect(code).not.toMatch(/title|location|latitude|longitude|place_id|address|duration|leave_at|arrive/i);
   });
