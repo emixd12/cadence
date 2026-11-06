@@ -1,5 +1,22 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 5: Ticket 281 remembered places — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- A place correction for a Calendar event with a location now stores the corrected place ID in
+  `travel_place_cache` under the one-way key of the original location text. After a reload,
+  that text resolves to the corrected place for every event with it, with no new lookup. The
+  same refresh already routes other events with that location to the correction.
+- No place or event text is stored. Turning travel off deletes the rows through the existing
+  trigger. Decision D12 dropped attendance, so no attendance record exists.
+- Calendar details show a new note for a located event, not yet approved (decision D7). An
+  event without a location keeps the approved "until you close the Timeline" note.
+- Behaviors and Home with the same normalized text also resolve to the corrected place, because
+  they share the key. Correcting back to the original text keeps the remembered place.
+- Messaging: P-025. Tests: `tests/travel-route-refresh.service.test.ts` (4 new),
+  `tests/sql/ticket-281-remembered-places-smoke.sql` on an isolated local stack.
+
 ## Travel advisory revamp Wave 4: Codex review fixes for leave reminders — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. New migration

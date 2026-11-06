@@ -125,8 +125,9 @@ export async function refreshTravelRoutes(
     }
   };
 
+  const remembered = correctedPlaceTexts(snapshot?.events ?? [], request);
   const drafts = [
-    ...calendarCommitmentDrafts(snapshot?.events ?? [], request, now),
+    ...calendarCommitmentDrafts(snapshot?.events ?? [], request, remembered, now),
     ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now),
   ].sort((left, right) => compareInstants(left.commitment.startAt, right.commitment.startAt));
   // Keep one unrouteable boundary commitment when the bounded source window truncates.
@@ -135,6 +136,7 @@ export async function refreshTravelRoutes(
     : drafts;
   const baseText = bounded.length ? source.settings.baseLocationText : null;
   const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve);
+  await rememberCorrectedPlaces(caller, remembered, places, now);
   // Ticket 217: learned buffers and the remembered mode per place, falling back to usual travel.
   const habits = source.settings.habits;
   const buffers = travelHabitBuffers(habits);
@@ -267,9 +269,41 @@ function placeTextKey(text: string): string {
   return createHash("sha256").update(normalizeTravelPlaceText(text)).digest("base64url");
 }
 
+/**
+ * Ticket 281: each corrected event's own location key, mapped to the corrected text. Other
+ * events with the same location use the correction too. Unlocated events have nothing to remember.
+ */
+function correctedPlaceTexts(events: Awaited<ReturnType<typeof getCalendarEvents>>["events"], request: TravelRouteRefreshRequest): ReadonlyMap<string, string> {
+  return new Map(request.corrections.flatMap((correction) => {
+    const location = events.find((event) => event.id === correction.eventId)?.location;
+    if (!location || !normalizeTravelPlaceText(location)) return [];
+    const key = placeTextKey(location);
+    return key === placeTextKey(correction.locationText) ? [] : [[key, correction.locationText] as const];
+  }));
+}
+
+/**
+ * Ticket 281: stores a corrected place's ID under the original text's key, so the text resolves
+ * to it after a reload. Only the key and place ID are stored, never place or event text. Turning
+ * travel off deletes the rows. A failed write only loses the memory, not this refresh.
+ */
+async function rememberCorrectedPlaces(
+  caller: CalendarReadCaller,
+  remembered: ReadonlyMap<string, string>,
+  places: ReadonlyMap<string, TravelPoint | null>,
+  now: Temporal.Instant,
+): Promise<void> {
+  const rows: TravelPlaceCacheRow[] = [...remembered].flatMap(([textKey, text]) => {
+    const point = places.get(text);
+    return point?.kind === "place_id" ? [{ textKey, outcome: "resolved" as const, placeId: point.placeId, lookedUpAt: now.toString() }] : [];
+  });
+  if (rows.length) await writeTravelPlaceCache(caller.client, caller.user.id, rows).catch(() => undefined);
+}
+
 function calendarCommitmentDrafts(
   events: Awaited<ReturnType<typeof getCalendarEvents>>["events"],
   request: TravelRouteRefreshRequest,
+  remembered: ReadonlyMap<string, string>,
   now: Temporal.Instant,
 ): CommitmentDraft[] {
   const correctionById = new Map(request.corrections.map((correction) => [correction.eventId, correction]));
@@ -280,7 +314,9 @@ function calendarCommitmentDrafts(
   }
   // Decision D12: an event with a place is in person; an event without one is not travel. It asks
   // nothing, gets no route and never blocks a later trip. It stays a normal Calendar event.
-  const placeOf = (event: (typeof allTimed)[number]): string | null => correctionById.get(event.id)?.locationText ?? (event.location || null);
+  // Ticket 281: an event whose location another event corrected uses that correction too.
+  const placeOf = (event: (typeof allTimed)[number]): string | null => correctionById.get(event.id)?.locationText ??
+    (event.location ? remembered.get(placeTextKey(event.location)) ?? event.location : null);
   // Ticket 264: an event under way stays the prior stop until its end.
   const prospective = allTimed
     .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && placeOf(event) !== null &&

@@ -510,6 +510,70 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(JSON.stringify(result.evidence)).not.toContain("call");
   });
 
+  describe("Ticket 281: remembered places", () => {
+    const written = () => mocks.writePlaces.mock.calls.flatMap(([, , rows]) => rows as { textKey: string; outcome: string; placeId: string | null }[]);
+    const routeAllFromReady = () => mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+
+    it("stores the corrected place ID under the original text's key, and later events with that text use it", async () => {
+      withEvents([
+        event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus"),
+        event("second", "2026-09-22T13:00:00Z", "2026-09-22T14:00:00Z", "main  campus"),
+      ]);
+      routeAllFromReady();
+      const corrected = { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "500 Main St" }] };
+      const result = await refreshTravelRoutes(caller, corrected, config, now);
+      expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "500 Main St"]);
+      expect(written()).toContainEqual({ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.toString() });
+      // A row holds a key, an outcome, a place ID and a time: no place or event text.
+      for (const row of written()) expect(Object.keys(row).sort()).toEqual(["lookedUpAt", "outcome", "placeId", "textKey"]);
+      expect(written().map((row) => row.textKey)).not.toContain("Main Campus");
+      // Both events are at the corrected place, so nothing travels between them.
+      expect(result.evidence?.legs.map((entry) => [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([[null, "first"], ["second", null]]);
+      expect(result.evidence?.unknownLegs).toEqual([]);
+    });
+
+    it("resolves the original text to the remembered place after a reload, with no lookup", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.readPlaces.mockImplementation(async (_client: unknown, _userId: unknown, keys: readonly string[]) => keys.includes(keyOf("Main Campus"))
+        ? [{ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.subtract({ hours: 1 }).toString() }] : []);
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+      expect(mocks.geocode.mock.calls.map(([text]) => text)).toEqual(["1 Base St"]);
+      expect(JSON.stringify(mocks.route.mock.calls[0]![0].routes)).toContain("place:500 Main St");
+      expect(result.evidence?.unknownLegs).toEqual([]);
+    });
+
+    it("remembers nothing for an unresolved correction, an unchanged text or an event without a location", async () => {
+      withEvents([
+        event("vague", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus"),
+        event("same", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "Hall St"),
+        event("blank", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z", ""),
+      ]);
+      routeAllFromReady();
+      mocks.geocode.mockImplementation(async (text: string) => text === "Somewhere"
+        ? { kind: "ambiguous" } : { kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } });
+      await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [
+        { eventId: "vague", revision: "vague", locationText: "Somewhere" },
+        { eventId: "same", revision: "same", locationText: " hall  st " },
+        { eventId: "blank", revision: "blank", locationText: "9 Added St" },
+      ] }, config, now);
+      const keys = written().map((row) => row.textKey);
+      expect(keys).not.toContain(keyOf("Main Campus"));
+      expect(keys).not.toContain(keyOf(""));
+      expect(written().filter((row) => row.textKey === keyOf("Hall St"))).toEqual([
+        { textKey: keyOf("Hall St"), outcome: "resolved", placeId: "place: hall  st ", lookedUpAt: now.toString() },
+      ]);
+    });
+
+    it("keeps the refresh when remembering fails", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.writePlaces.mockRejectedValue(new Error("write failed"));
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "500 Main St" }] }, config, now);
+      expect(result.evidence?.legs.length).toBeGreaterThan(0);
+    });
+  });
+
   it("keeps a Behavior under way until its end, and its source for later decisions", async () => {
     located("2026-09-22T07:50:00Z");
     mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));

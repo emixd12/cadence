@@ -161,6 +161,14 @@ Migration `20261018051402_fence_travel_place_cache_consent.sql` serializes cache
 writes with the owner's travel-settings row. A late lookup cannot repopulate the
 cache after travel is disabled. The trigger rejects foreign ownership and skips
 writes without current routing consent.
+Ticket 281 (remembered places, no migration) reuses this table. When a Calendar event
+has a location and its corrected destination resolves, the refresh service upserts a
+`resolved` row under the key of the event's original location text with the corrected
+place ID. That text then resolves to the corrected place after a reload, for other
+events, Behaviors and Home with the same normalized text, under the same 365-day reuse.
+The row is indistinguishable from a lookup and holds no place or event text. Correcting
+again replaces it; turning travel off deletes it with the rest of the cache. Decision
+D12 dropped the planned attendance record, so nothing about attendance is stored.
 
 Migration `20260922013000_add_travel_route_quota.sql` keeps owner-local-day and
 global UTC-day counters. Authenticated callers consume quota through one

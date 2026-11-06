@@ -16566,12 +16566,25 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 
 ## Ticket 281: Remember places and attendance
 
-Status: filed November 4, 2026. Not started. Decision D12 (November 5, 2026) removes the
-attendance part: a located event is in person and nothing asks about attendance, so only
-remembered places remain in scope.
+Status: implemented November 6, 2026 on branch `us-work`; not merged or deployed. Decision
+D12 (November 5, 2026) removes the attendance part: a located event is in person and nothing
+asks about attendance, so only remembered places remain in scope.
 Dependencies: Ticket 273. Decision D4.
 
 Goal: stop asking the same question after every reload (G5).
+
+Implementation (November 6, 2026): no migration. The existing `travel_place_cache` already
+holds a one-way text key and a place ID, rejects foreign owners and is deleted when travel is
+turned off. `refreshTravelRoutes` (`lib/services/travel-route-refresh.service.ts`) upserts a
+`resolved` row under the corrected event's original location key with the corrected place ID,
+and in the same refresh routes other events with that location to the correction. A correction
+of an event without a location, one that does not resolve, or one whose text normalizes to the
+original is not remembered. Calendar details show "Applies to this event and other events at
+the same location. Turning off Travel estimates forgets it." for a located event, not yet
+approved (decision D7); an event without a location keeps the approved note. Owner isolation:
+`tests/sql/ticket-281-remembered-places-smoke.sql`. Known limit: correcting back to the
+original text keeps the remembered place; correct to another description of the place, or turn
+travel off, to forget it.
 
 Scope and acceptance:
 
@@ -16597,10 +16610,11 @@ Platform impact:
 | Marketing | Not applicable until release. P-020 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
 
-Messaging impact: P-020.
+Messaging impact: P-020, P-025.
 
 Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
-`npm run supabase -- db reset`, a new owner-isolation test.
+`npm run supabase -- db reset`, a new owner-isolation test
+(`tests/sql/ticket-281-remembered-places-smoke.sql`).
 
 ## Ticket 282: Tomorrow's first trip
 

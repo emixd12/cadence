@@ -11,9 +11,9 @@ import type { WeatherConditionId } from "../types/weather";
  * `DEPARTURE_PHRASE_REVIEW` below lists every reviewed phrase. The owner approved them on
  * November 5, 2026. The design-system bench renders each one with sample values (Ticket 266), and
  * a test fails when a builder produces a sentence missing from the list. New wording is added
- * with `approvedOn: null` until the owner approves it. Two phrases from Ticket 261 live outside
- * this module: the correction note in `ExternalEventDetails` and the production unavailable
- * message in `lib/ui/travel.ts`. The bench lists them too.
+ * with `approvedOn: null` until the owner approves it. Three phrases live outside this module:
+ * the two correction notes in `ExternalEventDetails` (Tickets 261 and 281) and the production
+ * unavailable message in `lib/ui/travel.ts`. The bench lists them too.
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */

@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-025` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-026` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -94,6 +94,7 @@ Status values:
 | [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
 | [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
 | [P-024](#p-024-leave-reminder-switch-and-readiness-list-in-travel-settings) | Leave reminder switch and readiness list in Travel Settings | logged | 279 | Travel Settings, user guide |
+| [P-025](#p-025-corrected-places-are-remembered-for-their-location-text) | Corrected places are remembered for their location text | logged | 281 | Privacy, in-app copy, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -881,4 +882,36 @@ cite has not changed.
   requirement, that it applies to every device on the account, and which sources get
   reminders. P-016 carries the Privacy and retention wording.
 - **D17 note (November 6, 2026):** the owner approved all twelve phrases as written.
+- **Status:** logged.
+
+## P-025: Corrected places are remembered for their location text
+
+- **Change:** Ticket 281, as narrowed by decision D12, implemented November 6, 2026. When a
+  Calendar event has a location and its corrected destination resolves, the hosted route
+  stores the corrected place's Google place ID in `travel_place_cache` under the one-way key
+  of the event's original location text. That text then resolves to the corrected place after
+  a reload and for every other event, Behavior Where or saved Home with the same normalized
+  text, for up to 365 days. No place or event text is stored. Turning travel off deletes the
+  rows. A correction for an event without a location still lasts only while the Timeline is
+  open. Correcting a place again replaces the remembered one. Refines P-020; nothing about
+  attendance is stored (P-023).
+- **Affected:** Ticket 281. Files: `lib/services/travel-route-refresh.service.ts`,
+  `components/timeline/ExternalEventDetails.tsx`, `components/settings/LegalContent.tsx`,
+  `docs/user-guide/travel.md`.
+- **Surfaces:** Privacy, in-app copy, user guide.
+- **Conflicting current text:**
+  - Privacy, travel section: "To avoid repeat lookups, Cadence stores Google's place
+    identifier for each looked-up location with the account, keyed by a one-way fingerprint
+    of the typed text." The identifier under a fingerprint can now be a corrected place's.
+  - `docs/user-guide/travel.md`, "Inspect travel and correct a journey": "Use for this
+    journey changes temporary routing only." and "Leave and reopen the Timeline to discard
+    journey corrections."
+  - In-app text, Calendar details: "Applies to this event and other events at the same
+    location. Turning off Travel estimates forgets it." is new and not yet approved
+    (decision D7). The approved "Applies to this event until you close the Timeline." now
+    shows only for an event without a location.
+- **Update needed:** say that a corrected place is remembered for that location text,
+  including for Behaviors and Home with the same text, that only a place identifier and a
+  one-way key are stored, for how long, and that turning travel off forgets it. The owner
+  approves the new in-app note.
 - **Status:** logged.

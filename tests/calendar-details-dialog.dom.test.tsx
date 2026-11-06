@@ -209,9 +209,13 @@ describe("Ticket 261 wording", () => {
   });
 
   it("says how long a journey correction applies in plain words", async () => {
+    // Ticket 281: a located event's corrected place is remembered for its location.
     const dialog = await open(full, { onTravelCorrection: () => undefined });
-    expect(dialog.textContent).toContain("Applies to this event until you close the Timeline.");
+    expect(dialog.textContent).toContain("Applies to this event and other events at the same location. Turning off Travel estimates forgets it.");
+    expect(dialog.textContent).not.toContain("until you close the Timeline");
     expect(dialog.textContent).not.toContain("revision");
+    const unlocated = await open({ ...full, location: "" }, { onTravelCorrection: () => undefined });
+    expect(unlocated.textContent).toContain("Applies to this event until you close the Timeline.");
   });
 });
 
