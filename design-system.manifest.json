@@ -649,6 +649,20 @@
       "notes": "Ticket 217: learned get-ready time, arrival buffer and travel per place as plain sentences with inline selects; each change saves at once with the habit revision. Bench saves stay in page memory."
     },
     {
+      "id": "module.leave-reminder-setting",
+      "name": "LeaveReminderSetting",
+      "kind": "module",
+      "source": "components/settings/LeaveReminderSetting.tsx",
+      "exportName": "LeaveReminderSetting",
+      "usageNames": [
+        "LeaveReminderSetting"
+      ],
+      "benchAnchor": "design-system#ds-module-leave-reminder-setting",
+      "trackUsages": "required",
+      "status": "active",
+      "notes": "Ticket 279 (decision D3): last in How you travel. One native checkbox, off by default, that saves the account-wide switch at once through /api/travel/leave-reminders (web session or a linked Mac's bearer token). An indented, aria-describedby readiness list names this device's notifications (with a Turn on notifications link to #notifications), Home, and where the estimate starts (web: Home or the previous stop; Mac: its last estimate), then which sources get reminders. It cannot turn on while Travel estimates is off; it can always turn off. Hidden on an unlinked Mac. Wording waits for the owner (D7). Bench clients stay in page memory."
+    },
+    {
       "id": "composite.travel-mode-choice",
       "name": "TravelModeChoice",
       "kind": "composite",

@@ -286,6 +286,14 @@ server derives the owner, plans the change with the shared core rules and compar
 the habit revision only; a stale revision returns 409. Neither method calls a
 provider or accepts an owner ID, position or route result.
 
+`GET /api/travel/leave-reminders` (Ticket 279, decision D3) returns the account's leave
+reminder switch as `{ enabled }`; an account with no row reads `false` and the read
+creates none. `PUT` accepts exactly `{ enabled }`. Turning it on needs Travel estimates on
+(409 `travel_off`); turning it off always saves, and the database then deletes the
+account's reminder rows (decision D15). Both methods accept the web session or a linked
+Mac's bearer token, with the same native-origin CORS as the other travel routes, and run
+under RLS as that user. Neither calls a provider.
+
 ### Historical briefing and sequence evaluation (Tickets 182–183)
 
 `GET/POST /api/dev/briefing-history` exposes defaults and explicit no-model historical

@@ -10,6 +10,8 @@ import { projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-
 import { planTravelHabitChange } from "@cadence/core/services/travel-habits";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import { TravelHabitsSection } from "@/components/settings/TravelHabitsSection";
+import { LeaveReminderSetting } from "@/components/settings/LeaveReminderSetting";
+import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { TravelLeaveQuestion } from "@/components/timeline/TravelLeaveQuestion";
 import { TravelModeChoice } from "@/components/timeline/TravelModeChoice";
@@ -40,10 +42,17 @@ const enabledClient: TravelSettingsClient = { load: async () => enabled, save: a
 const notAllowed = async (requestPermission: boolean) => requestPermission
   ? { state: "unavailable" as const, reason: "timeout" } : { state: "prompt" as const };
 const benchOnly = async () => {};
+/** Ticket 279: bench-only memory for the leave reminder switch; nothing reaches the hosted endpoint. */
+function benchReminderClient(initialEnabled: boolean): LeaveReminderClient {
+  let enabled = initialEnabled;
+  return { load: async () => ({ enabled }), save: async (next) => ({ enabled: (enabled = next) }) };
+}
+const panelReminders = benchReminderClient(false);
 export function TravelSettingsBench() {
   return <div className="grid gap-8">
-    {/* The complete panel: setup, How you travel and Completion places (Tickets 215–217). */}
-    <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} readPermission={async () => "denied"} /></PlaceLabelBench>
+    {/* The complete panel: setup, How you travel with the leave reminder switch, and Completion places (Tickets 215–217, 279). */}
+    <PlaceLabelBench><TravelSettingsPanel client={client} readLocation={denied} readPermission={async () => "denied"}
+      leaveReminderClient={panelReminders} readDeviceNotifications={async () => "blocked"} /></PlaceLabelBench>
     <TravelSettingsPanel client={enabledClient} readLocation={notAllowed} readPermission={async () => "prompt"} openLocationSettings={benchOnly} desktop />
   </div>;
 }
@@ -53,6 +62,21 @@ export function TravelHabitsBench() {
   const [settings, setSettings] = useState<TravelSettings>(initial);
   return <TravelHabitsSection settings={settings} onSaved={setSettings} client={{ ...client,
     saveHabits: async (input) => ({ ...settings, habits: planTravelHabitChange(settings.habits, input, BENCH_NOW) }) }} />;
+}
+
+/** Ticket 279: the leave reminder switch and its readiness list in each state. Saves stay in this page. */
+const readyReminders = benchReminderClient(true);
+const blockedReminders = benchReminderClient(false);
+const macReminders = benchReminderClient(true);
+export function LeaveReminderSettingBench() {
+  return <div className="grid gap-6">
+    <section aria-label="Web, ready" className="grid gap-2"><h3 className="text-sm font-bold">Web, ready and on</h3>
+      <LeaveReminderSetting client={readyReminders} readDeviceNotifications={async () => "enabled"} homeSaved travelEnabled /></section>
+    <section aria-label="Web, needs setup" className="grid gap-2"><h3 className="text-sm font-bold">Web, Travel estimates off, notifications not enabled, no Home</h3>
+      <LeaveReminderSetting client={blockedReminders} readDeviceNotifications={async () => "not_enabled"} homeSaved={false} travelEnabled={false} /></section>
+    <section aria-label="Linked Mac" className="grid gap-2"><h3 className="text-sm font-bold">Linked Mac, notifications blocked</h3>
+      <LeaveReminderSetting client={macReminders} readDeviceNotifications={async () => "blocked"} homeSaved travelEnabled desktop /></section>
+  </div>;
 }
 
 /** Ticket 217: the journey mode choice with a synthetic place key. No provider call. */

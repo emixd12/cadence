@@ -35,6 +35,34 @@ export const SETUP_TRAVEL_ESTIMATES_OFF = "Estimates off";
 /** Ticket 273: in a step phrase, the words before these are the step's own action (as owner change R1 does for Refresh travel). */
 const DEPARTURE_STEP_SUFFIXES = [" to get a leave time", " to estimate"] as const;
 
+/**
+ * Ticket 279 (decision D3): the leave reminder switch and its readiness list in Settings, How you
+ * travel. Not yet approved (decision D7). The device states reuse the Notifications panel's words.
+ */
+export const LEAVE_REMINDER_SWITCH = "Remind me when it is time to get ready to leave.";
+export const LEAVE_REMINDER_NOTIFICATIONS_STEP = "Turn on notifications";
+export const LEAVE_REMINDER_HOME_SAVED = "Home: saved.";
+export const LEAVE_REMINDER_HOME_MISSING = "Home: not saved. The day's first trip needs Home to get a reminder.";
+export const LEAVE_REMINDER_START_WEB = "Reminders estimate from Home or your previous stop, never from this device's position.";
+export const LEAVE_REMINDER_START_MAC = "This Mac reminds from its last estimate, which starts from your position, Home or your previous stop, and names when that estimate was checked.";
+export const LEAVE_REMINDER_SOURCES = "For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.";
+export const LEAVE_REMINDER_TRAVEL_OFF = "Turn on Travel estimates to use reminders.";
+export const LEAVE_REMINDER_SAVED = "Reminder setting saved.";
+export const LEAVE_REMINDER_SAVE_FAILED = "The reminder setting could not save.";
+export const LEAVE_REMINDER_LOAD_FAILED = "The reminder setting could not load.";
+/** Ticket 279: one device's notification state, as the readiness list names it. */
+export type LeaveReminderDeviceNotifications = "enabled" | "not_enabled" | "blocked" | "unsupported";
+const LEAVE_REMINDER_DEVICE_STATES: Readonly<Record<LeaveReminderDeviceNotifications, string>> = {
+  enabled: "Enabled on this device",
+  not_enabled: "Not enabled on this device",
+  blocked: "Blocked in this browser",
+  unsupported: "Not supported on this device",
+};
+/** "Notifications: {device state}." The Mac names System Settings where a browser names itself. */
+export function leaveReminderNotificationsPhrase(state: LeaveReminderDeviceNotifications, desktop: boolean): string {
+  return `Notifications: ${desktop && state === "blocked" ? "Blocked in System Settings" : LEAVE_REMINDER_DEVICE_STATES[state]}.`;
+}
+
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** Decisions D13 and D14: the owner approved the wording each lists on this date. */
@@ -43,7 +71,7 @@ export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "279";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -361,6 +389,42 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "First-run setup, Home and travel row, when both are saved but Travel estimates is off. Replaces Saved there.",
     replaces: "Saved",
     approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-switch", ticket: "279", template: LEAVE_REMINDER_SWITCH,
+    situation: "Settings, How you travel: the leave reminder checkbox. Off by default; one switch per account.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-notifications", ticket: "279", template: "Notifications: {device state}.",
+    situation: "Leave reminder readiness: this device's notification state, in the Notifications panel's words. The Mac says \"Blocked in System Settings\" when blocked.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-notifications-step", ticket: "279", template: LEAVE_REMINDER_NOTIFICATIONS_STEP,
+    situation: "Leave reminder readiness: a link to the Notifications section while this device's notifications are not enabled.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-home-saved", ticket: "279", template: LEAVE_REMINDER_HOME_SAVED,
+    situation: "Leave reminder readiness: Home is saved.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-home-missing", ticket: "279", template: LEAVE_REMINDER_HOME_MISSING,
+    situation: "Leave reminder readiness: no Home is saved, so a trip with no stop before it has no start.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-start-web", ticket: "279", template: LEAVE_REMINDER_START_WEB,
+    situation: "Leave reminder readiness on web: where the hosted job's estimate starts (decision D3).",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-start-mac", ticket: "279", template: LEAVE_REMINDER_START_MAC,
+    situation: "Leave reminder readiness on a linked Mac: native reminders use the last estimate and name its time (decision D3, Ticket 280).",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-sources", ticket: "279", template: LEAVE_REMINDER_SOURCES,
+    situation: "Leave reminder readiness: which trips get reminders until Ticket 283 routes Outlook and iCloud events.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-travel-off", ticket: "279", template: LEAVE_REMINDER_TRAVEL_OFF,
+    situation: "Leave reminder readiness while Travel estimates is off. The checkbox cannot turn on until it is on.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-saved", ticket: "279", template: LEAVE_REMINDER_SAVED,
+    situation: "Status after the leave reminder checkbox saves.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-save-failed", ticket: "279", template: LEAVE_REMINDER_SAVE_FAILED,
+    situation: "Status when the leave reminder checkbox could not save. The checkbox keeps its stored value.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "leave-reminder-load-failed", ticket: "279", template: LEAVE_REMINDER_LOAD_FAILED,
+    situation: "Status when the stored leave reminder setting could not load. The checkbox stays unavailable.",
+    replaces: null, approvedOn: null, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {

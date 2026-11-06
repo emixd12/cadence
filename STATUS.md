@@ -1,5 +1,24 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Ticket 279 leave reminder setting and readiness list — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change and no provider call.**
+
+- How you travel gains one checkbox, off by default: "Remind me when it is time to get ready
+  to leave." It saves the account-wide switch at once through the new
+  `GET`/`PUT /api/travel/leave-reminders`, under RLS as the user, on web and on a linked Mac
+  (bearer token). Turning it off lets the Ticket 275 trigger delete the reminder rows (D15).
+- It cannot turn on while Travel estimates is off; the endpoint refuses that too. It is
+  hidden on an unlinked Mac.
+- The readiness list shows notifications on this device (browser push state on web, macOS
+  permission on the Mac), Home, and where the estimate starts, then says only Google
+  Calendar events and Behaviors get reminders until Ticket 283.
+- Interaction INT-TRAVEL-013, design catalog `module.leave-reminder-setting` and its bench.
+- Built before Ticket 278 (its listed dependency), at the coordinator's direction. The Mac
+  posts no leave reminder until Ticket 280.
+- Messaging impact: P-024 logged; P-016 unchanged. The twelve new phrases are in
+  `departure-phrases.ts`, not yet approved (D7).
+
 ## Travel advisory revamp Wave 4: Ticket 276 the leave reminder job acts as the user — November 6, 2026
 
 **On branch `us-work`. Not merged. The new migration is applied to local Supabase only; the

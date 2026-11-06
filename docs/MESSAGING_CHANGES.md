@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-024` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-025` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -93,6 +93,7 @@ Status values:
 | [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
 | [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
 | [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
+| [P-024](#p-024-leave-reminder-switch-and-readiness-list-in-travel-settings) | Leave reminder switch and readiness list in Travel Settings | logged | 279 | Travel Settings, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -836,4 +837,26 @@ cite has not changed.
   "an event's time, location or attendance changes".
 - **Update needed:** drop the in-person or remote choice; say an event without a location is not
   travel; describe the no-Home return sentence and its Settings link.
+- **Status:** logged.
+
+## P-024: Leave reminder switch and readiness list in Travel Settings
+
+- **Change:** Ticket 279, November 6, 2026. How you travel gains one checkbox, off by
+  default: "Remind me when it is time to get ready to leave." Below it, a readiness list
+  names this device's notifications ("Notifications: {device state}.", with a "Turn on
+  notifications" link), whether Home is saved, and where the estimate starts. Web says
+  "Reminders estimate from Home or your previous stop, never from this device's position."
+  A linked Mac says it reminds from its last estimate and names when that estimate was
+  checked. A line says only Google Calendar events and Behaviors get reminders, not Outlook
+  or iCloud events. The switch cannot turn on while Travel estimates is off. It is one
+  switch per account, saved on the hosted server, and hidden on an unlinked Mac. All twelve
+  new phrases are on the bench wording review, not yet approved (D7).
+- **Affected:** Ticket 279, with P-016. Files: `docs/user-guide/travel.md`, "Learned travel
+  habits", which the interaction registry links for INT-TRAVEL-013.
+- **Surfaces:** Travel Settings, user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md` describes How you travel as
+  get-ready time, arrival buffer and travel per place, with no reminder switch.
+- **Update needed:** describe the switch, the readiness list, the Travel estimates
+  requirement, that it applies to every device on the account, and which sources get
+  reminders. P-016 carries the Privacy and retention wording.
 - **Status:** logged.

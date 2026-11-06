@@ -326,7 +326,8 @@
         "INT-PLACE-006",
         "INT-PLACE-007",
         "INT-TRAVEL-011",
-        "INT-TRAVEL-012"
+        "INT-TRAVEL-012",
+        "INT-TRAVEL-013"
       ]
     },
     {
@@ -889,7 +890,8 @@
         "INT-TRAVEL-002",
         "INT-PLACE-006",
         "INT-TRAVEL-006",
-        "INT-TRAVEL-007"
+        "INT-TRAVEL-007",
+        "INT-TRAVEL-013"
       ]
     },
     {
@@ -915,6 +917,14 @@
       "interaction_marker_count": 6,
       "interaction_ids": [
         "INT-TRAVEL-010"
+      ]
+    },
+    {
+      "path": "components/settings/LeaveReminderSetting.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 3,
+      "interaction_ids": [
+        "INT-TRAVEL-013"
       ]
     },
     {
@@ -14616,6 +14626,102 @@
           "applicability": "not_applicable",
           "status": "not_applicable",
           "reason": "Native mobile implementation is deferred. Mobile web inherits the web Timeline."
+        }
+      }
+    },
+    {
+      "id": "INT-TRAVEL-013",
+      "name": "Turn leave reminders on or off",
+      "user_guidance": {
+        "audience": "user",
+        "references": [
+          "docs/user-guide/travel.md#learned-travel-habits"
+        ]
+      },
+      "status": "implemented",
+      "surfaces": [
+        "settings"
+      ],
+      "routes": [
+        "/settings"
+      ],
+      "journeys": [
+        "J14"
+      ],
+      "intent": "Turn the account's leave reminders on or off with one sentence in How you travel, and see what they still need on this device: notifications, Home, and where the estimate starts (decision D3).",
+      "triggers": [
+        {
+          "kind": "change",
+          "control": "Remind me when it is time to get ready to leave."
+        },
+        {
+          "kind": "activate",
+          "control": "Turn on notifications"
+        }
+      ],
+      "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section.",
+      "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15).",
+      "failure_result": "Keeps the stored value and says the reminder setting could not save. A failed load leaves the checkbox unavailable and says so.",
+      "effects": [
+        "ui_state",
+        "network_request",
+        "database_write"
+      ],
+      "risk": "low",
+      "confirmation": "none",
+      "implementation": [
+        "components/settings/LeaveReminderSetting.tsx",
+        "components/settings/TravelSettingsPanel.tsx",
+        "lib/ui/leave-reminders.ts",
+        "app/api/travel/leave-reminders/route.ts",
+        "lib/services/leave-reminder-settings.service.ts",
+        "lib/db/leave-reminder-settings.repo.ts"
+      ],
+      "test_coverage": {
+        "level": "direct",
+        "references": [
+          "tests/travel-settings.dom.test.tsx",
+          "tests/leave-reminder-settings.test.ts"
+        ],
+        "notes": "Provider-free tests. The database trigger that deletes reminder rows on off is covered by tests/sql/ticket-275-leave-reminders-smoke.sql."
+      },
+      "platforms": {
+        "web": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/LeaveReminderSetting.tsx",
+            "app/api/travel/leave-reminders/route.ts"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/leave-reminder-settings.test.ts"
+          ],
+          "reason": "Shared Settings section; the hosted endpoint saves the switch under RLS as the signed-in user."
+        },
+        "desktop": {
+          "applicability": "applicable",
+          "status": "implemented",
+          "implementation": [
+            "components/settings/LeaveReminderSetting.tsx",
+            "apps/desktop/src/leave-reminders.ts",
+            "apps/desktop/src/product.tsx"
+          ],
+          "evidence": [
+            "tests/travel-settings.dom.test.tsx",
+            "tests/leave-reminder-settings.test.ts"
+          ],
+          "reason": "Same Settings section on a linked Mac, through the hosted endpoint with the account's bearer token. Nothing is stored in SQLite. Native leave reminders themselves arrive with Ticket 280."
+        },
+        "marketing": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Marketing cannot change authenticated reminder settings."
+        },
+        "mobile": {
+          "applicability": "not_applicable",
+          "status": "not_applicable",
+          "reason": "Native mobile implementation is deferred; mobile web inherits the shared Settings section, checked at 390 px."
         }
       }
     },

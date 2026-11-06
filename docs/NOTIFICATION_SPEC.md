@@ -466,6 +466,11 @@ ship, nothing reads or writes the new tables.
 
 - Off by default. One switch per account (Ticket 279). Leave reminders do not use
   the Behavior's `browser_reminder_enabled` or email settings.
+- The switch sits in Settings, How you travel, on web and on a linked Mac, and saves
+  through `/api/travel/leave-reminders`. It turns on only while Travel estimates is on and
+  can always turn off. Beside it, a readiness list shows this device's notification
+  state (in the Browser notifications device-state words), whether Home is saved, and
+  where the estimate starts.
 - The reminder time is the leave time minus the get-ready time from Travel habits
   (`travel-habit-defaults@1`; 10 minutes when nothing is learned). A get-ready time
   of 0 fires at the leave time. There is no separate minutes setting.

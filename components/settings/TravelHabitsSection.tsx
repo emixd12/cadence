@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Temporal } from "@js-temporal/polyfill";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import {
@@ -20,10 +20,12 @@ const SELECT = "min-h-11 min-w-0 border-0 border-b border-line bg-background";
  * Ticket 217: learned travel habits in plain words. Each inline choice saves at once
  * with its own revision; there are no separate buffer fields.
  */
-export function TravelHabitsSection({ settings, client, onSaved }: Readonly<{
+export function TravelHabitsSection({ settings, client, onSaved, children }: Readonly<{
   settings: TravelSettings;
   client: TravelSettingsClient;
   onSaved: (value: TravelSettings) => void;
+  /** Ticket 279: the leave reminder switch, last in How you travel. */
+  children?: ReactNode;
 }>) {
   const id = useId();
   const [pending, setPending] = useState(false);
@@ -81,5 +83,6 @@ export function TravelHabitsSection({ settings, client, onSaved }: Readonly<{
       </select> to <span className="[overflow-wrap:anywhere]">{placeLabel(entry.placeKey, entry.chosenAt)}</span>.</li>)}
     </ul> : <p className="text-muted-readable">No place has its own travel yet. Choose one in Calendar event or Behavior details on the Timeline.</p>}
     {message ? <p role="status">{message}</p> : null}
+    {children}
   </section>;
 }

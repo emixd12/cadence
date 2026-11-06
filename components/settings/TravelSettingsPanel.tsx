@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TravelMode, TravelSettings } from "@cadence/core/types/travel";
 import { SettingsPanel } from "./SettingsPanels";
 import { CompletionPlacesSection, PlaceMarkerControl } from "@/components/travel/PlaceLabels";
@@ -8,6 +8,9 @@ import { readBrowserForegroundLocation, readBrowserLocationPermission, type Fore
 import { notifyTravelSettingsChanged, webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import { TravelHabitsSection } from "./TravelHabitsSection";
 import { clearTravelLeaveMemory } from "@/lib/ui/travel-habits";
+import type { LeaveReminderDeviceNotifications } from "@cadence/core/services/departure-phrases";
+import { readWebDeviceNotifications, webLeaveReminderClient, type LeaveReminderClient } from "@/lib/ui/leave-reminders";
+import { LeaveReminderSetting } from "./LeaveReminderSetting";
 
 const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
   { value: "walking", label: "Walking" },
@@ -20,8 +23,14 @@ const TRAVEL_MODES: ReadonlyArray<{ value: TravelMode; label: string }> = [
  * Ticket 215: three inputs. The toggle records routing consent and asks for
  * foreground location in the same click; Home and usual travel save together.
  */
-export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false }: Readonly<{
+export function TravelSettingsPanel({ client = webTravelSettingsClient, readLocation = readBrowserForegroundLocation, readPermission = readBrowserLocationPermission, openLocationSettings, desktop = false,
+  leaveReminderClient = webLeaveReminderClient, readDeviceNotifications, vapidPublicKey = "" }: Readonly<{
   client?: TravelSettingsClient;
+  /** Ticket 279: the hosted leave reminder switch. Null hides it, as on an unlinked Mac. */
+  leaveReminderClient?: LeaveReminderClient | null;
+  /** Ticket 279: this device's notification state. Web reads the browser with `vapidPublicKey`. */
+  readDeviceNotifications?: () => Promise<LeaveReminderDeviceNotifications | null>;
+  vapidPublicKey?: string;
   readLocation?: (requestPermission: boolean) => Promise<ForegroundLocation>;
   readPermission?: () => Promise<LocationPermission>;
   /** Desktop only: opens System Settings › Privacy & Security › Location Services. */
@@ -112,6 +121,7 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
   const locationHelp = Boolean(settings?.enabled) && location !== "available" && (!locating || retrying)
     && (permission === "not yet allowed" || locationDenied || locationTimedOut);
   const permissionHint = permission && !locationHelp ? deviceLocationHint(permission, desktop) : null;
+  const readWebNotifications = useCallback(() => readWebDeviceNotifications(vapidPublicKey), [vapidPublicKey]);
   const changed = settings ? (home.trim() || null) !== settings.baseLocationText || (mode || null) !== settings.mode : false;
   return <SettingsPanel id="travel" title="Travel" description="Estimate travel time to located Calendar events and Behaviors. Travel never changes a schedule or status.">
     <div className="grid max-w-2xl gap-4 text-sm leading-6">
@@ -140,7 +150,10 @@ export function TravelSettingsPanel({ client = webTravelSettingsClient, readLoca
       </fieldset> : <p>Loading travel settings…</p>}
       {locating ? <p role="status">Checking device location…</p> : location ? <p role="status">{location === "available" ? "A current position is available. Cadence did not save it." : `Location ${location}. Estimates start from Home or your previous stop instead.${locationReason && (location === "unavailable" || location === "denied") ? ` Diagnostic: ${locationReason}.` : ""}`}</p> : null}
       {message ? <p role="status">{message}</p> : null}
-      {settings && client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={setSettings} /> : null}
+      {settings && client.saveHabits ? <TravelHabitsSection settings={settings} client={client} onSaved={setSettings}>
+        {leaveReminderClient ? <LeaveReminderSetting client={leaveReminderClient} readDeviceNotifications={readDeviceNotifications ?? readWebNotifications}
+          homeSaved={Boolean(settings.baseLocationText)} travelEnabled={settings.enabled} desktop={desktop} /> : null}
+      </TravelHabitsSection> : null}
       {/* Ticket 216: rendered only inside a PlaceLabelProvider. */}
       <CompletionPlacesSection />
     </div>

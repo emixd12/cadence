@@ -8,6 +8,8 @@ import type { TravelSettings } from "@cadence/core/types/travel";
 import { ExternalEventDetails } from "@/components/timeline/ExternalEventDetails";
 import { validateExternalEventSnapshot } from "@cadence/core/services/external-event-validation";
 import snapshotFixture from "./fixtures/external-event-snapshot.valid.json";
+import { LEAVE_REMINDER_SWITCH, type LeaveReminderDeviceNotifications } from "@cadence/core/services/departure-phrases";
+import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
 
 it("turns travel on in one click: consent and a foreground location request, no separate checkbox (Ticket 215)", async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -356,4 +358,88 @@ it.each([
     expect(buttonNamed(container, "Open Location Services")).toBeUndefined();
     expect(buttonNamed(container, "Check again")).toBeDefined();
   } finally { await unmount(); }
+});
+
+// Ticket 279 (decision D3): the leave reminder switch and its readiness list in How you travel.
+async function renderReminders(options: Readonly<{ settings?: TravelSettings; reminders?: Partial<LeaveReminderClient> | null; notifications?: LeaveReminderDeviceNotifications | null; desktop?: boolean }>) {
+  mockPermissions(null);
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const settings = options.settings ?? { ...travelOn, baseLocationText: "1 Example Street" };
+  const reminders = options.reminders === null ? null : { load: vi.fn(async () => ({ enabled: false })), save: vi.fn(async (enabled: boolean) => ({ enabled })), ...options.reminders };
+  const readDeviceNotifications = vi.fn(async () => options.notifications === undefined ? "enabled" as const : options.notifications);
+  const container = document.createElement("div"); document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<TravelSettingsPanel client={{ load: async () => settings, save: async () => settings, saveHabits: async () => settings }}
+    readLocation={vi.fn(async () => ({ state: "prompt" as const }))} desktop={options.desktop} leaveReminderClient={reminders} readDeviceNotifications={readDeviceNotifications} />));
+  const box = () => [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((input) => input.closest("label")?.textContent === LEAVE_REMINDER_SWITCH);
+  const readiness = () => container.querySelector('[aria-label="What reminders need"]');
+  return { container, reminders, readDeviceNotifications, box, readiness, unmount: async () => { await act(() => root.unmount()); container.remove(); } };
+}
+
+it("puts one off-by-default reminder switch in How you travel and saves it at once", async () => {
+  const view = await renderReminders({});
+  try {
+    const section = [...view.container.querySelectorAll("section")].find((element) => element.querySelector("h3")?.textContent === "How you travel")!;
+    expect(section.contains(view.box()!)).toBe(true);
+    expect(view.box()!.checked).toBe(false);
+    expect(view.box()!.disabled).toBe(false);
+    expect(view.readiness()?.textContent).toContain("Notifications: Enabled on this device.");
+    expect(view.readiness()?.textContent).toContain("Home: saved.");
+    expect(view.readiness()?.textContent).toContain("Reminders estimate from Home or your previous stop, never from this device's position.");
+    expect(view.container.textContent).toContain("For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.");
+    expect(view.box()!.getAttribute("aria-describedby")).toBe(view.readiness()!.parentElement!.id);
+    await act(async () => view.box()!.click());
+    expect(view.reminders!.save).toHaveBeenLastCalledWith(true);
+    expect(view.box()!.checked).toBe(true);
+    expect(view.container.textContent).toContain("Reminder setting saved.");
+    expect(view.readDeviceNotifications).toHaveBeenCalledTimes(2);
+    await act(async () => view.box()!.click());
+    expect(view.reminders!.save).toHaveBeenLastCalledWith(false);
+    expect(view.box()!.checked).toBe(false);
+  } finally { await view.unmount(); }
+});
+
+it("shows what reminders still need: notifications, Home and Travel estimates", async () => {
+  const view = await renderReminders({ settings: { ...travelOn, enabled: false, routingConsentAt: null }, notifications: "not_enabled" });
+  try {
+    expect(view.box()!.disabled).toBe(true);
+    const text = view.readiness()!.textContent;
+    expect(text).toContain("Turn on Travel estimates to use reminders.");
+    expect(text).toContain("Notifications: Not enabled on this device. Turn on notifications");
+    expect(text).toContain("Home: not saved. The day's first trip needs Home to get a reminder.");
+    expect(view.readiness()!.querySelector("a")?.getAttribute("href")).toBe("#notifications");
+  } finally { await view.unmount(); }
+  // A switch that is already on can still turn off while Travel estimates is off.
+  const on = await renderReminders({ settings: { ...travelOn, enabled: false, routingConsentAt: null }, reminders: { load: async () => ({ enabled: true }) } });
+  try { expect(on.box()!.checked).toBe(true); expect(on.box()!.disabled).toBe(false); } finally { await on.unmount(); }
+});
+
+it("keeps the stored value when loading or saving fails", async () => {
+  const failing = await renderReminders({ reminders: { save: vi.fn(async () => { throw new Error("offline"); }) } });
+  try {
+    await act(async () => failing.box()!.click());
+    expect(failing.box()!.checked).toBe(false);
+    expect(failing.container.textContent).toContain("The reminder setting could not save.");
+  } finally { await failing.unmount(); }
+  const unloaded = await renderReminders({ reminders: { load: async () => { throw new Error("offline"); } } });
+  try {
+    expect(unloaded.box()!.disabled).toBe(true);
+    expect(unloaded.container.textContent).toContain("The reminder setting could not load.");
+  } finally { await unloaded.unmount(); }
+});
+
+it("names the Mac's start and System Settings on a linked Mac, and hides the switch on an unlinked one", async () => {
+  const linked = await renderReminders({ desktop: true, notifications: "blocked" });
+  try {
+    expect(linked.readiness()!.textContent).toContain("Notifications: Blocked in System Settings.");
+    expect(linked.readiness()!.textContent).toContain("This Mac reminds from its last estimate");
+    expect(linked.readiness()!.textContent).not.toContain("never from this device's position");
+  } finally { await linked.unmount(); }
+  const checking = await renderReminders({ desktop: true, notifications: null });
+  try { expect(checking.readiness()!.textContent).not.toContain("Notifications:"); } finally { await checking.unmount(); }
+  const unlinked = await renderReminders({ desktop: true, reminders: null });
+  try {
+    expect(unlinked.box()).toBeUndefined();
+    expect(unlinked.container.textContent).not.toContain("For now, only Google Calendar events");
+  } finally { await unlinked.unmount(); }
 });

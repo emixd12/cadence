@@ -16456,7 +16456,11 @@ Verification: `npx vitest run` on the push and reminder service tests,
 
 ## Ticket 279: Reminder setting and readiness list
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alongside
+Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
+saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
+token). It cannot turn on while Travel estimates is off. The twelve new phrases wait for
+the owner (D7). The Mac posts no leave reminder until Ticket 280.
 Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
@@ -16484,7 +16488,7 @@ Platform impact:
 | Marketing | Not applicable until release. P-016 logs the text changes. |
 | Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
 
-Messaging impact: P-016.
+Messaging impact: P-016, P-024.
 
 Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
 `npm run interactions:check`, `npm run design-system:check`, bench at both widths.
