@@ -49,6 +49,31 @@ describe("planLeaveReminderVisit", () => {
     expect(plan([record({ routeCount: 0 })]).work[0]?.step).toBe("plan");
   });
 
+  it("moves a planned pending check by a get-ready change, without a route", () => {
+    // Planned at 10 minutes of get-ready time for a 14:00Z leave time: check 13:50Z.
+    const planned = record({ routeCount: 1, nextCheckAt: "2026-11-06T13:50:00Z", plannedPreparationMinutes: 10 });
+    const later = { ...planned, nextCheckAt: "2026-11-06T17:50:00Z" };
+    const result = planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: 60 * 60, records: [later], trips: [trip] });
+    expect(result.reschedule).toEqual([{ record: later, nextCheckAt: "2026-11-06T17:00:00Z", preparationMinutes: 60 }]);
+    expect(result.work).toEqual([]);
+    // Unchanged get-ready time: the check stays.
+    expect(plan([{ ...later, plannedPreparationMinutes: 10 }]).reschedule).toEqual([]);
+    // A record that does not say what it used stays where it is.
+    expect(planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: 60 * 60,
+      records: [{ ...later, plannedPreparationMinutes: null }], trips: [trip] }).reschedule).toEqual([]);
+  });
+
+  it("works a pending record at once when its moved check is already due, and holds one moved later", () => {
+    const planned = record({ routeCount: 1, nextCheckAt: "2026-11-06T15:30:00Z", plannedPreparationMinutes: 10 });
+    const grown = planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: 60 * 60, records: [planned], trips: [trip] });
+    expect(grown.work).toEqual([{ record: planned, trip, step: "send" }]);
+    expect(grown.reschedule).toEqual([]);
+    const dueOld = record({ routeCount: 1, nextCheckAt: "2026-11-06T15:02:00Z", plannedPreparationMinutes: 30 });
+    const shrunk = planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: 0, records: [dueOld], trips: [trip] });
+    expect(shrunk.work).toEqual([]);
+    expect(shrunk.reschedule).toEqual([{ record: dueOld, nextCheckAt: "2026-11-06T15:32:00Z", preparationMinutes: 0 }]);
+  });
+
   it("leaves a record another run holds, and takes over a stale claim", () => {
     expect(plan([record({ processingStartedAt: "2026-11-06T14:50:00Z" })]).work).toEqual([]);
     expect(plan([record({ processingStartedAt: "2026-11-06T14:45:00Z" })]).work).toHaveLength(1);

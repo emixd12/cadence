@@ -47,7 +47,8 @@ class MemoryStore implements LeaveReminderStore {
     if (!this.enabled) return null;
     if ([...this.rows.values()].some((row) => row.tripDigest === input.tripDigest && row.localDate === input.localDate)) return null;
     const row = { id: `r${this.nextId++}`, tripDigest: input.tripDigest, localDate: input.localDate, status: "pending" as const,
-      nextCheckAt: input.now, routeCount: 0, processingStartedAt: input.now, sentAt: null, updateSentAt: null, error: null };
+      nextCheckAt: input.now, routeCount: 0, processingStartedAt: input.now, sentAt: null, updateSentAt: null, error: null,
+      plannedPreparationMinutes: null };
     this.rows.set(row.id, row);
     return this.strip(row);
   }
@@ -80,7 +81,8 @@ class MemoryStore implements LeaveReminderStore {
   }
   private strip(row: LeaveReminderRecord & { error: string | null }): LeaveReminderRecord {
     return { id: row.id, tripDigest: row.tripDigest, localDate: row.localDate, status: row.status, nextCheckAt: row.nextCheckAt,
-      routeCount: row.routeCount, processingStartedAt: row.processingStartedAt, sentAt: row.sentAt, updateSentAt: row.updateSentAt };
+      routeCount: row.routeCount, processingStartedAt: row.processingStartedAt, sentAt: row.sentAt, updateSentAt: row.updateSentAt,
+      plannedPreparationMinutes: row.plannedPreparationMinutes ?? null };
   }
   private write(row: LeaveReminderRecord & { error: string | null }, patch: LeaveReminderRecordPatch) {
     const next = {
@@ -92,7 +94,9 @@ class MemoryStore implements LeaveReminderStore {
       ...(patch.sent_at !== undefined ? { sentAt: patch.sent_at } : {}),
       ...(patch.update_sent_at !== undefined ? { updateSentAt: patch.update_sent_at } : {}),
       ...(patch.error !== undefined ? { error: patch.error } : {}),
+      ...(patch.planned_preparation_minutes !== undefined ? { plannedPreparationMinutes: patch.planned_preparation_minutes } : {}),
     };
+    if (next.plannedPreparationMinutes != null && (next.plannedPreparationMinutes < 0 || next.plannedPreparationMinutes > 60)) throw new Error("preparation");
     // The migration's checks and guard trigger.
     if (next.routeCount > 3 || next.routeCount < row.routeCount) throw new Error("route_count");
     if (next.routeCount === 3 && next.status !== "sent") throw new Error("third_route_after_send");
@@ -131,12 +135,13 @@ function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: n
   const store = options.store ?? new MemoryStore();
   const world: World = { trips: [tripFor("event-1", EVENT_START)], leaveAt: new Map([["event-1", "2026-11-06T17:20:00Z"]]),
     budgetRefused: false, updatePaused: false, routeThrows: false, titleGone: false, routes: [] };
+  const preparation = { seconds: options.preparationSeconds ?? PREP_SECONDS };
   const sent: LeaveReminderMessage[] = [];
   const deliver = vi.fn<LeaveReminderDelivery>(async (_caller, message) => { sent.push(message); return { status: "sent" }; });
   const port = (): LeaveReminderAccountPort => ({
     caller: { userId: USER_ID } as LeaveReminderCaller,
     store,
-    readContext: async () => ({ timezone: TZ, preparationSeconds: options.preparationSeconds ?? PREP_SECONDS, travelOn: true, habitsUpdatedAt: null }),
+    readContext: async () => ({ timezone: TZ, preparationSeconds: preparation.seconds, travelOn: true, habitsUpdatedAt: null }),
     listTrips: async () => world.trips,
     routeTrips: async (_localDate, trips) => {
       if (world.routeThrows) throw new Error("provider_unavailable");
@@ -159,7 +164,7 @@ function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: n
     const account = { userId: USER_ID, nextCheckAt: store.accountNextCheckAt ?? at };
     return visitLeaveReminderAccount(port(), account, Temporal.Instant.from(at), deliver);
   };
-  return { store, world, sent, deliver, port, visit };
+  return { store, world, sent, deliver, port, visit, preparation };
 }
 
 const only = (store: MemoryStore) => {
@@ -394,6 +399,63 @@ describe("processLeaveReminders", () => {
     expect(result.selected).toBe(3);
     expect(result.skipped + result.failed).toBe(3);
     expect(result.skipped).toBeGreaterThan(0);
+  });
+});
+
+describe("get-ready change before the reminder sends (Codex review, Ticket 277)", () => {
+  // Leave time 17:20Z. Planned with 10 minutes of get-ready time, the check is 17:10Z.
+  it("moves the pending check to the new reminder time without a route, then sends at it", async () => {
+    const { store, world, sent, visit, preparation } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T17:10:00Z", plannedPreparationMinutes: 10 });
+
+    preparation.seconds = 60 * 60;
+    await visit("2026-11-06T15:30:00Z");
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T16:20:00Z", plannedPreparationMinutes: 60 });
+    expect(world.routes).toHaveLength(1);
+    expect(store.accountNextCheckAt).toBe("2026-11-06T16:00:00Z");
+
+    await visit("2026-11-06T16:16:00Z");
+    expect(sent.map((message) => [message.kind, message.leaveAt])).toEqual([["reminder", "2026-11-06T17:20:00Z"]]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2, sentAt: "2026-11-06T16:16:00Z" });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("sends at once when the moved reminder time has passed but the leave time is ahead", async () => {
+    const { store, world, sent, visit, preparation } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    preparation.seconds = 60 * 60;
+    await visit("2026-11-06T16:40:00Z");
+    expect(sent.map((message) => [message.kind, message.leaveAt])).toEqual([["reminder", "2026-11-06T17:20:00Z"]]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2 });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("moves the check later when get-ready time shrinks, so the reminder does not fire early", async () => {
+    const { store, world, sent, visit, preparation } = harness({ preparationSeconds: 30 * 60 });
+    await visit("2026-11-06T15:00:00Z");
+    expect(only(store).nextCheckAt).toBe("2026-11-06T16:50:00Z");
+    preparation.seconds = 0;
+    await visit("2026-11-06T16:47:00Z");
+    expect(sent).toEqual([]);
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T17:20:00Z", plannedPreparationMinutes: 0 });
+    expect(world.routes).toHaveLength(1);
+    await visit("2026-11-06T17:16:00Z");
+    expect(sent).toHaveLength(1);
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("never routes a trip more than three times across a get-ready change", async () => {
+    const { store, world, sent, visit, preparation } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    preparation.seconds = 60 * 60;
+    await visit("2026-11-06T15:30:00Z");
+    await visit("2026-11-06T16:16:00Z");
+    world.leaveAt.set("event-1", "2026-11-06T17:05:00Z");
+    for (const at of ["2026-11-06T16:21:00Z", "2026-11-06T16:26:00Z", "2026-11-06T16:31:00Z", "2026-11-06T16:36:00Z"]) await visit(at);
+    expect(world.routes.length).toBeLessThanOrEqual(3);
+    expect(only(store).routeCount).toBeLessThanOrEqual(3);
+    expect(sent.length).toBeLessThanOrEqual(2);
   });
 });
 

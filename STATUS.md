@@ -1,5 +1,19 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Codex review fixes for leave reminders — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106070000_leave_reminder_planned_preparation.sql` is not applied anywhere yet; the
+hosted push waits for the owner.**
+
+- Fixed (Ticket 277): a get-ready change after the plan route left a pending web reminder at
+  the old time. Each pending record keeps the get-ready minutes its check used, and the job
+  moves the check by the difference with no route. A moved check already due sends at once
+  while the leave time is ahead. The three-route cap and the budget rules are unchanged.
+- Fixed (Ticket 280): turning Travel estimates off, or changing the get-ready time, in Mac
+  Settings now reconciles native leave reminders at once, with the Timeline closed.
+- Messaging impact: none.
+
 ## Travel advisory revamp Wave 4: final checks on the leave reminder job — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. New migration

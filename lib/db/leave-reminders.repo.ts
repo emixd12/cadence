@@ -59,7 +59,7 @@ export async function readTravelPreparationChangedAt(client: AppSupabaseClient, 
 // route or send one reminder.
 
 const LEAVE_REMINDER_COLUMNS =
-  "id, trip_digest, local_date, status, next_check_at, route_count, processing_started_at, sent_at, update_sent_at";
+  "id, trip_digest, local_date, status, next_check_at, route_count, processing_started_at, sent_at, update_sent_at, planned_preparation_minutes";
 
 type LeaveReminderRow = Readonly<{
   id: string;
@@ -71,6 +71,7 @@ type LeaveReminderRow = Readonly<{
   processing_started_at: string | null;
   sent_at: string | null;
   update_sent_at: string | null;
+  planned_preparation_minutes: number | null;
 }>;
 
 /** The fields the job may change on a claimed record. */
@@ -82,6 +83,7 @@ export type LeaveReminderRecordPatch = Partial<Readonly<{
   sent_at: string;
   update_sent_at: string;
   error: string | null;
+  planned_preparation_minutes: number | null;
 }>>;
 
 export type LeaveReminderStore = Readonly<{
@@ -192,5 +194,6 @@ function toRecord(row: LeaveReminderRow): LeaveReminderRecord {
     processingStartedAt: row.processing_started_at,
     sentAt: row.sent_at,
     updateSentAt: row.update_sent_at,
+    plannedPreparationMinutes: row.planned_preparation_minutes,
   };
 }

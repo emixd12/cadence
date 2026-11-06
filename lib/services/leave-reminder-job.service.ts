@@ -3,6 +3,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import {
   LEAVE_REMINDER_CLAIM_STALE_SECONDS,
   LEAVE_REMINDER_LOOKAHEAD_SECONDS,
+  leaveReminderPreparationMinutes,
   leaveReminderStaleClaimBefore,
   leaveReminderTripDigest,
   nextLeaveReminderAccountCheck,
@@ -190,6 +191,10 @@ export async function visitLeaveReminderAccount(
     for (const record of plan.closeCheck) {
       await store.updateUnclaimed(record, staleBefore, { next_check_at: null, processing_started_at: null });
     }
+    // The get-ready time changed after the plan route: the check moves with no route.
+    for (const { record, nextCheckAt, preparationMinutes } of plan.reschedule) {
+      await store.updateUnclaimed(record, staleBefore, { next_check_at: nextCheckAt, planned_preparation_minutes: preparationMinutes });
+    }
 
     const claimed: Claimed[] = [];
     for (const trip of plan.create) {
@@ -272,7 +277,8 @@ async function applyRoute(
 
   switch (outcome.kind) {
     case "schedule":
-      await store.finish(record, { next_check_at: outcome.nextCheckAt, route_count: routeCount, processing_started_at: null });
+      await store.finish(record, { next_check_at: outcome.nextCheckAt, route_count: routeCount, processing_started_at: null,
+        planned_preparation_minutes: leaveReminderPreparationMinutes(input.preparationSeconds) });
       return "planned";
     case "fail":
       await store.finish(record, { status: "failed", error: outcome.error, next_check_at: null, route_count: routeCount, processing_started_at: null });

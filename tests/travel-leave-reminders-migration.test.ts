@@ -60,3 +60,15 @@ describe("get-ready change time (Ticket 277, Wave 4 final check)", () => {
     expect(sync).not.toContain("preparation_changed_at");
   });
 });
+
+describe("planned get-ready time (Ticket 277, Codex review)", () => {
+  const plannedMigration = resolve(process.cwd(), "supabase/migrations/20261106070000_leave_reminder_planned_preparation.sql");
+
+  it("keeps only whole get-ready minutes, so a pending check can move without a route", async () => {
+    const sql = await readFile(plannedMigration, "utf8");
+    expect(sql).toContain("add column planned_preparation_minutes smallint");
+    expect(sql).toContain("check (planned_preparation_minutes is null or planned_preparation_minutes between 0 and 60)");
+    const code = sql.replace(/^\s*--.*$/gm, "");
+    expect(code).not.toMatch(/title|location|latitude|longitude|place_id|address|duration|leave_at|arrive|account_sync|grant/i);
+  });
+});

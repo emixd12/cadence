@@ -466,6 +466,7 @@ create table travel_leave_reminders (
   sent_at timestamptz,
   update_sent_at timestamptz,  -- the one update (D15); set once
   error text,                  -- ^[a-z][a-z0-9_]{0,63}$
+  planned_preparation_minutes smallint,  -- 0–60; get-ready minutes the pending check used
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, trip_digest, local_date),
@@ -481,6 +482,11 @@ create table travel_leave_reminders (
   (Ticket 217's `travelEventRef`) and its start instant. A moved event is therefore a
   new trip. The rows hold no title, place, position, route duration, leave time or
   provider result. `error` accepts only a short code, so free text cannot be stored.
+- `planned_preparation_minutes` (migration
+  `20261106070000_leave_reminder_planned_preparation.sql`) is the get-ready time, in
+  whole minutes, that the plan route used for a pending check. When the get-ready time
+  changes before sending, the job moves the check by the difference without a route.
+  Null on rows planned before the column; their check stays where it is.
 - Shape checks: `pending` needs `next_check_at` and no `sent_at`; `sent` needs
   `sent_at`; `failed` needs `error`. A `sent` row may keep `next_check_at` for the
   update route and be claimed only while it does; once `update_sent_at` is set it has

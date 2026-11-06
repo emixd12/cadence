@@ -42,6 +42,11 @@ export type LeaveReminderRecord = Readonly<{
   processingStartedAt: string | null;
   sentAt: string | null;
   updateSentAt: string | null;
+  /**
+   * The get-ready time, in minutes, the plan route used for a pending record's check.
+   * Null for a record planned before it was kept; such a check stays where it is.
+   */
+  plannedPreparationMinutes?: number | null;
 }>;
 
 /** A trip the current plan has: a located destination on the local date, not the trip home. */
@@ -59,6 +64,11 @@ export type LeaveReminderVisitPlan = Readonly<{
   create: readonly LeaveReminderTrip[];
   /** Cancelled records, never routed, whose trip came back: make them pending, then plan. */
   restore: ReadonlyArray<Readonly<{ record: LeaveReminderRecord; trip: LeaveReminderTrip }>>;
+  /**
+   * Pending records whose get-ready time changed after the plan route: the check moves
+   * by the difference, with no route. A moved check that is already due is in `work`.
+   */
+  reschedule: ReadonlyArray<Readonly<{ record: LeaveReminderRecord; nextCheckAt: string; preparationMinutes: number }>>;
   /** Existing records due now. */
   work: ReadonlyArray<Readonly<{ record: LeaveReminderRecord; trip: LeaveReminderTrip; step: LeaveReminderStep }>>;
   /** Pending records whose trip was dropped or whose date has passed. */
@@ -128,6 +138,7 @@ export function planLeaveReminderVisit(input: Readonly<{
   const recorded = new Set<string>();
   const restore: Array<{ record: LeaveReminderRecord; trip: LeaveReminderTrip }> = [];
   const work: Array<{ record: LeaveReminderRecord; trip: LeaveReminderTrip; step: LeaveReminderStep }> = [];
+  const reschedule: Array<{ record: LeaveReminderRecord; nextCheckAt: string; preparationMinutes: number }> = [];
   const cancel: LeaveReminderRecord[] = [];
   const closeCheck: LeaveReminderRecord[] = [];
   const due = (at: string | null) => !!at && Temporal.Instant.compare(Temporal.Instant.from(at), dueBy) <= 0;
@@ -151,7 +162,13 @@ export function planLeaveReminderVisit(input: Readonly<{
       continue;
     }
     if (record.status === "pending") {
-      if (due(record.nextCheckAt)) work.push({ record, trip, step: record.routeCount === 0 ? "plan" : "send" });
+      const moved = movedPendingCheck(record, input.preparationSeconds);
+      if (moved && !due(moved)) {
+        reschedule.push({ record, nextCheckAt: moved, preparationMinutes: leaveReminderPreparationMinutes(input.preparationSeconds) });
+        continue;
+      }
+      // A moved check that is already due sends now through the send route, while the leave time is ahead.
+      if (due(moved ?? record.nextCheckAt)) work.push({ record, trip, step: record.routeCount === 0 ? "plan" : "send" });
       continue;
     }
     if (openCheck && (habitsChangedAfter(input.habitsUpdatedAt, record.sentAt) || preparationChangedAfter(input.preparationChangedAt, record.sentAt))) {
@@ -166,7 +183,24 @@ export function planLeaveReminderVisit(input: Readonly<{
   }
 
   const create = input.trips.filter((trip) => !recorded.has(trip.digest));
-  return { localDate, create, restore, work, cancel, closeCheck, purgeBefore };
+  return { localDate, create, restore, reschedule, work, cancel, closeCheck, purgeBefore };
+}
+
+/** The get-ready time a record keeps, in whole minutes as Travel habits store it. */
+export function leaveReminderPreparationMinutes(preparationSeconds: number): number {
+  return Math.max(0, Math.round(preparationSeconds / 60));
+}
+
+/**
+ * A planned pending check is the leave time minus the get-ready time the plan route used.
+ * When the get-ready time has changed since, the same leave time gives the check moved by
+ * the difference. Null when nothing moved or the record does not say what it used.
+ */
+function movedPendingCheck(record: LeaveReminderRecord, preparationSeconds: number): string | null {
+  if (record.routeCount === 0 || !record.nextCheckAt || record.plannedPreparationMinutes == null) return null;
+  const current = leaveReminderPreparationMinutes(preparationSeconds);
+  if (record.plannedPreparationMinutes === current) return null;
+  return Temporal.Instant.from(record.nextCheckAt).add({ minutes: record.plannedPreparationMinutes - current }).toString();
 }
 
 function habitsChangedAfter(habitsUpdatedAt: string | null | undefined, sentAt: string | null): boolean {

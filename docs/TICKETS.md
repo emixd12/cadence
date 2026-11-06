@@ -16387,6 +16387,9 @@ check, November 6, 2026: migration `20261106060000_travel_preparation_changed_at
 so a Mac clock or a late offline sync can only suppress an update, never send a false one.
 A routing failure after partial spend is retried through the shared refresh, which
 reserves again before every provider call, so spend stays under the monthly ceiling.
+Codex review fix, November 6, 2026: migration
+`20261106070000_leave_reminder_planned_preparation.sql` keeps the get-ready minutes a
+pending check used, so a later get-ready change moves the check without a route.
 Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
 
 Goal: check each opted-in account and send a reminder at the right time.

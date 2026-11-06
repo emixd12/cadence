@@ -1527,6 +1527,7 @@ export type Database = {
           id: string
           local_date: string
           next_check_at: string | null
+          planned_preparation_minutes: number | null
           processing_started_at: string | null
           route_count: number
           sent_at: string | null
@@ -1542,6 +1543,7 @@ export type Database = {
           id?: string
           local_date: string
           next_check_at?: string | null
+          planned_preparation_minutes?: number | null
           processing_started_at?: string | null
           route_count?: number
           sent_at?: string | null
@@ -1557,6 +1559,7 @@ export type Database = {
           id?: string
           local_date?: string
           next_check_at?: string | null
+          planned_preparation_minutes?: number | null
           processing_started_at?: string | null
           route_count?: number
           sent_at?: string | null

@@ -495,7 +495,11 @@ ship, nothing reads or writes the new tables.
 - The job routes each trip at most three times (decision D15), and each route
   reserves spend first:
   1. The plan route runs at the first visit that sees the trip on its local date. It
-     sets the trip's next check time to the reminder time.
+     sets the trip's next check time to the reminder time, and keeps the get-ready
+     minutes it used. If the get-ready time changes before the reminder sends, the job
+     moves the check by the difference at its next visit, with no route, so the
+     reminder fires at the new reminder time. If the moved check is already due, the
+     send route runs at once and sends while the leave time is still ahead.
   2. The send route runs at that check. The notification uses its estimate, read in
      memory, and sends at once, even if the new reminder time is a little later. If
      the leave time it named is more than 4 minutes ahead, the send keeps one more
@@ -618,9 +622,11 @@ reminders' web push sender with its own options. Behavior reminders are unchange
 - The Mac app schedules a native notification from its last estimate, so it fires
   with Cadence quit. The text names the estimate time, because a quit app cannot
   re-route. It adds no background helper and makes no route call of its own.
-- Reconcile on launch, resume, local day change and each travel update. A new
-  estimate before the reminder fires replaces the scheduled notification; that is
-  not an update.
+- Reconcile on launch, resume, local day change, each travel update and each saved
+  travel setting, including from Settings with the Timeline closed. A new estimate
+  before the reminder fires replaces the scheduled notification; that is not an update.
+  A changed get-ready time moves a pending notification to the leave time minus the new
+  get-ready time, and one already past fires at once while the leave time is ahead.
 - After a reminder fires, if a later estimate from the app's own refreshes moves
   the leave time 10 minutes or more earlier, and the leave time is still ahead, the
   app posts one update. It posts no second update.
@@ -630,7 +636,7 @@ reminders' web push sender with its own options. Behavior reminders are unchange
 - The Mac reads the hosted preference on a linked account. An unlinked Mac has no
   hosted travel and no leave reminders. Travel estimates off on the Mac also means no
   leave reminders. Turning either off, signing out or changing account removes every
-  pending and delivered leave reminder.
+  pending and delivered leave reminder at once.
 - The Mac reminds only for trips with a known leave time still ahead, toward a Calendar
   event or a Behavior; never for the trip home. A reminder whose time has passed when
   the Mac first knows the trip fires at once (10 seconds later).
