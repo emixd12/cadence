@@ -192,10 +192,11 @@ Ticket 267 replaced the earlier draft rows with the refresh plan's counts, Novem
 is 180 of the 240 typical legs today. The trip refreshes and reminders spend most of it
 again. Decision D15's third reminder route (November 6, 2026) adds 8, 40 and 104 legs, one
 per trip. The heavy upper bound, US$6.61, now passes both today's figure and the US$5
-ceiling. Automatic refreshes stop at US$4.00, 80% of the ceiling. Reminder routes continue
-until the ceiling, where the reservation refuses them and the reminder fails with
-`budget_refused`. Spend therefore stays at or under US$5, but a heavy driving user can lose
-reminders and updates near month end.
+ceiling. Automatic refreshes stop at US$4.00, 80% of the ceiling. So does the reminder update
+route (decision D16, Ticket 277): from 80% the job closes the check without a call. The plan
+and send routes continue until the ceiling, where the reservation refuses them and the
+reminder fails with `budget_refused`. Spend therefore stays at or under US$5, but a heavy
+driving user can lose updates from 80% and reminders near month end.
 
 Measured with a fake clock through the real client hook and the real hosted service
 (`tests/travel-refresh-day.dom.test.tsx`, Ticket 268, November 5, 2026; provider, database and
@@ -253,8 +254,13 @@ Assumptions and limits:
   send, and one after sending to check for the update (decision D15, Ticket 275, November
   6, 2026). Trips per month are the planned legs less the trip home, which gets no
   reminder: 8, 40 and 104. The third call is skipped when the named leave time has passed
-  by its check, so this is close to an upper bound. The database refuses a fourth route
-  per trip. The Mac's update makes no call of its own.
+  by its check, and from 80% of the monthly ceiling (decision D16), so this is close to an
+  upper bound. The database refuses a fourth route per trip. The Mac's update makes no call
+  of its own.
+- Ticket 277's job lists an account's trips at most every 30 minutes with a request that
+  names no planned trip, so the listing makes no route call. A place lookup it needs is the
+  same one the Timeline makes, reserved first and kept for a year. The job routes only the
+  trips due. Each visit also re-reads Calendar, which costs nothing per call.
 - Not counted yet: tomorrow's first trip (Ticket 282) and Outlook and iCloud legs
   (Ticket 283). Each ticket adds its own count.
 - Ticket 264 adds two kinds of route call, both assumed and not in the table:
@@ -457,6 +463,9 @@ arrives, fees reduce the US$5:
   routes each trip up to three times, so its row rose from 16, 80 and 208 legs to 24, 120
   and 312, and the proposed totals to US$0.33–0.67, US$1.40–2.82 and US$3.32–6.61 a month
   (Ticket 275).
+- 2026-11-06: Decision D16 stops the reminder update route at 80% of the monthly ceiling,
+  like automatic refreshes (Ticket 277). The proposed totals are unchanged as upper bounds.
+  The listing request makes no route call.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

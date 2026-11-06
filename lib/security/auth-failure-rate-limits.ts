@@ -19,6 +19,12 @@ export const occurrenceSyncAuthFailureLimiter = new InMemoryRateLimiter({
   windowMs: AUTH_FAILURE_WINDOW_MS,
 });
 
+/** Ticket 277: the leave reminder job's cron route. */
+export const leaveReminderProcessAuthFailureLimiter = new InMemoryRateLimiter({
+  maxAttempts: AUTH_FAILURE_LIMIT,
+  windowMs: AUTH_FAILURE_WINDOW_MS,
+});
+
 export function buildAuthFailureRateLimitKey(
   scope: string,
   headers: Pick<Headers, "get">,
@@ -30,6 +36,7 @@ export function resetAuthFailureRateLimitersForTests(): void {
   pushSubscribeAuthFailureLimiter.clear();
   reminderProcessAuthFailureLimiter.clear();
   occurrenceSyncAuthFailureLimiter.clear();
+  leaveReminderProcessAuthFailureLimiter.clear();
 }
 
 export function getClientIp(headers: Pick<Headers, "get">): string {

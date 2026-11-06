@@ -1669,3 +1669,21 @@ Platform impact: web through the hosted job (Tickets 277 and 278). Desktop: unch
 Mac still sends its one update from its own estimates (Ticket 280). Marketing: not applicable
 until release. Future mobile: the hosted contract is portable; native mobile is deferred.
 Messaging impact: P-016 note.
+
+## 2026-11-06: The leave reminder update estimate stops at 80% of the budget (D16)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator, while Ticket 277
+was being built:
+
+1. The update estimate after a leave reminder is sent stops at 80% of the monthly travel
+   budget, like automatic refreshes (Ticket 267, decision D11).
+2. The plan and send estimates continue to the ceiling, so first reminders keep the
+   remaining budget.
+
+Ticket 277 implements it: from 80% the job closes the post-send check with `budget_paused`
+and makes no route call (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). `docs/COSTS.md`
+records it. It answers the Ticket 275 verifier's open question about the update route.
+
+Platform impact: web through the hosted job (Ticket 277). Desktop: not applicable; the Mac
+makes no route call for reminders (Ticket 280). Marketing: not applicable. Future mobile:
+the hosted contract is portable; native mobile is deferred. Messaging impact: none.

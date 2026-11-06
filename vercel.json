@@ -8,6 +8,10 @@
     {
       "path": "/api/occurrences/sync",
       "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/travel/leave-reminders/process",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
