@@ -16681,6 +16681,14 @@ shape. `lib/services/travel-calendar-sources.ts` reads and fences all three Cale
 Outlook drops an online meeting's placeholder location. The Daily Brief's signed conclusions
 stay Google-only, so a plan with an Outlook or iCloud stop carries none. The Ticket 279
 Google-only line is removed. No cost table change.
+Verifier fix (November 6, 2026): a failed Outlook or iCloud read (a connector error other
+than `invalid_request`) now leaves that Calendar out of the request and routes the others, as
+before this ticket; the final revision check reads the same Calendars, and such a plan carries
+no signed conclusions. A failed Google read still fails the request.
+Known limit: on a day with an Outlook or iCloud stop, or with one of those Calendars left out,
+the Daily Brief gets no signed travel conclusions and shows its travel block without them.
+Covering those stops needs the brief verifier to accept Outlook and iCloud event refs, only
+when the brief's own Outlook or iCloud disclosure is on; that is follow-up work.
 Dependencies: Tickets 281, 277 and 279. Decision D4.
 
 Goal: people whose events are not in Google Calendar get leave times too (G6).

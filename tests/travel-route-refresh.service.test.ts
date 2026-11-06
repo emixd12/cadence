@@ -34,6 +34,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
+import { ConnectorError } from "@/lib/types/connectors";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import {
   TRAVEL_LEG_READY_AFTER_END,
@@ -1185,12 +1186,35 @@ describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () =
     expect(legs(result)).toEqual([["outbound", null, "outlook_calendar/o1"], ["return", "outlook_calendar/o1", null]]);
   });
 
-  it("fails the request before any spend when a connected Calendar cannot be read, as Google always did", async () => {
+  it("leaves out an Outlook or iCloud Calendar that cannot be read and routes the others, with no brief token", async () => {
+    const secret = "s".repeat(64);
     setUp({ google: [google], icloud: [icloud] });
-    mocks.icloudEvents.mockRejectedValue(Object.assign(new Error("rate_limited"), { code: "rate_limited" }));
+    mocks.icloudEvents.mockRejectedValue(new ConnectorError("rate_limited"));
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+    expect(legs(result)).toEqual([["outbound", null, "g1"], ["return", "g1", null]]);
+    // The final check does not read the left-out Calendar again.
+    expect(mocks.icloudEvents).toHaveBeenCalledTimes(1);
+    expect(mocks.events).toHaveBeenCalledTimes(2);
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("still fails before any spend on an invalid Outlook or iCloud request, a non-connector error, or a Google failure", async () => {
+    for (const failure of [new ConnectorError("invalid_request"), new Error("boom")]) {
+      setUp({ google: [google], outlook: [outlook] });
+      mocks.outlookEvents.mockRejectedValue(failure);
+      await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toBe(failure);
+    }
+    setUp({ google: [google], outlook: [outlook] });
+    mocks.events.mockRejectedValue(Object.assign(new Error("rate_limited"), { code: "rate_limited" }));
     await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ code: "rate_limited" });
     expect(mocks.spend).not.toHaveBeenCalled();
     expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("fails when a Calendar read at the start fails in the final check", async () => {
+    setUp({ google: [google], icloud: [icloud] });
+    mocks.icloudEvents.mockResolvedValueOnce(snapshot([icloud])).mockRejectedValueOnce(new ConnectorError("timeout"));
+    await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ code: "timeout" });
   });
 
   it("withdraws the refresh when an Outlook connection or an iCloud event changes during it", async () => {

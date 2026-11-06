@@ -1,6 +1,6 @@
 import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import type { CalendarConnectionView } from "@/lib/types/google-calendar";
-import type { ConnectorConnectionView } from "@/lib/types/connectors";
+import { ConnectorError, type ConnectorConnectionView } from "@/lib/types/connectors";
 import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
 import { getIcloudCalendarConnection, getIcloudCalendarEvents } from "@/lib/services/icloud-calendar.service";
 import { getOutlookCalendarConnection, getOutlookCalendarEvents } from "@/lib/services/outlook-calendar.service";
@@ -10,15 +10,19 @@ import type { TravelRouteRefreshRequest } from "@/lib/services/travel-route-requ
 /**
  * Ticket 283 (decision D4): the Calendars travel reads, Google, Outlook and iCloud, under one
  * rule. A connected Calendar is read for the requested dates, through `readTravelCalendarRange`
- * so a `first_trip` read starts today (Ticket 282). A failed read fails the request,
- * as the Google read always did. Outlook and iCloud read event locations only here and in the
- * Timeline's own read. Locations stay in memory for this request; nothing about an event is stored.
+ * so a `first_trip` read starts today (Ticket 282). A failed Google read fails the request, as it
+ * always did. A failed Outlook or iCloud read leaves that Calendar out of this request, so an
+ * outage there routes the other Calendars as before Ticket 283; an invalid request still fails.
+ * Outlook and iCloud read event locations only here and in the Timeline's own read. Locations
+ * stay in memory for this request; nothing about an event is stored.
  */
 export type TravelCalendarConnections = Readonly<{
   google: CalendarConnectionView;
   outlook: ConnectorConnectionView;
   icloud: ConnectorConnectionView;
 }>;
+
+export type TravelConnectorName = "outlook" | "icloud";
 
 export type TravelCalendarEvents = Readonly<{
   /** The Google snapshot's events. The Daily Brief's signed conclusions name only these. */
@@ -27,6 +31,8 @@ export type TravelCalendarEvents = Readonly<{
   all: readonly NormalizedExternalEvent[];
   /** The Google snapshot's timezone, when Google was read. */
   timezone: string | null;
+  /** Connected Outlook or iCloud Calendars whose read failed and were left out. */
+  unavailable: readonly TravelConnectorName[];
 }>;
 
 export async function readTravelCalendarConnections(caller: CalendarReadCaller): Promise<TravelCalendarConnections> {
@@ -43,21 +49,34 @@ function connectorReadable(connection: ConnectorConnectionView): boolean {
   return connection.status === "connected" && connection.preferences.selectedSourceIds.length > 0;
 }
 
+/**
+ * Reads every taking-part Calendar. Without `previous`, an Outlook or iCloud provider failure
+ * leaves that Calendar out. With `previous` (the final revision check), a Calendar left out then
+ * stays out and any other failure fails the request, so both reads cover the same Calendars.
+ */
 export async function readTravelCalendarEvents(caller: CalendarReadCaller, connections: TravelCalendarConnections,
-  request: Pick<TravelRouteRefreshRequest, "scope" | "startLocalDate" | "endLocalDate">): Promise<TravelCalendarEvents> {
+  request: Pick<TravelRouteRefreshRequest, "scope" | "startLocalDate" | "endLocalDate">, previous?: TravelCalendarEvents): Promise<TravelCalendarEvents> {
+  const connector = async (name: TravelConnectorName, read: Parameters<typeof readTravelCalendarRange>[1]) => {
+    if (!connectorReadable(connections[name]) || previous?.unavailable.includes(name)) return { name, events: null };
+    try {
+      return { name, events: (await readTravelCalendarRange(request, read)).events };
+    } catch (error) {
+      if (previous || !(error instanceof ConnectorError) || error.code === "invalid_request") throw error;
+      return { name, events: null, failed: true };
+    }
+  };
   const [google, outlook, icloud] = await Promise.all([
     connections.google.status === "connected"
       ? readTravelCalendarRange(request, (start, end) => getCalendarEvents(caller, start, end)) : null,
-    connectorReadable(connections.outlook)
-      ? readTravelCalendarRange(request, (start, end) => getOutlookCalendarEvents(caller, start, end, { includeLocation: true })) : null,
-    connectorReadable(connections.icloud)
-      ? readTravelCalendarRange(request, (start, end) => getIcloudCalendarEvents(caller, start, end, { includeLocation: true })) : null,
+    connector("outlook", (start, end) => getOutlookCalendarEvents(caller, start, end, { includeLocation: true })),
+    connector("icloud", (start, end) => getIcloudCalendarEvents(caller, start, end, { includeLocation: true })),
   ]);
   const googleEvents = google?.events ?? [];
   return {
     google: googleEvents,
-    all: [...googleEvents, ...(outlook?.events ?? []), ...(icloud?.events ?? [])],
+    all: [...googleEvents, ...(outlook.events ?? []), ...(icloud.events ?? [])],
     timezone: google?.requestedRange.timezone ?? null,
+    unavailable: [...(previous?.unavailable ?? []), ...[outlook, icloud].flatMap((entry) => "failed" in entry ? [entry.name] : [])],
   };
 }
 

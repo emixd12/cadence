@@ -74,8 +74,7 @@ export async function refreshTravelRoutes(
   const calendars = await readTravelCalendarConnections(caller);
   const calendar = calendars.google;
   // Ticket 282: Calendar reads start today, so a first_trip read covers today and keeps tomorrow.
-  const readCalendars = () => readTravelCalendarEvents(caller, calendars, request);
-  const calendarEvents = await readCalendars();
+  const calendarEvents = await readTravelCalendarEvents(caller, calendars, request);
   const events = calendarEvents.all;
   const [behaviorOccurrences, behaviors, timezone] = await Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
@@ -120,7 +119,8 @@ export async function refreshTravelRoutes(
   };
   // Calendar event revisions are checked once more before returning.
   const assertAllCurrent = async () => {
-    const currentEvents = await readCalendars();
+    // A Calendar left out by the first read stays out; any other failure here fails the request.
+    const currentEvents = await readTravelCalendarEvents(caller, calendars, request, calendarEvents);
     if (!sameCalendarRevisions(events, currentEvents.all)) throw changed();
     await assertSourcesCurrent();
     if (deadline.aborted) throw changed();
@@ -215,10 +215,11 @@ export async function refreshTravelRoutes(
     ...doomed.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_READY_AFTER_END })),
   ];
   // A trip request leaves the other trips unrouted, so its conclusions would not describe the day.
-  // Ticket 283: the brief names only Google Calendar events, so an Outlook or iCloud stop withholds the token.
+  // Ticket 283: the brief names only Google Calendar events, so an Outlook or iCloud stop withholds the token,
+  // and so does a left-out Outlook or iCloud Calendar, whose stops the conclusions would miss.
   const googleIds = new Set(calendarEvents.google.map((event) => event.id));
   const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip &&
-    commitments.every((commitment) => commitment.kind !== "calendar" || googleIds.has(commitment.ref));
+    calendarEvents.unavailable.length === 0 && commitments.every((commitment) => commitment.kind !== "calendar" || googleIds.has(commitment.ref));
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,

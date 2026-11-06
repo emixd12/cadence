@@ -14,8 +14,10 @@
   placeholder location. iCloud keeps the `LOCATION` text. The hosted server stores no event
   detail.
 - The hosted route fences Outlook and iCloud connections and event revisions like Google's.
-  A failed read of a connected Calendar fails the request. The Daily Brief's signed conclusions
-  stay Google-only: a plan with an Outlook or iCloud stop carries no token.
+  A failed Google read fails the request; a failed Outlook or iCloud read leaves that Calendar
+  out and routes the others (verifier fix). The Daily Brief's signed conclusions stay
+  Google-only: a plan with an Outlook or iCloud stop, or with one left out, carries no token.
+  Known limit, follow-up: the Daily Brief has no signed travel conclusions on such days.
 - The Ticket 279 line limiting reminders to Google Calendar events is removed.
 - Messaging: P-026 (new), notes on P-017, P-019 and P-024. No cost table change.
 - Tests: connector providers and services, `tests/external-event-contract.test.ts`,
