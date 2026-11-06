@@ -1752,3 +1752,21 @@ keeps the same closed shape: yes/no fits, trip states and weather margins, never
 Platform impact: web through the hosted route and the Daily Brief. Desktop: a linked Mac uses the
 same hosted route and brief. Marketing: not applicable. Future mobile: the hosted contract is
 portable; native mobile is deferred. Messaging impact: note on P-026.
+
+## 2026-11-06: Wave 5 wording approved (D20)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after Tickets 281
+and 282 were verified:
+
+1. `line-tomorrow` (Ticket 282) is approved as written: "Tomorrow: leave by {time} for
+   {event}."
+2. `correction-note-remembered` (Ticket 281) is approved with a change. It now reads "Applies
+   to every event, Behavior and Home with the same location. Turning off Travel estimates
+   forgets it." The proposed text was "Applies to this event and other events at the same
+   location. Turning off Travel estimates forgets it."
+3. Both carry `OWNER_APPROVED_2026_11_06`. The bench wording review shows all 96 phrases
+   approved, with none awaiting; the correction note's row records owner change D20.
+
+Platform impact: web and desktop through the shared phrase module and Calendar details.
+Marketing: not applicable until release. Future mobile: mobile web inherits the web text;
+native mobile is deferred. Messaging impact: P-025 and P-021 notes.

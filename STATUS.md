@@ -1,5 +1,15 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed.**
+
+- Decision D20: the owner approved both Wave 5 phrases. Ticket 282's `line-tomorrow` stays as
+  written. Ticket 281's correction note now reads "Applies to every event, Behavior and Home
+  with the same location. Turning off Travel estimates forgets it." The bench wording review
+  shows all 96 phrases approved, none awaiting. Recorded in `docs/DECISIONS.md`.
+- Messaging impact: P-025 and P-021 notes.
+
 ## Travel advisory revamp: signed Daily Brief travel lines for all Calendars (D18) — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No migration.**
@@ -67,7 +77,7 @@ the hosted push waits for the owner.**
   in its own `first_trip` request: one leg from Home, no device position, no weather and no
   signed conclusions. Today's conclusions, the Daily Brief and leave reminders never include it.
 - The next-departure line reads "Tomorrow: leave by 8:10 AM for Dentist." while today has no
-  trip left. The wording is not yet approved (decision D7).
+  trip left. The owner approved the wording as written (decision D20).
 - Web and the linked Mac share the hook and the hosted route. Cost: one leg per travel day,
   in `docs/COSTS.md`. Messaging: a Ticket 282 note on P-021.
 - Verifier fixes: the request reads Calendar from today, as every Calendar read must, and
@@ -88,8 +98,10 @@ the hosted push waits for the owner.**
   same refresh already routes other events with that location to the correction.
 - No place or event text is stored. Turning travel off deletes the rows through the existing
   trigger. Decision D12 dropped attendance, so no attendance record exists.
-- Calendar details show a new note for a located event, not yet approved (decision D7). An
-  event without a location keeps the approved "until you close the Timeline" note.
+- Calendar details show a new note for a located event: "Applies to every event, Behavior and
+  Home with the same location. Turning off Travel estimates forgets it." (approved with an owner
+  change, decision D20). An event without a location keeps the approved "until you close the
+  Timeline" note.
 - Behaviors and Home with the same normalized text also resolve to the corrected place, because
   they share the key. Correcting back to the original text keeps the remembered place.
 - Messaging: P-025. Tests: `tests/travel-route-refresh.service.test.ts` (4 new),

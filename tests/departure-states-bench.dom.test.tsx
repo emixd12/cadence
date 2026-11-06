@@ -222,7 +222,7 @@ it("lists every reviewed phrase with its approval, rendered by the module to mat
   const review = container.querySelector("[data-departure-wording-review]")!;
   expect(review.querySelectorAll("[data-wording-id]")).toHaveLength(rows.length);
   expect(review.textContent).toContain("Applies to this event until you close the Timeline.");
-  expect(review.textContent).toContain("Applies to this event and other events at the same location. Turning off Travel estimates forgets it.");
+  expect(review.textContent).toContain("Applies to every event, Behavior and Home with the same location. Turning off Travel estimates forgets it.");
   expect(review.textContent).toContain("Travel estimates are unavailable right now. Tracking and Calendar still work.");
   expect(review.textContent).toContain("Travel estimates await this deployment’s provider review.");
 });
@@ -285,18 +285,19 @@ it("shows the owner's approval on the wording review", async () => {
   // the same day, adds "Home {time}", approved, and chooses the one-line "Leave 1:20", so "Leave {time}" is approved too.
   // Ticket 279 adds the leave reminder switch and its readiness list, Ticket 280 the Mac's three leave reminder phrases and
   // Ticket 278 the three web push leave reminder phrases. Decision D17 approves all 18 on November 6, 2026.
-  // Ticket 281 adds the remembered-place correction note, not yet approved (decision D7).
-  // Ticket 282 adds the line for tomorrow's first trip, not yet approved.
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("2 of 96 phrases await the owner's approval.");
-  for (const id of ["correction-note-remembered", "line-tomorrow"]) {
-    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
-  }
-  for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off",
+  // Ticket 281 adds the remembered-place correction note and Ticket 282 the line for tomorrow's first trip. Decision D20
+  // approves both on November 6, 2026, and rewords the correction note.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("All 96 phrases approved by the owner");
+  expect(container.querySelector("[data-wording-approval]")?.textContent).not.toContain("await the owner's approval");
+  expect(container.querySelector('[data-wording-id="line-tomorrow"] [data-wording-status]')?.textContent).toBe("Approved November 6, 2026");
+  expect(container.querySelector('[data-wording-id="correction-note-remembered"] [data-wording-status]')?.textContent)
+    .toBe("Approved November 6, 2026 with owner change D20. Proposed: “Applies to this event and other events at the same location. Turning off Travel estimates forgets it.”");
+  for (const id of ["line-tomorrow", "correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off",
     "needs-origin-blocked", "return-home-missing", "marker-rail-home", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
     "marker-rail-past-leave-home", "marker-rail-head-home-now", "marker-rail"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Approved November 6, 2026");
   }
-  for (const row of container.querySelectorAll("[data-wording-id]:not([data-wording-id='correction-note-remembered']):not([data-wording-id='line-tomorrow'])")) {
+  for (const row of container.querySelectorAll("[data-wording-id]")) {
     expect(row.querySelector("[data-wording-status]")?.textContent, row.getAttribute("data-wording-id")!).not.toBe("Not yet approved");
     if (/^((mac|web)-)?leave-reminder-/.test(row.getAttribute("data-wording-id")!)) {
       expect(row.querySelector("[data-wording-status]")?.textContent, row.getAttribute("data-wording-id")!).toBe("Approved November 6, 2026");

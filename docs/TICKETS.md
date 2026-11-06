@@ -16585,9 +16585,10 @@ turned off. `refreshTravelRoutes` (`lib/services/travel-route-refresh.service.ts
 `resolved` row under the corrected event's original location key with the corrected place ID,
 and in the same refresh routes other events with that location to the correction. A correction
 of an event without a location, one that does not resolve, or one whose text normalizes to the
-original is not remembered. Calendar details show "Applies to this event and other events at
-the same location. Turning off Travel estimates forgets it." for a located event, not yet
-approved (decision D7); an event without a location keeps the approved note. Owner isolation:
+original is not remembered. Calendar details show "Applies to every event, Behavior and Home
+with the same location. Turning off Travel estimates forgets it." for a located event, approved
+with an owner change on November 6, 2026 (decision D20); an event without a location keeps the
+approved note. Owner isolation:
 `tests/sql/ticket-281-remembered-places-smoke.sql`. Known limit: correcting back to the
 original text keeps the remembered place; correct to another description of the place, or turn
 travel off, to forget it.
@@ -16626,7 +16627,8 @@ Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
 
 Status: implemented and verified November 6, 2026 on branch `us-work`; not merged or
 deployed. No migration. The verifier fixed the Calendar read range for tomorrow and added one
-retry after a failed request.
+retry after a failed request. The line's wording, "Tomorrow: leave by {time} for {event}.", is
+approved as written (decision D20, November 6, 2026).
 Dependencies: Tickets 268 and 269. Decision D4.
 
 Goal: warn the evening before an early start (G7).

@@ -503,7 +503,7 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "line-tomorrow", ticket: "282", template: "Tomorrow: leave by {time} for {event}.",
     situation: "Next-departure line once today has no trip left, after tomorrow's first trip was estimated: after 5 PM, or earlier once today's trips are over.",
-    replaces: null, approvedOn: null, ownerChange: null },
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {

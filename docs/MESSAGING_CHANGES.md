@@ -831,7 +831,7 @@ cite has not changed.
 - **Ticket 282 detail (November 6, 2026):** after 5 PM, or once today has no trip left, Cadence
   estimates tomorrow's first trip once, from Home, in a request of its own. When today's line
   has nothing to say, it reads "Tomorrow: leave by 8:10 AM for Dentist." (bench row
-  `line-tomorrow`, not yet approved, D7). Tomorrow's trip gets no leave reminder, never enters
+  `line-tomorrow`, approved as written, D20). Tomorrow's trip gets no leave reminder, never enters
   the Daily Brief and adds no weather margin. Like today's view, its route view stays in the
   tab's browser session, with the first stop kept only as a digest; sign-out, travel turned off,
   a settings change and a new day clear it. The guide's "Refresh travel estimates" section
@@ -932,14 +932,16 @@ cite has not changed.
   - `docs/user-guide/travel.md`, "Inspect travel and correct a journey": "Use for this
     journey changes temporary routing only." and "Leave and reopen the Timeline to discard
     journey corrections."
-  - In-app text, Calendar details: "Applies to this event and other events at the same
-    location. Turning off Travel estimates forgets it." is new and not yet approved
-    (decision D7). The approved "Applies to this event until you close the Timeline." now
-    shows only for an event without a location.
+  - In-app text, Calendar details: "Applies to every event, Behavior and Home with the same
+    location. Turning off Travel estimates forgets it." is new, approved with an owner change
+    on November 6, 2026 (decision D20; it replaces the proposed "Applies to this event and other
+    events at the same location."). The approved "Applies to this event until you close the
+    Timeline." now shows only for an event without a location.
 - **Update needed:** say that a corrected place is remembered for that location text,
   including for Behaviors and Home with the same text, that only a place identifier and a
   one-way key are stored, for how long, and that turning travel off or correcting back to the
-  original text forgets it. The owner approves the new in-app note.
+  original text forgets it. The in-app note is approved (D20); the Privacy text and user guide
+  still need the update.
 - **Status:** logged.
 
 ## P-026: Outlook and iCloud events get leave reminders, and Mac-cached locations

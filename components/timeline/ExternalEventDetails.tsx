@@ -233,7 +233,7 @@ export const TRAVEL_CORRECTION_NOTE = "Applies to this event until you close the
  * Ticket 281 wording, not yet approved (decision D7). A located event's corrected place is
  * remembered for its location text until travel is turned off. The bench lists it.
  */
-export const TRAVEL_CORRECTION_REMEMBERED_NOTE = "Applies to this event and other events at the same location. Turning off Travel estimates forgets it.";
+export const TRAVEL_CORRECTION_REMEMBERED_NOTE = "Applies to every event, Behavior and Home with the same location. Turning off Travel estimates forgets it.";
 
 /**
  * Ticket 271: the Maps link for a Calendar event or a located Behavior. It carries only the
