@@ -1185,3 +1185,159 @@ position and an unavailable position; refresh Settings while a position request 
 active; then verify a changed OS grant is reflected. Use only the existing
 owner-authorized permission-test flow, and record no coordinates. Linux tests do
 not establish macOS native compilation, actual prompts or Core Location delivery.
+
+## Ticket 284: web acceptance with the real clock — November 6, 2026
+
+Production `app.cadence-me.com`, deployment `cadence-pubbpi517` (`dpl_9j69heXycLTfqtQhJaUTDbUvhktY`,
+commit `9064f5f`). Test account A (`cadence.testing.is@gmail.com`, America/New_York) in the Cadence QA
+Chrome profile, Chrome 156 on macOS. All times are Eastern unless marked Z. The agent drove every
+step; the owner set the spend cap (decision D5: US$5 for this test) and asked for the Calendar API
+client setup. No coordinates, route durations or provider responses are recorded here.
+
+### Readiness
+
+- 16:45:39Z, first run after `CADENCE_LEAVE_REMINDER_JOB=enabled`: `leave_reminder_process_oidc_subject`
+  logged `oidc_subject_present: true` (source `header`); the run then failed 500
+  (`leave_reminder_process_failed`, `UnknownError`). Cause: PostgREST's schema cache had not loaded
+  the Wave 4 tables (PGRST205). The coordinator reloaded it at 16:53Z.
+- 16:55:39Z: `leave_reminder_process_completed`, selected 0, failed 0. Every later run in this test
+  returned 200.
+
+### Setup (agent steps under the 2026-11-06 decision "Agents act as the test accounts")
+
+- Google sign-in for account A in QA Chrome with `scripts/acceptance/google-signin.mjs` (vault
+  password and authenticator): identifier, "Try another way", password, authenticator, done.
+- Calendar, created in Google Calendar as account A, in the selected "Cadence demonstration" Calendar:
+  E1 "W6 Met visit", today 5:30–6:15 PM, at The Metropolitan Museum of Art, 1000 5th Ave; T1
+  "W6 Museum morning", tomorrow 10–11 AM, at the American Museum of Natural History. Cadence's
+  Calendar API read both back.
+- Behavior B1 "W6 Library stop", weekly on Friday 2:30–3:00 PM, Where = New York Public Library,
+  476 5th Ave, its own Behavior reminder off. (A first attempt with End date = today was archived at
+  creation, as documented: the end date is the first excluded day.)
+- Travel: Home Grand Central Terminal, usual travel Walking, get-ready 20 minutes, arrival buffer 15
+  minutes. Travel estimates on at 12:28 PM (routing consent recorded). Leave reminders on; Settings
+  read "Home: saved." and "Reminders estimate from Home or your previous stop, never from this
+  device's position."
+- QA Chrome: location blocked and notifications allowed for the app (persistent site settings), push
+  subscribed through FCM.
+
+### Ticket 165's denied state on web
+
+With location blocked, Travel Settings read "Device location: blocked.", "Allow location for this
+site in your browser's site settings, then choose Check again.", "Saved places and Calendar trips keep
+working without device location." Check again showed "Checking device location…" and stayed blocked.
+Every trip started from Home or the previous stop. At 390 px the page width equals the viewport.
+
+### One day on the real clock
+
+| Time | State | Text (line unless noted) |
+| --- | --- | --- |
+| 12:29 | Upcoming | "Leave by 4:29 PM for W6 Met visit from Home · walking, arrive 5:15 PM." Marker "Leave 4:29". Drawer: "Head home 6:15 PM · walking, home by 6:59 PM." "Free again 6:59 PM." "Google Maps · checked 12:28 PM." |
+| 12:39 | Last estimate (details) | "Last estimate: leave by 4:29 PM · checked 12:32 PM. Refresh travel" and "Last estimate: head home 6:15 PM · checked 12:32 PM." Directions kept. |
+| 1:40 | Soon (B1) | "Leave in 29 minutes, by 2:08 PM for W6 Library stop from Home · walking, arrive 2:15 PM." |
+| 2:09 | Late before leave (B1) | "You may arrive late at W6 Library stop: leave by 2:09 PM from Home · walking, arrive 2:15 PM." Marker "May arrive late". |
+| 2:15 | Last estimate past leave (B1) | "Last estimate: if you haven't left for W6 Library stop yet, you'd arrive about 2:21 PM · checked 2:09 PM. Refresh travel" Marker "Arrive about 2:21". |
+| 3:58 | Last estimate, unfocused tab | "Last estimate: leave by 4:29 PM for W6 Met visit · checked 2:15 PM." Leave feedback for B1 shown ("Your leave time for W6 Library stop was:" … "Too late"). |
+| 4:00 | Soon (E1), automatic 30-minute refresh | "Leave in 30 minutes, by 4:29 PM for W6 Met visit from Home · walking, arrive 5:15 PM." |
+| 4:30 | Last estimate, leave now | "Last estimate: leave now for W6 Met visit · checked 3:59 PM. Refresh travel" |
+| 4:30 | Refresh at the leave time | "You may arrive late at W6 Met visit: leave by 4:30 PM from Home · walking, arrive 5:16 PM." |
+| 4:36 | Last estimate past leave | "Last estimate: if you haven't left for W6 Met visit yet, you'd arrive about 5:21 PM · checked 4:30 PM. Refresh travel" |
+| 4:38 | Late after leave | "You may arrive late at W6 Met visit: arrive 5:21 PM." |
+| 5:46 | Head home soon, automatic 30-minute refresh | "Head home in 29 minutes, by 6:15 PM · walking, home by 6:59 PM." Marker "Home 6:15". Drawer: "Free again 6:59 PM." "Google Maps · checked 5:45 PM." |
+| 6:12 | Head home soon, after Refresh travel | "Head home in 3 minutes, by 6:15 PM · walking, home by 6:59 PM." |
+| 6:15 | Head home now | "Head home now · walking, home by 7:00 PM." Leave feedback moves to "Your leave time for W6 Met visit was:". |
+| 6:21 | Last estimate, past the trip home's leave time | "Last estimate: if you haven't left yet, you'd be home about 7:06 PM · checked 6:12 PM. Refresh travel" |
+| 6:21 | Tomorrow's first trip, after Refresh travel (after 5 PM, no trip left today) | "Tomorrow: leave by 8:56 AM for W6 Museum morning." |
+
+"Leave time appears later" was not reached: the first open of the day routes every trip, and that
+phrase covers a stop whose start is unknown. The fresh "Leave now" form was not reached for either
+trip: a refresh at or after the leave time re-plans from now, so the new route arrived seconds past
+the target and the line read "You may arrive late". Automatic trip refreshes need the Timeline visible
+and focused; the automated tab was not focused at 3:58, so focus was emulated from 3:59.
+
+The fresh form "If you haven't left yet, you'd be home about …" was not reached: Refresh travel at
+6:21 PM dropped the trip home, whose leave time had passed, and the line moved to tomorrow.
+
+### Leave reminders by web push
+
+| Trip | Fire time | Sent (record) | Routes | Delivered to QA Chrome |
+| --- | --- | --- | --- | --- |
+| B1 W6 Library stop | 1:48 PM | 1:45:39 PM | 3 | No — see below |
+| E1 W6 Met visit | 4:09 PM | 4:05:39 PM | 3 | Yes, 4:05:46 PM: "Leave by 4:29 PM for W6 Met visit" / "Walking, 45 min from Home. Arrive 5:15 PM." |
+
+Both sends came up to 5 minutes early by design (`LEAVE_REMINDER_LOOKAHEAD_SECONDS`). The B1 push did
+not arrive because QA Chrome's push connection had never started: notification permission had been
+granted only as a temporary automation override. After a persistent site permission, a restart of the
+QA profile and a new subscription, `chrome://gcm-internals` showed CONNECTED, a Cadence Behavior push
+arrived at 2:05:45 PM, and the E1 leave reminder above arrived. This was a test-setup gap, not a
+Cadence defect.
+
+### Directions matrix (Ticket 165)
+
+Chrome on Mac was real; the other rows used user-agent and platform emulation in the same QA Chrome
+profile. The installed Mac row belongs to Ticket 285.
+
+| Surface | E1 (routed) | T1 (not routed) | B1 expanded row |
+| --- | --- | --- | --- |
+| Chrome on Mac | Directions in Apple Maps, `daddr` = E1, `dirflg=w` | — | — |
+| Safari on Mac (emulated) | Directions in Apple Maps, `dirflg=w` | Search in Apple Maps | Directions in Apple Maps to B1's place |
+| Safari on iPhone, 390 px (emulated) | Directions in Apple Maps | Search in Apple Maps | Directions in Apple Maps |
+| Safari on iPad (emulated) | Directions in Apple Maps | Search in Apple Maps | — |
+| Chrome on Windows (emulated) | Directions in Google Maps, `travelmode=walking` | Search in Google Maps | Directions in Google Maps to B1's place |
+| Chrome on Linux (emulated) | Directions in Google Maps | Search in Google Maps | — |
+| Chrome on Android, 412 px (emulated) | Directions in Google Maps | Search in Google Maps | — |
+
+Modes, set with "Travel by" for the Met and restored to Usual travel afterwards: Transit
+`dirflg=r` / `travelmode=transit`; Driving `dirflg=d` / `travelmode=driving`; Cycling with no Apple
+flag and the details note "Choose cycling in Apple Maps; this link cannot preselect it.", and
+`travelmode=bicycling` for Google with no note. Opening the walking links: Apple Maps showed walking
+directions to The Metropolitan Museum of Art with an empty start; Google Maps showed walking
+directions to the Met from Google's own "Your location" (not from Cadence). Negative checks: T1 said
+Search before any route; an expired estimate kept Directions with "Last estimate … checked"; B1's
+row linked to its own place text and kept its timing.
+
+### 390 px
+
+At 3:58 PM the Timeline, E1's drawer and E1's details dialog each had document width equal to the
+390 px viewport, with "Directions in Apple Maps" in the drawer.
+
+### Measured calls and spend
+
+Google Cloud Monitoring for the production project, 17:20Z to 23:30Z (12:20 PM to 6:30 PM), all
+HTTP 200: 91 `ComputeRoutes` and 4 `GeocodeAddress`. Account A's ledger reserved US$0.48 for
+November, which matches those calls at list price (95 × US$0.005, plus the Pro rate for the transit
+and driving checks), so every call in the window was this test's. Breakdown:
+
+| Source | Route calls |
+| --- | --- |
+| Directions matrix and mode checks, 12:33–12:41 (each emulated device tab started its own whole-day pass) | about 60, plus 3 lookups |
+| Leave reminder job, two trips (plan, send, one update check each) | 6 |
+| Timeline: travel on, B1 added, automatic 30-minute refreshes, six Refresh travel presses, tomorrow's first trip | about 25 |
+
+Spend stayed under the owner's US$5 cap for this test and far under the 80% automatic-refresh pause
+(US$4.00). Details in `docs/COSTS.md`.
+
+### Cleanup
+
+Leave reminders turned off for account A at 6:25 PM, so tomorrow's 10 AM event makes no unattended
+call. Travel estimates stay on for Ticket 285. The "QA push check" Behavior is archived. The W6
+Calendar events and the weekly "W6 Library stop" Behavior remain for Ticket 285.
+
+### Observations (not blocking)
+
+- B1's Timeline row at 1280 px: the range "2:30 PM - 3:00 PM" runs into the title "W6 Library stop".
+- The Timeline setup panel said "Browser notifications: Not enabled" while Settings said enabled and
+  the server had the subscription.
+- 2:09 PM: "You may arrive late … arrive 2:15 PM" while the target arrival was also 2:15 PM. The
+  route arrived seconds after the target; minutes are rounded.
+- The screen-reader status region (`DayProgressTimeline.tsx`, `role="status"`) is updated only when
+  the line's state signature changes. Moving from late before leaving to late after leaving kept the
+  hidden text "…leave by 4:36 PM…" while the visible line read "…arrive 5:21 PM."
+- After E1 started, its drawer switched from "Directions in Apple Maps" to "Search in Apple Maps":
+  the 5:46 PM refresh routed only the trip home, so no current route reached E1's place. Correction
+  C2 says Directions depends on a resolved place and should not revert on expiry; here the leg was
+  dropped rather than expired. Owner or coordinator to judge.
+- T1's drawer showed no leave time and "Search in Apple Maps" while the line showed tomorrow's leave
+  time: the evening first-trip estimate feeds the line only.
+- No Outlook or iCloud test connector exists for accounts A or B, so Ticket 283's routed Outlook or
+  iCloud event was not checked.

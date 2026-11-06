@@ -1,5 +1,37 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026
+
+**On branch `travel-wave6`. Evidence only; no app change. Awaiting verification.**
+
+- Production run on deployment `cadence-pubbpi517` (`9064f5f`) with test account A in the Cadence QA
+  Chrome profile, 12:20 PM to 6:30 PM Eastern. Evidence: `docs/qa/travel-release.md`, "Ticket 284".
+- The leave reminder job's OIDC subject was present on its first run. That run failed on a stale
+  PostgREST schema cache (PGRST205); after the coordinator's reload every run returned 200.
+- States seen on the real clock: upcoming, soon, late before and after the leave time, last estimate
+  (leave by, leave now, past the leave time), head home soon and now, last estimate home, and
+  tomorrow's first trip. Not reached: "Leave time appears later" (the first open routes every trip)
+  and the fresh "Leave now" form (a refresh at the leave time re-plans from now and comes out late).
+- A real web leave reminder reached the test account by push at 4:05 PM ("Leave by 4:29 PM for W6
+  Met visit", "Walking, 45 min from Home. Arrive 5:15 PM."). The earlier one was sent but not
+  received because of a test-setup gap in QA Chrome, since fixed.
+- Ticket 165: the web denied state and the directions matrix (Chrome on Mac real; Safari on Mac,
+  iPhone and iPad, Chrome on Windows, Linux and Android by emulation), the transit, driving and
+  cycling checks and the negative checks pass. The installed Mac row stays with Ticket 285.
+- Decision D5: the owner set the spend cap at US$5 for this test. Measured: 91 route calls and 4
+  lookups, US$0.48 reserved (`docs/COSTS.md`).
+- Not checked: Ticket 283's Outlook or iCloud routed event; no test connector exists.
+- Observations, not blocking: Behavior range time overlapping its title at 1280 px; setup panel
+  showing notifications "Not enabled"; late wording with an arrival equal to the target after
+  rounding; a stale screen-reader status after late before → after; E1's link reverting to Search
+  once the event started. Each has its text in the evidence.
+- Owner decision the same day ("Agents act as the test accounts, end to end", commit `513c5d3`):
+  Google sign-in for test accounts from the vault (`scripts/acceptance/google-signin.mjs`). A
+  separate workspace finishes the QA Calendar API client (project `cadence-qa-498717`).
+- Leave reminders are off again for account A; travel stays on for Ticket 285.
+- Platform impact: web, production acceptance only. Desktop: Ticket 285. Marketing: none. Future
+  mobile: 390 px checks passed on mobile web. Messaging impact: none.
+
 ## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed.**
@@ -760,6 +792,7 @@ collection.
 - `docs/COSTS.md` records the assumed usage model and the November 4 readback.
 - New log entries: P-016 to P-021 and L-015 to L-016. P-015 and L-014 are updated.
 - Decision D5, the spend cap for Ticket 165's directions test, stays open until Ticket 284.
+  (Closed November 6, 2026: the owner set US$5 for Ticket 284.)
 - `dagger check cadence/test` was reported failing on untouched `1a369e4` in five acceptance
   test files, while main's CI passes. It is not caused by this change and was not
   independently reproduced.

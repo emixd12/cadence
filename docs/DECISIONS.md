@@ -1528,7 +1528,8 @@ the owner's answers. Tickets 263–285 carry the work. The evidence is
 | D6 | Go-ahead and PR #182 | "Merge PR #182 now, then start Wave 0" | This also approves the plan and its order. PR #182 merged on November 4 as `1a369e4`. Each merge to main is followed by a Trust refresh and app redeploy. |
 
 D5, the spend cap for Ticket 165's directions test, is still open. Ticket 284 asks the
-owner before that test runs.
+owner before that test runs. (Closed November 6, 2026: the owner set US$5 for Ticket 284's whole run; US$0.48 was
+reserved. See `docs/qa/travel-release.md`, "Ticket 284".)
 
 Merges, deployments, hosted migrations, provider spending, Mac notarization and
 publication still wait for the owner's instruction each time. The ban on storing device
