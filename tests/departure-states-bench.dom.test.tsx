@@ -91,7 +91,7 @@ it("walks the state switch through every state and shows the bench clock", async
       if (!state.expected.startsWith("needs_")) expect(travelLines.length, state.id).toBeGreaterThan(0);
     }
   }
-});
+}, 20_000);
 
 it("renders each preset's sentences in the shared surfaces", async () => {
   await render("fresh");

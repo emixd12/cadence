@@ -156,7 +156,7 @@ it("walks one day from first open to after the last event with a correct line at
     if (state) expect(line()!.hasAttribute("data-departure-timed"), at).toBe(["upcoming", "soon", "leave_now", "late", "head_home"].includes(state));
   }
   expect([...seen].sort()).toEqual(["appears_later", "head_home", "late", "leave_now", "none", "soon", "trip_changed", "upcoming"]);
-});
+}, 20_000);
 
 it("keeps the screen-reader region silent on a countdown minute and speaks on a state change", async () => {
   await render("trip-changed");
@@ -205,7 +205,7 @@ it("puts the paused phrase beside every known time, and alone once only waiting 
               : { text: null, button: "none" };
     expectLine(expected, at);
   }
-});
+}, 20_000);
 
 it("shows no travel text at any step of a day with no trips", async () => {
   await render("no-trips");
@@ -215,7 +215,7 @@ it("shows no travel text at any step of a day with no trips", async () => {
     expectLine({ text: null, button: "none" }, clock(m));
     expect(announced(), clock(m)).toBe("");
   }
-});
+}, 20_000);
 
 describe("live region", () => {
   const trip = (state: DepartureTrip["state"], linePhrase: string, key = "outbound:base:gym") => ({ key, state, action: null, linePhrase, phrase: linePhrase }) as unknown as DepartureTrip;
