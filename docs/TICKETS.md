@@ -16390,7 +16390,11 @@ reserves again before every provider call, so spend stays under the monthly ceil
 Codex review fix, November 6, 2026: migration
 `20261106070000_leave_reminder_planned_preparation.sql` keeps the get-ready minutes a
 pending check used, so a later get-ready change moves the check without a route.
-Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
+Decision D19, November 6, 2026: migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql` moves the account's next
+job visit to now when the get-ready time changes, so a moved reminder goes out within about
+5 minutes of its new time. No route is added.
+Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15, D16 and D19.
 
 Goal: check each opted-in account and send a reminder at the right time.
 
@@ -16439,6 +16443,7 @@ Messaging impact: P-016 and P-017.
 Verification: `npx vitest run tests/leave-reminder-plan.test.ts
 tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test.ts`,
 `tests/leave-reminder-store.local-integration.test.ts` on an isolated local project,
+`tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`,
 `npm run resolvers:check`, `npm run agents:check`.
 
 ## Ticket 278: Leave reminders through web push
@@ -16489,7 +16494,8 @@ Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alon
 Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
 saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
 token). It cannot turn on while Travel estimates is off. The owner approved the twelve new
-phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280.
+phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280. Ticket 283
+removed the Google-only sources line, leaving eleven phrases.
 Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
@@ -16566,12 +16572,26 @@ Verification: `cargo test` in `apps/desktop/src-tauri`,
 
 ## Ticket 281: Remember places and attendance
 
-Status: filed November 4, 2026. Not started. Decision D12 (November 5, 2026) removes the
-attendance part: a located event is in person and nothing asks about attendance, so only
-remembered places remain in scope.
+Status: implemented November 6, 2026 on branch `us-work`; not merged or deployed. Decision
+D12 (November 5, 2026) removes the attendance part: a located event is in person and nothing
+asks about attendance, so only remembered places remain in scope.
 Dependencies: Ticket 273. Decision D4.
 
 Goal: stop asking the same question after every reload (G5).
+
+Implementation (November 6, 2026): no migration. The existing `travel_place_cache` already
+holds a one-way text key and a place ID, rejects foreign owners and is deleted when travel is
+turned off. `refreshTravelRoutes` (`lib/services/travel-route-refresh.service.ts`) upserts a
+`resolved` row under the corrected event's original location key with the corrected place ID,
+and in the same refresh routes other events with that location to the correction. A correction
+of an event without a location, one that does not resolve, or one whose text normalizes to the
+original is not remembered. Calendar details show "Applies to every event, Behavior and Home
+with the same location. Turning off Travel estimates forgets it." for a located event, approved
+with an owner change on November 6, 2026 (decision D20); an event without a location keeps the
+approved note. Owner isolation:
+`tests/sql/ticket-281-remembered-places-smoke.sql`. Correcting back to the original text
+forgets the remembered place: the refresh looks that text up again and the result replaces the
+remembered row. This costs one place lookup per refresh while the correction stays.
 
 Scope and acceptance:
 
@@ -16592,19 +16612,23 @@ Platform impact:
 
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
-| Web | Hosted route service and one additive migration. Pushing it waits for the owner. |
+| Web | Hosted route service. No migration: the existing `travel_place_cache` holds the remembered place. |
 | Desktop | Shares the hosted route on a linked Mac. Nothing is added to the synced profile. |
 | Marketing | Not applicable until release. P-020 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
 
-Messaging impact: P-020.
+Messaging impact: P-020, P-025.
 
 Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
-`npm run supabase -- db reset`, a new owner-isolation test.
+`npm run supabase -- db reset`, a new owner-isolation test
+(`tests/sql/ticket-281-remembered-places-smoke.sql`).
 
 ## Ticket 282: Tomorrow's first trip
 
-Status: filed November 4, 2026. Not started.
+Status: implemented and verified November 6, 2026 on branch `us-work`; not merged or
+deployed. No migration. The verifier fixed the Calendar read range for tomorrow and added one
+retry after a failed request. The line's wording, "Tomorrow: leave by {time} for {event}.", is
+approved as written (decision D20, November 6, 2026).
 Dependencies: Tickets 268 and 269. Decision D4.
 
 Goal: warn the evening before an early start (G7).
@@ -16636,9 +16660,63 @@ Messaging impact: P-021.
 Verification: `npx vitest run tests/travel-route-refresh.service.test.ts
 tests/travel-lifecycle.dom.test.tsx`.
 
+Implementation notes (November 6, 2026):
+
+- `resolveTravelTomorrowPlan` (`packages/core/src/services/travel-refresh-policy.ts`) decides
+  when: after 5 PM local time, or once every trip in today's kept view has left, with a
+  located stop tomorrow, below 80% of the monthly ceiling, once per first stop and revision.
+- `useTravelContext` sends `scope: "first_trip"` for tomorrow's date, with no device position,
+  trips or corrections, and keeps the result in `TravelState.tomorrow`, apart from today's view.
+  The browser session keeps it with the first stop as a digest. The Mac passes the same stop
+  key through `travelTomorrowStopKey`.
+- Review fix (November 6, 2026, PR #194): the stop key lists tomorrow's located stops, and
+  the hook keys the estimate on the first one away from Home, read from travel settings. The
+  server and the hook pick it with one helper, `firstTravelStopAwayFromHome`, so an edit to
+  the routed destination asks again and a stop at Home does not.
+- `refreshTravelRoutes` accepts `first_trip` only for tomorrow in the account's timezone. It
+  plans tomorrow's first stop away from Home alone and routes that one leg from Home, with no
+  weather call and no signed conclusions.
+- `resolveTomorrowFirstTrip` builds the line from the departure model. The Timeline shows it
+  only while today's departure model has no trip. It never reaches `onDeparture` (Mac
+  reminders), the Daily Brief or the hosted reminder job.
+- Wording "Tomorrow: leave by {time} for {event}." is in `departure-phrases.ts`, not yet
+  approved (decision D7).
+- `docs/COSTS.md` counts one leg per travel day: 8, 20 and 26 a month.
+
 ## Ticket 283: Route Outlook and iCloud events
 
-Status: filed November 4, 2026. Not started. Planned last in Wave 5.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Locations are an
+opt-in read (`fields=location`, `includeLocation`) used by the Timeline, the travel route
+and the leave reminder job, never the Daily Brief; released clients keep the first-slice
+shape. `lib/services/travel-calendar-sources.ts` reads and fences all three Calendars.
+Outlook drops an online meeting's placeholder location. The Ticket 279
+Google-only line is removed. No cost table change.
+Verifier fix (November 6, 2026): a failed Outlook or iCloud read (a connector error other
+than `invalid_request`) now leaves that Calendar out of the request and routes the others, as
+before this ticket; the final revision check reads the same Calendars, and such a plan carries
+no signed conclusions. A failed Google read still fails the request.
+Review fix (November 6, 2026, PR #194): the leave reminder job no longer cancels a trip a failed
+Outlook or iCloud read left out. `refreshTravelRoutesReportingCalendars` names the left-out
+Calendars, and `planLeaveReminderVisit` keeps today's records with a missing trip while any
+Calendar is left out. A failed Google read fails the visit, which cancels nothing. Tests:
+`tests/leave-reminder-plan.test.ts`, `tests/leave-reminder-job.service.test.ts`,
+`tests/leave-reminder-hosted-port.test.ts`. Known limit: the send-time Calendar read that names
+the event still cancels that reminder if an Outlook or iCloud read fails there, after the same
+visit read it successfully; a retry would need a third route before sending, which the
+`travel_leave_reminders_third_route_after_send` check refuses (`docs/NOTIFICATION_SPEC.md`,
+"Leave reminders").
+Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
+cover Outlook and iCloud stops. The token names those events by source, and its source key
+binds the Outlook and iCloud connections that took part. The brief accepts it only when each
+named event is in its own context, which holds Outlook or iCloud only under that Calendar's
+Daily Brief disclosure. The token flags, per Outlook and iCloud Calendar, whether it had a stop.
+A stop from an undisclosed Calendar withholds the conclusions; an undisclosed Calendar with only
+unlocated events is left out of the check, so those days keep their lines. Known limit: a stop
+that appears in that undisclosed Calendar after the route goes unseen until the token expires, at
+most 5 minutes after the earliest estimate was fetched. A
+disclosed Calendar that took part needs a current, complete read. A left-out Calendar still
+withholds the token. The brief pipeline projects travel beside its Google-only view, so trips
+to disclosed Outlook or iCloud events stay visible. Leave times never reach the model.
 Dependencies: Tickets 281, 277 and 279. Decision D4.
 
 Goal: people whose events are not in Google Calendar get leave times too (G6).
@@ -16668,10 +16746,12 @@ Platform impact:
 | Marketing | Not applicable until release. P-019 logs the text changes. |
 | Future mobile | Inherits the hosted behavior. Native mobile is deferred. |
 
-Messaging impact: P-019.
+Messaging impact: P-019, P-026 (notes on P-017 and P-024; D18 note on P-026).
 
 Verification: connector and route service tests, `npm run interactions:check`, local
-verification with fixtures.
+verification with fixtures. D18: `tests/briefing-account-context.test.ts`,
+`tests/briefing-travel.test.ts`, `tests/travel-route-refresh.service.test.ts`,
+`tests/travel-conclusions-token.test.ts`.
 
 ## Ticket 284: Web acceptance with the real clock
 

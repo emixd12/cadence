@@ -11,9 +11,9 @@ import type { WeatherConditionId } from "../types/weather";
  * `DEPARTURE_PHRASE_REVIEW` below lists every reviewed phrase. The owner approved them on
  * November 5, 2026. The design-system bench renders each one with sample values (Ticket 266), and
  * a test fails when a builder produces a sentence missing from the list. New wording is added
- * with `approvedOn: null` until the owner approves it. Two phrases from Ticket 261 live outside
- * this module: the correction note in `ExternalEventDetails` and the production unavailable
- * message in `lib/ui/travel.ts`. The bench lists them too.
+ * with `approvedOn: null` until the owner approves it. Three phrases live outside this module:
+ * the two correction notes in `ExternalEventDetails` (Tickets 261 and 281) and the production
+ * unavailable message in `lib/ui/travel.ts`. The bench lists them too.
  *
  * Weather advice is not here. Development builds add it on their own path (Ticket 260).
  */
@@ -46,7 +46,6 @@ export const LEAVE_REMINDER_HOME_SAVED = "Home: saved.";
 export const LEAVE_REMINDER_HOME_MISSING = "Home: not saved. The day's first trip needs Home to get a reminder.";
 export const LEAVE_REMINDER_START_WEB = "Reminders estimate from Home or your previous stop, never from this device's position.";
 export const LEAVE_REMINDER_START_MAC = "This Mac reminds from its last estimate, which starts from your position, Home or your previous stop, and names when that estimate was checked.";
-export const LEAVE_REMINDER_SOURCES = "For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.";
 export const LEAVE_REMINDER_TRAVEL_OFF = "Turn on Travel estimates to use reminders.";
 export const LEAVE_REMINDER_SAVED = "Reminder setting saved.";
 export const LEAVE_REMINDER_SAVE_FAILED = "The reminder setting could not save.";
@@ -133,7 +132,7 @@ export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280" | "282";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -472,9 +471,6 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "leave-reminder-start-mac", ticket: "279", template: LEAVE_REMINDER_START_MAC,
     situation: "Leave reminder readiness on a linked Mac: native reminders use the last estimate and name its time (decision D3, Ticket 280).",
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
-  { id: "leave-reminder-sources", ticket: "279", template: LEAVE_REMINDER_SOURCES,
-    situation: "Leave reminder readiness: which trips get reminders until Ticket 283 routes Outlook and iCloud events.",
-    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "leave-reminder-travel-off", ticket: "279", template: LEAVE_REMINDER_TRAVEL_OFF,
     situation: "Leave reminder readiness while Travel estimates is off. The checkbox cannot turn on until it is on.",
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
@@ -504,6 +500,9 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
   { id: "web-leave-reminder-body", ticket: "278", template: "{Mode}, {minutes} min from {start}. Arrive {time}.",
     situation: "Browser notification body for both. {start} is Home or the previous stop's title; the web job never starts from a device position.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "line-tomorrow", ticket: "282", template: "Tomorrow: leave by {time} for {event}.",
+    situation: "Next-departure line once today has no trip left, after tomorrow's first trip was estimated: after 5 PM, or earlier once today's trips are over.",
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
 ];
 
@@ -577,6 +576,15 @@ export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLa
 /** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Approved under D13. */
 export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
   return `Back around ${departureTimeLabel(at, context)}.`;
+}
+
+/**
+ * Ticket 282: tomorrow's first trip on the next-departure line, once today has no trip left.
+ * The time shows without a date, because the line names the day. Not yet approved (decision D7).
+ */
+export function departureTomorrowPhrase(leaveAt: string, destinationLabel: string | null, timezone: string): string {
+  const day = Temporal.Instant.from(leaveAt).toZonedDateTimeISO(timezone).toPlainDate();
+  return `Tomorrow: leave by ${departureTimeLabel(leaveAt, { timezone, currentDate: day })} for ${destinationLabel ?? NEXT_STOP_FALLBACK}.`;
 }
 
 /** Ticket 273: offered while Travel estimates is off and a located event is ahead today. Approved under D13. */

@@ -53,6 +53,8 @@ describe("web Outlook coordinator", () => {
     routes["GET /api/outlook-calendar/connection"] = () => json(view("outlook-scope", "outlook_calendar"));
     routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("outlook-scope"));
     await expect(webOutlookCalendarCoordinator.refreshEvents(range)).resolves.toMatchObject({ source: "outlook_calendar", accountId: "outlook-scope" });
+    // Ticket 283: the Timeline asks for locations so Outlook events route like Google ones.
+    expect(new URL(calls.find((call) => call.path.startsWith("/api/outlook-calendar/events"))!.path, "https://cadence.example").searchParams.get("fields")).toBe("location");
     for (const wrong of [{ connectionGeneration: 1 }, { accountId: "someone-else" }, { requestedRange: { ...outlookFixture.requestedRange, timezone: "Europe/Madrid" } },
       { requestedRange: { ...outlookFixture.requestedRange, selectedCalendarIds: ["calendar-2"] } }]) {
       routes["GET /api/outlook-calendar/events"] = () => json(outlookSnapshot("outlook-scope", wrong));

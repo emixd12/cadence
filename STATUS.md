@@ -1,5 +1,116 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed.**
+
+- Decision D20: the owner approved both Wave 5 phrases. Ticket 282's `line-tomorrow` stays as
+  written. Ticket 281's correction note now reads "Applies to every event, Behavior and Home
+  with the same location. Turning off Travel estimates forgets it." The bench wording review
+  shows all 96 phrases approved, none awaiting. Recorded in `docs/DECISIONS.md`.
+- Messaging impact: P-025 and P-021 notes.
+
+## Travel advisory revamp: signed Daily Brief travel lines for all Calendars (D18) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- Ticket 283 follow-up, decision D18: the travel route now signs a one-day plan whose stops
+  come from Google, Outlook or iCloud. Outlook and iCloud events are named by source, as the
+  brief names them, and the source key binds the Outlook and iCloud connections that took part.
+- The Daily Brief accepts the conclusions only when each named event is in its context with the
+  same revision. Outlook and iCloud are in that context only under their own disclosure. The
+  token carries one flag per Outlook and iCloud Calendar saying whether it had a stop. A stop
+  from an undisclosed Calendar withholds the conclusions; an undisclosed Calendar with only
+  unlocated, past or declined events is left out of the check, so the other Calendars' lines
+  stay (D18 follow-up). A left-out Calendar still withholds them.
+- The brief pipeline projects travel beside the Google-only view, so a trip to a disclosed
+  Outlook or iCloud event stays visible to the model. Before this change such a context failed
+  validation. Model input is unchanged: no leave time, duration or place.
+- Messaging impact: note on P-026; no disclosure text changes. Tests:
+  `tests/briefing-account-context.test.ts`, `tests/briefing-travel.test.ts`,
+  `tests/travel-route-refresh.service.test.ts`, `tests/travel-conclusions-token.test.ts`.
+
+## Travel advisory revamp: a get-ready change brings the next reminder visit forward (D19) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql` is applied locally only;
+the hosted push waits for the owner.**
+
+- Ticket 277, decision D19: a real change to the get-ready time sets the account's
+  `travel_leave_reminder_settings.next_check_at` to now when reminders are on, so the next
+  5-minute job run moves the pending check. A moved web reminder goes out within about 5
+  minutes of its new time, instead of up to about 30 minutes late.
+- The trigger runs as the writer under owner RLS and changes only `next_check_at`. A visit
+  already due stays. The visit adds no route: the three-route cap and D16 are unchanged.
+  The job planner did not change.
+- Messaging impact: none. Tests: `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`,
+  `tests/travel-leave-reminders-migration.test.ts`.
+
+## Travel advisory revamp Wave 5: Ticket 283 Outlook and iCloud events route — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- Outlook and iCloud events with a location now get routes, leave times, trips and leave
+  reminders under the same rules as Google Calendar events (decisions D4 and D12). Web and the
+  linked Mac route every Calendar's events; automatic requests wait for all three reads.
+- Locations are an opt-in read (`fields=location` on the events routes, `includeLocation` in
+  the services). The Timeline, the travel route and the leave reminder job ask; the Daily Brief
+  read does not. Clients that never ask, such as released Mac builds, keep the first-slice shape.
+  Outlook adds `location` and `isOnlineMeeting` to its Graph select and drops an online meeting's
+  placeholder location. iCloud keeps the `LOCATION` text. The hosted server stores no event
+  detail.
+- The hosted route fences Outlook and iCloud connections and event revisions like Google's.
+  A failed Google read fails the request; a failed Outlook or iCloud read leaves that Calendar
+  out and routes the others (verifier fix). A plan with a left-out Calendar carries no token.
+  Review fix (PR #194): the leave reminder job keeps, rather than cancels, today's reminders
+  whose trip a left-out Calendar may hold, and decides them once every Calendar reads again.
+  Decision D18 (entry above) extends signed conclusions to Outlook and iCloud stops.
+- The Ticket 279 line limiting reminders to Google Calendar events is removed.
+- Messaging: P-026 (new), notes on P-017, P-019 and P-024. No cost table change.
+- Tests: connector providers and services, `tests/external-event-contract.test.ts`,
+  `tests/travel-route-refresh.service.test.ts` (7 new), `tests/leave-reminder-hosted-port.test.ts`,
+  `tests/day-progress-timeline.dom.test.tsx`, client URL checks.
+
+## Travel advisory revamp Wave 5: Ticket 282 tomorrow's first trip — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- After 5 PM, or once today has no trip left, the Timeline asks once for tomorrow's first trip
+  in its own `first_trip` request: one leg from Home, no device position, no weather and no
+  signed conclusions. Today's conclusions, the Daily Brief and leave reminders never include it.
+- The next-departure line reads "Tomorrow: leave by 8:10 AM for Dentist." while today has no
+  trip left. The owner approved the wording as written (decision D20).
+- Web and the linked Mac share the hook and the hosted route. Cost: one leg per travel day,
+  in `docs/COSTS.md`. Messaging: a Ticket 282 note on P-021.
+- Verifier fixes: the request reads Calendar from today, as every Calendar read must, and
+  keeps tomorrow's events (`readTravelCalendarRange`, shared with Ticket 283). A failed
+  request is tried once more after 5 minutes. DST and late-night tests added.
+- Review fix (PR #194): tomorrow's estimate is keyed on the first stop away from Home, the
+  stop the server routes, through one shared helper. An edit to that stop asks again.
+- Tests: `tests/travel-route-refresh.service.test.ts`, `tests/travel-lifecycle.dom.test.tsx`,
+  `tests/travel-refresh-policy.test.ts`, `tests/departure.resolver.test.ts`,
+  `tests/travel-route-request.test.ts`, `tests/next-departure-line.dom.test.tsx`,
+  `tests/day-progress-timeline.dom.test.tsx`.
+
+## Travel advisory revamp Wave 5: Ticket 281 remembered places — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- A place correction for a Calendar event with a location now stores the corrected place ID in
+  `travel_place_cache` under the one-way key of the original location text. After a reload,
+  that text resolves to the corrected place for every event with it, with no new lookup. The
+  same refresh already routes other events with that location to the correction.
+- No place or event text is stored. Turning travel off deletes the rows through the existing
+  trigger. Decision D12 dropped attendance, so no attendance record exists.
+- Calendar details show a new note for a located event: "Applies to every event, Behavior and
+  Home with the same location. Turning off Travel estimates forgets it." (approved with an owner
+  change, decision D20). An event without a location keeps the approved "until you close the
+  Timeline" note.
+- Behaviors and Home with the same normalized text also resolve to the corrected place, because
+  they share the key. Correcting back to the original text keeps the remembered place.
+- Messaging: P-025. Tests: `tests/travel-route-refresh.service.test.ts` (4 new),
+  `tests/sql/ticket-281-remembered-places-smoke.sql` on an isolated local stack.
+
 ## Travel advisory revamp Wave 4: Codex review fixes for leave reminders — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. New migration

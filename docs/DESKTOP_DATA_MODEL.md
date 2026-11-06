@@ -605,6 +605,9 @@ Native replacement is atomic and accepts only complete matching requests. Failed
 refreshes retain the last complete snapshot. Clear invalidates in-flight writes.
 Account-free mode cannot read cached external details. Sign-out and account
 disconnect clear content even when the user keeps local Cadence records.
+The Outlook and iCloud snapshots (Ticket 238) share this file, one scope per source, and
+each source's disconnect clears its own. Since Ticket 283 they hold event locations, as the
+Google snapshot always has, so the Mac can route those events (P-026).
 
 No Google credential, Supabase session, raw provider payload, or sync baseline
 belongs in this file. Existing backup/restore and account sync continue to operate

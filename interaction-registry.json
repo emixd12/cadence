@@ -13666,7 +13666,7 @@
       "journeys": [
         "J14"
       ],
-      "intent": "Use an explicit destination correction for one event revision while the Timeline stays open.",
+      "intent": "Use an explicit destination correction for one event revision, and remember the corrected place for that event's location text.",
       "triggers": [
         {
           "kind": "activate",
@@ -13681,12 +13681,13 @@
           "control": "Add a place for {event}"
         }
       ],
-      "availability": "Versioned timed Calendar event details while routing context is available. Ticket 271 puts the form behind one native Change for this trip disclosure; saving closes it and returns focus to that control. Decision D12: a Calendar event with a location is in person and one without a location is not travel, so the form asks only for the destination and nothing asks about attendance. Ticket 273: where the next-departure line, the Calendar drawer, the details dialog or an expanded Behavior row says a Calendar event's place cannot be found, the sentence's first words (Add a place for {event}, or Fix {event}'s place for the event holding up a later trip) open that event's details with this correction open and the destination focused.",
-      "success_result": "Use an explicit destination correction for one event revision while the Timeline stays open.",
+      "availability": "Versioned timed Calendar event details while routing context is available. Ticket 271 puts the form behind one native Change for this trip disclosure; saving closes it and returns focus to that control. Decision D12: a Calendar event with a location is in person and one without a location is not travel, so the form asks only for the destination and nothing asks about attendance. Ticket 281: when the event has a location and the corrected destination resolves, the hosted route stores the corrected place ID under a one-way key of the original location text in travel_place_cache, so that text resolves to the corrected place after a reload, including for other events with the same text; no place or event text is stored, and turning travel off deletes it. A correction for an event without a location applies only while the Timeline stays open. Ticket 273: where the next-departure line, the Calendar drawer, the details dialog or an expanded Behavior row says a Calendar event's place cannot be found, the sentence's first words (Add a place for {event}, or Fix {event}'s place for the event holding up a later trip) open that event's details with this correction open and the destination focused. Ticket 283: Outlook and iCloud Calendar events with a location get the same correction and remembered place as Google Calendar events.",
+      "success_result": "Use an explicit destination correction for one event revision; a located event's corrected place is remembered for its location text until travel is turned off.",
       "failure_result": "Shows an unavailable state and preserves tracking data.",
       "effects": [
         "ui_state",
-        "network_request"
+        "network_request",
+        "database_write"
       ],
       "risk": "moderate",
       "confirmation": "none",
@@ -13700,9 +13701,10 @@
         "references": [
           "tests/calendar-details-dialog.dom.test.tsx",
           "tests/travel-next-step.dom.test.tsx",
-          "tests/travel-settings.dom.test.tsx"
+          "tests/travel-settings.dom.test.tsx",
+          "tests/travel-route-refresh.service.test.ts"
         ],
-        "notes": "Provider-free tests. Installed permission and live provider acceptance remain open."
+        "notes": "Provider-free tests. tests/sql/ticket-281-remembered-places-smoke.sql checks owner isolation and deletion when travel is turned off. Installed permission and live provider acceptance remain open."
       },
       "platforms": {
         "web": {
@@ -14681,7 +14683,7 @@
           "control": "Turn on notifications"
         }
       ],
-      "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section.",
+      "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section. Ticket 283: Outlook and iCloud events get reminders like Google Calendar events, so the readiness list no longer limits sources.",
       "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
       "failure_result": "Keeps the stored value and says the reminder setting could not save. A failed load leaves the checkbox unavailable and says so.",
       "effects": [

@@ -401,3 +401,27 @@ describe("normalization deadline", () => {
     }
   });
 });
+
+describe("travel location read (Ticket 283)", () => {
+  it("keeps the LOCATION text only for a travel read, and every other detail stays out", async () => {
+    const result = await readIcloudCalendarEvents(readInput(harness([xml(fixture("events.xml"))]), { includeLocation: true }));
+    if (!result.ok) throw new Error("expected ok");
+    expect(validateVersionedExternalEventSnapshot(result.snapshot)).toEqual(result.snapshot);
+    const timed = result.snapshot.events.find((event) => event.providerEventId === "timed-1")!;
+    expect(timed).toMatchObject({ location: "Secret place", description: "" });
+    expect(timed.fieldAvailability.location).toBeUndefined();
+    expect(result.snapshot.events.find((event) => event.providerEventId === "duration-1")).toMatchObject({ location: "", fieldAvailability: { location: "not_provided" } });
+    const serialized = JSON.stringify(result.snapshot);
+    for (const secret of ["Private notes", "friend@example", "example.invalid/event"]) expect(serialized).not.toContain(secret);
+  });
+
+  it("unescapes LOCATION text and reads a repeated LOCATION as no location", async () => {
+    const body = fixture("events.xml")
+      .replace("LOCATION:Secret place", "LOCATION:1 Main St\\, Springfield")
+      .replace("UID:duration-1", "UID:duration-1\r\nLOCATION:A\r\nLOCATION:B");
+    const result = await readIcloudCalendarEvents(readInput(harness([xml(body)]), { includeLocation: true }));
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.snapshot.events.find((event) => event.providerEventId === "timed-1")!.location).toBe("1 Main St, Springfield");
+    expect(result.snapshot.events.find((event) => event.providerEventId === "duration-1")).toMatchObject({ location: "", fieldAvailability: { location: "not_provided" } });
+  });
+});

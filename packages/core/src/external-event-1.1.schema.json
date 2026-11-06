@@ -72,10 +72,10 @@
         { "$ref": "external-event-snapshot-1.0.0.json#/$defs/fieldAvailability" },
         {
           "type": "object",
-          "required": ["description", "location", "organizer", "attendees", "conference", "attachments"],
+          "required": ["description", "organizer", "attendees", "conference", "attachments"],
           "properties": {
             "description": { "$ref": "#/$defs/unsupported" },
-            "location": { "$ref": "#/$defs/unsupported" },
+            "location": { "enum": ["unsupported", "not_provided"] },
             "organizer": { "$ref": "#/$defs/unsupported" },
             "attendees": { "$ref": "#/$defs/unsupported" },
             "conference": { "$ref": "#/$defs/unsupported" },
@@ -130,7 +130,7 @@
         "revision": { "$ref": "external-event-snapshot-1.0.0.json#/$defs/revision" },
         "title": { "type": "string" },
         "description": { "const": "" },
-        "location": { "const": "" },
+        "location": { "type": "string" },
         "sourceUrl": {
           "oneOf": [
             { "$ref": "external-event-snapshot-1.0.0.json#/$defs/httpsUrl" },
@@ -150,7 +150,10 @@
           ]
         },
         "attachments": { "type": "null" }
-      }
+      },
+      "if": { "properties": { "fieldAvailability": { "required": ["location"] } } },
+      "then": { "properties": { "location": { "const": "" } } },
+      "else": { "properties": { "location": { "minLength": 1 } } }
     },
     "timedEvent": {
       "allOf": [

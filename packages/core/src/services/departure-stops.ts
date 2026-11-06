@@ -59,13 +59,26 @@ export type LocatedStopOccurrence = Readonly<{ id: string; title: string; schedu
  * not declined or cancelled it; a Behavior counts when it is Unresolved and set to a place. Pure:
  * `now` is injected. Titles stay on the device.
  */
-export function firstLocatedStopAhead(input: Readonly<{
+export function firstLocatedStopAhead(input: LocatedStopsInput): Readonly<{ ref: string; label: string }> | null {
+  const first = locatedStopsAhead(input)[0];
+  return first ? { ref: first.ref, label: first.label } : null;
+}
+
+type LocatedStopsInput = Readonly<{
   events: readonly NormalizedExternalEvent[];
   occurrences: readonly LocatedStopOccurrence[];
   now: string;
   localDate: string;
   timezone: string;
-}>): Readonly<{ ref: string; label: string }> | null {
+}>;
+
+export type LocatedStop = Readonly<{ ref: string; label: string; startAt: string; placeText: string }>;
+
+/**
+ * Every stop `firstLocatedStopAhead` considers, with its place text, in start order. Ticket 282
+ * picks tomorrow's first stop away from Home from these.
+ */
+export function locatedStopsAhead(input: LocatedStopsInput): LocatedStop[] {
   const now = Temporal.Instant.from(input.now);
   const today = Temporal.PlainDate.from(input.localDate);
   const ahead = (startAt: string) => {
@@ -76,10 +89,9 @@ export function firstLocatedStopAhead(input: Readonly<{
   const candidates = [
     ...input.events.flatMap((event) => event.kind === "timed" && event.location.trim() && event.state !== "cancelled" &&
       event.currentUserResponse !== "declined" && ahead(event.startAt)
-      ? [{ ref: event.id, label: event.title || "Untitled event", startAt: event.startAt }] : []),
+      ? [{ ref: event.id, label: event.title || "Untitled event", startAt: event.startAt, placeText: event.location }] : []),
     ...input.occurrences.flatMap((occurrence) => occurrence.status === "unresolved" && occurrence.placeText?.trim() && ahead(occurrence.scheduledFor)
-      ? [{ ref: occurrence.id, label: occurrence.title, startAt: occurrence.scheduledFor }] : []),
-  ].sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt)));
-  const first = candidates[0];
-  return first ? { ref: first.ref, label: first.label } : null;
+      ? [{ ref: occurrence.id, label: occurrence.title, startAt: occurrence.scheduledFor, placeText: occurrence.placeText }] : []),
+  ];
+  return candidates.sort((left, right) => Temporal.Instant.compare(Temporal.Instant.from(left.startAt), Temporal.Instant.from(right.startAt)));
 }

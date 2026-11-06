@@ -89,7 +89,12 @@ export type LeaveReminderRecordPatch = Partial<Readonly<{
 export type LeaveReminderStore = Readonly<{
   /** Takes the account's visit: moves its next check to the lease end if it is unchanged. */
   claimAccount(expectedNextCheckAt: string, leaseUntil: string): Promise<boolean>;
-  /** Ends the visit: sets the next check if the lease is still this run's. */
+  /**
+   * Ends the visit: sets the next check if the lease is still this run's. Decision D19: a
+   * get-ready change can replace the lease, and an overlapping visit may then set a later
+   * next check from records this visit still held. So when the lease is gone, a later next
+   * check is brought forward to this visit's own; it never moves later.
+   */
   releaseAccount(leaseUntil: string, nextCheckAt: string): Promise<boolean>;
   remindersEnabled(): Promise<boolean>;
   listRecords(): Promise<LeaveReminderRecord[]>;
@@ -122,7 +127,12 @@ export function createLeaveReminderStore(client: AppSupabaseClient, userId: stri
         .eq("user_id", userId).eq("enabled", true).eq("next_check_at", leaseUntil)
         .select("user_id");
       if (error) throw error;
-      return (data ?? []).length === 1;
+      if ((data ?? []).length === 1) return true;
+      const { error: earlierError } = await client.from("travel_leave_reminder_settings")
+        .update({ next_check_at: nextCheckAt })
+        .eq("user_id", userId).eq("enabled", true).gt("next_check_at", nextCheckAt);
+      if (earlierError) throw earlierError;
+      return false;
     },
     async remindersEnabled() {
       const { data, error } = await client.from("travel_leave_reminder_settings")

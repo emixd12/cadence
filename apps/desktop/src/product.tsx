@@ -8,7 +8,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { travelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
+import { travelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
@@ -366,21 +366,26 @@ export function Product() {
     && (icloudTimeline.showAllDay || event.kind !== "all_day")) ?? [];
   const outlookEvents = outlookTimeline.snapshot?.events.filter((event) => !outlookTimeline.hiddenCalendarIds.includes(event.calendarId)
     && (outlookTimeline.showAllDay || event.kind !== "all_day")) ?? [];
-  const currentTravelCorrections = useMemo(() => (travelCorrections.accountId === accountUserId ? travelCorrections.items : []).filter((correction) => calendar.snapshot?.events.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [travelCorrections, calendar.snapshot, accountUserId]);
   const visibleCalendarEvents = calendar.preferences?.visible ? calendar.snapshot?.events.filter((event) =>
     !calendar.preferences!.hiddenCalendarIds.includes(event.calendarId)
     && (calendar.preferences!.showAllDay || event.kind !== "all_day")) ?? [] : [];
+  // Ticket 283: Google, Outlook and iCloud events route under the same rules, as on the web.
+  const travelEvents = [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents];
+  const correctionEvents = [...(calendar.snapshot?.events ?? []), ...outlookEvents, ...icloudEvents];
+  const currentTravelCorrections = (travelCorrections.accountId === accountUserId ? travelCorrections.items : []).filter((correction) => correctionEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision));
   const travelBehaviorRevisions = bundle?.timeline.behaviors.map((behavior) => ({ id: behavior.id, whereKind: behavior.where_kind ?? null,
     locationText: behavior.location_text ?? null, updatedAt: behavior.updated_at })) ?? [];
   const travel = useTravelContext({ enabled: activeScreen === "timeline" && syncReady && syncStatus.state === "current",
     accountId: accountUserId, localDate: calendarRange.startLocalDate, client: travelClient, corrections: currentTravelCorrections,
     timezone: profile?.timezone ?? "America/New_York",
-    // Ticket 268: automatic travel requests wait for the first Calendar read to settle.
-    sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL,
-    sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
-    stopRevisions: travelStopRevisions(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions) });
+    // Ticket 268: automatic travel requests wait for the first Calendar reads to settle (Ticket 283: all three).
+    sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL && outlookTimeline.state !== "not_loaded" && icloudTimeline.state !== "not_loaded",
+    sourceKey: travelSourceKey(travelEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
+    stopRevisions: travelStopRevisions(travelEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions),
+    // Ticket 282: tomorrow's first trip, through the same hook and hosted route as the web.
+    tomorrowStopKey: bundle ? travelTomorrowStopKey(travelEvents, bundle.timeline.timeline, travelBehaviorRevisions) : null });
   // Ticket 280: the leave reminder's destination, once today's Calendar read or Timeline has it. A moved or removed trip matches nothing.
-  const leaveTarget = leaveActivation && bundle ? leaveReminderTarget(leaveActivation.digest, { events: visibleCalendarEvents,
+  const leaveTarget = leaveActivation && bundle ? leaveReminderTarget(leaveActivation.digest, { events: travelEvents,
     occurrences: bundle.timeline.timeline.daySections.flatMap((section) => section.occurrences) }) : null;
   const openEvent = leaveActivation && leaveTarget?.kind === "event" ? { eventId: leaveTarget.eventId, requestKey: leaveActivation.requestKey } : null;
   const leaveOccurrenceId = leaveTarget?.kind === "occurrence" ? leaveTarget.occurrenceId : null;
@@ -401,8 +406,7 @@ export function Product() {
     // Ticket 273: steps open Settings or Behaviors. Estimates need a linked account, so local mode offers no Travel estimates.
     openTravelSettings: accountUserId ? () => navigate("settings", "travel") : undefined,
     openBehavior: () => navigate("behaviors"),
-    // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
-    events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
+    events: travelEvents,
     // Ticket 280: native leave reminders follow the departure model; activation opens the event's drawer.
     onDeparture: accountUserId ? leaveReminders.onDeparture : undefined,
     openEvent,

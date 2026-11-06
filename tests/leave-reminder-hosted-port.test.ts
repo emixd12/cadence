@@ -7,8 +7,10 @@ vi.mock("@/lib/integrations/leave-reminder-caller", () => ({
   createLeaveReminderCaller: vi.fn(() => ({ userId: USER_ID, client: {} })),
   leaveReminderCalendarCaller: vi.fn(async () => ({ client: {} })),
 }));
-vi.mock("@/lib/services/travel-route-refresh.service", () => ({ refreshTravelRoutes: vi.fn() }));
+vi.mock("@/lib/services/travel-route-refresh.service", () => ({ refreshTravelRoutes: vi.fn(), refreshTravelRoutesReportingCalendars: vi.fn() }));
 vi.mock("@/lib/db/behaviors.repo", () => ({ getProfileTimezone: vi.fn(async () => "America/New_York"), listUserBehaviors: vi.fn() }));
+vi.mock("@/lib/db/occurrences.repo", () => ({ listOccurrencesBetweenLocalDates: vi.fn(async () => []) }));
+vi.mock("@/lib/services/travel-calendar-sources", () => ({ readTravelCalendarConnections: vi.fn(async () => ({})), readTravelCalendarEvents: vi.fn() }));
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: vi.fn() }));
 vi.mock("@/lib/db/leave-reminders.repo", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/db/leave-reminders.repo")>(),
@@ -19,10 +21,11 @@ vi.mock("@/lib/db/leave-reminders.repo", async (importOriginal) => ({
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const { readTravelPreparationChangedAt } = await import("../lib/db/leave-reminders.repo");
-const { refreshTravelRoutes } = await import("../lib/services/travel-route-refresh.service");
+const { refreshTravelRoutes, refreshTravelRoutesReportingCalendars } = await import("../lib/services/travel-route-refresh.service");
 const { readTravelRouteSource } = await import("../lib/services/travel-settings.service");
 const { TravelRoutingError } = await import("../lib/services/travel-routing.service");
 const { createHostedLeaveReminderAccountPort } = await import("../lib/services/leave-reminder-job.service");
+const { readTravelCalendarEvents } = await import("../lib/services/travel-calendar-sources");
 
 const NOW = Temporal.Instant.from("2026-11-06T17:06:00Z");
 const TRIP: LeaveReminderPlannedTrip = {
@@ -59,5 +62,57 @@ describe("hosted leave reminder port (Wave 4 final check)", () => {
       preparationChangedAt: "2026-11-06T17:28:30.000000Z",
     });
     expect(readTravelPreparationChangedAt).toHaveBeenCalledWith({}, USER_ID);
+  });
+
+  it("lists and names Outlook and iCloud trips like Google ones, reading every Calendar as the user (Ticket 283)", async () => {
+    vi.mocked(readTravelRouteSource).mockResolvedValue({ settings: { baseLocationText: null }, behaviors: [] } as never);
+    const event = (id: string, startAt: string, location: string, title: string, extra: Record<string, unknown> = {}) =>
+      ({ id, kind: "timed", state: "unknown", currentUserResponse: null, startAt, location, title, ...extra });
+    const events = [
+      event("outlook_calendar/dentist", "2026-11-06T18:00:00Z", "Dentist St", "Dentist"),
+      event("icloud_calendar/lunch", "2026-11-06T20:00:00Z", "Cafe St", "Lunch"),
+      event("icloud_calendar/call", "2026-11-06T21:00:00Z", "", "Call"),
+      event("outlook_calendar/declined", "2026-11-06T22:00:00Z", "Elsewhere", "Declined", { currentUserResponse: "declined" }),
+    ];
+    vi.mocked(readTravelCalendarEvents).mockResolvedValue({ google: [], all: events, timezone: null, unavailable: [] } as never);
+    vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValue({ calendarsLeftOut: [], response: { evidence: { legs: [
+      { leg: { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "outlook_calendar/dentist", mode: "walking" } },
+      { leg: { role: "onward", originCommitmentRef: "outlook_calendar/dentist", destinationCommitmentRef: "icloud_calendar/lunch", mode: "walking" } },
+      { leg: { role: "return", originCommitmentRef: "icloud_calendar/lunch", destinationCommitmentRef: null, mode: "walking" } },
+    ] } } } as never);
+    const { trips, calendarsLeftOut } = await port().listTrips("2026-11-06");
+    expect(calendarsLeftOut).toBe(false);
+    expect(trips.map((trip) => [trip.destinationRef, trip.originRef])).toEqual([
+      ["outlook_calendar/dentist", null], ["icloud_calendar/lunch", "outlook_calendar/dentist"],
+    ]);
+    expect(readTravelCalendarEvents).toHaveBeenCalledWith(expect.anything(), expect.anything(), { scope: "day", startLocalDate: "2026-11-06", endLocalDate: "2026-11-06" });
+    const details = await port().readSendDetails("2026-11-06", trips[1]!, "outlook_calendar/dentist");
+    expect(details).toEqual({ title: "Lunch", origin: { kind: "previous_stop", title: "Dentist" } });
+  });
+
+  it("reports a Calendar a failed read left out, from the refresh or the destination read, so the job keeps its trips (Ticket 283)", async () => {
+    vi.mocked(readTravelRouteSource).mockResolvedValue({ settings: { baseLocationText: null }, behaviors: [] } as never);
+    const google = { id: "google-event", kind: "timed", state: "unknown", currentUserResponse: null, startAt: "2026-11-06T18:00:00Z", location: "Main St", title: "Gym" };
+    const legs = { evidence: { legs: [{ leg: { role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "google-event", mode: "walking" } }] } };
+    const read = (unavailable: string[]) => ({ google: [google], all: [google], timezone: "America/New_York", unavailable });
+
+    vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValueOnce({ calendarsLeftOut: ["outlook"], response: legs } as never);
+    vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read([]) as never);
+    const fromRefresh = await port().listTrips("2026-11-06");
+    expect(fromRefresh.trips.map((trip) => trip.destinationRef)).toEqual(["google-event"]);
+    expect(fromRefresh.calendarsLeftOut).toBe(true);
+
+    vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValueOnce({ calendarsLeftOut: [], response: legs } as never);
+    vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read(["icloud"]) as never);
+    expect((await port().listTrips("2026-11-06")).calendarsLeftOut).toBe(true);
+
+    vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValueOnce({ calendarsLeftOut: [], response: legs } as never);
+    vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read([]) as never);
+    expect((await port().listTrips("2026-11-06")).calendarsLeftOut).toBe(false);
+  });
+
+  it("fails the trip list when Google Calendar's read fails, so the visit cancels nothing", async () => {
+    vi.mocked(refreshTravelRoutesReportingCalendars).mockRejectedValueOnce(new Error("google_calendar_unavailable"));
+    await expect(port().listTrips("2026-11-06")).rejects.toThrow("google_calendar_unavailable");
   });
 });

@@ -9,6 +9,7 @@ vi.mock("@/lib/services/google-calendar-provider", async (importOriginal) => ({ 
 import { GoogleCalendarProviderError } from "@/lib/services/google-calendar-provider";
 import type { CalendarCaller } from "@/lib/services/google-calendar.service";
 import { Temporal } from "@js-temporal/polyfill";
+import { readTravelCalendarRange } from "@/lib/services/travel-calendar-range";
 const user = { id: "owner", identities: [{ provider: "google", identity_data: { sub: "subject" } }] } as unknown as User;
 const state = "a".repeat(43);
 beforeEach(() => {
@@ -140,4 +141,41 @@ it("prepares Calendar revocation without mutating the surviving account", async 
   expect(revoke).not.toBeNull();
   await revoke!();
   expect(fetcher).toHaveBeenCalledOnce();
+});
+
+describe("tomorrow's first trip Calendar read (Ticket 282)", () => {
+  it("is refused when it starts tomorrow, and reads today through tomorrow through readTravelCalendarRange", async () => {
+    const timezone = "America/Chicago";
+    const connection = { userId: user.id, googleSubject: "subject", generation: 1, selectionRevision: 1, status: "connected",
+      preferences: { selectedCalendarIds: ["work"], hiddenCalendarIds: [], visible: true, showAllDay: true } };
+    repo.readCalendarConnection.mockResolvedValue(connection);
+    repo.readCalendarCredential.mockResolvedValue(sealCalendarSecret(readCalendarOAuthConfig()!, "refresh", { ...connection, purpose: "refresh" }));
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ access_token: "ephemeral", token_type: "Bearer" }));
+    provider.readGoogleCalendarCalendars.mockResolvedValue([{ id: "work", name: "Work", timezone, primary: true, selected: true, accessRole: "owner" }]);
+    const client = { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { timezone }, error: null }) }) }) }) } as unknown as CalendarCaller["client"];
+    const caller = { client, user };
+    const today = Temporal.Now.zonedDateTimeISO(timezone).toPlainDate();
+    const tomorrow = today.add({ days: 1 });
+    const at = (date: Temporal.PlainDate, hour: number, minute = 0) => date.toZonedDateTime({ timeZone: timezone, plainTime: { hour, minute } }).toInstant().toString();
+    const timed = (id: string, startAt: string) => ({ id, kind: "timed", startAt, endAt: startAt, endUnspecified: true });
+    const allDay = (id: string, start: Temporal.PlainDate, end: Temporal.PlainDate) => ({ id, kind: "all_day", startLocalDate: start.toString(), endLocalDate: end.toString() });
+    provider.readGoogleCalendarEvents.mockImplementation(async (input: { range: { timezone: string } }) => ({ ok: true, snapshot: {
+      requestedRange: input.range, events: [
+        timed("tonight", at(today, 23, 30)), timed("dentist", at(tomorrow, 9)),
+        allDay("today-only", today, tomorrow), allDay("through-tomorrow", today, tomorrow.add({ days: 1 })),
+      ] } }));
+
+    // The real range rule: every Calendar read starts today in the profile timezone.
+    await expect(getCalendarEvents(caller, tomorrow.toString(), tomorrow.toString())).rejects.toMatchObject({ code: "invalid_request" });
+    expect(provider.readGoogleCalendarEvents).not.toHaveBeenCalled();
+
+    const request = { scope: "first_trip" as const, startLocalDate: tomorrow.toString(), endLocalDate: tomorrow.toString() };
+    const snapshot = await readTravelCalendarRange(request, (start, end) => getCalendarEvents(caller, start, end));
+    expect(provider.readGoogleCalendarEvents.mock.calls[0]?.[0].range).toMatchObject({ startLocalDate: today.toString(), endLocalDate: tomorrow.toString(), timezone });
+    expect(snapshot.events.map((event) => event.id)).toEqual(["dentist", "through-tomorrow"]);
+
+    // Other scopes read their own range unchanged.
+    const day = await readTravelCalendarRange({ scope: "day", startLocalDate: today.toString(), endLocalDate: today.toString() }, (start, end) => getCalendarEvents(caller, start, end));
+    expect(day.events).toHaveLength(4);
+  });
 });

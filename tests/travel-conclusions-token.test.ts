@@ -22,6 +22,7 @@ const payload: Omit<TravelConclusionsPayload, "v"> = {
     fits: [{ ref: "occurrence:o2", conclusion: "does_not_fit", basis: "travel_overlap", trip: { destinationRef: "occurrence:o1", role: "outbound" }, position: null }] },
   weather: null,
   events: {},
+  stops: { outlook_calendar: false, icloud_calendar: true },
 };
 const secrets = { current: SECRET, previous: null };
 const verify = (token: unknown, overrides: Partial<Parameters<typeof verifyTravelConclusionsToken>[1]> = {}) =>
@@ -32,7 +33,9 @@ describe("travel conclusions token", () => {
     expect(verify(issueTravelConclusionsToken(payload, SECRET))).toEqual({ v: 1, ...payload });
     // Signed, not encrypted: the payload names only the user's own commitments and holds no timing.
     const body = JSON.parse(Buffer.from(issueTravelConclusionsToken(payload, SECRET).split(".")[0]!, "base64url").toString());
-    expect(Object.keys(body).sort()).toEqual(["conclusions", "date", "events", "exp", "iat", "src", "sub", "v", "weather"]);
+    expect(Object.keys(body).sort()).toEqual(["conclusions", "date", "events", "exp", "iat", "src", "stops", "sub", "v", "weather"]);
+    // Decision D18: one boolean per Outlook and iCloud Calendar, nothing else about their events.
+    expect(body.stops).toEqual({ outlook_calendar: false, icloud_calendar: true });
   });
 
   it("verifies a token signed with the previous secret only during rotation", () => {
@@ -70,6 +73,9 @@ describe("travel conclusions token", () => {
       ["wrong version", signed({ ...payload, v: 2 })],
       ["extra field", signed({ v: 1, ...payload, durationSeconds: 2237 })],
       ["missing field", signed({ v: 1, ...payload, src: undefined })],
+      ["no stop flags (issued before the D18 follow-up)", signed({ v: 1, ...payload, stops: undefined })],
+      ["stop count instead of a flag", signed({ v: 1, ...payload, stops: { outlook_calendar: 2, icloud_calendar: false } })],
+      ["extra stop source", signed({ v: 1, ...payload, stops: { ...payload.stops, google_calendar: true } })],
       ["bad instant", signed({ v: 1, ...payload, exp: "tomorrow" })],
       ["oversized", `${"A".repeat(40_000)}.${signature}`],
     ];
@@ -98,6 +104,11 @@ describe("travel conclusions token", () => {
     };
     const key = travelConclusionsSourceKey(base);
     expect(travelConclusionsSourceKey({ ...base, occurrences: [...base.occurrences].reverse() })).toBe(key);
+    // Decision D18: a Google-only key is unchanged; an Outlook or iCloud Calendar taking part changes it.
+    expect(travelConclusionsSourceKey({ ...base, connectors: null })).toBe(key);
+    const withOutlook = travelConclusionsSourceKey({ ...base, connectors: JSON.stringify([["outlook", 1, 1]]) });
+    expect(withOutlook).not.toBe(key);
+    expect(travelConclusionsSourceKey({ ...base, connectors: JSON.stringify([["outlook", 1, 2]]) })).not.toBe(withOutlook);
     expect(key).not.toContain("Gym");
     for (const changed of [
       { ...base, settingsRevision: "s2" },

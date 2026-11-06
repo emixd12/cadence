@@ -163,6 +163,8 @@ export type IcloudEventsOptions = IcloudServiceOptions & Readonly<{
   authorizedCalendarIds?: readonly string[];
   expectedConnectionGeneration?: number;
   expectedSelectionRevision?: number;
+  /** Ticket 283: read event locations too. Only the travel route and the Timeline ask; the Daily Brief never does. */
+  includeLocation?: boolean;
 }>;
 export type IcloudCalendarRead = Readonly<{ connection: ConnectorConnection; result: IcloudCalendarReadResult }>;
 
@@ -207,7 +209,7 @@ async function readEventsForCaller(caller: ConnectorCaller, start: string, end: 
     });
     const result = await readIcloudCalendarEvents({ ...request, accountId: caller.user.id, connectionGeneration: connection.generation, calendars: selected,
       range: { startLocalDate: start, endLocalDate: end, timezone: profile.timezone, selectedCalendarIds: selected.map((calendar) => calendar.id) },
-      fetchedAt: nowInstant.toString() });
+      fetchedAt: nowInstant.toString(), includeLocation: options.includeLocation === true });
     if (!result.ok && result.error.code === "reconnect_required") await markConnectorReconnectRequired(connection).catch(() => undefined);
     return { connection, result };
   });

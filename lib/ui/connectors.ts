@@ -241,7 +241,8 @@ async function refreshWebCalendarEvents(source: CalendarConnectorSource, memory:
   if (!options?.force && cached && fetchedRecently(cached.fetchedAt)) return cached;
   const running = memory.pendingFor(key);
   if (running) return running;
-  return memory.track(key, epoch, request<unknown>(`${basePath}/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate })}`)
+  // Ticket 283: ask for locations, so these events route like Google Calendar events.
+  return memory.track(key, epoch, request<unknown>(`${basePath}/events?${new URLSearchParams({ start: range.startLocalDate, end: range.endLocalDate, fields: "location" })}`)
     .then((value) => {
       const applied = applyCalendarConnectorRefresh(memory.get(key) ?? null, validateCalendarSnapshotForScope(value, scope));
       if (memory.epoch(connection.accountId) !== epoch) throw new ConnectorClientError("connection_changed");

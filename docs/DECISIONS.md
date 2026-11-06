@@ -1702,3 +1702,71 @@ The owner decided on November 6, 2026, as relayed by the travel coordinator afte
 Platform impact: web and desktop through the shared phrase module, Settings and the two
 notification paths. Marketing: not applicable until release. Future mobile: mobile web
 inherits the web text; native mobile is deferred. Messaging impact: P-016 and P-024 notes.
+
+## 2026-11-06: A get-ready change brings the next leave reminder visit forward (D19)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the PR #193
+verifier noted that a moved web reminder could arrive up to about 30 minutes late:
+
+1. A get-ready change brings the account's next leave reminder job visit forward, so a moved
+   web reminder goes out within about 5 minutes of its new time.
+
+A trigger on `travel_settings` sets `travel_leave_reminder_settings.next_check_at` to now when
+`preparation_minutes` changes on an account with reminders on (migration
+`20261106080000_leave_reminder_visit_after_preparation_change.sql`). The visit moves pending
+checks without a route, so the three-route cap per trip and D16 are unchanged.
+`docs/NOTIFICATION_SPEC.md` and `docs/DATA_MODEL.md` record it.
+
+Platform impact: web through the hosted job (Tickets 275 and 277). Desktop: a linked Mac's
+synced get-ready change reaches the hosted row and moves the visit too; the Mac's own
+notifications already move at once (Ticket 280). Marketing: not applicable. Future mobile: the
+hosted contract is portable; native mobile is deferred. Messaging impact: none.
+
+## 2026-11-06: Signed Daily Brief travel lines cover every Calendar's stops (D18)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after the Ticket 283
+verifier recorded that a day with an Outlook or iCloud stop lost its signed travel conclusions:
+
+1. Signed Daily Brief travel conclusions cover every routed stop, including Outlook and iCloud
+   stops, so days that mix Calendars keep their lines.
+
+The route signs a one-day plan whatever Calendar its stops come from. The token names an
+Outlook or iCloud event by its source, calendar and provider event ID, as the brief's own refs
+do, and its source key adds the Outlook and iCloud connections that took part. The brief accepts
+the token only when each named event is in its own context with the same revision. An Outlook or
+iCloud Calendar is in that context only under its own Daily Brief disclosure, so the disclosure
+still decides what the brief may say. The token also carries one flag per Outlook and iCloud
+Calendar: whether any of its events was a stop the plan counted (a placed, not declined or
+cancelled, event not yet ended, including one past the nine-stop bound). The flag is one boolean
+and says nothing else about that Calendar's events. A stop from an undisclosed Calendar withholds
+all signed conclusions, because it shapes the trips after it. An undisclosed Calendar with no stop
+is left out of the event check, so days where it has only unlocated meetings (not travel under
+D12) keep their lines, as before D18. Known limit: a stop that appears in an undisclosed Calendar
+after the route (an event that gains a place, a new located event, or a declined event accepted
+again) is not seen by the brief until the token expires or the route refreshes. The token expires
+with the plan's earliest estimate, at most 5 minutes after it was fetched. A disclosed
+Calendar that took part must have a current, complete read, as Google
+must. A left-out Calendar (Ticket 283 verifier fix) still withholds the token. The model input
+keeps the same closed shape: yes/no fits, trip states and weather margins, never a time.
+
+Platform impact: web through the hosted route and the Daily Brief. Desktop: a linked Mac uses the
+same hosted route and brief. Marketing: not applicable. Future mobile: the hosted contract is
+portable; native mobile is deferred. Messaging impact: note on P-026.
+
+## 2026-11-06: Wave 5 wording approved (D20)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after Tickets 281
+and 282 were verified:
+
+1. `line-tomorrow` (Ticket 282) is approved as written: "Tomorrow: leave by {time} for
+   {event}."
+2. `correction-note-remembered` (Ticket 281) is approved with a change. It now reads "Applies
+   to every event, Behavior and Home with the same location. Turning off Travel estimates
+   forgets it." The proposed text was "Applies to this event and other events at the same
+   location. Turning off Travel estimates forgets it."
+3. Both carry `OWNER_APPROVED_2026_11_06`. The bench wording review shows all 96 phrases
+   approved, with none awaiting; the correction note's row records owner change D20.
+
+Platform impact: web and desktop through the shared phrase module and Calendar details.
+Marketing: not applicable until release. Future mobile: mobile web inherits the web text;
+native mobile is deferred. Messaging impact: P-025 and P-021 notes.

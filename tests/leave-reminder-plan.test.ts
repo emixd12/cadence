@@ -88,6 +88,14 @@ describe("planLeaveReminderVisit", () => {
     expect(result.create).toEqual([]);
   });
 
+  it("keeps today's records whose trip is missing while a Calendar read failed (Ticket 283)", () => {
+    const pending = record({ routeCount: 1 });
+    const sent = record({ id: "r2", tripDigest: "b".repeat(64), status: "sent", sentAt: "2026-11-06T14:50:00Z", nextCheckAt: "2026-11-06T14:50:00Z", routeCount: 2 });
+    const yesterday = record({ id: "y", localDate: "2026-11-05", routeCount: 1 });
+    const result = planLeaveReminderVisit({ now: NOW, timezone: TZ, preparationSeconds: PREP, records: [pending, sent, yesterday], trips: [], calendarsLeftOut: true });
+    expect(result).toMatchObject({ cancel: [yesterday], closeCheck: [], work: [], create: [] });
+  });
+
   it("restores a dropped trip only if it was never routed", () => {
     const fresh = record({ status: "cancelled", nextCheckAt: null });
     const routed = record({ id: "r2", status: "cancelled", nextCheckAt: null, routeCount: 1 });

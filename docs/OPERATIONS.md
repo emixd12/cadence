@@ -1898,7 +1898,9 @@ Each source has a separate default-off Daily Brief disclosure. Generation and
 calendar-selection changes require renewed permission. Disablement and older
 client preference saves revoke the new choices. Only current, disclosed timing
 can reach the model; raw provider details and credentials cannot. Source failures
-never change manual Behavior status. Travel remains Google-only. Existing
+never change manual Behavior status. Travel routes Outlook and iCloud events with a
+location under the Google rules since Ticket 283; the Daily Brief read never asks for
+locations. Existing
 production brief retention remains unchanged: no prompt/text history in Cadence,
 bounded operational metadata, `store:false` with provider retention still possible.
 

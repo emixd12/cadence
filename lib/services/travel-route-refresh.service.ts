@@ -9,6 +9,7 @@ import {
   TRAVEL_ESTIMATE_LIFETIME_SECONDS,
   TRAVEL_LEG_OUTSIDE_WINDOW,
   TRAVEL_LEG_READY_AFTER_END,
+  firstTravelStopAwayFromHome,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
   travelPlaceLookupReusable,
@@ -27,13 +28,15 @@ import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/serv
 import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAddress, type TravelProviderConfig } from "@/lib/services/travel-provider";
 import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
-import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
+import type { CalendarReadCaller } from "@/lib/services/google-calendar.service";
+import { readTravelCalendarConnections, readTravelCalendarEvents, sameTravelCalendarConnections, travelConnectorFence, type TravelConnectorName } from "@/lib/services/travel-calendar-sources";
+import type { NormalizedExternalEvent, NormalizedTimedExternalEvent } from "@cadence/core/types/day-progress";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 import { readTravelWeather } from "@/lib/services/weather-forecast.service";
 import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
 import { advisorWeatherOutlook } from "@cadence/core/services/briefing-travel";
 import type { TravelEvidenceResult } from "@cadence/core/types/travel";
-import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision } from "@/lib/services/travel-conclusions-token";
+import { issueTravelConclusionsToken, renameTravelConclusionRefs, travelConclusionsSourceKey, travelDurationHistoryRange, travelDurationRevision, type TravelConclusionsStops } from "@/lib/services/travel-conclusions-token";
 
 const PLACE_LOOKUP_CONCURRENCY = 4;
 
@@ -49,6 +52,11 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 267: a request naming trips routes only those trips' legs. A leg that could leave
  * only after its destination ends is never routed. The response reports the month's budget.
  * Ticket 277: the leave reminder job calls this with its own caller, which has no Auth user.
+ * Ticket 282: a `first_trip` request routes only tomorrow's first trip from Home, with no weather
+ * and no signed conclusions, so today's conclusions and the Daily Brief never include it.
+ * Ticket 283: Outlook and iCloud events route under the same rules as Google Calendar events.
+ * Their locations are read for this request only. Decision D18: the signed conclusions name
+ * every Calendar's events, so a day mixing Calendars keeps them.
  */
 export async function refreshTravelRoutes(
   caller: CalendarReadCaller,
@@ -58,22 +66,46 @@ export async function refreshTravelRoutes(
   weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
   conclusionsSecret: string | null = null,
 ): Promise<TravelRoutesResponse> {
+  return (await refreshTravelRoutesReportingCalendars(caller, raw, config, now, weatherConfig, conclusionsSecret)).response;
+}
+
+/** The response, and the connected Outlook or iCloud Calendars whose read failed and were left out. */
+export type TravelRoutesRefresh = Readonly<{ response: TravelRoutesResponse; calendarsLeftOut: readonly TravelConnectorName[] }>;
+
+/**
+ * `refreshTravelRoutes`, also naming the Calendars a failed read left out. The leave reminder
+ * job keeps those Calendars' trips rather than cancel them (Ticket 283). The Timeline route
+ * returns only the response.
+ */
+export async function refreshTravelRoutesReportingCalendars(
+  caller: CalendarReadCaller,
+  raw: unknown,
+  config: TravelProviderConfig,
+  now = Temporal.Now.instant(),
+  weatherConfig: WeatherProviderConfig = WEATHER_PROVIDER_OFF,
+  conclusionsSecret: string | null = null,
+): Promise<TravelRoutesRefresh> {
   assertTravelProviderReady(config);
   const request = parseTravelRouteRefreshRequest(raw);
   const source = await readTravelRouteSource(caller.client, caller.user.id);
   if (!source.settings.enabled || !source.settings.mode || !source.settings.routingConsentAt) {
     throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
   }
-  const calendar = await getCalendarConnection(caller);
-  const snapshot = calendar.status === "connected"
-    ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate)
-    : null;
+  const calendars = await readTravelCalendarConnections(caller);
+  const calendar = calendars.google;
+  // Ticket 282: Calendar reads start today, so a first_trip read covers today and keeps tomorrow.
+  const calendarEvents = await readTravelCalendarEvents(caller, calendars, request);
+  const events = calendarEvents.all;
   const [behaviorOccurrences, behaviors, timezone] = await Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
     listUserBehaviors(caller.client, caller.user.id),
-    snapshot ? Promise.resolve(snapshot.requestedRange.timezone) : getProfileTimezone(caller.client, caller.user.id),
+    calendarEvents.timezone ? Promise.resolve(calendarEvents.timezone) : getProfileTimezone(caller.client, caller.user.id),
   ]);
   if (!timezone) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
+  const firstTrip = request.scope === "first_trip";
+  if (firstTrip && request.startLocalDate !== now.toZonedDateTimeISO(timezone).toPlainDate().add({ days: 1 }).toString()) {
+    throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
+  }
   const historyRange = travelDurationHistoryRange(request.startLocalDate);
   const readDurationHistory = () => Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
@@ -88,9 +120,9 @@ export async function refreshTravelRoutes(
   // Database inputs are fenced before spending and before delivery. Calendar has one initial read and one final check.
   const assertSourcesCurrent = async () => {
     if (deadline.aborted) throw changed();
-    const [current, currentCalendar, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions], currentTimezone] = await Promise.all([
+    const [current, currentCalendars, currentOccurrences, [currentHistoryOccurrences, currentHistorySessions], currentTimezone] = await Promise.all([
       readTravelRouteSource(caller.client, caller.user.id),
-      getCalendarConnection(caller),
+      readTravelCalendarConnections(caller),
       listOccurrencesBetweenLocalDates(caller.client, caller.user.id, request.startLocalDate, request.endLocalDate),
       readDurationHistory(),
       getProfileTimezone(caller.client, caller.user.id),
@@ -99,7 +131,7 @@ export async function refreshTravelRoutes(
       current.settings.mode !== source.settings.mode || current.settings.routingConsentAt !== source.settings.routingConsentAt ||
       current.settings.baseLocationText !== source.settings.baseLocationText || JSON.stringify(current.settings.habits) !== JSON.stringify(source.settings.habits) ||
       currentTimezone !== timezone ||
-      currentCalendar.status !== calendar.status || currentCalendar.generation !== calendar.generation || currentCalendar.selectionRevision !== calendar.selectionRevision ||
+      !sameTravelCalendarConnections(currentCalendars, calendars) ||
       !sameBehaviors(current.behaviors, source.behaviors) || !sameOccurrences(currentOccurrences, occurrenceRevisions) ||
       travelDurationRevision(currentHistoryOccurrences, currentHistorySessions) !== durationRevision) {
       throw changed();
@@ -107,8 +139,9 @@ export async function refreshTravelRoutes(
   };
   // Calendar event revisions are checked once more before returning.
   const assertAllCurrent = async () => {
-    const currentEvents = snapshot ? await getCalendarEvents(caller, request.startLocalDate, request.endLocalDate) : null;
-    if (snapshot && (!currentEvents || !sameCalendarRevisions(snapshot.events, currentEvents.events))) throw changed();
+    // A Calendar left out by the first read stays out; any other failure here fails the request.
+    const currentEvents = await readTravelCalendarEvents(caller, calendars, request, calendarEvents);
+    if (!sameCalendarRevisions(events, currentEvents.all)) throw changed();
     await assertSourcesCurrent();
     if (deadline.aborted) throw changed();
   };
@@ -125,16 +158,20 @@ export async function refreshTravelRoutes(
     }
   };
 
+  const remembered = correctedPlaceTexts(events, request);
+  const restored = restoredPlaceKeys(events, request);
+  const stops = calendarStops(events, request, remembered, now);
   const drafts = [
-    ...calendarCommitmentDrafts(snapshot?.events ?? [], request, now),
+    ...calendarCommitmentDrafts(stops),
     ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now),
   ].sort((left, right) => compareInstants(left.commitment.startAt, right.commitment.startAt));
   // Keep one unrouteable boundary commitment when the bounded source window truncates.
-  const bounded = drafts.length > 9
+  const bounded = firstTrip ? firstTripDrafts(drafts, source.settings.baseLocationText) : drafts.length > 9
     ? [...drafts.slice(0, 8), { ...drafts[8]!, commitment: { ...drafts[8]!.commitment, attendance: "unknown" as const }, placeText: null }]
     : drafts;
   const baseText = bounded.length ? source.settings.baseLocationText : null;
-  const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve);
+  const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve, restored);
+  await rememberCorrectedPlaces(caller, remembered, places, now);
   // Ticket 217: learned buffers and the remembered mode per place, falling back to usual travel.
   const habits = source.settings.habits;
   const buffers = travelHabitBuffers(habits);
@@ -148,7 +185,8 @@ export async function refreshTravelRoutes(
   const base: TravelEndpoint | null = basePoint ? { ref: "base", point: basePoint, source: "saved_base", sourceRevision: source.settingsRevision, observedAt: now.toString() } : null;
   const behaviorOccupancy = behaviorOccupancyCandidates(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now);
   const device = request.device ? endpointForDevice(request.device, source.settingsRevision) : null;
-  const journeyRevision = revision(source.settingsRevision, source.habitsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections);
+  const journeyRevision = revision(source.settingsRevision, source.habitsRevision, calendar.generation, calendar.selectionRevision, commitments, request.corrections,
+    travelConnectorFence(calendars));
   const plan = resolveTravelPlan({
     journeyRef: `${request.startLocalDate}:${request.endLocalDate}`,
     journeyRevision,
@@ -163,13 +201,15 @@ export async function refreshTravelRoutes(
     buffers,
   });
   // Weather never blocks routing; it runs beside the route calls and falls back to unavailable.
-  const weatherRequest = plan.legs.length
+  const weatherRequest = plan.legs.length && !firstTrip
     ? readTravelWeather({ device: request.device, config: weatherConfig, now }).catch(() => ({ state: "unavailable" as const }))
     : Promise.resolve(null);
   const trips = request.trips ?? null;
   const requested = (leg: (typeof plan.legs)[number]) => !!trips?.some((trip) => travelTripMatches(trip, leg));
+  const first = (leg: (typeof plan.legs)[number]) => leg.role !== "return" && leg.destinationCommitmentRef === bounded[0]?.commitment.ref;
   const { due: candidates, later } = trips
     ? { due: plan.legs.filter(requested), later: plan.legs.filter((leg) => !requested(leg)) }
+    : firstTrip ? { due: plan.legs.filter(first), later: plan.legs.filter((leg) => !first(leg)) }
     : request.scope === "day"
       ? { due: plan.legs, later: [] }
       : partitionTravelLegsByWindow(plan.legs, now);
@@ -196,18 +236,22 @@ export async function refreshTravelRoutes(
     ...doomed.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_READY_AFTER_END })),
   ];
   // A trip request leaves the other trips unrouted, so its conclusions would not describe the day.
-  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips;
+  // A left-out Outlook or iCloud Calendar withholds the token too: the conclusions would miss its stops.
+  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip &&
+    calendarEvents.unavailable.length === 0;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
-    events: snapshot?.events ?? [], occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    events, occurrenceIds: behaviorOccurrences.map((occurrence) => occurrence.id),
+    stops: { outlook_calendar: stops.some(({ event }) => event.source === "outlook_calendar"),
+      icloud_calendar: stops.some(({ event }) => event.source === "icloud_calendar") },
     sourceKey: travelConclusionsSourceKey({ settingsRevision: source.settingsRevision, habitsRevision: source.habitsRevision,
       enabled: source.settings.enabled, mode: source.settings.mode, routingConsentAt: source.settings.routingConsentAt,
       baseLocationText: source.settings.baseLocationText, habits: source.settings.habits ?? null,
-      calendar: calendar, behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
+      calendar: calendar, connectors: travelConnectorFence(calendars), behaviors: source.behaviors, occurrences: behaviorOccurrences, timezone, durationRevision }),
   }) : null;
   const budget = await readTravelBudget(caller, timezone, now);
-  return response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
+  return { calendarsLeftOut: calendarEvents.unavailable, response: response(caller.user.id, source, conclusionsToken, budget, { ...projectTravelRouteDisplay(evidence),
     behaviorSources: behaviorOccurrences.filter(occurrence => afterNow(occurrence.scheduled_for, now) ||
       (!!behaviorDestination(source.behaviors.find((behavior) => behavior.id === occurrence.behavior_id), source.settings.baseLocationText) &&
         notEnded(behaviorEndAt(occurrence, durationEstimates.get(occurrence.behavior_id), timezone), now))).map(occurrence => {
@@ -215,7 +259,7 @@ export async function refreshTravelRoutes(
       return { ref: occurrence.id, behaviorId: occurrence.behavior_id, unresolved: occurrence.status === "unresolved",
         ...(occurrence.schedule_kind === "exact" ? { durationSeconds: duration?.kind === "known" ? duration.seconds : null } : {}) };
     }),
-  });
+  }) };
 }
 
 /**
@@ -230,11 +274,13 @@ async function resolvePlaces(
   signal: AbortSignal,
   beforeFirstProviderCall: () => Promise<void>,
   reserve: TravelSpendReservation,
+  lookUpAgain: ReadonlySet<string> = new Set(),
 ): Promise<ReadonlyMap<string, TravelPoint | null>> {
   const keyByText = new Map(texts.flatMap((text) => text ? [[text, placeTextKey(text)] as const] : []));
   if (!keyByText.size) return new Map();
   const stored = await readTravelPlaceCache(caller.client, caller.user.id, [...new Set(keyByText.values())]);
-  const reusable = new Map(stored.filter((row) => travelPlaceLookupReusable(row, now)).map((row) => [row.textKey, row]));
+  // Ticket 281: a key in lookUpAgain is looked up again, and the result replaces its stored row.
+  const reusable = new Map(stored.filter((row) => !lookUpAgain.has(row.textKey) && travelPlaceLookupReusable(row, now)).map((row) => [row.textKey, row]));
   // One lookup per distinct key, even when differently typed texts normalize alike.
   const missing = [...new Map([...keyByText].filter(([, key]) => !reusable.has(key)).map(([text, key]) => [key, text])).entries()];
   if (missing.length) {
@@ -267,27 +313,85 @@ function placeTextKey(text: string): string {
   return createHash("sha256").update(normalizeTravelPlaceText(text)).digest("base64url");
 }
 
-function calendarCommitmentDrafts(
-  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"],
-  request: TravelRouteRefreshRequest,
+/**
+ * Ticket 281: each corrected event's own location key, mapped to the corrected text. Other
+ * events with the same location use the correction too. Unlocated events have nothing to remember.
+ */
+function correctedPlaceTexts(events: readonly NormalizedExternalEvent[], request: TravelRouteRefreshRequest): ReadonlyMap<string, string> {
+  return new Map(request.corrections.flatMap((correction) => {
+    const location = events.find((event) => event.id === correction.eventId)?.location;
+    if (!location || !normalizeTravelPlaceText(location)) return [];
+    const key = placeTextKey(location);
+    return key === placeTextKey(correction.locationText) ? [] : [[key, correction.locationText] as const];
+  }));
+}
+
+/**
+ * Ticket 281: the location keys of events corrected back to their own text. The user is undoing
+ * a remembered place, so that text is looked up again and the result replaces the remembered row.
+ * This costs one place lookup per refresh while the correction stays, until the Timeline closes.
+ */
+function restoredPlaceKeys(events: readonly NormalizedExternalEvent[], request: TravelRouteRefreshRequest): ReadonlySet<string> {
+  return new Set(request.corrections.flatMap((correction) => {
+    const location = events.find((event) => event.id === correction.eventId)?.location;
+    if (!location || !normalizeTravelPlaceText(location)) return [];
+    const key = placeTextKey(location);
+    return key === placeTextKey(correction.locationText) ? [key] : [];
+  }));
+}
+
+/**
+ * Ticket 281: stores a corrected place's ID under the original text's key, so the text resolves
+ * to it after a reload. Only the key and place ID are stored, never place or event text. Turning
+ * travel off deletes the rows. A failed write only loses the memory, not this refresh.
+ */
+async function rememberCorrectedPlaces(
+  caller: CalendarReadCaller,
+  remembered: ReadonlyMap<string, string>,
+  places: ReadonlyMap<string, TravelPoint | null>,
   now: Temporal.Instant,
-): CommitmentDraft[] {
+): Promise<void> {
+  const rows: TravelPlaceCacheRow[] = [...remembered].flatMap(([textKey, text]) => {
+    const point = places.get(text);
+    return point?.kind === "place_id" ? [{ textKey, outcome: "resolved" as const, placeId: point.placeId, lookedUpAt: now.toString() }] : [];
+  });
+  if (rows.length) await writeTravelPlaceCache(caller.client, caller.user.id, rows).catch(() => undefined);
+}
+
+type CalendarStop = Readonly<{ event: NormalizedTimedExternalEvent; placeText: string; endpointSource: "correction" | "calendar" }>;
+
+/**
+ * The Calendar events the plan counts as stops, in start order, before the nine-stop bound.
+ * Decision D18: the signed token records per Outlook and iCloud Calendar whether it had one.
+ */
+function calendarStops(
+  events: readonly NormalizedExternalEvent[],
+  request: TravelRouteRefreshRequest,
+  remembered: ReadonlyMap<string, string>,
+  now: Temporal.Instant,
+): CalendarStop[] {
   const correctionById = new Map(request.corrections.map((correction) => [correction.eventId, correction]));
-  const allTimed = events.filter((event) => event.kind === "timed");
+  const allTimed = events.filter((event): event is NormalizedTimedExternalEvent => event.kind === "timed");
   for (const correction of request.corrections) {
     const event = allTimed.find((candidate) => candidate.id === correction.eventId);
     if (!event || eventRevision(event) !== correction.revision) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
   }
   // Decision D12: an event with a place is in person; an event without one is not travel. It asks
   // nothing, gets no route and never blocks a later trip. It stays a normal Calendar event.
-  const placeOf = (event: (typeof allTimed)[number]): string | null => correctionById.get(event.id)?.locationText ?? (event.location || null);
+  // Ticket 281: an event whose location another event corrected uses that correction too.
+  const placeOf = (event: (typeof allTimed)[number]): string | null => correctionById.get(event.id)?.locationText ??
+    (event.location ? remembered.get(placeTextKey(event.location)) ?? event.location : null);
   // Ticket 264: an event under way stays the prior stop until its end.
-  const prospective = allTimed
+  return allTimed
     .filter((event) => event.state !== "cancelled" && event.currentUserResponse !== "declined" && placeOf(event) !== null &&
       (afterNow(event.startAt, now) || notEnded(event.endUnspecified ? null : event.endAt, now)))
-    .sort((left, right) => compareInstants(left.startAt, right.startAt));
+    .sort((left, right) => compareInstants(left.startAt, right.startAt))
+    .map((event) => ({ event, placeText: placeOf(event)!, endpointSource: correctionById.has(event.id) ? "correction" as const : "calendar" as const }));
+}
+
+function calendarCommitmentDrafts(prospective: readonly CalendarStop[]): CommitmentDraft[] {
   const timed = prospective.length > 9 ? prospective.slice(0, 9) : prospective;
-  return timed.map((event, index) => {
+  return timed.map(({ event, placeText, endpointSource }, index) => {
     const overflow = prospective.length > 9 && index === 8;
     return {
       commitment: {
@@ -300,10 +404,19 @@ function calendarCommitmentDrafts(
         mode: null,
         excluded: event.state === "cancelled" || event.currentUserResponse === "declined",
       } as Omit<TravelCommitment, "endpoint">,
-      placeText: overflow ? null : placeOf(event),
-      endpointSource: correctionById.has(event.id) ? "correction" : "calendar",
+      placeText: overflow ? null : placeText,
+      endpointSource,
     };
   });
+}
+
+/**
+ * Ticket 282: tomorrow's first stop away from Home, alone, so the request makes one route call and
+ * at most two place lookups. The Timeline's tomorrow key picks its stop with the same helper.
+ */
+function firstTripDrafts(drafts: readonly CommitmentDraft[], homeText: string | null): CommitmentDraft[] {
+  const first = firstTravelStopAwayFromHome(drafts, (draft) => draft.placeText, homeText);
+  return first ? [first] : [];
 }
 
 /**
@@ -392,8 +505,11 @@ function eventRevision(event: { revision: { providerEtag: string | null; provide
   return createHash("sha256").update(JSON.stringify([event.id, event.startAt ?? null, event.endAt ?? null, event.location, event.conference, event.state])).digest("base64url");
 }
 
-function revision(settingsRevision: string, habitsRevision: string | null, generation: number, selectionRevision: number, commitments: readonly TravelCommitment[], corrections: TravelRouteRefreshRequest["corrections"]): string {
-  return createHash("sha256").update(JSON.stringify({ settingsRevision, habitsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, locationText }) => [eventId, correctionRevision, locationText]) })).digest("base64url");
+function revision(settingsRevision: string, habitsRevision: string | null, generation: number, selectionRevision: number, commitments: readonly TravelCommitment[], corrections: TravelRouteRefreshRequest["corrections"],
+  connectors: string | null): string {
+  return createHash("sha256").update(JSON.stringify({ settingsRevision, habitsRevision, generation, selectionRevision, commitments: commitments.map(({ ref, revision: eventRevisionValue }) => [ref, eventRevisionValue]), corrections: corrections.map(({ eventId, revision: correctionRevision, locationText }) => [eventId, correctionRevision, locationText]),
+    // Ticket 283: present only while Outlook or iCloud takes part, so a Google-only revision is unchanged.
+    ...(connectors ? { connectors } : {}) })).digest("base64url");
 }
 
 function sameBehaviors(left: readonly TravelRouteBehavior[], right: readonly TravelRouteBehavior[]): boolean {
@@ -409,7 +525,7 @@ function sameOccurrences(current: Awaited<ReturnType<typeof listOccurrencesBetwe
   return occurrenceRouteRevision(current) === expected;
 }
 
-function sameCalendarRevisions(left: Awaited<ReturnType<typeof getCalendarEvents>>["events"], right: Awaited<ReturnType<typeof getCalendarEvents>>["events"]): boolean {
+function sameCalendarRevisions(left: readonly NormalizedExternalEvent[], right: readonly NormalizedExternalEvent[]): boolean {
   const revisions = (events: typeof left) => events.map((event) => [event.id, eventRevision(event)]).sort((first, second) => first[0].localeCompare(second[0]));
   return JSON.stringify(revisions(left)) === JSON.stringify(revisions(right));
 }
@@ -495,28 +611,43 @@ function response(accountId: string, source: Awaited<ReturnType<typeof readTrave
 /**
  * Signs Cadence's conclusions for this view (Ticket 219 Option A). Commitments are named
  * by occurrence ID or Calendar event identity so the brief can map them to its own refs.
- * Any commitment it cannot name withholds the whole token.
+ * Decision D18: `events` is every Calendar's snapshot; Outlook and iCloud names carry their
+ * source, as the brief's refs do. `stops` says, per Outlook and iCloud Calendar, whether it had
+ * a stop. Any commitment it cannot name withholds the whole token.
  */
 function signedConclusions(evidence: TravelEvidenceResult, input: Readonly<{
   secret: string; userId: string; localDate: string; now: Temporal.Instant; expiresAt: string; sourceKey: string;
-  events: Awaited<ReturnType<typeof getCalendarEvents>>["events"]; occurrenceIds: readonly string[];
+  events: readonly NormalizedExternalEvent[]; occurrenceIds: readonly string[]; stops: TravelConclusionsStops;
 }>): string | null {
   const conclusions = evidence.modelProjection;
   if (!conclusions || Temporal.Instant.compare(Temporal.Instant.from(input.expiresAt), input.now) <= 0) return null;
   const occurrences = new Set(input.occurrenceIds);
   const events = new Map(input.events.map((event) => [event.id, event]));
-  const named = new Map(input.events.map((event) => [`event:${event.calendarId}\0${event.providerEventId}`, JSON.stringify(event.revision)]));
+  const named = new Map(input.events.map((event) => [conclusionEventName(event), conclusionEventRevision(event)]));
   const rename = (ref: string) => {
     const event = events.get(ref);
-    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? `event:${event.calendarId}\0${event.providerEventId}` : null;
+    const key = occurrences.has(ref) ? `occurrence:${ref}` : event ? conclusionEventName(event) : null;
     if (!key) throw new Error("Unnamed travel commitment.");
     return key;
   };
   try {
     const facts = renameTravelConclusionRefs({ conclusions, weather: advisorWeatherOutlook(evidence) }, rename);
     return issueTravelConclusionsToken({ sub: input.userId, date: input.localDate, src: input.sourceKey, iat: input.now.toString(),
-      exp: input.expiresAt, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named) }, input.secret);
+      exp: input.expiresAt, conclusions: facts.conclusions, weather: facts.weather, events: Object.fromEntries(named), stops: input.stops }, input.secret);
   } catch {
     return null;
   }
+}
+
+/** Matches the brief's own event ref input: Google unscoped, Outlook and iCloud led by their source. */
+function conclusionEventScope(event: NormalizedExternalEvent, value: string): string {
+  return event.source === "outlook_calendar" || event.source === "icloud_calendar" ? `${event.source}\0${value}` : value;
+}
+
+function conclusionEventName(event: NormalizedExternalEvent): string {
+  return `event:${conclusionEventScope(event, `${event.calendarId}\0${event.providerEventId}`)}`;
+}
+
+function conclusionEventRevision(event: NormalizedExternalEvent): string {
+  return conclusionEventScope(event, JSON.stringify(event.revision));
 }

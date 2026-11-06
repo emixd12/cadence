@@ -110,7 +110,8 @@ export function leaveReminderStaleClaimBefore(now: string): string {
  * Decides one account visit from its records and the trips the current plan has. Records
  * another run holds are left alone. A trip is dropped when it leaves the plan: its event
  * moved (new digest), was cancelled or declined, lost its location, or its Occurrence was
- * resolved or its Where stopped routing.
+ * resolved or its Where stopped routing. While a Calendar read failed, a missing trip may
+ * be that Calendar's, so today's records are kept and decided on a later visit.
  */
 export function planLeaveReminderVisit(input: Readonly<{
   now: string;
@@ -129,6 +130,12 @@ export function planLeaveReminderVisit(input: Readonly<{
   preparationChangedAt?: string | null;
   records: readonly LeaveReminderRecord[];
   trips: readonly LeaveReminderTrip[];
+  /**
+   * True when a connected Calendar's read failed, so `trips` may lack its trips. A record for
+   * today whose trip is missing is then neither cancelled nor closed. A record is only a digest,
+   * so its Calendar is unknown: every missing trip for today is kept until a complete read.
+   */
+  calendarsLeftOut?: boolean;
 }>): LeaveReminderVisitPlan {
   const now = Temporal.Instant.from(input.now);
   const localDate = leaveReminderLocalDate(input.now, input.timezone);
@@ -151,6 +158,7 @@ export function planLeaveReminderVisit(input: Readonly<{
     const openCheck = record.status === "sent" && record.nextCheckAt !== null && record.updateSentAt === null;
 
     if (!trip) {
+      if (input.calendarsLeftOut && record.localDate === localDate) continue;
       if (record.status === "pending") cancel.push(record);
       else if (openCheck) closeCheck.push(record);
       continue;

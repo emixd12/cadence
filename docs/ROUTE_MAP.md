@@ -173,10 +173,10 @@ Tauri-origin rules, and expose no provider write.
 | `/api/outlook-calendar/connection` | GET, POST, PUT, DELETE | 224 | Status; start consent; desktop completion with the desktop session and Keychain client state; disconnect with the Microsoft removal instruction |
 | `/auth/outlook-calendar/callback` | GET | 224 | Web: consume one-use state, require the initiating cookie user, PKCE, nonce, issuer, `tid`/`sub` binding, sealed install. Desktop: forward code and state to `cadence://outlook-calendar/callback` without consuming the attempt |
 | `/api/outlook-calendar/calendars` | GET, PUT | 224 | List readable calendars; save selection |
-| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/outlook-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 224 | Schema `1.1.0` snapshot; today through today + 30. `fields=location` adds event locations (Ticket 283) |
 | `/api/icloud-calendar/connection` | GET, POST, DELETE | 227 | Status, accept credential once, disconnect |
 | `/api/icloud-calendar/calendars` | GET, PUT | 227 | Discover `VEVENT` calendars; save selection |
-| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30 |
+| `/api/icloud-calendar/events?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 227 | Schema `1.1.0` snapshot; today through today + 30. `fields=location` adds event locations (Ticket 283) |
 | `/api/hevy/connection` | GET, POST, DELETE | 223 | Status, accept API key once, disconnect |
 | `/api/hevy/activities?start=YYYY-MM-DD&end=YYYY-MM-DD` | GET | 223 | Recorded-activity snapshot `1.0.0`; inclusive local days, end no later than today, at most 31 days |
 
@@ -268,6 +268,13 @@ planned from a last stop at Home. The response adds `budget`: `reservedMicrodoll
 through owner-only RLS. It is omitted when the read fails. The ceiling is enforced only by
 `reserve_travel_provider_spend`. Timeline scope also routes an onward trip 3 hours before
 it can leave, so a trip longer than 3 hours gets its leave time before it is due.
+Ticket 282 adds `scope: first_trip`, for one local day that must be tomorrow in the account's
+timezone; any other day returns `context_changed` before a provider call. It takes no trips or
+corrections and ignores any device sample. It routes one leg, from saved Home to tomorrow's
+first stop away from Home, with no weather and no `conclusionsToken`, so today's signed
+conclusions and the Daily Brief never include it.
+Calendar reads must start today, so this scope reads today through tomorrow and keeps
+only the events that start tomorrow (`readTravelCalendarRange`).
 Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
 state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
 leg may carry its fixed weather margin. The server derives the weather area from the
@@ -278,6 +285,9 @@ HMAC-signed and bound to the user, local date, stored travel inputs and the view
 expiry. Clients keep it in page memory only and return it unchanged as
 `travelConclusions` in `POST /api/advisor/brief`. The server verifies it there; any
 failure leaves trip and weather facts `not_supplied` and never fails the brief.
+Decision D18: the token covers stops from every Calendar. It names Outlook and iCloud events
+by source, and the brief accepts it only when each named event is in its own context, which
+holds Outlook or iCloud only under that Calendar's Daily Brief disclosure.
 
 `GET /api/travel/habits` (Ticket 217) returns names for remembered places: "Home"
 or the Behavior's own place text, keyed by place key. Calendar-only places get no

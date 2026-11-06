@@ -182,6 +182,8 @@ describe("desktop iCloud source", () => {
     await act(async () => { await current.refresh("manual"); });
     expect(current.icloud).toMatchObject({ state: "ready", error: null });
     expect(events).toHaveBeenCalledTimes(1);
+    // Ticket 283: the Mac asks for locations too, so iCloud events route like Google ones.
+    expect(transport.request.mock.calls.map(([path]) => String(path)).find((path) => path.startsWith("/api/icloud-calendar/events"))).toContain("fields=location");
   });
 
   it("drops cached iCloud context after permission withdrawal without clearing Hevy", async () => {

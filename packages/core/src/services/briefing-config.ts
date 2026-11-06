@@ -22,6 +22,7 @@ import { ADVISOR_DAY_CONTEXT_VERSION, type AdvisorCalendarConnector, type Adviso
 import { BRIEFING_ANALYSIS_LANE_IDS, type BriefingAnalysisLaneId } from "../types/briefing-analysis";
 import type { BriefingAnalysisConfig } from "../types/briefing-config";
 import type { AdvisorDuration, AdvisorOccurrence } from "../types/advisor-day-context";
+import type { AdvisorTravelContext } from "../types/briefing-travel";
 import { validateAdvisorDayContext, validateVersionedAdvisorDayContext } from "./advisor-day-context";
 import { projectBriefingTravelFacts } from "./briefing-travel";
 
@@ -206,14 +207,18 @@ export function scopeBriefingContext(contextValue: unknown, configValue: unknown
 export function splitBriefingContext(contextValue: unknown, configValue: unknown): Readonly<{
   context: AdvisorDayContextV1;
   sources: BriefingConnectorSources;
+  /** Validated against every source's refs; a `1.1` view leaves it out (decision D18). */
+  travel: AdvisorTravelContext | null;
 }> {
   const context = validateVersionedAdvisorDayContext(contextValue);
   const config = parseBriefingConfig(configValue);
-  if (context.version === ADVISOR_DAY_CONTEXT_VERSION) return { context, sources: { calendars: [], recordedActivity: null } };
+  if (context.version === ADVISOR_DAY_CONTEXT_VERSION) return { context, sources: { calendars: [], recordedActivity: null }, travel: context.travel ?? null };
   const google = (context.connectors.find((connector) => connector.source === "google_calendar")
     ?? { source: "google_calendar", state: "not_requested" }) as AdvisorCalendarConnector | { source: "google_calendar"; state: "not_requested" };
+  // Travel may name an Outlook or iCloud event, which the Google-only view cannot hold.
+  const { travel, ...rest } = context;
   const view = validateAdvisorDayContext({
-    ...context,
+    ...rest,
     version: ADVISOR_DAY_CONTEXT_VERSION,
     status: google.state !== "not_requested" && !google.complete ? "partial" : "complete",
     connectors: [google],
@@ -221,7 +226,7 @@ export function splitBriefingContext(contextValue: unknown, configValue: unknown
   const calendars = config.scope.includeCalendar ? context.connectors.filter((connector): connector is AdvisorCalendarConnectorV1_1 =>
     (connector.source === "outlook_calendar" || connector.source === "icloud_calendar") && connector.state !== "not_requested") : [];
   const activity = context.connectors.find((connector) => connector.source === "hevy" && connector.state !== "not_requested");
-  return { context: view, sources: { calendars, recordedActivity: activity && "activities" in activity ? activity : null } };
+  return { context: view, sources: { calendars, recordedActivity: activity && "activities" in activity ? activity : null }, travel: travel ?? null };
 }
 
 /** Model branches for disclosed sources. Calendar timing and recorded activity stay separate. */
@@ -233,7 +238,15 @@ export function projectBriefingConnectorSources(sources: BriefingConnectorSource
   };
 }
 
-export function projectBriefingContext(contextValue: unknown, configValue: unknown): BriefingContextProjection {
+/**
+ * `split` comes from `splitBriefingContext`. Decision D18: travel conclusions may name
+ * Outlook or iCloud events, which only the separately disclosed calendars carry, so the
+ * travel block arrives beside the Google-only view and those events count as visible.
+ */
+export function projectBriefingContext(contextValue: unknown, configValue: unknown, split?: Readonly<{
+  travel: AdvisorTravelContext | null;
+  calendars: readonly AdvisorCalendarConnectorV1_1[];
+}>): BriefingContextProjection {
   const config = parseBriefingConfig(configValue);
   const sourceContext = validateAdvisorDayContext(contextValue);
   const context = scopeBriefingContext(contextValue, config);
@@ -271,11 +284,16 @@ export function projectBriefingContext(contextValue: unknown, configValue: unkno
     selectedBehaviors.has(behaviorRef) && localDate >= context.cadence.history.startLocalDate && localDate < context.cadence.history.endLocalDateExclusive);
   const recordedIncluded = config.context.includeRecordedElapsedDurations && recorded.length > 0;
   const calendarInFacts = config.scope.includeCalendar && calendarIncluded;
-  const travel = sourceContext.travel ? projectBriefingTravelFacts(sourceContext.travel, {
+  const otherCalendars = config.scope.includeCalendar ? split?.calendars ?? [] : [];
+  const travelSource = split ? split.travel : sourceContext.travel ?? null;
+  const travel = travelSource ? projectBriefingTravelFacts(travelSource, {
     occurrenceRefs: new Set(occurrences.map(({ ref }) => ref)),
     behaviorRefs: new Set(occurrences.map(({ behaviorRef }) => behaviorRef)),
-    eventRefs: new Set(calendarInFacts && calendar && "events" in calendar ? calendar.events.map(({ ref }) => ref) : []),
-    calendarIncluded: calendarInFacts,
+    eventRefs: new Set([
+      ...(calendarInFacts && calendar && "events" in calendar ? calendar.events.map(({ ref }) => ref) : []),
+      ...otherCalendars.flatMap((item) => "events" in item ? item.events.map(({ ref }) => ref) : []),
+    ]),
+    calendarIncluded: calendarInFacts || otherCalendars.length > 0,
   }) : null;
   const facts = {
     version: context.version,

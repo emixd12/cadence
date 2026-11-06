@@ -6,6 +6,7 @@ import {
   DEPARTURE_LEAVE_NOW_SECONDS,
   DEPARTURE_SOON_SECONDS,
   resolveDepartureModel,
+  resolveTomorrowFirstTrip,
 } from "../packages/core/src/resolvers/departure.resolver";
 import { resolveTravelAfterDecisions, resolveTravelEvidence, resolveTravelPlan } from "../packages/core/src/resolvers/travel.resolver";
 import {
@@ -707,5 +708,33 @@ describe("Ticket 261 phrases", () => {
     expect(eventStateWord("tentative")).toBe("Tentative");
     expect(eventStateWord("cancelled")).toBe("Cancelled");
     expect(eventStateWord("confirmed")).toBeNull();
+  });
+});
+
+describe("tomorrow's first trip (Ticket 282)", () => {
+  // Today is September 16 at 7 PM. Tomorrow: Dentist at 9 AM, routed from Home to leave at 8:10 AM.
+  const tomorrowDentist: DepartureStop = { ref: "dentist", label: "Dentist", startAt: local("09:00", "2026-09-17"), endAt: local("10:00", "2026-09-17") };
+  const routed = timed(leg("outbound", null, "dentist", { readyAt: local("07:00", "2026-09-17") }), local("08:10", "2026-09-17"), local("08:50", "2026-09-17"),
+    {}, local("19:05"));
+  const later = missing(leg("return", "dentist", null, { readyAt: local("10:00", "2026-09-17") }), "unavailable", TRAVEL_LEG_OUTSIDE_WINDOW);
+  const first = (legs: readonly TravelResolvedLegEvidence[], now = local("19:00"), stops: readonly DepartureStop[] = [tomorrowDentist]) =>
+    resolveTomorrowFirstTrip({ evidence: { legs: [...legs], unknownLegs: [] }, stops, now, timezone: NY, tomorrowLocalDate: "2026-09-17",
+      arrivalBufferSeconds: 600, preparationSeconds: 0 });
+
+  it("reads the line with the time and the event, without a date", () => {
+    expect(first([routed, later])).toEqual({ ref: "dentist", leaveAt: local("08:10", "2026-09-17"), phrase: "Tomorrow: leave by 8:10 AM for Dentist." });
+    // The estimate is long expired by 11 PM; the line still names the leave time.
+    expect(first([routed, later], local("23:00"))?.phrase).toBe("Tomorrow: leave by 8:10 AM for Dentist.");
+  });
+
+  it("shows nothing without a leave time, for another day, or once tomorrow has come", () => {
+    expect(first([missing(routed.leg, "unavailable", "no_route"), later])).toBeNull();
+    expect(resolveTomorrowFirstTrip({ evidence: { legs: [routed, later], unknownLegs: [] }, stops: [tomorrowDentist], now: local("19:00"), timezone: NY,
+      tomorrowLocalDate: "2026-09-18", arrivalBufferSeconds: 600, preparationSeconds: 0 })).toBeNull();
+    expect(first([routed, later], local("08:00", "2026-09-17"))).toBeNull();
+  });
+
+  it("names the next stop when the title is not known", () => {
+    expect(first([routed, later], local("19:00"), [])?.phrase).toBe("Tomorrow: leave by 8:10 AM for your next stop.");
   });
 });

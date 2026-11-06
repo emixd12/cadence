@@ -2,7 +2,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DAILY_BRIEF_TRAVEL_WAIT_MS, clearTravelSession, requestDailyBriefTravel, waitForDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, useTravelContext, type TravelClient, type TravelState, type TravelRoutesInput, type TravelRoutesView } from "@/lib/ui/travel";
+import { DAILY_BRIEF_TRAVEL_WAIT_MS, clearTravelSession, requestDailyBriefTravel, waitForDailyBriefTravel, travelConclusionsToken, TravelClientError, travelClientErrorFromResponse, resetTravelViewCacheForTest, travelTomorrowStopKey, useTravelContext, type TravelClient, type TravelState, type TravelRoutesInput, type TravelRoutesView } from "@/lib/ui/travel";
+import type { NormalizedExternalEvent } from "@cadence/core/types/day-progress";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { travelTripMatches } from "@cadence/core/services/travel-refresh-policy";
 import type { TravelEvidenceLeg, TravelOccupiedSegment, TravelResolvedLegEvidence } from "@cadence/core/types/travel";
@@ -893,6 +894,154 @@ describe("Ticket 272: the first Daily Brief's travel wait", () => {
       expect(settled).toBeUndefined();
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(settled).toBeNull();
+    } finally { await unmount(); }
+  });
+});
+
+describe("tomorrow's first trip (Ticket 282)", () => {
+  /** 4 PM in New York. Today's last trip leaves at 7 PM. */
+  const AFTERNOON = new Date("2026-09-21T20:00:00Z");
+  const tomorrowView = (): TravelRoutesView => ({ ...view("account-a"), evidence: { ...view("account-a").evidence!, journeyRef: "tomorrow" } });
+  /** A tomorrow key with one located stop, the dentist, at the given travel-input revision. */
+  const dentistKey = (revision: string) => JSON.stringify(["2026-09-22", [["dentist", "Dentist St", revision]]]);
+  function TomorrowProbe({ client, stopKey }: { client: TravelClient; stopKey: string | null }) {
+    const state = useTravelContext({ enabled: true, accountId: "account-a", sourceKey: "source", localDate: "2026-09-21", client,
+      timezone: "America/New_York", tomorrowStopKey: stopKey });
+    capture(state);
+    return <p>{state.view?.evidence?.journeyRef ?? "empty"}</p>;
+  }
+  async function mountTomorrow(stopKey: string | null = dentistKey("r1"), homeText: string | null = null) {
+    vi.useFakeTimers({ now: AFTERNOON });
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    const routes = vi.fn(async (input: TravelRoutesInput) => input.scope === "first_trip" ? tomorrowView()
+      // The token outlives the hour this test waits, so a change to it would show.
+      : { ...movingView("account-a"), conclusionsToken: "signed.token", expiresAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString() });
+    const withHome = { ...settings, baseLocationText: homeText };
+    const client: TravelClient = { settings: { load: async () => withHome, save: async () => withHome },
+      configured: async () => true, readLocation: async () => ({ state: "denied" as const }), routes };
+    const host = document.createElement("div"); document.body.append(host);
+    let root = createRoot(host);
+    const render = (key: string | null = stopKey) => act(() => root.render(<TomorrowProbe client={client} stopKey={key} />));
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+    const firstTripCalls = () => routes.mock.calls.filter(([input]) => input.scope === "first_trip");
+    const remount = async () => { await act(() => root.unmount()); root = createRoot(host); await render(); await act(async () => vi.advanceTimersByTimeAsync(350)); };
+    return { routes, firstTripCalls, render, remount, unmount: async () => { await act(() => root.unmount()); host.remove(); } };
+  }
+
+  it("asks once at 5 PM in a request of its own, and keeps today's view and signed conclusions", async () => {
+    const { routes, firstTripCalls, remount, unmount } = await mountTomorrow();
+    try {
+      expect(routes).toHaveBeenCalledTimes(1);
+      expect(latest().tomorrow).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(firstTripCalls()[0]![0]).toEqual({ scope: "first_trip", startLocalDate: "2026-09-22", endLocalDate: "2026-09-22", device: null, corrections: [] });
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22", view: { evidence: { journeyRef: "tomorrow" } } });
+      // Today's view, its signed conclusions and the Daily Brief token are untouched.
+      expect(latest().view?.evidence?.journeyRef).toBe("account-a");
+      expect(travelConclusionsToken("account-a", "2026-09-21")).toBe("signed.token");
+      expect(travelConclusionsToken("account-a", "2026-09-22")).toBeNull();
+      // Once: focus, a remount and a reload in the same tab ask nothing more.
+      await focusAndWait();
+      await remount();
+      resetTravelViewCacheForTest({ keepSession: true });
+      await remount();
+      await act(async () => vi.advanceTimersByTimeAsync(30 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22" });
+    } finally { await unmount(); }
+  });
+
+  it("asks again only when tomorrow's first stop changes, and never without one", async () => {
+    const { firstTripCalls, render, unmount } = await mountTomorrow(null);
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(0);
+      await render(dentistKey("r1"));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(1);
+      await render(dentistKey("r2"));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(2);
+    } finally { await unmount(); }
+  });
+
+  it("keys tomorrow's estimate on the first stop away from Home, the one the server routes", async () => {
+    const event = (id: string, location: string, startAt: string, endAt: string) => ({ kind: "timed", id, providerEventId: id, calendarId: "test",
+      source: "google_calendar", title: id, location, startAt, endAt, endUnspecified: false, state: "confirmed", currentUserResponse: "accepted",
+      conference: null }) as unknown as NormalizedExternalEvent;
+    const timeline = { daySections: [], todayLocalDate: "2026-09-21", timezone: "America/New_York" };
+    // 8 AM at Home, then 10 AM at the dentist: the first trip is to the dentist.
+    const atHome = event("breakfast", " 1 home st ", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z");
+    const dentist = event("dentist", "Dentist St", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z");
+    const key = (events: NormalizedExternalEvent[]) => travelTomorrowStopKey(events, timeline);
+    const { firstTripCalls, render, unmount } = await mountTomorrow(key([atHome, dentist]), "1 Home St");
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      // The routed destination moves: tomorrow's estimate is asked for again.
+      await render(key([atHome, { ...dentist, location: "New Dentist St" } as NormalizedExternalEvent]));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(2);
+      // The stop at Home changes, but the routed stop does not: nothing more is asked.
+      await render(key([{ ...atHome, endAt: "2026-09-22T13:30:00Z" } as NormalizedExternalEvent, { ...dentist, location: "New Dentist St" } as NormalizedExternalEvent]));
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(2);
+    } finally { await unmount(); }
+  });
+
+  it("tries a failed request once more after 5 minutes, and not after a quota refusal", async () => {
+    const { routes, firstTripCalls, unmount } = await mountTomorrow();
+    try {
+      const today = routes.getMockImplementation()!;
+      routes.mockImplementation(async (input: TravelRoutesInput) => input.scope === "first_trip" ? Promise.reject(new TravelClientError("provider_unavailable")) : today(input));
+      // 5 PM: the first request fails. 5:05 PM: the one retry fails too.
+      await act(async () => vi.advanceTimersByTimeAsync(64 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60_000));
+      expect(firstTripCalls()).toHaveLength(2);
+      expect(latest().tomorrow ?? null).toBeNull();
+      // Both failed: nothing more this evening.
+      await focusAndWait();
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(2);
+    } finally { await unmount(); }
+
+    resetTravelViewCacheForTest();
+    const second = await mountTomorrow(dentistKey("r1"));
+    try {
+      const today = second.routes.getMockImplementation()!;
+      second.routes.mockImplementation(async (input: TravelRoutesInput) => input.scope === "first_trip"
+        ? Promise.reject(new TravelClientError("quota_exceeded", null, "2026-10-01T04:00:00Z")) : today(input));
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60 * 60_000));
+      expect(second.firstTripCalls()).toHaveLength(1);
+    } finally { await second.unmount(); }
+  });
+
+  it("shows tomorrow's first trip from the retry when the first request failed", async () => {
+    const { routes, firstTripCalls, unmount } = await mountTomorrow();
+    try {
+      const today = routes.getMockImplementation()!;
+      routes.mockImplementationOnce(async (input: TravelRoutesInput) => input.scope === "first_trip" ? Promise.reject(new TravelClientError("unknown")) : today(input));
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000 - 1));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(latest().tomorrow ?? null).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(5 * 60_000 + 1));
+      expect(firstTripCalls()).toHaveLength(2);
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22" });
+    } finally { await unmount(); }
+  });
+
+  it("forgets tomorrow's first trip when travel settings change", async () => {
+    const { unmount } = await mountTomorrow();
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(latest().tomorrow).not.toBeNull();
+      await act(async () => { clearTravelSession(); window.dispatchEvent(new Event("cadence:travel-changed")); });
+      expect(latest().tomorrow ?? null).toBeNull();
     } finally { await unmount(); }
   });
 });

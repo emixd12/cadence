@@ -50,9 +50,10 @@ export function prepareBriefing(sourceContext: AdvisorDayContext, value: unknown
   alongsideBehaviorRefs: ReadonlySet<string> = new Set()) {
   const config = parseBriefingConfig(value);
   // Ticket 239: existing projections see the Google-only `1.0` view; disclosed sources travel separately.
-  const { context, sources } = splitBriefingContext(sourceContext, config);
+  const { context, sources, travel } = splitBriefingContext(sourceContext, config);
   const plannerContext = scopeBriefingContext(context, config);
-  const projected = projectBriefingContext(context, config);
+  // Decision D18: travel may name disclosed Outlook or iCloud events, so it is projected beside the view.
+  const projected = projectBriefingContext(context, config, { travel, calendars: sources.calendars });
   const contextControls = projected.contextControls;
   const connectorSources = projectBriefingConnectorSources(sources);
   const sourcesComplete = sources.calendars.every((item) => item.complete) && (sources.recordedActivity?.complete ?? true);

@@ -28,6 +28,7 @@ localDescribe("leave reminder store against local Supabase", () => {
   let userA: string;
   let userB: string;
   let callerA: LeaveReminderCaller;
+  let callerB: LeaveReminderCaller;
   let storeA: LeaveReminderStore;
   let storeB: LeaveReminderStore;
   const runId = randomUUID().slice(0, 8);
@@ -40,7 +41,7 @@ localDescribe("leave reminder store against local Supabase", () => {
     userA = await createUser(`store-a-${runId}@example.test`);
     userB = await createUser(`store-b-${runId}@example.test`);
     callerA = callerFor(userA);
-    const callerB = callerFor(userB);
+    callerB = callerFor(userB);
     storeA = createLeaveReminderStore(callerA.client, userA);
     storeB = createLeaveReminderStore(callerB.client, userB);
     for (const [caller, id] of [[callerA, userA], [callerB, userB]] as const) {
@@ -126,6 +127,36 @@ localDescribe("leave reminder store against local Supabase", () => {
     expect(await storeA.listRecords()).toEqual([]);
     expect(await storeA.remindersEnabled()).toBe(false);
     expect(await storeA.insertClaimed({ tripDigest: digest("5"), localDate: DATE, now: "2026-11-06T15:00:00.000Z" })).toBeNull();
+  });
+
+  it("brings a later next check forward when a get-ready change replaced its lease (D19)", async () => {
+    const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
+    const nextCheck = async () => {
+      const { data, error } = await callerB.client.from("travel_leave_reminder_settings").select("next_check_at").eq("user_id", userB).single();
+      if (error) throw error;
+      return data.next_check_at!;
+    };
+    const lease = at(900_000);
+    expect(await storeB.claimAccount(await nextCheck(), lease)).toBe(true);
+
+    // The user's own get-ready write runs the trigger under RLS and replaces the lease with now.
+    const { error } = await callerB.client.from("travel_settings").update({ preparation_minutes: 25, habits_updated_at: new Date().toISOString() }).eq("user_id", userB);
+    expect(error).toBeNull();
+    const moved = await nextCheck();
+    expect(Date.parse(moved)).toBeLessThan(Date.parse(lease));
+
+    // An overlapping visit takes the account and sets a later next check.
+    const overlapLease = at(900_000);
+    expect(await storeB.claimAccount(moved, overlapLease)).toBe(true);
+    expect(await storeB.releaseAccount(overlapLease, at(1_200_000))).toBe(true);
+
+    // The first visit's release misses its lease but brings the next check forward.
+    const earlier = at(360_000);
+    expect(await storeB.releaseAccount(lease, earlier)).toBe(false);
+    expect(Date.parse(await nextCheck())).toBe(Date.parse(earlier));
+    // It never moves the next check later.
+    expect(await storeB.releaseAccount(lease, at(1_500_000))).toBe(false);
+    expect(Date.parse(await nextCheck())).toBe(Date.parse(earlier));
   });
 
   function callerFor(userId: string): LeaveReminderCaller {

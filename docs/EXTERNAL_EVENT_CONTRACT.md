@@ -328,9 +328,11 @@ Ticket 234 entry points and enforced rules:
   in `EXTERNAL_EVENT_SOURCE_VERSIONS`. Every event and tombstone must carry the
   snapshot source. Outlook and iCloud `id` and `logicalInstanceId` values must
   start with `<source>/` (`externalEventNormalizedId` builds them).
-- Outlook and iCloud events must keep description and location empty and
-  organizer, attendees, conference, and attachments null, each marked
-  `unsupported`. Outlook live events use `unknown` state. iCloud events have a
+- Outlook and iCloud events must keep description empty and organizer,
+  attendees, conference, and attachments null, each marked `unsupported`.
+  Location is `""` and `unsupported` unless the read asked for it (Ticket 283):
+  a travel read carries a non-empty location with no `location` availability
+  entry, or `""` with `not_provided`. Outlook live events use `unknown` state. iCloud events have a
   null source URL and null user response.
 - `externalEventSnapshotScopeKey` binds source, account, generation, range,
   timezone, and selected calendars.
@@ -373,7 +375,7 @@ Outlook mapping (Ticket 237) uses Microsoft Graph `calendarView`:
 | Availability | `showAs`: `free` → free; `busy` and `oof` → busy; `tentative`, `workingElsewhere`, and `unknown` → unknown. |
 | User response | `responseStatus.response`, mapped to the existing response vocabulary. |
 | Revision | `changeKey`, plus `lastModifiedDateTime` when Graph returns it. Graph documents that `lastModifiedDateTime` does not support `$select` on calendarView, so Ticket 237 does not request it and normally records `changeKey` only (`revision.availability` stays `available`). |
-| Details | `subject` only, as bounded untrusted plaintext. Ticket 242: the connector holds exactly one effective Graph data permission, `Calendars.Read` (a co-granted `Calendars.ReadBasic` from earlier consent is accepted; live October 22, 2026, it grants nothing more). The connector needs `Calendars.Read` because Graph rejects personal-account tokens with only `Calendars.ReadBasic`, and `Calendars.Read` allows body, attachments, and extensions. Every calendarView and calendar-list request therefore carries an explicit `$select` of contract fields and no `$expand`; a provider next link that expands or selects any other field is refused before the token is sent, and one without `$select` gets the contract list appended. Response fields outside the contract are dropped by the adapter. Location, attendees, organizer, and online-meeting data are not requested and use `unsupported`. |
+| Details | `subject` only, as bounded untrusted plaintext. Ticket 242: the connector holds exactly one effective Graph data permission, `Calendars.Read` (a co-granted `Calendars.ReadBasic` from earlier consent is accepted; live October 22, 2026, it grants nothing more). The connector needs `Calendars.Read` because Graph rejects personal-account tokens with only `Calendars.ReadBasic`, and `Calendars.Read` allows body, attachments, and extensions. Every calendarView and calendar-list request therefore carries an explicit `$select` of contract fields and no `$expand`; a provider next link that expands or selects any other field is refused before the token is sent, and one without `$select` gets the contract list appended. Response fields outside the contract are dropped by the adapter. Attendees, organizer, and online-meeting data are not requested and use `unsupported`. Ticket 283: a travel read (`includeLocation`, `fields=location` on the route) adds `location` and `isOnlineMeeting` to the select. The location's display name and address parts become one text; an online meeting's default-type location with no address or coordinates (such as "Microsoft Teams Meeting") becomes no location. Other reads keep `location: unsupported`. |
 | Source link | `webLink` is kept only when it is HTTPS on `outlook.office365.com`, `outlook.office.com`, or `outlook.live.com` without credentials or a port; otherwise it is null with `source_url: not_provided`. Ticket 237 found no Microsoft-documented conversion to a newer Outlook on the web format, so none is applied (not verified against live links). |
 | Pagination | `$top` of at most 1,000 per page. Completion requires a response without `@odata.nextLink`. Each next link must be HTTPS on `graph.microsoft.com` (default port, no credentials) and keep the same `/v1.0/me/calendars/{id}/calendarView` path, with the `{id}` segment equal to the requested calendar ID after percent-decoding (raw `=` and `%3D` are the same calendar), before the bearer token is sent; otherwise the read fails as `malformed_provider_response`. A repeated link or a 21st page is `incomplete_pagination`. Pages are capped at 5 MB. Each attempt's fetch and body read settle within the attempt budget even if the fetch or stream ignores abort, and a response completing after the absolute deadline is discarded as `timeout`. |
 | Quarantine record | Ticket 237: a quarantined item (`timezone_unresolved`, `not_midnight`, `invalid_interval`, `unexpected_response_timezone`, `series_master`, or `malformed_item`) does not stop the read. That calendar's coverage has `paginationComplete: false`, and one non-retryable `malformed_provider_response` failure with its `calendarId` lists the reason counts. The snapshot is `incomplete`. |
@@ -391,7 +393,7 @@ iCloud mapping (Ticket 240) uses CalDAV:
 | Availability | `TRANSP`: `OPAQUE` → busy; `TRANSPARENT` → free; absent → unknown. |
 | User response | Not read in the first slice; null with `unsupported`. |
 | Revision | `DAV:getetag` and `LAST-MODIFIED`. |
-| Details | `SUMMARY` only, as bounded untrusted plaintext. Description, location, attendees, organizer, alarms, attachments, and URLs are not read in the first slice and use `unsupported`. |
+| Details | `SUMMARY` only, as bounded untrusted plaintext. Description, attendees, organizer, alarms, attachments, and URLs are not read in the first slice and use `unsupported`. Ticket 283: a travel read keeps one `LOCATION` text, unescaped and bounded; a missing or repeated `LOCATION` is `not_provided`. Other reads keep `location: unsupported`. |
 | Source link | None. Use `unsupported`. |
 | Pagination | CalDAV `calendar-query` has no page token. A `507` response or a truncated multistatus is `incomplete_pagination`. Response bodies are capped at 5 MB per calendar. |
 

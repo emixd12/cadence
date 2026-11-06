@@ -161,6 +161,17 @@ Migration `20261018051402_fence_travel_place_cache_consent.sql` serializes cache
 writes with the owner's travel-settings row. A late lookup cannot repopulate the
 cache after travel is disabled. The trigger rejects foreign ownership and skips
 writes without current routing consent.
+Ticket 281 (remembered places, no migration) reuses this table. When a Calendar event
+has a location and its corrected destination resolves, the refresh service upserts a
+`resolved` row under the key of the event's original location text with the corrected
+place ID. That text then resolves to the corrected place after a reload, for other
+events, Behaviors and Home with the same normalized text, under the same 365-day reuse.
+The row is indistinguishable from a lookup and holds no place or event text. Correcting
+again replaces it; turning travel off deletes it with the rest of the cache. Correcting an
+event back to its own location text undoes it: that refresh looks the text up again, and the
+result replaces the row. While that correction stays, until the Timeline closes, each refresh
+repeats this one lookup. Decision
+D12 dropped the planned attendance record, so nothing about attendance is stored.
 
 Migration `20260922013000_add_travel_route_quota.sql` keeps owner-local-day and
 global UTC-day counters. Authenticated callers consume quota through one
@@ -500,6 +511,15 @@ create table travel_leave_reminders (
   off cannot leave a pending row. `sent` and `failed` are final, `route_count` never
   goes down, `update_sent_at` is set at most once, a `sent` row cannot reopen its
   check, and a reminder keeps its owner, trip and date.
+- A real change to `travel_settings.preparation_minutes` sets the settings row's
+  `next_check_at` to now when reminders are on and the visit is later (decision D19,
+  migration `20261106080000_leave_reminder_visit_after_preparation_change.sql`). The
+  trigger runs as the writer, so owner RLS limits it to that account's row, and it
+  changes nothing else. A visit already due stays. A running visit's lease is replaced,
+  so that visit's release misses and the next run visits again; each reminder keeps
+  its own claim. A release that misses its lease still brings a later `next_check_at`
+  forward to that visit's own next check, never later. `tests/sql/ticket-277-visit-after-preparation-change-smoke.sql`
+  covers it.
 - Row Level Security: owners read, insert and update their own settings row, and
   read, insert, update and delete their own reminders. The job acts as the user
   (Ticket 276), so it uses these same policies. `anon` has no access.

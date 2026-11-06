@@ -223,8 +223,17 @@ export const ExternalEventDetails = forwardRef<HTMLDialogElement, ExternalEventD
   },
 );
 
-/** Ticket 261 wording, approved by the owner on November 5, 2026. The bench lists it (Ticket 266). */
+/**
+ * Ticket 261 wording, approved by the owner on November 5, 2026. The bench lists it (Ticket 266).
+ * Since Ticket 281 it shows only for an event without a location, whose correction is not remembered.
+ */
 export const TRAVEL_CORRECTION_NOTE = "Applies to this event until you close the Timeline.";
+
+/**
+ * Ticket 281 wording, not yet approved (decision D7). A located event's corrected place is
+ * remembered for its location text until travel is turned off. The bench lists it.
+ */
+export const TRAVEL_CORRECTION_REMEMBERED_NOTE = "Applies to every event, Behavior and Home with the same location. Turning off Travel estimates forgets it.";
 
 /**
  * Ticket 271: the Maps link for a Calendar event or a located Behavior. It carries only the
@@ -287,7 +296,7 @@ function TravelCorrectionControl({ event, onTravelCorrection, openRequest = 0 }:
       summaryRef.current?.focus();
     }}>
       <label className="grid gap-1">Destination for this journey<input name="travel_location" required maxLength={500} defaultValue={event.location} className="min-h-11 min-w-0 border-b border-line bg-background" /></label>
-      <p className="text-muted-readable">{TRAVEL_CORRECTION_NOTE} Calendar and saved locations stay unchanged.</p>
+      <p className="text-muted-readable">{event.location?.trim() ? TRAVEL_CORRECTION_REMEMBERED_NOTE : TRAVEL_CORRECTION_NOTE} Calendar and saved locations stay unchanged.</p>
       <button type="submit" className="product-action product-action-secondary min-h-11 w-fit">Use for this journey</button>
     </form>
   </details>;

@@ -38,6 +38,21 @@ export function normalizeTravelPlaceText(text: string): string {
   return text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/**
+ * Ticket 282: the first stop, in the order given, whose place is away from Home. A stop at
+ * Home's text needs no trip, and a stop with blank text has no place. With no Home, the first
+ * stop with a place. The hosted first-trip request routes this stop, and the Timeline keys
+ * tomorrow's estimate on it, so both pick the same one.
+ */
+export function firstTravelStopAwayFromHome<Stop>(stops: readonly Stop[], placeText: (stop: Stop) => string | null | undefined,
+  homeText: string | null): Stop | null {
+  const home = homeText ? normalizeTravelPlaceText(homeText) : null;
+  return stops.find((stop) => {
+    const text = normalizeTravelPlaceText(placeText(stop) ?? "");
+    return !!text && text !== home;
+  }) ?? null;
+}
+
 export function travelPlaceLookupReusable(
   entry: Readonly<{ outcome: TravelPlaceLookupOutcome; lookedUpAt: string }>,
   now: Temporal.Instant,
@@ -319,6 +334,62 @@ export function recordTravelRefresh(
 /** The route request fields for a planned request. Both kinds use the whole-day scope. */
 export function travelRefreshRequestFields(request: TravelRefreshRequest): Readonly<{ scope: "day"; trips?: readonly TravelTripRef[] }> {
   return request.kind === "trip" ? { scope: "day", trips: request.trips } : { scope: "day" };
+}
+
+/** Ticket 282: from this local hour, tomorrow's first trip is estimated even while today has trips left. */
+export const TRAVEL_TOMORROW_FROM_HOUR = 17;
+
+export type TravelTomorrowPlanInput = Readonly<{
+  now: string;
+  timezone: string;
+  /** The date of the day view asking. After midnight that view no longer requests. */
+  localDate: string;
+  /** Today's trips from the kept day view. Null while no day view is known, so nothing is requested. */
+  todayTrips: readonly TravelRefreshTrip[] | null;
+  /** Identifies tomorrow's first located stop and its revision. Null when tomorrow has none. */
+  stopKey: string | null;
+  /**
+   * The last request for tomorrow's first trip: its date and stop key. `retryAt` is set after a
+   * first request failed for a reason worth one more try; the retry is due from then.
+   */
+  last: Readonly<{ localDate: string; stopKey: string; retryAt?: string | null }> | null;
+  budget: TravelBudgetState | null;
+}>;
+
+export type TravelTomorrowPlan = Readonly<{
+  /** Tomorrow's local date when a request is due now, otherwise null. */
+  dueLocalDate: string | null;
+  /** When to ask again if nothing else changes: 5 PM or the last leave time today. */
+  nextDueAt: string | null;
+}>;
+
+/**
+ * Ticket 282 (decision D4): whether to estimate tomorrow's first trip now. Pure; `now` is
+ * injected. A request is due once per tomorrow's first stop and its revision, after 5 PM local
+ * time or once today has no trips left. A failed request is tried once more at `retryAt`. It is a request of its own, so today's signed
+ * conclusions never cover it. Automatic, so it stops at 80% of the monthly ceiling.
+ */
+export function resolveTravelTomorrowPlan(input: TravelTomorrowPlanInput): TravelTomorrowPlan {
+  const none: TravelTomorrowPlan = { dueLocalDate: null, nextDueAt: null };
+  const now = Temporal.Instant.from(input.now);
+  const today = now.toZonedDateTimeISO(input.timezone).toPlainDate();
+  if (today.toString() !== input.localDate || !input.stopKey || !input.todayTrips) return none;
+  const tomorrow = today.add({ days: 1 }).toString();
+  const retryAt = input.last?.localDate === tomorrow && input.last.stopKey === input.stopKey
+    ? input.last.retryAt ? Temporal.Instant.from(input.last.retryAt) : null : undefined;
+  // Asked already: once, plus one retry after a failure, under the 5-minute failure wait.
+  if (retryAt === null) return none;
+  if (travelBudgetPausesAutomatic(input.budget, now)) return none;
+  if (retryAt && Temporal.Instant.compare(now, retryAt) < 0) return { dueLocalDate: null, nextDueAt: retryAt.toString() };
+  if (retryAt) return { dueLocalDate: tomorrow, nextDueAt: null };
+  const evening = today.toPlainDateTime({ hour: TRAVEL_TOMORROW_FROM_HOUR }).toZonedDateTime(input.timezone).toInstant();
+  const ahead = (at: string) => Temporal.Instant.compare(Temporal.Instant.from(at), now) > 0;
+  const tripsLeft = input.todayTrips.filter((trip) => !trip.leaveAt || ahead(trip.leaveAt));
+  if (Temporal.Instant.compare(now, evening) >= 0 || !tripsLeft.length) return { dueLocalDate: tomorrow, nextDueAt: null };
+  // With every remaining leave time known, the day can end before 5 PM.
+  const lastLeave = tripsLeft.every((trip) => trip.leaveAt)
+    ? tripsLeft.map((trip) => Temporal.Instant.from(trip.leaveAt!)).sort(Temporal.Instant.compare).at(-1)! : evening;
+  return { dueLocalDate: null, nextDueAt: (Temporal.Instant.compare(lastLeave, evening) < 0 ? lastLeave : evening).toString() };
 }
 
 export type TravelDeviceSample = Readonly<{ latitude: number; longitude: number; accuracyMeters: number }>;

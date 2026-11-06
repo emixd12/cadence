@@ -21,11 +21,12 @@ import {
   type ConnectorProvider,
   type ConnectorRevocationInstruction,
 } from "@/lib/types/connectors";
-import type { CalendarCaller } from "./google-calendar.service";
+import type { CalendarReadCaller } from "./google-calendar.service";
 
 // Ticket 235 credential custody for Hevy, Outlook Calendar, and iCloud Calendar.
 // The Google Calendar key, AAD, and same-subject rules stay in google-calendar-oauth.ts.
-export type ConnectorCaller = CalendarCaller;
+// Connector reads need only the account id, so the leave reminder job's caller fits (Ticket 283).
+export type ConnectorCaller = CalendarReadCaller;
 export type ConnectorCredentialConfig = Readonly<{ key: Buffer; keyId: string; decryptionKeys: Readonly<Record<string, Buffer>> }>;
 
 const KEY_ID = /^[a-zA-Z0-9_-]{1,32}$/;

@@ -6,10 +6,14 @@ const mocks = vi.hoisted(() => ({
   source: vi.fn(), calendar: vi.fn(), events: vi.fn(), spend: vi.fn(), readPlaces: vi.fn(), writePlaces: vi.fn(),
   occurrences: vi.fn(), behaviors: vi.fn(), timezone: vi.fn(), geocode: vi.fn(), route: vi.fn(),
   historySessions: vi.fn(), weather: vi.fn(), monthSpend: vi.fn(),
+  outlook: vi.fn(), outlookEvents: vi.fn(), icloud: vi.fn(), icloudEvents: vi.fn(),
 }));
 
 vi.mock("@/lib/services/travel-settings.service", () => ({ readTravelRouteSource: mocks.source }));
 vi.mock("@/lib/services/google-calendar.service", () => ({ getCalendarConnection: mocks.calendar, getCalendarEvents: mocks.events }));
+// Ticket 283: Outlook and iCloud are disconnected unless a test connects them.
+vi.mock("@/lib/services/outlook-calendar.service", () => ({ getOutlookCalendarConnection: mocks.outlook, getOutlookCalendarEvents: mocks.outlookEvents }));
+vi.mock("@/lib/services/icloud-calendar.service", () => ({ getIcloudCalendarConnection: mocks.icloud, getIcloudCalendarEvents: mocks.icloudEvents }));
 vi.mock("@/lib/db/travelSpend.repo", async (load) => ({
   ...(await load<typeof import("@/lib/db/travelSpend.repo")>()),
   reserveTravelProviderSpend: mocks.spend, readTravelMonthSpend: mocks.monthSpend,
@@ -30,6 +34,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { verifyTravelConclusionsToken } from "@/lib/services/travel-conclusions-token";
+import { ConnectorError } from "@/lib/types/connectors";
 import { travelPlaceKey } from "@cadence/core/services/travel-place-key";
 import {
   TRAVEL_LEG_READY_AFTER_END,
@@ -71,6 +76,9 @@ beforeEach(() => {
   mocks.timezone.mockResolvedValue("America/New_York");
   mocks.weather.mockResolvedValue(null);
   mocks.monthSpend.mockResolvedValue(0);
+  const disconnected = { status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } };
+  mocks.outlook.mockResolvedValue(disconnected);
+  mocks.icloud.mockResolvedValue(disconnected);
 });
 
 const located = (scheduledFor = "2026-09-22T10:00:00Z") => {
@@ -510,6 +518,86 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
     expect(JSON.stringify(result.evidence)).not.toContain("call");
   });
 
+  describe("Ticket 281: remembered places", () => {
+    const written = () => mocks.writePlaces.mock.calls.flatMap(([, , rows]) => rows as { textKey: string; outcome: string; placeId: string | null }[]);
+    const routeAllFromReady = () => mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+
+    it("stores the corrected place ID under the original text's key, and later events with that text use it", async () => {
+      withEvents([
+        event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus"),
+        event("second", "2026-09-22T13:00:00Z", "2026-09-22T14:00:00Z", "main  campus"),
+      ]);
+      routeAllFromReady();
+      const corrected = { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "500 Main St" }] };
+      const result = await refreshTravelRoutes(caller, corrected, config, now);
+      expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "500 Main St"]);
+      expect(written()).toContainEqual({ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.toString() });
+      // A row holds a key, an outcome, a place ID and a time: no place or event text.
+      for (const row of written()) expect(Object.keys(row).sort()).toEqual(["lookedUpAt", "outcome", "placeId", "textKey"]);
+      expect(written().map((row) => row.textKey)).not.toContain("Main Campus");
+      // Both events are at the corrected place, so nothing travels between them.
+      expect(result.evidence?.legs.map((entry) => [entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef])).toEqual([[null, "first"], ["second", null]]);
+      expect(result.evidence?.unknownLegs).toEqual([]);
+    });
+
+    it("resolves the original text to the remembered place after a reload, with no lookup", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.readPlaces.mockImplementation(async (_client: unknown, _userId: unknown, keys: readonly string[]) => keys.includes(keyOf("Main Campus"))
+        ? [{ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.subtract({ hours: 1 }).toString() }] : []);
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+      expect(mocks.geocode.mock.calls.map(([text]) => text)).toEqual(["1 Base St"]);
+      expect(JSON.stringify(mocks.route.mock.calls[0]![0].routes)).toContain("place:500 Main St");
+      expect(result.evidence?.unknownLegs).toEqual([]);
+    });
+
+    it("remembers nothing for an unresolved correction, an unchanged text or an event without a location", async () => {
+      withEvents([
+        event("vague", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus"),
+        event("same", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "Hall St"),
+        event("blank", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z", ""),
+      ]);
+      routeAllFromReady();
+      mocks.geocode.mockImplementation(async (text: string) => text === "Somewhere"
+        ? { kind: "ambiguous" } : { kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } });
+      await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [
+        { eventId: "vague", revision: "vague", locationText: "Somewhere" },
+        { eventId: "same", revision: "same", locationText: " hall  st " },
+        { eventId: "blank", revision: "blank", locationText: "9 Added St" },
+      ] }, config, now);
+      const keys = written().map((row) => row.textKey);
+      expect(keys).not.toContain(keyOf("Main Campus"));
+      expect(keys).not.toContain(keyOf(""));
+      expect(written().filter((row) => row.textKey === keyOf("Hall St"))).toEqual([
+        { textKey: keyOf("Hall St"), outcome: "resolved", placeId: "place: hall  st ", lookedUpAt: now.toString() },
+      ]);
+    });
+
+    it("forgets the remembered place when the user corrects back to the original text", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.readPlaces.mockImplementation(async (_client: unknown, _userId: unknown, keys: readonly string[]) => keys.includes(keyOf("Main Campus"))
+        ? [{ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.subtract({ hours: 1 }).toString() }] : []);
+      await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "Main Campus" }] }, config, now);
+      // The original text is looked up again, and its own place replaces the remembered one.
+      expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "Main Campus"]);
+      expect(written().filter((row) => row.textKey === keyOf("Main Campus"))).toEqual([
+        { textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:Main Campus", lookedUpAt: now.toString() },
+      ]);
+      const routes = JSON.stringify(mocks.route.mock.calls[0]![0].routes);
+      expect(routes).toContain("place:Main Campus");
+      expect(routes).not.toContain("place:500 Main St");
+    });
+
+    it("keeps the refresh when remembering fails", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.writePlaces.mockRejectedValue(new Error("write failed"));
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "500 Main St" }] }, config, now);
+      expect(result.evidence?.legs.length).toBeGreaterThan(0);
+    });
+  });
+
   it("keeps a Behavior under way until its end, and its source for later decisions", async () => {
     located("2026-09-22T07:50:00Z");
     mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
@@ -667,7 +755,7 @@ describe("refreshTravelRoutes signed conclusions (Ticket 219 Option A)", () => {
         { destinationRef: "occurrence:occurrence-1", role: "outbound", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
         { destinationRef: null, role: "return", state: "margin", conditions: ["rain"], marginMinutes: 10, suggestion: null },
       ] },
-      events: {} });
+      events: {}, stops: { outlook_calendar: false, icloud_calendar: false } });
     // The view itself stays free of model conclusions.
     expect(result.evidence).not.toHaveProperty("modelProjection");
     const body = decode(result.conclusionsToken!);
@@ -920,5 +1008,310 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
     expect(mocks.route.mock.calls[0]![0].routes.map((route: { id: string }) => result.evidence!.legs.find((entry) => entry.leg.id === route.id)?.leg.role))
       .toEqual(["outbound", "return"]);
     expect(result.evidence?.legs.find((entry) => entry.leg.role === "onward")).toMatchObject({ state: "unavailable", estimate: null, reason: TRAVEL_LEG_READY_AFTER_END });
+  });
+});
+
+describe("tomorrow's first trip (Ticket 282)", () => {
+  /** 6 PM in New York. Tomorrow: Stretch at Home 7 AM, Dentist 9 AM, Gym 3 PM. */
+  const evening = Temporal.Instant.from("2026-09-22T22:00:00Z");
+  const tomorrow = { startLocalDate: "2026-09-23", endLocalDate: "2026-09-23", scope: "first_trip" };
+  const secret = "s".repeat(64);
+  const device = { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T22:00:00Z" };
+  const routedLegs = () => mocks.route.mock.calls.reduce((count, [input]) => count + input.routes.length, 0);
+  const tomorrowDay = () => {
+    mocks.source.mockResolvedValue({ ...source, behaviors: [source.behaviors[0]!,
+      { id: "behavior-home", whereKind: "home" as const, locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
+      { id: "behavior-3", whereKind: "place" as const, locationText: "3 Gym St", updatedAt: "2026-09-20T00:00:00Z" }] });
+    mocks.calendar.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0 });
+    mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: 30 }, { id: "behavior-home", default_duration_minutes: 30 },
+      { id: "behavior-3", default_duration_minutes: 60 }]);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-09-23" ? [
+      { ...occurrence("stretch", "behavior-home", "2026-09-23T11:00:00Z"), local_date: "2026-09-23" },
+      { ...occurrence("dentist", "behavior-1", "2026-09-23T13:00:00Z"), local_date: "2026-09-23" },
+      { ...occurrence("gym", "behavior-3", "2026-09-23T19:00:00Z"), local_date: "2026-09-23" },
+    ] : []);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string }[] }) => routes.map((route) => ({ id: route.id, failure: null,
+      estimate: { ...estimate, durationSeconds: 2400, departureAt: "2026-09-23T12:10:00Z", arrivalAt: "2026-09-23T12:50:00Z",
+        observedAt: evening.toString(), expiresAt: evening.add({ minutes: 5 }).toString() } })));
+  };
+
+  it("routes one leg from Home to the first stop away from Home, with at most two lookups", async () => {
+    tomorrowDay();
+    const result = await refreshTravelRoutes(caller, { ...tomorrow, device }, config, evening, undefined, secret);
+    // One route call for one leg. Lookups: Dentist's place and Home, never Gym's.
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(routedLegs()).toBe(1);
+    expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "2 Habit St"]);
+    expect(mocks.spend).toHaveBeenCalledOnce();
+    expect(mocks.weather).not.toHaveBeenCalled();
+    const routed = result.evidence!.legs.find((entry) => entry.estimate)!;
+    expect(routed.leg).toMatchObject({ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "dentist" });
+    // From Home, never from the device position.
+    expect(routed.leg.provenance.originSource).toBe("saved_base");
+    expect(result.evidence!.legs.filter((entry) => !entry.estimate).map((entry) => entry.leg.role)).toEqual(["return"]);
+    // Its own request: no signed conclusions, so today's token and the Daily Brief never include it.
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("makes no lookup and one route call once the places are stored, and none with nothing to route", async () => {
+    tomorrowDay();
+    mocks.readPlaces.mockResolvedValue(["1 Base St", "2 Habit St"].map((text) =>
+      ({ textKey: keyOf(text), outcome: "resolved", placeId: `place:${text}`, lookedUpAt: "2026-09-01T00:00:00Z" })));
+    await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(routedLegs()).toBe(1);
+
+    vi.clearAllMocks();
+    tomorrowDay();
+    mocks.readPlaces.mockResolvedValue([]);
+    mocks.timezone.mockResolvedValue("America/New_York");
+    mocks.monthSpend.mockResolvedValue(0);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-09-23"
+      ? [{ ...occurrence("stretch", "behavior-home", "2026-09-23T11:00:00Z"), local_date: "2026-09-23" }] : []);
+    const atHome = await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+    expect(atHome.evidence).toMatchObject({ legs: [], unknownLegs: [] });
+  });
+
+  it("reads Calendar from today, as every Calendar read must, and keeps only tomorrow's events", async () => {
+    tomorrowDay();
+    mocks.occurrences.mockResolvedValue([]);
+    mocks.calendar.mockResolvedValue({ status: "connected", generation: 1, selectionRevision: 1 });
+    const event = (id: string, startAt: string, endAt: string, location: string) => ({ id, calendarId: "primary", providerEventId: id, kind: "timed",
+      state: "confirmed", currentUserResponse: "accepted", startAt, endAt, endUnspecified: false, location, conference: null,
+      revision: { providerEtag: `etag-${id}`, providerUpdatedAt: null } });
+    // 11:30 PM today in New York is already tomorrow in UTC; it is still today's event.
+    mocks.events.mockResolvedValue({ requestedRange: { timezone: "America/New_York" }, events: [
+      event("late-tonight", "2026-09-23T03:30:00Z", "2026-09-23T04:30:00Z", "9 Tonight St"),
+      event("dentist", "2026-09-23T13:00:00Z", "2026-09-23T14:00:00Z", "4 Dentist St"),
+    ] });
+    const result = await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.events.mock.calls.map(([, start, end]) => [start, end])).toEqual([["2026-09-22", "2026-09-23"], ["2026-09-22", "2026-09-23"]]);
+    expect(routedLegs()).toBe(1);
+    expect(result.evidence!.legs.find((entry) => entry.estimate)!.leg).toMatchObject({ role: "outbound", destinationCommitmentRef: "dentist" });
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("9 Tonight St");
+  });
+
+  it("refuses a first-trip request for any day but tomorrow, before any provider call", async () => {
+    tomorrowDay();
+    for (const date of ["2026-09-22", "2026-09-24"]) {
+      await expect(refreshTravelRoutes(caller, { ...tomorrow, startLocalDate: date, endLocalDate: date }, config, evening))
+        .rejects.toMatchObject({ failure: { code: "context_changed" } });
+    }
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("checks tomorrow in the account's timezone late at night, when UTC is already on the next day", async () => {
+    // 11:30 PM on September 22 in New York is September 23 in UTC.
+    const lateNight = Temporal.Instant.from("2026-09-23T03:30:00Z");
+    tomorrowDay();
+    await expect(refreshTravelRoutes(caller, { ...tomorrow, startLocalDate: "2026-09-24", endLocalDate: "2026-09-24" }, config, lateNight))
+      .rejects.toMatchObject({ failure: { code: "context_changed" } });
+    expect(mocks.route).not.toHaveBeenCalled();
+    await refreshTravelRoutes(caller, tomorrow, config, lateNight);
+    expect(routedLegs()).toBe(1);
+  });
+
+  it("leaves today's signed conclusions unchanged", async () => {
+    // The same route answers for all three requests.
+    tomorrowDay();
+    located("2026-09-23T01:00:00Z");
+    const before = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, evening, undefined, secret);
+    tomorrowDay();
+    await refreshTravelRoutes(caller, tomorrow, config, evening, undefined, secret);
+    located("2026-09-23T01:00:00Z");
+    const after = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, evening, undefined, secret);
+    expect(before.conclusionsToken).toBeTruthy();
+    expect(after.conclusionsToken).toBe(before.conclusionsToken);
+  });
+});
+
+describe("refreshTravelRoutes with Outlook and iCloud events (Ticket 283)", () => {
+  const connected = (generation = 1) => ({ status: "connected", generation, selectionRevision: 1, preferences: { selectedSourceIds: ["cal-1"] } });
+  const event = (id: string, startAt: string, endAt: string, location = `${id} St`, extra: Record<string, unknown> = {}) => ({
+    id, kind: "timed", state: "unknown", currentUserResponse: null, calendarId: "cal-1", providerEventId: id, startAt, endAt,
+    source: id.startsWith("outlook_calendar/") ? "outlook_calendar" : id.startsWith("icloud_calendar/") ? "icloud_calendar" : "google_calendar",
+    endUnspecified: false, location, conference: null, revision: { providerEtag: id, providerUpdatedAt: null }, ...extra,
+  });
+  const snapshot = (events: readonly Record<string, unknown>[]) => ({ requestedRange: { timezone: "America/New_York" }, events });
+  const fromReady = (leg: { id: string; request: { readyAt: string } }) => ({ id: leg.id, failure: null, estimate: { ...estimate,
+    departureAt: leg.request.readyAt, arrivalAt: Temporal.Instant.from(leg.request.readyAt).add({ seconds: 600 }).toString(), durationSeconds: 600 } });
+  const google = event("g1", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Google St", { state: "confirmed", currentUserResponse: "accepted", calendarId: "primary" });
+  const outlook = event("outlook_calendar/o1", "2026-09-22T12:00:00Z", "2026-09-22T13:00:00Z", "Outlook St");
+  const icloud = event("icloud_calendar/i1", "2026-09-22T14:00:00Z", "2026-09-22T15:00:00Z", "iCloud St");
+  const setUp = (input: Readonly<{ google?: readonly Record<string, unknown>[] | null; outlook?: readonly Record<string, unknown>[]; icloud?: readonly Record<string, unknown>[] }>) => {
+    mocks.source.mockResolvedValue({ ...source, behaviors: [] });
+    mocks.behaviors.mockResolvedValue([]);
+    mocks.occurrences.mockResolvedValue([]);
+    mocks.calendar.mockResolvedValue(input.google ? { status: "connected", generation: 1, selectionRevision: 1 } : { status: "disconnected", generation: 0, selectionRevision: 0 });
+    mocks.events.mockResolvedValue(snapshot(input.google ?? []));
+    if (input.outlook) { mocks.outlook.mockResolvedValue(connected()); mocks.outlookEvents.mockResolvedValue(snapshot(input.outlook)); }
+    if (input.icloud) { mocks.icloud.mockResolvedValue(connected()); mocks.icloudEvents.mockResolvedValue(snapshot(input.icloud)); }
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string; request: { readyAt: string } }[] }) => routes.map(fromReady));
+  };
+  const legs = (result: Awaited<ReturnType<typeof refreshTravelRoutes>>) =>
+    result.evidence?.legs.map((entry) => [entry.leg.role, entry.leg.originCommitmentRef, entry.leg.destinationCommitmentRef]);
+
+  it("routes all three Calendars' located events under the same rules, reading locations for this request only", async () => {
+    setUp({ google: [google],
+      outlook: [outlook, event("outlook_calendar/declined", "2026-09-22T12:30:00Z", "2026-09-22T12:45:00Z", "Declined St", { currentUserResponse: "declined" }),
+        event("outlook_calendar/call", "2026-09-22T13:15:00Z", "2026-09-22T13:30:00Z", "")],
+      icloud: [icloud, event("icloud_calendar/past", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z", "Past St")] });
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    expect(mocks.outlookEvents).toHaveBeenCalledWith(caller, "2026-09-22", "2026-09-22", { includeLocation: true });
+    expect(mocks.icloudEvents).toHaveBeenCalledWith(caller, "2026-09-22", "2026-09-22", { includeLocation: true });
+    expect(legs(result)).toEqual([
+      ["outbound", null, "g1"], ["onward", "g1", "outlook_calendar/o1"], ["onward", "outlook_calendar/o1", "icloud_calendar/i1"], ["return", "icloud_calendar/i1", null],
+    ]);
+    expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "Google St", "Outlook St", "iCloud St"]);
+    const serialized = JSON.stringify(result);
+    for (const text of ["Outlook St", "iCloud St", "Declined St", "Past St", "outlook_calendar/call"]) expect(serialized).not.toContain(text);
+  });
+
+  it("reads Outlook and iCloud only when connected with a calendar selected", async () => {
+    setUp({ google: [google] });
+    mocks.outlook.mockResolvedValue({ ...connected(), preferences: { selectedSourceIds: [] } });
+    mocks.icloud.mockResolvedValue({ ...connected(), status: "reconnect_required" });
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    expect(mocks.outlookEvents).not.toHaveBeenCalled();
+    expect(mocks.icloudEvents).not.toHaveBeenCalled();
+    expect(legs(result)).toEqual([["outbound", null, "g1"], ["return", "g1", null]]);
+  });
+
+  it("routes Outlook events without a Google Calendar connection", async () => {
+    setUp({ google: null, outlook: [outlook] });
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now);
+    expect(mocks.events).not.toHaveBeenCalled();
+    expect(legs(result)).toEqual([["outbound", null, "outlook_calendar/o1"], ["return", "outlook_calendar/o1", null]]);
+  });
+
+  it("leaves out an Outlook or iCloud Calendar that cannot be read and routes the others, with no brief token", async () => {
+    const secret = "s".repeat(64);
+    setUp({ google: [google], icloud: [icloud] });
+    mocks.icloudEvents.mockRejectedValue(new ConnectorError("rate_limited"));
+    const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+    expect(legs(result)).toEqual([["outbound", null, "g1"], ["return", "g1", null]]);
+    // The final check does not read the left-out Calendar again.
+    expect(mocks.icloudEvents).toHaveBeenCalledTimes(1);
+    expect(mocks.events).toHaveBeenCalledTimes(2);
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("still fails before any spend on an invalid Outlook or iCloud request, a non-connector error, or a Google failure", async () => {
+    for (const failure of [new ConnectorError("invalid_request"), new Error("boom")]) {
+      setUp({ google: [google], outlook: [outlook] });
+      mocks.outlookEvents.mockRejectedValue(failure);
+      await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toBe(failure);
+    }
+    setUp({ google: [google], outlook: [outlook] });
+    mocks.events.mockRejectedValue(Object.assign(new Error("rate_limited"), { code: "rate_limited" }));
+    await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ code: "rate_limited" });
+    expect(mocks.spend).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("fails when a Calendar read at the start fails in the final check", async () => {
+    setUp({ google: [google], icloud: [icloud] });
+    mocks.icloudEvents.mockResolvedValueOnce(snapshot([icloud])).mockRejectedValueOnce(new ConnectorError("timeout"));
+    await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ code: "timeout" });
+  });
+
+  it("withdraws the refresh when an Outlook connection or an iCloud event changes during it", async () => {
+    setUp({ google: [google], outlook: [outlook] });
+    let checks = 0;
+    mocks.outlook.mockImplementation(async () => connected((checks += 1) < 2 ? 1 : 2));
+    await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+
+    vi.clearAllMocks();
+    setUp({ google: [google], icloud: [icloud] });
+    mocks.outlook.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    mocks.timezone.mockResolvedValue("America/New_York");
+    mocks.monthSpend.mockResolvedValue(0);
+    mocks.readPlaces.mockResolvedValue([]);
+    mocks.spend.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, resetsAt: null });
+    mocks.geocode.mockImplementation(async (text: string) => ({ kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } }));
+    mocks.historySessions.mockResolvedValue([]);
+    mocks.icloudEvents.mockResolvedValueOnce(snapshot([icloud])).mockResolvedValueOnce(snapshot([{ ...icloud, revision: { providerEtag: "moved", providerUpdatedAt: null } }]));
+    await expect(refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now)).rejects.toMatchObject({ failure: { code: "context_changed" } });
+  });
+
+  it("signs the Daily Brief's conclusions for a day mixing all three Calendars, naming each event by its source (decision D18)", async () => {
+    const secret = "s".repeat(64);
+    setUp({ google: [google], outlook: [outlook], icloud: [icloud] });
+    const mixed = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+    const payload = verifyTravelConclusionsToken(mixed.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!;
+    const outlookName = "event:outlook_calendar\0cal-1\0outlook_calendar/o1", icloudName = "event:icloud_calendar\0cal-1\0icloud_calendar/i1";
+    expect(payload.events).toEqual({
+      "event:primary\0g1": JSON.stringify(google.revision),
+      [outlookName]: `outlook_calendar\0${JSON.stringify(outlook.revision)}`,
+      [icloudName]: `icloud_calendar\0${JSON.stringify(icloud.revision)}`,
+    });
+    expect(payload.conclusions.trips.map((trip) => trip.destinationRef)).toEqual(["event:primary\0g1", outlookName, icloudName, null]);
+    expect(payload.stops).toEqual({ outlook_calendar: true, icloud_calendar: true });
+    // Conclusions only: no place text, time or duration of any stop.
+    for (const leaked of ["Outlook St", "iCloud St", "Google St", "12:00", "600"]) expect(JSON.stringify(payload.conclusions)).not.toContain(leaked);
+  });
+
+  it("binds the signed conclusions to the Outlook and iCloud Calendars that took part (decision D18)", async () => {
+    const secret = "s".repeat(64);
+    const key = async () => {
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+      return verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!.src;
+    };
+    setUp({ google: [google] });
+    const googleOnly = await key();
+    setUp({ google: [google], outlook: [] });
+    const withOutlook = await key();
+    expect(withOutlook).not.toBe(googleOnly);
+  });
+
+  it("still signs a Google-only day with an Outlook Calendar that has no located event", async () => {
+    const secret = "s".repeat(64);
+    vi.clearAllMocks();
+    setUp({ google: [google], outlook: [{ ...outlook, location: "" }] });
+    mocks.icloud.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0, preferences: { selectedSourceIds: [] } });
+    mocks.timezone.mockResolvedValue("America/New_York");
+    mocks.monthSpend.mockResolvedValue(0);
+    mocks.readPlaces.mockResolvedValue([]);
+    mocks.spend.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, resetsAt: null });
+    mocks.geocode.mockImplementation(async (text: string) => ({ kind: "resolved", point: { kind: "place_id", placeId: `place:${text}` } }));
+    mocks.historySessions.mockResolvedValue([]);
+    const googleOnly = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+    const payload = verifyTravelConclusionsToken(googleOnly.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now });
+    expect(Object.keys(payload!.events)).toEqual(["event:primary\0g1", "event:outlook_calendar\0cal-1\0outlook_calendar/o1"]);
+    // Decision D18: the unlocated Outlook event is no stop, so the brief may keep these lines with Outlook undisclosed.
+    expect(payload!.stops).toEqual({ outlook_calendar: false, icloud_calendar: false });
+  });
+
+  it("flags only the Calendars that had a stop, counting a stop past the nine-stop bound but not an ended or declined event (decision D18)", async () => {
+    const secret = "s".repeat(64);
+    const googleStops = Array.from({ length: 9 }, (_, index) => event(`g${index}`, `2026-09-22T1${index}:00:00Z`, `2026-09-22T1${index}:30:00Z`, `G${index} St`,
+      { state: "confirmed", currentUserResponse: "accepted", calendarId: "primary" }));
+    const stopsFor = async (input: Parameters<typeof setUp>[0]) => {
+      setUp(input);
+      const result = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, now, undefined, secret);
+      return verifyTravelConclusionsToken(result.conclusionsToken!, { secrets: { current: secret, previous: null }, userId: "owner", localDate: day.startLocalDate, now })!.stops;
+    };
+    // An Outlook stop after nine Google stops is left out of the plan but still marks the boundary stop, so it counts.
+    expect(await stopsFor({ google: googleStops, outlook: [event("outlook_calendar/late", "2026-09-22T20:00:00Z", "2026-09-22T21:00:00Z")] }))
+      .toEqual({ outlook_calendar: true, icloud_calendar: false });
+    // A located iCloud event that already ended, and a declined one, are not stops; nor is an Outlook Calendar with no event.
+    expect(await stopsFor({ google: [google], outlook: [], icloud: [event("icloud_calendar/past", "2026-09-22T06:00:00Z", "2026-09-22T07:00:00Z"),
+      event("icloud_calendar/declined", "2026-09-22T16:00:00Z", "2026-09-22T17:00:00Z", "Declined St", { currentUserResponse: "declined" })] }))
+      .toEqual({ outlook_calendar: false, icloud_calendar: false });
+  });
+
+  it("reads Outlook from today for tomorrow's first trip and keeps only tomorrow's events (Ticket 282)", async () => {
+    const evening = Temporal.Instant.from("2026-09-22T22:00:00Z");
+    setUp({ google: null, outlook: [event("outlook_calendar/today", "2026-09-22T23:00:00Z", "2026-09-22T23:30:00Z", "Late St"),
+      event("outlook_calendar/dentist", "2026-09-23T13:00:00Z", "2026-09-23T14:00:00Z", "Dentist St")] });
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string }[] }) => routes.map((route) => ({ id: route.id, failure: null,
+      estimate: { ...estimate, departureAt: "2026-09-23T12:40:00Z", arrivalAt: "2026-09-23T12:50:00Z", observedAt: evening.toString(), expiresAt: evening.add({ minutes: 5 }).toString() } })));
+    const result = await refreshTravelRoutes(caller, { startLocalDate: "2026-09-23", endLocalDate: "2026-09-23", scope: "first_trip" }, config, evening);
+    expect(mocks.outlookEvents).toHaveBeenCalledWith(caller, "2026-09-22", "2026-09-23", { includeLocation: true });
+    expect(result.evidence!.legs.find((entry) => entry.estimate)!.leg).toMatchObject({ role: "outbound", destinationCommitmentRef: "outlook_calendar/dentist" });
+    expect(mocks.geocode.mock.calls.map(([text]) => text)).not.toContain("Late St");
   });
 });

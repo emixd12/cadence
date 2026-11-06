@@ -450,9 +450,9 @@ ship, nothing reads or writes the new tables.
 
 ### What gets a reminder
 
-- A trip to a located destination: a Google Calendar event with a location, or a
-  Behavior Occurrence whose Where routes (Home or a place). Outlook and iCloud events
-  join when Ticket 283 routes them.
+- A trip to a located destination: a Google, Outlook or iCloud Calendar event with a
+  location, or a Behavior Occurrence whose Where routes (Home or a place). Ticket 283 added
+  Outlook and iCloud events; the job reads them as the user, like Google Calendar.
 - Under D12, an event with no location is outside travel and gets no reminder. A
   located event is treated as in person; nothing asks about attendance.
 - The trip home gets no reminder in this version. Getting ready applies to leaving
@@ -484,6 +484,16 @@ ship, nothing reads or writes the new tables.
 - A trip is dropped, and nothing sends, when its event is cancelled, declined, moved
   or loses its location, when its Occurrence is resolved or its Behavior's Where stops
   routing, or when the user turns reminders off.
+- A failed Calendar read while the job lists trips drops nothing. A failed Google Calendar
+  read fails the visit and the job retries the account later. A failed Outlook or iCloud read
+  leaves that Calendar's trips out of the visit, so the job keeps every record for today whose
+  trip is missing and decides it once the Calendars read again. A kept reminder whose time
+  passed during the outage sends then if its leave time is still ahead.
+- Known limit: the job reads Calendar once more after the send route, to name the event. If
+  the destination's or previous stop's Outlook or iCloud read fails at that moment, after the
+  same visit read it successfully, that reminder is cancelled. A retry would need another
+  route before sending, and the database allows a third route only after a reminder is sent
+  (decision D15).
 - No action buttons, snooze or email leave reminders in this version.
 - Leave times never reach Daily Brief model input or MCP.
 
@@ -499,7 +509,13 @@ ship, nothing reads or writes the new tables.
      minutes it used. If the get-ready time changes before the reminder sends, the job
      moves the check by the difference at its next visit, with no route, so the
      reminder fires at the new reminder time. If the moved check is already due, the
-     send route runs at once and sends while the leave time is still ahead.
+     send route runs at once and sends while the leave time is still ahead. A saved
+     get-ready change brings that visit forward to now (decision D19, migration
+     `20261106080000_leave_reminder_visit_after_preparation_change.sql`), so the next
+     5-minute run moves the check and a moved reminder goes out within about 5 minutes
+     of its new time. Only a real change to `preparation_minutes` counts, from any
+     client, and only for an account with reminders on. The earlier visit adds no
+     route: each trip is still routed at most three times, and D16 is unchanged.
   2. The send route runs at that check. The notification uses its estimate, read in
      memory, and sends at once, even if the new reminder time is a little later. If
      the leave time it named is more than 4 minutes ahead, the send keeps one more
@@ -549,7 +565,12 @@ ship, nothing reads or writes the new tables.
   processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
   is final and its update is recorded once, so overlapping runs cannot send either
   twice. Each account visit also leases the account's next check for 15 minutes, so
-  two runs never visit one account at once. Writes are compare-and-set on the claim.
+  two runs do not visit one account at once. A get-ready change (decision D19) can
+  replace that lease, and the next run may then visit while the first is still running.
+  The per-reminder claims keep that overlap from routing or sending one reminder
+  twice. When a visit finds its lease gone, its release only brings a later next check
+  forward to its own, so a reminder it just planned is not visited late. Writes are
+  compare-and-set on the claim.
   A visit that fails releases its claims and retries 10 minutes later.
 - To list the plan's trips, the job sends a route request that names no planned trip,
   so it makes no route call. Place lookups the plan needs reserve spend first and are

@@ -16,7 +16,7 @@ import {
 } from "react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
-import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
+import { resolveDepartureModel, resolveTomorrowFirstTrip } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops, firstLocatedStopAhead } from "@cadence/core/services/departure-stops";
 import type { DepartureModel, DepartureStop } from "@cadence/core/types/departure";
 import { DEPARTURE_REFRESH_LABEL, departureMarkerRailLines } from "@cadence/core/services/departure-phrases";
@@ -44,7 +44,7 @@ import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
-import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
+import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
 import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import {
   dismissTravelLeaveQuestion,
@@ -216,15 +216,16 @@ export function DayProgressTimeline({
   const contextEvents = context?.events;
   const events = useMemo(() => contextEvents ?? (outlookEvents.length || icloudEvents.length ? [...googleEvents, ...outlookEvents, ...icloudEvents] : googleEvents),
     [contextEvents, googleEvents, outlookEvents, icloudEvents]);
-  // Travel estimates and their brief guidance stay Google-only (Ticket 238 adds no new routing disclosure).
-  const travelEvents = useMemo(() => events.some((event) => event.source !== "google_calendar") ? events.filter((event) => event.source === "google_calendar") : events, [events]);
+  // Ticket 283: Google, Outlook and iCloud events route under the same rules.
+  const travelEvents = events;
   const travelSourceKey = buildTravelSourceKey(travelEvents, timeline);
   const stopRevisions = useMemo(() => travelStopRevisions(travelEvents, timeline), [travelEvents, timeline]);
+  const tomorrowStopKey = useMemo(() => travelTomorrowStopKey(travelEvents, timeline), [travelEvents, timeline]);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone,
-    // Ticket 268: automatic travel requests wait for the Google Calendar read that feeds travel to settle.
-    sourceReady: live.state !== "not_loaded", stopRevisions });
+    // Ticket 268: automatic travel requests wait for the Calendar reads that feed travel to settle (Ticket 283: all three).
+    sourceReady: live.state !== "not_loaded" && outlook.state !== "not_loaded" && icloud.state !== "not_loaded", stopRevisions, tomorrowStopKey });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
   const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,
@@ -263,6 +264,18 @@ export function DayProgressTimeline({
       arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds,
       pausedUntil: travelStatus?.resumesAt ?? null });
   }, [travel, now, timeline.timezone, todayStops, habitsForModel, travelStatus?.resumesAt]);
+  // Ticket 282: tomorrow's first trip, from its own response. It never enters `departure`, so the
+  // Daily Brief, leave reminders and today's marker never see it. The line shows it once today has no trip left.
+  const tomorrowView = travelStatus?.tomorrow ?? null;
+  const tomorrowTrip = useMemo(() => {
+    const tomorrowLocalDate = Temporal.PlainDate.from(timeline.todayLocalDate).add({ days: 1 }).toString();
+    if (!tomorrowView?.view.evidence || tomorrowView.localDate !== tomorrowLocalDate) return null;
+    const section = timeline.daySections.find((day) => day.localDate === tomorrowLocalDate);
+    const buffers = resolveTravelHabits(habitsForModel).buffers;
+    return resolveTomorrowFirstTrip({ evidence: tomorrowView.view.evidence, now, timezone: timeline.timezone, tomorrowLocalDate,
+      stops: departureStops({ events: travelEvents, occurrences: section?.occurrences ?? [], durationEstimates: durations, timezone: timeline.timezone }),
+      arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds });
+  }, [tomorrowView, now, timeline.todayLocalDate, timeline.daySections, timeline.timezone, travelEvents, durations, habitsForModel]);
   const onDeparture = context?.onDeparture;
   useEffect(() => {
     onDeparture?.({ localDate: timeline.todayLocalDate, preparationSeconds, trips: travel ? departure.trips : null, stops: todayStops });
@@ -496,7 +509,7 @@ export function DayProgressTimeline({
       {calendarState ? <p className={styles.calendarState} data-calendar-state={liveCalendar && !context ? live.state : fresh.state}>{calendarState}</p> : null}
       {sourceMessages.map((message) => <p key={message} className={styles.calendarState} data-source-state>{message}</p>)}
       <TravelStatusLine departure={departure} status={displayedTravelStatus} message={invalidTravelMessage ?? context?.travelMessage ?? null} hasEvidence={!!travel}
-        steps={stepActions} />
+        steps={stepActions} tomorrow={tomorrowTrip?.phrase ?? null} />
       {travelOffer && offerTarget ? <TravelOffOffer label={travelOffer.label} target={offerTarget} className={styles.calendarState}
         onDismiss={() => { dismissTravelOffer(); setOfferDismissed(true); }} /> : null}
       {leavePrompt ? <TravelLeaveQuestion key={leavePrompt.eventRef} title={leavePrompt.title} className={styles.calendarState} onAnswer={answerLeaveTime}
@@ -998,9 +1011,17 @@ export type TravelStatusLines = Readonly<{
 
 const NO_STATUS_LINES: TravelStatusLines = { line: null, lineRefresh: null, note: null, noteRefresh: false, signature: "none" };
 
-export function travelStatusLines({ departure, status, message = null, hasEvidence, developmentBuild }: Readonly<{
+export function travelStatusLines({ departure, status, message = null, hasEvidence, developmentBuild, tomorrow = null }: Readonly<{
   departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean; developmentBuild: boolean;
+  /** Ticket 282: tomorrow's first trip, shown only while today has nothing to say. */
+  tomorrow?: string | null;
 }>): TravelStatusLines {
+  if (tomorrow && departure.state === "none") {
+    const raw = status ? status.message : message;
+    const note = !developmentBuild && raw === TRAVEL_CLEARANCE_MESSAGE ? TRAVEL_UNAVAILABLE_MESSAGE : raw;
+    const noteRefresh = !!note && !!status && !status.resumesAt && raw !== TRAVEL_CLEARANCE_MESSAGE;
+    return { line: tomorrow, lineRefresh: null, note, noteRefresh, signature: ["tomorrow", tomorrow, note ?? ""].join("|") };
+  }
   // Evidence with no trips: nothing to time, so nothing to say (G9).
   if (!departure.phrase && hasEvidence) return NO_STATUS_LINES;
   const next = departure.next;
@@ -1024,13 +1045,15 @@ export function travelStatusLines({ departure, status, message = null, hasEviden
 
 const TIMED_DEPARTURE_STATES: ReadonlySet<string> = new Set(["upcoming", "soon", "leave_now", "late", "head_home"]);
 
-export function TravelStatusLine({ departure, status, message = null, hasEvidence, steps = null }: Readonly<{
+export function TravelStatusLine({ departure, status, message = null, hasEvidence, steps = null, tomorrow = null }: Readonly<{
   departure: DepartureModel; status: TravelState | null; message?: string | null; hasEvidence: boolean;
   /** Ticket 273: the one action for a missing estimate. */
   steps?: TravelStepActions | null;
+  /** Ticket 282: tomorrow's first trip, for when today has no trip left. */
+  tomorrow?: string | null;
 }>) {
   const developmentBuild = useDevelopmentBuild();
-  const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild });
+  const lines = travelStatusLines({ departure, status, message, hasEvidence, developmentBuild, tomorrow });
   const announcement = [lines.line, lines.note].filter(Boolean).join(" ");
   // The polite region speaks only when the signature changes, so a countdown minute is silent.
   const [announced, setAnnounced] = useState({ signature: lines.signature, text: "" });
@@ -1050,7 +1073,7 @@ export function TravelStatusLine({ departure, status, message = null, hasEvidenc
   }, [hasButton, pending]);
   const refreshButton = (label: string) => status
     ? <button type="button" className="text-link" disabled={status.pending} onClick={() => { refreshedFromButton.current = true; status.refresh(); }}>{label}</button> : label;
-  const nextState = departure.next?.state ?? departure.state;
+  const nextState = lines.signature.startsWith("tomorrow|") ? "tomorrow" : departure.next?.state ?? departure.state;
   return (
     <div ref={containerRef} className={styles.travelStatus} data-travel-status data-travel-focus tabIndex={-1}>
       {lines.line ? <p ref={lineRef} tabIndex={-1} className={styles.departureLine} data-departure-line={nextState}

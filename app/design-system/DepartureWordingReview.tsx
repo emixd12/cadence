@@ -8,7 +8,6 @@ import {
   LEAVE_REMINDER_NOTIFICATIONS_STEP,
   LEAVE_REMINDER_SAVED,
   LEAVE_REMINDER_SAVE_FAILED,
-  LEAVE_REMINDER_SOURCES,
   LEAVE_REMINDER_START_MAC,
   LEAVE_REMINDER_START_WEB,
   LEAVE_REMINDER_SWITCH,
@@ -33,12 +32,13 @@ import {
   leaveReminderNotificationsPhrase,
   macLeaveReminderPhrases,
   webLeaveReminderPhrases,
+  departureTomorrowPhrase,
   departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
   type DeparturePhraseInput,
 } from "@cadence/core/services/departure-phrases";
-import { TRAVEL_CORRECTION_NOTE } from "@/components/timeline/ExternalEventDetails";
+import { TRAVEL_CORRECTION_NOTE, TRAVEL_CORRECTION_REMEMBERED_NOTE } from "@/components/timeline/ExternalEventDetails";
 import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE } from "@/lib/ui/travel";
 
 /**
@@ -153,7 +153,6 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "leave-reminder-home-missing": () => LEAVE_REMINDER_HOME_MISSING,
   "leave-reminder-start-web": () => LEAVE_REMINDER_START_WEB,
   "leave-reminder-start-mac": () => LEAVE_REMINDER_START_MAC,
-  "leave-reminder-sources": () => LEAVE_REMINDER_SOURCES,
   "leave-reminder-travel-off": () => LEAVE_REMINDER_TRAVEL_OFF,
   "leave-reminder-saved": () => LEAVE_REMINDER_SAVED,
   "leave-reminder-save-failed": () => LEAVE_REMINDER_SAVE_FAILED,
@@ -164,12 +163,13 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "web-leave-reminder-title": () => webReminder(false).title,
   "web-leave-reminder-update-title": () => webReminder(true).title,
   "web-leave-reminder-body": () => webReminder(false).body,
+  "line-tomorrow": () => departureTomorrowPhrase("2026-11-11T08:10:00-05:00", EVENT, TIMEZONE),
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;
   approvedOn: string | null; ownerChange: Readonly<{ id: string; before: string }> | null }>;
 
-/** The rows the review shows: the module's list, then the two Ticket 261 phrases kept outside it. */
+/** The rows the review shows: the module's list, then the Ticket 261 and 281 phrases kept outside it. */
 export function departureWordingRows(): DepartureWordingRow[] {
   return [
     ...DEPARTURE_PHRASE_REVIEW.map((entry) => ({ ...entry, source: "departure-phrases.ts",
@@ -177,6 +177,10 @@ export function departureWordingRows(): DepartureWordingRow[] {
     { id: "correction-note", ticket: "261", source: "ExternalEventDetails.tsx", sample: TRAVEL_CORRECTION_NOTE, template: TRAVEL_CORRECTION_NOTE,
       situation: "Calendar details, under the form that corrects the destination for one journey.",
       replaces: "Applies only to this event revision while the Timeline is open.", approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
+    { id: "correction-note-remembered", ticket: "281", source: "ExternalEventDetails.tsx", sample: TRAVEL_CORRECTION_REMEMBERED_NOTE, template: TRAVEL_CORRECTION_REMEMBERED_NOTE,
+      situation: "Calendar details, under the correction form for an event with a location. The corrected place is remembered for that location.",
+      replaces: TRAVEL_CORRECTION_NOTE, approvedOn: OWNER_APPROVED_2026_11_06,
+      ownerChange: { id: "D20", before: "Applies to this event and other events at the same location. Turning off Travel estimates forgets it." } },
     { id: "production-unavailable", ticket: "261", source: "lib/ui/travel.ts", sample: TRAVEL_UNAVAILABLE_MESSAGE, template: TRAVEL_UNAVAILABLE_MESSAGE,
       situation: "Travel status line in production builds while travel waits for the deployment's provider review.",
       replaces: TRAVEL_CLEARANCE_MESSAGE, approvedOn: OWNER_APPROVED_2026_11_05, ownerChange: null },
