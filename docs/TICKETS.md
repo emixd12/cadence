@@ -16086,8 +16086,7 @@ times use the line's words. Variants B and C, the title-size line and
 `NEXT_TRIP_PRESENTATION` are removed. `DESIGN.md` ("Next trip marker (Ticket 270)") and
 `docs/UI_SPEC.md` describe the shipped form. Decision D14 (November 6, 2026): the label is
 one line on wide layouts and stacked on phones, the trip home reads "Home {time}", the leader
-keeps its full 14px beside the current-time dot, and the label phrases except "Leave {time}"
-are approved.
+keeps its full 14px beside the current-time dot, and every label phrase is approved.
 Dependencies: Ticket 269.
 
 Goal: the Timeline shows the next trip without hovering (decision D2).
@@ -16230,7 +16229,8 @@ the attendance choice in Change for this trip are removed; a correction carries 
 destination. The stop past the bounded source window now reads as past the trip limit. "Fix
 {event}'s place or attendance" becomes "Fix {event}'s place", and the trip home with no Home
 reads "Add Home in Settings to estimate the return time." with its first words linking to
-`/settings#travel`. Both sentences await the owner's approval (D7). Messaging impact: P-023.
+`/settings#travel`. The owner approved both sentences on November 6, 2026 (D14). Messaging
+impact: P-023.
 
 References: next-departure line, drawer, `components/settings/TravelSettingsPanel.tsx`,
 first-run setup, `tests/onboarding-travel.dom.test.tsx`.

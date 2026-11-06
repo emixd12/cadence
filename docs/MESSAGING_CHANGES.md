@@ -785,8 +785,8 @@ cite has not changed.
   gone, and "Fix {event}'s place or attendance" now reads "Fix {event}'s place". See P-023.
 - **Ticket 270 detail, decision D14 (November 6, 2026):** the label is one line ("Leave 1:20")
   on wide layouts and stacked on phones. The trip home's label reads "Home {time}". The owner
-  approved the late and passed forms, "Home {time}" and the two D12 steps; "Leave {time}" still
-  awaits approval (D7).
+  approved "Leave {time}", the late and passed forms, "Home {time}" and the two D12 steps. No
+  travel phrase awaits approval.
 - **Status:** logged.
 
 ## P-022: Weather margin can mean arriving later

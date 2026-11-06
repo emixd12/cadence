@@ -1641,7 +1641,8 @@ The owner decided on November 6, 2026, as relayed by the travel coordinator afte
 3. Approved: "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}", "Head
    home now", "Add Home in Settings to estimate the return time." and "Fix {event}'s place to
    get a leave time for {event}." `DEPARTURE_PHRASE_REVIEW` carries the date as
-   `OWNER_APPROVED_2026_11_06`. D14 does not name "Leave {time}", so it stays unapproved (D7).
+   `OWNER_APPROVED_2026_11_06`. Choosing the one-line "Leave 1:20" also approves "Leave
+   {time}", as the coordinator confirmed. Every travel phrase on the bench is now approved.
 4. When the current-time dot sits at the leave point, the leader keeps its full 14px past the
    dot, so it does not read as a hyphen beside the label.
 

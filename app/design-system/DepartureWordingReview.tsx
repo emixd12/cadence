@@ -3,6 +3,7 @@
 import {
   DEPARTURE_PHRASE_REVIEW,
   OWNER_APPROVED_2026_11_05,
+  OWNER_APPROVED_2026_11_06,
   RETURN_TIME_UNKNOWN,
   SETUP_TRAVEL_ESTIMATES_OFF,
   TRAVEL_CORRECTION_TOGGLE,
@@ -151,7 +152,7 @@ export function DepartureWordingReview() {
     <div className="grid gap-2">
       <h2 id="departure-wording-title" className="text-xl font-bold">Travel wording</h2>
       <p className="max-w-3xl text-sm leading-6 text-muted-readable" data-wording-approval>
-        {pending ? `${pending} of ${rows.length} phrases await the owner's approval. ` : `All ${rows.length} phrases approved by the owner on ${approvalDate(OWNER_APPROVED_2026_11_05)}, with changes R1–R3. `}
+        {pending ? `${pending} of ${rows.length} phrases await the owner's approval. ` : `All ${rows.length} phrases approved by the owner: the Wave 1 wording on ${approvalDate(OWNER_APPROVED_2026_11_05)}, with changes R1–R3, and the rest on ${approvalDate(OWNER_APPROVED_2026_11_06)}. `}
         Each sentence is rendered by the product code with sample values: Dentist at 2 PM, leaving Home at 1:20 PM on foot,
         and Gym as the stop before it. Times on November 10 show without a date.
       </p>

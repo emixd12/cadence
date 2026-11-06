@@ -11,8 +11,8 @@
 - When the current-time dot sits at the leave point, the leader starts 8px out and keeps its
   full 14px.
 - D14 approves "Leave now", "May arrive late", "Arrive about {time}", "Home about {time}", "Head
-  home now" and the two D12 steps. "Leave {time}" is not named in D14 and still awaits the
-  owner: 1 of 77 on the bench review.
+  home now", the two D12 steps and, through the chosen one-line "Leave 1:20", "Leave {time}".
+  The bench review shows all 77 phrases approved.
 - Screenshots refreshed in `.intent/artifacts/t270-final/`. Messaging impact: P-021 note.
 
 ## Travel advisory revamp Wave 3: Ticket 270 final marker (decision D13) — November 6, 2026
