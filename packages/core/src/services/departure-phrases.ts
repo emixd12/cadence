@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import type { ExternalEventState } from "../types/day-progress";
 import type { DepartureTrip } from "../types/departure";
+import type { TravelMode } from "../types/travel";
 import type { WeatherConditionId } from "../types/weather";
 
 /**
@@ -35,15 +36,104 @@ export const SETUP_TRAVEL_ESTIMATES_OFF = "Estimates off";
 /** Ticket 273: in a step phrase, the words before these are the step's own action (as owner change R1 does for Refresh travel). */
 const DEPARTURE_STEP_SUFFIXES = [" to get a leave time", " to estimate"] as const;
 
+/**
+ * Ticket 279 (decision D3): the leave reminder switch and its readiness list in Settings, How you
+ * travel. Approved under decision D17 (2026-11-06). The device states reuse the Notifications panel's words.
+ */
+export const LEAVE_REMINDER_SWITCH = "Remind me when it is time to get ready to leave.";
+export const LEAVE_REMINDER_NOTIFICATIONS_STEP = "Turn on notifications";
+export const LEAVE_REMINDER_HOME_SAVED = "Home: saved.";
+export const LEAVE_REMINDER_HOME_MISSING = "Home: not saved. The day's first trip needs Home to get a reminder.";
+export const LEAVE_REMINDER_START_WEB = "Reminders estimate from Home or your previous stop, never from this device's position.";
+export const LEAVE_REMINDER_START_MAC = "This Mac reminds from its last estimate, which starts from your position, Home or your previous stop, and names when that estimate was checked.";
+export const LEAVE_REMINDER_SOURCES = "For now, only Google Calendar events and Behaviors get reminders, not Outlook or iCloud events.";
+export const LEAVE_REMINDER_TRAVEL_OFF = "Turn on Travel estimates to use reminders.";
+export const LEAVE_REMINDER_SAVED = "Reminder setting saved.";
+export const LEAVE_REMINDER_SAVE_FAILED = "The reminder setting could not save.";
+export const LEAVE_REMINDER_LOAD_FAILED = "The reminder setting could not load.";
+/** Ticket 279: one device's notification state, as the readiness list names it. */
+export type LeaveReminderDeviceNotifications = "enabled" | "not_enabled" | "blocked" | "unsupported";
+const LEAVE_REMINDER_DEVICE_STATES: Readonly<Record<LeaveReminderDeviceNotifications, string>> = {
+  enabled: "Enabled on this device",
+  not_enabled: "Not enabled on this device",
+  blocked: "Blocked in this browser",
+  unsupported: "Not supported on this device",
+};
+/** "Notifications: {device state}." The Mac names System Settings where a browser names itself. */
+export function leaveReminderNotificationsPhrase(state: LeaveReminderDeviceNotifications, desktop: boolean): string {
+  return `Notifications: ${desktop && state === "blocked" ? "Blocked in System Settings" : LEAVE_REMINDER_DEVICE_STATES[state]}.`;
+}
+
+/**
+ * Ticket 280 (decision D3): the Mac's native leave reminder. Approved under decision D17 (2026-11-06).
+ * A quit app cannot re-route, so the body names when its estimate was checked. The update
+ * (decision D15) names the new, earlier leave time.
+ */
+export type MacLeaveReminderStart = "home" | "previous_stop" | "position";
+const MAC_LEAVE_REMINDER_STARTS: Readonly<Record<MacLeaveReminderStart, string>> = {
+  home: "Home",
+  previous_stop: "your previous stop",
+  position: "your position",
+};
+const MAC_LEAVE_REMINDER_MODES: Readonly<Record<TravelMode, string>> = {
+  walking: "Walking", cycling: "Cycling", transit: "Transit", driving: "Driving",
+};
+/** Keeps the title inside the native 200-unit limit with any event title. */
+const MAC_LEAVE_REMINDER_LABEL_LIMIT = 120;
+export function macLeaveReminderPhrases(input: Readonly<{
+  update: boolean;
+  destinationLabel: string;
+  leaveAt: string;
+  arriveAt: string;
+  checkedAt: string;
+  mode: TravelMode;
+  start: MacLeaveReminderStart;
+}>, context: DeparturePhraseContext): Readonly<{ title: string; body: string }> {
+  const time = (at: string) => departureTimeLabel(at, context);
+  const trimmed = input.destinationLabel.trim() || "Untitled event";
+  const label = trimmed.length > MAC_LEAVE_REMINDER_LABEL_LIMIT ? `${trimmed.slice(0, MAC_LEAVE_REMINDER_LABEL_LIMIT - 1)}…` : trimmed;
+  const title = `${input.update ? "Leave earlier: by" : "Leave by"} ${time(input.leaveAt)} for ${label}`;
+  const body = `${MAC_LEAVE_REMINDER_MODES[input.mode]} from ${MAC_LEAVE_REMINDER_STARTS[input.start]}, arrive ${time(input.arriveAt)}. Estimate checked ${time(input.checkedAt)}.`;
+  return { title, body };
+}
+
+/**
+ * Ticket 278 (decision D3): the web push leave reminder. Approved under decision D17 (2026-11-06).
+ * The hosted job routes at send time, so the body names the start and the route time instead
+ * of an estimate time. The update (decision D15) names the new, earlier leave time. The
+ * notification link carries the trip digest only; these words travel only in the payload.
+ */
+export type WebLeaveReminderStart = Readonly<{ kind: "home" }> | Readonly<{ kind: "previous_stop"; title: string }>;
+export function webLeaveReminderPhrases(input: Readonly<{
+  update: boolean;
+  destinationLabel: string;
+  leaveAt: string;
+  arriveAt: string;
+  travelMinutes: number;
+  mode: TravelMode;
+  start: WebLeaveReminderStart;
+}>, context: DeparturePhraseContext): Readonly<{ title: string; body: string }> {
+  const time = (at: string) => departureTimeLabel(at, context);
+  const label = (text: string, fallback: string) => {
+    const trimmed = text.trim() || fallback;
+    return trimmed.length > MAC_LEAVE_REMINDER_LABEL_LIMIT ? `${trimmed.slice(0, MAC_LEAVE_REMINDER_LABEL_LIMIT - 1)}…` : trimmed;
+  };
+  const start = input.start.kind === "home" ? MAC_LEAVE_REMINDER_STARTS.home : label(input.start.title, MAC_LEAVE_REMINDER_STARTS.previous_stop);
+  const minutes = Math.max(1, Math.round(input.travelMinutes));
+  const title = `${input.update ? "Leave earlier: by" : "Leave by"} ${time(input.leaveAt)} for ${label(input.destinationLabel, "Untitled event")}`;
+  const body = `${MAC_LEAVE_REMINDER_MODES[input.mode]}, ${minutes} min from ${start}. Arrive ${time(input.arriveAt)}.`;
+  return { title, body };
+}
+
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
-/** Decisions D13 and D14: the owner approved the wording each lists on this date. */
+/** Decisions D13, D14 and D17: the owner approved the wording each lists on this date. D17 covers all Wave 4 wording (Tickets 278–280). */
 export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -361,6 +451,60 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     situation: "First-run setup, Home and travel row, when both are saved but Travel estimates is off. Replaces Saved there.",
     replaces: "Saved",
     approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-switch", ticket: "279", template: LEAVE_REMINDER_SWITCH,
+    situation: "Settings, How you travel: the leave reminder checkbox. Off by default; one switch per account.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-notifications", ticket: "279", template: "Notifications: {device state}.",
+    situation: "Leave reminder readiness: this device's notification state, in the Notifications panel's words. The Mac says \"Blocked in System Settings\" when blocked.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-notifications-step", ticket: "279", template: LEAVE_REMINDER_NOTIFICATIONS_STEP,
+    situation: "Leave reminder readiness: a link to the Notifications section while this device's notifications are not enabled.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-home-saved", ticket: "279", template: LEAVE_REMINDER_HOME_SAVED,
+    situation: "Leave reminder readiness: Home is saved.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-home-missing", ticket: "279", template: LEAVE_REMINDER_HOME_MISSING,
+    situation: "Leave reminder readiness: no Home is saved, so a trip with no stop before it has no start.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-start-web", ticket: "279", template: LEAVE_REMINDER_START_WEB,
+    situation: "Leave reminder readiness on web: where the hosted job's estimate starts (decision D3).",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-start-mac", ticket: "279", template: LEAVE_REMINDER_START_MAC,
+    situation: "Leave reminder readiness on a linked Mac: native reminders use the last estimate and name its time (decision D3, Ticket 280).",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-sources", ticket: "279", template: LEAVE_REMINDER_SOURCES,
+    situation: "Leave reminder readiness: which trips get reminders until Ticket 283 routes Outlook and iCloud events.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-travel-off", ticket: "279", template: LEAVE_REMINDER_TRAVEL_OFF,
+    situation: "Leave reminder readiness while Travel estimates is off. The checkbox cannot turn on until it is on.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-saved", ticket: "279", template: LEAVE_REMINDER_SAVED,
+    situation: "Status after the leave reminder checkbox saves.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-save-failed", ticket: "279", template: LEAVE_REMINDER_SAVE_FAILED,
+    situation: "Status when the leave reminder checkbox could not save. The checkbox keeps its stored value.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "leave-reminder-load-failed", ticket: "279", template: LEAVE_REMINDER_LOAD_FAILED,
+    situation: "Status when the stored leave reminder setting could not load. The checkbox stays unavailable.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "mac-leave-reminder-title", ticket: "280", template: "Leave by {time} for {event}",
+    situation: "Mac notification title, at the leave time minus the get-ready time, from the Mac's last estimate. Fires with Cadence quit.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "mac-leave-reminder-update-title", ticket: "280", template: "Leave earlier: by {time} for {event}",
+    situation: "Mac notification title for the one update, when a later estimate moves the leave time 10 minutes or more earlier (D15).",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "mac-leave-reminder-body", ticket: "280", template: "{Mode} from {start}, arrive {time}. Estimate checked {time}.",
+    situation: "Mac notification body for both. {start} is Home, your previous stop or your position. A quit app cannot re-route, so it names when the estimate was checked.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "web-leave-reminder-title", ticket: "278", template: "Leave by {time} for {event}",
+    situation: "Browser notification title, at the leave time minus the get-ready time, from the hosted job's estimate at send time. Expires when the trip starts.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "web-leave-reminder-update-title", ticket: "278", template: "Leave earlier: by {time} for {event}",
+    situation: "Browser notification title for the one update, when the job's estimate after sending moves the leave time 10 minutes or more earlier (D15). It replaces the first notification.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "web-leave-reminder-body", ticket: "278", template: "{Mode}, {minutes} min from {start}. Arrive {time}.",
+    situation: "Browser notification body for both. {start} is Home or the previous stop's title; the web job never starts from a device position.",
+    replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {

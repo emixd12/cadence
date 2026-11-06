@@ -701,6 +701,17 @@ the existing 1px magenta Timeline axis and overlap borders; markers remain at
 scheduled starts. Known gaps remain unfilled. Unknown returns cannot claim full
 availability. Live provider and installed native acceptance remain separate.
 
+### Leave reminder switch (Ticket 279)
+
+`LeaveReminderSetting` is the last item in How you travel. It follows the Daily Brief
+checkbox pattern: a native checkbox in a 44px row with a 12px gap and the sentence as its
+label, then an indented (`pl-7`) muted readiness block tied by `aria-describedby`. The
+block is a short list (Travel estimates when off, notifications on this device with a
+`text-link` to `#notifications` when not enabled, Home, where the estimate starts) and one
+line naming the sources that get reminders. Status text uses `role="status"`. No new
+token, colour or control. Bench: `module.leave-reminder-setting` shows web ready, web
+needing setup and a linked Mac; the Travel Settings bench shows it in place.
+
 ### Next-departure line (Ticket 269)
 
 `TravelStatusLine` in `components/timeline/DayProgressTimeline.tsx` is one paragraph at

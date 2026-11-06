@@ -1948,9 +1948,17 @@
       "confidence": "exact"
     },
     {
+      "componentId": "module.leave-reminder-setting",
+      "file": "components/settings/TravelSettingsPanel.tsx",
+      "line": 154,
+      "route": null,
+      "usageKind": "render",
+      "confidence": "exact"
+    },
+    {
       "componentId": "module.travel-habits-section",
       "file": "components/settings/TravelSettingsPanel.tsx",
-      "line": 140,
+      "line": 153,
       "route": null,
       "usageKind": "render",
       "confidence": "exact"
@@ -2045,7 +2053,7 @@
     }
   ],
   "summary": {
-    "productUsages": 255,
+    "productUsages": 256,
     "benchPreviews": 0
   }
 }

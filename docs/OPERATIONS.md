@@ -832,6 +832,7 @@ product behavior:
 | `CADENCE_DISABLE_REMINDER_BATCHES=1`        | The protected reminder batch before any channel work     | Pending rows and all ordinary app access                           |
 | `CADENCE_DISABLE_OCCURRENCE_SYNC_BATCHES=1` | The protected background occurrence batch before writes  | On-demand owner-scoped freshness and ordinary decisions            |
 | `CADENCE_DISABLE_EXPORT_DOWNLOADS=1`        | Structured export downloads before export reads          | Export page review, Timeline, status, Notes, account access        |
+| `CADENCE_DISABLE_LEAVE_REMINDER_BATCHES=1`  | The leave reminder job (Ticket 277) before any account is read | Pending leave reminder rows, Behavior reminders, all app access |
 
 Set `CADENCE_LAUNCH_BREAKER_REASON_CODE` to one of `abuse`,
 `application_regression`, `cost_surge`, `operator_drill`, or

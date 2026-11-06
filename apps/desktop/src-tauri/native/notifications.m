@@ -4,8 +4,19 @@
 
 static void (*eventCallback)(void);
 
+// Ticket 280: cadence.leave.<64 lowercase hex trip digest>, optionally with .update.
+static BOOL leaveReminderIdentifier(NSString *identifier) {
+    if (![identifier hasPrefix:@"cadence.leave."]) return NO;
+    NSString *digest = [identifier substringFromIndex:@"cadence.leave.".length];
+    if ([digest hasSuffix:@".update"]) digest = [digest substringToIndex:digest.length - @".update".length];
+    if (digest.length != 64) return NO;
+    NSCharacterSet *invalid = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
+    return [digest rangeOfCharacterFromSet:invalid].location == NSNotFound;
+}
+
 static BOOL ownedIdentifier(NSString *identifier) {
     if ([identifier hasPrefix:@"cadence-spike."]) return YES;
+    if (leaveReminderIdentifier(identifier)) return YES;
     if (![identifier hasPrefix:@"cadence.local."]) return NO;
     NSString *suffix = [identifier substringFromIndex:@"cadence.local.".length];
     return suffix.length == 36 && [[NSUUID alloc] initWithUUIDString:suffix] != nil;

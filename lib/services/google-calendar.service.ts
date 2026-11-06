@@ -4,13 +4,15 @@ import type { AppSupabaseClient } from "@/lib/db/behaviors.repo";
 import { beginCalendarAttempt, consumeCalendarAttempt, installCalendarCredential, readCalendarCallbackUser, readCalendarConnection, readCalendarCredential, removeCalendarCredential, saveCalendarPreferences } from "@/lib/db/google-calendar.repo";
 import type { CalendarConnection, CalendarConnectionView, CalendarPreferences, CalendarPurpose } from "@/lib/types/google-calendar";
 import { DEFAULT_CALENDAR_PREFERENCES } from "@/lib/types/google-calendar";
-import { CalendarConnectionError, calendarGoogleSubject, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
+import { CalendarConnectionError, calendarGoogleSubject, type CalendarIdentityUser, createCalendarAuthorization, exchangeCalendarCode, hashCalendarState, openCalendarSecret, readCalendarOAuthConfig, refreshCalendarToken, revokeCalendarToken, sealCalendarSecret } from "./google-calendar-oauth";
 import { readGoogleCalendarEvents, readGoogleCalendarCalendars, GoogleCalendarProviderError, type GoogleCalendarReadResult } from "./google-calendar-provider";
 import { readDailyBriefPreferences } from "@/lib/db/daily-brief.repo";
 
 export type CalendarCaller = { client: AppSupabaseClient; user: User };
+/** Calendar reads need only the account id and its Google identity, so the leave reminder job's caller (Ticket 276) fits. */
+export type CalendarReadCaller = { client: AppSupabaseClient; user: CalendarIdentityUser };
 function config(requestOrigin?: string, grantPurpose: CalendarPurpose = "standard") { const value = readCalendarOAuthConfig(process.env, requestOrigin, grantPurpose); if (!value) throw new CalendarConnectionError("not_configured"); return value; }
-export async function getCalendarConnection(caller: CalendarCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnectionView> {
+export async function getCalendarConnection(caller: CalendarReadCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnectionView> {
   const settings = readCalendarOAuthConfig(process.env, undefined, grantPurpose);
   if (!settings) return { accountId: caller.user.id, status: "not_configured", generation: 0, selectionRevision: 0, preferences: DEFAULT_CALENDAR_PREFERENCES };
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
@@ -62,7 +64,7 @@ export async function finishCalendarConnection(input: { state: string; code: str
   if (attempt.target === "desktop") return `cadence://calendar/callback?${new URLSearchParams({ state: attempt.clientState, result, ...(grantPurpose === "agent" ? { purpose: "agent" } : {}) })}`;
   return new URL(`/settings?${resultKey}=${encodeURIComponent(result)}`, settings.callbackUrl).toString();
 }
-async function connected(caller: CalendarCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnection> {
+async function connected(caller: CalendarReadCaller, grantPurpose: CalendarPurpose = "standard"): Promise<CalendarConnection> {
   const settings = config(undefined, grantPurpose);
   const connection = await readCalendarConnection(caller.client, caller.user.id, grantPurpose);
   if (!connection || connection.status !== "connected" || (grantPurpose === "agent" && connection.oauthClientId !== settings.clientId)) throw new CalendarConnectionError("reconnect_required");
@@ -80,7 +82,7 @@ async function accessToken(connection: CalendarConnection): Promise<string> {
     throw error;
   }
 }
-async function assertCurrent(caller: CalendarCaller, old: CalendarConnection) {
+async function assertCurrent(caller: CalendarReadCaller, old: CalendarConnection) {
   const current = await connected(caller, old.grantPurpose);
   if (current.generation !== old.generation || current.selectionRevision !== old.selectionRevision) throw new CalendarConnectionError("connection_changed");
 }
@@ -117,7 +119,7 @@ export async function updateCalendarPreferences(caller: CalendarCaller, raw: unk
   return getCalendarConnection(caller, grantPurpose);
 }
 const pendingReads = new Map<string, Promise<Awaited<ReturnType<typeof readGoogleCalendarEvents>>>>();
-export async function getCalendarEvents(caller: CalendarCaller, start: string, end: string) {
+export async function getCalendarEvents(caller: CalendarReadCaller, start: string, end: string) {
   const read = await readAuthorizedCalendarRange(caller, start, end, {}, false, "standard");
   if (!read.result.ok) {
     if (read.result.error.code === "reconnect_required") await removeCalendarCredential(read.connection, "reconnect_required");
@@ -172,7 +174,7 @@ export async function getCalendarEventsForWorkbenchHistory(
 }
 
 async function readAuthorizedCalendarRange(
-  caller: CalendarCaller, start: string, end: string,
+  caller: CalendarReadCaller, start: string, end: string,
   options: NonNullable<Parameters<typeof getCalendarEventsForAdvisor>[3]>, historical: boolean, grantPurpose: CalendarPurpose,
 ): Promise<AdvisorCalendarRead> {
   const connection = await connected(caller, grantPurpose);

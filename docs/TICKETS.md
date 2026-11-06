@@ -16284,8 +16284,13 @@ tests/travel-habits.dom.test.tsx`.
 
 ## Ticket 275: Leave reminder specification and schema
 
-Status: filed November 4, 2026. Not started.
-Dependencies: Ticket 263. Decision D3.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
+applied to local Supabase only; the hosted push waits for the owner. Under decision D15
+the web job routes a trip at most three times (plan, send, and once after sending) and
+sends at most one update; the Mac sends its update from its own estimates
+(`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). Under D12, only trips to located
+destinations get reminders.
+Dependencies: Ticket 263. Decisions D3 and D15.
 
 Goal: write the contract before building the job (proposal P3).
 
@@ -16323,7 +16328,12 @@ Verification: `npm run supabase -- db reset`, the new migration test, `npm run t
 
 ## Ticket 276: A background job acts as the user
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged. The migration is
+applied to local Supabase only; the hosted push waits for the owner. The leave reminder
+token is its own channel with no MCP grant claims. The Google identity comes from
+`public.leave_reminder_google_subject()`. Open for Ticket 277: Vercel's documentation does
+not say whether cron requests carry `x-vercel-oidc-token`; check it in production before
+the job routes (STATUS.md, Ticket 276).
 Dependencies: Ticket 275. Decision D3.
 
 Goal: a job reads Calendar and reserves spend under Row Level Security, with no user
@@ -16364,8 +16374,23 @@ run, `npm run resolvers:check`.
 
 ## Ticket 277: Leave reminder job
 
-Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 276, 264, 265 and 267. Decision D3.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Off until
+`CADENCE_LEAVE_REMINDER_JOB=enabled`, and the route reports delivery unavailable until
+Ticket 278. Planner `packages/core/src/services/leave-reminder-plan.ts`, service
+`lib/services/leave-reminder-job.service.ts`, route
+`app/api/travel/leave-reminders/process/route.ts`, breaker `leave_reminder_batches`. The
+send payload contract for Ticket 278 is `lib/services/leave-reminder-delivery.ts`. After
+sending, the one check is the reminder time the notification named, so no leave time is
+stored. Decision D16: the update route stops at 80% of the monthly budget. Wave 4 final
+check, November 6, 2026: migration `20261106060000_travel_preparation_changed_at.sql` adds
+`travel_settings.preparation_changed_at`, the database's time of the last get-ready change,
+so a Mac clock or a late offline sync can only suppress an update, never send a false one.
+A routing failure after partial spend is retried through the shared refresh, which
+reserves again before every provider call, so spend stays under the monthly ceiling.
+Codex review fix, November 6, 2026: migration
+`20261106070000_leave_reminder_planned_preparation.sql` keeps the get-ready minutes a
+pending check used, so a later get-ready change moves the check without a route.
+Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
 
 Goal: check each opted-in account and send a reminder at the right time.
 
@@ -16377,12 +16402,22 @@ Scope and acceptance:
 - Run every 5 minutes with a bounded batch. Look 5 minutes ahead so reminders are not late.
 - Select due accounts as Ticket 276 states. Everything else runs as that user.
 - Start from Home or the previous stop. Never use a stored position.
-- Route at most twice per trip: once to set the check time, once when due. Store no
-  durations.
+- Route at most three times per trip (decision D15): once to set the check time, once
+  when due to send, and once 5 minutes after sending while the named leave time is still
+  ahead. Send one update only if that estimate moves the leave time 10 minutes or more
+  earlier. The database refuses a fourth route, a third before sending and a second
+  update. Store no durations.
 - Re-read Calendar at least every 30 minutes. Drop a trip when its event moves, is
-  cancelled or declined, is marked remote, or its Occurrence is resolved.
+  cancelled or declined, loses its location (decision D12), or its Occurrence is
+  resolved.
 - Read the title only at send time, in memory.
 - Stay off until a new server flag is set. Add it to `.env.example`.
+- Authenticate the cron request with `CRON_SECRET`. Read the Vercel OIDC token from the
+  request header, then `VERCEL_OIDC_TOKEN_FILE`, then `VERCEL_OIDC_TOKEN`, and fail closed.
+  On the first production run, log only whether the token was present.
+- Decision D16: the update route stops at 80% of the monthly travel budget.
+- Define the send payload Ticket 278 builds against: digest, times, mode and origin label.
+  Titles stay in memory, never in stored data.
 - Tests cover no duplicate sends, overlapping runs, budget refusal, removed events and
   daylight-saving changes.
 - Spend reserves first. Update `docs/COSTS.md`.
@@ -16401,12 +16436,20 @@ Platform impact:
 
 Messaging impact: P-016 and P-017.
 
-Verification: new service and planner tests, `npm run resolvers:check`,
-`npm run agents:check`.
+Verification: `npx vitest run tests/leave-reminder-plan.test.ts
+tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test.ts`,
+`tests/leave-reminder-store.local-integration.test.ts` on an isolated local project,
+`npm run resolvers:check`, `npm run agents:check`.
 
 ## Ticket 278: Leave reminders through web push
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed, and no real
+notification was sent. Delivery `lib/services/leave-reminder-web-push.ts`, wired through
+`createLeaveReminderDelivery`; link helpers `lib/ui/leave-reminder-link.ts`. The sender gains
+optional lifetime and urgency; Behavior reminders keep 24 hours at normal urgency. The link is
+`/timeline?leave=<trip digest>`. The update shares the first notification's tag and alerts
+again. Three phrases in `departure-phrases.ts`, approved November 6, 2026 (D17). The Ticket 277 payload
+contract is unchanged; the delivery reads the profile timezone itself.
 Dependencies: Ticket 277. Decision D3.
 
 Goal: the notification is short-lived, plain and able to open the right event.
@@ -16442,7 +16485,11 @@ Verification: `npx vitest run` on the push and reminder service tests,
 
 ## Ticket 279: Reminder setting and readiness list
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`, not merged. Built alongside
+Ticket 277, before Ticket 278. `LeaveReminderSetting` sits last in How you travel and
+saves through `GET`/`PUT /api/travel/leave-reminders` (web session or a linked Mac's bearer
+token). It cannot turn on while Travel estimates is off. The owner approved the twelve new
+phrases on November 6, 2026 (D17). The Mac posts no leave reminder until Ticket 280.
 Dependencies: Ticket 278. Decision D3.
 
 Goal: the user gets one switch and sees what it still needs.
@@ -16470,14 +16517,19 @@ Platform impact:
 | Marketing | Not applicable until release. P-016 logs the text changes. |
 | Future mobile | Mobile web inherits it, checked at 390 px. Native mobile is deferred. |
 
-Messaging impact: P-016.
+Messaging impact: P-016, P-024.
 
 Verification: `npx vitest run tests/travel-settings.dom.test.tsx`,
 `npm run interactions:check`, `npm run design-system:check`, bench at both widths.
 
 ## Ticket 280: Leave reminders on the Mac
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`, not merged or released. A linked Mac
+schedules `cadence.leave.<trip digest>` notifications from the departure model's last estimate
+(`packages/core/src/services/mac-leave-reminder-plan.ts`,
+`apps/desktop/src/local-leave-reminder.service.ts`), with one D15 update and activation into the
+event's drawer. Behavior reminder coverage is unchanged. The owner approved its three phrases on
+November 6, 2026 (D17). Installed acceptance waits for a dev-signed build; a release waits for the owner.
 Dependencies: Tickets 265, 268 and 279. Decision D3.
 
 Goal: a native reminder fires from the last estimate, even if the app has quit.

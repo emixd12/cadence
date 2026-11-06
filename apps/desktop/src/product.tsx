@@ -10,6 +10,7 @@ import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSetting
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
 import { travelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
+import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
 import { createLocalPlaceLabelClient } from "./local-place-labels.service";
 import { PlaceLabelProvider } from "@/components/travel/PlaceLabels";
@@ -45,7 +46,8 @@ import { readNativeEvents } from "./native-spike";
 import { createLocalBehaviorActions, createLocalOccurrenceActions, localErrorMessage } from "./local-actions";
 import { getLocalBehaviorsPageData } from "./local-behaviors-read.service";
 import { loadLocalTimeline } from "./local-timeline.service";
-import { latestNotificationOccurrenceId, loadNotificationOccurrence, type NotificationTarget } from "./notification-activation";
+import { latestNotificationActivation, leaveReminderTarget, loadNotificationOccurrence, type NotificationTarget } from "./notification-activation";
+import { useDesktopLeaveReminders } from "./use-leave-reminders";
 import { scrollAfterDesktopNavigation } from "./desktop-navigation";
 import { scheduleLocalDayRefresh } from "./desktop-lifecycle";
 import { reconcileLocalBehaviorEndDates } from "./local-behavior-lifecycle.service";
@@ -82,6 +84,8 @@ export function Product() {
     return () => desktopUpdater.stop();
   }, []);
   const [account, setAccount] = useState<DesktopAccountState>({ status: "local" });
+  // Ticket 280: true once the saved session has been read. Before that, "local" is only the default.
+  const [accountKnown, setAccountKnown] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const [firstLink, setFirstLink] = useState<{ recognized: boolean; complete?: boolean; backupPath?: string; error?: string } | null>(null);
   const [syncReady, setSyncReady] = useState(false);
@@ -99,6 +103,9 @@ export function Product() {
   const [travelCorrections, setTravelCorrections] = useState<{ accountId: string | null; items: readonly TravelCorrection[] }>({ accountId: null, items: [] });
   const [calendarClient, setCalendarClient] = useState<ReturnType<DesktopAuth["accountClient"]> | null>(null);
   const [notificationTarget, setNotificationTarget] = useState<NotificationTarget | null>(null);
+  const [leaveActivation, setLeaveActivation] = useState<{ digest: string; requestKey: number } | null>(null);
+  const handledLeaveActivation = useRef<number | null>(null);
+  const resumeReconcile = useRef<() => void>(() => undefined);
   const [navigationRequest, setNavigationRequest] = useState<{ anchor?: string } | null>(null);
   const activation = useRef<{ occurrenceId: string; requestKey: number } | null>(null);
   const activationSequence = useRef(0);
@@ -212,11 +219,19 @@ export function Product() {
         if (!mounted.current) return;
         retainNativeDeliveryEvents(events);
         if (events.length) void desktopUpdater.checkOverdue();
-        const occurrenceId = latestNotificationOccurrenceId(events);
-        if (occurrenceId) {
+        // Ticket 280: resuming or waking reconciles leave reminders from the last estimate.
+        if (events.some((event) => event.kind === "resume" || event.kind === "wake")) resumeReconcile.current();
+        const activated = latestNotificationActivation(events);
+        if (activated?.kind === "occurrence") {
           const requestKey = ++activationSequence.current;
-          activation.current = { occurrenceId, requestKey };
+          activation.current = { occurrenceId: activated.occurrenceId, requestKey };
+          setLeaveActivation(null);
           setNotificationTarget({ requestKey, status: "loading" });
+          setNavigationRequest(null);
+          setActiveScreen("timeline");
+        } else if (activated?.kind === "leave") {
+          // Ticket 280: a leave reminder opens the Timeline and its event's drawer once the event is known.
+          setLeaveActivation({ digest: activated.digest, requestKey: ++activationSequence.current });
           setNavigationRequest(null);
           setActiveScreen("timeline");
         }
@@ -238,7 +253,7 @@ export function Product() {
     const config = readDesktopAuthConfig();
     if (!isTauri() || !config) return;
     let active = true;
-    const service = new DesktopAuth(config, (state) => { if (active) { setAccount(state); setCalendarClient(state.status === "linked" ? service.accountClient() : null); } });
+    const service = new DesktopAuth(config, (state) => { if (active) { setAccount(state); setAccountKnown(true); setCalendarClient(state.status === "linked" ? service.accountClient() : null); } });
     auth.current = service;
     let stop: (() => void) | undefined;
     void service.initialize().then((value) => { if (active) stop = value; else value(); }).catch(() => { if (active) setAccount({ status: "error", message: "The saved account session could not be read." }); });
@@ -318,6 +333,14 @@ export function Product() {
     } };
   }, []);
   const travelClient = useMemo(() => calendarClient && accountUserId ? createDesktopTravelClient(calendarClient) : null, [calendarClient, accountUserId]);
+  // Ticket 279: the account's leave reminder switch lives on the hosted server, so only a linked Mac shows it.
+  const leaveReminderClient = useMemo(() => calendarClient && accountUserId ? createDesktopLeaveReminderClient(calendarClient) : null, [calendarClient, accountUserId]);
+  const leaveReminders = useDesktopLeaveReminders({ native: isTauri(), accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
+    // "error" and "waiting" keep what is scheduled; only a read session or a signed-out Mac reconciles.
+    accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient });
+  useEffect(() => { resumeReconcile.current = leaveReminders.reconcile; }, [leaveReminders.reconcile]);
+  const nativePermission = reminders?.permission ?? "checking";
+  const readLeaveReminderNotifications = useCallback(async () => nativeLeaveReminderNotifications(nativePermission), [nativePermission]);
   // Ticket 216: place labels live in SQLite; each change asks account sync to run.
   const placeLabelClient = useMemo(() => createLocalPlaceLabelClient(() => setSyncRequest((previous) => previous + 1)), []);
   const calendarRange = {
@@ -356,6 +379,19 @@ export function Product() {
     sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
     stopRevisions: travelStopRevisions(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions) });
+  // Ticket 280: the leave reminder's destination, once today's Calendar read or Timeline has it. A moved or removed trip matches nothing.
+  const leaveTarget = leaveActivation && bundle ? leaveReminderTarget(leaveActivation.digest, { events: visibleCalendarEvents,
+    occurrences: bundle.timeline.timeline.daySections.flatMap((section) => section.occurrences) }) : null;
+  const openEvent = leaveActivation && leaveTarget?.kind === "event" ? { eventId: leaveTarget.eventId, requestKey: leaveActivation.requestKey } : null;
+  const leaveOccurrenceId = leaveTarget?.kind === "occurrence" ? leaveTarget.occurrenceId : null;
+  const leaveRequestKey = leaveActivation?.requestKey ?? null;
+  useEffect(() => {
+    // A Behavior destination opens its Occurrence the way a Behavior reminder does.
+    if (!leaveOccurrenceId || leaveRequestKey === null || handledLeaveActivation.current === leaveRequestKey) return;
+    handledLeaveActivation.current = leaveRequestKey;
+    activation.current = { occurrenceId: leaveOccurrenceId, requestKey: leaveRequestKey };
+    refresh();
+  }, [leaveOccurrenceId, leaveRequestKey, refresh]);
   const calendarContext = {
     travelMessage: travel.message,
     travelStatus: travel,
@@ -367,6 +403,9 @@ export function Product() {
     openBehavior: () => navigate("behaviors"),
     // Travel and its brief guidance stay on Google events; Outlook and iCloud add schedule context only.
     events: [...visibleCalendarEvents, ...outlookEvents, ...icloudEvents],
+    // Ticket 280: native leave reminders follow the departure model; activation opens the event's drawer.
+    onDeparture: accountUserId ? leaveReminders.onDeparture : undefined,
+    openEvent,
     ...desktopTimelineFreshness({ snapshot: calendar.snapshot, stale: calendar.stale, label: calendar.label, error: calendar.error }, outlookTimeline, icloudTimeline),
     recordedActivity: connectors.hevy,
   };
@@ -558,7 +597,8 @@ export function Product() {
             : <ConnectorUnavailable id="hevy" reason={connectorUnavailableReason("Hevy", connectors.unavailableReason)} /> },
         ]} />}
         dailyBriefControls={<>{calendar.agentCoordinator ? <GoogleCalendarPanel key={`agent-${accountUserId ?? "local"}`} agent coordinator={calendar.agentCoordinator} wrongAccount={calendar.agentWrongAccount} callbackMessage={calendar.agentCallbackMessage} refreshRange={calendarRange} refreshVersion={calendar.panelVersion} openExternalUrl={openCalendarSourceUrl} /> : null}<DailyBriefSettingsPanel key={accountUserId ?? "local"} client={dailyBriefClient} desktop /></>}
-        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop />}
+        travelControls={<TravelSettingsPanel key={`travel-${accountUserId ?? "local"}`} client={travelSettingsClient} readLocation={readMacForegroundLocation} readPermission={readMacLocationPermission} openLocationSettings={openMacLocationSettings} desktop
+          leaveReminderClient={leaveReminders.settingsClient} readDeviceNotifications={readLeaveReminderNotifications} />}
         updates={<div id="app-updates" tabIndex={-1} className="scroll-mt-20"><DesktopUpdatePanel {...restartActions} /></div>}
         databaseControls={<LocalDatabaseControls onRestored={refresh} />}
         updateTimezoneAction={timezoneAction} permission={permission} coverage={coverage}

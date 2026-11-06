@@ -11,6 +11,7 @@ import { DayProgressTimeline } from "@/components/timeline/DayProgressTimeline";
 import { travelBenchEvidence } from "@/app/design-system/TravelBench";
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import type { TimelineView } from "@/lib/types/timeline";
+import { leaveReminderTripDigest } from "@cadence/core/services/leave-reminder-plan";
 
 const action = vi.fn(async () => ({ status: "idle" as const, message: "" }));
 let container: HTMLDivElement;
@@ -210,6 +211,53 @@ describe("DayProgressTimeline", () => {
       freshness: { state: "stale", refreshedAt: "2026-09-16T14:00:00Z", label: "Calendar context may be out of date", canAssertNoOverlap: false },
     }} /></RefreshProvider>));
     expect(container.textContent).toContain("Last refreshed Sep 16");
+  });
+
+  it("opens an event's drawer once per request and reports today's departure model to the Mac (Ticket 280)", async () => {
+    const input = props();
+    const onDeparture = vi.fn();
+    const render = (requestKey: number) => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{
+      ...input.context, onDeparture, openEvent: { eventId: "event-offsite", requestKey } }} /></RefreshProvider>);
+    await act(() => render(1));
+    expect(container.querySelector("dialog")?.open).toBe(true);
+    expect(onDeparture).toHaveBeenLastCalledWith({ localDate: "2026-09-16", preparationSeconds: expect.any(Number), trips: null,
+      stops: [{ ref: "occurrence-1", label: "Morning walk", startAt: "2026-09-16T13:00:00Z", endAt: null }] });
+    await act(() => button("Close Calendar details").click());
+    expect(container.querySelector("dialog")?.open).toBe(false);
+    await act(() => render(1));
+    expect(container.querySelector("dialog")?.open).toBe(false);
+    await act(() => render(2));
+    expect(container.querySelector("dialog")?.open).toBe(true);
+  });
+
+  it("opens a web leave reminder's event drawer once from its trip digest (Ticket 278)", async () => {
+    const input = props();
+    const dentist = { ...outlookEvent(), id: "event-dentist", providerEventId: "event-dentist", logicalInstanceId: "event-dentist",
+      source: "google_calendar" as const, title: "Dentist", location: "Main St" };
+    const render = (events: readonly (typeof dentist)[], digest: string | null) => root.render(<RefreshProvider onRefresh={() => {}}>
+      <DayProgressTimeline {...input} context={{ ...input.context, events: [allDayEvent(), ...events] }} leaveReminderDigest={digest} /></RefreshProvider>);
+    const digest = leaveReminderTripDigest("calendar", "event-dentist", dentist.startAt);
+    // The event moved: the digest covers the start, so nothing opens.
+    await act(() => render([{ ...dentist, startAt: "2026-09-16T15:30:00Z" }], digest));
+    expect(container.querySelector("dialog")?.open).not.toBe(true);
+    // Once the Calendar read has the event at the same start, its drawer opens.
+    await act(() => render([dentist], digest));
+    expect(container.querySelector("dialog")?.open).toBe(true);
+    expect(container.querySelector("dialog")?.textContent).toContain("Dentist");
+    await act(() => button("Close Calendar details").click());
+    await act(() => render([dentist], digest));
+    expect(container.querySelector("dialog")?.open).toBe(false);
+  });
+
+  it("scrolls to a web leave reminder's Occurrence from its trip digest (Ticket 278)", async () => {
+    const scrolled = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value(this: HTMLElement) { scrolled(this.dataset.occurrenceId); } });
+    const input = props();
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input}
+      leaveReminderDigest={leaveReminderTripDigest("behavior", "occurrence-1", "2026-09-16T13:00:00Z")} /></RefreshProvider>));
+    expect(scrolled).toHaveBeenCalledWith("occurrence-1");
+    expect(container.querySelector("dialog")?.open).not.toBe(true);
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
   it("opens details from a focus preview and restores the launcher", async () => {

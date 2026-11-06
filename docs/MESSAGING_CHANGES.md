@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-024` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-025` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -93,6 +93,7 @@ Status values:
 | [P-021](#p-021-next-trip-marks-wider-directions-and-other-travel-guide-wording) | Next-trip marks, wider Directions and other travel guide wording | logged | 269–271, 273, 274, 282 | User guide |
 | [P-022](#p-022-weather-margin-can-mean-arriving-later) | Weather margin can mean arriving later | logged | 265 | User guide |
 | [P-023](#p-023-no-attendance-question-and-no-travel-for-events-without-a-location) | No attendance question, and no travel for events without a location | logged | D12 (follows 273) | User guide |
+| [P-024](#p-024-leave-reminder-switch-and-readiness-list-in-travel-settings) | Leave reminder switch and readiness list in Travel Settings | logged | 279 | Travel Settings, user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -623,6 +624,33 @@ cite has not changed.
 - **Update needed:** describe the setting, what it stores, when it sends, where the
   estimate starts, and that a Mac notification names its estimate time. Add a retention
   row. Say which calendars get reminders.
+- **Ticket 275 note (November 6, 2026):** the stored fields are now fixed. The preference
+  row holds the switch, when it was turned on and the job's next check time. Each reminder
+  row also holds a route count and a claim time. Turning reminders off deletes the reminder
+  rows; otherwise rows older than the previous local date are deleted. Only trips to a
+  located destination get a reminder (D12), and the trip home gets none. Under D15, web
+  and Mac each send at most one update when a later estimate moves the leave time 10
+  minutes or more earlier; the web job estimates the trip once more after sending to check,
+  and the reminder row records when the update sent. Turning reminders off and on the same
+  day can repeat a reminder.
+- **Ticket 280 note (November 6, 2026):** the Mac keeps, on the device only, each trip's digest,
+  fire time and the leave time its reminder named, so a dismissed reminder is not sent again.
+  Its text names the start (Home, your previous stop or your position) and when the estimate was
+  checked, with no route duration. Travel estimates off on the Mac also stops its reminders.
+  The three Mac phrases are listed in `departure-phrases.ts`, not yet approved (D7).
+- **Ticket 277 note (November 6, 2026):** after sending, the record keeps the reminder time
+  it named as its one check, until the update route runs. The update estimate stops at 80%
+  of the monthly travel budget (D16), so near month end an update may not arrive. A trip
+  that was dropped after its first estimate and then comes back gets no reminder. Failed
+  reminders record a short code such as `no_subscription`.
+- **Ticket 278 note (November 6, 2026):** the web notification names the leave time, the event
+  title, the mode, the route time in minutes, the start (Home or the previous stop's title) and
+  the arrival time. The titles travel only in the encrypted push payload; the link carries the
+  trip digest only. The push service holds the notification at most until the leave time. The
+  three web phrases are listed in `departure-phrases.ts`, not yet approved (D7).
+- **D17 note (November 6, 2026):** the owner approved all Wave 4 wording: the three web and three
+  Mac reminder phrases above and the twelve P-024 setting phrases. No travel phrase awaits
+  approval.
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session
@@ -642,6 +670,9 @@ cite has not changed.
 - **Update needed:** add the reminder check as a processing moment. State that it happens
   only for accounts that turned the reminder on, and that Cadence still stores no Google
   event details. Update the verification materials before the next submission.
+- **Ticket 277 note (November 6, 2026):** the job reads Calendar, Behaviors and Occurrences
+  for an opted-in account at least every 30 minutes, and again at send time, all day
+  while reminders stay on. It reads titles only at send time.
 - **Status:** logged.
 
 ## P-018: Last estimates and per-trip refresh
@@ -827,4 +858,27 @@ cite has not changed.
   "an event's time, location or attendance changes".
 - **Update needed:** drop the in-person or remote choice; say an event without a location is not
   travel; describe the no-Home return sentence and its Settings link.
+- **Status:** logged.
+
+## P-024: Leave reminder switch and readiness list in Travel Settings
+
+- **Change:** Ticket 279, November 6, 2026. How you travel gains one checkbox, off by
+  default: "Remind me when it is time to get ready to leave." Below it, a readiness list
+  names this device's notifications ("Notifications: {device state}.", with a "Turn on
+  notifications" link), whether Home is saved, and where the estimate starts. Web says
+  "Reminders estimate from Home or your previous stop, never from this device's position."
+  A linked Mac says it reminds from its last estimate and names when that estimate was
+  checked. A line says only Google Calendar events and Behaviors get reminders, not Outlook
+  or iCloud events. The switch cannot turn on while Travel estimates is off. It is one
+  switch per account, saved on the hosted server, and hidden on an unlinked Mac. All twelve
+  new phrases are on the bench wording review, not yet approved (D7).
+- **Affected:** Ticket 279, with P-016. Files: `docs/user-guide/travel.md`, "Learned travel
+  habits", which the interaction registry links for INT-TRAVEL-013.
+- **Surfaces:** Travel Settings, user guide.
+- **Conflicting current text:** `docs/user-guide/travel.md` describes How you travel as
+  get-ready time, arrival buffer and travel per place, with no reminder switch.
+- **Update needed:** describe the switch, the readiness list, the Travel estimates
+  requirement, that it applies to every device on the account, and which sources get
+  reminders. P-016 carries the Privacy and retention wording.
+- **D17 note (November 6, 2026):** the owner approved all twelve phrases as written.
 - **Status:** logged.

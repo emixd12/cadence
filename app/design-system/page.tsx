@@ -1,7 +1,7 @@
 import { ConsentBench, ConnectedAppsBench } from "./OAuthBench";
 import { CalendarSettingsBench, CalendarDetailsBench, CalendarTimelineBench } from "./CalendarBench";
 import { ConnectorLibraryBench, HevyPanelBench, IcloudCalendarPanelBench, OutlookCalendarPanelBench, RecordedActivityBench } from "./ConnectorBench";
-import { TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
+import { LeaveReminderSettingBench, TravelDevelopmentTextBench, TravelHabitsBench, TravelLeaveQuestionBench, TravelModeChoiceBench, TravelSettingsBench } from "./TravelBench";
 import { FirstRunOnboardingBench } from "./OnboardingBench";
 import { BehaviorPlaceAssistBench, CompletionPlacesSectionBench, PlaceMarkerControlBench } from "./PlaceLabelBench";
 import { DailyBriefBubbleBench, DailyBriefSettingsBench, DailyBriefWorkbench } from "./DailyBriefBench";
@@ -1637,6 +1637,7 @@ const previewFactories: Record<
   "composite.recorded-activity-list": () => <ProductPreview><RecordedActivityBench /></ProductPreview>,
   "module.travel-settings-panel": () => <ProductPreview><TravelSettingsBench /></ProductPreview>,
   "module.travel-habits-section": () => <ProductPreview><TravelHabitsBench /></ProductPreview>,
+  "module.leave-reminder-setting": () => <ProductPreview><LeaveReminderSettingBench /></ProductPreview>,
   "composite.travel-mode-choice": () => <ProductPreview><TravelModeChoiceBench /></ProductPreview>,
   "composite.travel-leave-question": () => <ProductPreview><TravelLeaveQuestionBench /></ProductPreview>,
   "module.completion-places-section": () => <ProductPreview><CompletionPlacesSectionBench /></ProductPreview>,

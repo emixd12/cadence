@@ -6,6 +6,7 @@ export const LAUNCH_CIRCUIT_BREAKER_NAMES = [
   "reminder_batches",
   "occurrence_sync_batches",
   "export_downloads",
+  "leave_reminder_batches",
 ] as const;
 
 export type LaunchCircuitBreakerName =
@@ -35,6 +36,8 @@ const BREAKER_ENVIRONMENT_KEYS: Record<LaunchCircuitBreakerName, string> = {
   reminder_batches: "CADENCE_DISABLE_REMINDER_BATCHES",
   occurrence_sync_batches: "CADENCE_DISABLE_OCCURRENCE_SYNC_BATCHES",
   export_downloads: "CADENCE_DISABLE_EXPORT_DOWNLOADS",
+  // Ticket 277: the leave reminder job, before any account is read.
+  leave_reminder_batches: "CADENCE_DISABLE_LEAVE_REMINDER_BATCHES",
 };
 
 const OPEN_REASON_CODES = new Set<LaunchCircuitBreakerReasonCode>([

@@ -72,7 +72,7 @@ async function SettingsContent() {
 
       <WebConnectorLibrary timezone={settings.timezone} />
 
-      <TravelSettingsPanel />
+      <TravelSettingsPanel vapidPublicKey={settings.vapidPublicKey} />
 
       <WebGoogleCalendarPanel timezone={settings.timezone} agent />
       <DailyBriefSettingsPanel />

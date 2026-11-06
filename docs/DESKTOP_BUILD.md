@@ -432,6 +432,43 @@ replaces the guaranteed 30-day requirement. It does not complete Ticket 108 or
 waive native activation proof before broad refactoring. See
 [native evidence](qa/2026-08-30-desktop-native-boundary.md).
 
+### Leave reminders (Ticket 280)
+
+Leave reminders are a separate kind (decisions D3 and D15; `docs/NOTIFICATION_SPEC.md`,
+"Mac: native notifications"). They use the same thin macOS adapter with their own
+identifiers, `cadence.leave.<trip digest>` and `cadence.leave.<trip digest>.update`.
+The Rust command and `native/notifications.m` accept exactly 64 lowercase hex digits,
+optionally followed by `.update`. Behavior reminder reconciliation and coverage only
+read `cadence.local.<UUID>` identifiers, so leave reminders never change coverage.
+
+- Planner: `packages/core/src/services/mac-leave-reminder-plan.ts`, pure, with `now`
+  injected. It reads the Timeline's departure model (Ticket 265), so it uses the last
+  estimate and never makes a route call. The digest is SHA-256 of the destination's
+  commitment ref and start, so a moved event is a new trip.
+- Service: `apps/desktop/src/local-leave-reminder.service.ts` runs one reconcile at a
+  time. `use-leave-reminders.ts` triggers it on launch once the saved session is read,
+  on account change, on resume and wake, on a new estimate, trip or local day, and after
+  the Settings switch saves. There is no background helper.
+- Enabled only on a linked Mac with Travel estimates on (SQLite travel settings) and the
+  hosted switch on (Ticket 279's `GET /api/travel/leave-reminders`). Offline, the last
+  value read is used. Off, sign-out or another account removes every pending and
+  delivered leave reminder.
+- Device memory lives in WKWebView `localStorage` under `cadence.leave-reminders.v1`:
+  account ID, the last switch value, and per trip the digest, local date, fire time and
+  the leave time it named, plus the one update. No title, place, position or duration.
+  Nothing goes to SQLite, synchronization or the server. A record is kept only after
+  macOS reads the request back, so a rejected request is planned again.
+- A reminder whose fire time has passed counts as sent. After that, one update fires at
+  once if a later estimate moves the leave time 10 minutes or more earlier and it is
+  still ahead. A reminder whose time has passed when the Mac first knows the trip fires
+  10 seconds later, while the leave time is ahead.
+- Activation opens Timeline and the event's drawer once today's Calendar read has the
+  event at the same start; a Behavior destination opens its Occurrence like a Behavior
+  reminder.
+
+Installed acceptance (scheduled delivery with Cadence quit, update, activation) waits
+for a dev-signed build; a release waits for the owner.
+
 ## Implementation sequence
 
 | Phase | Ticket | Completion requirement |

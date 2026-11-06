@@ -2,6 +2,17 @@
 
 import {
   DEPARTURE_PHRASE_REVIEW,
+  LEAVE_REMINDER_HOME_MISSING,
+  LEAVE_REMINDER_HOME_SAVED,
+  LEAVE_REMINDER_LOAD_FAILED,
+  LEAVE_REMINDER_NOTIFICATIONS_STEP,
+  LEAVE_REMINDER_SAVED,
+  LEAVE_REMINDER_SAVE_FAILED,
+  LEAVE_REMINDER_SOURCES,
+  LEAVE_REMINDER_START_MAC,
+  LEAVE_REMINDER_START_WEB,
+  LEAVE_REMINDER_SWITCH,
+  LEAVE_REMINDER_TRAVEL_OFF,
   OWNER_APPROVED_2026_11_05,
   OWNER_APPROVED_2026_11_06,
   RETURN_TIME_UNKNOWN,
@@ -19,6 +30,9 @@ import {
   departureMarkerRailLines,
   departureOverlapPhrase,
   departurePhraseContext,
+  leaveReminderNotificationsPhrase,
+  macLeaveReminderPhrases,
+  webLeaveReminderPhrases,
   departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
@@ -46,6 +60,12 @@ const HOME_TRIP: Partial<DeparturePhraseInput> = { role: "return", fromHome: fal
 const detail = (input: Partial<DeparturePhraseInput>) => departureDetailPhrase({ ...BASE, ...input }, CONTEXT);
 const line = (input: Partial<DeparturePhraseInput>) => departureLinePhrase({ ...BASE, ...input }, CONTEXT);
 const old: Partial<DeparturePhraseInput> = { freshness: "last_estimate", checkedAt: at("08:55") };
+/** Ticket 280: the Mac's native leave reminder, from an estimate checked at 1 PM. */
+const macReminder = (update: boolean) => macLeaveReminderPhrases({ update, destinationLabel: EVENT, leaveAt: at(update ? "13:05" : "13:20"),
+  arriveAt: at("13:55"), checkedAt: at(update ? "13:10" : "13:00"), mode: "walking", start: "home" }, CONTEXT);
+/** Ticket 278: the web push leave reminder, routed at send time from Home. */
+const webReminder = (update: boolean) => webLeaveReminderPhrases({ update, destinationLabel: EVENT, leaveAt: at(update ? "13:05" : "13:20"),
+  arriveAt: at("13:55"), travelMinutes: update ? 50 : 35, mode: "walking", start: { kind: "home" } }, CONTEXT);
 /** Ticket 270 (D13, D14): the leader label, its word groups joined as on wide layouts. */
 const marker = (input: Partial<DeparturePhraseInput>) => departureMarkerRailLines({ ...BASE, ...input }, TIMEZONE).join(" ");
 
@@ -126,6 +146,24 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "travel-off-offer": () => departureTravelOffPhrase(EVENT),
   "travel-off-dismiss": () => TRAVEL_OFF_DISMISS,
   "setup-estimates-off": () => SETUP_TRAVEL_ESTIMATES_OFF,
+  "leave-reminder-switch": () => LEAVE_REMINDER_SWITCH,
+  "leave-reminder-notifications": () => leaveReminderNotificationsPhrase("not_enabled", false),
+  "leave-reminder-notifications-step": () => LEAVE_REMINDER_NOTIFICATIONS_STEP,
+  "leave-reminder-home-saved": () => LEAVE_REMINDER_HOME_SAVED,
+  "leave-reminder-home-missing": () => LEAVE_REMINDER_HOME_MISSING,
+  "leave-reminder-start-web": () => LEAVE_REMINDER_START_WEB,
+  "leave-reminder-start-mac": () => LEAVE_REMINDER_START_MAC,
+  "leave-reminder-sources": () => LEAVE_REMINDER_SOURCES,
+  "leave-reminder-travel-off": () => LEAVE_REMINDER_TRAVEL_OFF,
+  "leave-reminder-saved": () => LEAVE_REMINDER_SAVED,
+  "leave-reminder-save-failed": () => LEAVE_REMINDER_SAVE_FAILED,
+  "leave-reminder-load-failed": () => LEAVE_REMINDER_LOAD_FAILED,
+  "mac-leave-reminder-title": () => macReminder(false).title,
+  "mac-leave-reminder-update-title": () => macReminder(true).title,
+  "mac-leave-reminder-body": () => macReminder(false).body,
+  "web-leave-reminder-title": () => webReminder(false).title,
+  "web-leave-reminder-update-title": () => webReminder(true).title,
+  "web-leave-reminder-body": () => webReminder(false).body,
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

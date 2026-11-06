@@ -23,6 +23,18 @@ pub enum NotificationRequest {
     CancelPending { ids: Vec<String> },
 }
 
+/// Ticket 280: leave reminders use their own identifiers, so Behavior reminder coverage never counts them.
+/// `cadence.leave.<64 lowercase hex trip digest>`, or the same with `.update` for the one update.
+fn leave_reminder_id(id: &str) -> bool {
+    id.strip_prefix("cadence.leave.").is_some_and(|rest| {
+        let digest = rest.strip_suffix(".update").unwrap_or(rest);
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
 fn validate(request: &NotificationRequest) -> Result<(), String> {
     let ids: Vec<&String> = match request {
         NotificationRequest::Schedule { reminders } => {
@@ -60,14 +72,14 @@ fn validate(request: &NotificationRequest) -> Result<(), String> {
                     }
                 })
         });
-        if !(id.starts_with("cadence-spike.") || product_id)
+        if !(id.starts_with("cadence-spike.") || product_id || leave_reminder_id(id))
             || id.len() > 160
             || !id
                 .bytes()
                 .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
             || !seen.insert(id)
         {
-            return Err("Reminder IDs must be unique cadence-spike. identifiers or cadence.local.<occurrence UUID>.".into());
+            return Err("Reminder IDs must be unique cadence-spike. identifiers, cadence.local.<occurrence UUID> or cadence.leave.<trip digest>[.update].".into());
         }
     }
     Ok(())
@@ -191,6 +203,38 @@ mod tests {
             r#"{"operation":"cancelPending","ids":[],"reminders":[]}"#,
         )
         .is_err());
+    }
+
+    #[test]
+    fn leave_reminder_identifiers_have_their_own_exact_shape() {
+        let digest = "0123456789abcdef".repeat(4);
+        for id in [
+            format!("cadence.leave.{digest}"),
+            format!("cadence.leave.{digest}.update"),
+        ] {
+            assert!(validate(&NotificationRequest::CancelPending { ids: vec![id] }).is_ok());
+        }
+        for id in [
+            "cadence.leave.".to_string(),
+            format!("cadence.leave.{}", &digest[..63]),
+            format!("cadence.leave.{digest}0"),
+            format!("cadence.leave.{}", digest.to_uppercase()),
+            format!("cadence.leave.{digest}.updated"),
+            format!("cadence.leave.{digest}.update.update"),
+            format!("cadence.leave.{digest}/x"),
+            format!("cadence.leaves.{digest}"),
+        ] {
+            assert!(validate(&NotificationRequest::Cancel { ids: vec![id] }).is_err());
+        }
+        assert!(validate(&NotificationRequest::Schedule {
+            reminders: vec![Reminder {
+                id: format!("cadence.leave.{digest}"),
+                title: "Leave by 1:15 PM for Dentist".into(),
+                body: "Walking from Home, arrive 2:20 PM. Estimate checked 12:40 PM.".into(),
+                fire_at: "2026-11-06T18:05:00Z".into(),
+            }]
+        })
+        .is_ok());
     }
 
     #[test]

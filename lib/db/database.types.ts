@@ -1493,6 +1493,84 @@ export type Database = {
           },
         ]
       }
+      travel_leave_reminder_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          next_check_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          next_check_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          next_check_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      travel_leave_reminders: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          local_date: string
+          next_check_at: string | null
+          planned_preparation_minutes: number | null
+          processing_started_at: string | null
+          route_count: number
+          sent_at: string | null
+          status: string
+          trip_digest: string
+          update_sent_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          local_date: string
+          next_check_at?: string | null
+          planned_preparation_minutes?: number | null
+          processing_started_at?: string | null
+          route_count?: number
+          sent_at?: string | null
+          status?: string
+          trip_digest: string
+          update_sent_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          local_date?: string
+          next_check_at?: string | null
+          planned_preparation_minutes?: number | null
+          processing_started_at?: string | null
+          route_count?: number
+          sent_at?: string | null
+          status?: string
+          trip_digest?: string
+          update_sent_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       travel_place_cache: {
         Row: {
           looked_up_at: string
@@ -1568,6 +1646,7 @@ export type Database = {
           navigation_preference: string | null
           onboarding_completed_at: string | null
           place_modes: Json
+          preparation_changed_at: string | null
           preparation_minutes: number | null
           routing_consent_at: string | null
           updated_at: string
@@ -1584,6 +1663,7 @@ export type Database = {
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
           place_modes?: Json
+          preparation_changed_at?: string | null
           preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
@@ -1600,6 +1680,7 @@ export type Database = {
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
           place_modes?: Json
+          preparation_changed_at?: string | null
           preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
@@ -2048,6 +2129,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      leave_reminder_google_subject: { Args: never; Returns: string }
       list_my_occurrence_time_session_history: {
         Args: {
           cursor_session_id: string

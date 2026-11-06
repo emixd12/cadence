@@ -27,7 +27,7 @@ import { projectTravelRouteDisplay, type TravelRoutesResponse } from "@/lib/serv
 import { TRAVEL_GEOCODE_MICRODOLLARS, assertTravelProviderReady, geocodeGoogleAddress, type TravelProviderConfig } from "@/lib/services/travel-provider";
 import { TravelRoutingError, boundedMap, routeTravelLegs, type TravelSpendReservation } from "@/lib/services/travel-routing.service";
 import { parseTravelRouteRefreshRequest, type TravelRouteRefreshRequest } from "@/lib/services/travel-route-request";
-import { getCalendarConnection, getCalendarEvents, type CalendarCaller } from "@/lib/services/google-calendar.service";
+import { getCalendarConnection, getCalendarEvents, type CalendarReadCaller } from "@/lib/services/google-calendar.service";
 import { readTravelRouteSource, type TravelRouteBehavior } from "@/lib/services/travel-settings.service";
 import { readTravelWeather } from "@/lib/services/weather-forecast.service";
 import { WEATHER_PROVIDER_OFF, type WeatherProviderConfig } from "@/lib/services/weather-provider";
@@ -48,9 +48,10 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * of Cadence's own conclusions for the Daily Brief request to return.
  * Ticket 267: a request naming trips routes only those trips' legs. A leg that could leave
  * only after its destination ends is never routed. The response reports the month's budget.
+ * Ticket 277: the leave reminder job calls this with its own caller, which has no Auth user.
  */
 export async function refreshTravelRoutes(
-  caller: CalendarCaller,
+  caller: CalendarReadCaller,
   raw: unknown,
   config: TravelProviderConfig,
   now = Temporal.Now.instant(),
@@ -222,7 +223,7 @@ export async function refreshTravelRoutes(
  * every new lookup. Paid results are stored even when another lookup fails.
  */
 async function resolvePlaces(
-  caller: CalendarCaller,
+  caller: CalendarReadCaller,
   texts: readonly (string | null)[],
   config: TravelProviderConfig,
   now: Temporal.Instant,
@@ -471,7 +472,7 @@ function collisionCandidates(commitments: readonly TravelCommitment[], occupancy
  * Ticket 267: the month's reserved spend after this request. The ceiling is enforced only by
  * `reserve_travel_provider_spend`; this readback never reserves. A failed read omits the field.
  */
-async function readTravelBudget(caller: CalendarCaller, timezone: string, now: Temporal.Instant): Promise<TravelBudgetState | null> {
+async function readTravelBudget(caller: CalendarReadCaller, timezone: string, now: Temporal.Instant): Promise<TravelBudgetState | null> {
   try {
     const month = now.toZonedDateTimeISO(timezone).toPlainDate().with({ day: 1 });
     const reserved = await readTravelMonthSpend(caller.client, caller.user.id, month.toString());

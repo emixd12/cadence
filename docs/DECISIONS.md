@@ -1649,3 +1649,56 @@ The owner decided on November 6, 2026, as relayed by the travel coordinator afte
 Platform impact: web and desktop through the shared Timeline component and phrase module.
 Marketing: not applicable. Future mobile: mobile web keeps the stacked label at 390 px; native
 mobile is deferred. Messaging impact: P-021 note.
+
+## 2026-11-06: Web leave reminders send the one update (D15)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator, while Ticket 275
+was under verification:
+
+1. Web leave reminders also send the one update. The hosted job estimates each trip up to
+   three times: to plan, before sending, and once after sending to catch a leave time that
+   moved 10 minutes or more earlier. It sends at most one update.
+2. The trip home gets no reminder.
+3. Turning reminders off deletes the reminder records.
+
+This replaces Ticket 275's first settlement, in which the web job routed twice and only the
+Mac sent updates. It changes Tickets 275 and 277 and `docs/COSTS.md`: the reminder job's
+route legs rise by up to half.
+
+Platform impact: web through the hosted job (Tickets 277 and 278). Desktop: unchanged; the
+Mac still sends its one update from its own estimates (Ticket 280). Marketing: not applicable
+until release. Future mobile: the hosted contract is portable; native mobile is deferred.
+Messaging impact: P-016 note.
+
+## 2026-11-06: The leave reminder update estimate stops at 80% of the budget (D16)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator, while Ticket 277
+was being built:
+
+1. The update estimate after a leave reminder is sent stops at 80% of the monthly travel
+   budget, like automatic refreshes (Ticket 267, decision D11).
+2. The plan and send estimates continue to the ceiling, so first reminders keep the
+   remaining budget.
+
+Ticket 277 implements it: from 80% the job closes the post-send check with `budget_paused`
+and makes no route call (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). `docs/COSTS.md`
+records it. It answers the Ticket 275 verifier's open question about the update route.
+
+Platform impact: web through the hosted job (Ticket 277). Desktop: not applicable; the Mac
+makes no route call for reminders (Ticket 280). Marketing: not applicable. Future mobile:
+the hosted contract is portable; native mobile is deferred. Messaging impact: none.
+
+## 2026-11-06: All Wave 4 wording approved (D17)
+
+The owner decided on November 6, 2026, as relayed by the travel coordinator after Tickets
+275–280 were verified:
+
+1. All Wave 4 wording is approved as written: the twelve reminder-setting phrases (Ticket
+   279), the three web push reminder phrases (Ticket 278) and the three Mac reminder phrases
+   (Ticket 280).
+2. `DEPARTURE_PHRASE_REVIEW` carries the date as `OWNER_APPROVED_2026_11_06`. The bench
+   wording review shows every phrase approved, with none awaiting.
+
+Platform impact: web and desktop through the shared phrase module, Settings and the two
+notification paths. Marketing: not applicable until release. Future mobile: mobile web
+inherits the web text; native mobile is deferred. Messaging impact: P-016 and P-024 notes.

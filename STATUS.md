@@ -1,5 +1,189 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: Codex review fixes for leave reminders — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106070000_leave_reminder_planned_preparation.sql` is not applied anywhere yet; the
+hosted push waits for the owner.**
+
+- Fixed (Ticket 277): a get-ready change after the plan route left a pending web reminder at
+  the old time. Each pending record keeps the get-ready minutes its check used, and the job
+  moves the check by the difference with no route. A moved check already due sends at once
+  while the leave time is ahead. The three-route cap and the budget rules are unchanged.
+- Fixed (Ticket 280): turning Travel estimates off, or changing the get-ready time, in Mac
+  Settings now reconciles native leave reminders at once, with the Timeline closed.
+- Messaging impact: none.
+
+## Travel advisory revamp Wave 4: final checks on the leave reminder job — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106060000_travel_preparation_changed_at.sql` is applied locally only; the hosted push
+waits for the owner.**
+
+- Fixed: a get-ready change written from a slow Mac clock, or made offline before a reminder
+  sent and synced after, could send a false "leave earlier" update. `travel_settings` gains
+  `preparation_changed_at`, stamped by a trigger with the database time and not synced. The
+  job closes the update check when it is later than one minute before sending, so skew can
+  only suppress an update.
+- Confirmed: when routing throws after some spend, the claims are released and the retry
+  routes through the shared refresh again, which reserves before every provider call. The
+  database refuses any reservation past the US$5 monthly ceiling, and the reminder then
+  fails with `budget_refused`. Tests cover both.
+- Messaging impact: none.
+
+## Travel advisory revamp Wave 4: wording approved (D17) — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed.**
+
+- Decision D17: the owner approved all Wave 4 wording, the twelve reminder-setting phrases
+  (Ticket 279) and the web and Mac reminder text (Tickets 278 and 280). The bench wording
+  review shows all 95 phrases approved, none awaiting. Recorded in `docs/DECISIONS.md`.
+- Messaging impact: P-016 and P-024 notes.
+
+## Travel advisory revamp Wave 4: Ticket 278 leave reminders through web push — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change. No real notification was
+sent; a real send waits for an owner-approved test account.**
+
+- `createLeaveReminderDelivery` now returns a web push delivery
+  (`lib/services/leave-reminder-web-push.ts`) when VAPID keys are set, so the Ticket 277 job
+  route no longer reports delivery unavailable once both are configured. The job stays off
+  until `CADENCE_LEAVE_REMINDER_JOB=enabled`.
+- Each send reads push subscriptions and the profile timezone as the user, at high urgency,
+  with a push lifetime that ends at the leave time. Behavior reminders keep 24 hours at normal
+  urgency (tested).
+- Text: "Leave by 1:15 PM for Dentist", then "Walking, 65 min from Home. Arrive 2:20 PM." The
+  update reads "Leave earlier: by {time} for {event}", replaces the first notification by tag
+  and alerts again. No action buttons or snooze.
+- The link is `/timeline?leave=<trip digest>`, never a title or place. The Timeline opens that
+  event's drawer once the Calendar read has it at the same start, or scrolls to the Behavior's
+  Occurrence. Interaction INT-NOTIFICATION-001 updated.
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, approved
+  November 6, 2026 (D17).
+
+## Travel advisory revamp Wave 4: Ticket 280 leave reminders on the Mac — November 6, 2026
+
+**On branch `us-work`. Not merged and not released. No schema change, no provider call and no
+route call of its own. A desktop release waits for the owner.**
+
+- A linked Mac schedules a native notification from its last estimate, at the leave time minus
+  the get-ready time, so it fires with Cadence quit. No background helper. It reconciles on
+  launch, resume and wake, account change, each new estimate or trip, a local day change, and
+  after the switch saves.
+- On only with the hosted switch (Ticket 279) and Travel estimates both on. Off, sign-out or
+  another account removes every pending and delivered leave reminder. The trip home gets none.
+- Decision D15: after the reminder fires, one update if a later estimate moves the leave time 10
+  minutes or more earlier and it is still ahead. Never a second update.
+- Own identifiers, `cadence.leave.<trip digest>[.update]`, allowed in the Rust check and the
+  native adapter. Behavior reminder coverage reads only `cadence.local.` identifiers, so its
+  results are unchanged (tested).
+- Activation opens the Timeline and the event's drawer, or the Behavior's Occurrence.
+- Device-only memory in WKWebView `localStorage`: trip digests, fire times and named leave
+  times. No title, place, position or duration; nothing in SQLite, sync or on the server.
+- Planner `packages/core/src/services/mac-leave-reminder-plan.ts`, separate from Ticket 277's
+  hosted planner. Interaction INT-NOTIFICATION-001 and INT-TRAVEL-013 updated.
+- Not verified: installed delivery with the app quit, the update and activation on a dev-signed
+  build.
+- Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, approved
+  November 6, 2026 (D17).
+
+## Travel advisory revamp Wave 4: Ticket 277 leave reminder job — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change. No provider call was made.**
+
+- Pure planner `packages/core/src/services/leave-reminder-plan.ts`: trip digests, which
+  records to create, route, cancel or close, each step's outcome, and the account's next
+  visit. Service `lib/services/leave-reminder-job.service.ts` and the record store in
+  `lib/db/leave-reminders.repo.ts` run everything as the user on Ticket 276's minted client;
+  only the due-account selection uses the service role.
+- Route `/api/travel/leave-reminders/process`, Vercel Cron every 5 minutes, `CRON_SECRET`
+  only. Off until `CADENCE_LEAVE_REMINDER_JOB=enabled`; breaker
+  `CADENCE_DISABLE_LEAVE_REMINDER_BATCHES`. It reads the Vercel OIDC token from the header,
+  then `VERCEL_OIDC_TOKEN_FILE`, then `VERCEL_OIDC_TOKEN`, fails closed without it, and logs
+  only its presence on the first production run.
+- Routes at most three times per trip from Home or the previous stop, with spend reserved
+  first by the shared travel refresh. Trips are listed with a request that names no planned
+  trip, so listing makes no route call. Calendar is re-read at least every 30 minutes and at
+  send time; titles are read only at send time. The trip home gets no reminder.
+- After sending, the one check is the reminder time the notification named, so no leave
+  time is stored. Decision D16: the update route stops at 80% of the monthly budget
+  (recorded in `docs/DECISIONS.md`, `docs/NOTIFICATION_SPEC.md` and `docs/COSTS.md`).
+- Delivery is absent until Ticket 278; the route then reports `delivery_unavailable`. The
+  payload contract is `lib/services/leave-reminder-delivery.ts`.
+- Known limits: a trip dropped after its first route that comes back gets no reminder; a
+  crash between a push and its record write can send it again after 15 minutes, as for Behavior
+  reminders; the update compares with the current get-ready time.
+- Messaging impact: P-016 and P-017 notes. No new user-facing wording.
+
+## Travel advisory revamp Wave 4: Ticket 279 leave reminder setting and readiness list — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change and no provider call.**
+
+- How you travel gains one checkbox, off by default: "Remind me when it is time to get ready
+  to leave." It saves the account-wide switch at once through the new
+  `GET`/`PUT /api/travel/leave-reminders`, under RLS as the user, on web and on a linked Mac
+  (bearer token). Turning it off lets the Ticket 275 trigger delete the reminder rows (D15).
+- It cannot turn on while Travel estimates is off; the endpoint refuses that too. It is
+  hidden on an unlinked Mac.
+- The readiness list shows notifications on this device (browser push state on web, macOS
+  permission on the Mac), Home, and where the estimate starts, then says only Google
+  Calendar events and Behaviors get reminders until Ticket 283.
+- Interaction INT-TRAVEL-013, design catalog `module.leave-reminder-setting` and its bench.
+- Built before Ticket 278 (its listed dependency), at the coordinator's direction. The Mac
+  posts no leave reminder until Ticket 280.
+- Messaging impact: P-024 logged; P-016 unchanged. The twelve new phrases are in
+  `departure-phrases.ts`, approved November 6, 2026 (D17).
+
+## Travel advisory revamp Wave 4: Ticket 276 the leave reminder job acts as the user — November 6, 2026
+
+**On branch `us-work`. Not merged. The new migration is applied to local Supabase only; the
+hosted push waits for the owner.**
+
+- `mintLeaveReminderAccessToken` adds a separate `leave_reminder` token channel: 5 minutes
+  or less, no MCP grant or client claims, so MCP grant functions refuse it. The MCP minter
+  now refuses any channel except `mcp`.
+- `createLeaveReminderCaller` (`lib/integrations/leave-reminder-caller.ts`) builds the
+  job's client from the publishable key and that token. It never uses the service role,
+  and the token is not returned, stored or logged.
+- Migration `20261106050000_leave_reminder_google_subject.sql` adds
+  `public.leave_reminder_google_subject()`, the smallest read the Calendar check needs: the
+  caller's single Google provider id, for leave reminder tokens only.
+  `leaveReminderCalendarCaller` uses it; the Calendar service accepts this narrower caller.
+- `reserve_travel_provider_spend` charges the token's user. `selectDueLeaveReminderAccounts`
+  is the job's one service-role read: account IDs and next check times.
+- Local proof on an isolated project: `tests/leave-reminder-caller.local-integration.test.ts`
+  (own rows only, no cross-account reads or writes, spend charged to the right month,
+  MCP grant functions refuse the token, expired token refused, due-account selection
+  limited to its columns) and `tests/sql/ticket-276-leave-reminder-identity-smoke.sql`.
+- Not confirmed: whether Vercel cron requests carry `x-vercel-oidc-token`, which hosted
+  routing needs. Vercel documents the header on function requests but says nothing about
+  cron. Ticket 277 should log only whether the header is present on its first production
+  cron run. If it is absent, the job needs another documented token source before it routes.
+- Known limits: the Calendar credential read still uses the existing service-role
+  functions, as it does for every caller. The token is a full `authenticated` token for
+  that user, held only on the server.
+- Messaging impact: P-017, no change. No new user-facing wording.
+
+## Travel advisory revamp Wave 4: Ticket 275 leave reminder specification and schema — November 6, 2026
+
+**On branch `us-work`. Not merged. Applied to local Supabase only; the hosted push waits for the owner.**
+
+- `docs/NOTIFICATION_SPEC.md` gains "Leave reminders": off by default, leave time minus
+  get-ready time, one reminder per trip, located destinations only (D12), no reminder for
+  the trip home, and start from the previous stop or Home.
+- Open point settled by owner decision D15: the web job routes a trip at most three
+  times (plan, send, and once after sending) and sends at most one update. The Mac sends
+  its update from its own estimates. Ticket 277 and `docs/COSTS.md` now say so; the
+  reminder job's route legs rise by up to half, to 24, 120 and 312 a month.
+- Migration `20261106040000_travel_leave_reminders.sql` adds two hosted-only tables:
+  `travel_leave_reminder_settings` and `travel_leave_reminders`. Owner Row Level Security.
+  No title, place, position, duration or leave time. The database refuses a fourth route,
+  a third before sending, a second update, a pending row while off (race-safe) and a
+  second row per trip. Turning off deletes the rows. The service role may read only
+  account IDs, the switch and next check times.
+- Account sync never reads the tables, so released Mac builds keep syncing.
+- Messaging impact: P-016 note. No new user-facing wording.
+
 ## Travel advisory revamp Wave 3: decision D14 applied to the Ticket 270 marker — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed, and no provider call was made.**
