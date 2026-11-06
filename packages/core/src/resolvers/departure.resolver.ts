@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 
-import { departureDetailPhrase, departureLinePhrase, departurePausedPhrase, departurePhraseContext } from "../services/departure-phrases";
+import { departureDetailPhrase, departureLinePhrase, departurePausedPhrase, departurePhraseContext, departureTomorrowPhrase } from "../services/departure-phrases";
 import type { DeparturePhraseContext } from "../services/departure-phrases";
 import { TRAVEL_LEG_OUTSIDE_WINDOW, travelEstimateAppearsAt, travelTripKey } from "../services/travel-refresh-policy";
 import type { DepartureModel, DepartureModelInput, DepartureStop, DepartureTrip } from "../types/departure";
@@ -53,6 +53,22 @@ export function resolveDepartureModel(input: DepartureModelInput): DepartureMode
   // evidence, a pause is all that can be said.
   if (paused && !input.evidence && input.stops.length > 0) return { state: "paused", next: null, phrase: pausedPhrase, trips, resumesAt: paused, pausedPhrase };
   return { state: "none", next: null, phrase: null, trips, resumesAt: null, pausedPhrase: null };
+}
+
+/**
+ * Ticket 282: tomorrow's first trip, from its own route response, for the next-departure line.
+ * Only an outbound trip with a leave time on `tomorrowLocalDate` counts; anything else shows
+ * nothing. The phrase stays on the device: it never reaches Daily Brief input or a reminder.
+ */
+export function resolveTomorrowFirstTrip(input: Omit<DepartureModelInput, "pausedUntil"> & Readonly<{ tomorrowLocalDate: string }>):
+  Readonly<{ ref: string; leaveAt: string; phrase: string }> | null {
+  const model = resolveDepartureModel({ ...input, pausedUntil: null });
+  const trip = model.trips.find((candidate) => candidate.role !== "return" && candidate.leaveAt);
+  if (!trip?.leaveAt || !trip.destinationRef || trip.state !== "upcoming") return null;
+  const leaveDay = Temporal.Instant.from(trip.leaveAt).toZonedDateTimeISO(input.timezone).toPlainDate().toString();
+  if (leaveDay !== input.tomorrowLocalDate) return null;
+  const label = input.stops.find((stop) => stop.ref === trip.destinationRef)?.label ?? null;
+  return { ref: trip.destinationRef, leaveAt: trip.leaveAt, phrase: departureTomorrowPhrase(trip.leaveAt, label, input.timezone) };
 }
 
 type EvidenceTrip = TravelResolvedLegEvidence | TravelUnknownLeg;

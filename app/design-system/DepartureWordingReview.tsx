@@ -33,6 +33,7 @@ import {
   leaveReminderNotificationsPhrase,
   macLeaveReminderPhrases,
   webLeaveReminderPhrases,
+  departureTomorrowPhrase,
   departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
@@ -164,6 +165,7 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "web-leave-reminder-title": () => webReminder(false).title,
   "web-leave-reminder-update-title": () => webReminder(true).title,
   "web-leave-reminder-body": () => webReminder(false).body,
+  "line-tomorrow": () => departureTomorrowPhrase("2026-11-11T08:10:00-05:00", EVENT, TIMEZONE),
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

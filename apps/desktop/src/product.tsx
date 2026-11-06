@@ -8,7 +8,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { travelSourceKey, travelStopRevisions, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
+import { travelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
@@ -378,7 +378,9 @@ export function Product() {
     // Ticket 268: automatic travel requests wait for the first Calendar read to settle.
     sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL,
     sourceKey: travelSourceKey(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
-    stopRevisions: travelStopRevisions(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions) });
+    stopRevisions: travelStopRevisions(visibleCalendarEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions),
+    // Ticket 282: tomorrow's first trip, through the same hook and hosted route as the web.
+    tomorrowStopKey: bundle ? travelTomorrowStopKey(visibleCalendarEvents, bundle.timeline.timeline, travelBehaviorRevisions) : null });
   // Ticket 280: the leave reminder's destination, once today's Calendar read or Timeline has it. A moved or removed trip matches nothing.
   const leaveTarget = leaveActivation && bundle ? leaveReminderTarget(leaveActivation.digest, { events: visibleCalendarEvents,
     occurrences: bundle.timeline.timeline.daySections.flatMap((section) => section.occurrences) }) : null;

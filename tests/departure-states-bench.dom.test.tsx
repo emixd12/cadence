@@ -286,14 +286,17 @@ it("shows the owner's approval on the wording review", async () => {
   // Ticket 279 adds the leave reminder switch and its readiness list, Ticket 280 the Mac's three leave reminder phrases and
   // Ticket 278 the three web push leave reminder phrases. Decision D17 approves all 18 on November 6, 2026.
   // Ticket 281 adds the remembered-place correction note, not yet approved (decision D7).
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("1 of 96 phrases await the owner's approval.");
-  expect(container.querySelector('[data-wording-id="correction-note-remembered"] [data-wording-status]')?.textContent).toBe("Not yet approved");
+  // Ticket 282 adds the line for tomorrow's first trip, not yet approved.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("2 of 97 phrases await the owner's approval.");
+  for (const id of ["correction-note-remembered", "line-tomorrow"]) {
+    expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Not yet approved");
+  }
   for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off",
     "needs-origin-blocked", "return-home-missing", "marker-rail-home", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
     "marker-rail-past-leave-home", "marker-rail-head-home-now", "marker-rail"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Approved November 6, 2026");
   }
-  for (const row of container.querySelectorAll("[data-wording-id]:not([data-wording-id='correction-note-remembered'])")) {
+  for (const row of container.querySelectorAll("[data-wording-id]:not([data-wording-id='correction-note-remembered']):not([data-wording-id='line-tomorrow'])")) {
     expect(row.querySelector("[data-wording-status]")?.textContent, row.getAttribute("data-wording-id")!).not.toBe("Not yet approved");
     if (/^((mac|web)-)?leave-reminder-/.test(row.getAttribute("data-wording-id")!)) {
       expect(row.querySelector("[data-wording-status]")?.textContent, row.getAttribute("data-wording-id")!).toBe("Approved November 6, 2026");

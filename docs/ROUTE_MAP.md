@@ -268,6 +268,11 @@ planned from a last stop at Home. The response adds `budget`: `reservedMicrodoll
 through owner-only RLS. It is omitted when the read fails. The ceiling is enforced only by
 `reserve_travel_provider_spend`. Timeline scope also routes an onward trip 3 hours before
 it can leave, so a trip longer than 3 hours gets its leave time before it is due.
+Ticket 282 adds `scope: first_trip`, for one local day that must be tomorrow in the account's
+timezone; any other day returns `context_changed` before a provider call. It takes no trips or
+corrections and ignores any device sample. It routes one leg, from saved Home to tomorrow's
+first stop away from Home, with no weather and no `conclusionsToken`, so today's signed
+conclusions and the Daily Brief never include it.
 Ticket 218 adds optional weather to the same response: `evidence.weather` carries the
 state (`applied`, `no_position` or `unavailable`) and the Open-Meteo credit, and each
 leg may carry its fixed weather margin. The server derives the weather area from the

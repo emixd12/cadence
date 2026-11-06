@@ -7,6 +7,7 @@ import {
   partitionTravelLegsByWindow,
   recordTravelRefresh,
   resolveTravelRefreshPlan,
+  resolveTravelTomorrowPlan,
   travelBudgetPausesAutomatic,
   travelDeviceMoved,
   travelEstimateAppearsAt,
@@ -18,6 +19,7 @@ import {
   type TravelRefreshPlanInput,
   type TravelRefreshState,
   type TravelRefreshTrip,
+  type TravelTomorrowPlanInput,
 } from "@cadence/core/services/travel-refresh-policy";
 
 const now = Temporal.Instant.from("2026-10-17T12:00:00Z");
@@ -206,5 +208,45 @@ describe("trip refresh plan (Ticket 267)", () => {
       { ...DENTIST_TRIP, key: DENTIST, leaveAt: at("13:55"), checkedAt: at("08:00"), fallbackAt: null },
       { role: "return", originRef: "dentist", destinationRef: null, key: "return:dentist:", leaveAt: null, checkedAt: null, fallbackAt: at("12:40") },
     ]);
+  });
+});
+
+describe("tomorrow's first trip plan (Ticket 282)", () => {
+  /** New York, UTC-4 in October: 12:00Z is 8 AM local. */
+  const at = (time: string) => `2026-10-17T${time}:00-04:00`;
+  const trip = (leaveAt: string | null): TravelRefreshTrip => ({ role: "outbound", originRef: null, destinationRef: `stop-${leaveAt}`,
+    key: `outbound::stop-${leaveAt}`, leaveAt, checkedAt: null, fallbackAt: leaveAt ? null : at("15:00") });
+  const input = (time: string, overrides: Partial<TravelTomorrowPlanInput> = {}): TravelTomorrowPlanInput => ({
+    now: Temporal.Instant.from(at(time)).toString(), timezone: "America/New_York", localDate: "2026-10-17",
+    todayTrips: [trip(at("18:30"))], stopKey: "dentist-r1", last: null, budget: null, ...overrides });
+
+  it("asks from 5 PM even with a trip left today, and waits until then", () => {
+    expect(resolveTravelTomorrowPlan(input("16:59"))).toEqual({ dueLocalDate: null, nextDueAt: Temporal.Instant.from(at("17:00")).toString() });
+    expect(resolveTravelTomorrowPlan(input("17:00"))).toEqual({ dueLocalDate: "2026-10-18", nextDueAt: null });
+  });
+
+  it("asks before 5 PM once today has no trips left, and waits for the last known leave time", () => {
+    const morning = { todayTrips: [trip(at("09:00")), trip(at("12:30"))] };
+    expect(resolveTravelTomorrowPlan(input("10:00", morning)).nextDueAt).toBe(Temporal.Instant.from(at("12:30")).toString());
+    expect(resolveTravelTomorrowPlan(input("12:31", morning)).dueLocalDate).toBe("2026-10-18");
+    expect(resolveTravelTomorrowPlan(input("10:00", { todayTrips: [] })).dueLocalDate).toBe("2026-10-18");
+    // A trip with no leave time yet is still ahead.
+    expect(resolveTravelTomorrowPlan(input("10:00", { todayTrips: [trip(null)] })).dueLocalDate).toBeNull();
+  });
+
+  it("asks once per first stop and revision", () => {
+    const last = { localDate: "2026-10-18", stopKey: "dentist-r1" };
+    expect(resolveTravelTomorrowPlan(input("18:00", { last }))).toEqual({ dueLocalDate: null, nextDueAt: null });
+    expect(resolveTravelTomorrowPlan(input("18:00", { last, stopKey: "dentist-r2" })).dueLocalDate).toBe("2026-10-18");
+    expect(resolveTravelTomorrowPlan(input("18:00", { last: { ...last, localDate: "2026-10-17" } })).dueLocalDate).toBe("2026-10-18");
+  });
+
+  it("asks nothing without a located stop tomorrow, without today's view, after midnight or at 80% of the budget", () => {
+    expect(resolveTravelTomorrowPlan(input("18:00", { stopKey: null })).dueLocalDate).toBeNull();
+    expect(resolveTravelTomorrowPlan(input("18:00", { todayTrips: null })).dueLocalDate).toBeNull();
+    expect(resolveTravelTomorrowPlan(input("18:00", { localDate: "2026-10-16" })).dueLocalDate).toBeNull();
+    const budget = { reservedMicrodollars: 4_000_000, ceilingMicrodollars: 5_000_000, resetsAt: "2026-11-01T04:00:00Z" };
+    expect(resolveTravelTomorrowPlan(input("18:00", { budget })).dueLocalDate).toBeNull();
+    expect(resolveTravelTomorrowPlan(input("18:00", { budget: { ...budget, reservedMicrodollars: 3_999_999 } })).dueLocalDate).toBe("2026-10-18");
   });
 });

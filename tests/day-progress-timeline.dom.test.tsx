@@ -12,6 +12,8 @@ import { travelBenchEvidence } from "@/app/design-system/TravelBench";
 import { resolveTravelEvidence, resolveTravelPlan } from "@cadence/core/resolvers/travel.resolver";
 import type { TimelineView } from "@/lib/types/timeline";
 import { leaveReminderTripDigest } from "@cadence/core/services/leave-reminder-plan";
+import { useBriefTravel } from "@/lib/ui/brief-travel";
+import type { TravelResolvedLegEvidence } from "@cadence/core/types/travel";
 
 const action = vi.fn(async () => ({ status: "idle" as const, message: "" }));
 let container: HTMLDivElement;
@@ -228,6 +230,39 @@ describe("DayProgressTimeline", () => {
     expect(container.querySelector("dialog")?.open).toBe(false);
     await act(() => render(2));
     expect(container.querySelector("dialog")?.open).toBe(true);
+  });
+
+  it("shows tomorrow's first trip once today has none, and keeps it from the Mac reminders and the Daily Brief (Ticket 282)", async () => {
+    // 7 PM on September 16. Today's trips are over; tomorrow's Dentist is at 9 AM.
+    vi.setSystemTime(new Date("2026-09-16T23:00:00Z"));
+    const input = props();
+    const dentist = { ...outlookEvent(), id: "event-dentist", providerEventId: "event-dentist", logicalInstanceId: "event-dentist",
+      source: "google_calendar" as const, title: "Dentist", location: "Main St", startAt: "2026-09-17T13:00:00Z", endAt: "2026-09-17T14:00:00Z" };
+    const empty = { version: "1.0" as const, journeyRef: "today", legs: [] as TravelResolvedLegEvidence[], segments: [], occupiedSpans: [], collisions: [], completeTrip: false, finalAvailabilityAt: null };
+    const routed: TravelResolvedLegEvidence = { state: "current", reason: null,
+      leg: { id: "leg-dentist", role: "outbound", journeyRef: "tomorrow", originCommitmentRef: null, destinationCommitmentRef: "event-dentist",
+        mode: "walking", readyAt: "2026-09-17T11:00:00Z", provenance: { originRef: "base", originSource: "saved_base", originRevision: "1",
+          destinationRef: "event-dentist", destinationSource: "calendar", destinationRevision: "1", grantRevision: "one" } },
+      estimate: { durationSeconds: 2400, departureAt: "2026-09-17T12:10:00Z", arrivalAt: "2026-09-17T12:50:00Z", warnings: [], fallback: false,
+        attribution: "Google Maps", observedAt: "2026-09-16T23:00:00Z", expiresAt: "2026-09-16T23:05:00Z" } };
+    const view = (evidence: typeof empty) => ({ accountId: "owner", evidence, mode: "walking" as const, navigationPreference: "google_maps" as const, settingsRevision: "one", expiresAt: null });
+    const onDeparture = vi.fn();
+    const brief = vi.fn();
+    function BriefProbe() { brief(useBriefTravel()); return null; }
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><BriefProbe /><DayProgressTimeline {...input} context={{ ...input.context,
+      events: [allDayEvent(), dentist], travel: empty, onDeparture, travelStatus: { view: view(empty), message: null, stale: false, pending: false,
+        observedAt: "2026-09-16T23:00:00Z", resumesAt: null, refresh: () => undefined,
+        tomorrow: { localDate: "2026-09-17", view: view({ ...empty, journeyRef: "tomorrow", legs: [routed] }) } } }} /></RefreshProvider>));
+    expect(container.querySelector("[data-departure-line]")?.textContent).toBe("Tomorrow: leave by 8:10 AM for Dentist.");
+    // Today's departure model, which feeds Mac reminders and the Daily Brief, has no trip.
+    expect(onDeparture).toHaveBeenLastCalledWith(expect.objectContaining({ localDate: "2026-09-16", trips: [] }));
+    expect(JSON.stringify(brief.mock.lastCall?.[0] ?? null)).not.toMatch(/event-dentist|12:10|8:10|Dentist/);
+    // A view for another day is not tomorrow's.
+    await act(() => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{ ...input.context,
+      events: [allDayEvent(), dentist], travel: empty, travelStatus: { view: view(empty), message: null, stale: false, pending: false,
+        observedAt: "2026-09-16T23:00:00Z", resumesAt: null, refresh: () => undefined,
+        tomorrow: { localDate: "2026-09-18", view: view({ ...empty, journeyRef: "tomorrow", legs: [routed] }) } } }} /></RefreshProvider>));
+    expect(container.querySelector("[data-departure-line]")).toBeNull();
   });
 
   it("opens a web leave reminder's event drawer once from its trip digest (Ticket 278)", async () => {

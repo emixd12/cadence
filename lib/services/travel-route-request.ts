@@ -1,7 +1,11 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 export type TravelRouteRefreshRequest = Readonly<{
-  scope: "timeline" | "day";
+  /**
+   * Ticket 282: `first_trip` estimates only the first trip of one later day, from Home, with no
+   * device position, trips or signed conclusions.
+   */
+  scope: "timeline" | "day" | "first_trip";
   startLocalDate: string;
   endLocalDate: string;
   device: Readonly<{
@@ -23,14 +27,15 @@ export type TravelRouteRefreshRequest = Readonly<{
 export function parseTravelRouteRefreshRequest(value: unknown): TravelRouteRefreshRequest {
   if (!record(value)) throw new TypeError("Travel route request must be an object.");
   const scope = value.scope ?? "timeline";
-  if (scope !== "timeline" && scope !== "day") throw new TypeError("Travel route scope is invalid.");
+  if (scope !== "timeline" && scope !== "day" && scope !== "first_trip") throw new TypeError("Travel route scope is invalid.");
   const startLocalDate = localDate(value.startLocalDate);
   const endLocalDate = localDate(value.endLocalDate);
   if (Temporal.PlainDate.compare(Temporal.PlainDate.from(endLocalDate), Temporal.PlainDate.from(startLocalDate)) < 0 ||
       Temporal.PlainDate.from(startLocalDate).until(Temporal.PlainDate.from(endLocalDate)).days > 1) throw new TypeError("Travel route range must cover one or two adjacent local days.");
   const corrections = value.corrections === undefined ? [] : correctionArray(value.corrections);
   const trips = value.trips === undefined ? undefined : tripArray(value.trips);
-  return { scope, startLocalDate, endLocalDate, device: device(value.device), corrections, ...(trips ? { trips } : {}) };
+  if (scope === "first_trip" && (startLocalDate !== endLocalDate || trips || corrections.length)) throw new TypeError("Travel first-trip request is invalid.");
+  return { scope, startLocalDate, endLocalDate, device: scope === "first_trip" ? null : device(value.device), corrections, ...(trips ? { trips } : {}) };
 }
 
 function device(value: unknown): TravelRouteRefreshRequest["device"] {

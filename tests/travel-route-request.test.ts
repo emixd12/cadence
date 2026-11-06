@@ -46,6 +46,20 @@ describe("travel route scope", () => {
   });
 });
 
+describe("tomorrow's first trip scope (Ticket 282)", () => {
+  const day = { startLocalDate: "2026-11-07", endLocalDate: "2026-11-07", scope: "first_trip" };
+  it("accepts one day and drops any device position", () => {
+    const device = { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-11-06T22:00:00Z" };
+    expect(parseTravelRouteRefreshRequest({ ...day, device })).toEqual({ ...day, device: null, corrections: [] });
+  });
+
+  it("rejects two days, named trips or corrections", () => {
+    expect(() => parseTravelRouteRefreshRequest({ ...day, endLocalDate: "2026-11-08" })).toThrow();
+    expect(() => parseTravelRouteRefreshRequest({ ...day, trips: [{ role: "outbound", originRef: null, destinationRef: "a" }] })).toThrow();
+    expect(() => parseTravelRouteRefreshRequest({ ...day, corrections: [{ eventId: "e", revision: "r", locationText: "1 Main St" }] })).toThrow();
+  });
+});
+
 describe("travel route trips (Ticket 267)", () => {
   const day = { startLocalDate: "2026-11-05", endLocalDate: "2026-11-05", scope: "day" };
   it("accepts named trips and leaves them out for older clients", () => {

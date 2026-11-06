@@ -49,6 +49,8 @@ type CommitmentDraft = Readonly<{ commitment: Omit<TravelCommitment, "endpoint">
  * Ticket 267: a request naming trips routes only those trips' legs. A leg that could leave
  * only after its destination ends is never routed. The response reports the month's budget.
  * Ticket 277: the leave reminder job calls this with its own caller, which has no Auth user.
+ * Ticket 282: a `first_trip` request routes only tomorrow's first trip from Home, with no weather
+ * and no signed conclusions, so today's conclusions and the Daily Brief never include it.
  */
 export async function refreshTravelRoutes(
   caller: CalendarReadCaller,
@@ -74,6 +76,10 @@ export async function refreshTravelRoutes(
     snapshot ? Promise.resolve(snapshot.requestedRange.timezone) : getProfileTimezone(caller.client, caller.user.id),
   ]);
   if (!timezone) throw new TravelRoutingError({ code: "context_changed", retryable: true, retryAfterSeconds: null });
+  const firstTrip = request.scope === "first_trip";
+  if (firstTrip && request.startLocalDate !== now.toZonedDateTimeISO(timezone).toPlainDate().add({ days: 1 }).toString()) {
+    throw new TravelRoutingError({ code: "context_changed", retryable: false, retryAfterSeconds: null });
+  }
   const historyRange = travelDurationHistoryRange(request.startLocalDate);
   const readDurationHistory = () => Promise.all([
     listOccurrencesBetweenLocalDates(caller.client, caller.user.id, historyRange.startLocalDate, historyRange.endLocalDate),
@@ -132,7 +138,7 @@ export async function refreshTravelRoutes(
     ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now),
   ].sort((left, right) => compareInstants(left.commitment.startAt, right.commitment.startAt));
   // Keep one unrouteable boundary commitment when the bounded source window truncates.
-  const bounded = drafts.length > 9
+  const bounded = firstTrip ? firstTripDrafts(drafts, source.settings.baseLocationText) : drafts.length > 9
     ? [...drafts.slice(0, 8), { ...drafts[8]!, commitment: { ...drafts[8]!.commitment, attendance: "unknown" as const }, placeText: null }]
     : drafts;
   const baseText = bounded.length ? source.settings.baseLocationText : null;
@@ -166,13 +172,15 @@ export async function refreshTravelRoutes(
     buffers,
   });
   // Weather never blocks routing; it runs beside the route calls and falls back to unavailable.
-  const weatherRequest = plan.legs.length
+  const weatherRequest = plan.legs.length && !firstTrip
     ? readTravelWeather({ device: request.device, config: weatherConfig, now }).catch(() => ({ state: "unavailable" as const }))
     : Promise.resolve(null);
   const trips = request.trips ?? null;
   const requested = (leg: (typeof plan.legs)[number]) => !!trips?.some((trip) => travelTripMatches(trip, leg));
+  const first = (leg: (typeof plan.legs)[number]) => leg.role !== "return" && leg.destinationCommitmentRef === bounded[0]?.commitment.ref;
   const { due: candidates, later } = trips
     ? { due: plan.legs.filter(requested), later: plan.legs.filter((leg) => !requested(leg)) }
+    : firstTrip ? { due: plan.legs.filter(first), later: plan.legs.filter((leg) => !first(leg)) }
     : request.scope === "day"
       ? { due: plan.legs, later: [] }
       : partitionTravelLegsByWindow(plan.legs, now);
@@ -199,7 +207,7 @@ export async function refreshTravelRoutes(
     ...doomed.map((leg) => ({ legId: leg.id, provenance: leg.provenance, estimate: null, unavailableReason: TRAVEL_LEG_READY_AFTER_END })),
   ];
   // A trip request leaves the other trips unrouted, so its conclusions would not describe the day.
-  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips;
+  const signConclusions = !!conclusionsSecret && request.startLocalDate === request.endLocalDate && !trips && !firstTrip;
   const evidence = resolveTravelEvidence({ plan, results, collisionCandidates: collisionCandidates(plan.commitments, behaviorOccupancy), buffers, weather, now: now.toString(), expectedJourneyRevision: journeyRevision, expectedGrantRevision: source.settingsRevision, modelProjection: signConclusions ? "enabled" : "disabled" });
   const conclusionsToken = (expiresAt: string) => signConclusions ? signedConclusions(evidence, {
     secret: conclusionsSecret!, userId: caller.user.id, localDate: request.startLocalDate, now, expiresAt,
@@ -357,6 +365,16 @@ function calendarCommitmentDrafts(
       endpointSource: correctionById.has(event.id) ? "correction" : "calendar",
     };
   });
+}
+
+/**
+ * Ticket 282: tomorrow's first stop away from Home, alone, so the request makes one route call and
+ * at most two place lookups. A stop at Home's text needs no trip. With no Home, the first stop.
+ */
+function firstTripDrafts(drafts: readonly CommitmentDraft[], homeText: string | null): CommitmentDraft[] {
+  const home = homeText ? placeTextKey(homeText) : null;
+  const first = drafts.find((draft) => draft.placeText && placeTextKey(draft.placeText) !== home);
+  return first ? [first] : [];
 }
 
 /**

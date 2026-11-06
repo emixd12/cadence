@@ -1,5 +1,21 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 5: Ticket 282 tomorrow's first trip — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No migration.**
+
+- After 5 PM, or once today has no trip left, the Timeline asks once for tomorrow's first trip
+  in its own `first_trip` request: one leg from Home, no device position, no weather and no
+  signed conclusions. Today's conclusions, the Daily Brief and leave reminders never include it.
+- The next-departure line reads "Tomorrow: leave by 8:10 AM for Dentist." while today has no
+  trip left. The wording is not yet approved (decision D7).
+- Web and the linked Mac share the hook and the hosted route. Cost: one leg per travel day,
+  in `docs/COSTS.md`. Messaging: a Ticket 282 note on P-021.
+- Tests: `tests/travel-route-refresh.service.test.ts`, `tests/travel-lifecycle.dom.test.tsx`,
+  `tests/travel-refresh-policy.test.ts`, `tests/departure.resolver.test.ts`,
+  `tests/travel-route-request.test.ts`, `tests/next-departure-line.dom.test.tsx`,
+  `tests/day-progress-timeline.dom.test.tsx`.
+
 ## Travel advisory revamp Wave 5: Ticket 281 remembered places — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No migration.**

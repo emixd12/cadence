@@ -896,3 +896,82 @@ describe("Ticket 272: the first Daily Brief's travel wait", () => {
     } finally { await unmount(); }
   });
 });
+
+describe("tomorrow's first trip (Ticket 282)", () => {
+  /** 4 PM in New York. Today's last trip leaves at 7 PM. */
+  const AFTERNOON = new Date("2026-09-21T20:00:00Z");
+  const tomorrowView = (): TravelRoutesView => ({ ...view("account-a"), evidence: { ...view("account-a").evidence!, journeyRef: "tomorrow" } });
+  function TomorrowProbe({ client, stopKey }: { client: TravelClient; stopKey: string | null }) {
+    const state = useTravelContext({ enabled: true, accountId: "account-a", sourceKey: "source", localDate: "2026-09-21", client,
+      timezone: "America/New_York", tomorrowStopKey: stopKey });
+    capture(state);
+    return <p>{state.view?.evidence?.journeyRef ?? "empty"}</p>;
+  }
+  async function mountTomorrow(stopKey: string | null = "dentist-r1") {
+    vi.useFakeTimers({ now: AFTERNOON });
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    const routes = vi.fn(async (input: TravelRoutesInput) => input.scope === "first_trip" ? tomorrowView()
+      // The token outlives the hour this test waits, so a change to it would show.
+      : { ...movingView("account-a"), conclusionsToken: "signed.token", expiresAt: new Date(Date.now() + 3 * 60 * 60_000).toISOString() });
+    const client: TravelClient = { settings: { load: async () => settings, save: async () => settings },
+      configured: async () => true, readLocation: async () => ({ state: "denied" as const }), routes };
+    const host = document.createElement("div"); document.body.append(host);
+    let root = createRoot(host);
+    const render = (key: string | null = stopKey) => act(() => root.render(<TomorrowProbe client={client} stopKey={key} />));
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(350));
+    const firstTripCalls = () => routes.mock.calls.filter(([input]) => input.scope === "first_trip");
+    const remount = async () => { await act(() => root.unmount()); root = createRoot(host); await render(); await act(async () => vi.advanceTimersByTimeAsync(350)); };
+    return { routes, firstTripCalls, render, remount, unmount: async () => { await act(() => root.unmount()); host.remove(); } };
+  }
+
+  it("asks once at 5 PM in a request of its own, and keeps today's view and signed conclusions", async () => {
+    const { routes, firstTripCalls, remount, unmount } = await mountTomorrow();
+    try {
+      expect(routes).toHaveBeenCalledTimes(1);
+      expect(latest().tomorrow).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(firstTripCalls()[0]![0]).toEqual({ scope: "first_trip", startLocalDate: "2026-09-22", endLocalDate: "2026-09-22", device: null, corrections: [] });
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22", view: { evidence: { journeyRef: "tomorrow" } } });
+      // Today's view, its signed conclusions and the Daily Brief token are untouched.
+      expect(latest().view?.evidence?.journeyRef).toBe("account-a");
+      expect(travelConclusionsToken("account-a", "2026-09-21")).toBe("signed.token");
+      expect(travelConclusionsToken("account-a", "2026-09-22")).toBeNull();
+      // Once: focus, a remount and a reload in the same tab ask nothing more.
+      await focusAndWait();
+      await remount();
+      resetTravelViewCacheForTest({ keepSession: true });
+      await remount();
+      await act(async () => vi.advanceTimersByTimeAsync(30 * 60_000));
+      expect(firstTripCalls()).toHaveLength(1);
+      expect(latest().tomorrow).toMatchObject({ localDate: "2026-09-22" });
+    } finally { await unmount(); }
+  });
+
+  it("asks again only when tomorrow's first stop changes, and never without one", async () => {
+    const { firstTripCalls, render, unmount } = await mountTomorrow(null);
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(2 * 60 * 60_000));
+      expect(firstTripCalls()).toHaveLength(0);
+      await render("dentist-r1");
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(1);
+      await render("dentist-r2");
+      await act(async () => vi.advanceTimersByTimeAsync(350));
+      expect(firstTripCalls()).toHaveLength(2);
+    } finally { await unmount(); }
+  });
+
+  it("forgets tomorrow's first trip when travel settings change", async () => {
+    const { unmount } = await mountTomorrow();
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(60 * 60_000));
+      expect(latest().tomorrow).not.toBeNull();
+      await act(async () => { clearTravelSession(); window.dispatchEvent(new Event("cadence:travel-changed")); });
+      expect(latest().tomorrow ?? null).toBeNull();
+    } finally { await unmount(); }
+  });
+});

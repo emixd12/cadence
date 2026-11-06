@@ -240,4 +240,18 @@ describe("live region", () => {
     await show(model(appears("Refresh travel to get a leave time for Dentist.", "refresh")));
     expect(announced()).toBe("Refresh travel to get a leave time for Dentist.");
   });
+  it("shows tomorrow's first trip only once today has no trip left (Ticket 282)", async () => {
+    const tomorrow = "Tomorrow: leave by 8:10 AM for Dentist.";
+    const none: DepartureModel = { state: "none", next: null, phrase: null, trips: [], resumesAt: null, pausedPhrase: null };
+    await act(() => root.render(<TravelStatusLine departure={model(trip("head_home", "Head home now, home by 6:30 PM."))} status={status} hasEvidence tomorrow={tomorrow} />));
+    expect(container.querySelector("[data-departure-line]")!.textContent).toBe("Head home now, home by 6:30 PM.");
+    await act(() => root.render(<TravelStatusLine departure={none} status={status} hasEvidence tomorrow={tomorrow} />));
+    const line = container.querySelector("[data-departure-line]")!;
+    expect(line.textContent).toBe(tomorrow);
+    expect(line.getAttribute("data-departure-line")).toBe("tomorrow");
+    expect(line.querySelector("button")).toBeNull();
+    expect(announced()).toBe(tomorrow);
+    await act(() => root.render(<TravelStatusLine departure={none} status={status} hasEvidence tomorrow={null} />));
+    expect(container.querySelector("[data-departure-line]")).toBeNull();
+  });
 });

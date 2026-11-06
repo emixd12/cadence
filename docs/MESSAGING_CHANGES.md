@@ -815,6 +815,15 @@ cite has not changed.
   row's label and purpose text unchanged.
 - **D12 note (November 5, 2026):** "Is {event} in person or remote?", In person and Remote are
   gone, and "Fix {event}'s place or attendance" now reads "Fix {event}'s place". See P-023.
+- **Ticket 282 detail (November 6, 2026):** after 5 PM, or once today has no trip left, Cadence
+  estimates tomorrow's first trip once, from Home, in a request of its own. When today's line
+  has nothing to say, it reads "Tomorrow: leave by 8:10 AM for Dentist." (bench row
+  `line-tomorrow`, not yet approved, D7). Tomorrow's trip gets no leave reminder, never enters
+  the Daily Brief and adds no weather margin. Like today's view, its route view stays in the
+  tab's browser session, with the first stop kept only as a digest; sign-out, travel turned off,
+  a settings change and a new day clear it. The guide's "Refresh travel estimates" section
+  describes today only. The Privacy text about browser storage of travel estimates names no
+  day, so no Privacy edit is proposed.
 - **Ticket 270 detail, decision D14 (November 6, 2026):** the label is one line ("Leave 1:20")
   on wide layouts and stacked on phones. The trip home's label reads "Home {time}". The owner
   approved "Leave {time}", the late and passed forms, "Home {time}" and the two D12 steps. No

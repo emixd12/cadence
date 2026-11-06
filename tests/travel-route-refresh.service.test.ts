@@ -1002,3 +1002,90 @@ describe("trip refresh plan through the service (Ticket 267)", () => {
     expect(result.evidence?.legs.find((entry) => entry.leg.role === "onward")).toMatchObject({ state: "unavailable", estimate: null, reason: TRAVEL_LEG_READY_AFTER_END });
   });
 });
+
+describe("tomorrow's first trip (Ticket 282)", () => {
+  /** 6 PM in New York. Tomorrow: Stretch at Home 7 AM, Dentist 9 AM, Gym 3 PM. */
+  const evening = Temporal.Instant.from("2026-09-22T22:00:00Z");
+  const tomorrow = { startLocalDate: "2026-09-23", endLocalDate: "2026-09-23", scope: "first_trip" };
+  const secret = "s".repeat(64);
+  const device = { latitude: 40, longitude: -74, accuracyMeters: 10, sampledAt: "2026-09-22T22:00:00Z" };
+  const routedLegs = () => mocks.route.mock.calls.reduce((count, [input]) => count + input.routes.length, 0);
+  const tomorrowDay = () => {
+    mocks.source.mockResolvedValue({ ...source, behaviors: [source.behaviors[0]!,
+      { id: "behavior-home", whereKind: "home" as const, locationText: null, updatedAt: "2026-09-20T00:00:00Z" },
+      { id: "behavior-3", whereKind: "place" as const, locationText: "3 Gym St", updatedAt: "2026-09-20T00:00:00Z" }] });
+    mocks.calendar.mockResolvedValue({ status: "disconnected", generation: 0, selectionRevision: 0 });
+    mocks.behaviors.mockResolvedValue([{ id: "behavior-1", default_duration_minutes: 30 }, { id: "behavior-home", default_duration_minutes: 30 },
+      { id: "behavior-3", default_duration_minutes: 60 }]);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-09-23" ? [
+      { ...occurrence("stretch", "behavior-home", "2026-09-23T11:00:00Z"), local_date: "2026-09-23" },
+      { ...occurrence("dentist", "behavior-1", "2026-09-23T13:00:00Z"), local_date: "2026-09-23" },
+      { ...occurrence("gym", "behavior-3", "2026-09-23T19:00:00Z"), local_date: "2026-09-23" },
+    ] : []);
+    mocks.route.mockImplementation(async ({ routes }: { routes: { id: string }[] }) => routes.map((route) => ({ id: route.id, failure: null,
+      estimate: { ...estimate, durationSeconds: 2400, departureAt: "2026-09-23T12:10:00Z", arrivalAt: "2026-09-23T12:50:00Z",
+        observedAt: evening.toString(), expiresAt: evening.add({ minutes: 5 }).toString() } })));
+  };
+
+  it("routes one leg from Home to the first stop away from Home, with at most two lookups", async () => {
+    tomorrowDay();
+    const result = await refreshTravelRoutes(caller, { ...tomorrow, device }, config, evening, undefined, secret);
+    // One route call for one leg. Lookups: Dentist's place and Home, never Gym's.
+    expect(mocks.route).toHaveBeenCalledOnce();
+    expect(routedLegs()).toBe(1);
+    expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "2 Habit St"]);
+    expect(mocks.spend).toHaveBeenCalledOnce();
+    expect(mocks.weather).not.toHaveBeenCalled();
+    const routed = result.evidence!.legs.find((entry) => entry.estimate)!;
+    expect(routed.leg).toMatchObject({ role: "outbound", originCommitmentRef: null, destinationCommitmentRef: "dentist" });
+    // From Home, never from the device position.
+    expect(routed.leg.provenance.originSource).toBe("saved_base");
+    expect(result.evidence!.legs.filter((entry) => !entry.estimate).map((entry) => entry.leg.role)).toEqual(["return"]);
+    // Its own request: no signed conclusions, so today's token and the Daily Brief never include it.
+    expect(result).not.toHaveProperty("conclusionsToken");
+  });
+
+  it("makes no lookup and one route call once the places are stored, and none with nothing to route", async () => {
+    tomorrowDay();
+    mocks.readPlaces.mockResolvedValue(["1 Base St", "2 Habit St"].map((text) =>
+      ({ textKey: keyOf(text), outcome: "resolved", placeId: `place:${text}`, lookedUpAt: "2026-09-01T00:00:00Z" })));
+    await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(routedLegs()).toBe(1);
+
+    vi.clearAllMocks();
+    tomorrowDay();
+    mocks.readPlaces.mockResolvedValue([]);
+    mocks.timezone.mockResolvedValue("America/New_York");
+    mocks.monthSpend.mockResolvedValue(0);
+    mocks.occurrences.mockImplementation(async (_client: unknown, _userId: unknown, start: string) => start === "2026-09-23"
+      ? [{ ...occurrence("stretch", "behavior-home", "2026-09-23T11:00:00Z"), local_date: "2026-09-23" }] : []);
+    const atHome = await refreshTravelRoutes(caller, tomorrow, config, evening);
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+    expect(atHome.evidence).toMatchObject({ legs: [], unknownLegs: [] });
+  });
+
+  it("refuses a first-trip request for any day but tomorrow, before any provider call", async () => {
+    tomorrowDay();
+    for (const date of ["2026-09-22", "2026-09-24"]) {
+      await expect(refreshTravelRoutes(caller, { ...tomorrow, startLocalDate: date, endLocalDate: date }, config, evening))
+        .rejects.toMatchObject({ failure: { code: "context_changed" } });
+    }
+    expect(mocks.geocode).not.toHaveBeenCalled();
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("leaves today's signed conclusions unchanged", async () => {
+    // The same route answers for all three requests.
+    tomorrowDay();
+    located("2026-09-23T01:00:00Z");
+    const before = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, evening, undefined, secret);
+    tomorrowDay();
+    await refreshTravelRoutes(caller, tomorrow, config, evening, undefined, secret);
+    located("2026-09-23T01:00:00Z");
+    const after = await refreshTravelRoutes(caller, { ...day, scope: "day" }, config, evening, undefined, secret);
+    expect(before.conclusionsToken).toBeTruthy();
+    expect(after.conclusionsToken).toBe(before.conclusionsToken);
+  });
+});

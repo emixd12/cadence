@@ -133,7 +133,7 @@ export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "278" | "279" | "280" | "282";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -505,6 +505,9 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
   { id: "web-leave-reminder-body", ticket: "278", template: "{Mode}, {minutes} min from {start}. Arrive {time}.",
     situation: "Browser notification body for both. {start} is Home or the previous stop's title; the web job never starts from a device position.",
     replaces: null, approvedOn: OWNER_APPROVED_2026_11_06, ownerChange: null },
+  { id: "line-tomorrow", ticket: "282", template: "Tomorrow: leave by {time} for {event}.",
+    situation: "Next-departure line once today has no trip left, after tomorrow's first trip was estimated: after 5 PM, or earlier once today's trips are over.",
+    replaces: null, approvedOn: null, ownerChange: null },
 ];
 
 const WEATHER_CONDITIONS: Readonly<Record<WeatherConditionId, string>> = {
@@ -577,6 +580,15 @@ export function departureBriefOverlapPhrase(behaviorLabel: string, destinationLa
 /** Ticket 272: the Daily Brief's line for when the whole day's trip ends. Approved under D13. */
 export function departureBriefBackPhrase(at: string, context: DeparturePhraseContext): string {
   return `Back around ${departureTimeLabel(at, context)}.`;
+}
+
+/**
+ * Ticket 282: tomorrow's first trip on the next-departure line, once today has no trip left.
+ * The time shows without a date, because the line names the day. Not yet approved (decision D7).
+ */
+export function departureTomorrowPhrase(leaveAt: string, destinationLabel: string | null, timezone: string): string {
+  const day = Temporal.Instant.from(leaveAt).toZonedDateTimeISO(timezone).toPlainDate();
+  return `Tomorrow: leave by ${departureTimeLabel(leaveAt, { timezone, currentDate: day })} for ${destinationLabel ?? NEXT_STOP_FALLBACK}.`;
 }
 
 /** Ticket 273: offered while Travel estimates is off and a located event is ahead today. Approved under D13. */

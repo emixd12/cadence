@@ -16618,7 +16618,8 @@ Verification: `npx vitest run tests/travel-route-refresh.service.test.ts`,
 
 ## Ticket 282: Tomorrow's first trip
 
-Status: filed November 4, 2026. Not started.
+Status: implemented November 6, 2026 on branch `us-work`; not merged or deployed. No
+migration.
 Dependencies: Tickets 268 and 269. Decision D4.
 
 Goal: warn the evening before an early start (G7).
@@ -16649,6 +16650,25 @@ Messaging impact: P-021.
 
 Verification: `npx vitest run tests/travel-route-refresh.service.test.ts
 tests/travel-lifecycle.dom.test.tsx`.
+
+Implementation notes (November 6, 2026):
+
+- `resolveTravelTomorrowPlan` (`packages/core/src/services/travel-refresh-policy.ts`) decides
+  when: after 5 PM local time, or once every trip in today's kept view has left, with a
+  located stop tomorrow, below 80% of the monthly ceiling, once per first stop and revision.
+- `useTravelContext` sends `scope: "first_trip"` for tomorrow's date, with no device position,
+  trips or corrections, and keeps the result in `TravelState.tomorrow`, apart from today's view.
+  The browser session keeps it with the first stop as a digest. The Mac passes the same stop
+  key through `travelTomorrowStopKey`.
+- `refreshTravelRoutes` accepts `first_trip` only for tomorrow in the account's timezone. It
+  plans tomorrow's first stop away from Home alone and routes that one leg from Home, with no
+  weather call and no signed conclusions.
+- `resolveTomorrowFirstTrip` builds the line from the departure model. The Timeline shows it
+  only while today's departure model has no trip. It never reaches `onDeparture` (Mac
+  reminders), the Daily Brief or the hosted reminder job.
+- Wording "Tomorrow: leave by {time} for {event}." is in `departure-phrases.ts`, not yet
+  approved (decision D7).
+- `docs/COSTS.md` counts one leg per travel day: 8, 20 and 26 a month.
 
 ## Ticket 283: Route Outlook and iCloud events
 

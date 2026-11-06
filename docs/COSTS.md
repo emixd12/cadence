@@ -184,15 +184,18 @@ today's model until the tickets ship.
 | 3-hour and 30-minute trip refreshes, legs | 16–32 | 60–120 | 130–260 |
 | Trip with no estimate, fallback, legs | 0 | 0 | 0 |
 | Reminder job, legs | 24 | 120 | 312 |
-| **Proposed, route legs** | **60–76** | **260–320** | **624–754** |
-| **Proposed, cost with lookups** | **US$0.33–0.67** | **US$1.40–2.82** | **US$3.32–6.61** |
+| Tomorrow's first trip (Ticket 282), legs | 8 | 20 | 26 |
+| **Proposed, route legs** | **68–84** | **280–340** | **650–780** |
+| **Proposed, cost with lookups** | **US$0.37–0.74** | **US$1.50–2.99** | **US$3.45–6.83** |
 
 Ticket 267 replaced the earlier draft rows with the refresh plan's counts, November 5,
 2026. All rows stay assumed. Showing last estimates removes re-routing on opens, which
 is 180 of the 240 typical legs today. The trip refreshes and reminders spend most of it
 again. Decision D15's third reminder route (November 6, 2026) adds 8, 40 and 104 legs, one
-per trip. The heavy upper bound, US$6.61, now passes both today's figure and the US$5
-ceiling. Automatic refreshes stop at US$4.00, 80% of the ceiling. So does the reminder update
+per trip. Ticket 282 (November 6, 2026) adds tomorrow's first trip: one leg the evening before
+each travel day, at US$0.005 to US$0.0085 a leg, so US$0.04–0.07, US$0.10–0.17 and
+US$0.13–0.22 a month. The heavy upper bound, US$6.83, now passes both today's figure and the
+US$5 ceiling. Automatic refreshes stop at US$4.00, 80% of the ceiling. So does the reminder update
 route (decision D16, Ticket 277): from 80% the job closes the check without a call. The plan
 and send routes continue until the ceiling, where the reservation refuses them and the
 reminder fails with `budget_refused`. Spend therefore stays at or under US$5, but a heavy
@@ -230,6 +233,7 @@ two provider calls per leg.
 | Device moved more than 500 m, Timeline focused, at most every 10 minutes (Ticket 268) | next trip from the device | 1 |
 | Within 3 hours of a known leave time, once, Timeline visible and focused | that trip | 1 |
 | Within 30 minutes of a known leave time, once, same condition | that trip | 1 |
+| After 5 PM, or once today has no trip left, with a located stop tomorrow; once per first stop and its revision (Ticket 282) | tomorrow's first trip, from Home | 1 |
 | Trip with no estimate, once its appearance time comes | that trip | 1 |
 | Refresh travel | whole day | every planned leg |
 | At 80% of the monthly ceiling | none, except Refresh travel | 0 |
@@ -261,8 +265,15 @@ Assumptions and limits:
   names no planned trip, so the listing makes no route call. A place lookup it needs is the
   same one the Timeline makes, reserved first and kept for a year. The job routes only the
   trips due. Each visit also re-reads Calendar, which costs nothing per call.
-- Not counted yet: tomorrow's first trip (Ticket 282) and Outlook and iCloud legs
-  (Ticket 283). Each ticket adds its own count.
+- Tomorrow's first trip (Ticket 282): one request the evening before each travel day, so 8,
+  20 and 26 legs a month. It routes one leg, from Home to tomorrow's first stop away from
+  Home, and looks up at most two places: that stop and Home, both usually stored already, so
+  the lookup row is unchanged. It makes no weather call and is automatic, so it stops at 80% of
+  the monthly ceiling. It asks once per browser tab session and once per Mac app session, so a
+  second tab or a linked Mac open the same evening makes another call. A changed first stop, or the same stop with a new time or place,
+  asks again, one leg each. A failed request is not retried that evening. Assumed: one per
+  travel day. Measured by Ticket 284. Transit doubles each figure.
+- Not counted yet: Outlook and iCloud legs (Ticket 283), which adds its own count.
 - Ticket 264 adds two kinds of route call, both assumed and not in the table:
   - A late transit leg makes one more call, from the ready time, reserved first at
     US$0.010. Other modes make no extra call. Assumed: rare, at most a few a month.
