@@ -16374,8 +16374,15 @@ run, `npm run resolvers:check`.
 
 ## Ticket 277: Leave reminder job
 
-Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 276, 264, 265 and 267. Decision D3.
+Status: implemented November 6, 2026 on branch `us-work`. Not merged or deployed. Off until
+`CADENCE_LEAVE_REMINDER_JOB=enabled`, and the route reports delivery unavailable until
+Ticket 278. Planner `packages/core/src/services/leave-reminder-plan.ts`, service
+`lib/services/leave-reminder-job.service.ts`, route
+`app/api/travel/leave-reminders/process/route.ts`, breaker `leave_reminder_batches`. The
+send payload contract for Ticket 278 is `lib/services/leave-reminder-delivery.ts`. After
+sending, the one check is the reminder time the notification named, so no leave time is
+stored. Decision D16: the update route stops at 80% of the monthly budget.
+Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
 
 Goal: check each opted-in account and send a reminder at the right time.
 
@@ -16397,6 +16404,12 @@ Scope and acceptance:
   resolved.
 - Read the title only at send time, in memory.
 - Stay off until a new server flag is set. Add it to `.env.example`.
+- Authenticate the cron request with `CRON_SECRET`. Read the Vercel OIDC token from the
+  request header, then `VERCEL_OIDC_TOKEN_FILE`, then `VERCEL_OIDC_TOKEN`, and fail closed.
+  On the first production run, log only whether the token was present.
+- Decision D16: the update route stops at 80% of the monthly travel budget.
+- Define the send payload Ticket 278 builds against: digest, times, mode and origin label.
+  Titles stay in memory, never in stored data.
 - Tests cover no duplicate sends, overlapping runs, budget refusal, removed events and
   daylight-saving changes.
 - Spend reserves first. Update `docs/COSTS.md`.
@@ -16415,8 +16428,10 @@ Platform impact:
 
 Messaging impact: P-016 and P-017.
 
-Verification: new service and planner tests, `npm run resolvers:check`,
-`npm run agents:check`.
+Verification: `npx vitest run tests/leave-reminder-plan.test.ts
+tests/leave-reminder-job.service.test.ts tests/leave-reminder-process-route.test.ts`,
+`tests/leave-reminder-store.local-integration.test.ts` on an isolated local project,
+`npm run resolvers:check`, `npm run agents:check`.
 
 ## Ticket 278: Leave reminders through web push
 

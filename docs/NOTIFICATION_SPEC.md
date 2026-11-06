@@ -498,20 +498,33 @@ ship, nothing reads or writes the new tables.
      sets the trip's next check time to the reminder time.
   2. The send route runs at that check. The notification uses its estimate, read in
      memory, and sends at once, even if the new reminder time is a little later. If
-     the leave time it named is still ahead, the send sets one more check, 5 minutes
-     later, for the update.
-  3. The update route runs at that check, while the leave time the reminder named is
-     still ahead. If its estimate moves the leave time 10 minutes or more earlier, the
-     job sends the one update at once. Otherwise the check closes and nothing more
-     sends. The job never routes a trip a fourth time.
+     the leave time it named is more than 4 minutes ahead, the send keeps one more
+     check for the update. That check is the reminder time the notification named
+     (its leave time minus the get-ready time), so no leave time is stored.
+  3. The update route runs at the first run at least 4 minutes after sending, about
+     5 minutes later, once that check is due. The leave time the reminder named is the
+     check plus the current get-ready time. While it is still ahead, the job routes
+     once more. If the estimate moves the leave time 10 minutes or more earlier and it
+     is still ahead, the job sends the one update at once. Otherwise the check closes
+     and nothing more sends. Once the named leave time passes, the check closes without
+     a route. The job never routes a trip a fourth time.
   If the plan route finds the reminder already due, it is also the send route, and
   the update route is the second. The update route adds up to half the job's route
   legs (`docs/COSTS.md`). Leave times stay in memory; only the check time is stored.
 - The job re-reads Calendar at least every 30 minutes for an account with pending
   trips, and again at send time. It reads the event title only at send time, in
   memory, and never stores it.
-- A budget refusal fails that reminder with `budget_refused`. Automatic refreshes stop
-  at 80% of the monthly ceiling, but reminder checks continue (Ticket 267).
+- A budget refusal fails that reminder with `budget_refused`. The plan and send routes
+  continue to the monthly ceiling, so first reminders keep the remaining budget. The
+  update route stops at 80% of the ceiling, like automatic refreshes (decision D16,
+  Ticket 267): from 80% the job closes the check with `budget_paused` and does not
+  route.
+- Other failures are short codes too. A plan or send route with no estimate fails
+  with `route_unavailable`. A leave time that has already passed fails with
+  `leave_time_passed`. Delivery failures are `no_subscription` and `delivery_failed`.
+  A failed update leaves the sent reminder sent and closes its check with that code.
+- The job plans the current local date only. It visits the account again at local
+  midnight, so the new date's trips are planned from then.
 - The text names the start (Home or the previous stop) and the leave time, as D3
   requires. An update names the new, earlier leave time. Ticket 278 owns the
   wording, which waits for the owner's approval (D7).
@@ -522,8 +535,43 @@ ship, nothing reads or writes the new tables.
 - The job claims a reminder before routing or sending, as Behavior reminder
   processing does. A claim older than 15 minutes can be reclaimed. A sent reminder
   is final and its update is recorded once, so overlapping runs cannot send either
-  twice.
-- A server flag keeps the job off until it is set. The rollback is to unset it.
+  twice. Each account visit also leases the account's next check for 15 minutes, so
+  two runs never visit one account at once. Writes are compare-and-set on the claim.
+  A visit that fails releases its claims and retries 10 minutes later.
+- To list the plan's trips, the job sends a route request that names no planned trip,
+  so it makes no route call. Place lookups the plan needs reserve spend first and are
+  kept for the Timeline. It then routes only the trips due, in one request.
+- A dropped trip returns to pending if it comes back, but only if it was never
+  routed. A routed trip that comes back gets no reminder, because a send route would
+  send at once, possibly hours early.
+- `CADENCE_LEAVE_REMINDER_JOB=enabled` turns the job on; any other value keeps it off.
+  The rollback is to clear it. `CADENCE_DISABLE_LEAVE_REMINDER_BATCHES=1` stops it as an
+  incident breaker (`docs/OPERATIONS.md`). Vercel Cron calls
+  `/api/travel/leave-reminders/process` every 5 minutes with `CRON_SECRET`. Hosted
+  routing reads the Vercel OIDC token from the request header, then
+  `VERCEL_OIDC_TOKEN_FILE`, then `VERCEL_OIDC_TOKEN`, and fails closed without one. The
+  first production run logs only whether the token was present.
+
+### Web: send payload (Ticket 278 contract)
+
+`LeaveReminderMessage` in `lib/services/leave-reminder-delivery.ts`. The job builds it
+in memory at send time and passes it to the delivery, which Ticket 278 builds on web
+push. Until then the delivery is absent and the job route reports it unavailable.
+
+- `kind`: `reminder`, or `update` for the one update.
+- `tripDigest` and `localDate`: the record's identity. The notification link carries
+  the digest only, never a title or place.
+- `leaveAt`, `arriveAt`, `startAt` and `expiresAt` (ISO instants). `leaveAt` is the
+  leave time the text names; for an update, the new one. `expiresAt` is the leave
+  time, when the trip starts.
+- `mode` and `travelMinutes`, for "Walking, 65 min from Home."
+- `origin`: `{ kind: "home" }` or `{ kind: "previous_stop", title }`.
+- `title`: the destination's title, read from Calendar or the Behavior at send time.
+- Titles live only in this message. They are never stored, logged or put in a link.
+  Records keep only the digest, local date, check time, counts, times sent and a short
+  error code.
+- The delivery returns `sent`, or `failed` with `no_subscription` or
+  `delivery_failed`. It reads push subscriptions as the user.
 
 ### Mac: native notifications
 

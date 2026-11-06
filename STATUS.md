@@ -26,6 +26,34 @@ route call of its own. A desktop release waits for the owner.**
 - Messaging impact: P-016 note. Three new phrases in `departure-phrases.ts`, not yet approved
   (D7).
 
+## Travel advisory revamp Wave 4: Ticket 277 leave reminder job — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. No schema change. No provider call was made.**
+
+- Pure planner `packages/core/src/services/leave-reminder-plan.ts`: trip digests, which
+  records to create, route, cancel or close, each step's outcome, and the account's next
+  visit. Service `lib/services/leave-reminder-job.service.ts` and the record store in
+  `lib/db/leave-reminders.repo.ts` run everything as the user on Ticket 276's minted client;
+  only the due-account selection uses the service role.
+- Route `/api/travel/leave-reminders/process`, Vercel Cron every 5 minutes, `CRON_SECRET`
+  only. Off until `CADENCE_LEAVE_REMINDER_JOB=enabled`; breaker
+  `CADENCE_DISABLE_LEAVE_REMINDER_BATCHES`. It reads the Vercel OIDC token from the header,
+  then `VERCEL_OIDC_TOKEN_FILE`, then `VERCEL_OIDC_TOKEN`, fails closed without it, and logs
+  only its presence on the first production run.
+- Routes at most three times per trip from Home or the previous stop, with spend reserved
+  first by the shared travel refresh. Trips are listed with a request that names no planned
+  trip, so listing makes no route call. Calendar is re-read at least every 30 minutes and at
+  send time; titles are read only at send time. The trip home gets no reminder.
+- After sending, the one check is the reminder time the notification named, so no leave
+  time is stored. Decision D16: the update route stops at 80% of the monthly budget
+  (recorded in `docs/DECISIONS.md`, `docs/NOTIFICATION_SPEC.md` and `docs/COSTS.md`).
+- Delivery is absent until Ticket 278; the route then reports `delivery_unavailable`. The
+  payload contract is `lib/services/leave-reminder-delivery.ts`.
+- Known limits: a trip dropped after its first route that comes back gets no reminder; a
+  crash between a push and its record write can send it again after 15 minutes, as for Behavior
+  reminders; the update compares with the current get-ready time.
+- Messaging impact: P-016 and P-017 notes. No new user-facing wording.
+
 ## Travel advisory revamp Wave 4: Ticket 279 leave reminder setting and readiness list — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed. No schema change and no provider call.**

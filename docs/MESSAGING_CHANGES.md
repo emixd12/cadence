@@ -638,6 +638,11 @@ cite has not changed.
   Its text names the start (Home, your previous stop or your position) and when the estimate was
   checked, with no route duration. Travel estimates off on the Mac also stops its reminders.
   The three Mac phrases are listed in `departure-phrases.ts`, not yet approved (D7).
+- **Ticket 277 note (November 6, 2026):** after sending, the record keeps the reminder time
+  it named as its one check, until the update route runs. The update estimate stops at 80%
+  of the monthly travel budget (D16), so near month end an update may not arrive. A trip
+  that was dropped after its first estimate and then comes back gets no reminder. Failed
+  reminders record a short code such as `no_subscription`.
 - **Status:** logged.
 
 ## P-017: Calendar reads with no user session
@@ -657,6 +662,9 @@ cite has not changed.
 - **Update needed:** add the reminder check as a processing moment. State that it happens
   only for accounts that turned the reminder on, and that Cadence still stores no Google
   event details. Update the verification materials before the next submission.
+- **Ticket 277 note (November 6, 2026):** the job reads Calendar, Behaviors and Occurrences
+  for an opted-in account at least every 30 minutes, and again at send time, all day
+  while reminders stay on. It reads titles only at send time.
 - **Status:** logged.
 
 ## P-018: Last estimates and per-trip refresh
