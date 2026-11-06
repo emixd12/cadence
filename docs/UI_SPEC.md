@@ -308,7 +308,12 @@ verified route. Directions needs a resolved place: a route that reached this sto
 after its 5-minute estimate expired (Ticket 271, correction C2). Directions opens in the mode
 that route used, which can be a mode remembered for that place, and falls back to usual travel.
 The link carries only the source-authored text. The destination correction sits behind one native
-**Change for this trip** disclosure; it asks only for the destination (decision D12); saving closes it and returns focus to that control. Current position is the default immediate origin, ahead of a
+**Change for this trip** disclosure; it asks only for the destination (decision D12); saving closes it and returns focus to that control. For an event with a location, a correction
+that resolves is remembered for that location text (Ticket 281): other events, Behaviors and Home
+with the same text resolve to the corrected place, because they name the same place. Their text
+stays unchanged. Correcting back to the event's own text forgets it; turning travel off forgets
+every remembered place. A correction for an event without a location lasts until the Timeline
+closes. Current position is the default immediate origin, ahead of a
 predicted scheduled position. When location is unavailable, Home or the previous
 stop is the origin. Missing Home withholds only the trip back; current-location-
 to-event and event-to-event advice remain available for usable points. Never

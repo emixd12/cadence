@@ -565,6 +565,22 @@ describe("refreshTravelRoutes late trips and trips home (Ticket 264)", () => {
       ]);
     });
 
+    it("forgets the remembered place when the user corrects back to the original text", async () => {
+      withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
+      routeAllFromReady();
+      mocks.readPlaces.mockImplementation(async (_client: unknown, _userId: unknown, keys: readonly string[]) => keys.includes(keyOf("Main Campus"))
+        ? [{ textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:500 Main St", lookedUpAt: now.subtract({ hours: 1 }).toString() }] : []);
+      await refreshTravelRoutes(caller, { ...day, scope: "day", corrections: [{ eventId: "first", revision: "first", locationText: "Main Campus" }] }, config, now);
+      // The original text is looked up again, and its own place replaces the remembered one.
+      expect(mocks.geocode.mock.calls.map(([text]) => text).sort()).toEqual(["1 Base St", "Main Campus"]);
+      expect(written().filter((row) => row.textKey === keyOf("Main Campus"))).toEqual([
+        { textKey: keyOf("Main Campus"), outcome: "resolved", placeId: "place:Main Campus", lookedUpAt: now.toString() },
+      ]);
+      const routes = JSON.stringify(mocks.route.mock.calls[0]![0].routes);
+      expect(routes).toContain("place:Main Campus");
+      expect(routes).not.toContain("place:500 Main St");
+    });
+
     it("keeps the refresh when remembering fails", async () => {
       withEvents([event("first", "2026-09-22T10:00:00Z", "2026-09-22T11:00:00Z", "Main Campus")]);
       routeAllFromReady();

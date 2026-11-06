@@ -126,6 +126,7 @@ export async function refreshTravelRoutes(
   };
 
   const remembered = correctedPlaceTexts(snapshot?.events ?? [], request);
+  const restored = restoredPlaceKeys(snapshot?.events ?? [], request);
   const drafts = [
     ...calendarCommitmentDrafts(snapshot?.events ?? [], request, remembered, now),
     ...behaviorCommitmentDrafts(behaviorOccurrences, source.behaviors, source.settings.baseLocationText, durationEstimates, timezone, now),
@@ -135,7 +136,7 @@ export async function refreshTravelRoutes(
     ? [...drafts.slice(0, 8), { ...drafts[8]!, commitment: { ...drafts[8]!.commitment, attendance: "unknown" as const }, placeText: null }]
     : drafts;
   const baseText = bounded.length ? source.settings.baseLocationText : null;
-  const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve);
+  const places = await resolvePlaces(caller, [...bounded.map((draft) => draft.placeText), baseText], config, now, deadline, beforeFirstProviderCall, reserve, restored);
   await rememberCorrectedPlaces(caller, remembered, places, now);
   // Ticket 217: learned buffers and the remembered mode per place, falling back to usual travel.
   const habits = source.settings.habits;
@@ -232,11 +233,13 @@ async function resolvePlaces(
   signal: AbortSignal,
   beforeFirstProviderCall: () => Promise<void>,
   reserve: TravelSpendReservation,
+  lookUpAgain: ReadonlySet<string> = new Set(),
 ): Promise<ReadonlyMap<string, TravelPoint | null>> {
   const keyByText = new Map(texts.flatMap((text) => text ? [[text, placeTextKey(text)] as const] : []));
   if (!keyByText.size) return new Map();
   const stored = await readTravelPlaceCache(caller.client, caller.user.id, [...new Set(keyByText.values())]);
-  const reusable = new Map(stored.filter((row) => travelPlaceLookupReusable(row, now)).map((row) => [row.textKey, row]));
+  // Ticket 281: a key in lookUpAgain is looked up again, and the result replaces its stored row.
+  const reusable = new Map(stored.filter((row) => !lookUpAgain.has(row.textKey) && travelPlaceLookupReusable(row, now)).map((row) => [row.textKey, row]));
   // One lookup per distinct key, even when differently typed texts normalize alike.
   const missing = [...new Map([...keyByText].filter(([, key]) => !reusable.has(key)).map(([text, key]) => [key, text])).entries()];
   if (missing.length) {
@@ -279,6 +282,20 @@ function correctedPlaceTexts(events: Awaited<ReturnType<typeof getCalendarEvents
     if (!location || !normalizeTravelPlaceText(location)) return [];
     const key = placeTextKey(location);
     return key === placeTextKey(correction.locationText) ? [] : [[key, correction.locationText] as const];
+  }));
+}
+
+/**
+ * Ticket 281: the location keys of events corrected back to their own text. The user is undoing
+ * a remembered place, so that text is looked up again and the result replaces the remembered row.
+ * This costs one place lookup per refresh while the correction stays, until the Timeline closes.
+ */
+function restoredPlaceKeys(events: Awaited<ReturnType<typeof getCalendarEvents>>["events"], request: TravelRouteRefreshRequest): ReadonlySet<string> {
+  return new Set(request.corrections.flatMap((correction) => {
+    const location = events.find((event) => event.id === correction.eventId)?.location;
+    if (!location || !normalizeTravelPlaceText(location)) return [];
+    const key = placeTextKey(location);
+    return key === placeTextKey(correction.locationText) ? [key] : [];
   }));
 }
 

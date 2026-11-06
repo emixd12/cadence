@@ -167,7 +167,10 @@ has a location and its corrected destination resolves, the refresh service upser
 place ID. That text then resolves to the corrected place after a reload, for other
 events, Behaviors and Home with the same normalized text, under the same 365-day reuse.
 The row is indistinguishable from a lookup and holds no place or event text. Correcting
-again replaces it; turning travel off deletes it with the rest of the cache. Decision
+again replaces it; turning travel off deletes it with the rest of the cache. Correcting an
+event back to its own location text undoes it: that refresh looks the text up again, and the
+result replaces the row. While that correction stays, until the Timeline closes, each refresh
+repeats this one lookup. Decision
 D12 dropped the planned attendance record, so nothing about attendance is stored.
 
 Migration `20260922013000_add_travel_route_quota.sql` keeps owner-local-day and

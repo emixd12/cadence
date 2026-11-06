@@ -893,7 +893,8 @@ cite has not changed.
   a reload and for every other event, Behavior Where or saved Home with the same normalized
   text, for up to 365 days. No place or event text is stored. Turning travel off deletes the
   rows. A correction for an event without a location still lasts only while the Timeline is
-  open. Correcting a place again replaces the remembered one. Refines P-020; nothing about
+  open. Correcting a place again replaces the remembered one, and correcting it back to the
+  event's own location text forgets it (verifier fix). Refines P-020; nothing about
   attendance is stored (P-023).
 - **Affected:** Ticket 281. Files: `lib/services/travel-route-refresh.service.ts`,
   `components/timeline/ExternalEventDetails.tsx`, `components/settings/LegalContent.tsx`,
@@ -912,6 +913,6 @@ cite has not changed.
     shows only for an event without a location.
 - **Update needed:** say that a corrected place is remembered for that location text,
   including for Behaviors and Home with the same text, that only a place identifier and a
-  one-way key are stored, for how long, and that turning travel off forgets it. The owner
-  approves the new in-app note.
+  one-way key are stored, for how long, and that turning travel off or correcting back to the
+  original text forgets it. The owner approves the new in-app note.
 - **Status:** logged.
