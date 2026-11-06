@@ -16695,7 +16695,9 @@ binds the Outlook and iCloud connections that took part. The brief accepts it on
 named event is in its own context, which holds Outlook or iCloud only under that Calendar's
 Daily Brief disclosure. The token flags, per Outlook and iCloud Calendar, whether it had a stop.
 A stop from an undisclosed Calendar withholds the conclusions; an undisclosed Calendar with only
-unlocated events is left out of the check, so those days keep their lines. A
+unlocated events is left out of the check, so those days keep their lines. Known limit: a stop
+that appears in that undisclosed Calendar after the route goes unseen until the token expires, at
+most 5 minutes after the earliest estimate was fetched. A
 disclosed Calendar that took part needs a current, complete read. A left-out Calendar still
 withholds the token. The brief pipeline projects travel beside its Google-only view, so trips
 to disclosed Outlook or iCloud events stay visible. Leave times never reach the model.

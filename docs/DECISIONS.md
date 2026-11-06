@@ -1741,8 +1741,10 @@ cancelled, event not yet ended, including one past the nine-stop bound). The fla
 and says nothing else about that Calendar's events. A stop from an undisclosed Calendar withholds
 all signed conclusions, because it shapes the trips after it. An undisclosed Calendar with no stop
 is left out of the event check, so days where it has only unlocated meetings (not travel under
-D12) keep their lines, as before D18. Known limit: an undisclosed event that gains a place after
-the route is not seen by the brief until the token expires or the route refreshes. A disclosed
+D12) keep their lines, as before D18. Known limit: a stop that appears in an undisclosed Calendar
+after the route (an event that gains a place, a new located event, or a declined event accepted
+again) is not seen by the brief until the token expires or the route refreshes. The token expires
+with the plan's earliest estimate, at most 5 minutes after it was fetched. A disclosed
 Calendar that took part must have a current, complete read, as Google
 must. A left-out Calendar (Ticket 283 verifier fix) still withholds the token. The model input
 keeps the same closed shape: yes/no fits, trip states and weather margins, never a time.
