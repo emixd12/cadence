@@ -86,6 +86,12 @@ Settings, a travel mode chosen for a place, or a leave-time answer.
 - `habits_updated_at`: null until the first habit change. Habit writes compare
   this revision only, so they never conflict with a Settings save; Settings saves
   compare `updated_at` and leave the habit columns alone.
+- `preparation_changed_at` (migration `20261106060000_travel_preparation_changed_at.sql`,
+  Ticket 277): the database's own time of the last hosted change to
+  `preparation_minutes`. A trigger sets it on every insert and update, so a client
+  value is never kept. It is not synced. The leave reminder job uses it to tell
+  whether the get-ready time changed after a reminder was sent, because a Mac writes
+  `habits_updated_at` from its own clock and syncs offline changes later.
 
 Check functions validate entry shape, order, bounds and canonical
 microsecond instants. A row without a habit revision must hold no learned values.
@@ -314,7 +320,9 @@ create table travel_settings (
   arrival_buffer_minutes integer check (arrival_buffer_minutes between 0 and 30),
   place_modes jsonb not null default '[]',
   leave_feedback jsonb not null default '[]',
-  habits_updated_at timestamptz
+  habits_updated_at timestamptz,
+  -- Ticket 277: database time of the last get-ready change; trigger-set, not synced.
+  preparation_changed_at timestamptz
 );
 ```
 

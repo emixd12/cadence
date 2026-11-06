@@ -1643,6 +1643,7 @@ export type Database = {
           navigation_preference: string | null
           onboarding_completed_at: string | null
           place_modes: Json
+          preparation_changed_at: string | null
           preparation_minutes: number | null
           routing_consent_at: string | null
           updated_at: string
@@ -1659,6 +1660,7 @@ export type Database = {
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
           place_modes?: Json
+          preparation_changed_at?: string | null
           preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string
@@ -1675,6 +1677,7 @@ export type Database = {
           navigation_preference?: string | null
           onboarding_completed_at?: string | null
           place_modes?: Json
+          preparation_changed_at?: string | null
           preparation_minutes?: number | null
           routing_consent_at?: string | null
           updated_at?: string

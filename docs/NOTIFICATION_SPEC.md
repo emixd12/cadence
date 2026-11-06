@@ -509,6 +509,13 @@ ship, nothing reads or writes the new tables.
      and nothing more sends. Once the named leave time passes, the check closes without
      a route. If Travel habits changed after sending, the get-ready time the reminder
      used is unknown, so the check also closes without a route and no update sends.
+     The job judges this from both `habits_updated_at` and `preparation_changed_at`.
+     A Mac writes `habits_updated_at` from its own clock, and an offline Mac change
+     reaches the hosted row only when it syncs, so neither proves a change came before
+     sending. `preparation_changed_at` is the database's time of the hosted change,
+     set only by a trigger. A change stamped later than one minute before sending
+     closes the check, so a clock difference can only suppress an update, never send
+     a false one.
      The job never routes a trip a fourth time.
   If the plan route finds the reminder already due, it is also the send route, and
   the update route is the second. The update route adds up to half the job's route

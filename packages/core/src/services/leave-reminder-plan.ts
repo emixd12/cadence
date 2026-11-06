@@ -20,6 +20,12 @@ export const LEAVE_REMINDER_CLAIM_STALE_SECONDS = 15 * 60;
 export const LEAVE_REMINDER_UPDATE_AFTER_SEND_SECONDS = 4 * 60;
 /** One update, only when the leave time moves at least this much earlier. */
 export const LEAVE_REMINDER_UPDATE_MIN_EARLIER_SECONDS = 10 * 60;
+/**
+ * `preparation_changed_at` comes from the database clock and `sent_at` from the job's. A
+ * get-ready change this close before sending still counts as after it, so a small
+ * difference between the two clocks can only close a check, never keep one open.
+ */
+export const LEAVE_REMINDER_SERVER_CLOCK_MARGIN_SECONDS = 60;
 /** Decision D15: plan, send, and one route after sending. The database refuses a fourth. */
 export const LEAVE_REMINDER_MAX_ROUTES = 3;
 
@@ -105,6 +111,12 @@ export function planLeaveReminderVisit(input: Readonly<{
    * its get-ready time, so the leave time it named is unknown and its check closes unrouted.
    */
   habitsUpdatedAt?: string | null;
+  /**
+   * The database's time of the last hosted get-ready change. A Mac writes `habitsUpdatedAt`
+   * from its own clock, and an offline Mac change arrives when it syncs, so only this one
+   * reliably shows a change after sending. Either one after the send time closes the check.
+   */
+  preparationChangedAt?: string | null;
   records: readonly LeaveReminderRecord[];
   trips: readonly LeaveReminderTrip[];
 }>): LeaveReminderVisitPlan {
@@ -142,7 +154,7 @@ export function planLeaveReminderVisit(input: Readonly<{
       if (due(record.nextCheckAt)) work.push({ record, trip, step: record.routeCount === 0 ? "plan" : "send" });
       continue;
     }
-    if (openCheck && habitsChangedAfter(input.habitsUpdatedAt, record.sentAt)) {
+    if (openCheck && (habitsChangedAfter(input.habitsUpdatedAt, record.sentAt) || preparationChangedAfter(input.preparationChangedAt, record.sentAt))) {
       closeCheck.push(record);
       continue;
     }
@@ -160,6 +172,12 @@ export function planLeaveReminderVisit(input: Readonly<{
 function habitsChangedAfter(habitsUpdatedAt: string | null | undefined, sentAt: string | null): boolean {
   if (!habitsUpdatedAt || !sentAt) return false;
   return Temporal.Instant.compare(Temporal.Instant.from(habitsUpdatedAt), Temporal.Instant.from(sentAt)) > 0;
+}
+
+function preparationChangedAfter(preparationChangedAt: string | null | undefined, sentAt: string | null): boolean {
+  if (!preparationChangedAt || !sentAt) return false;
+  const after = Temporal.Instant.from(sentAt).subtract({ seconds: LEAVE_REMINDER_SERVER_CLOCK_MARGIN_SECONDS });
+  return Temporal.Instant.compare(Temporal.Instant.from(preparationChangedAt), after) > 0;
 }
 
 function updateWaitOver(sentAt: string, now: Temporal.Instant): boolean {

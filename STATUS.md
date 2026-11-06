@@ -1,5 +1,22 @@
 # Implementation Status
 
+## Travel advisory revamp Wave 4: final checks on the leave reminder job — November 6, 2026
+
+**On branch `us-work`. Not merged or deployed. New migration
+`20261106060000_travel_preparation_changed_at.sql` is applied locally only; the hosted push
+waits for the owner.**
+
+- Fixed: a get-ready change written from a slow Mac clock, or made offline before a reminder
+  sent and synced after, could send a false "leave earlier" update. `travel_settings` gains
+  `preparation_changed_at`, stamped by a trigger with the database time and not synced. The
+  job closes the update check when it is later than one minute before sending, so skew can
+  only suppress an update.
+- Confirmed: when routing throws after some spend, the claims are released and the retry
+  routes through the shared refresh again, which reserves before every provider call. The
+  database refuses any reservation past the US$5 monthly ceiling, and the reminder then
+  fails with `budget_refused`. Tests cover both.
+- Messaging impact: none.
+
 ## Travel advisory revamp Wave 4: wording approved (D17) — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed.**

@@ -40,3 +40,23 @@ describe("leave reminder migration (Ticket 275)", () => {
     expect(sql).not.toMatch(/account_sync/);
   });
 });
+
+describe("get-ready change time (Ticket 277, Wave 4 final check)", () => {
+  const prepMigration = resolve(process.cwd(), "supabase/migrations/20261106060000_travel_preparation_changed_at.sql");
+
+  it("stamps the database time on every get-ready change and keeps no client value", async () => {
+    const sql = await readFile(prepMigration, "utf8");
+    expect(sql).toContain("add column preparation_changed_at timestamptz");
+    expect(sql).toContain("new.preparation_minutes is distinct from old.preparation_minutes then\n    new.preparation_changed_at := statement_timestamp();");
+    expect(sql).toContain("new.preparation_changed_at := old.preparation_changed_at;");
+    expect(sql).toContain("before insert or update on public.travel_settings");
+    expect(sql).toContain("revoke all on function cadence_private.stamp_travel_preparation_change() from public, anon, authenticated");
+    const code = sql.replace(/^\s*--.*$/gm, "");
+    expect(code).not.toMatch(/security definer|account_sync|location|latitude|longitude|duration|leave_at/i);
+  });
+
+  it("stays out of the synced profile", async () => {
+    const sync = await readFile(syncMigration, "utf8");
+    expect(sync).not.toContain("preparation_changed_at");
+  });
+});

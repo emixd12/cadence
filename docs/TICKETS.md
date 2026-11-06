@@ -16381,7 +16381,12 @@ Ticket 278. Planner `packages/core/src/services/leave-reminder-plan.ts`, service
 `app/api/travel/leave-reminders/process/route.ts`, breaker `leave_reminder_batches`. The
 send payload contract for Ticket 278 is `lib/services/leave-reminder-delivery.ts`. After
 sending, the one check is the reminder time the notification named, so no leave time is
-stored. Decision D16: the update route stops at 80% of the monthly budget.
+stored. Decision D16: the update route stops at 80% of the monthly budget. Wave 4 final
+check, November 6, 2026: migration `20261106060000_travel_preparation_changed_at.sql` adds
+`travel_settings.preparation_changed_at`, the database's time of the last get-ready change,
+so a Mac clock or a late offline sync can only suppress an update, never send a false one.
+A routing failure after partial spend is retried through the shared refresh, which
+reserves again before every provider call, so spend stays under the monthly ceiling.
 Dependencies: Tickets 276, 264, 265 and 267. Decisions D3, D12, D15 and D16.
 
 Goal: check each opted-in account and send a reminder at the right time.

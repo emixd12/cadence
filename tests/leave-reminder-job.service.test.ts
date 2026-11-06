@@ -404,9 +404,10 @@ describe("decision D15 update threshold (verifier, Ticket 277)", () => {
     const h = harness({ preparationSeconds: 30 * 60 });
     const port = h.port;
     h.world.leaveAt.set("event-1", "2026-11-06T18:00:00Z");
-    const visitWith = async (at: string, habitsUpdatedAt: string | null = null) => {
+    const visitWith = async (at: string, habitsUpdatedAt: string | null = null, preparationChangedAt: string | null = null) => {
       const base = port();
-      const custom = { ...base, readContext: async () => ({ timezone: TZ, preparationSeconds: preparation.seconds, travelOn: true, habitsUpdatedAt }) };
+      const custom = { ...base, readContext: async () => ({ timezone: TZ, preparationSeconds: preparation.seconds, travelOn: true, habitsUpdatedAt,
+        preparationChangedAt }) };
       return visitLeaveReminderAccount(custom, { userId: USER_ID, nextCheckAt: h.store.accountNextCheckAt ?? at }, Temporal.Instant.from(at), h.deliver);
     };
     await visitWith("2026-11-06T15:00:00Z");
@@ -464,7 +465,78 @@ describe("decision D15 update threshold (verifier, Ticket 277)", () => {
   it("keeps the exact rule when habits last changed before the reminder was sent", async () => {
     const { sent, world, visitWith } = await sentReminder();
     world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
-    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T09:00:00.000000Z");
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T09:00:00.000000Z", "2026-11-06T09:00:00.000000Z");
     expect(sent.map((message) => message.kind)).toEqual(["reminder", "update"]);
+  });
+
+  // Wave 4 final check: habits_updated_at comes from the Mac's clock and arrives when the Mac
+  // syncs. The database stamps preparation_changed_at itself, so skew can only close a check.
+  it.each([
+    ["a slow Mac clock dates the change before sending", "2026-11-06T17:00:00.000000Z"],
+    ["an offline Mac change made before sending syncs after it", "2026-11-06T17:10:00.000000Z"],
+  ])("sends no false update when %s", async (_case, habitsUpdatedAt) => {
+    const { store, world, sent, preparation, visitWith } = await sentReminder();
+    preparation.seconds = 45 * 60; // the hosted row's get-ready time grows at 17:28:30, database time
+    await visitWith("2026-11-06T17:31:00Z", habitsUpdatedAt, "2026-11-06T17:28:30.000000Z");
+    expect(sent).toHaveLength(1);
+    expect(only(store)).toMatchObject({ updateSentAt: null, nextCheckAt: null, routeCount: 2 });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("treats a get-ready change within a minute before sending as after it, so clock difference only closes the check", async () => {
+    const { store, world, sent, visitWith } = await sentReminder();
+    world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
+    // Sent at 17:26:00 by the job's clock; the database stamped the change 30 s earlier.
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T09:00:00.000000Z", "2026-11-06T17:25:30.000000Z");
+    expect(sent).toHaveLength(1);
+    expect(only(store)).toMatchObject({ updateSentAt: null, nextCheckAt: null, routeCount: 2 });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("keeps the exact rule when the database stamped the change more than a minute before sending", async () => {
+    const { sent, world, visitWith } = await sentReminder();
+    world.leaveAt.set("event-1", "2026-11-06T17:50:00Z");
+    await visitWith("2026-11-06T17:31:00Z", "2026-11-06T09:00:00.000000Z", "2026-11-06T17:24:59.000000Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder", "update"]);
+  });
+});
+
+describe("spend after a routing failure (Wave 4 final check)", () => {
+  // The hosted port routes through the shared travel refresh, which reserves list price in
+  // reserve_travel_provider_spend before every provider call and never refunds a reservation.
+  // A refused reservation reserves nothing and surfaces as a budget-refused result.
+  it("reserves again on each retry after a throw that followed spending, and never passes the monthly ceiling", async () => {
+    const { store, world, sent, port } = harness();
+    const ledger = { ceiling: 3, reserved: 0, attempts: 0 };
+    let throwAfterSpend = false;
+    const spendingPort = (): LeaveReminderAccountPort => {
+      const base = port();
+      return { ...base, routeTrips: async (localDate, trips) => {
+        ledger.attempts += 1;
+        if (ledger.reserved + trips.length > ledger.ceiling) {
+          return new Map(trips.map((trip) => [trip.digest, { result: { kind: "unavailable", budgetRefused: true }, estimate: null, mode: trip.mode,
+            originRef: trip.originRef } satisfies LeaveReminderRouted]));
+        }
+        ledger.reserved += trips.length;
+        if (throwAfterSpend) throw new Error("context_changed");
+        return base.routeTrips(localDate, trips);
+      } };
+    };
+    const visit = (at: string) => visitLeaveReminderAccount(spendingPort(), { userId: USER_ID, nextCheckAt: store.accountNextCheckAt ?? at },
+      Temporal.Instant.from(at), vi.fn<LeaveReminderDelivery>(async (_caller, message) => { sent.push(message); return { status: "sent" }; }));
+
+    await visit("2026-11-06T15:00:00Z"); // plan route: 1 reserved
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1 });
+    throwAfterSpend = true;
+    expect((await visit("2026-11-06T17:06:00Z")).kind).toBe("failed"); // send route reserves, then throws
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, processingStartedAt: null });
+    expect((await visit("2026-11-06T17:16:00Z")).kind).toBe("failed"); // the retry reserves again
+    expect(ledger).toMatchObject({ reserved: 3, attempts: 3 });
+    await visit("2026-11-06T17:26:00Z"); // the next retry is refused at the ceiling
+    expect(ledger).toMatchObject({ reserved: 3, attempts: 4 });
+    expect(ledger.reserved).toBeLessThanOrEqual(ledger.ceiling);
+    expect(sent).toHaveLength(0);
+    expect(store.rows.get(only(store).id)).toMatchObject({ status: "failed", error: "budget_refused", routeCount: 2 });
+    expect(world.routes).toHaveLength(1);
   });
 });

@@ -41,6 +41,18 @@ export async function selectDueLeaveReminderAccounts(
   );
 }
 
+/**
+ * Ticket 277 follow-up: the database's own time of the last hosted get-ready change
+ * (`travel_settings.preparation_changed_at`, set only by a trigger). Unlike
+ * `habits_updated_at`, no device clock writes it. Read as the user under RLS.
+ */
+export async function readTravelPreparationChangedAt(client: AppSupabaseClient, userId: string): Promise<string | null> {
+  const { data, error } = await client.from("travel_settings")
+    .select("preparation_changed_at").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data?.preparation_changed_at ?? null;
+}
+
 // Ticket 277: the job's reads and writes on its own records. Every function runs on
 // the user's minted client (`createLeaveReminderCaller`), so RLS limits it to that
 // account. Writes are compare-and-set on the claim, so overlapping runs cannot both

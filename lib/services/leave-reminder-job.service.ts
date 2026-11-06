@@ -21,6 +21,7 @@ import { getProfileTimezone, listUserBehaviors, type AppSupabaseClient } from "@
 import {
   LEAVE_REMINDER_ACCOUNT_BATCH_MAX,
   createLeaveReminderStore,
+  readTravelPreparationChangedAt,
   selectDueLeaveReminderAccounts,
   type DueLeaveReminderAccount,
   type LeaveReminderRecordPatch,
@@ -81,8 +82,12 @@ export type LeaveReminderSendDetails = Readonly<{
 export type LeaveReminderAccountPort = Readonly<{
   caller: LeaveReminderCaller;
   store: LeaveReminderStore;
-  /** `habitsUpdatedAt`: when Travel habits, and so the get-ready time, last changed. */
-  readContext(): Promise<Readonly<{ timezone: string; preparationSeconds: number; travelOn: boolean; habitsUpdatedAt: string | null }>>;
+  /**
+   * `habitsUpdatedAt`: when Travel habits last changed, by the writing device's clock.
+   * `preparationChangedAt`: the database's time of the last hosted get-ready change.
+   */
+  readContext(): Promise<Readonly<{ timezone: string; preparationSeconds: number; travelOn: boolean; habitsUpdatedAt: string | null;
+    preparationChangedAt?: string | null }>>;
   listTrips(localDate: string): Promise<LeaveReminderPlannedTrip[]>;
   routeTrips(localDate: string, trips: readonly LeaveReminderPlannedTrip[]): Promise<ReadonlyMap<string, LeaveReminderRouted>>;
   readSendDetails(localDate: string, trip: LeaveReminderPlannedTrip, originRef: string | null): Promise<LeaveReminderSendDetails | null>;
@@ -173,7 +178,8 @@ export async function visitLeaveReminderAccount(
     const records = await store.listRecords();
     const localDate = Temporal.Instant.from(nowText).toZonedDateTimeISO(timezone).toPlainDate().toString();
     const trips = context.travelOn ? await port.listTrips(localDate) : [];
-    const plan = planLeaveReminderVisit({ now: nowText, timezone, preparationSeconds: context.preparationSeconds, habitsUpdatedAt: context.habitsUpdatedAt, records, trips });
+    const plan = planLeaveReminderVisit({ now: nowText, timezone, preparationSeconds: context.preparationSeconds, habitsUpdatedAt: context.habitsUpdatedAt,
+      preparationChangedAt: context.preparationChangedAt ?? null, records, trips });
     const tripByDigest = new Map(trips.map((trip) => [trip.digest, trip]));
     const staleBefore = leaveReminderStaleClaimBefore(nowText);
 
@@ -344,12 +350,14 @@ export function createHostedLeaveReminderAccountPort(
     caller,
     store,
     async readContext() {
-      const [timezone, source] = await Promise.all([getProfileTimezone(caller.client, userId), readTravelRouteSource(caller.client, userId)]);
+      const [timezone, source, preparationChangedAt] = await Promise.all([getProfileTimezone(caller.client, userId),
+        readTravelRouteSource(caller.client, userId), readTravelPreparationChangedAt(caller.client, userId)]);
       return {
         timezone: timezone ?? DEFAULT_TIMEZONE,
         preparationSeconds: travelHabitBuffers(source.settings.habits).preparationSeconds,
         travelOn: source.settings.enabled && !!source.settings.mode && !!source.settings.routingConsentAt,
         habitsUpdatedAt: source.habitsRevision,
+        preparationChangedAt,
       };
     },
     async listTrips(localDate) {
