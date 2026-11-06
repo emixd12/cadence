@@ -344,6 +344,13 @@ account-switch or navigation acceptance. Ticket 165 keeps those gates open in
 under Ticket 165.
 
 
+Ticket 280 adds native leave reminders on a linked Mac: a Mac-only planner over the
+shared departure model, `cadence.leave.` identifiers outside Behavior reminder coverage,
+and activation into the event's drawer through `DayProgressContext.openEvent`. Web uses
+the hosted job and web push instead (Tickets 277 and 278). Details are in
+`docs/DESKTOP_BUILD.md`, "Leave reminders (Ticket 280)". Installed acceptance waits for a
+dev-signed build.
+
 Ticket 240 mounts `IcloudCalendarPanel` in the linked Settings library and
 consumes the hosted 1.1 snapshot through `calendar/icloud-calendar.ts` and
 `calendar/use-connectors.ts`. The disposable iCloud cache binds account,

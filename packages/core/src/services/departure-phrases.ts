@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import type { ExternalEventState } from "../types/day-progress";
 import type { DepartureTrip } from "../types/departure";
+import type { TravelMode } from "../types/travel";
 import type { WeatherConditionId } from "../types/weather";
 
 /**
@@ -63,6 +64,39 @@ export function leaveReminderNotificationsPhrase(state: LeaveReminderDeviceNotif
   return `Notifications: ${desktop && state === "blocked" ? "Blocked in System Settings" : LEAVE_REMINDER_DEVICE_STATES[state]}.`;
 }
 
+/**
+ * Ticket 280 (decision D3): the Mac's native leave reminder. Not yet approved (decision D7).
+ * A quit app cannot re-route, so the body names when its estimate was checked. The update
+ * (decision D15) names the new, earlier leave time.
+ */
+export type MacLeaveReminderStart = "home" | "previous_stop" | "position";
+const MAC_LEAVE_REMINDER_STARTS: Readonly<Record<MacLeaveReminderStart, string>> = {
+  home: "Home",
+  previous_stop: "your previous stop",
+  position: "your position",
+};
+const MAC_LEAVE_REMINDER_MODES: Readonly<Record<TravelMode, string>> = {
+  walking: "Walking", cycling: "Cycling", transit: "Transit", driving: "Driving",
+};
+/** Keeps the title inside the native 200-unit limit with any event title. */
+const MAC_LEAVE_REMINDER_LABEL_LIMIT = 120;
+export function macLeaveReminderPhrases(input: Readonly<{
+  update: boolean;
+  destinationLabel: string;
+  leaveAt: string;
+  arriveAt: string;
+  checkedAt: string;
+  mode: TravelMode;
+  start: MacLeaveReminderStart;
+}>, context: DeparturePhraseContext): Readonly<{ title: string; body: string }> {
+  const time = (at: string) => departureTimeLabel(at, context);
+  const trimmed = input.destinationLabel.trim() || "Untitled event";
+  const label = trimmed.length > MAC_LEAVE_REMINDER_LABEL_LIMIT ? `${trimmed.slice(0, MAC_LEAVE_REMINDER_LABEL_LIMIT - 1)}…` : trimmed;
+  const title = `${input.update ? "Leave earlier: by" : "Leave by"} ${time(input.leaveAt)} for ${label}`;
+  const body = `${MAC_LEAVE_REMINDER_MODES[input.mode]} from ${MAC_LEAVE_REMINDER_STARTS[input.start]}, arrive ${time(input.arriveAt)}. Estimate checked ${time(input.checkedAt)}.`;
+  return { title, body };
+}
+
 /** The owner approved the Wave 1 travel wording on this date: "Apply R1–R3, approve the rest" (docs/DECISIONS.md). */
 export const OWNER_APPROVED_2026_11_05 = "2026-11-05";
 /** Decisions D13 and D14: the owner approved the wording each lists on this date. */
@@ -71,7 +105,7 @@ export const OWNER_APPROVED_2026_11_06 = "2026-11-06";
 /** One reviewed phrase. The bench lists them all with sample values (Ticket 266). */
 export type DeparturePhraseApproval = Readonly<{
   id: string;
-  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "279";
+  ticket: "261" | "265" | "268" | "270" | "271" | "272" | "273" | "279" | "280";
   /** The words, with sample values named in braces. */
   template: string;
   /** When the user sees it. */
@@ -424,6 +458,15 @@ export const DEPARTURE_PHRASE_REVIEW: readonly DeparturePhraseApproval[] = [
     replaces: null, approvedOn: null, ownerChange: null },
   { id: "leave-reminder-load-failed", ticket: "279", template: LEAVE_REMINDER_LOAD_FAILED,
     situation: "Status when the stored leave reminder setting could not load. The checkbox stays unavailable.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "mac-leave-reminder-title", ticket: "280", template: "Leave by {time} for {event}",
+    situation: "Mac notification title, at the leave time minus the get-ready time, from the Mac's last estimate. Fires with Cadence quit.",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "mac-leave-reminder-update-title", ticket: "280", template: "Leave earlier: by {time} for {event}",
+    situation: "Mac notification title for the one update, when a later estimate moves the leave time 10 minutes or more earlier (D15).",
+    replaces: null, approvedOn: null, ownerChange: null },
+  { id: "mac-leave-reminder-body", ticket: "280", template: "{Mode} from {start}, arrive {time}. Estimate checked {time}.",
+    situation: "Mac notification body for both. {start} is Home, your previous stop or your position. A quit app cannot re-route, so it names when the estimate was checked.",
     replaces: null, approvedOn: null, ownerChange: null },
 ];
 

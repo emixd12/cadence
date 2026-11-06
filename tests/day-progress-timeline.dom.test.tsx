@@ -212,6 +212,23 @@ describe("DayProgressTimeline", () => {
     expect(container.textContent).toContain("Last refreshed Sep 16");
   });
 
+  it("opens an event's drawer once per request and reports today's departure model to the Mac (Ticket 280)", async () => {
+    const input = props();
+    const onDeparture = vi.fn();
+    const render = (requestKey: number) => root.render(<RefreshProvider onRefresh={() => {}}><DayProgressTimeline {...input} context={{
+      ...input.context, onDeparture, openEvent: { eventId: "event-offsite", requestKey } }} /></RefreshProvider>);
+    await act(() => render(1));
+    expect(container.querySelector("dialog")?.open).toBe(true);
+    expect(onDeparture).toHaveBeenLastCalledWith({ localDate: "2026-09-16", preparationSeconds: expect.any(Number), trips: null,
+      stops: [{ ref: "occurrence-1", label: "Morning walk", startAt: "2026-09-16T13:00:00Z", endAt: null }] });
+    await act(() => button("Close Calendar details").click());
+    expect(container.querySelector("dialog")?.open).toBe(false);
+    await act(() => render(1));
+    expect(container.querySelector("dialog")?.open).toBe(false);
+    await act(() => render(2));
+    expect(container.querySelector("dialog")?.open).toBe(true);
+  });
+
   it("opens details from a focus preview and restores the launcher", async () => {
     const launcher = button("All day: Design offsite");
     await act(() => launcher.focus());

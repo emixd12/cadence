@@ -31,6 +31,7 @@ import {
   departureOverlapPhrase,
   departurePhraseContext,
   leaveReminderNotificationsPhrase,
+  macLeaveReminderPhrases,
   departureTravelOffPhrase,
   departureWeatherMarginPhrase,
   eventStateWord,
@@ -58,6 +59,9 @@ const HOME_TRIP: Partial<DeparturePhraseInput> = { role: "return", fromHome: fal
 const detail = (input: Partial<DeparturePhraseInput>) => departureDetailPhrase({ ...BASE, ...input }, CONTEXT);
 const line = (input: Partial<DeparturePhraseInput>) => departureLinePhrase({ ...BASE, ...input }, CONTEXT);
 const old: Partial<DeparturePhraseInput> = { freshness: "last_estimate", checkedAt: at("08:55") };
+/** Ticket 280: the Mac's native leave reminder, from an estimate checked at 1 PM. */
+const macReminder = (update: boolean) => macLeaveReminderPhrases({ update, destinationLabel: EVENT, leaveAt: at(update ? "13:05" : "13:20"),
+  arriveAt: at("13:55"), checkedAt: at(update ? "13:10" : "13:00"), mode: "walking", start: "home" }, CONTEXT);
 /** Ticket 270 (D13, D14): the leader label, its word groups joined as on wide layouts. */
 const marker = (input: Partial<DeparturePhraseInput>) => departureMarkerRailLines({ ...BASE, ...input }, TIMEZONE).join(" ");
 
@@ -150,6 +154,9 @@ export const DEPARTURE_WORDING_SAMPLES: Readonly<Record<string, () => string>> =
   "leave-reminder-saved": () => LEAVE_REMINDER_SAVED,
   "leave-reminder-save-failed": () => LEAVE_REMINDER_SAVE_FAILED,
   "leave-reminder-load-failed": () => LEAVE_REMINDER_LOAD_FAILED,
+  "mac-leave-reminder-title": () => macReminder(false).title,
+  "mac-leave-reminder-update-title": () => macReminder(true).title,
+  "mac-leave-reminder-body": () => macReminder(false).body,
 };
 
 export type DepartureWordingRow = Readonly<{ id: string; ticket: string; source: string; sample: string; template: string; situation: string; replaces: string | null;

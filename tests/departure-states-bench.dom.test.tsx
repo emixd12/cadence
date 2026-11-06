@@ -283,14 +283,15 @@ it("shows the owner's approval on the wording review", async () => {
   // the leader label's leave-now, late, passed and head-home forms. Decision D14 approves those forms and the two D12 steps on
   // the same day, adds "Home {time}", approved, and chooses the one-line "Leave 1:20", so "Leave {time}" is approved too.
   // Ticket 279 adds the leave reminder switch and its readiness list, not yet approved (decision D7).
-  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("12 of 89 phrases await the owner's approval.");
+  // Ticket 280 adds the Mac's three leave reminder phrases, also not yet approved.
+  expect(container.querySelector("[data-wording-approval]")?.textContent).toContain("15 of 92 phrases await the owner's approval.");
   for (const id of ["correction-toggle", "brief-overlap", "brief-overlap-trip-home", "brief-back", "travel-off-offer", "travel-off-dismiss", "setup-estimates-off",
     "needs-origin-blocked", "return-home-missing", "marker-rail-home", "marker-rail-leave-now", "marker-rail-late", "marker-rail-past-leave",
     "marker-rail-past-leave-home", "marker-rail-head-home-now", "marker-rail"]) {
     expect(container.querySelector(`[data-wording-id="${id}"] [data-wording-status]`)?.textContent, id).toBe("Approved November 6, 2026");
   }
   for (const row of container.querySelectorAll("[data-wording-id]")) {
-    const pending = row.getAttribute("data-wording-id")!.startsWith("leave-reminder-");
+    const pending = /^(mac-)?leave-reminder-/.test(row.getAttribute("data-wording-id")!);
     expect(row.querySelector("[data-wording-status]")?.textContent === "Not yet approved", row.getAttribute("data-wording-id")!).toBe(pending);
   }
   expect(container.querySelector('[data-wording-id="marker-row"]')).toBeNull();

@@ -9316,7 +9316,7 @@
       "journeys": [
         "J12"
       ],
-      "intent": "Open the intended Occurrence from a delivered Cadence notification.",
+      "intent": "Open the intended Occurrence, or a leave reminder's event, from a delivered Cadence notification.",
       "triggers": [
         {
           "kind": "activate",
@@ -9325,11 +9325,15 @@
         {
           "kind": "activate",
           "control": "Delivered Cadence native notification"
+        },
+        {
+          "kind": "activate",
+          "control": "Delivered Cadence native leave reminder"
         }
       ],
-      "availability": "Available after a Cadence notification is delivered. Web protected routes may require sign-in. Desktop accepts only a native product notification with an exact cadence.local UUID target.",
-      "success_result": "Web focuses or opens the same-origin target. Desktop opens Timeline, reads the owned Occurrence independently of the visible date range, expands and focuses its existing row or a reminder context row, and preserves the current status, Note, and timing controls. Exact native delivery evidence is retained for local history without claiming user receipt or reading.",
-      "failure_result": "Web cross-origin targets fall back to /timeline. Desktop ignores malformed or bench identifiers; a missing Occurrence shows unavailable text and a storage error remains an error. Failed delivery-history persistence keeps evidence for retry and leaves reminder verification unavailable.",
+      "availability": "Available after a Cadence notification is delivered. Web protected routes may require sign-in. Desktop accepts only a native product notification with an exact cadence.local UUID target, or a leave reminder with an exact cadence.leave trip digest (Ticket 280).",
+      "success_result": "Web focuses or opens the same-origin target. Desktop opens Timeline, reads the owned Occurrence independently of the visible date range, expands and focuses its existing row or a reminder context row, and preserves the current status, Note, and timing controls. Exact native delivery evidence is retained for local history without claiming user receipt or reading. A leave reminder opens Timeline and, once today's Calendar read has the event at the same start, that event's drawer; a Behavior destination opens its Occurrence as above.",
+      "failure_result": "Web cross-origin targets fall back to /timeline. Desktop ignores malformed or bench identifiers; a missing Occurrence shows unavailable text and a storage error remains an error. Failed delivery-history persistence keeps evidence for retry and leaves reminder verification unavailable. A leave reminder whose event moved or is gone leaves Timeline open with no drawer.",
       "effects": [
         "navigation",
         "focus_navigation",
@@ -9343,13 +9347,17 @@
         "apps/desktop/src/notification-activation.ts",
         "apps/desktop/src/timeline-screen.tsx",
         "apps/desktop/src/local-reminder.service.ts",
-        "packages/core/src/services/timeline.service.ts#resolvePersistedTimelineOccurrence"
+        "packages/core/src/services/timeline.service.ts#resolvePersistedTimelineOccurrence",
+        "packages/core/src/services/mac-leave-reminder-plan.ts",
+        "components/timeline/DayProgressTimeline.tsx"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/push-service-worker.test.ts",
           "tests/desktop-notification-activation.test.tsx",
+          "tests/desktop-leave-reminders.test.ts",
+          "tests/day-progress-timeline.dom.test.tsx",
           "tests/desktop-store-contract.test.ts",
           "tests/desktop-reminder-repair.test.ts",
           "tests/desktop-controls.dom.test.tsx"
@@ -9374,16 +9382,19 @@
             "apps/desktop/src/product.tsx#Product",
             "apps/desktop/src/notification-activation.ts",
             "apps/desktop/src/timeline-screen.tsx",
-            "packages/core/src/services/timeline.service.ts#resolvePersistedTimelineOccurrence"
+            "packages/core/src/services/timeline.service.ts#resolvePersistedTimelineOccurrence",
+            "packages/core/src/services/mac-leave-reminder-plan.ts"
           ],
           "evidence": [
             "tests/desktop-notification-activation.test.tsx",
+            "tests/desktop-leave-reminders.test.ts",
+            "tests/day-progress-timeline.dom.test.tsx",
             "tests/desktop-store-contract.test.ts",
             "tests/desktop-controls.dom.test.tsx",
             "docs/qa/2026-08-30-desktop-lifecycle-release.md#product-notification-click-passed",
             "docs/qa/2026-08-30-desktop-lifecycle-release.md#system-sleep-and-wake-passed"
           ],
-          "reason": "The owner clicked the native product notification after the app quit. Before any agent launch, Cadence was running with the intended 22:41 Occurrence expanded and its summary focused; the 22:30 row remained collapsed. Tab moved to that target's Track Time control. Tests cover other target states and real SQLite lookup after restart. Separate actual system sleep/wake acceptance passed on 2026-08-31 with persisted reconciliation before the next minute poll and GUI inspection. Tickets 111 and 112 are complete locally; offline acceptance includes owner-confirmed disconnection. Ticket 113 signed-release acceptance remains open."
+          "reason": "The owner clicked the native product notification after the app quit. Before any agent launch, Cadence was running with the intended 22:41 Occurrence expanded and its summary focused; the 22:30 row remained collapsed. Tab moved to that target's Track Time control. Tests cover other target states and real SQLite lookup after restart. Separate actual system sleep/wake acceptance passed on 2026-08-31 with persisted reconciliation before the next minute poll and GUI inspection. Tickets 111 and 112 are complete locally; offline acceptance includes owner-confirmed disconnection. Ticket 113 signed-release acceptance remains open. Ticket 280 leave reminder activation is covered by automated tests only; a clicked native leave reminder is not yet verified on an installed build."
         },
         "marketing": {
           "applicability": "not_applicable",
@@ -14660,7 +14671,7 @@
         }
       ],
       "availability": "Settings, Travel, How you travel, on web and on a linked Mac. Off by default; one switch per account. It cannot turn on while Travel estimates is off, and can always turn off. Hidden on an unlinked Mac. Turn on notifications moves to the Notifications section.",
-      "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15).",
+      "success_result": "Saves the switch on the hosted server at once and says Reminder setting saved. Turning it on asks the reminder job to visit the account; turning it off deletes the account's reminder records (decision D15). On a linked Mac the save then reconciles native leave reminders: on schedules them from the last estimate, off removes them (Ticket 280).",
       "failure_result": "Keeps the stored value and says the reminder setting could not save. A failed load leaves the checkbox unavailable and says so.",
       "effects": [
         "ui_state",
@@ -14705,13 +14716,16 @@
           "implementation": [
             "components/settings/LeaveReminderSetting.tsx",
             "apps/desktop/src/leave-reminders.ts",
-            "apps/desktop/src/product.tsx"
+            "apps/desktop/src/product.tsx",
+            "apps/desktop/src/use-leave-reminders.ts",
+            "apps/desktop/src/local-leave-reminder.service.ts"
           ],
           "evidence": [
             "tests/travel-settings.dom.test.tsx",
-            "tests/leave-reminder-settings.test.ts"
+            "tests/leave-reminder-settings.test.ts",
+            "tests/desktop-leave-reminders.test.ts"
           ],
-          "reason": "Same Settings section on a linked Mac, through the hosted endpoint with the account's bearer token. Nothing is stored in SQLite. Native leave reminders themselves arrive with Ticket 280."
+          "reason": "Same Settings section on a linked Mac, through the hosted endpoint with the account's bearer token. Nothing is stored in SQLite. Ticket 280: each save reconciles native leave reminders; turning off removes every pending and delivered leave reminder."
         },
         "marketing": {
           "applicability": "not_applicable",

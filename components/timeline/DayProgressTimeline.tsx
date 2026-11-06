@@ -18,7 +18,7 @@ import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 import { resolveTravelAfterDecisions } from "@cadence/core/resolvers/travel.resolver";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 import { departureStops, firstLocatedStopAhead } from "@cadence/core/services/departure-stops";
-import type { DepartureModel } from "@cadence/core/types/departure";
+import type { DepartureModel, DepartureStop } from "@cadence/core/types/departure";
 import { DEPARTURE_REFRESH_LABEL, departureMarkerRailLines } from "@cadence/core/services/departure-phrases";
 import { nextTripCrowdsBehavior, resolveDayProgressLayout, resolveNextTripMarkInput } from "@cadence/core/resolvers/day-progress.resolver";
 import { resolveTimelineOccurrenceContext } from "@cadence/core/resolvers/timeline-context.resolver";
@@ -89,6 +89,21 @@ export type DayProgressContext = Readonly<{
   openTravelSettings?: () => void;
   /** Ticket 273 (Mac): opens the Behaviors screen, where a Behavior's place is changed. */
   openBehavior?: (behaviorId: string) => void;
+  /**
+   * Ticket 280 (Mac): today's departure model for native leave reminders, each time it changes.
+   * `trips` is null while no travel evidence is known.
+   */
+  onDeparture?: (departure: DepartureSnapshot) => void;
+  /** Ticket 280 (Mac): opens this Calendar event's drawer once for each request key. */
+  openEvent?: Readonly<{ eventId: string; requestKey: number }> | null;
+}>;
+
+/** Ticket 280: what the departure model says about today, for the Mac's leave reminders. */
+export type DepartureSnapshot = Readonly<{
+  localDate: string;
+  preparationSeconds: number;
+  trips: DepartureModel["trips"] | null;
+  stops: readonly DepartureStop[];
 }>;
 
 type DayProgressTimelineProps = Readonly<{
@@ -232,14 +247,22 @@ export function DayProgressTimeline({
   const usualTravelMode = context?.travelMode ?? liveTravel.view?.mode ?? null;
   // Ticket 261: one departure model for every travel line. Components only show its phrases.
   const habitsForModel = travelHabits.settings?.habits ?? null;
-  const departure = useMemo((): DepartureModel => {
+  const todayStops = useMemo(() => {
     const today = timeline.daySections.find((section) => section.localDate === timeline.todayLocalDate);
+    return departureStops({ events: travelEvents, occurrences: today?.occurrences ?? [], durationEstimates: durations, timezone: timeline.timezone });
+  }, [timeline.daySections, timeline.todayLocalDate, timeline.timezone, travelEvents, durations]);
+  const preparationSeconds = resolveTravelHabits(habitsForModel).buffers.preparationSeconds;
+  const departure = useMemo((): DepartureModel => {
     const buffers = resolveTravelHabits(habitsForModel).buffers;
     return resolveDepartureModel({ evidence: travel ?? null, now, timezone: timeline.timezone,
-      stops: departureStops({ events: travelEvents, occurrences: today?.occurrences ?? [], durationEstimates: durations, timezone: timeline.timezone }),
+      stops: todayStops,
       arrivalBufferSeconds: buffers.arrivalSeconds, preparationSeconds: buffers.preparationSeconds,
       pausedUntil: travelStatus?.resumesAt ?? null });
-  }, [travel, now, timeline.timezone, timeline.daySections, timeline.todayLocalDate, travelEvents, durations, habitsForModel, travelStatus?.resumesAt]);
+  }, [travel, now, timeline.timezone, todayStops, habitsForModel, travelStatus?.resumesAt]);
+  const onDeparture = context?.onDeparture;
+  useEffect(() => {
+    onDeparture?.({ localDate: timeline.todayLocalDate, preparationSeconds, trips: travel ? departure.trips : null, stops: todayStops });
+  }, [onDeparture, timeline.todayLocalDate, preparationSeconds, travel, departure.trips, todayStops]);
   // Ticket 272: the bubble reads the same departure model, so it keeps last estimates and late trips.
   // Ticket 214 requests the day when a brief is generated.
   const briefTravel = useMemo(() => {
@@ -374,6 +397,17 @@ export function DayProgressTimeline({
     setPreview(null);
     setDetailEvent(event);
   }, [preview]);
+  // Ticket 280: a leave reminder opens its event's drawer once, as soon as the event is on the Timeline.
+  const openEvent = context?.openEvent;
+  const [openedEventRequest, setOpenedEventRequest] = useState<number | null>(null);
+  if (openEvent && openedEventRequest !== openEvent.requestKey) {
+    const event = events.find((item) => item.id === openEvent.eventId);
+    if (event) {
+      setOpenedEventRequest(openEvent.requestKey);
+      setPreview(null);
+      setDetailEvent(event);
+    }
+  }
   const closeDetails = useCallback(() => {
     setDetailEvent(null);
     restoringFocus.current = true;
