@@ -94,6 +94,12 @@ order that can answer the question:
    and credentials, consent or permission prompts, provider revocation, settings
    that change synced data or send data to a provider, and creating macOS users.
 
+For test accounts A and B, sign-ins, consent, provider-sending settings, test Calendar
+fixtures and permission grants in the Cadence QA Chrome profile are agent steps, using
+the "Cadence Agents" vault and `scripts/acceptance/google-signin.mjs`. The owner still
+sets each paid test's spend cap (`docs/DECISIONS.md`, 2026-11-06, "Agents act as the
+test accounts, end to end").
+
 Send owner asks as one numbered list. If a tool is missing, name it and ask the
 owner to enable it instead of handing its work to the owner. Test devices other
 than the owner's Mac are driven over Tailscale SSH with `scripts/test-device.mjs`

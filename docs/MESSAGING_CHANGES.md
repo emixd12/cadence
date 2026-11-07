@@ -986,8 +986,8 @@ cite has not changed.
 
 ## P-027: Mac screen recovery message
 
-- **Change:** Ticket 285 defect fix, implemented November 7, 2026. It ships alone in the Mac
-  0.1.9 patch from branch `mac-blank-window-hotfix` (D22), not merged. When a Mac app
+- **Change:** Ticket 285 defect fix, implemented November 7, 2026. It reached `main` through
+  PR #195 and ships in Mac 0.1.9 with the travel revamp (D23). When a Mac app
   screen fails to render, Cadence now shows "This screen could not be shown. Try again, or open
   another screen." with **Try again**, and keeps the navigation, account sync and Settings
   working. Before, the whole window went blank. If the app shell itself fails, the existing

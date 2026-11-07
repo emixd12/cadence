@@ -293,6 +293,34 @@ Assumptions and limits:
 - Automatic refreshes stop at 80% of the monthly ceiling. Refresh travel and reminder
   checks continue (Ticket 267).
 
+### Ticket 284 production measurements, November 6, 2026
+
+Measured on production with test account A, one walking day: a Behavior with a place at 2:30 PM,
+a Calendar event at 5:30 PM, the trip home and tomorrow's first trip. Evidence and times are in
+`docs/qa/travel-release.md`, "Ticket 284". Source: Cloud Monitoring request counts for the
+production project and the account's reserved-spend ledger, which agreed to the cent.
+
+| Measured | Value |
+| --- | --- |
+| Route calls, 12:20 PM to 6:30 PM | 91 (all HTTP 200) |
+| Place lookups | 4 (Home, two Calendar places and one Behavior place) |
+| Reserved spend | US$0.48, under the owner's US$5 cap for this test |
+| Leave reminder job, per trip | 3 routes (plan, send, one update check), measured on both trips |
+| Tomorrow's first trip | 1 route, the evening before |
+| A new browser tab, first open of the day | a whole-day pass, every planned leg |
+
+What this replaces in the assumed model above:
+
+- Reminder job: three routes per trip is now measured, not assumed.
+- Tomorrow's first trip: one route per evening is now measured. It is asked for once per tab
+  session, as the assumption says.
+- New tabs: each new tab or device user agent made its own whole-day pass. About 60 of the 91 calls
+  came from the test's own emulated device tabs and mode checks, so a person who keeps one tab
+  open spends far less. The "first open of the day" row assumes one tab per day; several tabs a day
+  multiply it.
+- Not measured: a typical month, Transit at scale, Ticket 264's extra legs during an event, and a
+  second user. The per-profile totals stay assumed.
+
 ### Production readback, November 4, 2026
 
 Read-only aggregate readback. No user IDs, places or event details were read.
@@ -484,6 +512,14 @@ arrives, fees reduce the US$5:
 - 2026-11-06: Decision D16 stops the reminder update route at 80% of the monthly ceiling,
   like automatic refreshes (Ticket 277). The proposed totals are unchanged as upper bounds.
   The listing request makes no route call.
+- 2026-11-06: Ticket 284 measured one production walking day: 91 route calls and 4 lookups,
+  US$0.48 reserved, three routes per reminded trip, one route for tomorrow's first trip, and a
+  whole-day pass for each new browser tab.
+- 2026-11-07: Ticket 285 fix. A single named place found by its center, such as a park,
+  now resolves. Each stored unresolved or ambiguous place text from before 11:00 UTC is
+  looked up once more on its next refresh, at US$0.005 each, under the same spend
+  reservation and the 80% automatic-refresh pause. The new row is then reused as before.
+  Places that now resolve get routed, within the usage model above. Totals are unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm

@@ -174,11 +174,11 @@ export function OccurrenceRow({
               <time
                 dateTime={visibleOccurrence.scheduledFor}
                 className={[
-                  "timeline-occurrence-time min-w-0 whitespace-nowrap text-sm font-bold leading-5",
+                  "timeline-occurrence-time min-w-0 text-sm font-bold leading-5",
                   TIME_TONE_CLASSES[visibleOccurrence.visualTone],
                 ].join(" ")}
               >
-                {visibleOccurrence.scheduledTimeLabel}
+                <ScheduledTimeLabel label={visibleOccurrence.scheduledTimeLabel} />
               </time>
 
               <h3
@@ -303,6 +303,16 @@ function getLabelDensity({
   shouldProtectActionSpace: boolean;
 }>): LabelDensity {
   return shouldProtectActionSpace && title.length > 18 ? "compact" : "normal";
+}
+
+/**
+ * A range such as "2:30 PM - 3:00 PM" may break after its dash and nowhere else, so a narrow time
+ * column holds it on two lines instead of running it into the title (Ticket 284 finding).
+ */
+function ScheduledTimeLabel({ label }: Readonly<{ label: string }>) {
+  const [start, end] = label.split(" - ");
+  if (end === undefined) return <span className="whitespace-nowrap">{label}</span>;
+  return <><span className="whitespace-nowrap">{start} -</span> <span className="whitespace-nowrap" data-time-range-end>{end}</span></>;
 }
 
 function statusLabel(status: TimelineStatusActionStatus): string {

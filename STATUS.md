@@ -1,12 +1,62 @@
 # Implementation Status
 
-## Mac 0.1.9 patch: blank window from the archive notice — November 7, 2026
+## Ticket 285: installed Mac acceptance run — November 6–7, 2026
 
-**On branch `mac-blank-window-hotfix`, cut from `main` (`9064f5f`). PR open, not merged. Not built,
-notarized or published: the owner instructs each (D22).**
+**On branch `travel-wave6`. Evidence in `docs/qa/travel-release.md`, "Ticket 285". No notarization
+or publication.**
 
-- The branch carries only the Ticket 285 blank-window fix from `travel-wave6` (commits `caebbd7`
-  and `4407477`) and sets the desktop version to 0.1.9. The rest of Wave 6 stays on `travel-wave6`.
+- Builds: dev-signed `0.1.9-dev.1` (`acc86c4`, owner's Mac and test Mac), `0.1.9-dev.3`
+  (`caebbd7`, the blank-window fix) and `0.1.10-dev.1` (`5f629e4`, test Mac, the final checks).
+  A throwaway diagnostic build `0.1.9-dev.2` found the defect; it was never committed.
+- Found and fixed during the run: the Mac app went blank for an account with an auto-archived
+  Behavior (`caebbd7`; released 0.1.8 is affected), and a named place without a street address
+  could not route (`d1db8c2`, hosted; needs a deployment before it can be checked).
+- Pass on the installed app with test account A: travel states; the next-trip marker (owner
+  screenshot); the native leave reminder with Cadence running and with Cadence quit; the one update
+  when the leave time moved 15 minutes earlier; activation from a quit app into the Behavior's
+  Occurrence; notification permission denied; Travel estimates off cancelling pending and delivered
+  leave reminders; sync of published 0.1.8 against production; the installed-Mac row of Ticket 165's
+  directions matrix. Owner's Mac: install and launch sync with no row loss.
+- Not run: activation into a Calendar event's drawer (the reminder fired while the test Mac was
+  locked; synthetic banner clicks do not reach Cadence) and the named-place fix (not deployed).
+- Cleanup: account A's leave reminders off, test Behaviors archived, habits restored, Cadence's
+  location access restored. The test Mac is back on published 0.1.8 with Cadence quit (it opens
+  blank for account A until the fix ships). The owner's Mac still runs `0.1.9-dev.1`.
+- `docs/TEST_DEVICES.md` gains the optional Screen Recording grant and the known limits over SSH.
+- Platform impact: desktop acceptance only. Web, marketing and future mobile: not applicable.
+  Messaging impact: none.
+
+## Ticket 285 defect fixed: a named place without a street address — November 7, 2026
+
+**On branch `travel-wave6`. Awaiting verification and a hosted refresh for Ticket 285.**
+
+- Cause: the place lookup, not the place record or the departure model. Account A's
+  "Bryant Park, New York, NY 10018" is stored in `travel_place_cache` as `ambiguous` (read-only
+  hosted query, 03:17Z), while the street-address fixtures are `resolved`. The geocode filter
+  accepted only `ROOFTOP` or `RANGE_INTERPOLATED` results, so a park found by its center had no
+  endpoint, and the departure model correctly read that as `needs_place` ("Add a place for …")
+  and the next trip as blocked ("Fix …'s place").
+- Fix: `lib/services/travel-provider.ts` also accepts a single `GEOMETRIC_CENTER` or
+  `APPROXIMATE` result typed `establishment` or `point_of_interest`, with no coarse type and no
+  partial match. Multiple results, coarse areas and unnamed centers stay ambiguous.
+- Core `travelPlaceLookupReusable` looks up again any unresolved or ambiguous row stored before
+  `TRAVEL_PLACE_NAMED_PLACE_RULE_AT` (2026-11-07T11:00Z), once per stored text. Otherwise such
+  rows would be reused for 30 days. No new kind of provider call; no schema change.
+- Not verified live: Google's granularity for Bryant Park, because that needs a paid lookup. The
+  rule accepts both center granularities, so either routes.
+- Tests: `tests/travel-provider.test.ts` (hosted and API key paths) and
+  `tests/travel-refresh-policy.test.ts`; the three new tests fail on the base code.
+- Platform impact: web, this fix (hosted lookup). Desktop: linked Macs use the same hosted
+  refresh, so no desktop change; Ticket 285 checks it. Marketing: none. Future mobile: not
+  applicable. Messaging impact: none (no wording change).
+
+## Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026
+
+**On branch `travel-wave6` (`caebbd7`, `4407477`, verified) and on `main` through PR #195
+(cherry-picks `91ef553`, `52e81e0`), which also set the desktop version to 0.1.9. Mac 0.1.9
+ships from `main` with the travel revamp once Wave 6 merges (D23). Notarization and publication
+follow D24.**
+
 - Cause: the desktop Timeline renders "Review archived behaviors" as a shared `RuntimeLink`
   whenever it has an automatic-archive notice, and it had no `LinkProvider`. The throw unmounted
   the whole app, because the Mac app had no error boundary, so the window was blank and sync
@@ -27,16 +77,68 @@ notarized or published: the owner instructs each (D22).**
   reopen the app to try again." Logged as `P-027`; the user guide line is still to add.
 - Version: 0.1.9, the next patch after the published 0.1.8. By SemVer it is above the
   `0.1.9-dev.1`–`0.1.9-dev.3` builds from `travel-wave6`, so the stable feed updates them. Later
-  dev builds use `0.1.10-dev.N`. No SQLite migration or updater file changed, so release check 4
-  (real updater) does not apply; check 3 uses `--same-schema`.
+  dev builds use `0.1.10-dev.N`. Release check 4 (real updater) runs at publication step 3,
+  updating the test Mac from 0.1.8 to 0.1.9 (owner, November 7: follow the release doc; D24). No
+  SQLite migration changed since 0.1.8, so check 3 uses `--same-schema`.
 - Tests: `tests/desktop-render-recovery.dom.test.tsx` mounts `Product` with an archived
   Behavior's notice, opens Behaviors from the link, and recovers from a failed screen through
   Settings. `tests/desktop-main-recovery.dom.test.tsx` checks the app-level message. Each fix has
   a test that fails when it is reverted (verifier, Ticket 285).
 - Platform impact: web, not applicable (the web Timeline has its `LinkProvider` in
-  `WebRuntimeProvider`). Desktop: this fix and the 0.1.9 patch; Ticket 285 checks it on the
+  `WebRuntimeProvider`). Desktop: this fix and Mac 0.1.9; Ticket 285 checked it on the
   installed app. Marketing: none until publication. Future mobile: not applicable, desktop only.
   Messaging impact: `P-027`.
+
+## Travel advisory revamp Wave 6: Ticket 284 findings fixed — November 6, 2026
+
+**On branch `travel-wave6`. Awaiting verification.** Each finding has a test that fails without
+its fix. No new wording, no schema change and no provider call.
+
+- Late compares at the displayed minute: an arrival seconds past a 2:15 target is not late (core
+  `travelArrivalAfterTarget`, used by the travel and weather-margin resolvers).
+- A route checked at or after its leave time reads "Leave now" while it arrives less than 5
+  minutes after its target, as it did before the check (departure model). Leave now still ends 5
+  minutes after the ideal leave time, so the fresh "If you haven't left for … yet" form follows
+  (verifier fix). The fresh "If you
+  haven't left yet, you'd be home about" form stays unreachable by design: an estimate lives 5
+  minutes, the same as leave now, and a refresh after the event's end no longer plans the trip home.
+- Directions stays once an event is under way: the trip leaving the stop counts as its resolved place.
+- The screen-reader status speaks a new leave time, the leave time arriving and a new late basis.
+- A Behavior's time range wraps after its dash instead of running into its title at 1280 px.
+- The web setup panel reads this device's notification state again when the tab returns.
+- Tomorrow's first stop shows the line's leave time and Directions in its own drawer, dialog and row.
+
+## Travel advisory revamp Wave 6: Ticket 284 web acceptance with the real clock — November 6, 2026
+
+**On branch `travel-wave6`. Evidence only; no app change. Awaiting verification.**
+
+- Production run on deployment `cadence-pubbpi517` (`9064f5f`) with test account A in the Cadence QA
+  Chrome profile, 12:20 PM to 6:30 PM Eastern. Evidence: `docs/qa/travel-release.md`, "Ticket 284".
+- The leave reminder job's OIDC subject was present on its first run. That run failed on a stale
+  PostgREST schema cache (PGRST205); after the coordinator's reload every run returned 200.
+- States seen on the real clock: upcoming, soon, late before and after the leave time, last estimate
+  (leave by, leave now, past the leave time), head home soon and now, last estimate home, and
+  tomorrow's first trip. Not reached: "Leave time appears later" (the first open routes every trip)
+  and the fresh "Leave now" form (a refresh at the leave time re-plans from now and comes out late).
+- A real web leave reminder reached the test account by push at 4:05 PM ("Leave by 4:29 PM for W6
+  Met visit", "Walking, 45 min from Home. Arrive 5:15 PM."). The earlier one was sent but not
+  received because of a test-setup gap in QA Chrome, since fixed.
+- Ticket 165: the web denied state and the directions matrix (Chrome on Mac real; Safari on Mac,
+  iPhone and iPad, Chrome on Windows, Linux and Android by emulation), the transit, driving and
+  cycling checks and the negative checks pass. The installed Mac row stays with Ticket 285.
+- Decision D5: the owner set the spend cap at US$5 for this test. Measured: 91 route calls and 4
+  lookups, US$0.48 reserved (`docs/COSTS.md`).
+- Not checked: Ticket 283's Outlook or iCloud routed event; no test connector exists.
+- Observations, not blocking: Behavior range time overlapping its title at 1280 px; setup panel
+  showing notifications "Not enabled"; late wording with an arrival equal to the target after
+  rounding; a stale screen-reader status after late before → after; E1's link reverting to Search
+  once the event started. Each has its text in the evidence.
+- Owner decision the same day ("Agents act as the test accounts, end to end", commit `513c5d3`):
+  Google sign-in for test accounts from the vault (`scripts/acceptance/google-signin.mjs`). A
+  separate workspace finishes the QA Calendar API client (project `cadence-qa-498717`).
+- Leave reminders are off again for account A; travel stays on for Ticket 285.
+- Platform impact: web, production acceptance only. Desktop: Ticket 285. Marketing: none. Future
+  mobile: 390 px checks passed on mobile web. Messaging impact: none.
 
 ## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
 
@@ -798,6 +900,7 @@ collection.
 - `docs/COSTS.md` records the assumed usage model and the November 4 readback.
 - New log entries: P-016 to P-021 and L-015 to L-016. P-015 and L-014 are updated.
 - Decision D5, the spend cap for Ticket 165's directions test, stays open until Ticket 284.
+  (Closed November 6, 2026: the owner set US$5 for Ticket 284.)
 - `dagger check cadence/test` was reported failing on untouched `1a369e4` in five acceptance
   test files, while main's CI passes. It is not caused by this change and was not
   independently reproduced.

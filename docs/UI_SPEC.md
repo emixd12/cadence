@@ -270,7 +270,12 @@ status lines, and replaces "Travel as of". It shows the departure model's line p
 the next trip in every state; a day with no trips shows no travel text. While the travel
 budget is used up, the paused phrase follows a known time on the same line. Where the
 phrase starts with "Refresh travel", those words are the button (R1); otherwise Refresh
-travel ends the line only when the trip needs a new estimate. Decision D12: a Calendar event
+travel ends the line only when the trip needs a new estimate. Times show to the minute, so a
+route is late only when its arrival shows a later minute than its target. A route checked at or
+after its leave time leaves at once; while it arrives less than 5 minutes after its target it
+reads "Leave now", as it did before the check, and it reads late from the evidence only after
+that. The check does not extend leave now: it still ends 5 minutes after the ideal leave time
+(Ticket 284 findings). Decision D12: a Calendar event
 with a location is in person, and one without a location is not travel. It asks nothing, gets
 no route and never holds up a later trip; it stays a normal event on the Timeline. Nothing asks
 about attendance. Steps that need a place or a start (Ticket 273) show one sentence and one
@@ -288,8 +293,8 @@ in Settings to get a leave time for {event}." with **Not now**; the first words 
 settings and nothing turns on from the line. Below it, at
 most one muted note: the unavailable message, the development-only provider review, a
 changed-stop message or the weather state, in that order of preference. A polite live
-region announces the line only when the next trip or its state changes, never a
-countdown minute. Web and Mac share `TravelStatusLine` in `DayProgressTimeline`.
+region announces the line only when the next trip, its state, its leave time, whether that
+time has arrived, or its late basis changes, never a countdown minute. Web and Mac share `TravelStatusLine` in `DayProgressTimeline`.
 
 The drawer and the details dialog lead with the leave time (Ticket 271). The drawer puts the
 departure model's phrase for this event directly under the title, then the calendar and time
@@ -299,13 +304,17 @@ then Time and Location. The first line is one step larger than the lines under i
 weight: emphasis comes from position and wording, never bold. It covers the countdown within
 30 minutes, leave now, both late forms and the last-estimate form after expiry. The details
 dialog has no Duration row. An expanded located Behavior row adds the same Maps link after its
-travel lines, built from the Behavior's own place text.
+travel lines, built from the Behavior's own place text. Once today has no trip left, tomorrow's
+first stop shows the line's trip in its own drawer, dialog and expanded row too, from the same
+response and with Directions; nothing else from tomorrow joins today's views (Ticket 284 finding).
 
 Show available Calendar location text with a navigation link that follows the
 platform: Apple Maps on Apple devices, Google Maps elsewhere. There is no map-app
 setting. Unresolved addresses can offer Search in maps without claiming a
 verified route. Directions needs a resolved place: a route that reached this stop, even
-after its 5-minute estimate expired (Ticket 271, correction C2). Directions opens in the mode
+after its 5-minute estimate expired (Ticket 271, correction C2). Once the stop is under way
+only the trip leaving it is routed; that trip starts from the same source place, so it keeps
+Directions (Ticket 284 finding). Directions opens in the mode
 that route used, which can be a mode remembered for that place, and falls back to usual travel.
 The link carries only the source-authored text. The destination correction sits behind one native
 **Change for this trip** disclosure; it asks only for the destination (decision D12); saving closes it and returns focus to that control. For an event with a location, a correction

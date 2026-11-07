@@ -55,6 +55,9 @@ export function FirstRunOnboardingPanel({
   const [travelRouting, setTravelRouting] = useState<{
     configured: boolean | null;
   } | null>(null);
+  // Ticket 284 finding: a step finished in another tab or window, such as notifications in
+  // Settings, must not stay "Not enabled" here. Each return to the page reads this device again.
+  const [readRequest, setReadRequest] = useState(0);
 
   useEffect(() => {
     let isActive = true;
@@ -102,14 +105,34 @@ export function FirstRunOnboardingPanel({
       isActive = false;
       window.clearTimeout(timeoutId);
     };
-  }, [onboarding.vapidPublicKey, storageKey]);
+  }, [onboarding.vapidPublicKey, storageKey, readRequest]);
 
   // Ask the deployment about routing only while the pop-up will show.
-  const checkTravelRouting = Boolean(
+  const showing = Boolean(
     clientSnapshot &&
-      onboarding.travel &&
       resolveFirstRunOnboardingModel(onboarding, clientSnapshot).shouldRender,
   );
+  const checkTravelRouting = showing && Boolean(onboarding.travel);
+
+  // Reads again only while the pop-up shows, so a finished setup makes no request on focus.
+  useEffect(() => {
+    if (!showing) {
+      return;
+    }
+
+    const readAgain = () => {
+      if (document.visibilityState === "visible") {
+        setReadRequest((count) => count + 1);
+      }
+    };
+    window.addEventListener("focus", readAgain);
+    document.addEventListener("visibilitychange", readAgain);
+
+    return () => {
+      window.removeEventListener("focus", readAgain);
+      document.removeEventListener("visibilitychange", readAgain);
+    };
+  }, [showing]);
 
   useEffect(() => {
     if (!checkTravelRouting) {

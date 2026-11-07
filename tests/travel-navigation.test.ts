@@ -57,6 +57,22 @@ describe("Directions needs a resolved place, not a current estimate (Ticket 271,
     expect(resolved([leg("current")], "behavior")).toBe(false);
     expect(resolved([leg("current", { source: "behavior" })], "behavior")).toBe(true);
   });
+  it("Ticket 284 finding: once the stop is under way, the trip home from its place keeps Directions", () => {
+    const home = (source: "calendar" | "behavior" | "correction", state: TravelResolvedLegEvidence["state"] = "current", withEstimate = true): TravelResolvedLegEvidence => ({
+      state, reason: null, estimate: withEstimate ? estimate : null,
+      leg: { id: "home", role: "return", journeyRef: "day", originCommitmentRef: "stop", destinationCommitmentRef: null, mode: "transit", readyAt: "2026-11-01T05:00:00Z",
+        provenance: { originRef: "stop", originSource: source, originRevision: "1", destinationRef: "base", destinationSource: "saved_base", destinationRevision: "1", grantRevision: "g" } },
+    });
+    expect(travelDestinationRoute({ legs: [home("calendar")] }, "stop", "calendar")).toEqual({ mode: "transit" });
+    expect(resolved([home("calendar", "stale")])).toBe(true);
+    expect(resolved([home("behavior")], "behavior")).toBe(true);
+    // A corrected place, another source or a trip with no route does not count.
+    expect(resolved([home("correction")])).toBe(false);
+    expect(resolved([home("behavior")])).toBe(false);
+    expect(resolved([home("calendar", "unavailable", false)])).toBe(false);
+    // The trip that reached the place still gives its own mode.
+    expect(travelDestinationRoute({ legs: [home("calendar"), leg("current")] }, "stop", "calendar")).toEqual({ mode: "walking" });
+  });
   it("gives the mode the place was routed in, which may be remembered for that place", () => {
     const transit = { ...leg("current"), leg: { ...leg("current").leg, mode: "transit" as const } };
     expect(travelDestinationRoute({ legs: [transit] }, "stop", "calendar")).toEqual({ mode: "transit" });

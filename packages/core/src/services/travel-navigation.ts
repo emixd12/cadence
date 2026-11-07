@@ -1,4 +1,4 @@
-import type { TravelEndpointSource, TravelEvidenceResult, TravelMode, TravelNavigationPreference } from "../types/travel";
+import type { TravelEndpointSource, TravelEvidenceResult, TravelMode, TravelNavigationPreference, TravelResolvedLegEvidence } from "../types/travel";
 
 /**
  * Ticket 271 (correction C2): whether a route has reached this stop's own place, so the link can
@@ -18,15 +18,18 @@ export function travelDestinationResolved(
 /**
  * The route that resolved this stop's place, with the mode it was routed in. That mode can be a
  * remembered per-place choice (Ticket 217), so Directions opens in the same mode as the leave line.
+ * Once the stop is under way, only the trip leaving it is routed (Ticket 284 finding). That trip
+ * starts from the same source place, so it still counts, with its own mode.
  */
 export function travelDestinationRoute(
   evidence: Pick<TravelEvidenceResult, "legs"> | null | undefined,
   ref: string,
   source: Extract<TravelEndpointSource, "calendar" | "behavior">,
 ): Readonly<{ mode: TravelMode }> | null {
-  const found = (evidence?.legs ?? []).find((item) => item.leg.destinationCommitmentRef === ref &&
-    item.leg.provenance.destinationSource === source && item.estimate !== null &&
-    (item.state === "current" || item.state === "stale"));
+  const usable = (item: TravelResolvedLegEvidence) => item.estimate !== null && (item.state === "current" || item.state === "stale");
+  const legs = (evidence?.legs ?? []).filter(usable);
+  const found = legs.find((item) => item.leg.destinationCommitmentRef === ref && item.leg.provenance.destinationSource === source) ??
+    legs.find((item) => item.leg.originCommitmentRef === ref && item.leg.provenance.originSource === source);
   return found ? { mode: found.leg.mode } : null;
 }
 

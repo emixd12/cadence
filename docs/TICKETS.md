@@ -16755,8 +16755,11 @@ verification with fixtures. D18: `tests/briefing-account-context.test.ts`,
 
 ## Ticket 284: Web acceptance with the real clock
 
-Status: filed November 4, 2026. Not started.
-Dependencies: Tickets 266, 270, 271, 272, 273, 274, 279, 281, 282 and 283. Decision D5 is open.
+Status: filed November 4, 2026. Run on production November 6, 2026; evidence recorded, awaiting
+verification. Decision D5 closed: the owner set a US$5 cap for this test; US$0.48 was reserved.
+The seven web findings were fixed on `travel-wave6` the same day, each with a test (`STATUS.md`);
+fixes await verification and ship in the Mac acceptance build for Ticket 285.
+Dependencies: Tickets 266, 270, 271, 272, 273, 274, 279, 281, 282 and 283.
 
 Goal: check the whole feature on production through a full day, including Ticket 165's
 directions matrix.
@@ -16792,9 +16795,9 @@ Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=
 
 ## Ticket 285: Installed Mac acceptance
 
-Status: filed November 4, 2026. In progress on `travel-wave6`. A blank-window defect found
-during this acceptance ships alone as the 0.1.9 patch from branch `mac-blank-window-hotfix`
-(D22); notarization and publication wait for the owner.
+Status: installed acceptance run November 6–7, 2026 (`docs/qa/travel-release.md`). Calendar-event activation and the hosted named-place fix remain unchecked.
+The blank-window fix found during this acceptance is on `main` through PR #195. Mac 0.1.9
+ships from `main` with the travel revamp (D23); notarization and publication follow D24.
 Dependencies: Tickets 280 and 284.
 
 Goal: check the Mac app on a dev-signed build.

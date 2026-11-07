@@ -1528,7 +1528,8 @@ the owner's answers. Tickets 263–285 carry the work. The evidence is
 | D6 | Go-ahead and PR #182 | "Merge PR #182 now, then start Wave 0" | This also approves the plan and its order. PR #182 merged on November 4 as `1a369e4`. Each merge to main is followed by a Trust refresh and app redeploy. |
 
 D5, the spend cap for Ticket 165's directions test, is still open. Ticket 284 asks the
-owner before that test runs.
+owner before that test runs. (Closed November 6, 2026: the owner set US$5 for Ticket 284's whole run; US$0.48 was
+reserved. See `docs/qa/travel-release.md`, "Ticket 284".)
 
 Merges, deployments, hosted migrations, provider spending, Mac notarization and
 publication still wait for the owner's instruction each time. The ban on storing device
@@ -1771,6 +1772,34 @@ Platform impact: web and desktop through the shared phrase module and Calendar d
 Marketing: not applicable until release. Future mobile: mobile web inherits the web text;
 native mobile is deferred. Messaging impact: P-025 and P-021 notes.
 
+## 2026-11-06: Agents act as the test accounts, end to end
+
+The owner decided on November 6, 2026, during Ticket 284, that live acceptance must not need
+the owner's hands for test accounts A (`cadence.testing.is@gmail.com`) and B
+(`brittlebeliefs@gmail.com`). For those two accounts only, these become agent steps:
+
+1. Google sign-in in the Cadence QA Chrome profile, from the account's Login item in the
+   "Cadence Agents" vault (password and authenticator seed), through
+   `scripts/acceptance/google-signin.mjs`. Cadence sign-in from the kept sessions stays as it was.
+2. Consent screens, including Google Maps routing consent and Calendar connector consent.
+3. Settings that change synced data or send the account's data to a provider, such as Travel
+   estimates, Home and leave reminders.
+4. Test Calendar fixtures: creating and deleting events in the account's own test Calendars,
+   in the browser or through a QA Calendar API client (Cloud project `cadence-qa-498717`, kept
+   apart from the production sign-in and Calendar projects).
+5. Browser permission grants and denials in the Cadence QA Chrome profile, such as
+   notifications and location.
+
+The owner still sets each paid test's spend cap, creates vault items, keys and OAuth clients'
+secrets, keeps the owner's own accounts, and decides releases and publication. A Google check a
+script cannot pass (a phone prompt, a CAPTCHA, a recovery prompt) stops the run with a named
+reason; the agent then asks the owner for that one step. The agent never reads or prints the
+password, a one-time code or a session token.
+
+Platform impact: web acceptance only; no product change. Desktop: installed acceptance keeps
+its owner steps for the owner's Mac (quitting Cadence, macOS prompts). Marketing and future
+mobile: not applicable. Messaging impact: none.
+
 ## 2026-11-07: Mac recovery messages approved (D21)
 
 The owner decided on November 7, 2026, as relayed by the travel coordinator after the Ticket 285
@@ -1801,3 +1830,30 @@ The owner decided on November 7, 2026:
 Platform impact: desktop, the 0.1.9 patch. Web: not applicable, the web Timeline already has a
 `LinkProvider`. Marketing: the download link moves only at publication. Future mobile: not
 applicable. Messaging impact: P-027.
+
+## 2026-11-07: Mac 0.1.9 ships from main with the travel revamp (D23)
+
+The owner decided on November 7, 2026, replacing D22's plan to ship the blank-window fix alone:
+
+1. Mac 0.1.9 is built from `main` after Mac acceptance (Ticket 285) passes. It carries the
+   blank-window fix and the travel revamp together, so the shipped code matches what was tested.
+2. The Wave 6 branch (`travel-wave6`: the Ticket 284 and 285 fixes, including the named-place
+   fix) merges to `main` first. The blank-window fix is already on `main` through PR #195.
+3. Notarization and publication still wait for the owner's go-ahead on the built candidate,
+   unless D24 applies.
+
+Platform impact: desktop, Mac 0.1.9. Web: the Wave 6 fixes deploy with the merge. Marketing: the
+download link moves only at publication. Future mobile: not applicable. Messaging impact: P-027.
+
+## 2026-11-07: Publish Mac 0.1.9 once acceptance passes and every release check passes (D24)
+
+The owner decided on November 7, 2026:
+
+1. Notarize and publish Mac 0.1.9 as soon as Mac acceptance (Ticket 285) passes and the Wave 6
+   branch is merged to `main`, with no further confirmation.
+2. This holds only if every check in `docs/DESKTOP_RELEASE.md`, "Release acceptance", passes,
+   including check 4 (real updater) from 0.1.8 at "Publication", step 3.
+3. Any failed check stops the release and goes back to the owner.
+
+Platform impact: desktop, Mac 0.1.9 publication. Web: not applicable. Marketing: the download
+link moves at publication. Future mobile: not applicable. Messaging impact: none.

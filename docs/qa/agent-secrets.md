@@ -128,6 +128,37 @@ npm run agent:secret -- --check --env ANTHROPIC_API_KEY=anthropic-api-key --env 
   a plausible token; 8 `--store-token` write or read-back failed; 127 command not
   found.
 
+## Google sign-in for test accounts (2026-11-06)
+
+Decision 2026-11-06, "Agents act as the test accounts, end to end". The vault holds one
+Login item per test account: `google-test-account-a` (and `google-test-account-b`), with
+fields `username`, `password` and `one-time password` (the authenticator seed). Emi creates
+or changes these items; agents only read them.
+
+Sign the account in to Google in the open Cadence QA Chrome profile
+(`npm run mcp:accept:web -- open` starts it on port 4430):
+
+```bash
+npm run agent:secret -- --caller google-signin \
+  --env GOOGLE_TEST_PASSWORD=google-test-account-a/password \
+  --env "GOOGLE_TEST_OTP=google-test-account-a/one-time password" \
+  -- node scripts/acceptance/google-signin.mjs --slot A
+```
+
+- It prints `{"slot":"A","state":"signed-in"}` or `already-signed-in`, or
+  `{"state":"stopped","reason":…}` with exit 3. Reasons are fixed names:
+  `phone-prompt`, `captcha`, `verification-required`, `browser-not-secure`,
+  `password-rejected`, `otp-rejected`, `challenge-unsupported`, `stuck-<step>`. A stop
+  that needs a person goes to Emi as one step.
+- It computes the authenticator code itself from the seed (RFC 6238), so a code never
+  sits in the environment long enough to expire. It never prints the password, a code
+  or another signed-in account's address. Set `GOOGLE_SIGNIN_STOP_SCREENSHOT` to a
+  path to save Google's page when it stops.
+- It picks the password and then the authenticator app on Google's method pages, never
+  a passkey or a phone prompt.
+- First run, November 6, 2026: account A signed in through identifier, "Try another
+  way", password and authenticator steps with no owner step.
+
 ## Security notes
 
 - `-T /usr/bin/security` lets any process running as Emi read the token without a
