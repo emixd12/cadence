@@ -1342,7 +1342,7 @@ Calendar events and the weekly "W6 Library stop" Behavior remain for Ticket 285.
 - No Outlook or iCloud test connector exists for accounts A or B, so Ticket 283's routed Outlook or
   iCloud event was not checked.
 
-## Ticket 285: installed Mac acceptance — November 6, 2026 (in progress, blocked)
+## Ticket 285: installed Mac acceptance — November 6–7, 2026
 
 Dev-signed `0.1.9-dev.1` from `travel-wave6` at `acc86c4` (clean, SQLite schema 20, no migration
 differing from `origin/main`), binary SHA-256 `c13011a76e4d74500824e16c902dfc903193db5f6cd893bb2527ff8389f2da77`.
@@ -1364,7 +1364,7 @@ Cadence and change notification settings on the test Mac. No route call has been
   Settings was reopened.
 - 01:33Z: `0.1.9-dev.1` installed over 0.1.8 (protected copy holds the 0.1.8 ZIP and
   `before.sqlite3`); hash and signature match, schema 20, no count change.
-- **Defect, blocks this ticket:** the window is blank white and the launch sync never runs. Not
+- **Defect, fixed in `caebbd7`:** the window is blank white and the launch sync never runs. Not
   caused by the launch method, WebKit storage, the Calendar cache or local SQLite content (each moved
   aside in turn; the database was restored). Restored 0.1.8 fails the same way. A throwaway
   diagnostic build (`0.1.9-dev.2`, unminified, uncaught errors written to local storage; never
@@ -1407,7 +1407,39 @@ Cadence and change notification settings on the test Mac. No route call has been
   works without notification permission." and "Reminder coverage is not verified." Turned back on;
   Settings returned to "Notifications: Enabled on this device." Pass.
 
-Still open: the native leave reminder with the app running and after quitting, the one update,
-activation into the event drawer, Travel estimates off cancelling pending reminders, and the
-next-trip marker with a leave time ahead. Tonight's trips could not give a leave time still ahead
-before midnight, so these run on November 7. Then the test Mac returns to 0.1.8.
+### November 7: `0.1.10-dev.1` (from `5f629e4`), test Mac, account A
+
+The branch gained `d1db8c2` (shared `travel-refresh-policy.ts`), so the morning run used a new
+build: binary SHA-256 `d196dfcc07981a40a8dce7291f1ad6e48d5787b7069d7b3f7786fbd0d8890fd6`, clean,
+schema 20, installed over `0.1.9-dev.3` at 13:01Z (integrity ok, 0 foreign-key errors), launch sync
+13:01:12Z. Times are Eastern. Leave reminders were on for account A from November 6, 22:16.
+Location for Cadence was turned off on the test Mac from 08:21 to 15:10 so trips started from Home
+(the owner allowed system-setting changes for this test); it was turned back on.
+
+Evidence came from the app's device-only leave memory (`cadence.leave-reminders.v1`: trip digest,
+fire time and leave time only), macOS pending and delivered counts in the unified log, Notification
+Center through the accessibility tree, and the Timeline text.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Travel states | Pass | Upcoming "Leave by 9:26 AM for W6 Mac leave 5 from Home · walking, arrive 9:35 AM."; soon "Leave in 24 minutes, by 2:56 PM for W6 Mac leave 7 from Home · walking, arrive 3:05 PM."; last estimate "Last estimate: leave by 9:26 AM for W6 Mac leave 5 · checked 8:56 AM."; late "You may arrive late at W6 Museum morning: arrive 10:13 AM." (from the device position, before location was turned off); tomorrow "Tomorrow: leave by 8:56 AM for W6 Museum morning." (November 6). |
+| Next-trip marker | Pass (owner screenshot, 14:46) | The rail marker "Leave 2:56 —" led to the 3:20 PM "W6 Mac leave 7" row, under "Last estimate: leave by 2:56 PM for W6 Mac leave 7 · checked 2:40 PM. Refresh travel". The marker is `aria-hidden`, so it needs a screenshot. |
+| Reminder with Cadence running | Pass | 09:06:11 planned, banner at 09:06:14: "Leave by 9:26 AM for W6 Mac leave 5". 14:36:11 banner: "Leave by 2:56 PM for W6 Mac leave 7" / "Walking from Home, arrive 3:05 PM. Estimate checked 2:33 PM." (D17 wording). A reminder whose time had passed when first planned fired 10 seconds later (08:14:36). |
+| The one update | Pass | Raising the arrival buffer 15 → 30 moved the same trip's leave time 9:26 → 9:11. The memory recorded `update {fireAt 09:09:10, leaveAt 09:11:11}`; macOS delivered count went 3 → 4 at 09:09:10; the Timeline read "Leave in 3 minutes, by 9:11 AM for W6 Mac leave 5 from Home · walking, arrive 9:20 AM." The update banner text was not captured. Moving a Behavior's time instead made a new trip with its own first reminder, as NOTIFICATION_SPEC says ("A moved event is a new trip"). |
+| Reminder after quitting | Pass | Get-ready 20 → 60 moved "W6 Mac leave 8"'s pending reminder to 14:54:15 (pending notification moved, not an update). Cadence quit at 14:49:47 with 0 pending writes. Banner at 14:54:15 with Cadence not running: "Leave by 3:54 PM for W6 Mac leave 8" / "Walking from your previous stop, arrive 4:00 PM. Estimate checked 2:40 PM." |
+| Activation | Pass (Behavior), not run (Calendar event) | The owner clicked that banner; Cadence launched at 14:56:02 and showed "Opened reminder for W6 Mac leave 8 on 2026-11-07." The Calendar-event drawer path was not exercised: the 9:45 museum reminder fired while the test Mac was locked. A synthetic click on a banner reached no handler (banners expose only `AXShowMenu`). |
+| Notification permission denied | Pass (November 6) | See above. |
+| Travel estimates off cancels | Pass | 14:37:57: memory became `{enabled: false, records: []}`, macOS pending 61 → 60 (Behavior reminders only), delivered 0. Back on at 14:40: both trips planned again, and "W6 Mac leave 7"'s reminder fired once more at 14:39:15 because turning travel off had cleared its record. With location blocked, Settings read "Device location: blocked." and "Saved places and Calendar trips keep working without device location."; the Travel panel read "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again." |
+| Sync with an older contract | Pass (November 6) | Published 0.1.8 synced against production; see above. The dev builds also synced against production `9064f5f`, which is older than the branch. |
+| Ticket 165 installed-Mac row | Pass (November 6) | See above. |
+| Named place without a street address (`d1db8c2`) | Not checked | The fix is in the hosted lookup (`lib/services/travel-provider.ts`); production is still `9064f5f`. It needs a deployment first. |
+
+Cleanup (15:00–15:12): get-ready back to 20 and arrival buffer to 15; leave reminders off for
+account A ("Reminder setting saved."; memory `{enabled: false, records: []}`); "W6 Mac leave 3"–"8"
+archived on the web (4 active, 33 archived), synced to the Mac with 0 pending writes; Travel
+estimates stays on for account A, as found. The test Mac was returned to published 0.1.8 from its
+protected ZIP (`spctl`: accepted, Notarized Developer ID; schema 20; integrity ok) and left with
+Cadence quit, because 0.1.8 opens blank for account A until the fix ships. Kept on the test Mac:
+the protected copies under `dev-installs/` (0.1.8 ZIP, `before.sqlite3`, and the 0.1.10-dev.1 app
+ZIP) and the moved WebKit, cache and Calendar-cache files under `evidence-285-webkit-20261107T025043Z/`.
+The owner's Mac still runs `0.1.9-dev.1`, which lacks the blank-window fix.

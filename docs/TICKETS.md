@@ -16795,7 +16795,7 @@ Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=
 
 ## Ticket 285: Installed Mac acceptance
 
-Status: filed November 4, 2026. Not started.
+Status: installed acceptance run November 6–7, 2026 (`docs/qa/travel-release.md`). Calendar-event activation and the hosted named-place fix remain unchecked.
 Dependencies: Tickets 280 and 284.
 
 Goal: check the Mac app on a dev-signed build.

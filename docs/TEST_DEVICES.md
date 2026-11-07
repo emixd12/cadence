@@ -81,6 +81,23 @@ Owner steps, once per device:
 5. Run `node scripts/test-device.mjs check <device>`. The first accessibility call
    shows "sshd-keygen-wrapper wants access to control System Events"; choose
    **Allow**. Until then the call times out with -1712.
+6. Optional, for screenshots: Privacy & Security › **Screen & System Audio Recording**:
+   add `/usr/libexec/sshd-keygen-wrapper` and turn it on. The agent can open the pane
+   with `open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"`.
+   Without it, `screencapture` over SSH fails with "could not create image from display",
+   and anything drawn with `aria-hidden`, such as the Timeline's next-trip marker, cannot
+   be checked remotely.
+
+### Known limits over SSH (November 7, 2026, Ticket 285)
+
+- Notification banners expose only `AXShowMenu` to accessibility, and a synthetic mouse
+  click on a banner's frame did not reach Cadence (no activation event). Clicking a
+  leave or Behavior reminder stays an owner step until a screenshot-guided click is
+  shown to work on a banner.
+- `screencapture` needs step 6. Until then, ask the owner for one ⌘⇧3 screenshot.
+- A locked screen (frontmost process `loginwindow`) hides every window from
+  accessibility. Ask the owner to unlock the Mac and lengthen Lock Screen › "Require
+  password after screen saver begins" for the length of the test.
 
 Then add the entry to the inventory and record the device's model and macOS version
 in the release packet that first uses it.

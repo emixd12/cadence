@@ -1,5 +1,31 @@
 # Implementation Status
 
+## Ticket 285: installed Mac acceptance run — November 6–7, 2026
+
+**On branch `travel-wave6`. Evidence in `docs/qa/travel-release.md`, "Ticket 285". No notarization
+or publication.**
+
+- Builds: dev-signed `0.1.9-dev.1` (`acc86c4`, owner's Mac and test Mac), `0.1.9-dev.3`
+  (`caebbd7`, the blank-window fix) and `0.1.10-dev.1` (`5f629e4`, test Mac, the final checks).
+  A throwaway diagnostic build `0.1.9-dev.2` found the defect; it was never committed.
+- Found and fixed during the run: the Mac app went blank for an account with an auto-archived
+  Behavior (`caebbd7`; released 0.1.8 is affected), and a named place without a street address
+  could not route (`d1db8c2`, hosted; needs a deployment before it can be checked).
+- Pass on the installed app with test account A: travel states; the next-trip marker (owner
+  screenshot); the native leave reminder with Cadence running and with Cadence quit; the one update
+  when the leave time moved 15 minutes earlier; activation from a quit app into the Behavior's
+  Occurrence; notification permission denied; Travel estimates off cancelling pending and delivered
+  leave reminders; sync of published 0.1.8 against production; the installed-Mac row of Ticket 165's
+  directions matrix. Owner's Mac: install and launch sync with no row loss.
+- Not run: activation into a Calendar event's drawer (the reminder fired while the test Mac was
+  locked; synthetic banner clicks do not reach Cadence) and the named-place fix (not deployed).
+- Cleanup: account A's leave reminders off, test Behaviors archived, habits restored, Cadence's
+  location access restored. The test Mac is back on published 0.1.8 with Cadence quit (it opens
+  blank for account A until the fix ships). The owner's Mac still runs `0.1.9-dev.1`.
+- `docs/TEST_DEVICES.md` gains the optional Screen Recording grant and the known limits over SSH.
+- Platform impact: desktop acceptance only. Web, marketing and future mobile: not applicable.
+  Messaging impact: none.
+
 ## Ticket 285 defect fixed: a named place without a street address — November 7, 2026
 
 **On branch `travel-wave6`. Awaiting verification and a hosted refresh for Ticket 285.**
