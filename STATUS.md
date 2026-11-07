@@ -1,5 +1,19 @@
 # Implementation Status
 
+## Ticket 286: test-access preflight for acceptance runs — November 7, 2026
+
+**On branch `accounts-test`. Awaiting verification. No live probe has run.**
+
+- Engine installed from `service-connections-bootstrap` (skills commit `5c4baab`, branch
+  `claude/test-access-preflight`, not yet deployed) as `.agentic/scripts/test-access-preflight.mjs`.
+- `.agentic/test-access.json`: 49 requirements across 12 suites, with the 2026-11-07 owner
+  decisions applied. `npm run qa:preflight -- --suite <suite> --dry-run` works for every suite.
+- Adapters in `scripts/acceptance/access/`. Google Calendar and Outlook connect, test-Mac sign-in,
+  QA Chrome permission grants and travel settings are agent steps without a script yet; the
+  preflight reports them as check errors for an agent.
+- Platform impact: acceptance tooling only. Web, desktop, marketing and future mobile: not
+  applicable. Messaging impact: none.
+
 ## Ticket 285: installed Mac acceptance run — November 6–7, 2026
 
 **On branch `travel-wave6`. Evidence in `docs/qa/travel-release.md`, "Ticket 285". No notarization

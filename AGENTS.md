@@ -96,9 +96,12 @@ order that can answer the question:
 
 For test accounts A and B, sign-ins, consent, provider-sending settings, test Calendar
 fixtures and permission grants in the Cadence QA Chrome profile are agent steps, using
-the "Cadence Agents" vault and `scripts/acceptance/google-signin.mjs`. The owner still
-sets each paid test's spend cap (`docs/DECISIONS.md`, 2026-11-06, "Agents act as the
-test accounts, end to end").
+the "Cadence Agents" vault and `scripts/acceptance/google-signin.mjs`. Agents also
+re-enroll the kept Cadence sessions, connect A's Outlook, iCloud and Hevy test identities,
+and sign Cadence for Mac in as A on test devices. The owner still sets each paid test's
+spend cap and creates the vault items (`docs/DECISIONS.md`, 2026-11-06, "Agents act as the
+test accounts, end to end", and 2026-11-07, "Agents also renew sessions, connectors and
+test-device sign-in").
 
 Send owner asks as one numbered list. If a tool is missing, name it and ask the
 owner to enable it instead of handing its work to the owner. Test devices other
@@ -111,9 +114,9 @@ command line: the protocol suite, headless clients, and ChatGPT web and Claude w
 in the dedicated QA Chrome profile. They check each step against Cadence's own
 records with `npm run mcp:watch`, and resume from the run ledger in
 `.intent/acceptance/<run-id>/`. Agents sign in as test accounts A and B from kept
-sessions, click consent for them and read agent-scoped keys through
-`npm run agent:secret`. The owner keeps sign-ins, creating keys, vaults and service
-accounts, owner-secret approvals and release decisions. Run the testing agent as a
+sessions, re-enroll those sessions when they end, click consent for them and read
+agent-scoped keys through `npm run agent:secret`. The owner keeps the owner's own sign-ins,
+creating keys, vaults and service accounts, owner-secret approvals and release decisions. Run the testing agent as a
 top-level agent so it can ask the owner directly, one numbered list per batch, and
 never ask the owner to report outputs. Procedure: the project skill
 `.claude/skills/mcp-acceptance` and `docs/qa/mcp-server.md`, "Automated acceptance".

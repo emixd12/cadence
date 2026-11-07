@@ -129,6 +129,16 @@ async function accessToken(slot, d) {
   return json.access_token;
 }
 
+/**
+ * Test-access probe (Ticket 286): one token refresh for the slot's stored grant. Returns
+ * `{ slot, state: 'ok' }` or throws FixtureStop (`consent-required`, `token-invalid_grant`, …).
+ * The access token is discarded.
+ */
+export async function checkGrant({ slot }, deps) {
+  await accessToken(slot, withDefaults(deps));
+  return { slot, state: 'ok' };
+}
+
 async function api(slot, method, path, body, d) {
   const token = await accessToken(slot, d);
   const response = await d.fetch(`${API}${path}`, {

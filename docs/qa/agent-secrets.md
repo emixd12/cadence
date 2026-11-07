@@ -228,6 +228,48 @@ node scripts/acceptance/google-calendar-fixtures.mjs delete --slot A --calendar 
   fake `fetch`. They make no Google calls and check that output never contains the fake
   secret or tokens.
 
+## Test-access preflight (2026-11-07, Ticket 286)
+
+`npm run qa:preflight -- --suite <suite>` checks every credential and authorization a suite
+needs before the run, renews what agents may renew, and prints one numbered owner list for
+the rest. The engine is `.agentic/scripts/test-access-preflight.mjs`, installed from the
+`service-connections-bootstrap` skill; Cadence's manifest is `.agentic/test-access.json` and
+its adapters are in `scripts/acceptance/access/`.
+
+```bash
+npm run qa:preflight -- --suite all --dry-run            # the plan and every possible owner step; runs nothing
+npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<run-id>
+```
+
+- Exit codes: 0 ready; 10 owner steps needed (send the list as one message, stop, rerun after
+  the owner answers); 11 a probe or renewal failed to run (agent work, never an owner step);
+  2 usage or manifest error.
+- Suites: `mcp-local`, `mcp-protocol`, `mcp-clients`, `mcp-web`, `calendar-fixtures` (A),
+  `calendar-fixtures-b` (B), `web-travel`, `connectors`, `desktop-owner-mac`,
+  `desktop-test-mac`, `desktop-release`, `email`.
+- Vault probes call `agent:secret --check` through `scripts/acceptance/access/vault.mjs
+  --item <name>`; they list names only. The manifest never carries `--env NAME=item`; the
+  engine refuses it.
+- Agent renewals: Google sign-in (`google-signin.mjs`), QA Calendar consent
+  (`google-calendar-fixtures.mjs consent`), Cadence session re-enrollment (`mcp:oauth`
+  enroll in one QA Chrome tab), Cadence web sign-in, and the iCloud and Hevy connectors
+  (posted once to Cadence's own API with A's kept session). Each runs through
+  `agent:secret`, so the vault values reach one child process only (decision 2026-11-07).
+- Steps that belong to agents but have no script yet (Google Calendar and Outlook connect,
+  test-Mac sign-in, QA Chrome permission grants, travel settings) report exit 11 with the
+  step's name from `scripts/acceptance/access/agent-step.mjs`.
+- Owner approvals for one run (`maps-spend-cap`, `notarization-go-ahead`) live in
+  `<run-dir>/owner-approvals.json`. Record one after the owner gives it:
+  `node scripts/acceptance/access/record.mjs record --scope run --run-dir <run-dir> --id maps-spend-cap --source "owner set US$1 in chat"`.
+  Host confirmations (`qa-consent-test-users`) use `--scope host` and live in the git-ignored
+  `.agentic/runtime/test-access-confirmations.json`.
+- Results: the engine keeps status only in `.agentic/runtime/test-access-evidence.json`
+  (git-ignored) and, with `--run-dir`, `test-access-preflight.json`. A rerun reuses fresh
+  `present` results and rechecks the rest.
+- Tests: `tests/acceptance-access-adapters.test.mjs` (every adapter's exit codes with stubs)
+  and `tests/acceptance-access-manifest.test.mjs` (the manifest validates and every suite
+  dry-runs).
+
 ## Security notes
 
 - `-T /usr/bin/security` lets any process running as Emi read the token without a

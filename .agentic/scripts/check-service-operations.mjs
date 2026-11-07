@@ -7,13 +7,14 @@ import {
   fstatSync,
   lstatSync,
   openSync,
+  readFileSync,
   readSync,
   readdirSync,
   realpathSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -711,7 +712,17 @@ const nonGitEvidenceStorage = (projectRoot, evidencePath, rootGitignore = null) 
     for (const rule of text.split(/\r?\n/)) {
       const result = gitignoreRuleMatchesEvidence(rule, scopedPath);
       if (!result.relevant) continue;
-      if (result.ambiguous) return { ready: false, status: "ambiguous_ignore_rules", repository: "non_git", ignored: false, tracked: null };
+      if (result.ambiguous) return {
+        ready: false,
+        status: "ambiguous_ignore_rules",
+        repository: "non_git",
+        ignored: false,
+        tracked: null,
+        ignore_file: ignoreFile.label,
+        rule,
+        evidence_path: evidencePath,
+        remediation: "Replace the ambiguous rule with an exact ignore rule for the evidence path, then rerun the check.",
+      };
       ignored = !result.negated;
     }
   }
