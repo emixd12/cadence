@@ -515,6 +515,11 @@ arrives, fees reduce the US$5:
 - 2026-11-06: Ticket 284 measured one production walking day: 91 route calls and 4 lookups,
   US$0.48 reserved, three routes per reminded trip, one route for tomorrow's first trip, and a
   whole-day pass for each new browser tab.
+- 2026-11-07: Ticket 285 fix. A single named place found by its center, such as a park,
+  now resolves. Each stored unresolved or ambiguous place text from before 11:00 UTC is
+  looked up once more on its next refresh, at US$0.005 each, under the same spend
+  reservation and the 80% automatic-refresh pause. The new row is then reused as before.
+  Places that now resolve get routed, within the usage model above. Totals are unchanged.
 
 
 October 18 local acceptance: a cold two-place fixture makes two geocodes; a warm
