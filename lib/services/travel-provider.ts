@@ -37,6 +37,12 @@ const COARSE_GEOCODE_TYPE_PREFIXES = ["sublocality", "administrative_area_level"
 function coarseGeocodeType(type: string): boolean {
   return COARSE_GEOCODE_TYPES.has(type) || COARSE_GEOCODE_TYPE_PREFIXES.some((prefix) => type.startsWith(prefix));
 }
+/**
+ * Ticket 285 finding: a named place without a street address, such as a park, is found by its
+ * center rather than its rooftop. Its place ID still names one place, so it routes.
+ */
+const NAMED_PLACE_GEOCODE_TYPES = new Set(["establishment", "point_of_interest"]);
+const CENTERED_GEOCODE_GRANULARITIES = new Set(["GEOMETRIC_CENTER", "APPROXIMATE"]);
 const MAX_RETRIES = 1;
 export const TRAVEL_PROVIDER_TIMEOUT_MS = 5_000;
 
@@ -130,14 +136,17 @@ export async function geocodeGoogleAddress(
   if (!hosted && body.status !== "OK") throw new TravelProviderError("provider_unavailable", true);
   if (results.length === 0) return { kind: "unresolved" };
   // Coarse features (localities, postal codes, routes) are not safe endpoints;
-  // precise rooftop venues and addresses are.
+  // precise rooftop venues and addresses are, and so is a named place found by its center.
   // Do not choose among multiple or provider-overflowed candidates.
   if (results.length > MAX_GEOCODE_CANDIDATES) return { kind: "ambiguous" };
   const candidates = results.flatMap((result) => {
     const geometry = record(result.geometry) ? result.geometry : null;
     const granularity = hosted ? result.granularity : geometry?.location_type;
-    const preciseLocation = granularity === "ROOFTOP" || granularity === "RANGE_INTERPOLATED";
-    const preciseType = !stringArray(result.types, 32, 80).some(coarseGeocodeType);
+    const types = stringArray(result.types, 32, 80);
+    const namedPlace = types.some((type) => NAMED_PLACE_GEOCODE_TYPES.has(type));
+    const preciseLocation = granularity === "ROOFTOP" || granularity === "RANGE_INTERPOLATED" ||
+      (namedPlace && typeof granularity === "string" && CENTERED_GEOCODE_GRANULARITIES.has(granularity));
+    const preciseType = !types.some(coarseGeocodeType);
     const placeId = hosted ? result.placeId : result.place_id;
     if ((!hosted && result.partial_match === true) || !preciseLocation || !preciseType || typeof placeId !== "string" || !placeId) return [];
     return [{ kind: "place_id" as const, placeId }];

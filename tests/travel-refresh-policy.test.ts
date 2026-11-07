@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TRAVEL_LEG_OUTSIDE_WINDOW,
+  TRAVEL_PLACE_NAMED_PLACE_RULE_AT,
   firstTravelStopAwayFromHome,
   normalizeTravelPlaceText,
   partitionTravelLegsByWindow,
@@ -39,10 +40,22 @@ describe("travel refresh policy", () => {
     const at = (days: number) => now.subtract({ hours: 24 * days }).toString();
     expect(travelPlaceLookupReusable({ outcome: "resolved", lookedUpAt: at(364) }, now)).toBe(true);
     expect(travelPlaceLookupReusable({ outcome: "resolved", lookedUpAt: at(366) }, now)).toBe(false);
-    expect(travelPlaceLookupReusable({ outcome: "unresolved", lookedUpAt: at(29) }, now)).toBe(true);
-    expect(travelPlaceLookupReusable({ outcome: "ambiguous", lookedUpAt: at(31) }, now)).toBe(false);
+    const later = Temporal.Instant.from("2026-12-17T12:00:00Z");
+    const before = (days: number) => later.subtract({ hours: 24 * days }).toString();
+    expect(travelPlaceLookupReusable({ outcome: "unresolved", lookedUpAt: before(29) }, later)).toBe(true);
+    expect(travelPlaceLookupReusable({ outcome: "ambiguous", lookedUpAt: before(31) }, later)).toBe(false);
     expect(travelPlaceLookupReusable({ outcome: "resolved", lookedUpAt: now.add({ hours: 1 }).toString() }, now)).toBe(false);
     expect(travelPlaceLookupReusable({ outcome: "resolved", lookedUpAt: "not-an-instant" }, now)).toBe(false);
+  });
+
+  it("looks up again an unresolved or ambiguous place stored before the named-place rule", () => {
+    // Ticket 285: account A's "Bryant Park, New York, NY 10018" was stored as ambiguous at 03:17Z.
+    const stored = "2026-11-07T03:17:36.667Z";
+    const next = Temporal.Instant.from("2026-11-08T12:00:00Z");
+    expect(travelPlaceLookupReusable({ outcome: "ambiguous", lookedUpAt: stored }, next)).toBe(false);
+    expect(travelPlaceLookupReusable({ outcome: "unresolved", lookedUpAt: stored }, next)).toBe(false);
+    expect(travelPlaceLookupReusable({ outcome: "resolved", lookedUpAt: stored }, next)).toBe(true);
+    expect(travelPlaceLookupReusable({ outcome: "ambiguous", lookedUpAt: TRAVEL_PLACE_NAMED_PLACE_RULE_AT }, next)).toBe(true);
   });
 
   it("routes legs that depart, or must arrive, within three hours and leaves the rest", () => {

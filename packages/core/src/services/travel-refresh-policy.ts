@@ -15,6 +15,11 @@ export const TRAVEL_MOVEMENT_THRESHOLD_METERS = 500;
 export const TRAVEL_PLACE_RESOLVED_REUSE_SECONDS = 365 * 24 * 60 * 60;
 /** Unresolved or ambiguous text is retried monthly rather than on every refresh. */
 export const TRAVEL_PLACE_UNRESOLVED_REUSE_SECONDS = 30 * 24 * 60 * 60;
+/**
+ * Ticket 285 finding: before this instant, a named place found by its center, such as a park, was
+ * stored as ambiguous. Unresolved and ambiguous lookups from before it are looked up once more.
+ */
+export const TRAVEL_PLACE_NAMED_PLACE_RULE_AT = "2026-11-07T11:00:00Z";
 /** Unavailable reason for a leg left for a later refresh; it is never zero travel. */
 export const TRAVEL_LEG_OUTSIDE_WINDOW = "outside_route_window";
 /**
@@ -69,7 +74,10 @@ export function travelPlaceLookupReusable(
   try { age = now.since(Temporal.Instant.from(entry.lookedUpAt)).total("seconds"); }
   catch { return false; }
   if (age < 0) return false;
-  return age < (entry.outcome === "resolved" ? TRAVEL_PLACE_RESOLVED_REUSE_SECONDS : TRAVEL_PLACE_UNRESOLVED_REUSE_SECONDS);
+  if (entry.outcome === "resolved") return age < TRAVEL_PLACE_RESOLVED_REUSE_SECONDS;
+  const beforeNamedPlaceRule = Temporal.Instant.compare(Temporal.Instant.from(entry.lookedUpAt),
+    Temporal.Instant.from(TRAVEL_PLACE_NAMED_PLACE_RULE_AT)) < 0;
+  return !beforeNamedPlaceRule && age < TRAVEL_PLACE_UNRESOLVED_REUSE_SECONDS;
 }
 
 /**

@@ -159,12 +159,49 @@ describe("travel provider", () => {
       .mockResolvedValueOnce(Response.json({ results: [{ placeId: "city", granularity: "ROOFTOP", types: ["locality", "political"] }] }));
     await expect(geocodeGoogleAddress("Evanston", { config: hostedConfig(), fetch: city })).resolves.toEqual({ kind: "ambiguous" });
 
-    const [centerSts, centerIam] = authResponses();
-    const center = vi.fn()
-      .mockResolvedValueOnce(centerSts)
-      .mockResolvedValueOnce(centerIam)
-      .mockResolvedValueOnce(Response.json({ results: [{ placeId: "center", granularity: "GEOMETRIC_CENTER", types: ["establishment"] }] }));
-    await expect(geocodeGoogleAddress("Somewhere", { config: hostedConfig(), fetch: center })).resolves.toEqual({ kind: "ambiguous" });
+    const [unnamedSts, unnamedIam] = authResponses();
+    const unnamed = vi.fn()
+      .mockResolvedValueOnce(unnamedSts)
+      .mockResolvedValueOnce(unnamedIam)
+      .mockResolvedValueOnce(Response.json({ results: [{ placeId: "center", granularity: "GEOMETRIC_CENTER", types: ["premise"] }] }));
+    await expect(geocodeGoogleAddress("Somewhere", { config: hostedConfig(), fetch: unnamed })).resolves.toEqual({ kind: "ambiguous" });
+  });
+
+  it("resolves a named place without a street address, found by its center, on the hosted path", async () => {
+    // Ticket 285: account A's "Bryant Park, New York, NY 10018" was stored as ambiguous.
+    for (const granularity of ["GEOMETRIC_CENTER", "APPROXIMATE"]) {
+      const [sts, iam] = authResponses();
+      const park = vi.fn()
+        .mockResolvedValueOnce(sts)
+        .mockResolvedValueOnce(iam)
+        .mockResolvedValueOnce(Response.json({ results: [{ placeId: "bryant-park", granularity, types: ["establishment", "park", "point_of_interest"] }] }));
+      await expect(geocodeGoogleAddress("Bryant Park, New York, NY 10018", { config: hostedConfig(), fetch: park }))
+        .resolves.toEqual({ kind: "resolved", point: { kind: "place_id", placeId: "bryant-park" } });
+    }
+
+    const [twoSts, twoIam] = authResponses();
+    const two = vi.fn()
+      .mockResolvedValueOnce(twoSts)
+      .mockResolvedValueOnce(twoIam)
+      .mockResolvedValueOnce(Response.json({ results: [
+        { placeId: "park-a", granularity: "GEOMETRIC_CENTER", types: ["establishment", "park"] },
+        { placeId: "park-b", granularity: "GEOMETRIC_CENTER", types: ["establishment", "park"] },
+      ] }));
+    await expect(geocodeGoogleAddress("Lincoln Park", { config: hostedConfig(), fetch: two })).resolves.toEqual({ kind: "ambiguous" });
+
+    const [areaSts, areaIam] = authResponses();
+    const area = vi.fn()
+      .mockResolvedValueOnce(areaSts)
+      .mockResolvedValueOnce(areaIam)
+      .mockResolvedValueOnce(Response.json({ results: [{ placeId: "area", granularity: "APPROXIMATE", types: ["point_of_interest", "neighborhood", "political"] }] }));
+    await expect(geocodeGoogleAddress("Midtown", { config: hostedConfig(), fetch: area })).resolves.toEqual({ kind: "ambiguous" });
+
+    const [unknownSts, unknownIam] = authResponses();
+    const unknown = vi.fn()
+      .mockResolvedValueOnce(unknownSts)
+      .mockResolvedValueOnce(unknownIam)
+      .mockResolvedValueOnce(Response.json({ results: [{ placeId: "unknown", granularity: "GRANULARITY_UNSPECIFIED", types: ["establishment"] }] }));
+    await expect(geocodeGoogleAddress("Somewhere", { config: hostedConfig(), fetch: unknown })).resolves.toEqual({ kind: "ambiguous" });
   });
 
   it("scans past the first eight types before accepting a hosted geocode", async () => {
@@ -254,8 +291,17 @@ describe("travel provider", () => {
       .resolves.toEqual({ kind: "resolved", point: { kind: "place_id", placeId: "venue" } });
     const city = vi.fn().mockResolvedValue(Response.json({ status: "OK", results: [{ place_id: "city", types: ["locality", "political"], geometry: { location_type: "ROOFTOP" } }] }));
     await expect(geocodeGoogleAddress("Chicago", { config: APPROVED, fetch: city })).resolves.toEqual({ kind: "ambiguous" });
-    const center = vi.fn().mockResolvedValue(Response.json({ status: "OK", results: [{ place_id: "center", types: ["establishment"], geometry: { location_type: "GEOMETRIC_CENTER" } }] }));
-    await expect(geocodeGoogleAddress("Somewhere", { config: APPROVED, fetch: center })).resolves.toEqual({ kind: "ambiguous" });
+    const unnamed = vi.fn().mockResolvedValue(Response.json({ status: "OK", results: [{ place_id: "center", types: ["premise"], geometry: { location_type: "GEOMETRIC_CENTER" } }] }));
+    await expect(geocodeGoogleAddress("Somewhere", { config: APPROVED, fetch: unnamed })).resolves.toEqual({ kind: "ambiguous" });
+  });
+
+  it("resolves a named place found by its center on the api key path, unless the match is partial", async () => {
+    const result = { place_id: "bryant-park", types: ["establishment", "park", "point_of_interest"], geometry: { location_type: "GEOMETRIC_CENTER" } };
+    const park = vi.fn().mockResolvedValue(Response.json({ status: "OK", results: [result] }));
+    await expect(geocodeGoogleAddress("Bryant Park, New York, NY 10018", { config: APPROVED, fetch: park }))
+      .resolves.toEqual({ kind: "resolved", point: { kind: "place_id", placeId: "bryant-park" } });
+    const partial = vi.fn().mockResolvedValue(Response.json({ status: "OK", results: [{ ...result, partial_match: true }] }));
+    await expect(geocodeGoogleAddress("Bryant Park, Chicago", { config: APPROVED, fetch: partial })).resolves.toEqual({ kind: "ambiguous" });
   });
 
   it("reports denied geocoding requests as provider failures", async () => {

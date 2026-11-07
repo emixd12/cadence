@@ -1,5 +1,29 @@
 # Implementation Status
 
+## Ticket 285 defect fixed: a named place without a street address — November 7, 2026
+
+**On branch `travel-wave6`. Awaiting verification and a hosted refresh for Ticket 285.**
+
+- Cause: the place lookup, not the place record or the departure model. Account A's
+  "Bryant Park, New York, NY 10018" is stored in `travel_place_cache` as `ambiguous` (read-only
+  hosted query, 03:17Z), while the street-address fixtures are `resolved`. The geocode filter
+  accepted only `ROOFTOP` or `RANGE_INTERPOLATED` results, so a park found by its center had no
+  endpoint, and the departure model correctly read that as `needs_place` ("Add a place for …")
+  and the next trip as blocked ("Fix …'s place").
+- Fix: `lib/services/travel-provider.ts` also accepts a single `GEOMETRIC_CENTER` or
+  `APPROXIMATE` result typed `establishment` or `point_of_interest`, with no coarse type and no
+  partial match. Multiple results, coarse areas and unnamed centers stay ambiguous.
+- Core `travelPlaceLookupReusable` looks up again any unresolved or ambiguous row stored before
+  `TRAVEL_PLACE_NAMED_PLACE_RULE_AT` (2026-11-07T11:00Z), once per stored text. Otherwise such
+  rows would be reused for 30 days. No new kind of provider call; no schema change.
+- Not verified live: Google's granularity for Bryant Park, because that needs a paid lookup. The
+  rule accepts both center granularities, so either routes.
+- Tests: `tests/travel-provider.test.ts` (hosted and API key paths) and
+  `tests/travel-refresh-policy.test.ts`; the three new tests fail on the base code.
+- Platform impact: web, this fix (hosted lookup). Desktop: linked Macs use the same hosted
+  refresh, so no desktop change; Ticket 285 checks it. Marketing: none. Future mobile: not
+  applicable. Messaging impact: none (no wording change).
+
 ## Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026
 
 **On branch `travel-wave6`. Awaiting verification and a rebuilt dev-signed app for Ticket 285.**
