@@ -6,6 +6,7 @@ import {
   type NativeEvent, type NotificationResult, type Snapshot,
 } from "./native-spike";
 import { runNativeCoverageProbe } from "./native-coverage-probe";
+import { DESKTOP_APP_RECOVERY_MESSAGE, DesktopErrorBoundary } from "./desktop-error-boundary";
 
 function NativeBench() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -163,7 +164,8 @@ if (new URLSearchParams(window.location.search).get("bench") === "native") {
 } else if (new URLSearchParams(window.location.search).get("bench") === "settings") {
   void Promise.all([import("./timeline.css"), import("./settings-bench")]).then(([, { SettingsBench }]) => root.render(<SettingsBench />));
 } else {
-  void import("./product").then(({ Product }) => root.render(<Product />)).catch(() => {
-    root.render(<main role="alert">Cadence could not open. Quit and reopen the app to try again.</main>);
+  // Ticket 285: without a boundary, one render error unmounted everything and left a blank window.
+  void import("./product").then(({ Product }) => root.render(<DesktopErrorBoundary scope="app"><Product /></DesktopErrorBoundary>)).catch(() => {
+    root.render(<main role="alert">{DESKTOP_APP_RECOVERY_MESSAGE}</main>);
   });
 }

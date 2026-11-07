@@ -333,7 +333,7 @@
     {
       "path": "apps/desktop/src/timeline-screen.tsx",
       "classification": "cataloged",
-      "interaction_marker_count": 2,
+      "interaction_marker_count": 4,
       "interaction_ids": [
         "INT-TIMELINE-001",
         "INT-NOTIFICATION-001",
@@ -357,6 +357,14 @@
         "INT-WEATHER-001"
       ],
       "reason": "Product Timeline uses a local show-more callback. Full native workflow verification remains pending."
+    },
+    {
+      "path": "apps/desktop/src/desktop-error-boundary.tsx",
+      "classification": "cataloged",
+      "interaction_marker_count": 2,
+      "interaction_ids": [
+        "INT-DESKTOP-001"
+      ]
     },
     {
       "path": "apps/desktop/src/settings-bench.tsx",
@@ -1280,8 +1288,8 @@
           "control": "Try again"
         }
       ],
-      "availability": "Desktop product entry or Export screen after local data loading fails.",
-      "success_result": "Reloads the local profile and requested views; normal Timeline generation may run when reloading the product entry.",
+      "availability": "Desktop product entry or Export screen after local data loading fails, or a desktop screen after it fails to render.",
+      "success_result": "Reloads the local profile and requested views; normal Timeline generation may run when reloading the product entry. After a render failure, renders the screen again; opening another screen also clears the failure while navigation and account sync stay mounted.",
       "failure_result": "Keeps a factual error visible without clearing the local profile.",
       "effects": [
         "database_read",
@@ -1293,13 +1301,15 @@
       "implementation": [
         "apps/desktop/src/product.tsx#Product",
         "apps/desktop/src/local-timeline.service.ts",
-        "apps/desktop/src/export-screen.tsx#LocalExportScreen"
+        "apps/desktop/src/export-screen.tsx#LocalExportScreen",
+        "apps/desktop/src/desktop-error-boundary.tsx#DesktopErrorBoundary"
       ],
       "test_coverage": {
         "level": "direct",
         "references": [
           "tests/desktop-retry.dom.test.tsx",
-          "tests/desktop-store-contract.test.ts"
+          "tests/desktop-store-contract.test.ts",
+          "tests/desktop-render-recovery.dom.test.tsx"
         ],
         "notes": "Executed DOM retries cover failed local reads, repeated errors, recovery, and stable profile ownership. SQLite adapter reads pass separately."
       },
@@ -1314,11 +1324,13 @@
           "status": "implemented",
           "implementation": [
             "apps/desktop/src/product.tsx#Product",
-            "apps/desktop/src/export-screen.tsx#LocalExportScreen"
+            "apps/desktop/src/export-screen.tsx#LocalExportScreen",
+            "apps/desktop/src/desktop-error-boundary.tsx#DesktopErrorBoundary"
           ],
           "evidence": [
             "tests/desktop-retry.dom.test.tsx",
-            "tests/desktop-store-contract.test.ts"
+            "tests/desktop-store-contract.test.ts",
+            "tests/desktop-render-recovery.dom.test.tsx"
           ],
           "reason": "Executed Product and Export retry controls recover after injected read failures, keep repeated errors visible, and retain the same profile without an import or restore mutation. Native SQLite tracking reads pass separately."
         },
@@ -2839,9 +2851,10 @@
         "level": "direct",
         "references": [
           "tests/sign-out-shell.test.tsx",
-          "tests/desktop-navigation.test.ts"
+          "tests/desktop-navigation.test.ts",
+          "tests/desktop-render-recovery.dom.test.tsx"
         ],
-        "notes": "The app-shell test renders all four primary navigation destinations in the owning shell."
+        "notes": "The app-shell test renders all four primary navigation destinations in the owning shell. The desktop render-recovery test opens Behaviors from the Timeline's automatic-archive notice."
       },
       "platforms": {
         "web": {
@@ -2859,12 +2872,14 @@
           "applicability": "applicable",
           "status": "implemented",
           "implementation": [
-            "apps/desktop/src/desktop-app.tsx"
+            "apps/desktop/src/desktop-app.tsx",
+            "apps/desktop/src/timeline-screen.tsx"
           ],
           "evidence": [
             "tests/sign-out-shell.test.tsx",
             "tests/desktop-navigation.test.ts",
             "tests/desktop-ui.test.tsx",
+            "tests/desktop-render-recovery.dom.test.tsx",
             "docs/qa/2026-08-30-desktop-native-boundary.md",
             "docs/qa/2026-08-30-desktop-native-boundary.md#final-packaged-keyboard-and-artifact-checks",
             "docs/qa/2026-08-30-desktop-lifecycle-release.md#offline-launch-and-persistence-passed"

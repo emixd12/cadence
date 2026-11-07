@@ -25,6 +25,7 @@ import { desktopTimelineFreshness } from "./calendar/timeline-freshness";
 import { outlookTimelineRange } from "@/lib/ui/connectors";
 import { createDesktopDailyBriefClient } from "./daily-brief";
 import { TimelineScreen } from "./timeline-screen";
+import { DesktopErrorBoundary } from "./desktop-error-boundary";
 import { BehaviorsScreen } from "./behaviors-screen";
 import { CategoryPanel } from "@/components/settings/CategoryPanel";
 import { createLocalCategoryAction } from "./local-category.service";
@@ -566,6 +567,8 @@ export function Product() {
     {loading ? <p role="status" className="p-8">Opening local tracking data…</p> : null}
     {error ? <div role="alert" className="m-6 border border-line p-4"><p>{error}</p>
       <button className="product-action product-action-primary mt-3" onClick={refresh}>Try again</button></div> : null}
+    {/* Ticket 285: a screen's render error leaves navigation, sync and Settings working. */}
+    <DesktopErrorBoundary scope="screen" resetKey={activeScreen}>
     {bundle && occurrenceActions && behaviorActions ? <>
       {activeScreen === "timeline" ? <DesktopOnboardingGuide key={guideRequest} forceOpen={guideRequest > 0} onDismiss={() => setGuideRequest(0)}
         hasAnyBehavior={bundle.timeline.behaviors.length > 0} hasImportRuns={bundle.hasImportRuns} currentTimezone={bundle.timeline.profile.timezone}
@@ -576,6 +579,7 @@ export function Product() {
         notificationTarget={notificationTarget}
         dailyBriefClient={dailyBriefClient}
         dailyBriefSessionKey={accountUserId ?? "local"}
+        onNavigate={navigate}
         onRefresh={refresh} onReload={reloadTimeline} onShowMore={(days) => { parameters.current.days = days; void refreshScreen(); }} /> : null}
       {activeScreen === "behaviors" ? <BehaviorsScreen {...bundle.behaviors.behaviors} analytics={bundle.behaviors.analytics}
         {...occurrenceActions} {...behaviorActions} onRefresh={refresh}
@@ -610,6 +614,7 @@ export function Product() {
         onReconcile={() => refreshReminders()} onShowOnboarding={() => { setGuideRequest((value) => value + 1); navigate("timeline"); }} /> : null}
       {activeScreen === "export" ? <LocalExportScreen onChanged={refresh} /> : null}
     </> : null}
+    </DesktopErrorBoundary>
     </PlaceLabelProvider>
   </DesktopApp></DevelopmentBuildProvider>;
 }

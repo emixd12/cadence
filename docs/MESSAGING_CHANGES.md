@@ -982,3 +982,21 @@ cite has not changed.
   describe the Teams-placeholder rule. Update the Microsoft connector materials before the next
   submission.
 - **Status:** logged.
+
+## P-027: Mac screen recovery message
+
+- **Change:** Ticket 285 defect fix, implemented November 7, 2026, not merged. When a Mac app
+  screen fails to render, Cadence now shows "This screen could not be shown. Try again, or open
+  another screen." with **Try again**, and keeps the navigation, account sync and Settings
+  working. Before, the whole window went blank. If the app shell itself fails, the existing
+  message "Cadence could not open. Quit and reopen the app to try again." now also covers render
+  failures, not only a failed start. The recovery wording is new and not yet approved (D7).
+- **Affected:** Ticket 285. Files: `apps/desktop/src/desktop-error-boundary.tsx`,
+  `docs/user-guide/desktop-local.md`.
+- **Surfaces:** in-app copy (Mac), user guide.
+- **Conflicting current text:** `docs/user-guide/desktop-local.md`, "Retry loading local data",
+  describes **Try again** only for local data that cannot be opened. It does not mention a
+  screen that cannot be shown.
+- **Update needed:** approve or replace the recovery sentence; add one line to the user guide
+  section describing it.
+- **Status:** logged.
