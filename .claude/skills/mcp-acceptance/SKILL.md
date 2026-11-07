@@ -6,8 +6,9 @@ description: Automated acceptance of Cadence's MCP server and AI clients (Claude
 # Cadence MCP acceptance
 
 Agents run every tier and check each client step against Cadence's own records
-(the watcher). Emi signs in, creates keys and vaults, approves owner secrets and
-makes release decisions. Nothing else goes to her.
+(the watcher). Emi signs in to her own ChatGPT and Claude accounts, creates keys and
+vaults, approves owner secrets and makes release decisions. Nothing else goes to her,
+and she hears about it only through the preflight's numbered list.
 
 ## Read first
 
@@ -15,6 +16,34 @@ makes release decisions. Nothing else goes to her.
 2. `STATUS.md`, top section, and `docs/TICKETS.md`, Tickets 247–256.
 3. `docs/qa/mcp-server.md`, "Automated acceptance", and `docs/qa/agent-secrets.md`.
 4. The run folder's `STATE.md` if you are resuming (see "Resume").
+
+## Step one: the preflight
+
+Start every run, including a resume, with the test-access preflight for its suites
+(`docs/qa/agent-secrets.md`, "Test-access preflight"):
+
+| Run | Suites |
+|---|---|
+| Local rehearsal (Tier 0 and Tier 1) | `mcp-local` |
+| Production Tier 0 and the watcher | `mcp-protocol` |
+| Production Tier 1 | `mcp-clients` |
+| Production Tier 2 (ChatGPT web, Claude web) | `mcp-web` |
+
+```bash
+npm run qa:preflight -- --suite mcp-protocol,mcp-clients,mcp-web --run-dir .intent/acceptance/preflight-<run-id>
+```
+
+List every suite the run will reach, so the owner gets one list. Give `--run-dir` its
+own folder: runners stop with `run-exists` if their `<run-id>` folder already exists.
+
+- Exit 0: start the run.
+- Exit 10: send its numbered owner list as one message, unchanged, and end your turn.
+  Rerun the preflight after Emi answers; it rechecks only what was missing.
+- Exit 11: a probe or renewal failed to run. That is your work, never an owner step.
+- Exit 2: usage or manifest error; stop with that reason.
+
+The preflight re-enrolls A's and B's sessions itself (Google sign-in, then
+`mcp:oauth -- enroll`).
 
 Use Node 24 for everything: `export PATH=/opt/homebrew/opt/node@24/bin:$PATH`.
 Work in your own git worktree, never in Ticket 232's checkout
@@ -67,16 +96,16 @@ Work in your own git worktree, never in Ticket 232's checkout
 ## Agent autonomy (spec, "Automated MCP client acceptance")
 
 You may, without asking:
-- sign in as test accounts A and B from kept sessions, and click Allow or Deny on
-  Cadence's consent screen for them;
+- sign in as test accounts A and B, re-enroll their sessions when they end, and click
+  Allow or Deny on Cadence's consent screen for them;
 - read agent-scoped keys (the "Cadence Agents" vault through `agent:secret`);
 - run Tier 0, 1 and 2 clients against production test accounts (after the first
   run's go-ahead);
 - create, change, archive and restore test data in accounts A and B, and revoke
   your own grants.
 
-Stop and ask Emi (these stay hers):
-- a Google, ChatGPT or Claude sign-in when a kept session ends;
+These stay Emi's; the preflight lists them when they are missing:
+- a sign-in to her own ChatGPT or Claude account when a kept session ends;
 - creating vaults, service accounts or API keys;
 - the production signing key (owner vault, Touch ID);
 - turning MCP on or off;
@@ -89,6 +118,8 @@ before its timeout; an account check fails; or a command exits 2 (usage or setup
 
 ## Asking Emi
 
+- Owner asks come only from the preflight's numbered list (exit 10). Do not ask
+  separately for anything it checks.
 - Run the testing agent as a **top-level agent**:
   `ws.agent.create(name, message, { topLevel: true })`. Delegated agents cannot call
   `ws.app.question.ask`; if you are delegated, send one numbered list to your
@@ -100,9 +131,9 @@ before its timeout; an account check fails; or a command exits 2 (usage or setup
   tool itself.
 
 Emi's whole part, in the normal path:
-1. Sign-ins: Google for accounts A and B (`mcp:oauth -- enroll`), ChatGPT and Claude
-   in the Cadence QA Chrome profile (`mcp:accept:web -- open`), and authorizing the
-   claude.ai "Cadence QA" connector once.
+1. Sign-ins: her own ChatGPT and Claude accounts in the Cadence QA Chrome profile
+   (`mcp:accept:web -- open`), and authorizing the claude.ai "Cadence QA" connector
+   once.
 2. Keys, vaults and service accounts: `docs/qa/agent-secrets.md` steps 1–5.
 3. Owner-secret approvals: Touch ID for the "Cadence" vault and the signing key.
 4. Release decisions: the first production run's go-ahead, MCP on or off, deploys
@@ -130,16 +161,18 @@ npm run agent:secret -- --check --env ANTHROPIC_API_KEY=anthropic-api-key --env 
 
 Pass (exit 0) prints `token: present in the Keychain`,
 `service account vaults: Cadence Agents`, the item names and `item present` for each
-mapping. Failures and the owner step each one needs:
+mapping. The preflight runs this check (`op-service-token`, `vault-*`) and lists the
+owner step. Failures and the owner step each one needs:
 - exit 4, no token: Emi runs step 5 of `docs/qa/agent-secrets.md`.
 - exit 6, `cannot read "Cadence Agents"` or `can reach other vaults`: Emi recreates
   the service account for "Cadence Agents" only (step 4), then step 5. (Emi's setup
   was done and checked on 2026-10-30: the account reads only "Cadence Agents".)
 - exit 6, an item `missing`: Emi creates that key (steps 2–3).
 
-Production sessions expire when Google ends them. Enrollment is a sign-in (Emi's
-step): `npm run mcp:oauth -- enroll --target production --allow-production --slot A --port <free 4321–4330>`,
-only after Ticket 232 releases those ports.
+Production sessions expire when Google ends them. The preflight re-enrolls them
+(`supabase-session-a`, `supabase-session-b`): an agent step (`docs/DECISIONS.md`,
+2026-11-07). By hand: `npm run mcp:oauth -- enroll --target production --allow-production --slot A --port <free 4321–4330>`,
+after `scripts/acceptance/google-signin.mjs` for that slot.
 
 ## Tiers and commands
 
@@ -206,8 +239,8 @@ node $S down --name $N
 
 Order, one run folder per command (`--run prod-<date>-<n>`):
 
-1. Preconditions: go-ahead recorded (first run only), Ticket 232 cleanup not running,
-   `agent:secret -- --check` passes, both sessions pass `mcp:oauth -- status`. The
+1. Preconditions: the preflight for the run's suites exits 0 (it covers the go-ahead,
+   `agent:secret -- --check` and both sessions); Ticket 232 cleanup not running. The
    publishable key needs no lookup: every runner, the watcher and the session store
    read it from `scripts/acceptance/qa-config.mjs`. Set
    `CADENCE_QA_SUPABASE_PUBLISHABLE_KEY` only to override it (for example after a

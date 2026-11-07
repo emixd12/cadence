@@ -82,8 +82,12 @@ registry and design-system catalog for cross-platform evidence; do not create a 
 
 ## Installed and live acceptance
 
-Agents run installed desktop and live checks themselves. Use the first step in this
-order that can answer the question:
+Agents run installed desktop and live checks themselves. Step one of every run is the
+test-access preflight for its suites: `npm run qa:preflight -- --suite <suite>` (suites
+in `.agentic/test-access.json`; `docs/qa/agent-secrets.md`). It renews what agents may
+renew. Exit 10 prints one numbered owner list: send it as one message, end the turn and
+rerun the preflight after the owner answers. Then use the first step in this order that
+can answer the question:
 
 1. Read state without the UI: read-only SQLite on the installed database, the app's
    APIs as the signed-in user, and logs.
@@ -93,6 +97,7 @@ order that can answer the question:
 4. Ask the owner only for steps that stay the owner's: quitting Cadence, sign-ins
    and credentials, consent or permission prompts, provider revocation, settings
    that change synced data or send data to a provider, and creating macOS users.
+   Sign-in, credential, consent and permission asks come only from the preflight's list.
 
 For test accounts A and B, sign-ins, consent, provider-sending settings, test Calendar
 fixtures and permission grants in the Cadence QA Chrome profile are agent steps, using
@@ -106,10 +111,12 @@ test-device sign-in").
 Send owner asks as one numbered list. If a tool is missing, name it and ask the
 owner to enable it instead of handing its work to the owner. Test devices other
 than the owner's Mac are driven over Tailscale SSH with `scripts/test-device.mjs`
-(`docs/TEST_DEVICES.md`). Procedure:
+(`docs/TEST_DEVICES.md`). Desktop suites: `desktop-owner-mac`, `desktop-test-mac` and
+`desktop-release`. Procedure: the project skill `.claude/skills/desktop-acceptance` and
 `docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance".
 
-MCP and AI-client acceptance follows the same rule. Agents run every tier from the
+MCP and AI-client acceptance follows the same rule, with suites `mcp-local`,
+`mcp-protocol`, `mcp-clients` and `mcp-web`. Agents run every tier from the
 command line: the protocol suite, headless clients, and ChatGPT web and Claude web
 in the dedicated QA Chrome profile. They check each step against Cadence's own
 records with `npm run mcp:watch`, and resume from the run ledger in
