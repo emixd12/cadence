@@ -1444,6 +1444,18 @@ the protected copies under `dev-installs/` (0.1.8 ZIP, `before.sqlite3`, and the
 ZIP) and the moved WebKit, cache and Calendar-cache files under `evidence-285-webkit-20261107T025043Z/`.
 The owner's Mac still runs `0.1.9-dev.1`, which lacks the blank-window fix.
 
+Follow-up, 16:08–16:17: the owner quit Cadence on the owner's Mac, and `0.1.10-dev.1` was
+installed there (binary hash and signature match; schema 20, integrity ok; 34 tables, no count
+change; launch sync 21:08:43Z, 0 pending). The owner granted Screen Recording to
+`sshd-keygen-wrapper` on the test Mac, and `screencapture` over SSH returned the real screen;
+`node scripts/test-device.mjs screenshot` now wraps it. A second Calendar-event activation attempt
+reinstalled `0.1.10-dev.1` on the test Mac and created "W6 Mac event" (5:15–5:45 PM, The Morgan
+Library & Museum) in account A's "Cadence demonstration" calendar, but stopped before the Mac
+planned it, because the 0.1.9 release checks needed the test Mac. The test Mac is back on
+published 0.1.8 with Cadence quit, account A's leave reminders are off and Cadence's location
+access is on. Calendar-event drawer activation remains unchecked; the event remains in the test
+calendar.
+
 ### Named place after deploy — November 7, 2026
 
 Production `app.cadence-me.com`, deployment `dpl_BBH1CAJR8d1LJHSUrQfKXcLCk9Fb` (commit `7c698ec`,
