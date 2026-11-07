@@ -376,6 +376,7 @@
         ],
         "timeout_seconds": 600
       },
+      "owner_step": "If the agent's Google sign-in stops, finish test account A's Google sign-in in the Cadence QA Chrome window.",
       "owner_stops": {
         "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
         "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
@@ -420,6 +421,7 @@
         ],
         "timeout_seconds": 600
       },
+      "owner_step": "If the agent's Google sign-in stops, finish test account B's Google sign-in in the Cadence QA Chrome window.",
       "owner_stops": {
         "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
         "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
@@ -466,6 +468,7 @@
         ],
         "timeout_seconds": 600
       },
+      "owner_step": "If the agent's Calendar consent stops, approve the Cadence QA fixtures consent for test account A in the Cadence QA Chrome window.",
       "owner_stops": {
         "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
         "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
@@ -512,6 +515,7 @@
         ],
         "timeout_seconds": 600
       },
+      "owner_step": "If the agent's Calendar consent stops, approve the Cadence QA fixtures consent for test account B in the Cadence QA Chrome window.",
       "owner_stops": {
         "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun.",
         "captcha": "Solve Google's sign-in challenge for this test account in the Cadence QA Chrome window.",
@@ -561,7 +565,7 @@
         "timeout_seconds": 300
       },
       "owner_stops": {
-        "enroll-timeout": "Finish the Cadence sign-in for test account A in the Cadence QA Chrome tab the agent opened, then tell the agent to rerun."
+        "enroll-timeout": "Finish the kept-session enrollment (mcp:oauth enroll) for test account A in the 127.0.0.1 tab the agent opened in Cadence QA Chrome, then tell the agent to rerun."
       },
       "freshness_seconds": 900,
       "expiry": "Until Google or Supabase ends it; refreshed automatically with a 15-minute margin."
@@ -601,7 +605,7 @@
         "timeout_seconds": 300
       },
       "owner_stops": {
-        "enroll-timeout": "Finish the Cadence sign-in for test account B in the Cadence QA Chrome tab the agent opened, then tell the agent to rerun."
+        "enroll-timeout": "Finish the kept-session enrollment (mcp:oauth enroll) for test account B in the 127.0.0.1 tab the agent opened in Cadence QA Chrome, then tell the agent to rerun."
       },
       "freshness_seconds": 900,
       "expiry": "Until Google or Supabase ends it; refreshed automatically with a 15-minute margin."
@@ -640,6 +644,7 @@
         ],
         "timeout_seconds": 300
       },
+      "owner_step": "If the agent's Cadence sign-in stops, sign test account A in to app.cadence-me.com in the Cadence QA Chrome window.",
       "owner_stops": {
         "phone-prompt": "Approve Google's sign-in prompt on the phone for this test account, then tell the agent to rerun."
       },
@@ -918,7 +923,7 @@
         "timeout_seconds": 120
       },
       "owner_stops": {
-        "credential-rejected": "Cadence rejected the credential in this connector's Cadence Agents vault item; update the item."
+        "credential-rejected": "Cadence rejected the iCloud credential; update the icloud-test-account-a item in the Cadence Agents vault."
       },
       "freshness_seconds": 3600
     },
@@ -961,7 +966,7 @@
         "timeout_seconds": 120
       },
       "owner_stops": {
-        "credential-rejected": "Cadence rejected the credential in this connector's Cadence Agents vault item; update the item."
+        "credential-rejected": "Cadence rejected the Hevy credential; update the hevy-test-account-a item in the Cadence Agents vault."
       },
       "freshness_seconds": 3600
     },

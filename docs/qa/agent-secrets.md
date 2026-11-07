@@ -260,7 +260,8 @@ npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<
   step's name from `scripts/acceptance/access/agent-step.mjs`.
 - Owner approvals for one run (`maps-spend-cap`, `notarization-go-ahead`) live in
   `<run-dir>/owner-approvals.json`. Record one after the owner gives it:
-  `node scripts/acceptance/access/record.mjs record --scope run --run-dir <run-dir> --id maps-spend-cap --source "owner set US$1 in chat"`.
+  `node scripts/acceptance/access/record.mjs record --scope run --run-dir <run-dir> --id maps-spend-cap --source "owner set the cap in chat"`.
+  The source note allows letters, digits, spaces and `,.:;()'/-` only.
   Host confirmations (`qa-consent-test-users`) use `--scope host` and live in the git-ignored
   `.agentic/runtime/test-access-confirmations.json`.
 - Results: the engine keeps status only in `.agentic/runtime/test-access-evidence.json`
@@ -269,6 +270,24 @@ npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<
 - Tests: `tests/acceptance-access-adapters.test.mjs` (every adapter's exit codes with stubs)
   and `tests/acceptance-access-manifest.test.mjs` (the manifest validates and every suite
   dry-runs).
+
+Not in the manifest (from the test access inventory), one reason each:
+
+- `supabase-cli-login`: the owner's Supabase CLI token serves only the Ticket 232 tools and
+  `supabase db push`; routine acceptance must not use an owner credential.
+- `mcp-signing-key`: kept in the owner's "Cadence" vault behind Touch ID and used only for key
+  custody and hosted fixtures, each use with the owner's approval; no value-free probe exists.
+- `owner-mac-desktop-control`: desktop-control consent is given per agent session, not stored,
+  so a preflight cannot check it ahead of a run.
+- `prod-feature-config` is narrowed to `prod-mcp-enabled`, which reads
+  `/.well-known/oauth-protected-resource` without credentials. The travel flags
+  (`CADENCE_TRAVEL_PROVIDER_CLEARANCE`, `CADENCE_LEAVE_REMINDER_JOB`) and connector flags
+  (`CONNECTOR_CREDENTIAL_*`, `OUTLOOK_CALENDAR_*`) are not probed: listing them needs the
+  owner's Vercel login, and no credential-free read of their state is known. A missing
+  connector flag still shows up, as `not_configured` from that connector's status probe.
+- `notary-credentials` and `updater-signing-key` are folded into `notarization-go-ahead`: their
+  custody is not documented in the repo, and the owner supplies them with each notarization
+  instruction through the per-version `build-env.sh`.
 
 ## Security notes
 
