@@ -159,6 +159,75 @@ npm run agent:secret -- --caller google-signin \
 - First run, November 6, 2026: account A signed in through identifier, "Try another
   way", password and authenticator steps with no owner step.
 
+## Calendar fixtures for test accounts (2026-11-07)
+
+Decision 2026-11-06, item 4: agents create and delete test events in accounts A and B's own
+Calendars through `scripts/acceptance/google-calendar-fixtures.mjs`.
+
+- **Cloud project.** The tool uses a Desktop OAuth client in `cadence-qa-498717`. That project
+  is kept apart from Cadence's production sign-in and Calendar projects, so a QA grant,
+  test-user list or client change can never affect production users or Google's review of
+  the production apps. A and B are listed as test users on its consent screen. The app
+  stays in Testing and is not published.
+- **Keychain items** (macOS login Keychain, readable by `/usr/bin/security`):
+  - `cadence-qa-google-oauth-client`, account `cadence-qa-498717`: the client JSON that
+    Google's Console downloads, base64-encoded. The tool reads `.installed.client_id` and
+    `.installed.client_secret`. Emi stores or replaces it.
+  - `cadence-qa-google-calendar`, account `production:A` (or `production:B`): the account's
+    refresh token. `consent` writes it through `security -i` on stdin, never in a process
+    argument.
+- **Scope**: `https://www.googleapis.com/auth/calendar.events` only.
+
+Consent signs the account in to Google first (the same code as `google-signin.mjs`), then
+clicks through Google's consent in the open Cadence QA Chrome profile and stores the refresh
+token. An account already signed in to the profile needs no vault variables:
+
+```bash
+npm run agent:secret -- --caller google-calendar-fixtures \
+  --env GOOGLE_TEST_PASSWORD=google-test-account-a/password \
+  --env "GOOGLE_TEST_OTP=google-test-account-a/one-time password" \
+  -- node scripts/acceptance/google-calendar-fixtures.mjs consent --slot A
+```
+
+List, create and delete need no vault variables. Use "QA …" titles for new fixtures and
+delete them at the end of the run:
+
+```bash
+node scripts/acceptance/google-calendar-fixtures.mjs list --slot A --calendar <calendar-id> \
+  --from 2026-11-08T00:00:00-05:00 --to 2026-11-09T00:00:00-05:00
+node scripts/acceptance/google-calendar-fixtures.mjs create --slot A --calendar <calendar-id> \
+  --title "QA Leave reminder fixture" --start 2026-11-08T15:00:00-05:00 \
+  --end 2026-11-08T16:00:00-05:00 [--timezone America/New_York] [--location "Evanston, IL"]
+node scripts/acceptance/google-calendar-fixtures.mjs delete --slot A --calendar <calendar-id> --event <event-id>
+```
+
+- Output is one JSON line: event ids, titles, start and end times and locations, or
+  `{"deleted":…,"title":…}`, or `{"slot":"A","state":"consented",…}`. `consent` also prints
+  fixed step names. The tool never prints, logs or passes in a process argument the client
+  secret, an access token or a refresh token.
+- `--timezone` defaults to `America/New_York`. `consent` takes `--port` (default 4430).
+- Exit codes: 0 done; 2 usage (unknown command, `--slot` not A or B, or a missing
+  `--calendar`, `--from`, `--to`, `--title`, `--start`, `--end` or `--event`); 3 stopped.
+- **Title guard.** `create` and `delete` act only on titles that start with `QA `, `Test ` or
+  `W6 ` followed by text (case-sensitive). `create` checks the title before any Keychain
+  read or network call. `delete` re-reads the event and refuses it when its current title
+  does not match. Both stop with `title-not-test`. The `W6 ` prefix stays accepted for
+  existing fixtures; agents must not create, edit or delete "W6 …" events while Ticket 284's
+  live acceptance runs.
+- **Stop reasons** (`{"state":"stopped","reason":…}`, exit 3): `client-missing`,
+  `client-invalid`, `consent-required` (no refresh token for the slot), `token-<error>` (for
+  example `token-invalid_grant`), `token-missing`, `calendar-<status>-<error>`,
+  `title-not-test`, `slot-invalid`, `signin-<reason>` (any `google-signin.mjs` reason, such
+  as `signin-password-missing`), `access-denied-not-a-test-user`, `consent-timeout`,
+  `consent-<error>`, `no-refresh-token`, `scope-not-granted`, `keychain-value-invalid`,
+  `keychain-write-failed`. Set `GOOGLE_SIGNIN_STOP_SCREENSHOT` to save Google's page when
+  sign-in or consent stops.
+- **Refresh-token expiry.** While the QA app is in Testing, Google expires its refresh tokens
+  after 7 days. `token-invalid_grant` usually means that: run `consent` again for the slot.
+- Tests (`tests/acceptance-google-calendar-fixtures.test.mjs`) use a fake Keychain and a
+  fake `fetch`. They make no Google calls and check that output never contains the fake
+  secret or tokens.
+
 ## Security notes
 
 - `-T /usr/bin/security` lets any process running as Emi read the token without a
