@@ -1,9 +1,12 @@
 # Implementation Status
 
-## Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026
+## Mac 0.1.9 patch: blank window from the archive notice — November 7, 2026
 
-**On branch `travel-wave6`. Awaiting verification and a rebuilt dev-signed app for Ticket 285.**
+**On branch `mac-blank-window-hotfix`, cut from `main` (`9064f5f`). PR open, not merged. Not built,
+notarized or published: the owner instructs each (D22).**
 
+- The branch carries only the Ticket 285 blank-window fix from `travel-wave6` (commits `caebbd7`
+  and `4407477`) and sets the desktop version to 0.1.9. The rest of Wave 6 stays on `travel-wave6`.
 - Cause: the desktop Timeline renders "Review archived behaviors" as a shared `RuntimeLink`
   whenever it has an automatic-archive notice, and it had no `LinkProvider`. The throw unmounted
   the whole app, because the Mac app had no error boundary, so the window was blank and sync
@@ -19,16 +22,21 @@
   (`DayProgressTimeline`, `StatusButtons`, `OccurrenceNoteForm`) render only inside the Timeline
   and Behaviors `RefreshProvider`s. `PlaceLabels` and the development-build context have safe
   defaults. Settings, Export, onboarding, update and account panels use no required context.
-- New wording, not yet approved (D7): "This screen could not be shown. Try again, or open another
-  screen." Logged as `P-027`.
+- Wording: the owner approved both recovery messages on November 7, 2026 (D21): "This screen
+  could not be shown. Try again, or open another screen." and "Cadence could not open. Quit and
+  reopen the app to try again." Logged as `P-027`; the user guide line is still to add.
+- Version: 0.1.9, the next patch after the published 0.1.8. By SemVer it is above the
+  `0.1.9-dev.1`–`0.1.9-dev.3` builds from `travel-wave6`, so the stable feed updates them. Later
+  dev builds use `0.1.10-dev.N`. No SQLite migration or updater file changed, so release check 4
+  (real updater) does not apply; check 3 uses `--same-schema`.
 - Tests: `tests/desktop-render-recovery.dom.test.tsx` mounts `Product` with an archived
   Behavior's notice, opens Behaviors from the link, and recovers from a failed screen through
-  Settings. With either fix reverted, 2 of its 3 tests fail. The verifier added
-  `tests/desktop-main-recovery.dom.test.tsx`, which imports `main.tsx` with a `Product` that throws
-  and expects the app recovery message; it fails with the `main.tsx` boundary removed.
+  Settings. `tests/desktop-main-recovery.dom.test.tsx` checks the app-level message. Each fix has
+  a test that fails when it is reverted (verifier, Ticket 285).
 - Platform impact: web, not applicable (the web Timeline has its `LinkProvider` in
-  `WebRuntimeProvider`). Desktop: this fix; Ticket 285 checks it on the installed app.
-  Marketing: none. Future mobile: not applicable, desktop only. Messaging impact: `P-027`.
+  `WebRuntimeProvider`). Desktop: this fix and the 0.1.9 patch; Ticket 285 checks it on the
+  installed app. Marketing: none until publication. Future mobile: not applicable, desktop only.
+  Messaging impact: `P-027`.
 
 ## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
 

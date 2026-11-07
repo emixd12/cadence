@@ -11,7 +11,7 @@ type Props = Readonly<{
 }>;
 type State = { failed: boolean; resetKey: unknown };
 
-// Not yet approved (D7): new recovery wording, listed in STATUS.md under Ticket 285.
+// Both messages approved by the owner on November 7, 2026 (D21).
 export const DESKTOP_SCREEN_RECOVERY_MESSAGE = "This screen could not be shown. Try again, or open another screen.";
 export const DESKTOP_APP_RECOVERY_MESSAGE = "Cadence could not open. Quit and reopen the app to try again.";
 
