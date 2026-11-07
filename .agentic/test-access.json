@@ -1405,7 +1405,7 @@
           "scripts/acceptance/access/host.mjs",
           "--env-name",
           "SEQUENZY_API_KEY",
-          "--env-file",
+          "--dotenv",
           ".env.local"
         ],
         "timeout_seconds": 15
@@ -1427,7 +1427,7 @@
           "scripts/acceptance/access/host.mjs",
           "--env-name",
           "AGENTMAIL_API_KEY",
-          "--env-file",
+          "--dotenv",
           ".env.local"
         ],
         "timeout_seconds": 15

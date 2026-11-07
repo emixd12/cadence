@@ -78,6 +78,8 @@ describe('Cadence test-access manifest', () => {
         expect(command.argv[0], requirement.id).toBe('node');
         expect(existsSync(join(root, command.argv[1])), `${requirement.id}: ${command.argv[1]}`).toBe(true);
         expect(command.argv.some((part) => /^--env$/.test(part)), requirement.id).toBe(false);
+        // Node 24 reads --env-file anywhere in argv and exits 9 before the script runs.
+        expect(command.argv.some((part) => /^--env-file(-if-exists)?(=|$)/.test(part)), requirement.id).toBe(false);
         if (command.argv[1].endsWith('agent-step.mjs')) expect(Object.keys(STEPS)).toContain(command.argv.at(-1));
       }
     }

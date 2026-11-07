@@ -357,9 +357,9 @@ describe('host.mjs', () => {
     expect(envFileSets(`A=1\nSEQUENZY_API_KEY="${FAKE_VALUE}"\n`, 'SEQUENZY_API_KEY')).toBe(true);
     expect(envFileSets('SEQUENZY_API_KEY=\n', 'SEQUENZY_API_KEY')).toBe(false);
     const io = capture();
-    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--env-file', '.env.local'], { exists: () => true, readFile: () => `SEQUENZY_API_KEY=${FAKE_VALUE}`, out: io.out })).toBe(0);
+    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--dotenv', '.env.local'], { exists: () => true, readFile: () => `SEQUENZY_API_KEY=${FAKE_VALUE}`, out: io.out })).toBe(0);
     expectNoSecret(io.lines);
-    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--env-file', '.env.local'], { exists: () => false, out: () => {} })).toBe(21);
+    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--dotenv', '.env.local'], { exists: () => false, out: () => {} })).toBe(21);
   });
 
   it('checks a public URL status and local Accessibility', async () => {

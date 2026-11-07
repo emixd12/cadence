@@ -5,7 +5,7 @@
 //   host.mjs --command <name> [--command …]         commands are on PATH
 //   host.mjs --codesign "<identity name>"           a valid code-signing identity with that name (names only)
 //   host.mjs --profile-expiry <file>                a provisioning profile; reports its ExpirationDate
-//   host.mjs --env-name <NAME> --env-file <file>    the file sets NAME to something (the value is never kept or printed)
+//   host.mjs --env-name <NAME> --dotenv <file>       the file sets NAME to something (the value is never kept or printed)
 //   host.mjs --url <https-url> --expect-status <n>  a public URL answers with that status
 //   host.mjs --ax                                   this Mac lets the agent's process read windows through System Events
 import { existsSync, readFileSync } from 'node:fs';
@@ -39,9 +39,9 @@ export async function main(argv, {
 } = {}) {
   let flags;
   try {
-    flags = parseFlags(argv, { values: ['codesign', 'profile-expiry', 'env-name', 'env-file', 'url', 'expect-status'], flags: ['ax'], repeat: ['path', 'command'] });
+    flags = parseFlags(argv, { values: ['codesign', 'profile-expiry', 'env-name', 'dotenv', 'url', 'expect-status'], flags: ['ax'], repeat: ['path', 'command'] });
   } catch { flags = null; }
-  const usage = () => finish(out, USAGE, { detail: 'usage: one of --path, --command, --codesign, --profile-expiry, --env-name/--env-file, --url/--expect-status, --ax' });
+  const usage = () => finish(out, USAGE, { detail: 'usage: one of --path, --command, --codesign, --profile-expiry, --env-name/--dotenv, --url/--expect-status, --ax' });
   if (!flags) return usage();
   const modes = [flags.path.length > 0, flags.command.length > 0, Boolean(flags.codesign), Boolean(flags['profile-expiry']),
     Boolean(flags['env-name']), Boolean(flags.url), Boolean(flags.ax)].filter(Boolean).length;
@@ -71,8 +71,8 @@ export async function main(argv, {
     return finish(out, PROBE.PRESENT, { detail: 'profile valid', expires_at: expiresAt });
   }
   if (flags['env-name']) {
-    if (!ENV_NAME.test(flags['env-name']) || !flags['env-file']) return usage();
-    const file = expandPath(flags['env-file'], home);
+    if (!ENV_NAME.test(flags['env-name']) || !flags['dotenv']) return usage();
+    const file = expandPath(flags['dotenv'], home);
     if (!exists(file)) return finish(out, PROBE.MISSING, { detail: 'env file missing' });
     let text = '';
     try { text = readFile(file); } catch { return finish(out, PROBE.ERROR, { detail: 'env file unreadable' }); }

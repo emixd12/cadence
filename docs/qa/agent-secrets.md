@@ -227,6 +227,20 @@ node scripts/acceptance/google-calendar-fixtures.mjs delete --slot A --calendar 
 - Tests (`tests/acceptance-google-calendar-fixtures.test.mjs`) use a fake Keychain and a
   fake `fetch`. They make no Google calls and check that output never contains the fake
   secret or tokens.
+- `GET /api/google-calendar/events` takes local dates (`?start=2026-11-07&end=2026-11-07`),
+  not instants, and `start` must be today in the account's timezone. It accepts the kept
+  session's access token as `Authorization: Bearer`.
+
+Live runs:
+
+- **2026-11-07, account A: passed.** `qa:preflight --suite calendar-fixtures` exited 0; the
+  agent renewed A's QA Calendar grant itself. In "Cadence demonstration", `create` made
+  "QA Fixture round trip 2026-11-07" (20:00–20:30 ET); `list` showed it beside the two
+  "W6 …" events; Cadence's events endpoint, called with A's kept session, returned it; `delete`
+  removed it; a second `list` showed only the "W6 …" events. A's kept Cadence session had
+  expired and was re-enrolled with `cadence-session.mjs enroll --slot A` first.
+- **2026-11-07, account B: not run.** `qa:preflight --suite calendar-fixtures-b` exited 10:
+  the `google-test-account-b` vault item is missing (owner step).
 
 ## Test-access preflight (2026-11-07, Ticket 286)
 
@@ -270,6 +284,26 @@ npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<
 - Tests: `tests/acceptance-access-adapters.test.mjs` (every adapter's exit codes with stubs)
   and `tests/acceptance-access-manifest.test.mjs` (the manifest validates and every suite
   dry-runs).
+- Adapter flags must not use Node's own option names. Node 24 reads `--env-file` anywhere
+  in argv and exits 9 before the script runs, so `host.mjs` takes `--dotenv <file>`.
+- `.env.local` paths are relative to the checkout. A worktree without its own `.env.local`
+  shows `sequenzy-cli` and `agentmail-key` as owner steps even when the main checkout sets
+  both names; run the email suite from the main checkout.
+
+First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
+
+- Ready 33. Agent renewals that day: A's QA Calendar grant and A's kept Cadence session.
+- Owner steps: the vault items `google-test-account-b`, `outlook-test-account-a`,
+  `icloud-test-account-a` and `hevy-test-account-a`; the claude.ai connector for A;
+  `maps-spend-cap`; `notarization-go-ahead`; and the two `.env.local` names (false asks
+  from the worktree, see above).
+- Waiting on those items: B's Google sign-in and Calendar grant; A's Outlook, iCloud and
+  Hevy connections.
+- Error: `travel-settings-a` (A's Travel estimates, routing consent, Home and leave
+  reminders are off, and that agent step has no script). Not acted on: it changes A's
+  Cadence settings.
+- The first attempt also failed `sequenzy-cli` and `agentmail-key` with Node's exit 9; the
+  `--dotenv` rename fixed them.
 
 Not in the manifest (from the test access inventory), one reason each:
 
