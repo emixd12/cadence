@@ -5,12 +5,13 @@
 //   host.mjs --command <name> [--command …]         commands are on PATH
 //   host.mjs --codesign "<identity name>"           a valid code-signing identity with that name (names only)
 //   host.mjs --profile-expiry <file>                a provisioning profile; reports its ExpirationDate
-//   host.mjs --env-name <NAME> --dotenv <file>       the file sets NAME to something (the value is never kept or printed)
+//   host.mjs --env-name <NAME> --dotenv <file>       the file sets NAME to something (the value is never kept or printed);
+//                                                    a relative file is looked up in this checkout, then in the main checkout
 //   host.mjs --url <https-url> --expect-status <n>  a public URL answers with that status
 //   host.mjs --ax                                   this Mac lets the agent's process read windows through System Events
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { PROBE, USAGE, cliMain, finish, parseFlags, runProcess } from './lib.mjs';
 
 const ENV_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
@@ -27,6 +28,23 @@ export function envFileSets(text, name) {
   });
 }
 
+/**
+ * Files to check for a dotenv name, in order: this checkout's, then the main checkout's.
+ * The main checkout is the parent of `git rev-parse --git-common-dir`; agent worktrees
+ * share it but have no `.env.local` of their own. Only a relative path without `..` gets
+ * the second place; nothing else is ever searched.
+ */
+export function dotenvCandidates(path, { run = runProcess, home = homedir(), cwd = process.cwd() } = {}) {
+  const own = expandPath(path, home, cwd);
+  if (path.startsWith('~/') || isAbsolute(path) || path.split(/[\\/]/).includes('..')) return [own];
+  const result = run('git', ['rev-parse', '--git-common-dir'], { cwd, timeoutMs: 10_000 });
+  const commonDir = result.status === 0 ? result.stdout.trim() : '';
+  if (!commonDir) return [own];
+  const mainRoot = dirname(resolve(cwd, commonDir));
+  const main = join(mainRoot, path);
+  return main === own || !main.startsWith(mainRoot + sep) ? [own] : [own, main];
+}
+
 /** ExpirationDate from `security cms -D` plist output, as RFC3339, or null. */
 export function profileExpiry(plist) {
   const match = /<key>ExpirationDate<\/key>\s*<date>([0-9T:-]+Z)<\/date>/.exec(String(plist));
@@ -35,7 +53,7 @@ export function profileExpiry(plist) {
 
 export async function main(argv, {
   run = runProcess, out = (line) => process.stdout.write(`${line}\n`), exists = existsSync, readFile = (path) => readFileSync(path, 'utf8'),
-  fetchImpl = fetch, now = () => Date.now(), home = homedir(),
+  fetchImpl = fetch, now = () => Date.now(), home = homedir(), cwd = process.cwd(),
 } = {}) {
   let flags;
   try {
@@ -72,13 +90,17 @@ export async function main(argv, {
   }
   if (flags['env-name']) {
     if (!ENV_NAME.test(flags['env-name']) || !flags['dotenv']) return usage();
-    const file = expandPath(flags['dotenv'], home);
-    if (!exists(file)) return finish(out, PROBE.MISSING, { detail: 'env file missing' });
-    let text = '';
-    try { text = readFile(file); } catch { return finish(out, PROBE.ERROR, { detail: 'env file unreadable' }); }
-    const set = envFileSets(text, flags['env-name']);
-    text = '';
-    return set ? finish(out, PROBE.PRESENT, { detail: 'name set' }) : finish(out, PROBE.MISSING, { detail: 'name not set' });
+    const candidates = dotenvCandidates(flags.dotenv, { run, home, cwd });
+    const files = candidates.filter((file) => exists(file));
+    if (!files.length) return finish(out, PROBE.MISSING, { detail: 'env file missing' });
+    for (const file of files) {
+      let text = '';
+      try { text = readFile(file); } catch { return finish(out, PROBE.ERROR, { detail: 'env file unreadable' }); }
+      const set = envFileSets(text, flags['env-name']);
+      text = '';
+      if (set) return finish(out, PROBE.PRESENT, { detail: file === candidates[0] ? 'name set' : 'name set in main checkout' });
+    }
+    return finish(out, PROBE.MISSING, { detail: 'name not set' });
   }
   if (flags.url) {
     const expected = Number(flags['expect-status']);

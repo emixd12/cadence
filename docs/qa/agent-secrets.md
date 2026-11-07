@@ -286,9 +286,11 @@ npm run qa:preflight -- --suite calendar-fixtures --run-dir .intent/acceptance/<
   dry-runs).
 - Adapter flags must not use Node's own option names. Node 24 reads `--env-file` anywhere
   in argv and exits 9 before the script runs, so `host.mjs` takes `--dotenv <file>`.
-- `.env.local` paths are relative to the checkout. A worktree without its own `.env.local`
-  shows `sequenzy-cli` and `agentmail-key` as owner steps even when the main checkout sets
-  both names; run the email suite from the main checkout.
+- `host.mjs --env-name NAME --dotenv .env.local` checks this checkout's `.env.local` first,
+  then the main checkout's (the parent of `git rev-parse --git-common-dir`), so agent
+  worktrees without their own file still see the owner's names. It searches nowhere else:
+  absolute, `~/` and `..` paths get no fallback. It reports only whether the name is set,
+  and in which checkout.
 
 First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
 
@@ -296,7 +298,7 @@ First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
 - Owner steps: the vault items `google-test-account-b`, `outlook-test-account-a`,
   `icloud-test-account-a` and `hevy-test-account-a`; the claude.ai connector for A;
   `maps-spend-cap`; `notarization-go-ahead`; and the two `.env.local` names (false asks
-  from the worktree, see above).
+  from the worktree; fixed below).
 - Waiting on those items: B's Google sign-in and Calendar grant; A's Outlook, iCloud and
   Hevy connections.
 - Error: `travel-settings-a` (A's Travel estimates, routing consent, Home and leave
@@ -304,6 +306,9 @@ First live `--suite all` run, 2026-11-07 (worktree `accounts-test`): exit 11.
   Cadence settings.
 - The first attempt also failed `sequenzy-cli` and `agentmail-key` with Node's exit 9; the
   `--dotenv` rename fixed them.
+- After the main-checkout fallback, the next run also exited 11: ready 35, owner steps 7, waiting 5,
+  error 1 (`travel-settings-a`). `sequenzy-cli` and `agentmail-key` read "name set in main
+  checkout" and left the owner list.
 
 Not in the manifest (from the test access inventory), one reason each:
 

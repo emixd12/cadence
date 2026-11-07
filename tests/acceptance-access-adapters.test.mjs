@@ -1,5 +1,8 @@
 // Ticket 286: exit-code mapping of the test-access adapters, with stubs only
 // (no network, no Keychain, no browser, no SSH).
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { main as agentStep } from '../scripts/acceptance/access/agent-step.mjs';
 import { classifyPermission, main as browser } from '../scripts/acceptance/access/browser.mjs';
@@ -8,7 +11,7 @@ import { classifyConsent, main as calendar } from '../scripts/acceptance/access/
 import { main as connection } from '../scripts/acceptance/access/connection.mjs';
 import { linkQuery, main as device } from '../scripts/acceptance/access/device.mjs';
 import { classifySignIn, main as google } from '../scripts/acceptance/access/google.mjs';
-import { envFileSets, main as host, profileExpiry } from '../scripts/acceptance/access/host.mjs';
+import { dotenvCandidates, envFileSets, main as host, profileExpiry } from '../scripts/acceptance/access/host.mjs';
 import { main as keychain } from '../scripts/acceptance/access/keychain.mjs';
 import { signInStop } from '../scripts/acceptance/access/lib.mjs';
 import { main as record } from '../scripts/acceptance/access/record.mjs';
@@ -359,7 +362,42 @@ describe('host.mjs', () => {
     const io = capture();
     expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--dotenv', '.env.local'], { exists: () => true, readFile: () => `SEQUENZY_API_KEY=${FAKE_VALUE}`, out: io.out })).toBe(0);
     expectNoSecret(io.lines);
-    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--dotenv', '.env.local'], { exists: () => false, out: () => {} })).toBe(21);
+    expect(await host(['--env-name', 'SEQUENZY_API_KEY', '--dotenv', '.env.local'], { exists: () => false, run: proc(128), out: () => {} })).toBe(21);
+  });
+
+  it('falls back from an agent worktree to the main checkout .env.local, and nowhere else', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'cadence-dotenv-'));
+    try {
+      const main = join(base, 'main');
+      const worktree = join(base, 'worktrees', 'agent');
+      mkdirSync(join(main, '.git'), { recursive: true });
+      mkdirSync(worktree, { recursive: true });
+      writeFileSync(join(main, '.env.local'), `SEQUENZY_API_KEY=${FAKE_VALUE}\nEMPTY_KEY=\n`);
+      writeFileSync(join(base, '.env.local'), `OUTSIDE_KEY=${FAKE_VALUE}\n`);
+      const git = vi.fn(() => ({ status: 0, stdout: `${join(main, '.git')}\n`, stderr: '', error: null }));
+      const probe = async (name, path = '.env.local', run = git) => {
+        const io = capture();
+        const code = await host(['--env-name', name, '--dotenv', path], { run, cwd: worktree, out: io.out });
+        expectNoSecret(io.lines);
+        return { code, detail: io.last().detail };
+      };
+
+      expect(await probe('SEQUENZY_API_KEY')).toEqual({ code: 0, detail: 'name set in main checkout' });
+      expect(git).toHaveBeenCalledWith('git', ['rev-parse', '--git-common-dir'], expect.objectContaining({ cwd: worktree }));
+      expect(await probe('EMPTY_KEY')).toEqual({ code: 21, detail: 'name not set' });
+      expect(await probe('OUTSIDE_KEY')).toEqual({ code: 21, detail: 'name not set' });
+      expect(await probe('SEQUENZY_API_KEY', '.env.local', proc(128))).toEqual({ code: 21, detail: 'env file missing' });
+      expect(await probe('OUTSIDE_KEY', '../.env.local')).toEqual({ code: 21, detail: 'env file missing' });
+
+      writeFileSync(join(worktree, '.env.local'), `SEQUENZY_API_KEY=${FAKE_VALUE}\n`);
+      expect(await probe('SEQUENZY_API_KEY')).toEqual({ code: 0, detail: 'name set' });
+
+      expect(dotenvCandidates('.env.local', { run: git, cwd: worktree })).toEqual([join(worktree, '.env.local'), join(main, '.env.local')]);
+      expect(dotenvCandidates(join(base, '.env.local'), { run: git, cwd: worktree })).toEqual([join(base, '.env.local')]);
+      expect(dotenvCandidates('.env.local', { run: vi.fn(() => ({ status: 0, stdout: '.git\n' })), cwd: main })).toEqual([join(main, '.env.local')]);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 
   it('checks a public URL status and local Accessibility', async () => {
