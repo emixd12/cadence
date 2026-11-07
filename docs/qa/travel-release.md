@@ -1375,7 +1375,39 @@ Cadence and change notification settings on the test Mac. No route call has been
   error boundary, so the whole tree unmounts. Present since `d95dfaa3` (September 18), so released
   0.1.8 is affected. Reported to the coordinator with a repro.
 
-Remaining after a fixed build: travel states and the next-trip marker, the native leave reminder
-running and after quitting, the one update, activation, notification permission denied, Travel
-estimates off cancelling pending reminders, and the installed-Mac row of Ticket 165's matrix. Then
-return the test Mac to 0.1.8.
+### Fixed build `0.1.9-dev.3` (from `caebbd7`), test Mac, account A
+
+- 03:05Z: installed over the diagnostic build (binary SHA-256
+  `a1c97f9c083805c958ed51345b255d455e1df51e8a401f309c0edd874d5a27f2`, clean, schema 20, integrity
+  ok, 0 foreign-key errors). Launch sync at 03:05:48Z, 0 pending: the first sync since 0.1.8's.
+- The Timeline renders with "“W6 Library stop” was automatically archived for its 2026-11-06 end
+  date. History is preserved." and the link "Review archived behaviors", which opened Behaviors
+  ("Find it under Archived behaviors"). The Timeline also read "Tomorrow: leave by 8:56 AM for W6
+  Museum morning."
+- Leave reminders turned on from the Mac's Settings at 22:16 ("Reminder setting saved."). The panel
+  read "Notifications: Enabled on this device.", "Home: saved." and "This Mac reminds from its last
+  estimate, which starts from your position, Home or your previous stop, and names when that
+  estimate was checked." Device location is allowed on the test Mac, so the Mac's trips start from
+  the device position, not Home.
+- Fixtures on the web as account A: "W6 Mac leave 1" and "2" (weekly Friday, Where = A place) at
+  Bryant Park without a street address read "Add a place for W6 Mac leave 1 to get a leave time." on
+  both web and Mac, with "Fix W6 Mac leave 1's place"; both were archived. "W6 Mac leave 3" (The
+  Morgan Library & Museum, 225 Madison Ave, 11:20 PM) and "W6 Mac leave 4" (Empire State Building,
+  11:55 PM) replaced them.
+- Travel state on the Mac at 22:33: "You may arrive late at W6 Mac leave 3: arrive 11:38 PM." The
+  expanded row read "You may arrive late: arrive 11:38 PM.", "No leave time for the trip to W6 Mac
+  leave 4, because you may arrive late at W6 Mac leave 3.", "Google Maps · checked 10:32 PM."
+- **Ticket 165, installed Mac row:** the expanded row of "W6 Mac leave 3" showed "Directions in
+  Apple Maps". Pressing it opened Apple Maps directions from My Location to "The Morgan Library &
+  Museum" with Walk selected. Pass.
+- **Notification permission denied:** with Allow notifications off for Cadence in System Settings
+  (03:37Z), Settings read "Notifications: Blocked in System Settings." with "Turn on notifications"
+  (an in-page link to the Native notifications section), "macOS permission: Denied", "Allow
+  notifications for Cadence in macOS System Settings, then refresh reminder coverage. Tracking still
+  works without notification permission." and "Reminder coverage is not verified." Turned back on;
+  Settings returned to "Notifications: Enabled on this device." Pass.
+
+Still open: the native leave reminder with the app running and after quitting, the one update,
+activation into the event drawer, Travel estimates off cancelling pending reminders, and the
+next-trip marker with a leave time ahead. Tonight's trips could not give a leave time still ahead
+before midnight, so these run on November 7. Then the test Mac returns to 0.1.8.
