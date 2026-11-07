@@ -106,8 +106,9 @@ You may, without asking:
 - create, change, archive and restore test data in accounts A and B, and revoke
   your own grants.
 
-These stay Emi's. The preflight lists the first two when they are missing; send the
-rest as one numbered list when the task needs them:
+These stay Emi's. The preflight lists her sign-ins, keys and vaults when they are
+missing, and production MCP when it is off; send the rest as one numbered list when the
+task needs them:
 - a sign-in to her own ChatGPT or Claude account when a kept session ends;
 - creating vaults, service accounts or API keys;
 - the production signing key (owner vault, Touch ID);
