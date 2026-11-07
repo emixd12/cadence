@@ -7,8 +7,10 @@ description: Automated acceptance of Cadence's MCP server and AI clients (Claude
 
 Agents run every tier and check each client step against Cadence's own records
 (the watcher). Emi signs in to her own ChatGPT and Claude accounts, creates keys and
-vaults, approves owner secrets and makes release decisions. Nothing else goes to her,
-and she hears about it only through the preflight's numbered list.
+vaults, approves owner secrets and makes release decisions. Nothing else goes to her.
+Access asks (sign-ins, keys, vault items, consent, permissions) come only from the
+preflight's numbered list. Her other steps go as one numbered list when the task needs
+them.
 
 ## Read first
 
@@ -104,7 +106,8 @@ You may, without asking:
 - create, change, archive and restore test data in accounts A and B, and revoke
   your own grants.
 
-These stay Emi's; the preflight lists them when they are missing:
+These stay Emi's. The preflight lists the first two when they are missing; send the
+rest as one numbered list when the task needs them:
 - a sign-in to her own ChatGPT or Claude account when a kept session ends;
 - creating vaults, service accounts or API keys;
 - the production signing key (owner vault, Touch ID);
@@ -118,8 +121,11 @@ before its timeout; an account check fails; or a command exits 2 (usage or setup
 
 ## Asking Emi
 
-- Owner asks come only from the preflight's numbered list (exit 10). Do not ask
-  separately for anything it checks.
+- Access asks (sign-ins, keys, vault items, consent, permissions) come only from the
+  preflight's numbered list (exit 10). Do not ask separately for anything it checks.
+- Her other steps (Touch ID for the signing key, MCP on or off, deploys and merges,
+  non-test accounts, release decisions) go as one numbered list when the task needs
+  them.
 - Run the testing agent as a **top-level agent**:
   `ws.agent.create(name, message, { topLevel: true })`. Delegated agents cannot call
   `ws.app.question.ask`; if you are delegated, send one numbered list to your
@@ -239,8 +245,9 @@ node $S down --name $N
 
 Order, one run folder per command (`--run prod-<date>-<n>`):
 
-1. Preconditions: the preflight for the run's suites exits 0 (it covers the go-ahead,
-   `agent:secret -- --check` and both sessions); Ticket 232 cleanup not running. The
+1. Preconditions: the preflight for the run's suites exits 0 (it covers
+   `agent:secret -- --check` and both sessions), go-ahead recorded (first run only),
+   Ticket 232 cleanup not running. The
    publishable key needs no lookup: every runner, the watcher and the session store
    read it from `scripts/acceptance/qa-config.mjs`. Set
    `CADENCE_QA_SUPABASE_PUBLISHABLE_KEY` only to override it (for example after a
