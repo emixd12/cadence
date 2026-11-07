@@ -46,6 +46,10 @@ or publication.**
   rule accepts both center granularities, so either routes.
 - Tests: `tests/travel-provider.test.ts` (hosted and API key paths) and
   `tests/travel-refresh-policy.test.ts`; the three new tests fail on the base code.
+- Checked live after deploy (production `7c698ec`, November 7, 20:49–20:54Z, account A):
+  "Bryant Park, New York, NY 10018" gets a leave time, the trip after it routes with no
+  "Fix …'s place", its cache row is `resolved`, and "10018" alone stays `ambiguous` and still asks
+  for a place (`docs/qa/travel-release.md`, "Named place after deploy").
 - Platform impact: web, this fix (hosted lookup). Desktop: linked Macs use the same hosted
   refresh, so no desktop change; Ticket 285 checks it. Marketing: none. Future mobile: not
   applicable. Messaging impact: none (no wording change).
