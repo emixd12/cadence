@@ -132,8 +132,11 @@ function fromLeg(
   const expired = entry.state === "stale" || Temporal.Instant.compare(Temporal.Instant.from(estimate.expiresAt), now) <= 0;
   const untilLeave = leaveAt.since(now).total("seconds");
   const arrived = untilLeave <= 0;
-  const pastLeaveNow = untilLeave <= -DEPARTURE_LEAVE_NOW_SECONDS;
-  const late = !!entry.late && !checkedInLeaveNow(entry, input, destinationStart, leaveAt, arriveAt);
+  const overshoot = entry.late ? checkedInLeaveNow(entry, input, destinationStart, leaveAt, arriveAt) : null;
+  // A check moves the leave time to the check itself. Leave now still ends when it would have
+  // without the check, at the ideal leave time plus the leave-now period.
+  const pastLeaveNow = untilLeave - (overshoot ?? 0) <= -DEPARTURE_LEAVE_NOW_SECONDS;
+  const late = !!entry.late && overshoot === null;
   // An expired late flag says nothing once leave now has passed. Only the clock is left.
   const lateBasis = late && !(expired && pastLeaveNow) ? "evidence" : pastLeaveNow ? "clock" : null;
   const state: Draft["state"] = lateBasis ? "late"
@@ -156,7 +159,8 @@ function fromLeg(
  * Ticket 284 finding: a route checked at or after its leave time leaves at once, so it arrives
  * after its target by about as long as the check came after the ideal leave time. Within the
  * leave-now period that is still "leave now", as it was before the check. A route that waits for a
- * later ready time, such as the end of the previous stop, stays late.
+ * later ready time, such as the end of the previous stop, stays late. Returns how many seconds the
+ * route arrives after its target, or null when the route is late from the evidence.
  */
 function checkedInLeaveNow(
   entry: TravelResolvedLegEvidence,
@@ -164,13 +168,14 @@ function checkedInLeaveNow(
   destinationStart: string | null,
   leaveAt: Temporal.Instant,
   arriveAt: Temporal.Instant,
-): boolean {
-  if (entry.leg.role === "return" || !destinationStart || !entry.estimate) return false;
+): number | null {
+  if (entry.leg.role === "return" || !destinationStart || !entry.estimate) return null;
   const readyAt = Temporal.Instant.from(entry.leg.readyAt);
   const leavesWhenReady = Temporal.Instant.compare(leaveAt, readyAt) <= 0;
   const readyWhenChecked = Temporal.Instant.compare(readyAt, Temporal.Instant.from(entry.estimate.observedAt)) <= 0;
   const target = Temporal.Instant.from(destinationStart).subtract({ seconds: Math.ceil(input.arrivalBufferSeconds) });
-  return leavesWhenReady && readyWhenChecked && arriveAt.since(target).total("seconds") < DEPARTURE_LEAVE_NOW_SECONDS;
+  const after = arriveAt.since(target).total("seconds");
+  return leavesWhenReady && readyWhenChecked && after < DEPARTURE_LEAVE_NOW_SECONDS ? Math.max(0, after) : null;
 }
 
 function withoutTime(

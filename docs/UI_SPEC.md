@@ -274,7 +274,8 @@ travel ends the line only when the trip needs a new estimate. Times show to the 
 route is late only when its arrival shows a later minute than its target. A route checked at or
 after its leave time leaves at once; while it arrives less than 5 minutes after its target it
 reads "Leave now", as it did before the check, and it reads late from the evidence only after
-that (Ticket 284 findings). Decision D12: a Calendar event
+that. The check does not extend leave now: it still ends 5 minutes after the ideal leave time
+(Ticket 284 findings). Decision D12: a Calendar event
 with a location is in person, and one without a location is not travel. It asks nothing, gets
 no route and never holds up a later trip; it stays a normal event on the Timeline. Nothing asks
 about attendance. Steps that need a place or a start (Ticket 273) show one sentence and one

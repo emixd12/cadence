@@ -143,7 +143,12 @@ describe("each state", () => {
     const fresh = model(local("13:57:30"), [refreshed(local("14:22:20"))]).next;
     expect(fresh).toMatchObject({ state: "leave_now", lateBasis: null, freshness: "current", arriveAt: local("14:22:30") });
     expect(fresh?.linePhrase).toBe("Leave now for Dentist from Home · walking, arrive 2:22 PM.");
-    // Past the window the clock speaks, as it would have without the check.
+    // Past the window the clock speaks, as it would have without the check. The window ends at the
+    // ideal leave time (1:55 PM) plus 5 minutes, not 5 minutes after the check.
+    expect(model(local("13:59:50"), [refreshed(local("14:22:20"))]).next).toMatchObject({ state: "leave_now", lateBasis: null });
+    const past = model(local("14:00"), [refreshed(local("14:22:20"))]).next;
+    expect(past).toMatchObject({ state: "late", lateBasis: "clock", freshness: "current" });
+    expect(past?.linePhrase).toBe("If you haven't left for Dentist yet, you'd arrive about 2:25 PM.");
     expect(model(local("14:02:20"), [refreshed(local("14:22:20"))]).next).toMatchObject({ state: "late", lateBasis: "clock" });
     // Five minutes or more past the target is late.
     expect(model(local("13:57:30"), [refreshed(local("14:25"))]).next).toMatchObject({ state: "late", lateBasis: "evidence" });

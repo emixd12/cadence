@@ -8,7 +8,9 @@ its fix. No new wording, no schema change and no provider call.
 - Late compares at the displayed minute: an arrival seconds past a 2:15 target is not late (core
   `travelArrivalAfterTarget`, used by the travel and weather-margin resolvers).
 - A route checked at or after its leave time reads "Leave now" while it arrives less than 5
-  minutes after its target, as it did before the check (departure model). The fresh "If you
+  minutes after its target, as it did before the check (departure model). Leave now still ends 5
+  minutes after the ideal leave time, so the fresh "If you haven't left for … yet" form follows
+  (verifier fix). The fresh "If you
   haven't left yet, you'd be home about" form stays unreachable by design: an estimate lives 5
   minutes, the same as leave now, and a refresh after the event's end no longer plans the trip home.
 - Directions stays once an event is under way: the trip leaving the stop counts as its resolved place.
