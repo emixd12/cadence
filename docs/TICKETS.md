@@ -16845,7 +16845,7 @@ Scope and acceptance:
   (`.agentic/scripts/test-access-preflight.mjs`, skills commit `5c4baab`) with the skill's
   installer. Cadence's own `scripts/cloudflare-api.mjs` and `docs/SERVICE_CONNECTIONS.md`
   stay as they were.
-- Manifest `.agentic/test-access.json`: 49 requirements across 12 suites, from the test access
+- Manifest `.agentic/test-access.json`: 48 requirements across 12 suites, from the test access
   inventory, with the 2026-11-07 decisions applied.
 - Adapters in `scripts/acceptance/access/`: vault, Keychain, Calendar, Google sign-in, Cadence
   session, connectors, QA Chrome, test devices, host checks, owner records, and a placeholder

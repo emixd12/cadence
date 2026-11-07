@@ -1022,29 +1022,6 @@
       "freshness_seconds": 0
     },
     {
-      "id": "mcp-prod-go-ahead",
-      "kind": "owner-approval",
-      "summary": "Owner go-ahead for production MCP acceptance: recorded for Ticket 256; later runs need none.",
-      "suites": [
-        "mcp-protocol",
-        "mcp-clients",
-        "mcp-web"
-      ],
-      "probe": {
-        "argv": [
-          "node",
-          "scripts/acceptance/access/record.mjs",
-          "decision",
-          "--file",
-          ".claude/skills/mcp-acceptance/SKILL.md",
-          "--contains",
-          "later runs need none"
-        ]
-      },
-      "owner_step": "Give the go-ahead for the first production MCP acceptance run.",
-      "freshness_seconds": 86400
-    },
-    {
       "id": "prod-mcp-enabled",
       "kind": "provider-config",
       "summary": "MCP enabled on production: /.well-known/oauth-protected-resource answers 200.",

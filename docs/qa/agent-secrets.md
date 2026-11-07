@@ -285,6 +285,9 @@ Not in the manifest (from the test access inventory), one reason each:
   (`CONNECTOR_CREDENTIAL_*`, `OUTLOOK_CALENDAR_*`) are not probed: listing them needs the
   owner's Vercel login, and no credential-free read of their state is known. A missing
   connector flag still shows up, as `not_configured` from that connector's status probe.
+- `mcp-prod-go-ahead`: the go-ahead for the first production MCP run was one-time, and
+  Ticket 256 has already run on production (`STATUS.md`), so later runs need none. Checking
+  it by searching a sentence in the skill would break on any wording change.
 - `notary-credentials` and `updater-signing-key` are folded into `notarization-go-ahead`: their
   custody is not documented in the repo, and the owner supplies them with each notarization
   instruction through the per-version `build-env.sh`.

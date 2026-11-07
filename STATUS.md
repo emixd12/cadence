@@ -7,7 +7,7 @@
 - Engine installed from `service-connections-bootstrap` (skills commit `5c4baab`, branch
   `claude/test-access-preflight`) as `.agentic/scripts/test-access-preflight.mjs`. The skill
   was deployed to `~/.claude/skills` from the same commit at 2026-11-07 22:06Z.
-- `.agentic/test-access.json`: 49 requirements across 12 suites, with the 2026-11-07 owner
+- `.agentic/test-access.json`: 48 requirements across 12 suites, with the 2026-11-07 owner
   decisions applied. `npm run qa:preflight -- --suite <suite> --dry-run` works for every suite.
 - Adapters in `scripts/acceptance/access/`. Google Calendar and Outlook connect, test-Mac sign-in,
   QA Chrome permission grants and travel settings are agent steps without a script yet; the

@@ -60,6 +60,18 @@ describe('Cadence test-access manifest', () => {
     expect(byId.get('email-test-recipient').probe.argv).toContain('docs/DECISIONS.md');
   });
 
+  it('every probe that looks for text in a repo file finds it today, so a doc edit fails here instead of asking the owner', () => {
+    const textProbes = model.requirements.filter((requirement) => requirement.probe.argv.includes('--contains'));
+    expect(textProbes.map((requirement) => requirement.id)).toEqual(['email-test-recipient']);
+    for (const requirement of textProbes) {
+      const argv = requirement.probe.argv;
+      const file = argv[argv.indexOf('--file') + 1];
+      const text = argv[argv.indexOf('--contains') + 1];
+      expect(readFileSync(join(root, file), 'utf8'), `${requirement.id}: ${file}`).toContain(text);
+    }
+    expect(model.byId.has('mcp-prod-go-ahead')).toBe(false);
+  });
+
   it('names only existing scripts and known agent steps, and no inline secret options', () => {
     for (const requirement of model.requirements) {
       for (const command of [requirement.probe, requirement.renew].filter(Boolean)) {
