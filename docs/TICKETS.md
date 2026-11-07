@@ -16826,3 +16826,288 @@ Messaging impact: P-027 (recovery wording approved, D21).
 
 Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`. The blank-window fix:
 `tests/desktop-render-recovery.dom.test.tsx` and `tests/desktop-main-recovery.dom.test.tsx`.
+
+## Daily Brief on the user's ChatGPT plan: Tickets 286–292
+
+Filed November 7, 2026. The owner approved the plan that day (`docs/DECISIONS.md`,
+2026-11-07, D25). Goal: a signed-in user of Cadence for Mac can connect a ChatGPT Plus or Pro
+account, and the Daily Brief then runs on that user's ChatGPT plan instead of Cadence's
+OpenAI key.
+
+| Wave | Ticket | Delivery slice | Dependencies |
+|---|---|---|---|
+| 1 | 286 | Record the ChatGPT plan decision and tickets | None |
+| 1 | 287 | Spike the Daily Brief request on a ChatGPT plan | None |
+| 2 | 288 | Split Daily Brief generation and add the ChatGPT plan adapter | 287 |
+| 2 | 289 | Mac app ChatGPT connection | 287 |
+| 3 | 290 | Hosted Daily Brief prepare and complete for a device model | 287, 288 |
+| 3 | 291 | Mac app "Use your ChatGPT plan" UI and Daily Brief wiring | 289, 290 |
+| 4 | 292 | Installed Mac acceptance of the ChatGPT plan Daily Brief | 286–291 |
+
+Rules for every ticket below:
+
+- Write the client from OpenAI's public docs (`https://developers.openai.com/siwc/llms-full.txt`).
+  Do not copy, vendor or depend on the Sign in with ChatGPT DevKit or its components; its
+  licence is noncommercial (`docs/LEGAL.md` L-018).
+- Never write ChatGPT access, refresh or ID tokens, authorization codes or PKCE verifiers to
+  files, logs, test snapshots, SQLite, exports, backups or the repository. Tokens live only in
+  the Mac's Keychain. Tests use synthetic data.
+- When a connected plan with plan usage cannot run a brief, show the reason. Never fall back
+  to Cadence's OpenAI key for that brief, and never loop retries (D25).
+- Cadence picks the model from the user's ChatGPT catalog. No model setting (D25).
+- The web app shows no ChatGPT controls.
+- Merges, deployments, Mac notarization and publication wait for the owner's instruction
+  each time.
+
+Not in this work: ChatGPT as a Cadence login on web or Mac; ChatGPT plan usage in the hosted
+web app; billing, subscriptions or discounts; an account-free Mac Daily Brief; more than one
+active ChatGPT account per installation; Claude, Gemini or other providers; DevKit code or
+components; audio, tools or web search in the brief. `docs/FUTURE_UPDATES.md` records the
+follow-ups.
+
+## Ticket 286: Record the ChatGPT plan decision and tickets
+
+Status: in progress on branch `chatgpt-https`, November 7, 2026.
+Dependencies: none.
+
+Goal: record the approved direction in the repository before any code changes.
+
+Scope and acceptance:
+
+- Record D25 in `docs/DECISIONS.md`: the Mac-first slice, no fallback to Cadence's key, the
+  model chosen from the user's catalog, the deferred items and the reasons.
+- File Tickets 286–292 here. Add the in-scope and out-of-scope lines to `AGENTS.md` and a
+  scope paragraph to `docs/PRODUCT_SPEC.md`.
+- Record the follow-ups in `docs/FUTURE_UPDATES.md` and the cost effect in `docs/COSTS.md`.
+- Log L-017 to L-019 and P-028 to P-031. Mark Tickets 286 and 287 started in `STATUS.md`.
+- No code, and no Privacy, Terms, Trust, user-guide or marketing text.
+
+References: the workspace plan "Use your ChatGPT plan in Cadence";
+`https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Documents only. Tickets 288 and 290 implement the hosted steps. |
+| Desktop | Documents only. Tickets 289, 291 and 292 implement and accept. |
+| Marketing | Not applicable: no marketing text changes. P-031 logs the future claim. |
+| Future mobile | Not applicable: documents only. |
+
+Messaging impact: P-028, P-029, P-030 and P-031 logged.
+
+Verification: `npm run agents:check`, `npm run interactions:check` and
+`dagger check --progress=report`.
+
+## Ticket 287: Spike the Daily Brief request on a ChatGPT plan
+
+Status: in progress on branch `chatgpt-https`, November 7, 2026.
+Dependencies: none.
+
+Goal: prove with a real ChatGPT Plus or Pro account that the Daily Brief request works under
+ChatGPT plan rules, and measure latency and output validity per model.
+
+Scope and acceptance:
+
+- One development-only script under `scripts/`, never shipped in the Mac app, written from
+  the public docs. Its mock mode has unit tests.
+- Sign-in on a 127.0.0.1 loopback callback with PKCE, state and nonce; ID-token validation;
+  a check that plan usage was granted. Read the model catalog.
+- Run the Daily Brief prompt on synthetic briefing fixtures through the existing validation.
+  Record accepted and rejected request fields, latency per model and the validation pass rate.
+- Send CORS preflights from the Mac app's origin to decide whether Mac app HTTP runs in the
+  webview or in Rust.
+- Tokens stay in memory and the refresh token is revoked at the end. The owner signs in and
+  approves consent once.
+- `docs/qa/2026-11-07-chatgpt-plan-spike.md` records the results with no secrets and
+  recommends the request contract, model selection, the attempt deadline and the transport.
+
+References: `lib/services/daily-brief-openai.ts`, `lib/services/daily-brief-consumer.ts`,
+`lib/services/briefing-fixtures.ts`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: a development script only. |
+| Desktop | Not applicable: evidence for Tickets 288–291; nothing ships. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable: development script only. |
+
+Messaging impact: none.
+
+Verification: `npm run test` (mock mode), the live run with the owner's consent, and
+`dagger check --progress=report`.
+
+## Ticket 288: Split Daily Brief generation and add the ChatGPT plan adapter
+
+Status: not started.
+Dependencies: Ticket 287.
+
+Goal: make the model call separable so a device can run it, with no change to today's hosted
+behavior.
+
+Scope and acceptance:
+
+- Extract a prepare step (instructions, payload, response schema, serializable validation
+  data) and a validate step (model output to briefing) from `generateDailyBrief`, which
+  composes both. Existing Daily Brief tests pass unchanged.
+- Prepare and validate run in the browser (no `Buffer` or `node:crypto`), or move into
+  `packages/core`, following `docs/AGENT_RESOLVERS.md`.
+- A ChatGPT plan adapter builds the request contract Ticket 287 confirms, reads the stream
+  through completion, keeps the 64 KB cap and the abort signal, and never logs bodies.
+- Map plan errors to usage limit, not eligible, reconnect, retry later and advisor
+  unavailable. Device mode supports recipe 1.0 only.
+- Tests cover the prepare/validate round trip, stream parsing and error mapping.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | `lib/services/daily-brief-consumer.ts`; hosted behavior unchanged. |
+| Desktop | Provides the adapter Ticket 291 wires in. |
+| Marketing | Not applicable: no public change. |
+| Future mobile | Not applicable: no mobile client. |
+
+Messaging impact: none.
+
+Verification: `npm run resolvers:check`, `npm run test` and `dagger check --progress=report`.
+
+## Ticket 289: Mac app ChatGPT connection
+
+Status: not started.
+Dependencies: Ticket 287.
+
+Goal: the Mac app can connect, refresh and disconnect one ChatGPT account, with every token in
+Keychain.
+
+Scope and acceptance:
+
+- A one-shot loopback listener on 127.0.0.1 with an OS-chosen port and path `/auth/callback`.
+  It checks state, times out after 5 minutes and closes after one callback.
+- A host ID created once per installation, kept on the device, never synced or exported.
+- Authorization, code exchange, ID-token validation and the granted-scope check. Single-flight
+  refresh that saves each rotated refresh token.
+- Disconnect revokes the refresh token at OpenAI, then clears local tokens.
+- Read the model catalog. Connection states: disconnected; connected without plan usage;
+  connected with plan usage; needs reconnect.
+- Tokens never appear in SQLite, local storage, logs, exports, backups or error messages. A
+  test proves exports and backups hold no ChatGPT credential.
+- `docs/DESKTOP_BUILD.md` and `docs/DESKTOP_DATA_MODEL.md` describe the host ID and credential
+  storage.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: the web app shows no ChatGPT controls (D25). |
+| Desktop | `apps/desktop/src-tauri` listener and Keychain; `apps/desktop/src` connection client. |
+| Marketing | Not applicable: no public claim until release (P-031). |
+| Future mobile | Not applicable: desktop only. |
+
+Messaging impact: P-028 (data flow).
+
+Verification: desktop TypeScript and Rust tests, and `dagger check --progress=report`.
+
+## Ticket 290: Hosted Daily Brief prepare and complete for a device model
+
+Status: not started.
+Dependencies: Tickets 287 and 288.
+
+Goal: a signed-in Mac gets a prepared brief request from Cadence's server, runs it on the
+user's ChatGPT plan and returns the output for validation. Cadence's server makes no OpenAI
+call for these briefs.
+
+Scope and acceptance:
+
+- Prepare and complete routes under `app/api/advisor/brief`, recorded in `docs/ROUTE_MAP.md`.
+- Prepare runs today's admission, context and freshness steps and returns the request with a
+  short-lived signed envelope. The envelope binds the user, installation, lease, configuration
+  and context revisions, and holds only validation data. The server stores no prepared payload.
+- Complete verifies the envelope and the lease, validates the output with Ticket 288's
+  validator, finishes the lease, records the tip and returns the briefing.
+- `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode. Settings report device-model availability
+  without requiring `OPENAI_API_KEY`.
+- Tests reject forged, expired and mismatched envelopes and a superseded lease, and prove the
+  server model adapter is never called in device mode. Performance spans carry no prompt or
+  payload.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Hosted routes and the flag. The web Daily Brief keeps the hosted model path. |
+| Desktop | Linked Macs call these routes through Ticket 291. |
+| Marketing | Not applicable: no public claim. |
+| Future mobile | Not applicable: no mobile client. |
+
+Messaging impact: P-028 (data flow).
+
+Verification: `npm run resolvers:check`, `npm run test` and `dagger check --progress=report`.
+
+## Ticket 291: Mac app "Use your ChatGPT plan" UI and Daily Brief wiring
+
+Status: not started.
+Dependencies: Tickets 289 and 290.
+
+Goal: users connect ChatGPT from Settings, see when the brief uses their plan and recover from
+limits.
+
+Scope and acceptance:
+
+- A desktop-only Settings card "Use your ChatGPT plan" with a "Continue with ChatGPT" button
+  that follows OpenAI's brand guidelines (L-019). No DevKit components.
+- Connected state: the ChatGPT email, "Using ChatGPT plan", "Manage usage" (opens
+  `https://chatgpt.com/settings/usage` in the system browser) and "Disconnect". A one-time
+  "You're using your ChatGPT plan" confirmation after the first connection with plan usage.
+- With plan usage, the desktop Daily Brief runs prepare, the device model, then complete.
+- Daily Brief states: "Using ChatGPT plan"; usage limit with "Manage usage" as the primary
+  action; not eligible; reconnect; plan usage off (offers "Continue with ChatGPT").
+- Update `interaction-registry.json`, the design-system bench and `DESIGN.md`; use the
+  impeccable workflow. Log new copy in `docs/MESSAGING_CHANGES.md`; leave existing disclosure
+  text unchanged.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: the web app shows none of this (D25). |
+| Desktop | `apps/desktop/src/settings-screen.tsx`, `apps/desktop/src/daily-brief.ts`, `components/briefing/*`. |
+| Marketing | Not applicable until release (P-031). |
+| Future mobile | Not applicable: desktop only. |
+
+Messaging impact: P-029 and P-030, plus new entries for the card's copy.
+
+Verification: `npm run interactions:check`, `dagger check --progress=report` and bench
+screenshots of each state at narrow widths.
+
+## Ticket 292: Installed Mac acceptance of the ChatGPT plan Daily Brief
+
+Status: not started.
+Dependencies: Tickets 286–291.
+
+Goal: prove the feature on an installed dev-signed build.
+
+Scope and acceptance:
+
+- Follow `docs/DESKTOP_RELEASE.md`, "Agent-run installed acceptance", and the
+  `desktop-acceptance` skill. No notarization or publication.
+- Owner steps: sign in to ChatGPT and approve consent; quit Cadence when asked.
+- Check that a brief completes on the plan with no Cadence model call in the hosted spans;
+  Keychain holds the tokens and SQLite does not; quit and relaunch keep the connection;
+  Disconnect revokes; a disconnect in ChatGPT settings shows the reconnect state; the
+  usage-limit state appears through a development fault switch.
+- Record evidence in `docs/qa` and `STATUS.md`, and measured latency in `docs/COSTS.md`.
+
+Platform impact:
+
+| Platform | Implementation, follow-up, or not-applicable reason |
+|---|---|
+| Web | Not applicable: no web surface. |
+| Desktop | Installed acceptance on a dev-signed build. |
+| Marketing | Not applicable: no publication in this ticket. |
+| Future mobile | Not applicable: desktop only. |
+
+Messaging impact: none.
+
+Verification: the installed-app checks above and `dagger check --progress=report`.

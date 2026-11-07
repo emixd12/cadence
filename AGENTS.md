@@ -46,8 +46,10 @@ Cadence-owned OAuth server, and Claude and ChatGPT plugins; see
 read-only Outlook Calendar, iCloud Calendar, and Hevy workout-timing connectors on
 web and linked desktop with local verification. Ticket 241 owns final
 disclosure/evidence review; live and release gates remain open. Tickets 263–285
-implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Mobile and
-broader workspace restructuring remain deferred.
+implement the travel advisory revamp (`docs/DECISIONS.md`, 2026-11-04). Tickets 286–292
+let a signed-in Mac user run the Daily Brief on their own ChatGPT plan
+(`docs/DECISIONS.md`, 2026-11-07, D25). Mobile and broader workspace restructuring remain
+deferred.
 
 ## Agent operating model
 
@@ -203,6 +205,12 @@ In scope:
   next trip only, without hovering; opt-in leave reminders that reach the user with
   Cadence closed; remembered places (decision D12 drops attendance); tomorrow's first trip; and Outlook
   and iCloud event locations read for routing
+- Daily Brief on the user's ChatGPT plan for signed-in Mac users under Tickets 286–292
+  (`docs/DECISIONS.md`, 2026-11-07, D25): the Mac connects one ChatGPT account and runs
+  only the model call; Cadence's server still builds the context and validates the output.
+  ChatGPT tokens stay in the Mac's Keychain. No fallback to Cadence's OpenAI key when the
+  plan cannot run a brief; Cadence picks the model from the user's ChatGPT catalog. No
+  DevKit code or components
 - Workspace split only when explicitly ticketed
 
 Out of scope for v1:
@@ -230,6 +238,8 @@ Out of scope for v1:
   from recorded activity
 - EventKit and local-only Mac calendar access
 - Payment/subscription infrastructure
+- ChatGPT as a Cadence login and ChatGPT plan usage in the hosted web app, until OpenAI
+  approves them; plan-based pricing or discounts, until a billing ticket exists (D25)
 - Admin dashboards
 - PWA offline cache
 - Web offline writes or PWA conflict handling
