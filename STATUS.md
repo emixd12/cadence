@@ -23,7 +23,9 @@
   screen." Logged as `P-027`.
 - Tests: `tests/desktop-render-recovery.dom.test.tsx` mounts `Product` with an archived
   Behavior's notice, opens Behaviors from the link, and recovers from a failed screen through
-  Settings. With either fix reverted, 2 of its 3 tests fail.
+  Settings. With either fix reverted, 2 of its 3 tests fail. The verifier added
+  `tests/desktop-main-recovery.dom.test.tsx`, which imports `main.tsx` with a `Product` that throws
+  and expects the app recovery message; it fails with the `main.tsx` boundary removed.
 - Platform impact: web, not applicable (the web Timeline has its `LinkProvider` in
   `WebRuntimeProvider`). Desktop: this fix; Ticket 285 checks it on the installed app.
   Marketing: none. Future mobile: not applicable, desktop only. Messaging impact: `P-027`.
