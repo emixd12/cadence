@@ -1857,3 +1857,27 @@ The owner decided on November 7, 2026:
 
 Platform impact: desktop, Mac 0.1.9 publication. Web: not applicable. Marketing: the download
 link moves at publication. Future mobile: not applicable. Messaging impact: none.
+
+## 2026-11-07: Split release check 4 for Mac 0.1.9 and approve its notes (D25)
+
+The owner decided on November 7, 2026:
+
+1. The test Mac cannot run check 4: published 0.1.8 opens blank for test account A (an
+   auto-archived Behavior), so its update panel is unreachable. Check 3 runs on the test Mac
+   from the quarantined 0.1.9 DMG over account A's database, with Gatekeeper's first open.
+2. Check 4 runs on the owner's Mac through the real updater after "Publication", step 2, with
+   its database compared before and after.
+3. The feed notes are approved exactly as drafted (the release packet's "Release notes").
+
+Platform impact: desktop, Mac 0.1.9 publication. Web, marketing and future mobile: not
+applicable. Messaging impact: none.
+
+## 2026-11-07: Put published 0.1.8 on the owner's Mac for check 4 (D26)
+
+The owner decided on November 7, 2026: the owner's Mac ran `0.1.10-dev.1`, which is above 0.1.9,
+so its updater would never offer 0.1.9. The agent protects that app and a consistent database
+copy, installs the published, notarized 0.1.8 from its verified DMG, and after "Publication",
+step 2, drives 0.1.8's own updater to 0.1.9. The owner quits Cadence for the swap.
+
+Platform impact: desktop, Mac 0.1.9 publication. Web, marketing and future mobile: not
+applicable. Messaging impact: none.

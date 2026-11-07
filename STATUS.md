@@ -1,5 +1,30 @@
 # Implementation Status
 
+## Cadence for Mac 0.1.9 published — November 7, 2026
+
+**Published November 7, 2026, 23:24–23:30Z** (D24–D26). Built from `7c698ec` (PR #196 merge) with
+the blank-window fix and the travel advisory revamp. Both feeds serve 0.1.9;
+`Cadence_aarch64.dmg` is the 0.1.9 DMG (`93257f4f…`). Packet:
+`docs/qa/2026-11-07-desktop-0.1.9-release-packet.md`.
+
+- Notarization: app `b6040799…` and DMG `de9aac5c…`, both Accepted and stapled; 14 artifact checks
+  in `build` and in standalone `verify`.
+- Test Mac, account A, from the quarantined DMG over 0.1.8: Gatekeeper first open (owner chose
+  Open); no table lost rows; the archive notice and its link render where 0.1.8 was blank;
+  sign-in and Calendar callback replay, reminder coverage to the 30-day target, session renewal,
+  revoked session and Reconnect pass.
+- Check 4 (real updater) passed on the owner's Mac: published 0.1.8's own updater installed 0.1.9
+  after the stable feed moved, and **Restart Cadence** opened it with no lost rows. The test Mac
+  could not run it because 0.1.8 opens blank for account A (D25, D26).
+- 0.1.8 users with an auto-archived Behavior cannot reach the updater; the release body tells
+  them to download 0.1.9.
+- Not established: Calendar-event drawer activation from a leave reminder (Ticket 285). macOS 14
+  not tested.
+- Both Macs now run 0.1.9. The test Mac's 0.1.8 copies and the owner's 0.1.10-dev.1 app are kept
+  in their backup folders.
+- Platform impact: desktop release only. Web, marketing and future mobile: no change.
+  Messaging impact: none.
+
 ## Ticket 285: installed Mac acceptance run — November 6–7, 2026
 
 **On branch `travel-wave6`. Evidence in `docs/qa/travel-release.md`, "Ticket 285". No notarization
