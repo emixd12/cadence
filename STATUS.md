@@ -1,5 +1,33 @@
 # Implementation Status
 
+## Ticket 285 defect fixed: blank Mac window from the archive notice — November 7, 2026
+
+**On branch `travel-wave6`. Awaiting verification and a rebuilt dev-signed app for Ticket 285.**
+
+- Cause: the desktop Timeline renders "Review archived behaviors" as a shared `RuntimeLink`
+  whenever it has an automatic-archive notice, and it had no `LinkProvider`. The throw unmounted
+  the whole app, because the Mac app had no error boundary, so the window was blank and sync
+  never ran. Present since `d95dfaa3` (September 18), so released 0.1.8 is affected.
+- Fix: `apps/desktop/src/timeline-screen.tsx` provides a link that switches desktop screens and
+  never loads the href; `product.tsx` passes its `navigate`. The link opens Behaviors.
+- A new `DesktopErrorBoundary` wraps the active screen in `product.tsx` (reset by opening another
+  screen or **Try again**), so navigation, account sync and Settings stay mounted. A second one
+  wraps `Product` in `main.tsx` and shows the existing "Cadence could not open" message.
+- Audit of context-requiring UI on desktop screens: the archive notice was the only
+  `RuntimeLink` outside a `LinkProvider`. `BehaviorList`'s links render inside
+  `BehaviorsScreen`'s provider and all point to `/behaviors`. `useRefresh` users
+  (`DayProgressTimeline`, `StatusButtons`, `OccurrenceNoteForm`) render only inside the Timeline
+  and Behaviors `RefreshProvider`s. `PlaceLabels` and the development-build context have safe
+  defaults. Settings, Export, onboarding, update and account panels use no required context.
+- New wording, not yet approved (D7): "This screen could not be shown. Try again, or open another
+  screen." Logged as `P-027`.
+- Tests: `tests/desktop-render-recovery.dom.test.tsx` mounts `Product` with an archived
+  Behavior's notice, opens Behaviors from the link, and recovers from a failed screen through
+  Settings. With either fix reverted, 2 of its 3 tests fail.
+- Platform impact: web, not applicable (the web Timeline has its `LinkProvider` in
+  `WebRuntimeProvider`). Desktop: this fix; Ticket 285 checks it on the installed app.
+  Marketing: none. Future mobile: not applicable, desktop only. Messaging impact: `P-027`.
+
 ## Travel advisory revamp Wave 5: wording approved (D20) — November 6, 2026
 
 **On branch `us-work`. Not merged or deployed.**
