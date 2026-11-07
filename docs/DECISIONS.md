@@ -1770,3 +1770,34 @@ and 282 were verified:
 Platform impact: web and desktop through the shared phrase module and Calendar details.
 Marketing: not applicable until release. Future mobile: mobile web inherits the web text;
 native mobile is deferred. Messaging impact: P-025 and P-021 notes.
+
+## 2026-11-07: Mac recovery messages approved (D21)
+
+The owner decided on November 7, 2026, as relayed by the travel coordinator after the Ticket 285
+blank-window fix was verified:
+
+1. "This screen could not be shown. Try again, or open another screen." is approved as written.
+   It shows, with **Try again**, when one Mac app screen fails to render.
+2. "Cadence could not open. Quit and reopen the app to try again." is approved as written. It now
+   also shows when the app shell fails to render, not only when the app fails to start.
+
+Platform impact: desktop, `apps/desktop/src/desktop-error-boundary.tsx`. Web: not applicable, the
+change is in the Mac app only. Marketing: not applicable. Future mobile: not applicable,
+desktop only. Messaging impact: P-027.
+
+## 2026-11-07: Patch the published Mac app with only the blank-window fix (D22)
+
+The owner decided on November 7, 2026:
+
+1. The published Mac app gets a patch release now, built from `main`, with only the Ticket 285
+   blank-window fix: the archive notice's link on the desktop Timeline gets a `LinkProvider`
+   that switches screens, and screen-level and app-level error boundaries keep a render error
+   from blanking the window. The rest of Wave 6 waits for its own release.
+2. The patch is version 0.1.9, the next patch after the published 0.1.8. It is above the
+   `0.1.9-dev.N` builds by SemVer, so the stable feed updates them. Later dev builds use
+   `0.1.10-dev.N` (`docs/DESKTOP_RELEASE.md`, "Dev-signed builds").
+3. Notarization and publication still wait for the owner's go-ahead on the built candidate.
+
+Platform impact: desktop, the 0.1.9 patch. Web: not applicable, the web Timeline already has a
+`LinkProvider`. Marketing: the download link moves only at publication. Future mobile: not
+applicable. Messaging impact: P-027.

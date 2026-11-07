@@ -1,5 +1,5 @@
-import { RuntimeLink, RefreshProvider } from "@cadence/ui/runtime";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { LinkProvider, RuntimeLink, RefreshProvider, type RuntimeLinkProps } from "@cadence/ui/runtime";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { NoteShortcut } from "@cadence/core/types/note-shortcut";
 
@@ -12,6 +12,7 @@ import { useTimelineWheelReload } from "@/lib/ui/timeline-wheel-reload";
 import { timelineBriefKey, type DailyBriefClient } from "@/lib/ui/daily-brief";
 import { DailyBriefLauncher } from "@/components/briefing/DailyBriefLauncher";
 import type { NotificationTarget } from "./notification-activation";
+import type { DesktopScreen } from "./desktop-app";
 import type {
   OccurrenceFormAction,
   TimeTrackingFormAction,
@@ -33,7 +34,40 @@ export type TimelineScreenProps = Readonly<{
   shortcutsByBehavior?: Record<string, NoteShortcut[]>;
   dailyBriefClient?: DailyBriefClient | null;
   dailyBriefSessionKey?: string;
+  // Shared links on the Timeline (the archive notice) switch desktop screens instead of loading a URL.
+  onNavigate?: (screen: DesktopScreen, anchor?: string) => void;
 }>;
+
+type NavigateScreen = (screen: DesktopScreen, anchor?: string) => void;
+const ScreenNavigation = createContext<NavigateScreen | undefined>(undefined);
+const DESKTOP_SCREENS: Readonly<Record<string, DesktopScreen>> = {
+  "/timeline": "timeline", "/behaviors": "behaviors", "/export": "export", "/settings": "settings",
+};
+
+function desktopScreenForHref(href: string): { screen: DesktopScreen; anchor?: string } | null {
+  const url = new URL(href, "https://cadence.local");
+  const screen = url.origin === "https://cadence.local" ? DESKTOP_SCREENS[url.pathname] : undefined;
+  return screen ? { screen, anchor: url.hash.slice(1) || undefined } : null;
+}
+
+function DesktopScreenLink({ href, scroll: _scroll, onClick, ...props }: RuntimeLinkProps) {
+  void _scroll;
+  const navigate = useContext(ScreenNavigation);
+  return (
+    <a
+      {...props}
+      href={href}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented) return;
+        // The webview has no routes; never let it load the href.
+        event.preventDefault();
+        const target = desktopScreenForHref(href);
+        if (target) navigate?.(target.screen, target.anchor);
+      }}
+    />
+  );
+}
 
 export function TimelineScreen({
   timeline,
@@ -45,6 +79,7 @@ export function TimelineScreen({
   shortcutsByBehavior = {},
   dailyBriefClient,
   dailyBriefSessionKey,
+  onNavigate,
   ...actions
 }: TimelineScreenProps) {
   const nextFutureDays = timeline.nextFutureDays;
@@ -105,6 +140,8 @@ export function TimelineScreen({
   }, []);
 
   return (
+    <ScreenNavigation.Provider value={onNavigate}>
+    <LinkProvider component={DesktopScreenLink}>
     <RefreshProvider onRefresh={onRefresh}>
       <div ref={rootRef} className="flex w-full flex-col">
         <h1 className="sr-only">Timeline</h1>
@@ -203,5 +240,7 @@ export function TimelineScreen({
         </div>
       </div>
     </RefreshProvider>
+    </LinkProvider>
+    </ScreenNavigation.Provider>
   );
 }

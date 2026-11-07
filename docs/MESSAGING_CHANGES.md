@@ -48,7 +48,7 @@ numbers move.
 
 ## How to add or update an entry
 
-1. Give a new entry the next ID (`P-027` is next). Never reuse an ID.
+1. Give a new entry the next ID (`P-028` is next). Never reuse an ID.
 2. Fill in every field below. Quote the conflicting current text briefly and name
    its file and section.
 3. Log the change when it is decided or implemented. Do not wait for release.
@@ -96,6 +96,7 @@ Status values:
 | [P-024](#p-024-leave-reminder-switch-and-readiness-list-in-travel-settings) | Leave reminder switch and readiness list in Travel Settings | logged | 279 | Travel Settings, user guide |
 | [P-025](#p-025-corrected-places-are-remembered-for-their-location-text) | Corrected places are remembered for their location text | logged | 281 | Privacy, in-app copy, user guide |
 | [P-026](#p-026-outlook-and-icloud-events-get-leave-reminders-and-mac-cached-locations) | Outlook and iCloud events get leave reminders, and Mac-cached locations | logged | 283 | Privacy, Travel Settings, user guide, provider submissions |
+| [P-027](#p-027-mac-screen-recovery-message) | Mac screen recovery message | logged | 285 | In-app copy (Mac), user guide |
 
 P-003 holds the content of `docs/LEGAL.md` L-011, moved here on October 22, 2026.
 
@@ -981,4 +982,24 @@ cite has not changed.
   sessionless reminder check for both connectors; add locations to the desktop cache row;
   describe the Teams-placeholder rule. Update the Microsoft connector materials before the next
   submission.
+- **Status:** logged.
+
+## P-027: Mac screen recovery message
+
+- **Change:** Ticket 285 defect fix, implemented November 7, 2026. It ships alone in the Mac
+  0.1.9 patch from branch `mac-blank-window-hotfix` (D22), not merged. When a Mac app
+  screen fails to render, Cadence now shows "This screen could not be shown. Try again, or open
+  another screen." with **Try again**, and keeps the navigation, account sync and Settings
+  working. Before, the whole window went blank. If the app shell itself fails, the existing
+  message "Cadence could not open. Quit and reopen the app to try again." now also covers render
+  failures, not only a failed start. The owner approved both messages on November 7, 2026
+  (D21).
+- **Affected:** Ticket 285. Files: `apps/desktop/src/desktop-error-boundary.tsx`,
+  `docs/user-guide/desktop-local.md`.
+- **Surfaces:** in-app copy (Mac), user guide.
+- **Conflicting current text:** `docs/user-guide/desktop-local.md`, "Retry loading local data",
+  describes **Try again** only for local data that cannot be opened. It does not mention a
+  screen that cannot be shown.
+- **Update needed:** add one line to the user guide section describing the screen recovery
+  message. The wording itself is approved (D21).
 - **Status:** logged.

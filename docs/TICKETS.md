@@ -16792,7 +16792,9 @@ Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=
 
 ## Ticket 285: Installed Mac acceptance
 
-Status: filed November 4, 2026. Not started.
+Status: filed November 4, 2026. In progress on `travel-wave6`. A blank-window defect found
+during this acceptance ships alone as the 0.1.9 patch from branch `mac-blank-window-hotfix`
+(D22); notarization and publication wait for the owner.
 Dependencies: Tickets 280 and 284.
 
 Goal: check the Mac app on a dev-signed build.
@@ -16813,10 +16815,11 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Not applicable: Ticket 284 covers web. |
-| Desktop | Installed acceptance on a dev-signed build. |
+| Desktop | Installed acceptance on a dev-signed build. The blank-window fix: `apps/desktop/src/timeline-screen.tsx`, `product.tsx`, `main.tsx` and `desktop-error-boundary.tsx`. |
 | Marketing | Not applicable: no publication in this ticket. |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: none.
+Messaging impact: P-027 (recovery wording approved, D21).
 
-Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`.
+Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`. The blank-window fix:
+`tests/desktop-render-recovery.dom.test.tsx` and `tests/desktop-main-recovery.dom.test.tsx`.
