@@ -1799,3 +1799,61 @@ password, a one-time code or a session token.
 Platform impact: web acceptance only; no product change. Desktop: installed acceptance keeps
 its owner steps for the owner's Mac (quitting Cadence, macOS prompts). Marketing and future
 mobile: not applicable. Messaging impact: none.
+
+## 2026-11-07: Mac recovery messages approved (D21)
+
+The owner decided on November 7, 2026, as relayed by the travel coordinator after the Ticket 285
+blank-window fix was verified:
+
+1. "This screen could not be shown. Try again, or open another screen." is approved as written.
+   It shows, with **Try again**, when one Mac app screen fails to render.
+2. "Cadence could not open. Quit and reopen the app to try again." is approved as written. It now
+   also shows when the app shell fails to render, not only when the app fails to start.
+
+Platform impact: desktop, `apps/desktop/src/desktop-error-boundary.tsx`. Web: not applicable, the
+change is in the Mac app only. Marketing: not applicable. Future mobile: not applicable,
+desktop only. Messaging impact: P-027.
+
+## 2026-11-07: Patch the published Mac app with only the blank-window fix (D22)
+
+The owner decided on November 7, 2026:
+
+1. The published Mac app gets a patch release now, built from `main`, with only the Ticket 285
+   blank-window fix: the archive notice's link on the desktop Timeline gets a `LinkProvider`
+   that switches screens, and screen-level and app-level error boundaries keep a render error
+   from blanking the window. The rest of Wave 6 waits for its own release.
+2. The patch is version 0.1.9, the next patch after the published 0.1.8. It is above the
+   `0.1.9-dev.N` builds by SemVer, so the stable feed updates them. Later dev builds use
+   `0.1.10-dev.N` (`docs/DESKTOP_RELEASE.md`, "Dev-signed builds").
+3. Notarization and publication still wait for the owner's go-ahead on the built candidate.
+
+Platform impact: desktop, the 0.1.9 patch. Web: not applicable, the web Timeline already has a
+`LinkProvider`. Marketing: the download link moves only at publication. Future mobile: not
+applicable. Messaging impact: P-027.
+
+## 2026-11-07: Mac 0.1.9 ships from main with the travel revamp (D23)
+
+The owner decided on November 7, 2026, replacing D22's plan to ship the blank-window fix alone:
+
+1. Mac 0.1.9 is built from `main` after Mac acceptance (Ticket 285) passes. It carries the
+   blank-window fix and the travel revamp together, so the shipped code matches what was tested.
+2. The Wave 6 branch (`travel-wave6`: the Ticket 284 and 285 fixes, including the named-place
+   fix) merges to `main` first. The blank-window fix is already on `main` through PR #195.
+3. Notarization and publication still wait for the owner's go-ahead on the built candidate,
+   unless D24 applies.
+
+Platform impact: desktop, Mac 0.1.9. Web: the Wave 6 fixes deploy with the merge. Marketing: the
+download link moves only at publication. Future mobile: not applicable. Messaging impact: P-027.
+
+## 2026-11-07: Publish Mac 0.1.9 once acceptance passes and every release check passes (D24)
+
+The owner decided on November 7, 2026:
+
+1. Notarize and publish Mac 0.1.9 as soon as Mac acceptance (Ticket 285) passes and the Wave 6
+   branch is merged to `main`, with no further confirmation.
+2. This holds only if every check in `docs/DESKTOP_RELEASE.md`, "Release acceptance", passes,
+   including check 4 (real updater) from 0.1.8 at "Publication", step 3.
+3. Any failed check stops the release and goes back to the owner.
+
+Platform impact: desktop, Mac 0.1.9 publication. Web: not applicable. Marketing: the download
+link moves at publication. Future mobile: not applicable. Messaging impact: none.

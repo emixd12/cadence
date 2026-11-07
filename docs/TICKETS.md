@@ -16796,6 +16796,8 @@ Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=
 ## Ticket 285: Installed Mac acceptance
 
 Status: installed acceptance run November 6–7, 2026 (`docs/qa/travel-release.md`). Calendar-event activation and the hosted named-place fix remain unchecked.
+The blank-window fix found during this acceptance is on `main` through PR #195. Mac 0.1.9
+ships from `main` with the travel revamp (D23); notarization and publication follow D24.
 Dependencies: Tickets 280 and 284.
 
 Goal: check the Mac app on a dev-signed build.
@@ -16816,10 +16818,11 @@ Platform impact:
 | Platform | Implementation, follow-up, or not-applicable reason |
 |---|---|
 | Web | Not applicable: Ticket 284 covers web. |
-| Desktop | Installed acceptance on a dev-signed build. |
+| Desktop | Installed acceptance on a dev-signed build. The blank-window fix: `apps/desktop/src/timeline-screen.tsx`, `product.tsx`, `main.tsx` and `desktop-error-boundary.tsx`. |
 | Marketing | Not applicable: no publication in this ticket. |
 | Future mobile | Not applicable: desktop only. |
 
-Messaging impact: none.
+Messaging impact: P-027 (recovery wording approved, D21).
 
-Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`.
+Verification: evidence in `docs/qa/travel-release.md` and `STATUS.md`. The blank-window fix:
+`tests/desktop-render-recovery.dom.test.tsx` and `tests/desktop-main-recovery.dom.test.tsx`.
