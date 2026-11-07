@@ -1341,3 +1341,41 @@ Calendar events and the weekly "W6 Library stop" Behavior remain for Ticket 285.
   time: the evening first-trip estimate feeds the line only.
 - No Outlook or iCloud test connector exists for accounts A or B, so Ticket 283's routed Outlook or
   iCloud event was not checked.
+
+## Ticket 285: installed Mac acceptance — November 6, 2026 (in progress, blocked)
+
+Dev-signed `0.1.9-dev.1` from `travel-wave6` at `acc86c4` (clean, SQLite schema 20, no migration
+differing from `origin/main`), binary SHA-256 `c13011a76e4d74500824e16c902dfc903193db5f6cd893bb2527ff8389f2da77`.
+Production web is `9064f5f` (Wave 5). The owner set a US$5 spend cap and allowed the agent to quit
+Cadence and change notification settings on the test Mac. No route call has been made yet.
+
+### Owner's Mac (owner's own account; no account switch)
+
+- 01:18Z: installed over `0.1.7-dev.1` with `install-dev-build.mjs`. Version, binary hash and
+  `codesign --verify --strict` match; Developer ID `HK26VT477G`. Schema 20, integrity ok, 0 foreign-key
+  errors, 34 tables with no count change. Launch sync at 01:18:40Z, again at 01:20:43Z, 0 pending.
+
+### Test Mac (account A)
+
+- Older contract: published 0.1.8 (built from `281d49d`, before the Wave 4 and 5 hosted migrations)
+  synced against production at 01:26:02Z with 0 pending. Account A's travel settings arrived (on,
+  walking, Home set, get-ready 20, buffer 15) and the weekly "W6 Library stop" kept Where = A place.
+  The open Travel panel kept its pre-sync state ("Choose your usual travel", empty Home) until
+  Settings was reopened.
+- 01:33Z: `0.1.9-dev.1` installed over 0.1.8 (protected copy holds the 0.1.8 ZIP and
+  `before.sqlite3`); hash and signature match, schema 20, no count change.
+- **Defect, blocks this ticket:** the window is blank white and the launch sync never runs. Not
+  caused by the launch method, WebKit storage, the Calendar cache or local SQLite content (each moved
+  aside in turn; the database was restored). Restored 0.1.8 fails the same way. A throwaway
+  diagnostic build (`0.1.9-dev.2`, unminified, uncaught errors written to local storage; never
+  committed) captured `Error: Cadence UI requires a LinkProvider.` from `RuntimeLink` in
+  `TimelineScreen`. `apps/desktop/src/timeline-screen.tsx` renders "Review archived behaviors" as a
+  `RuntimeLink` whenever the Timeline has an auto-archive notice, and the desktop Timeline has no
+  `LinkProvider`. Account A has one auto-archived Behavior from Ticket 284. The desktop app has no
+  error boundary, so the whole tree unmounts. Present since `d95dfaa3` (September 18), so released
+  0.1.8 is affected. Reported to the coordinator with a repro.
+
+Remaining after a fixed build: travel states and the next-trip marker, the native leave reminder
+running and after quitting, the one update, activation, notification permission denied, Travel
+estimates off cancelling pending reminders, and the installed-Mac row of Ticket 165's matrix. Then
+return the test Mac to 0.1.8.
