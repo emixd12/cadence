@@ -500,9 +500,9 @@ part of L-002.
   November 7, 2026: signed-in Mac users first; hosted web plan usage and billing deferred.
   Under the 2026-11-04 rule, this entry holds nothing.
 - **Status:** open.
-- **Next action:** the owner submits OpenAI's interest form
-  (`https://openai.com/form/sign-in-with-chatgpt-interest/`) for plan usage in a paid, hosted
-  app. Recheck before any billing ticket.
+- **Next action:** recheck before any billing ticket. The owner decides when to submit
+  OpenAI's interest form (`https://openai.com/form/sign-in-with-chatgpt-interest/`) for plan
+  usage in a paid, hosted app; no ticket asks for it now.
 
 ## L-018: Sign in with ChatGPT DevKit licence
 

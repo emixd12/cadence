@@ -16,8 +16,9 @@
   request on a real ChatGPT plan. Mock mode first; the live run needs the owner's ChatGPT
   sign-in and consent. Results go to `docs/qa/2026-11-07-chatgpt-plan-spike.md`.
 - Tickets 288–292 are not started; Wave 2 waits for the spike's request contract.
-- Owner actions: submit OpenAI's interest form for web sign-in and hosted plan usage; provide
-  a ChatGPT Plus or Pro account for the spike and acceptance.
+- Owner actions: provide a ChatGPT Plus or Pro account for the spike and acceptance. The owner
+  decides when to submit OpenAI's interest form for web sign-in and hosted plan usage; it is
+  not a step in Tickets 286–292.
 - Platform impact: see Tickets 286–292. Web: hosted prepare and complete only, no ChatGPT
   controls. Desktop: the connection, UI and acceptance. Marketing: none until release (P-031).
   Future mobile: not applicable. Messaging impact: P-028 to P-031.

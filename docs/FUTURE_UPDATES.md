@@ -177,6 +177,13 @@ ticket and owner decision.
   Cadence about US$0.13 a month for a typical user (`docs/COSTS.md`), so a discount could be
   at most about 13 cents a month. A stronger model or more briefs for plan users may be worth
   more than a discount. Billing is not launch scope; this needs a billing ticket first.
+- **In-app agent chat on the user's ChatGPT plan.** An owner idea from November 7, 2026: a
+  chat inside Cadence that runs on the user's ChatGPT plan. It is out of v1 scope, because
+  `AGENTS.md` lists general AI coaching and chat as out of scope. It needs its own product
+  decision covering tools, writes, safety and cost. Tickets 286–292 build nothing for chat.
+
+The owner decides when to submit OpenAI's interest form for web sign-in and hosted plan
+usage. No ticket asks for it now.
 
 ## Location permission VM images
 
