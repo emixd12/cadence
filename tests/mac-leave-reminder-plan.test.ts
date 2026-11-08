@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
 import {
-  macLeaveReminderDigest, macLeaveReminderDigestFromId, macLeaveReminderId, planMacLeaveReminders,
+  macLeaveReminderDigest, macLeaveReminderDigestFromId, macLeaveReminderId, macLeaveReminderMissingStops, planMacLeaveReminders,
   type MacLeaveReminderRecord,
 } from "@cadence/core/services/mac-leave-reminder-plan";
 import { DEPARTURE_PHRASE_REVIEW } from "@cadence/core/services/departure-phrases";
@@ -148,5 +148,17 @@ describe("Mac leave reminder planner (Ticket 280)", () => {
     expect(rows.map((row) => row.template)).toEqual(["Leave by {time} for {event}", "Leave earlier: by {time} for {event}",
       "{Mode} from {start}, arrive {time}. Estimate checked {time}."]);
     expect(rows.every((row) => row.approvedOn === "2026-11-06")).toBe(true);
+  });
+});
+
+describe("routed trips whose stop this Mac does not list yet (follow-up after 0.1.9)", () => {
+  it("names a trip ahead whose destination is missing from the stops, once", () => {
+    const trips = [trip({ destinationRef: "event-new" }), trip({ key: "again", destinationRef: "event-new" }), trip()];
+    expect(macLeaveReminderMissingStops(trips, [DENTIST], at("12:45"))).toEqual(["event-new"]);
+  });
+  it("ignores the trip home, trips without a leave time and leave times already passed", () => {
+    const trips = [trip({ role: "return", destinationRef: "event-new" }), trip({ destinationRef: "event-new", leaveAt: null }),
+      trip({ destinationRef: "event-old", leaveAt: at("12:00") })];
+    expect(macLeaveReminderMissingStops(trips, [DENTIST], at("12:45"))).toEqual([]);
   });
 });

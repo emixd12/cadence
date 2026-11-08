@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -49,6 +49,9 @@ else if (command.includes("/axelement")) {
   console.log('{"width":100,"axError":0}');
 } else if (command.includes("/click") && mode === "click-refused") {
   console.error("Cadence is not frontmost."); process.exit(1);
+} else if (command.includes("screencapture")) {
+  if (mode === "screen-denied") { console.error("could not create image from display"); process.exit(1); }
+  console.log(Buffer.from("89504e470d0a1a0a0000", "hex").toString("base64"));
 } else if (command.startsWith("osascript")) console.log("synthetic AX result");
 `);
     chmodSync(ssh, 0o700);
@@ -177,6 +180,20 @@ else if (command.includes("/axelement")) {
     expect(result.status).toBe(1);
     expect(calls().at(-1)?.command).toContain("/click\" '111' '12' '34'");
     expect(result.stderr).toContain("Cadence is not frontmost");
+  });
+
+  it("writes a device screenshot as a private PNG and names the missing grant on failure", () => {
+    const file = path.join(directory, "shot.png");
+    const result = run(["screenshot", "test-mac", file]);
+    expect(result.status).toBe(0);
+    expect(readFileSync(file).subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(calls().at(-1)?.command).toContain("screencapture -x -t png");
+    const denied = run(["screenshot", "test-mac", path.join(directory, "denied.png")], "screen-denied");
+    expect(denied.status).toBe(1);
+    expect(denied.stderr).toContain("Screen Recording grant");
+    expect(existsSync(path.join(directory, "denied.png"))).toBe(false);
+    expect(run(["screenshot", "test-mac", path.join(directory, "shot.jpg")]).status).toBe(1);
   });
 
   it("fails a device read when SSH fails instead of interpreting empty output", () => {

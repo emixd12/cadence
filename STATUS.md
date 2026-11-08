@@ -1,5 +1,34 @@
 # Implementation Status
 
+## Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026
+
+**On branch `travel-postdeploy-checks`. Not pushed.** Found after the Wave 6 deploy: once, a
+Behavior Where edit on /behaviors left the tab's `cadence:travel-session` copy, so /timeline kept
+the old leave time as current and made no route request. Cause: the web Timeline's travel source
+key had no Behavior Where, so only the `cadence:travel-changed` event withdrew the kept view, and
+that event never reaches another tab. Fixed: each Timeline row now carries its Behavior's Where
+kind (Home or A place) beside its place text, and `travelSourceKey`, `travelStopRevisions` and
+`travelTomorrowStopKey` use the row's Where when no Behavior list is passed. A place edit in any
+tab changes the key, so the kept view withdraws that trip and routes again at the next refresh.
+The keys stay the same when nothing changed. The Mac already passed its Behavior list and is
+unchanged. Test: `tests/travel-timeline.test.ts` fails on the base code; `tests/travel-navigation.test.ts`
+covers the row's Where kind. Platform impact: web, this fix (shared `lib/ui/travel.ts` and core
+Timeline rows); desktop uses the same shared code with its Behavior list, so no change; marketing
+and future mobile not applicable. Messaging impact: none. Not yet rechecked live.
+
+## Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026
+
+**On branch `travel-postdeploy-checks`. Not pushed.** Found on published 0.1.9: a Calendar event
+added shortly before leaving got a leave line but no Mac leave reminder until the Mac's Calendar
+list refreshed, because the hosted route reads Calendar itself. Fixed: a routed trip ahead whose
+stop the Mac does not list makes the Mac read its Calendar lists again once, and the travel hook
+keeps the routed view current when the new stop is one it already routed, so no route request is
+added. After Codex review on PR #198, that holds only when the response routed the new stop at its
+current start, end and place; an event moved in between gets a new request. Evidence in `docs/qa/travel-release.md`, "Calendar-event activation on published 0.1.9".
+Platform impact: desktop (Calendar re-read and reminder planning); web shares the hook rule, which
+only skips a repeat whole-day request; marketing and future mobile not applicable. Messaging
+impact: none. Not yet rechecked on an installed Mac.
+
 ## Cadence for Mac 0.1.9 published — November 7, 2026
 
 **Published November 7, 2026, 23:24–23:30Z** (D24–D26). Built from `7c698ec` (PR #196 merge) with
@@ -18,8 +47,9 @@ the blank-window fix and the travel advisory revamp. Both feeds serve 0.1.9;
   could not run it because 0.1.8 opens blank for account A (D25, D26).
 - 0.1.8 users with an auto-archived Behavior cannot reach the updater; the release body tells
   them to download 0.1.9.
-- Not established: Calendar-event drawer activation from a leave reminder (Ticket 285). macOS 14
-  not tested.
+- Not established at publication: Calendar-event drawer activation from a leave reminder (Ticket
+  285). It passed later that evening on published 0.1.9 (`docs/qa/travel-release.md`,
+  "Calendar-event activation on published 0.1.9"). macOS 14 not tested.
 - Both Macs now run 0.1.9. The test Mac's 0.1.8 copies and the owner's 0.1.10-dev.1 app are kept
   in their backup folders.
 - Platform impact: desktop release only. Web, marketing and future mobile: no change.
@@ -71,6 +101,10 @@ or publication.**
   rule accepts both center granularities, so either routes.
 - Tests: `tests/travel-provider.test.ts` (hosted and API key paths) and
   `tests/travel-refresh-policy.test.ts`; the three new tests fail on the base code.
+- Checked live after deploy (production `7c698ec`, November 7, 20:49–20:54Z, account A):
+  "Bryant Park, New York, NY 10018" gets a leave time, the trip after it routes with no
+  "Fix …'s place", its cache row is `resolved`, and "10018" alone stays `ambiguous` and still asks
+  for a place (`docs/qa/travel-release.md`, "Named place after deploy").
 - Platform impact: web, this fix (hosted lookup). Desktop: linked Macs use the same hosted
   refresh, so no desktop change; Ticket 285 checks it. Marketing: none. Future mobile: not
   applicable. Messaging impact: none (no wording change).

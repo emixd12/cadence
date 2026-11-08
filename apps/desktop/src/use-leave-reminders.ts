@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { macLeaveReminderMissingStops } from "@cadence/core/services/mac-leave-reminder-plan";
 import { travelHabitBuffers } from "@cadence/core/services/travel-habits";
 import type { DepartureSnapshot } from "@/components/timeline/DayProgressTimeline";
 import type { LeaveReminderClient } from "@/lib/ui/leave-reminders";
@@ -17,10 +18,17 @@ export function useDesktopLeaveReminders(input: Readonly<{
   accountId: string | null;
   timezone: string;
   client: LeaveReminderClient | null;
+  /**
+   * Reads the Calendar lists again. Called once when a routed trip ahead names a stop the Mac
+   * does not list yet: the hosted route read a new event first, and the reminder needs its title
+   * and start time. It reads Calendar only; no route request of its own.
+   */
+  refreshSources?: (() => void) | null;
 }>) {
-  const { native, accountKnown, accountId, timezone, client } = input;
+  const { native, accountKnown, accountId, timezone, client, refreshSources } = input;
   const snapshot = useRef<DepartureSnapshot | null>(null);
   const snapshotKey = useRef("");
+  const missingKey = useRef("");
   const reconcile = useCallback(() => {
     if (!native || !accountKnown) return;
     // Travel estimates off means no reminders, whatever the account switch says.
@@ -46,6 +54,13 @@ export function useDesktopLeaveReminders(input: Readonly<{
   const onDeparture = useCallback((next: DepartureSnapshot) => {
     snapshot.current = next;
     const nowMs = Date.now();
+    // One refresh for each new set of missing stops, not one per minute while it is read.
+    const missing = macLeaveReminderMissingStops(next.trips ?? [], next.stops, new Date(nowMs).toISOString()).sort();
+    const missingNow = missing.length ? JSON.stringify([next.localDate, missing]) : "";
+    if (missingNow !== missingKey.current) {
+      missingKey.current = missingNow;
+      if (missingNow) refreshSources?.();
+    }
     // The model changes every minute; only a new estimate, trip, stop or day needs a reconcile.
     const key = JSON.stringify([next.localDate, next.preparationSeconds, next.trips === null,
       (next.trips ?? []).filter((trip) => trip.role !== "return" && trip.leaveAt && Date.parse(trip.leaveAt) > nowMs)
@@ -54,7 +69,7 @@ export function useDesktopLeaveReminders(input: Readonly<{
     if (key === snapshotKey.current) return;
     snapshotKey.current = key;
     reconcile();
-  }, [reconcile]);
+  }, [reconcile, refreshSources]);
   const settingsClient = useMemo((): LeaveReminderClient | null => client ? {
     load: client.load,
     save: async (enabled) => {

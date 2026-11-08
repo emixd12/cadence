@@ -1427,12 +1427,12 @@ Center through the accessibility tree, and the Timeline text.
 | Reminder with Cadence running | Pass | 09:06:11 planned, banner at 09:06:14: "Leave by 9:26 AM for W6 Mac leave 5". 14:36:11 banner: "Leave by 2:56 PM for W6 Mac leave 7" / "Walking from Home, arrive 3:05 PM. Estimate checked 2:33 PM." (D17 wording). A reminder whose time had passed when first planned fired 10 seconds later (08:14:36). |
 | The one update | Pass | Raising the arrival buffer 15 → 30 moved the same trip's leave time 9:26 → 9:11. The memory recorded `update {fireAt 09:09:10, leaveAt 09:11:11}`; macOS delivered count went 3 → 4 at 09:09:10; the Timeline read "Leave in 3 minutes, by 9:11 AM for W6 Mac leave 5 from Home · walking, arrive 9:20 AM." The update banner text was not captured. Moving a Behavior's time instead made a new trip with its own first reminder, as NOTIFICATION_SPEC says ("A moved event is a new trip"). |
 | Reminder after quitting | Pass | Get-ready 20 → 60 moved "W6 Mac leave 8"'s pending reminder to 14:54:15 (pending notification moved, not an update). Cadence quit at 14:49:47 with 0 pending writes. Banner at 14:54:15 with Cadence not running: "Leave by 3:54 PM for W6 Mac leave 8" / "Walking from your previous stop, arrive 4:00 PM. Estimate checked 2:40 PM." |
-| Activation | Pass (Behavior), not run (Calendar event) | The owner clicked that banner; Cadence launched at 14:56:02 and showed "Opened reminder for W6 Mac leave 8 on 2026-11-07." The Calendar-event drawer path was not exercised: the 9:45 museum reminder fired while the test Mac was locked. A synthetic click on a banner reached no handler (banners expose only `AXShowMenu`). |
+| Activation | Pass (Behavior); Calendar event passed later on published 0.1.9 (see "Calendar-event activation on published 0.1.9") | The owner clicked that banner; Cadence launched at 14:56:02 and showed "Opened reminder for W6 Mac leave 8 on 2026-11-07." The Calendar-event drawer path was not exercised: the 9:45 museum reminder fired while the test Mac was locked. A synthetic click on a banner reached no handler (banners expose only `AXShowMenu`). |
 | Notification permission denied | Pass (November 6) | See above. |
 | Travel estimates off cancels | Pass | 14:37:57: memory became `{enabled: false, records: []}`, macOS pending 61 → 60 (Behavior reminders only), delivered 0. Back on at 14:40: both trips planned again, and "W6 Mac leave 7"'s reminder fired once more at 14:39:15 because turning travel off had cleared its record. With location blocked, Settings read "Device location: blocked." and "Saved places and Calendar trips keep working without device location."; the Travel panel read "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again." |
 | Sync with an older contract | Pass (November 6) | Published 0.1.8 synced against production; see above. The dev builds also synced against production `9064f5f`, which is older than the branch. |
 | Ticket 165 installed-Mac row | Pass (November 6) | See above. |
-| Named place without a street address (`d1db8c2`) | Not checked | The fix is in the hosted lookup (`lib/services/travel-provider.ts`); production is still `9064f5f`. It needs a deployment first. |
+| Named place without a street address (`d1db8c2`) | Pass on web after deploy (November 7) | The fix is in the hosted lookup (`lib/services/travel-provider.ts`). Checked on production `7c698ec`; see "Named place after deploy" below. |
 
 Cleanup (15:00–15:12): get-ready back to 20 and arrival buffer to 15; leave reminders off for
 account A ("Reminder setting saved."; memory `{enabled: false, records: []}`); "W6 Mac leave 3"–"8"
@@ -1443,3 +1443,99 @@ Cadence quit, because 0.1.8 opens blank for account A until the fix ships. Kept 
 the protected copies under `dev-installs/` (0.1.8 ZIP, `before.sqlite3`, and the 0.1.10-dev.1 app
 ZIP) and the moved WebKit, cache and Calendar-cache files under `evidence-285-webkit-20261107T025043Z/`.
 The owner's Mac still runs `0.1.9-dev.1`, which lacks the blank-window fix.
+
+Follow-up, 16:08–16:17: the owner quit Cadence on the owner's Mac, and `0.1.10-dev.1` was
+installed there (binary hash and signature match; schema 20, integrity ok; 34 tables, no count
+change; launch sync 21:08:43Z, 0 pending). The owner granted Screen Recording to
+`sshd-keygen-wrapper` on the test Mac, and `screencapture` over SSH returned the real screen;
+`node scripts/test-device.mjs screenshot` now wraps it. A second Calendar-event activation attempt
+reinstalled `0.1.10-dev.1` on the test Mac and created "W6 Mac event" (5:15–5:45 PM, The Morgan
+Library & Museum) in account A's "Cadence demonstration" calendar, but stopped before the Mac
+planned it, because the 0.1.9 release checks needed the test Mac. The test Mac is back on
+published 0.1.8 with Cadence quit, account A's leave reminders are off and Cadence's location
+access is on.
+
+### Calendar-event activation on published 0.1.9 — November 7, 2026, 18:47–19:12 Eastern
+
+The test Mac ran published 0.1.9 as account A (installed by the 0.1.9 release checks). Setup: Cadence
+location turned off for the test so the trip started from Home; "W6 Mac event 2", 7:45–8:15 PM at
+The Morgan Library & Museum, 225 Madison Ave, created in account A's "Cadence demonstration"
+calendar; leave reminders turned on from the Mac's Settings ("Reminder setting saved."). The
+Timeline first read "Leave by 7:21 PM for your next stop from Home · walking, arrive 7:30 PM." with
+no reminder planned: the hosted route already had the new event, but the Mac's local Calendar list
+did not, so the line had no title and the planner had no event to remind for. After Settings ›
+Refresh Calendar the line read "Leave in 29 minutes, by 7:21 PM for W6 Mac event 2 from Home ·
+walking, arrive 7:30 PM.", the device memory held one record (reminder 00:01:11Z, leave 00:21:11Z)
+and macOS pending went 60 → 61.
+
+The banner appeared at 7:01 PM and the owner clicked it once, with Cadence running. Cadence opened
+"Calendar details" for "W6 Mac event 2": "Last estimate: leave by 7:21 PM · checked 6:55 PM.
+Refresh travel", "Last estimate: head home 8:15 PM · checked 6:55 PM.", "Free again 8:23 PM.",
+"Google Maps · checked 6:55 PM.", "Directions in Apple Maps", Travel by "Usual travel (Walking)",
+Time 7:45–8:15 PM, the Morgan Library location and Calendar "Google Calendar · Cadence
+demonstration". Evidence: the accessibility tree ("Close Calendar details" and the lines above) and
+a screenshot through `node scripts/test-device.mjs screenshot` (read, then deleted, because it
+showed the owner's desktop). Cadence writes no unified-log line for `notificationActivated`, so the
+log cannot show the activation itself; the drawer opened only after the owner's click, and the agent
+pressed nothing in that window. **Pass.**
+
+Cleanup: the drawer closed; leave reminders off for account A (memory `{enabled: false, records:
+[]}`); get-ready 20 and arrival buffer 15 unchanged; Cadence location access back on; "W6 Mac event"
+and "W6 Mac event 2" deleted from the test calendar; helper files removed from the test Mac.
+
+Follow-up fixed (November 7, branch `travel-postdeploy-checks`): when a routed trip ahead names a
+stop the Mac does not list, the Mac reads its Calendar lists again at once
+(`macLeaveReminderMissingStops`, `useDesktopLeaveReminders`), so the reminder is planned with the
+event's title without Settings › Refresh Calendar. The travel hook then keeps the routed view as
+current, because the new stop is one it already routed (`travelSourcesOnlyAddRoutedStops`): no
+second whole-day route request. After Codex review on PR #198, the hook adopts a new stop only
+when the response routed it at the start, end and place key the Mac lists now; an event moved in
+between gets a new route request, so the leave time and reminder follow the move. Tests: `tests/travel-refresh-day.dom.test.tsx`,
+`tests/desktop-leave-reminders-hook.dom.test.tsx`, `tests/mac-leave-reminder-plan.test.ts`,
+`tests/travel.resolver.test.ts`. Not yet rechecked on an installed Mac.
+
+### Named place after deploy — November 7, 2026
+
+Production `app.cadence-me.com`, deployment `dpl_BBH1CAJR8d1LJHSUrQfKXcLCk9Fb` (commit `7c698ec`,
+`main` with `d1db8c2` and `5f629e4`, ready 20:45Z). Test account A in the Cadence QA Chrome profile
+(kept session), travel on, Home Grand Central Terminal, walking, leave reminders off. Times are
+Eastern unless marked Z. The agent drove every step. No coordinates, durations or provider responses
+are recorded here.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Named place gets a leave time | Pass | 15:49: created "W6 Bryant Park check", daily 5:00 PM, 30 minutes, Where = "Bryant Park, New York, NY 10018", reminders off. The Timeline read "Leave by 4:38 PM for W6 Bryant Park check from Home · walking, arrive 4:45 PM." with the rail marker "Leave 4:38". No "Add a place for …" text. |
+| No "Fix …'s place" prompt | Pass | Nowhere on the Timeline at 15:50. To test the next trip, which is where that prompt appeared before, a second Behavior "W6 After park stop" at 6:00 PM was added at "The Morgan Library & Museum, 225 Madison Ave, New York, NY 10016". Bryant Park's row then read "Leave by 4:38 PM from Home · walking, arrive 4:45 PM." and "Leave by 5:36 PM for W6 After park stop · walking, arrive 5:45 PM."; the 6:00 PM row read "Leave by 5:36 PM · walking, arrive 5:45 PM." and "Google Maps · checked 3:53 PM.". So the trip from Bryant Park routed. |
+| A broad text still asks for a place | Pass | 15:50: the same Behavior's Where changed to "10018". After a fresh evaluation (see the observation below), the Timeline read "Add a place for W6 Bryant Park check to get a leave time." The Where was then set back to Bryant Park. |
+| Hosted cache outcome | Pass | Read as account A through RLS: `travel_place_cache` with the account's own session (JWT role `authenticated`; user ID checked against account A), publishable key, no service role. Key = core `travelPlaceKey` of the text. "Bryant Park, New York, NY 10018" (`tGMMQDSf…`): `resolved`, place ID present, looked up 20:49:36Z. It was `ambiguous` with no place ID at 03:17Z. "10018" (`yuC40giO…`): `ambiguous`, no place ID, looked up 20:52:08Z. The Morgan Library text (`8EkcSjja…`): already `resolved` from 19:40:40Z, so no new lookup. |
+
+Google's granularity for Bryant Park is still not read directly. The only evidence is the hosted
+outcome: the new center rule accepted the result.
+
+**Spend.** Two new lookups: Bryant Park and "10018". Route calls ran across four Timeline passes.
+They were not counted per call. The estimate is about ten calls, near US$0.05. Account A's November
+reservation (`travel_spend_owner_month`, read through RLS) was US$0.845 at 20:53Z and did not change
+after cleanup. That total includes Tickets 284 and 285. Spend stayed within the owner's US$5 test cap.
+
+**Cleanup.** 15:54 (20:54Z): "W6 Bryant Park check" and "W6 After park stop" were archived, with
+`active` false and `archived_at` set. The Timeline showed no travel line afterwards. Account A's leave
+reminders stayed off (`enabled` false, no next check). Travel estimates stayed on, as found. The two
+new `travel_place_cache` rows stay: they hold a one-way key and outcome only, and turning travel off
+clears them.
+
+**Observation (not blocking, not investigated further).** The first Where change, Bryant Park →
+"10018", was saved on /behaviors at 20:50:17Z. The tab's browser-session travel copy
+(`cadence:travel-session`, written 20:49:38Z) survived it. After reloading /timeline, the page still
+showed the Bryant Park leave line as current, not as "Last estimate", and made no route request. It
+updated only after that session copy was removed. The later edit and create on /behaviors did clear
+the copy. The web Timeline builds its travel source key without Behavior Where revisions
+(`components/timeline/DayProgressTimeline.tsx`, `buildTravelSourceKey(travelEvents, timeline)`). A
+Behavior place change therefore depends on the `cadence:travel-changed` event to withdraw the kept
+view. A missed event leaves a stale leave time until the session copy expires or the tab closes.
+
+**Fixed after this check (branch `travel-postdeploy-checks`, not deployed).** Each Timeline row now
+carries its Behavior's Where kind, and the travel source key, stop revisions and tomorrow key use
+the row's Where on the web. A Behavior place edit in any tab now changes the key, so the kept view
+withdraws that trip and routes again at the next refresh. Re-verify after deploy: as account A, open
+/timeline with a located Behavior, edit its place on /behaviors in a second tab, reload /timeline
+in the first tab, and expect a route request and the new leave line.

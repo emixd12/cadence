@@ -44,7 +44,7 @@ import { useWebGoogleCalendarTimeline } from "@/lib/ui/google-calendar";
 import { useWebHevyActivityTimeline, useWebIcloudCalendarTimeline, useWebOutlookCalendarTimeline, type ConnectorTimelineState, type HevyTimelineState, type OutlookTimelineState } from "@/lib/ui/connectors";
 import { publishBriefTravel } from "@/lib/ui/brief-travel";
 import { briefTravelSubjects, projectBriefTravelGuidance } from "@cadence/core/services/brief-travel-guidance";
-import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
+import { TRAVEL_CLEARANCE_MESSAGE, TRAVEL_UNAVAILABLE_MESSAGE, travelSourceKey as buildTravelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection, type TravelState } from "@/lib/ui/travel";
 import { webTravelSettingsClient, type TravelSettingsClient } from "@/lib/ui/travel-settings";
 import {
   dismissTravelLeaveQuestion,
@@ -222,10 +222,11 @@ export function DayProgressTimeline({
   const stopRevisions = useMemo(() => travelStopRevisions(travelEvents, timeline), [travelEvents, timeline]);
   const tomorrowStopKey = useMemo(() => travelTomorrowStopKey(travelEvents, timeline), [travelEvents, timeline]);
   const currentCorrections = useMemo(() => corrections.filter((correction) => travelEvents.some((event) => event.id === correction.eventId && (event.revision.providerEtag ?? event.revision.providerUpdatedAt) === correction.revision)), [corrections, travelEvents]);
+  const stopRoutes = useMemo(() => travelStopRoutes(travelEvents, currentCorrections), [travelEvents, currentCorrections]);
   const liveTravel = useTravelContext({ enabled: liveCalendar && !context, accountId: travelAccountId,
     localDate: timeline.todayLocalDate, sourceKey: travelSourceKey, corrections: currentCorrections, timezone: timeline.timezone,
     // Ticket 268: automatic travel requests wait for the Calendar reads that feed travel to settle (Ticket 283: all three).
-    sourceReady: live.state !== "not_loaded" && outlook.state !== "not_loaded" && icloud.state !== "not_loaded", stopRevisions, tomorrowStopKey });
+    sourceReady: live.state !== "not_loaded" && outlook.state !== "not_loaded" && icloud.state !== "not_loaded", stopRevisions, stopRoutes, tomorrowStopKey });
   const routeEvidence = context?.travel ?? liveTravel.view?.evidence;
   const durations = context?.durationEstimates ?? timeline.durationEstimates;
   const travel = useMemo(() => routeEvidence ? resolveTravelAfterDecisions(routeEvidence,

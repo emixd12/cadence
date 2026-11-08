@@ -39,6 +39,7 @@ node scripts/test-device.mjs ax <device> find '<regex>'
 node scripts/test-device.mjs ax <device> press AXButton 'Sync now'
 node scripts/test-device.mjs ax <device> locate AXButton 'Sync now'
 node scripts/test-device.mjs click <device> <x> <y>
+node scripts/test-device.mjs screenshot <device> <local .png path>
 node scripts/test-device.mjs update-install <device> <expected-version>
 ```
 
@@ -63,6 +64,13 @@ node scripts/test-device.mjs update-install <device> <expected-version>
   with "Cadence X is ready to install." showing. A failed restart is an error, even if
   installation succeeded. See "Restart after an update" below.
 
+- `screenshot` captures the device's whole screen with `screencapture`, streams it back
+  over SSH and writes a mode-0600 PNG at the local path. It needs step 6 below. Use it for
+  anything accessibility cannot read, such as the Timeline's next-trip marker (`aria-hidden`)
+  or a dialog outside Cadence. The image shows whatever is on the owner's screen: write it
+  outside the repository (for example under `.local/`), read it, and delete it. Never commit
+  it or paste it into a report; describe what it shows instead.
+
 Copy files with `scp` to the same `user@host`. Recheck hashes on the device.
 
 ## Adding a device
@@ -81,12 +89,13 @@ Owner steps, once per device:
 5. Run `node scripts/test-device.mjs check <device>`. The first accessibility call
    shows "sshd-keygen-wrapper wants access to control System Events"; choose
    **Allow**. Until then the call times out with -1712.
-6. Optional, for screenshots: Privacy & Security › **Screen & System Audio Recording**:
+6. For screenshots: Privacy & Security › **Screen & System Audio Recording**:
    add `/usr/libexec/sshd-keygen-wrapper` and turn it on. The agent can open the pane
    with `open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"`.
    Without it, `screencapture` over SSH fails with "could not create image from display",
    and anything drawn with `aria-hidden`, such as the Timeline's next-trip marker, cannot
-   be checked remotely.
+   be checked remotely. The owner granted it on `test-mac` on November 7, 2026, and
+   `screencapture` over SSH worked the same day.
 
 ### Known limits over SSH (November 7, 2026, Ticket 285)
 
@@ -94,7 +103,7 @@ Owner steps, once per device:
   click on a banner's frame did not reach Cadence (no activation event). Clicking a
   leave or Behavior reminder stays an owner step until a screenshot-guided click is
   shown to work on a banner.
-- `screencapture` needs step 6. Until then, ask the owner for one ⌘⇧3 screenshot.
+- `screenshot` needs step 6. On a device without it, ask the owner for one ⌘⇧3 screenshot.
 - A locked screen (frontmost process `loginwindow`) hides every window from
   accessibility. Ask the owner to unlock the Mac and lengthen Lock Screen › "Require
   password after screen saver begins" for the length of the test.

@@ -4,7 +4,7 @@
 // device permissions. AX reads and explicit exec commands can expose private data.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ const USAGE = `Usage:
   node scripts/test-device.mjs exec <device> -- <remote shell command>
   node scripts/test-device.mjs ax <device> read [limit] | find <regex> | press <role> <name> | locate <role> <name>
   node scripts/test-device.mjs click <device> <x> <y>
+  node scripts/test-device.mjs screenshot <device> <local .png path>
   node scripts/test-device.mjs update-install <device> <expected-version>
 Inventory: CADENCE_TEST_DEVICES or ${DEFAULT_INVENTORY}`;
 
@@ -72,8 +73,9 @@ function sshOptions(target) {
     ...(target.hostKeyAlias ? ["-o", `HostKeyAlias=${target.hostKeyAlias}`] : [])];
 }
 
-function ssh(target, command, { input, timeoutMs = 120_000 } = {}) {
-  return spawnSync("ssh", [...sshOptions(target), "--", `${target.user}@${target.host}`, command], { encoding: "utf8", input, timeout: timeoutMs });
+function ssh(target, command, { input, timeoutMs = 120_000, maxBuffer } = {}) {
+  return spawnSync("ssh", [...sshOptions(target), "--", `${target.user}@${target.host}`, command],
+    { encoding: "utf8", input, timeout: timeoutMs, ...(maxBuffer ? { maxBuffer } : {}) });
 }
 
 function run(target, command, options) {
@@ -230,6 +232,19 @@ if (command === "list") {
   if (!pid) fail("Cadence is not running.");
   const result = helper(target, ["click", pid, ...rest]);
   if (result.status !== 0) fail(`Click refused: ${(result.stderr ?? "").trim() || "Cadence must be frontmost and own the target point."}`);
+} else if (command === "screenshot") {
+  // Needs the device's one-time Screen Recording grant (docs/TEST_DEVICES.md, step 6).
+  // The image can show private data: keep it outside the repository and delete it after use.
+  if (rest.length !== 1 || !/\.png$/i.test(rest[0])) fail(USAGE);
+  const target = device(name);
+  const result = ssh(target, 'f="$(mktemp -t cadence-shot)" || exit 1; screencapture -x -t png "$f" && base64 -i "$f"; s=$?; rm -f "$f"; exit $s',
+    { timeoutMs: 60_000, maxBuffer: 64 * 1024 * 1024 });
+  if (result.error) fail(result.error.code === "ETIMEDOUT" ? "SSH command timed out." : `SSH failed: ${result.error.code ?? "unknown error"}`);
+  if (result.status !== 0) fail(`Screenshot failed: ${(result.stderr ?? "").trim() || "unknown error"}. If it says "could not create image from display", the device needs the Screen Recording grant.`);
+  const image = Buffer.from((result.stdout ?? "").replace(/\s+/g, ""), "base64");
+  if (image.length < 8 || image.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") fail("Screenshot failed: the device did not return a PNG.");
+  writeFileSync(rest[0], image, { mode: 0o600 });
+  console.log(`screenshot: ${rest[0]} (${image.length} bytes). It can show private data; delete it after use.`);
 } else if (command === "update-install") {
   if (rest.length !== 1 || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(rest[0])) fail(USAGE);
   updateInstall(device(name), rest[0]);

@@ -99,4 +99,16 @@ describe("a located Behavior row carries only its own place text (Ticket 271)", 
     expect(placeText({ where_kind: null, location_text: null })).toBeUndefined();
     expect(placeText({ where_kind: "nowhere", location_text: "x" })).toBeUndefined();
   });
+
+  it("carries Home or A place as the row's Where kind, for the travel source key", () => {
+    const whereKind = (where: Readonly<{ where_kind?: string | null; location_text?: string | null }>) => {
+      const behavior = { ...storedBehavior(), ...where };
+      return resolvePersistedTimelineOccurrence({ behavior, occurrence: occurrence(behavior.id), timeSessions: [],
+        now: Temporal.Instant.from("2026-08-30T12:00:00Z"), timezone: "America/New_York" })!.whereKind;
+    };
+    expect(whereKind({ where_kind: "place", location_text: "Riverside track" })).toBe("place");
+    expect(whereKind({ where_kind: "home", location_text: null })).toBe("home");
+    expect(whereKind({ where_kind: "anywhere", location_text: null })).toBeUndefined();
+    expect(whereKind({ where_kind: null, location_text: null })).toBeUndefined();
+  });
 });

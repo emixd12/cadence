@@ -6,6 +6,7 @@ import {
   resolveTravelCollisions,
   resolveTravelEvidence,
   resolveTravelPlan,
+  travelSourcesOnlyAddRoutedStops,
 } from "../packages/core/src/resolvers/travel.resolver";
 import { travelPlaceKey } from "../packages/core/src/services/travel-place-key";
 import type {
@@ -901,5 +902,43 @@ describe("Ticket 265: a weather margin and the ready time", () => {
     const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(plan.legs[0]!, estimate("2026-09-16T16:30:00Z", "2026-09-16T16:50:00Z", 1200))], []), now: NOW, weather });
     expect(evidence.legs[0]?.weather).toMatchObject({ departureAt: "2026-09-16T16:20:00Z", arrivalAt: "2026-09-16T16:50:00Z" });
     expect(evidence.legs[0]).not.toHaveProperty("late");
+  });
+});
+
+describe("travelSourcesOnlyAddRoutedStops (follow-up after Mac 0.1.9)", () => {
+  type Evidence = Parameters<typeof travelSourcesOnlyAddRoutedStops>[2];
+  const leg = (origin: string | null, destination: string | null, placeKey: string | null = destination ? `place:${destination}` : null) =>
+    ({ leg: { originCommitmentRef: origin, destinationCommitmentRef: destination, destinationPlaceKey: placeKey } });
+  const span = (ref: string, startAt = "2026-09-21T22:00:00Z", endAt = "2026-09-21T22:30:00Z") =>
+    ({ id: `commitment:${ref}`, kind: "commitment", startAt, endAt, sourceRefs: [ref], legId: null });
+  const evidence = (overrides: Partial<Record<"legs" | "unknownLegs" | "segments", unknown[]>> = {}) =>
+    ({ legs: [leg(null, "dentist"), leg("dentist", "late")], unknownLegs: [], segments: [span("late")], ...overrides }) as unknown as Evidence;
+  const before = { dentist: "d1" };
+  const listed = { late: { startAt: "2026-09-21T18:00:00-04:00", endAt: "2026-09-21T18:30:00-04:00", placeKey: "place:late" } };
+
+  it("is true when every new stop is one the evidence routed at its listed time and place", () => {
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", late: "l1" }, evidence(), listed)).toBe(true);
+  });
+  it("is false for a new stop the evidence does not name, a changed or gone stop, or no new stop", () => {
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", lunch: "x" }, evidence(), listed)).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d2", late: "l1" }, evidence(), listed)).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops({ ...before, gym: "g1" }, { dentist: "d1", late: "l1" }, evidence(), listed)).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1" }, evidence(), listed)).toBe(false);
+  });
+  it("is false when the new stop moved or changed place after the hosted route read it (Codex review)", () => {
+    const added = { dentist: "d1", late: "l2" };
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence(),
+      { late: { ...listed.late, startAt: "2026-09-21T19:00:00-04:00" } })).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence(),
+      { late: { ...listed.late, endAt: "2026-09-21T19:00:00-04:00" } })).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence(), { late: { ...listed.late, placeKey: "place:elsewhere" } })).toBe(false);
+  });
+  it("is false when the evidence or the list cannot say the stop's time or place", () => {
+    const added = { dentist: "d1", late: "l1" };
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence(), {})).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence({ segments: [] }), listed)).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence({ legs: [leg(null, "dentist")],
+      unknownLegs: [{ originCommitmentRef: "dentist", destinationCommitmentRef: "late" }] }), listed)).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, added, evidence(), { late: { ...listed.late, endAt: null } })).toBe(false);
   });
 });

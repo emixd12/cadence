@@ -114,11 +114,15 @@ function toTimelineOccurrenceInput(
   };
 }
 
-/** Ticket 271: A place's text for the row's Directions link. An unreadable Where gives none. */
-function behaviorPlaceText(behavior: BehaviorGraphRecord): { placeText?: string } {
+/**
+ * Ticket 271: A place's text for the row's Directions link. Also the Where kind when it is Home
+ * or A place, for the travel source key. An unreadable Where gives neither.
+ */
+function behaviorPlaceText(behavior: BehaviorGraphRecord): { placeText?: string; whereKind?: "home" | "place" } {
   try {
     const where = storedBehaviorWhere(behavior);
-    return where.where_kind === "place" && where.location_text ? { placeText: where.location_text } : {};
+    if (where.where_kind === "home") return { whereKind: "home" };
+    return where.where_kind === "place" && where.location_text ? { placeText: where.location_text, whereKind: "place" } : {};
   } catch {
     return {};
   }

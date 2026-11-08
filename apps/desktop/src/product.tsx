@@ -8,7 +8,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { travelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
+import { travelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
@@ -107,6 +107,9 @@ export function Product() {
   const [leaveActivation, setLeaveActivation] = useState<{ digest: string; requestKey: number } | null>(null);
   const handledLeaveActivation = useRef<number | null>(null);
   const resumeReconcile = useRef<() => void>(() => undefined);
+  // Set once the Calendar hooks exist, below; leave reminders call it through a stable callback.
+  const refreshTravelStops = useRef<() => void>(() => undefined);
+  const refreshLeaveStops = useCallback(() => refreshTravelStops.current(), []);
   const [navigationRequest, setNavigationRequest] = useState<{ anchor?: string } | null>(null);
   const activation = useRef<{ occurrenceId: string; requestKey: number } | null>(null);
   const activationSequence = useRef(0);
@@ -338,7 +341,8 @@ export function Product() {
   const leaveReminderClient = useMemo(() => calendarClient && accountUserId ? createDesktopLeaveReminderClient(calendarClient) : null, [calendarClient, accountUserId]);
   const leaveReminders = useDesktopLeaveReminders({ native: isTauri(), accountId: accountUserId, timezone: profile?.timezone ?? "America/New_York",
     // "error" and "waiting" keep what is scheduled; only a read session or a signed-out Mac reconciles.
-    accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient });
+    accountKnown: accountKnown && (account.status === "linked" || account.status === "local"), client: leaveReminderClient,
+    refreshSources: refreshLeaveStops });
   useEffect(() => { resumeReconcile.current = leaveReminders.reconcile; }, [leaveReminders.reconcile]);
   const nativePermission = reminders?.permission ?? "checking";
   const readLeaveReminderNotifications = useCallback(async () => nativeLeaveReminderNotifications(nativePermission), [nativePermission]);
@@ -361,6 +365,13 @@ export function Product() {
     todayLocalDate: calendarRange.startLocalDate, lastLocalDate: calendarRange.endLocalDate,
     enabled: isTauri() && Boolean(bundle && accountUserId) && (activeScreen === "timeline" || activeScreen === "settings"),
   });
+  const refreshGoogleStops = calendar.refresh;
+  const refreshConnectorStops = connectors.refresh;
+  useEffect(() => {
+    // A routed trip names an event this Mac's Calendar lists do not have yet: read them again now,
+    // not at the next 15-minute read, so its leave reminder is planned. Calendar reads only.
+    refreshTravelStops.current = () => { void refreshGoogleStops("manual"); void refreshConnectorStops("manual"); };
+  }, [refreshGoogleStops, refreshConnectorStops]);
   const outlookTimeline = connectors.outlook;
   const icloudTimeline = connectors.icloud;
   const icloudEvents = icloudTimeline.snapshot?.events.filter((event) => !icloudTimeline.hiddenCalendarIds.includes(event.calendarId)
@@ -383,6 +394,7 @@ export function Product() {
     sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL && outlookTimeline.state !== "not_loaded" && icloudTimeline.state !== "not_loaded",
     sourceKey: travelSourceKey(travelEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
     stopRevisions: travelStopRevisions(travelEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions),
+    stopRoutes: travelStopRoutes(travelEvents, currentTravelCorrections),
     // Ticket 282: tomorrow's first trip, through the same hook and hosted route as the web.
     tomorrowStopKey: bundle ? travelTomorrowStopKey(travelEvents, bundle.timeline.timeline, travelBehaviorRevisions) : null });
   // Ticket 280: the leave reminder's destination, once today's Calendar read or Timeline has it. A moved or removed trip matches nothing.

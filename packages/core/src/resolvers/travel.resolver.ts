@@ -393,6 +393,43 @@ export function changedTravelStops(
   return new Set(Object.keys(previous).filter((ref) => current[ref] !== previous[ref]));
 }
 
+/** A stop's time and place on this device's list: what a hosted route plans the trip to it from. */
+export type TravelStopRoute = Readonly<{ startAt: string; endAt: string | null; placeKey: string | null }>;
+
+/**
+ * Codex review of the Mac 0.1.9 follow-up: the hosted response routed this stop at the time and
+ * place this device lists now. The stop's own segment gives the routed start and end, and each
+ * leg to it gives the routed place key. A stop the response routed differently, or did not time
+ * or place, is not covered by the view.
+ */
+function routedAsListed(ref: string, stop: TravelStopRoute | undefined, evidence: TravelDisplayEvidence): boolean {
+  if (!stop?.endAt || !stop.placeKey) return false;
+  const span = evidence.segments.find((value) => value.kind === "commitment" && value.id === `commitment:${ref}`);
+  if (!span || Temporal.Instant.compare(instant(span.startAt, "Commitment start"), instant(stop.startAt, "Stop start")) !== 0 ||
+    Temporal.Instant.compare(instant(span.endAt, "Commitment end"), instant(stop.endAt, "Stop end")) !== 0) return false;
+  const places = evidence.legs.filter(({ leg }) => leg.destinationCommitmentRef === ref).map(({ leg }) => leg.destinationPlaceKey);
+  return places.length > 0 && places.every((placeKey) => placeKey === stop.placeKey);
+}
+
+/**
+ * Follow-up after Mac 0.1.9: the current sources only add stops that `evidence` already routed
+ * at their listed time and place, and no stop the view was made from changed or went. The hosted
+ * route reads Calendar itself, so it can route a new event before this device's Calendar list has
+ * it. When the list catches up, the view already covers the new stop, and a new request would
+ * route the same trips again. An event that moved in between needs that new request.
+ */
+export function travelSourcesOnlyAddRoutedStops(
+  previous: Readonly<Record<string, string>>,
+  current: Readonly<Record<string, string>>,
+  evidence: TravelDisplayEvidence,
+  stops: Readonly<Record<string, TravelStopRoute>>,
+): boolean {
+  if (changedTravelStops(previous, current).size) return false;
+  const added = Object.keys(current).filter((ref) => !Object.hasOwn(previous, ref));
+  if (!added.length) return false;
+  return added.every((ref) => routedAsListed(ref, stops[ref], evidence));
+}
+
 /**
  * Ticket 268: a kept view shown before any new response, with every trip to or from a changed
  * stop withdrawn. Such a trip keeps its place as `rejected_revision`, which the departure model

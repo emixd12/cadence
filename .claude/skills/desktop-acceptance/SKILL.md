@@ -15,7 +15,10 @@ theirs.
    round trip and the connector check.
 3. Before asking the owner for any Mac UI step, try Computer Use (if this session has
    it) and the apple-automation skill (System Events accessibility tree). Reading the
-   visible window needs no click.
+   visible window needs no click. On a test device, `node scripts/test-device.mjs
+   screenshot <device> <file>.png` shows what accessibility cannot (for example the
+   next-trip marker); keep the file outside the repository and delete it after reading.
+   Clicking a notification banner still needs the owner (`docs/TEST_DEVICES.md`).
 4. Never quit Cadence, restore a protected database, notarize, upload or publish
    without the owner's instruction (`docs/DECISIONS.md`, 2026-10-23).
 5. Send owner asks as one numbered list. If a tool is missing, name it and ask the

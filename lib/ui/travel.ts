@@ -13,7 +13,8 @@ import {
   firstTravelStopAwayFromHome, recordTravelRefresh, resolveTravelRefreshPlan, resolveTravelTomorrowPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
   type TravelBudgetState, type TravelDeviceSample, type TravelRefreshRequest, type TravelRefreshState, type TravelTripRef,
 } from "@cadence/core/services/travel-refresh-policy";
-import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
+import { changedTravelStops, mergeTravelLastEstimates, travelSourcesOnlyAddRoutedStops, withdrawChangedTravelTrips, type TravelStopRoute } from "@cadence/core/resolvers/travel.resolver";
+import { travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import { locatedStopsAhead } from "@cadence/core/services/departure-stops";
 
 /** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
@@ -120,16 +121,26 @@ export async function readTravelRoutingReport(
 }
 
 export type TravelBehaviorRevision = Readonly<{ id: string; whereKind?: string | null; locationText: string | null; updatedAt: string }>;
+type TravelOccurrenceWhere = Readonly<{ behaviorId?: string; whereKind?: string; placeText?: string }>;
+/**
+ * The Behavior Where part of a stop's travel inputs: from the Behavior list when the caller
+ * passes one (Mac), otherwise from the row itself (web), so a place edit always changes the key.
+ */
+function occurrenceWhereRevision(byId: ReadonlyMap<string, readonly unknown[]>, occurrence: TravelOccurrenceWhere): readonly unknown[] | null {
+  const listed = occurrence.behaviorId === undefined ? undefined : byId.get(occurrence.behaviorId);
+  if (listed) return listed;
+  return occurrence.whereKind || occurrence.placeText ? [occurrence.whereKind ?? null, occurrence.placeText ?? null] : null;
+}
 /**
  * Travel inputs only: visible events, occurrence schedule and owning Behavior Where revisions.
  * Status, Note and duration-history changes are excluded (Ticket 214): they make no provider call.
  * Core filters resolved stops and withdraws evidence when a reopened stop or duration needs new routes.
  */
 export function travelSourceKey(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections" | "durationEstimates">, behaviors: readonly TravelBehaviorRevision[] = []): string {
-  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
+  const byId = new Map<string, readonly unknown[]>(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
   const eventInputs = events.map((event) => [event.id, event.location, event.state, event.currentUserResponse, !!event.conference,
     event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-  return JSON.stringify([eventInputs, timeline.daySections.map((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null]))]);
+  return JSON.stringify([eventInputs, timeline.daySections.map((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.scheduledFor, occurrenceWhereRevision(byId, occurrence)]))]);
 }
 
 
@@ -140,13 +151,25 @@ export function travelSourceKey(events: readonly NormalizedExternalEvent[], time
  * browser session holds only digests.
  */
 export function travelStopRevisions(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections">, behaviors: readonly TravelBehaviorRevision[] = []): Record<string, string> {
-  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
+  const byId = new Map<string, readonly unknown[]>(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
   return Object.fromEntries([
     ...events.map((event) => [event.id, JSON.stringify([event.location, event.state, event.currentUserResponse, !!event.conference,
       event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null])] as const),
     ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) =>
-      [occurrence.id, JSON.stringify([occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null])] as const)),
+      [occurrence.id, JSON.stringify([occurrence.scheduledFor, occurrenceWhereRevision(byId, occurrence)])] as const)),
   ]);
+}
+
+/**
+ * Codex review of the Mac 0.1.9 follow-up: each timed event's start, end and place key, the time
+ * and place a hosted route plans its trip from. A current correction's place replaces the event's
+ * location, as in the hosted request. Kept in memory only.
+ */
+export function travelStopRoutes(events: readonly NormalizedExternalEvent[], corrections: readonly TravelCorrection[] = []): Record<string, TravelStopRoute> {
+  const corrected = new Map(corrections.map((correction) => [correction.eventId, correction.locationText]));
+  return Object.fromEntries(events.flatMap((event) => event.kind === "timed"
+    ? [[event.id, { startAt: event.startAt, endAt: event.endUnspecified ? null : event.endAt,
+      placeKey: travelHabitPlaceKey(corrected.get(event.id) ?? event.location) }] as const] : []));
 }
 
 /** Ticket 282: one of tomorrow's located stops in a tomorrow key: its ref, place text and travel inputs. */
@@ -461,6 +484,8 @@ export function useTravelContext(input: Readonly<{
   sourceReady?: boolean;
   /** Ticket 268: `travelStopRevisions` for the same sources as `sourceKey`. Without it a kept view withdraws nothing. */
   stopRevisions?: Readonly<Record<string, string>>;
+  /** `travelStopRoutes` for the same sources. Without it a Calendar list catching up always asks again. */
+  stopRoutes?: Readonly<Record<string, TravelStopRoute>>;
   /** Ticket 282: `travelTomorrowStopKey` for the same sources. Without it tomorrow's first trip is never requested. */
   tomorrowStopKey?: string | null;
 }>): TravelState {
@@ -548,6 +573,28 @@ export function useTravelContext(input: Readonly<{
         budget: travelBudgets.get(accountId) ?? null, tomorrow: travelTomorrowTrips.get(accountId) ?? null });
     };
     restore();
+    /**
+     * Follow-up after Mac 0.1.9: this device's Calendar list caught up with stops the last
+     * response already routed (the hosted route reads Calendar itself). That view stays current
+     * under the new sources, so the source change sends no new request. A new stop that moved
+     * after the hosted route read it is not adopted, so the source change asks again.
+     */
+    const adoptRoutedStops = () => {
+      if (travelViewCache.has(stateKey) || !stopDigests) return;
+      const last = travelRefreshStates.get(accountId);
+      if (!last || last.localDate !== localDate || last.sourceKey === planKey) return;
+      const previous = [...travelViewCache.entries()].reverse().find(([key]) => {
+        const [owner, day, source, corrections] = JSON.parse(key) as string[];
+        return owner === accountId && day === localDate && source !== "session" && corrections === correctionsKey
+          && travelDigest(JSON.stringify([source, corrections])) === last.sourceKey;
+      })?.[1];
+      if (!previous?.view?.evidence || !previous.stops || previous.resumesAt) return;
+      if (!travelSourcesOnlyAddRoutedStops(previous.stops, stopDigests, previous.view.evidence, input.stopRoutes ?? {})) return;
+      cacheTravel(stateKey, { ...previous, stops: stopDigests });
+      travelRefreshStates.set(accountId, { ...last, sourceKey: planKey });
+      persist();
+    };
+    adoptRoutedStops();
     /** Ticket 282: tomorrow's first trip, when its request was for the current first stop. */
     const showTomorrow = () => {
       const entry = travelTomorrowTrips.get(accountId);
