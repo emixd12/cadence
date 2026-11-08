@@ -767,9 +767,14 @@ Useful GET endpoints under `/v1/projects/{ref}`:
   A project-wide `ACTIVE_HEALTHY` flag does not prove each service is healthy.
   Omit optional `timeout_ms`: the API rejected its query-string value on
   September 10, 2026. Bound the HTTP client request instead.
-- `/analytics/endpoints/logs.all` accepts `sql`, `iso_timestamp_start`, and
-  `iso_timestamp_end`. Select timestamps, paths, status codes, and aggregate
-  error categories from `edge_logs`, `auth_logs`, and `postgres_logs`.
+- `/analytics/endpoints/logs` accepts `sql`, `iso_timestamp_start`, and
+  `iso_timestamp_end`, with a range of at most 24 hours. Supabase removed
+  `logs.all`; on November 8, 2026 it returned HTTP 410. The new endpoint uses
+  ClickHouse SQL over one table, `logs`. Filter it on the `source` column
+  (`edge_logs`, `postgres_logs`, `postgrest_logs`, `auth_logs`) and select
+  named columns such as `timestamp` and `event_message`; `*` is rejected.
+  Example: `select timestamp, event_message from logs where source =
+  'edge_logs' order by timestamp desc limit 20`.
 - `/config/disk/util` reports filesystem usage; `/config/disk` reports capacity.
 - `/billing/addons` reports selected and available add-ons. An empty selected
   list alone does not establish the exact current compute class.
@@ -791,6 +796,69 @@ health until recovery, then verify database start time and ordinary sign-in.
 Transient connection refusal is expected while services restart. Respect
 provider retry intervals; do not substitute pause/restore or database reset.
 Endpoint reference: <https://supabase.com/docs/reference/api/v1-restart-a-project>.
+
+## Hosted Postgres upgrade to 17.11 — November 8, 2026
+
+The owner decided to upgrade hosted Postgres past 17.6 (spec decision D28(d)).
+On 17.6, PostgREST's schema-reload listener failed for about 9 days with
+"could not access status of transaction … pg_xact". The cause was a NOTIFY
+queue entry older than the truncated transaction-status files. PostgreSQL
+17.8 (February 12, 2026) fixed this: "Prevent truncation of CLOG that is still
+needed by unread NOTIFY messages … prevents 'could not access status of
+transaction' errors when a backend is slow to absorb NOTIFY messages"
+(<https://www.postgresql.org/docs/release/17.8/>). 17.11 includes that fix.
+
+Procedure, all through the Management API with the CLI's Keychain credential:
+
+1. `GET /v1/projects/{ref}/upgrade/eligibility` listed one target,
+   `supabase-postgres-17.11.0.018` (`postgres_version` `17`, channel `ga`).
+   It reported no blocking objects or extensions and a 1-hour estimate.
+2. Before snapshot: `GET /v1/projects/{ref}/database/backups` showed daily
+   physical backups, the latest at 07:19 UTC that day. PITR is off. An agent
+   also took a logical schema and data dump with Homebrew CLI 2.109.1:
+   `supabase db dump --linked`, then `--data-only --use-copy`, run in a
+   temporary linked workdir outside the repository. The dump files stay on
+   the owner's Mac only, with mode 600. The agent also recorded the 102-entry
+   migration list, row counts for every user table, and RLS flags.
+3. `POST /v1/projects/{ref}/upgrade` with
+   `{"target_version":"17","release_channel":"ga"}` returned 201 and a
+   `tracking_id`. `GET /v1/projects/{ref}/upgrade/status` reported progress
+   steps (`1_started`, `2_launched_upgraded_instance`,
+   `5_initiated_data_upgrade`, `8_attached_volume_to_upgraded_instance`).
+   It returned `null` again when the upgrade finished.
+4. Timing: start 21:59:35 UTC. PostgREST lost the database at 22:02:12 and
+   reconnected at 22:05:23. Postgres restarted at 22:06:04, and the project
+   reported `ACTIVE_HEALTHY` on 17.11.0.018 at 22:06:31. The whole upgrade
+   took about 7 minutes, with about 4 minutes of database downtime.
+
+Verified after the upgrade:
+
+- `select version()` returns PostgreSQL 17.11. Extensions and their versions
+  are unchanged. The Management API health check reports auth, db, rest,
+  realtime and storage healthy.
+- The migration list is byte-identical: 102 entries, latest `20261106080000`.
+- Row counts match for every application and private-schema table. Supabase
+  Storage ran 5 of its own migrations (75 to 80) and added 2 empty internal
+  tables. No application table changed.
+- All 38 public tables, including the 8 travel tables, still have RLS enabled.
+- Supabase also upgraded PostgREST from 14.5 to 14.18. Its listener connected
+  to 17.11 on the `pgrst` channel and logged "Received a schema cache reload
+  message". It then loaded 38 relations and 86 RPCs.
+- REST with the publishable key returns 401 and `42501` for
+  `travel_leave_reminder_settings` and `travel_leave_reminders`. Both objects
+  are in the schema cache, and anonymous access is denied.
+- At 22:07:04 an agent ran `select pg_notify('pgrst','reload schema')`.
+  PostgREST logged the reload message at 22:07:04 and reloaded its cache.
+  Postgres logs since the upgrade contain no `pg_xact` errors.
+- The production crons `/api/travel/leave-reminders/process` and
+  `/api/reminders/process` returned 500 during the upgrade (22:00 and 22:05)
+  and 200 again at 22:10. No Behavior reminder was due in that window. The
+  leave reminder job's REST read of `travel_leave_reminder_settings` returned
+  200. Login, Privacy and Terms on `app.cadence-me.com` return 200.
+
+To detect a recurrence, search `postgrest_logs` for "Failed listening for
+database notifications" outside an upgrade or restart window. Connection-refused
+lines during the upgrade window itself are expected.
 
 ## Ticket 102 public evidence collection
 
