@@ -23,7 +23,8 @@ added shortly before leaving got a leave line but no Mac leave reminder until th
 list refreshed, because the hosted route reads Calendar itself. Fixed: a routed trip ahead whose
 stop the Mac does not list makes the Mac read its Calendar lists again once, and the travel hook
 keeps the routed view current when the new stop is one it already routed, so no route request is
-added. Evidence in `docs/qa/travel-release.md`, "Calendar-event activation on published 0.1.9".
+added. After Codex review on PR #198, that holds only when the response routed the new stop at its
+current start, end and place; an event moved in between gets a new request. Evidence in `docs/qa/travel-release.md`, "Calendar-event activation on published 0.1.9".
 Platform impact: desktop (Calendar re-read and reminder planning); web shares the hook rule, which
 only skips a repeat whole-day request; marketing and future mobile not applicable. Messaging
 impact: none. Not yet rechecked on an installed Mac.

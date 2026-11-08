@@ -32,7 +32,7 @@ vi.mock("@/lib/services/travel-routing.service", async (load) => ({ ...(await lo
 
 import { refreshTravelRoutes } from "@/lib/services/travel-route-refresh.service";
 import { TravelRoutingError } from "@/lib/services/travel-routing.service";
-import { resetTravelViewCacheForTest, useTravelContext, TravelClientError, type TravelClient, type TravelState, type TravelRoutesInput } from "@/lib/ui/travel";
+import { resetTravelViewCacheForTest, travelStopRoutes, useTravelContext, TravelClientError, type TravelClient, type TravelState, type TravelRoutesInput } from "@/lib/ui/travel";
 import { resolveDepartureModel } from "@cadence/core/resolvers/departure.resolver";
 
 const SECRET = "s".repeat(64);
@@ -114,7 +114,8 @@ const capture = vi.fn<(state: TravelState) => void>();
 const current = () => capture.mock.lastCall![0];
 function Probe(props: { sourceKey: string; sourceReady?: boolean; accountId?: string }) {
   const state = useTravelContext({ enabled: true, accountId: props.accountId ?? "owner", localDate: "2026-09-21", sourceKey: props.sourceKey, client, timezone: "America/New_York", sourceReady: props.sourceReady,
-    stopRevisions: Object.fromEntries((localEvents ?? world.events).map((event) => [event.id, JSON.stringify([event.start, event.end, event.location, event.etag ?? null])])) });
+    stopRevisions: Object.fromEntries((localEvents ?? world.events).map((event) => [event.id, JSON.stringify([event.start, event.end, event.location, event.etag ?? null])])),
+    stopRoutes: travelStopRoutes((localEvents ?? world.events).map((event) => ({ id: event.id, kind: "timed", startAt: event.start, endAt: event.end, endUnspecified: false, location: event.location })) as never) });
   capture(state);
   return createElement("p", null, "x");
 }
@@ -364,6 +365,21 @@ describe("a Calendar list that catches up with the hosted read (Mac follow-up af
     world.events = [...TYPICAL, late];
     await d.render(); await advance(400); await focus();
     expect(world.log.map((entry) => entry.roles)).toEqual(["day", "day"]);
+    await d.done();
+  });
+  it("still asks again when the new stop moved after the hosted route read it (Codex review)", async () => {
+    world.events = [...TYPICAL, late]; localEvents = [...TYPICAL];
+    const d = await start(et("7:00"));
+    const routedLeaveAt = model().trips.find((trip) => trip.destinationRef === "late")?.leaveAt;
+    expect(routedLeaveAt).toBeTruthy();
+    // The event moves before this device's Calendar list has it; the list then catches up with the moved event.
+    const moved = { ...late, start: et("19:00"), end: et("19:30"), etag: "etag-late-2" };
+    world.events = [...TYPICAL, moved]; localEvents = null;
+    await d.render(); await advance(400); await focus();
+    expect(world.log.map((entry) => entry.roles)).toEqual(["day", "day"]);
+    const leaveAt = model().trips.find((trip) => trip.destinationRef === "late")?.leaveAt;
+    expect(leaveAt).toBeTruthy();
+    expect(leaveAt).not.toBe(routedLeaveAt);
     await d.done();
   });
   it("still asks again when a known stop also changed", async () => {

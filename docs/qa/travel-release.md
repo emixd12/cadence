@@ -1488,7 +1488,9 @@ stop the Mac does not list, the Mac reads its Calendar lists again at once
 (`macLeaveReminderMissingStops`, `useDesktopLeaveReminders`), so the reminder is planned with the
 event's title without Settings › Refresh Calendar. The travel hook then keeps the routed view as
 current, because the new stop is one it already routed (`travelSourcesOnlyAddRoutedStops`): no
-second whole-day route request. Tests: `tests/travel-refresh-day.dom.test.tsx`,
+second whole-day route request. After Codex review on PR #198, the hook adopts a new stop only
+when the response routed it at the start, end and place key the Mac lists now; an event moved in
+between gets a new route request, so the leave time and reminder follow the move. Tests: `tests/travel-refresh-day.dom.test.tsx`,
 `tests/desktop-leave-reminders-hook.dom.test.tsx`, `tests/mac-leave-reminder-plan.test.ts`,
 `tests/travel.resolver.test.ts`. Not yet rechecked on an installed Mac.
 

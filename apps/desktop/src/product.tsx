@@ -8,7 +8,7 @@ import { openCalendarSourceUrl } from "./calendar/google-calendar";
 import { GoogleCalendarPanel } from "@/components/settings/GoogleCalendarPanel";
 import { DailyBriefSettingsPanel } from "@/components/briefing/DailyBriefSettingsPanel";
 import { TravelSettingsPanel } from "@/components/settings/TravelSettingsPanel";
-import { travelSourceKey, travelStopRevisions, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
+import { travelSourceKey, travelStopRevisions, travelStopRoutes, travelTomorrowStopKey, useTravelContext, type TravelCorrection } from "@/lib/ui/travel";
 import { createDesktopTravelClient } from "./travel";
 import { createDesktopLeaveReminderClient, nativeLeaveReminderNotifications } from "./leave-reminders";
 import { createLocalTravelSettingsClient, readLocalTravelSetupPresence } from "./local-travel-settings.service";
@@ -394,6 +394,7 @@ export function Product() {
     sourceReady: calendar.label !== DESKTOP_CALENDAR_NOT_LOADED_LABEL && outlookTimeline.state !== "not_loaded" && icloudTimeline.state !== "not_loaded",
     sourceKey: travelSourceKey(travelEvents, bundle?.timeline.timeline ?? { daySections: [], durationEstimates: {} }, travelBehaviorRevisions),
     stopRevisions: travelStopRevisions(travelEvents, bundle?.timeline.timeline ?? { daySections: [] }, travelBehaviorRevisions),
+    stopRoutes: travelStopRoutes(travelEvents, currentTravelCorrections),
     // Ticket 282: tomorrow's first trip, through the same hook and hosted route as the web.
     tomorrowStopKey: bundle ? travelTomorrowStopKey(travelEvents, bundle.timeline.timeline, travelBehaviorRevisions) : null });
   // Ticket 280: the leave reminder's destination, once today's Calendar read or Timeline has it. A moved or removed trip matches nothing.

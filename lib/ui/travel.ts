@@ -13,7 +13,8 @@ import {
   firstTravelStopAwayFromHome, recordTravelRefresh, resolveTravelRefreshPlan, resolveTravelTomorrowPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
   type TravelBudgetState, type TravelDeviceSample, type TravelRefreshRequest, type TravelRefreshState, type TravelTripRef,
 } from "@cadence/core/services/travel-refresh-policy";
-import { changedTravelStops, mergeTravelLastEstimates, travelSourcesOnlyAddRoutedStops, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
+import { changedTravelStops, mergeTravelLastEstimates, travelSourcesOnlyAddRoutedStops, withdrawChangedTravelTrips, type TravelStopRoute } from "@cadence/core/resolvers/travel.resolver";
+import { travelHabitPlaceKey } from "@cadence/core/services/travel-habits";
 import { locatedStopsAhead } from "@cadence/core/services/departure-stops";
 
 /** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
@@ -157,6 +158,18 @@ export function travelStopRevisions(events: readonly NormalizedExternalEvent[], 
     ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) =>
       [occurrence.id, JSON.stringify([occurrence.scheduledFor, occurrenceWhereRevision(byId, occurrence)])] as const)),
   ]);
+}
+
+/**
+ * Codex review of the Mac 0.1.9 follow-up: each timed event's start, end and place key, the time
+ * and place a hosted route plans its trip from. A current correction's place replaces the event's
+ * location, as in the hosted request. Kept in memory only.
+ */
+export function travelStopRoutes(events: readonly NormalizedExternalEvent[], corrections: readonly TravelCorrection[] = []): Record<string, TravelStopRoute> {
+  const corrected = new Map(corrections.map((correction) => [correction.eventId, correction.locationText]));
+  return Object.fromEntries(events.flatMap((event) => event.kind === "timed"
+    ? [[event.id, { startAt: event.startAt, endAt: event.endUnspecified ? null : event.endAt,
+      placeKey: travelHabitPlaceKey(corrected.get(event.id) ?? event.location) }] as const] : []));
 }
 
 /** Ticket 282: one of tomorrow's located stops in a tomorrow key: its ref, place text and travel inputs. */
@@ -471,6 +484,8 @@ export function useTravelContext(input: Readonly<{
   sourceReady?: boolean;
   /** Ticket 268: `travelStopRevisions` for the same sources as `sourceKey`. Without it a kept view withdraws nothing. */
   stopRevisions?: Readonly<Record<string, string>>;
+  /** `travelStopRoutes` for the same sources. Without it a Calendar list catching up always asks again. */
+  stopRoutes?: Readonly<Record<string, TravelStopRoute>>;
   /** Ticket 282: `travelTomorrowStopKey` for the same sources. Without it tomorrow's first trip is never requested. */
   tomorrowStopKey?: string | null;
 }>): TravelState {
@@ -561,7 +576,8 @@ export function useTravelContext(input: Readonly<{
     /**
      * Follow-up after Mac 0.1.9: this device's Calendar list caught up with stops the last
      * response already routed (the hosted route reads Calendar itself). That view stays current
-     * under the new sources, so the source change sends no new request.
+     * under the new sources, so the source change sends no new request. A new stop that moved
+     * after the hosted route read it is not adopted, so the source change asks again.
      */
     const adoptRoutedStops = () => {
       if (travelViewCache.has(stateKey) || !stopDigests) return;
@@ -573,7 +589,7 @@ export function useTravelContext(input: Readonly<{
           && travelDigest(JSON.stringify([source, corrections])) === last.sourceKey;
       })?.[1];
       if (!previous?.view?.evidence || !previous.stops || previous.resumesAt) return;
-      if (!travelSourcesOnlyAddRoutedStops(previous.stops, stopDigests, previous.view.evidence)) return;
+      if (!travelSourcesOnlyAddRoutedStops(previous.stops, stopDigests, previous.view.evidence, input.stopRoutes ?? {})) return;
       cacheTravel(stateKey, { ...previous, stops: stopDigests });
       travelRefreshStates.set(accountId, { ...last, sourceKey: planKey });
       persist();
