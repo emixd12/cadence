@@ -11,6 +11,7 @@ import {
   type LeaveReminderAccountPort,
   type LeaveReminderPlannedTrip,
   type LeaveReminderRouted,
+  type LeaveReminderSendRead,
 } from "../lib/services/leave-reminder-job.service";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -139,13 +140,19 @@ type World = {
   calendarsLeftOut: boolean;
   /** Google Calendar's read fails, which fails the whole trip list. */
   googleFails: boolean;
+  /** The send step's Calendar read leaves out the destination's Outlook or iCloud Calendar. */
+  sendReadLeftOut: boolean;
+  /** The send-time read throws, as a failed Google Calendar read does. */
+  sendReadThrows: boolean;
+  /** Send-time reads, one per visit at most. */
+  sendReads: number;
   routes: string[];
 };
 
 function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: number }> = {}) {
   const store = options.store ?? new MemoryStore();
   const world: World = { trips: [tripFor("event-1", EVENT_START)], leaveAt: new Map([["event-1", "2026-11-06T17:20:00Z"]]),
-    budgetRefused: false, updatePaused: false, routeThrows: false, titleGone: false, calendarsLeftOut: false, googleFails: false, routes: [] };
+    budgetRefused: false, updatePaused: false, routeThrows: false, titleGone: false, calendarsLeftOut: false, googleFails: false, sendReadLeftOut: false, sendReadThrows: false, sendReads: 0, routes: [] };
   const preparation = { seconds: options.preparationSeconds ?? PREP_SECONDS };
   const sent: LeaveReminderMessage[] = [];
   const deliver = vi.fn<LeaveReminderDelivery>(async (_caller, message) => { sent.push(message); return { status: "sent" }; });
@@ -171,7 +178,13 @@ function harness(options: Readonly<{ store?: MemoryStore; preparationSeconds?: n
       }
       return routed;
     },
-    readSendDetails: async () => world.titleGone ? null : { title: TITLE, origin: { kind: "home" } },
+    readSendCalendar: async () => {
+      world.sendReads += 1;
+      if (world.sendReadThrows) throw new Error("google_calendar_unavailable");
+      const read: LeaveReminderSendRead = world.sendReadLeftOut ? { kind: "left_out" }
+        : world.titleGone ? { kind: "gone" } : { kind: "found", details: { title: TITLE, origin: { kind: "home" } } };
+      return { read: () => read };
+    },
     updatePaused: async () => world.updatePaused,
   });
   const visit = async (at: string) => {
@@ -332,6 +345,87 @@ describe("leave reminder job", () => {
     world.googleFails = false;
     await visit("2026-11-06T17:16:00Z");
     expect(sent.map((message) => message.kind)).toEqual(["reminder"]);
+  });
+
+  it("keeps a reminder pending, with no route spent, when the send step's Calendar read leaves its Calendar out", async () => {
+    const { store, world, sent, visit } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    const planned = only(store);
+
+    // The trip list read every Calendar; the send step's read then fails for the destination's Calendar.
+    world.sendReadLeftOut = true;
+    await visit("2026-11-06T17:06:00Z");
+    expect(sent).toEqual([]);
+    expect(world.routes).toHaveLength(1);
+    expect(only(store)).toMatchObject({ id: planned.id, status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T17:10:00Z", processingStartedAt: null });
+    expect(store.accountNextCheckAt).toBe("2026-11-06T17:10:00Z");
+
+    // The next visit reads it: the send route runs while the leave time is ahead.
+    world.sendReadLeftOut = false;
+    await visit("2026-11-06T17:11:00Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder"]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2 });
+    expect(world.routes).toHaveLength(2);
+  });
+
+  it("keeps a reminder the plan route found due when the send-time read leaves its Calendar out", async () => {
+    const { store, world, sent, visit } = harness();
+    // First seen with its reminder time already due: the plan route is also the send route.
+    world.sendReadLeftOut = true;
+    await visit("2026-11-06T17:06:00Z");
+    expect(sent).toEqual([]);
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, nextCheckAt: "2026-11-06T17:10:00Z", processingStartedAt: null, plannedPreparationMinutes: 10 });
+
+    world.sendReadLeftOut = false;
+    await visit("2026-11-06T17:11:00Z");
+    expect(sent.map((message) => message.kind)).toEqual(["reminder"]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2 });
+  });
+
+  it("keeps the update check, with no route spent, when the update step's read leaves its Calendar out", async () => {
+    const { store, world, sent, visit } = harness({ preparationSeconds: 30 * 60 });
+    world.leaveAt.set("event-1", "2026-11-06T18:00:00Z");
+    await visit("2026-11-06T15:00:00Z");
+    await visit("2026-11-06T17:26:00Z");
+    world.leaveAt.set("event-1", "2026-11-06T17:45:00Z");
+
+    world.sendReadLeftOut = true;
+    await visit("2026-11-06T17:31:00Z");
+    expect(world.routes).toHaveLength(2);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 2, nextCheckAt: "2026-11-06T17:30:00Z", updateSentAt: null, processingStartedAt: null });
+
+    world.sendReadLeftOut = false;
+    await visit("2026-11-06T17:36:00Z");
+    expect(sent.map((message) => [message.kind, message.leaveAt])).toEqual([
+      ["reminder", "2026-11-06T18:00:00Z"],
+      ["update", "2026-11-06T17:45:00Z"],
+    ]);
+    expect(only(store)).toMatchObject({ status: "sent", routeCount: 3, nextCheckAt: null });
+  });
+
+  it("releases its claims, with no route spent, when the send-time read fails outright", async () => {
+    const { store, world, sent, visit } = harness();
+    await visit("2026-11-06T15:00:00Z");
+    world.sendReadThrows = true;
+    await expect(visit("2026-11-06T17:06:00Z")).resolves.toMatchObject({ kind: "failed", cancelled: 0 });
+    expect(world.routes).toHaveLength(1);
+    expect(only(store)).toMatchObject({ status: "pending", routeCount: 1, processingStartedAt: null });
+
+    world.sendReadThrows = false;
+    await visit(store.accountNextCheckAt!);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("reads Calendar once at send time for every trip the visit sends", async () => {
+    const { store, world, sent, visit } = harness();
+    world.trips = [tripFor("event-1", EVENT_START), tripFor("event-2", "2026-11-06T18:05:00Z")];
+    world.leaveAt.set("event-2", "2026-11-06T17:20:00Z");
+    await visit("2026-11-06T15:00:00Z");
+    expect(world.sendReads).toBe(0);
+    await visit(store.accountNextCheckAt!);
+    await visit("2026-11-06T17:06:00Z");
+    expect(sent).toHaveLength(2);
+    expect(world.sendReads).toBe(1);
   });
 
   it("does not send when the event is gone at send time", async () => {

@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { leaveReminderTripDigest } from "@cadence/core/services/leave-reminder-plan";
 import type { LeaveReminderPlannedTrip } from "../lib/services/leave-reminder-job.service";
 
 vi.mock("@/lib/integrations/leave-reminder-caller", () => ({
@@ -86,8 +87,8 @@ describe("hosted leave reminder port (Wave 4 final check)", () => {
       ["outlook_calendar/dentist", null], ["icloud_calendar/lunch", "outlook_calendar/dentist"],
     ]);
     expect(readTravelCalendarEvents).toHaveBeenCalledWith(expect.anything(), expect.anything(), { scope: "day", startLocalDate: "2026-11-06", endLocalDate: "2026-11-06" });
-    const details = await port().readSendDetails("2026-11-06", trips[1]!, "outlook_calendar/dentist");
-    expect(details).toEqual({ title: "Lunch", origin: { kind: "previous_stop", title: "Dentist" } });
+    const calendar = await port().readSendCalendar("2026-11-06");
+    expect(calendar.read(trips[1]!, "outlook_calendar/dentist")).toEqual({ kind: "found", details: { title: "Lunch", origin: { kind: "previous_stop", title: "Dentist" } } });
   });
 
   it("reports a Calendar a failed read left out, from the refresh or the destination read, so the job keeps its trips (Ticket 283)", async () => {
@@ -109,6 +110,30 @@ describe("hosted leave reminder port (Wave 4 final check)", () => {
     vi.mocked(refreshTravelRoutesReportingCalendars).mockResolvedValueOnce({ calendarsLeftOut: [], response: legs } as never);
     vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read([]) as never);
     expect((await port().listTrips("2026-11-06")).calendarsLeftOut).toBe(false);
+  });
+
+  it("marks a stop the send-time read could not see as left out only while a Calendar was left out", async () => {
+    vi.mocked(readTravelRouteSource).mockResolvedValue({ settings: { baseLocationText: null }, behaviors: [] } as never);
+    const google = { id: "google-event", kind: "timed", state: "unknown", currentUserResponse: null, startAt: "2026-11-06T18:00:00Z", location: "Main St", title: "Gym" };
+    const read = (unavailable: string[]) => ({ google: [google], all: [google], timezone: "America/New_York", unavailable });
+    const trip = (kind: "calendar" | "behavior", ref: string): LeaveReminderPlannedTrip => ({
+      digest: leaveReminderTripDigest(kind, ref, "2026-11-06T18:00:00Z"), destinationRef: ref, role: "outbound", originRef: null, startAt: "2026-11-06T18:00:00Z", mode: "walking",
+    });
+
+    vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read(["outlook"]) as never);
+    const partial = await port().readSendCalendar("2026-11-06");
+    expect(partial.read(trip("calendar", "outlook_calendar/dentist"), null)).toEqual({ kind: "left_out" });
+    // A Behavior's Occurrence is in no Calendar: missing means gone.
+    expect(partial.read(trip("behavior", "occurrence-1"), null)).toEqual({ kind: "gone" });
+    expect(partial.read(trip("calendar", "google-event"), null)).toEqual({ kind: "found", details: { title: "Gym", origin: { kind: "home" } } });
+    expect(partial.read(trip("calendar", "google-event"), "outlook_calendar/breakfast")).toEqual({ kind: "left_out" });
+
+    vi.mocked(readTravelCalendarEvents).mockResolvedValueOnce(read([]) as never);
+    const complete = await port().readSendCalendar("2026-11-06");
+    expect(complete.read(trip("calendar", "outlook_calendar/dentist"), null)).toEqual({ kind: "gone" });
+    expect(complete.read(trip("calendar", "google-event"), "outlook_calendar/breakfast")).toEqual({ kind: "gone" });
+    // The event moved: a new digest, so this trip is gone.
+    expect(complete.read({ ...trip("calendar", "google-event"), digest: "b".repeat(64) }, null)).toEqual({ kind: "gone" });
   });
 
   it("fails the trip list when Google Calendar's read fails, so the visit cancels nothing", async () => {

@@ -489,11 +489,20 @@ ship, nothing reads or writes the new tables.
   leaves that Calendar's trips out of the visit, so the job keeps every record for today whose
   trip is missing and decides it once the Calendars read again. A kept reminder whose time
   passed during the outage sends then if its leave time is still ahead.
-- Known limit: the job reads Calendar once more after the send route, to name the event. If
-  the destination's or previous stop's Outlook or iCloud read fails at that moment, after the
-  same visit read it successfully, that reminder is cancelled. A retry would need another
-  route before sending, and the database allows a third route only after a reminder is sent
-  (decision D15).
+- The send and update steps read Calendar and Behaviors once more before their route, to
+  name the event. If an Outlook or iCloud read fails there and the destination is missing,
+  the job releases the record with no route: a pending reminder stays pending at its check
+  and an open update check stays open. The next visit tries again, and the reminder sends
+  then while its leave time is still ahead. A visit reads this once, for every trip it sends.
+  If that read fails outright, as a Google read does, the visit fails before any route and
+  the account is retried later. The plan step reads only when its route finds the reminder
+  already due. If that read leaves the destination's Calendar out, the reminder stays pending
+  at its reminder time, so the send route sends it at the next visit. This keeps the three
+  routes of decision D15: no step routes again to retry.
+- Known limit: the previous stop is only known after the route. If it is missing because a
+  Calendar was left out of the send-time read, a send step cancels its reminder and an
+  update step closes its check, as before. A retry would need another route before sending,
+  and the database allows a third route only after a reminder is sent (decision D15).
 - No action buttons, snooze or email leave reminders in this version.
 - Leave times never reach Daily Brief model input or MCP.
 
@@ -541,7 +550,7 @@ ship, nothing reads or writes the new tables.
   the update route is the second. The update route adds up to half the job's route
   legs (`docs/COSTS.md`). Leave times stay in memory; only the check time is stored.
 - The job re-reads Calendar at least every 30 minutes for an account with pending
-  trips, and again at send time. It reads the event title only at send time, in
+  trips, and again at send time, before the send or update route. It reads the event title only at send time, in
   memory, and never stores it.
 - A budget refusal fails that reminder with `budget_refused`. The plan and send routes
   continue to the monthly ceiling, so first reminders keep the remaining budget. The

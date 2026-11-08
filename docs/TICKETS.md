@@ -16705,6 +16705,13 @@ the event still cancels that reminder if an Outlook or iCloud read fails there, 
 visit read it successfully; a retry would need a third route before sending, which the
 `travel_leave_reminders_third_route_after_send` check refuses (`docs/NOTIFICATION_SPEC.md`,
 "Leave reminders").
+Follow-up (November 8, 2026, branch `leave-reminder-send-read`, not merged): the send and update
+steps now read Calendar before their route. A destination a failed Outlook or iCloud read left
+out is released with no route spent, and the next visit sends while the leave time is ahead. A
+plan route that finds the reminder due keeps it pending at its reminder time instead of
+cancelling. Remaining limit: a previous stop missing from that read still cancels the reminder
+or closes the update check. No migration; D15 and D16 unchanged. Tests:
+`tests/leave-reminder-job.service.test.ts`, `tests/leave-reminder-hosted-port.test.ts`.
 Decision D18 follow-up (November 6, 2026, not merged): signed Daily Brief conclusions now
 cover Outlook and iCloud stops. The token names those events by source, and its source key
 binds the Outlook and iCloud connections that took part. The brief accepts it only when each

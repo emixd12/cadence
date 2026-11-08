@@ -80,10 +80,23 @@ export type LeaveReminderRouted = Readonly<{
   originRef: string | null;
 }>;
 
-/** At send time, read again in memory. Null when the trip is no longer current. */
+/** At send time, read again in memory. */
 export type LeaveReminderSendDetails = Readonly<{
   title: string;
   origin: LeaveReminderMessage["origin"];
+}>;
+
+/** What the send-time read says about one trip. */
+export type LeaveReminderSendRead =
+  | Readonly<{ kind: "found"; details: LeaveReminderSendDetails }>
+  /** The destination or previous stop is gone, has no title, or its start moved: nothing sends. */
+  | Readonly<{ kind: "gone" }>
+  /** A failed Outlook or iCloud read left out a Calendar the stop may be in: it is unknown. */
+  | Readonly<{ kind: "left_out" }>;
+
+/** One Calendar and Behavior read with titles, for the visit's sends. Titles stay in memory. */
+export type LeaveReminderSendCalendar = Readonly<{
+  read(trip: LeaveReminderPlannedTrip, originRef: string | null): LeaveReminderSendRead;
 }>;
 
 /** Everything the job does for one account, as that user. Tests replace it. */
@@ -98,7 +111,7 @@ export type LeaveReminderAccountPort = Readonly<{
     preparationChangedAt?: string | null }>>;
   listTrips(localDate: string): Promise<LeaveReminderTripList>;
   routeTrips(localDate: string, trips: readonly LeaveReminderPlannedTrip[]): Promise<ReadonlyMap<string, LeaveReminderRouted>>;
-  readSendDetails(localDate: string, trip: LeaveReminderPlannedTrip, originRef: string | null): Promise<LeaveReminderSendDetails | null>;
+  readSendCalendar(localDate: string): Promise<LeaveReminderSendCalendar>;
   /** Decision D16: true from 80% of the monthly budget. */
   updatePaused(timezone: string): Promise<boolean>;
 }>;
@@ -222,13 +235,31 @@ export async function visitLeaveReminderAccount(
 
     // Decision D16: the update route stops at 80% of the monthly budget.
     const updates = claimed.filter((item) => item.step === "update");
-    const toRoute = claimed.filter((item) => item.step !== "update");
+    let toRoute = claimed.filter((item) => item.step !== "update");
     if (updates.length) {
       if (await port.updatePaused(timezone)) {
         for (const item of updates) await store.finish(item.record, { next_check_at: null, processing_started_at: null, error: "budget_paused" });
       } else {
         toRoute.push(...updates);
       }
+    }
+
+    // One send-time read per visit. The send and update steps read before their route: a
+    // destination whose Calendar a failed read left out is released unrouted, keeping its
+    // check, and the next visit tries again. The plan step reads only when it sends.
+    let sendCalendar: Promise<LeaveReminderSendCalendar> | null = null;
+    const readSendCalendar = () => (sendCalendar ??= port.readSendCalendar(plan.localDate));
+    if (toRoute.some((item) => item.step !== "plan")) {
+      let calendar: LeaveReminderSendCalendar;
+      try {
+        calendar = await readSendCalendar();
+      } catch (error) {
+        for (const item of toRoute) await store.finish(item.record, { processing_started_at: null }).catch(() => false);
+        throw error;
+      }
+      const unread = toRoute.filter((item) => item.step !== "plan" && calendar.read(item.trip, null).kind === "left_out");
+      for (const item of unread) await store.finish(item.record, { processing_started_at: null });
+      toRoute = toRoute.filter((item) => !unread.includes(item));
     }
     if (!toRoute.length) return { kind: "visited", ...counts };
 
@@ -242,7 +273,7 @@ export async function visitLeaveReminderAccount(
 
     for (const item of toRoute) {
       const outcome = await applyRoute(port, item, routed.get(item.trip.digest) ?? null, {
-        now: nowText, preparationSeconds: context.preparationSeconds, localDate: plan.localDate, deliver,
+        now: nowText, preparationSeconds: context.preparationSeconds, deliver, readSendCalendar,
       });
       if (outcome === "planned") counts.planned += 1;
       else if (outcome === "sent") counts.sent += 1;
@@ -269,7 +300,7 @@ async function applyRoute(
   port: LeaveReminderAccountPort,
   item: Claimed,
   routed: LeaveReminderRouted | null,
-  input: Readonly<{ now: string; preparationSeconds: number; localDate: string; deliver: LeaveReminderDelivery }>,
+  input: Readonly<{ now: string; preparationSeconds: number; deliver: LeaveReminderDelivery; readSendCalendar: () => Promise<LeaveReminderSendCalendar> }>,
 ): Promise<ApplyOutcome> {
   const { store } = port;
   const { record, trip, step } = item;
@@ -298,8 +329,16 @@ async function applyRoute(
     case "send_update": {
       const update = outcome.kind === "send_update";
       // Calendar and Behaviors are read again at send time; the title stays in memory.
-      const details = routed.estimate ? await port.readSendDetails(input.localDate, trip, routed.originRef) : null;
-      if (!details || !routed.estimate) {
+      const read: LeaveReminderSendRead = routed.estimate ? (await input.readSendCalendar()).read(trip, routed.originRef) : { kind: "gone" };
+      // The plan route found the reminder due but a Calendar read failed: it stays pending at
+      // its reminder time, so the send route sends at the next visit while the leave time is ahead.
+      if (read.kind === "left_out" && step === "plan" && outcome.kind === "send") {
+        const reminderAt = Temporal.Instant.from(outcome.leaveAt).subtract({ seconds: Math.max(0, input.preparationSeconds) }).toString();
+        await store.finish(record, { next_check_at: reminderAt, route_count: routeCount, processing_started_at: null,
+          planned_preparation_minutes: leaveReminderPreparationMinutes(input.preparationSeconds) });
+        return "planned";
+      }
+      if (read.kind !== "found" || !routed.estimate) {
         await store.finish(record, update
           ? { next_check_at: null, route_count: routeCount, processing_started_at: null }
           : { status: "cancelled", next_check_at: null, route_count: routeCount, processing_started_at: null });
@@ -307,6 +346,7 @@ async function applyRoute(
       }
       // Turning reminders off deletes the records; a run that started before must not send.
       if (!await store.remindersEnabled()) return "released";
+      const details = read.details;
       const message: LeaveReminderMessage = {
         kind: update ? "update" : "reminder",
         tripDigest: record.tripDigest,
@@ -426,13 +466,23 @@ export function createHostedLeaveReminderAccountPort(
       }
       return routed;
     },
-    async readSendDetails(localDate, trip, originRef) {
-      const { destinations } = await readDestinations(await calendar(), localDate, true);
-      const destination = destinations.get(trip.destinationRef);
-      if (!destination?.title || leaveReminderTripDigest(destination.kind, trip.destinationRef, destination.startAt) !== trip.digest) return null;
-      if (originRef === null) return { title: destination.title, origin: { kind: "home" } };
-      const origin = destinations.get(originRef);
-      return origin?.title ? { title: destination.title, origin: { kind: "previous_stop", title: origin.title } } : null;
+    async readSendCalendar(localDate) {
+      const { destinations, calendarsLeftOut } = await readDestinations(await calendar(), localDate, true);
+      // A missing stop may be in a Calendar this read left out. A Behavior's Occurrence never is.
+      const missing = (behavior: boolean): LeaveReminderSendRead => ({ kind: calendarsLeftOut && !behavior ? "left_out" : "gone" });
+      return {
+        read(trip, originRef) {
+          const destination = destinations.get(trip.destinationRef);
+          if (!destination) return missing(leaveReminderTripDigest("behavior", trip.destinationRef, trip.startAt) === trip.digest);
+          if (!destination.title || leaveReminderTripDigest(destination.kind, trip.destinationRef, destination.startAt) !== trip.digest) return { kind: "gone" };
+          if (originRef === null) return { kind: "found", details: { title: destination.title, origin: { kind: "home" } } };
+          const origin = destinations.get(originRef);
+          if (!origin) return missing(false);
+          return origin.title
+            ? { kind: "found", details: { title: destination.title, origin: { kind: "previous_stop", title: origin.title } } }
+            : { kind: "gone" };
+        },
+      };
     },
     async updatePaused(timezone) {
       try {
