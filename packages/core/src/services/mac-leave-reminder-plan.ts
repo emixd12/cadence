@@ -92,6 +92,18 @@ function candidates(trips: readonly DepartureTrip[], stops: readonly DepartureSt
   return result;
 }
 
+/**
+ * Destinations of trips that would get a reminder but whose stop is not in `stops`: the hosted
+ * route read a Calendar event before this Mac's Calendar list did. The caller reads its Calendar
+ * lists again; until then the trip has no title or start time to remind with.
+ */
+export function macLeaveReminderMissingStops(trips: readonly DepartureTrip[], stops: readonly DepartureStop[], now: string): string[] {
+  const known = new Set(stops.map((stop) => stop.ref));
+  const instant = Temporal.Instant.from(now);
+  return [...new Set(trips.flatMap((trip) => trip.role !== "return" && trip.destinationRef && !known.has(trip.destinationRef)
+    && trip.leaveAt && Temporal.Instant.compare(Temporal.Instant.from(trip.leaveAt), instant) > 0 ? [trip.destinationRef] : []))];
+}
+
 function start(trip: DepartureTrip): MacLeaveReminderStart {
   if (trip.fromHome) return "home";
   return trip.originRef ? "previous_stop" : "position";

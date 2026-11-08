@@ -368,7 +368,10 @@ its destination ends. Clients must not restate the triggers or thresholds. Ticke
 `lib/ui/travel.ts` follows the plan on open, focus, return to the window and plan timers.
 A kept view from older sources first passes `changedTravelStops` and
 `withdrawChangedTravelTrips` (travel resolver), so a moved, re-placed or cancelled stop's trips
-read as changed instead of keeping their old times.
+read as changed instead of keeping their old times. When the new sources only add stops the kept
+view's evidence already names (`travelSourcesOnlyAddRoutedStops`), the hook keeps that view as
+current with no new request: the hosted route read a new Calendar event before this device's
+Calendar list did (follow-up after Mac 0.1.9, `tests/travel-refresh-day.dom.test.tsx`).
 Movement over 500 m plans a trip request for the next outbound trip only, no sooner than
 `TRAVEL_MOVEMENT_REFRESH_FLOOR_SECONDS` after the last request that routed from the device.
 `mergeTravelLastEstimates` in the travel resolver merges each response into the kept view

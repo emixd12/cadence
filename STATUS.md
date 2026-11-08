@@ -1,5 +1,17 @@
 # Implementation Status
 
+## Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026
+
+**On branch `travel-postdeploy-checks`. Not pushed.** Found on published 0.1.9: a Calendar event
+added shortly before leaving got a leave line but no Mac leave reminder until the Mac's Calendar
+list refreshed, because the hosted route reads Calendar itself. Fixed: a routed trip ahead whose
+stop the Mac does not list makes the Mac read its Calendar lists again once, and the travel hook
+keeps the routed view current when the new stop is one it already routed, so no route request is
+added. Evidence in `docs/qa/travel-release.md`, "Calendar-event activation on published 0.1.9".
+Platform impact: desktop (Calendar re-read and reminder planning); web shares the hook rule, which
+only skips a repeat whole-day request; marketing and future mobile not applicable. Messaging
+impact: none. Not yet rechecked on an installed Mac.
+
 ## Ticket 285: installed Mac acceptance run — November 6–7, 2026
 
 **On branch `travel-wave6`. Evidence in `docs/qa/travel-release.md`, "Ticket 285". No notarization

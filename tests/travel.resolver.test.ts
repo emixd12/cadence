@@ -6,6 +6,7 @@ import {
   resolveTravelCollisions,
   resolveTravelEvidence,
   resolveTravelPlan,
+  travelSourcesOnlyAddRoutedStops,
 } from "../packages/core/src/resolvers/travel.resolver";
 import { travelPlaceKey } from "../packages/core/src/services/travel-place-key";
 import type {
@@ -901,5 +902,27 @@ describe("Ticket 265: a weather margin and the ready time", () => {
     const evidence = resolveTravelEvidence({ ...evidenceInput(plan, [resultFor(plan.legs[0]!, estimate("2026-09-16T16:30:00Z", "2026-09-16T16:50:00Z", 1200))], []), now: NOW, weather });
     expect(evidence.legs[0]?.weather).toMatchObject({ departureAt: "2026-09-16T16:20:00Z", arrivalAt: "2026-09-16T16:50:00Z" });
     expect(evidence.legs[0]).not.toHaveProperty("late");
+  });
+});
+
+describe("travelSourcesOnlyAddRoutedStops (follow-up after Mac 0.1.9)", () => {
+  type Evidence = Parameters<typeof travelSourcesOnlyAddRoutedStops>[2];
+  const leg = (origin: string | null, destination: string | null) => ({ leg: { originCommitmentRef: origin, destinationCommitmentRef: destination } });
+  const evidence = (overrides: Partial<Record<"legs" | "unknownLegs" | "segments", unknown[]>> = {}) =>
+    ({ legs: [leg(null, "dentist"), leg("dentist", "late")], unknownLegs: [], segments: [], ...overrides }) as unknown as Evidence;
+  const before = { dentist: "d1" };
+
+  it("is true when every new stop is one the evidence routed and nothing else changed", () => {
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", late: "l1" }, evidence())).toBe(true);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", far: "f1" },
+      evidence({ unknownLegs: [{ originCommitmentRef: "dentist", destinationCommitmentRef: "far" }] }))).toBe(true);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", lunch: "x" },
+      evidence({ segments: [{ kind: "commitment", sourceRefs: ["lunch"] }] }))).toBe(true);
+  });
+  it("is false for a new stop the evidence does not name, a changed or gone stop, or no new stop", () => {
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1", lunch: "x" }, evidence())).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d2", late: "l1" }, evidence())).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops({ ...before, gym: "g1" }, { dentist: "d1", late: "l1" }, evidence())).toBe(false);
+    expect(travelSourcesOnlyAddRoutedStops(before, { dentist: "d1" }, evidence())).toBe(false);
   });
 });

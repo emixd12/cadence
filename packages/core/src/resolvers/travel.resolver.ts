@@ -394,6 +394,28 @@ export function changedTravelStops(
 }
 
 /**
+ * Follow-up after Mac 0.1.9: the current sources only add stops that `evidence` already names,
+ * and no stop the view was made from changed or went. The hosted route reads Calendar itself, so
+ * it can route a new event before this device's Calendar list has it. When the list catches up,
+ * the view already covers the new stop, and a new request would route the same trips again.
+ */
+export function travelSourcesOnlyAddRoutedStops(
+  previous: Readonly<Record<string, string>>,
+  current: Readonly<Record<string, string>>,
+  evidence: TravelDisplayEvidence,
+): boolean {
+  if (changedTravelStops(previous, current).size) return false;
+  const added = Object.keys(current).filter((ref) => !Object.hasOwn(previous, ref));
+  if (!added.length) return false;
+  const named = new Set<string>([
+    ...evidence.legs.flatMap(({ leg }) => [leg.originCommitmentRef, leg.destinationCommitmentRef]),
+    ...(evidence.unknownLegs ?? []).flatMap((leg) => [leg.originCommitmentRef, leg.destinationCommitmentRef]),
+    ...evidence.segments.flatMap((segment) => segment.sourceRefs),
+  ].filter((ref): ref is string => !!ref));
+  return added.every((ref) => named.has(ref));
+}
+
+/**
  * Ticket 268: a kept view shown before any new response, with every trip to or from a changed
  * stop withdrawn. Such a trip keeps its place as `rejected_revision`, which the departure model
  * shows as "The trip to {event} changed." with Refresh travel. Its segments and collisions go.

@@ -13,7 +13,7 @@ import {
   firstTravelStopAwayFromHome, recordTravelRefresh, resolveTravelRefreshPlan, resolveTravelTomorrowPlan, travelDeviceMoved, travelRefreshRequestFields, travelRefreshTripsFromEvidence,
   type TravelBudgetState, type TravelDeviceSample, type TravelRefreshRequest, type TravelRefreshState, type TravelTripRef,
 } from "@cadence/core/services/travel-refresh-policy";
-import { changedTravelStops, mergeTravelLastEstimates, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
+import { changedTravelStops, mergeTravelLastEstimates, travelSourcesOnlyAddRoutedStops, withdrawChangedTravelTrips } from "@cadence/core/resolvers/travel.resolver";
 import { locatedStopsAhead } from "@cadence/core/services/departure-stops";
 
 /** One event revision's destination for this trip. Decision D12: a located event is in person, so nothing asks attendance. */
@@ -548,6 +548,27 @@ export function useTravelContext(input: Readonly<{
         budget: travelBudgets.get(accountId) ?? null, tomorrow: travelTomorrowTrips.get(accountId) ?? null });
     };
     restore();
+    /**
+     * Follow-up after Mac 0.1.9: this device's Calendar list caught up with stops the last
+     * response already routed (the hosted route reads Calendar itself). That view stays current
+     * under the new sources, so the source change sends no new request.
+     */
+    const adoptRoutedStops = () => {
+      if (travelViewCache.has(stateKey) || !stopDigests) return;
+      const last = travelRefreshStates.get(accountId);
+      if (!last || last.localDate !== localDate || last.sourceKey === planKey) return;
+      const previous = [...travelViewCache.entries()].reverse().find(([key]) => {
+        const [owner, day, source, corrections] = JSON.parse(key) as string[];
+        return owner === accountId && day === localDate && source !== "session" && corrections === correctionsKey
+          && travelDigest(JSON.stringify([source, corrections])) === last.sourceKey;
+      })?.[1];
+      if (!previous?.view?.evidence || !previous.stops || previous.resumesAt) return;
+      if (!travelSourcesOnlyAddRoutedStops(previous.stops, stopDigests, previous.view.evidence)) return;
+      cacheTravel(stateKey, { ...previous, stops: stopDigests });
+      travelRefreshStates.set(accountId, { ...last, sourceKey: planKey });
+      persist();
+    };
+    adoptRoutedStops();
     /** Ticket 282: tomorrow's first trip, when its request was for the current first stop. */
     const showTomorrow = () => {
       const entry = travelTomorrowTrips.get(accountId);

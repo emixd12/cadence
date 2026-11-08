@@ -1483,6 +1483,15 @@ Cleanup: the drawer closed; leave reminders off for account A (memory `{enabled:
 []}`); get-ready 20 and arrival buffer 15 unchanged; Cadence location access back on; "W6 Mac event"
 and "W6 Mac event 2" deleted from the test calendar; helper files removed from the test Mac.
 
+Follow-up fixed (November 7, branch `travel-postdeploy-checks`): when a routed trip ahead names a
+stop the Mac does not list, the Mac reads its Calendar lists again at once
+(`macLeaveReminderMissingStops`, `useDesktopLeaveReminders`), so the reminder is planned with the
+event's title without Settings › Refresh Calendar. The travel hook then keeps the routed view as
+current, because the new stop is one it already routed (`travelSourcesOnlyAddRoutedStops`): no
+second whole-day route request. Tests: `tests/travel-refresh-day.dom.test.tsx`,
+`tests/desktop-leave-reminders-hook.dom.test.tsx`, `tests/mac-leave-reminder-plan.test.ts`,
+`tests/travel.resolver.test.ts`. Not yet rechecked on an installed Mac.
+
 ### Named place after deploy — November 7, 2026
 
 Production `app.cadence-me.com`, deployment `dpl_BBH1CAJR8d1LJHSUrQfKXcLCk9Fb` (commit `7c698ec`,
