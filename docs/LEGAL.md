@@ -485,8 +485,9 @@ part of L-002.
   (`apps/desktop/src-tauri`, `apps/desktop/src`) and hosted prepare and complete routes under
   `app/api/advisor/brief`. Decision: `docs/DECISIONS.md`, 2026-11-07, D25.
 - **Provider, clause, source and check date:** OpenAI, Sign in with ChatGPT, token sharing
-  for open-source apps: open-source and locally run apps may use a user's ChatGPT plan; a
-  paid or remotely hosted app needs OpenAI's approval first.
+  for open-source apps: "open-source and locally hosted apps" may use a user's ChatGPT plan,
+  and "ChatGPT plan usage is available to all open-source partners and selected private
+  clients"; a paid or remotely hosted app needs OpenAI's approval first.
   `https://developers.openai.com/siwc/llms-full.txt` and
   `https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt`. Read for the plan on
   November 7, 2026; not rechecked for this entry.
@@ -510,8 +511,12 @@ part of L-002.
   ChatGPT DevKit code or React components?
 - **Affected:** Tickets 287, 289 and 291. Files: the spike script under `scripts/`, the Mac
   connection and the Settings card.
-- **Provider, clause, source and check date:** OpenAI, the DevKit's licence, which is
-  noncommercial. Read for the plan on November 7, 2026; not rechecked for this entry.
+- **Provider, clause, source and check date:** OpenAI, "Sign-in with ChatGPT DevKit
+  Noncommercial License",
+  `https://github.com/openai/sign-in-with-chatgpt-devkit/blob/main/LICENSE`. Section 2 grants
+  rights "solely for Noncommercial Purposes". Section 1 excludes from those purposes a product
+  or service run "by or for a business ... whether or not a fee is currently charged". Checked
+  November 8, 2026.
 - **Current reading:** a noncommercial licence does not fit Cadence. Cadence writes its own
   client from the public docs (`https://developers.openai.com/siwc/llms-full.txt`) and does
   not copy, vendor or depend on DevKit code or components. The public docs themselves are

@@ -168,7 +168,8 @@ ticket and owner decision.
   interest form (`https://openai.com/form/sign-in-with-chatgpt-interest/`). Web sign-in
   stays Google only until then.
 - **ChatGPT plan usage in the hosted web app.** OpenAI's program requires a 127.0.0.1
-  callback and tokens kept on the device, and a remotely hosted app needs OpenAI's approval
+  callback and tokens kept in the user's own local or self-hosted runtime, and a remotely
+  hosted app needs OpenAI's approval
   (`docs/LEGAL.md` L-017). The web Daily Brief keeps Cadence's OpenAI key.
 - **An account-free Mac Daily Brief.** Today the brief context comes from Cadence's server,
   so the Mac must be linked to an account. A local brief would need the context builder and
@@ -181,6 +182,8 @@ ticket and owner decision.
   chat inside Cadence that runs on the user's ChatGPT plan. It is out of v1 scope, because
   `AGENTS.md` lists general AI coaching and chat as out of scope. It needs its own product
   decision covering tools, writes, safety and cost. Tickets 286–292 build nothing for chat.
+  They keep the ChatGPT connection and streaming adapter free of Daily Brief specifics, so
+  such a feature could reuse them (`docs/TICKETS.md`, Tickets 286–292 shared rules).
 
 The owner decides when to submit OpenAI's interest form for web sign-in and hosted plan
 usage. No ticket asks for it now.

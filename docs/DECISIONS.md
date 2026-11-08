@@ -1881,7 +1881,8 @@ Deferred, each needing its own ticket and decision:
   identity sign-in only as a limited trial for selected partners, through its interest form.
   Web sign-in stays Google only.
 - ChatGPT plan usage in the hosted web app. OpenAI's program requires a 127.0.0.1 callback
-  and tokens kept on the device, and a remotely hosted app needs OpenAI's approval.
+  and tokens kept in the user's own local or self-hosted runtime, and a remotely hosted app
+  needs OpenAI's approval.
 - Billing and any discount for bringing a ChatGPT plan. Billing is still not launch scope
   ("Pricing and AI" above). `docs/FUTURE_UPDATES.md` records the discount as a pricing
   proposal only.
@@ -1889,7 +1890,7 @@ Deferred, each needing its own ticket and decision:
 
 Reasons:
 
-- OpenAI's ChatGPT plan program covers open-source and locally run apps today. Cadence for
+- OpenAI's ChatGPT plan program covers open-source and locally hosted apps today. Cadence for
   Mac is MIT-licensed and runs locally; the web app runs on Vercel.
 - The money is small. The Daily Brief model costs Cadence about US$0.004 per brief, or
   US$0.06 / US$0.13 / US$0.25 a month for light, typical and heavy users (`docs/COSTS.md`,

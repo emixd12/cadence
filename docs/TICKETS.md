@@ -16856,6 +16856,8 @@ Rules for every ticket below:
   to Cadence's OpenAI key for that brief, and never loop retries (D25).
 - Cadence picks the model from the user's ChatGPT catalog. No model setting (D25).
 - The web app shows no ChatGPT controls.
+- Keep the ChatGPT connection (Ticket 289) and the streaming adapter (Ticket 288) free of
+  Daily Brief specifics, so a later feature can reuse them. Build nothing for chat.
 - Merges, deployments, Mac notarization and publication wait for the owner's instruction
   each time.
 
@@ -16959,6 +16961,7 @@ Scope and acceptance:
 - Map plan errors to usage limit, not eligible, reconnect, retry later and advisor
   unavailable. Device mode supports recipe 1.0 only.
 - Tests cover the prepare/validate round trip, stream parsing and error mapping.
+- `docs/AGENT_RESOLVERS.md` records the prepare and validate steps and the adapter.
 
 Platform impact:
 
@@ -17028,9 +17031,11 @@ Scope and acceptance:
   validator, finishes the lease, records the tip and returns the briefing.
 - `CADENCE_DAILY_BRIEF_DEVICE_MODEL` gates the mode. Settings report device-model availability
   without requiring `OPENAI_API_KEY`.
-- Tests reject forged, expired and mismatched envelopes and a superseded lease, and prove the
-  server model adapter is never called in device mode. Performance spans carry no prompt or
-  payload.
+- Tests reject forged, expired and mismatched envelopes, a superseded lease and output with
+  unknown refs, and prove the server model adapter is never called in device mode.
+  Performance spans carry no prompt or payload.
+- `docs/ROUTE_MAP.md`, `docs/AGENT_RESOLVERS.md`, `docs/OPERATIONS.md` and
+  `docs/VERCEL_WORKFLOW.md` cover the routes, the new signing secret and the flag.
 
 Platform impact:
 
