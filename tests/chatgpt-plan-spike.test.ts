@@ -1,12 +1,12 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateOpenAIDailyBrief } from "@/lib/services/daily-brief-openai";
 import {
-  acceptCallback, buildAuthorizeUrl, contractFromProbes, corsAllowsWebview, createSseParser, latencyStats, mockBrowser, newAttempt, parseArgs,
-  pkceChallenge, renderMarkdown, revokeRefreshToken, runSpike, selectModels, SpikeStop, streamResponses, toPlanRequest, verifyIdToken,
+  acceptCallback, buildAuthorizeUrl, contractFromProbes, corsAllowsWebview, createSseParser, latencyStats, main, mockBrowser, newAttempt, parseArgs,
+  pkceChallenge, refreshTokens, renderMarkdown, revokeRefreshToken, runSpike, SecretBag, selectModels, SpikeStop, streamResponses, toPlanRequest, verifyIdToken,
   type CorsResult, type Jwks, type ProbeResult, type SpikeOptions, type SseEvent,
 } from "@/scripts/chatgpt-plan-spike";
 import { startMockOpenAI, type MockOpenAI, type MockOptions } from "@/scripts/chatgpt-plan-spike-mock";
@@ -287,9 +287,65 @@ describe("mock-mode spike runs", () => {
     expect(report.probes.find((probe) => probe.probe === "cors_actual")?.allowOrigin).toBe("tauri://localhost");
   });
 
-  it("records a missing revocation endpoint instead of skipping silently", async () => {
+  it("stops before sign-in when discovery has no revocation endpoint", async () => {
     const target = await mock({ noRevocationEndpoint: true });
     const report = await runSpike(options(target, [], { fixtures: ["sparse"], maxModels: 1 }));
-    expect(report.revoke).toMatchObject({ attempted: false, ok: false, error: "no_revocation_endpoint" });
+    expect(report.errors).toEqual([{ stage: "discovery", code: "no_revocation_endpoint" }]);
+    expect(target.state.authorizeRequests).toHaveLength(0);
+    expect(target.state.tokenGrants).toEqual([]);
+    expect(report.revoke.attempted).toBe(false);
+  });
+
+  it("stops before sign-in when the discovery request fails", async () => {
+    const target = await mock();
+    const failing = (async (url: string | URL | Request, init?: RequestInit) => String(url).endsWith("/openid-configuration")
+      ? new Response("unavailable", { status: 503 }) : fetch(url, init)) as typeof fetch;
+    const report = await runSpike(options(target, [], { fetchImpl: failing, openBrowser: mockBrowser(failing) }));
+    expect(report.errors).toEqual([{ stage: "discovery", code: "http_503" }, { stage: "discovery", code: "not_fetched" }]);
+    expect(target.state.authorizeRequests).toHaveLength(0);
+  });
+
+  it("stops before sign-in when discovery names another issuer", async () => {
+    const target = await mock();
+    const report = await runSpike(options(target, [], { endpoints: { ...target.endpoints, issuer: "https://auth.openai.com" } }));
+    expect(report.errors).toEqual([{ stage: "discovery", code: "unexpected_issuer" }]);
+    expect(target.state.authorizeRequests).toHaveLength(0);
+  });
+
+  it("stops a brief promptly on interrupt and still revokes", async () => {
+    const target = await mock();
+    const controller = new AbortController();
+    const interrupting = (async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith("/responses") && typeof init?.body === "string" && init.body.includes("cadence_daily_brief")) controller.abort();
+      return fetch(url, init);
+    }) as typeof fetch;
+    const started = Date.now();
+    const report = await runSpike(options(target, [], { fetchImpl: interrupting, signal: controller.signal, deadlineMs: 60_000 }));
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(report.briefs).toHaveLength(1);
+    expect(report.briefs[0]).toMatchObject({ validation: "not_reached", validationCode: "interrupted" });
+    expect(report.errors.at(-1)).toEqual({ stage: "run", code: "AbortError" });
+    expect(report.revoke.ok).toBe(true);
+    expect(target.state.liveRefreshTokens.size).toBe(0);
+  });
+
+  it("removes mock mode's temporary host folder when the run ends", async () => {
+    const before = new Set(await readdir(tmpdir()));
+    const out = join(configDir, "report");
+    const code = await main(["--mock", "--fixtures", "sparse", "--max-models", "1", "--out", out], { startMock: () => startMockOpenAI() });
+    expect(code).toBe(0);
+    const left = (await readdir(tmpdir())).filter((name) => name.startsWith("cadence-chatgpt-spike-mock-") && !before.has(name));
+    expect(left).toEqual([]);
+    expect((await stat(`${out}.json`)).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe("refresh", () => {
+  it("keeps the current refresh token when the response has no replacement", async () => {
+    const endpoints = (await mock()).endpoints;
+    const reply = (async () => new Response(JSON.stringify({ access_token: "access-token-synthetic", expires_in: 3600, scope: "openid" }), { status: 200 })) as unknown as typeof fetch;
+    const set = await refreshTokens(reply, endpoints, { clientId: "oaiapp_x", refreshToken: "refresh-token-synthetic" }, new SecretBag(), 0);
+    expect(set.refreshToken).toBe("refresh-token-synthetic");
+    expect(set.accessToken).toBe("access-token-synthetic");
   });
 });

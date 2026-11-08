@@ -12,7 +12,7 @@
  */
 import { spawn } from "node:child_process";
 import { createHash, createPublicKey, randomBytes, randomUUID, timingSafeEqual, verify as verifySignature, type JsonWebKey } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -237,7 +237,9 @@ export async function refreshTokens(fetchImpl: typeof fetch, endpoints: SpikeEnd
   bag: SecretBag, now: number): Promise<TokenSet> {
   const response = await postForm(fetchImpl, endpoints.tokenUrl, { grant_type: "refresh_token", client_id: input.clientId,
     refresh_token: input.refreshToken, resource: endpoints.resource });
-  return readTokenResponse(response, bag, now);
+  const set = await readTokenResponse(response, bag, now);
+  // Without a replacement, the old refresh token stays valid and must still be revocable.
+  return { ...set, refreshToken: set.refreshToken ?? input.refreshToken };
 }
 
 export type RevokeResult = { status: number | null; ok: boolean; attempts: number; error: string | null };
@@ -602,7 +604,7 @@ export function chatgptPlanGenerator(input: Readonly<{
 }
 
 export async function runBriefFixture(fixture: BriefingFixtureId, repeat: number, model: string,
-  makeGenerator: (onOutcome: (outcome: StreamOutcome) => void) => DailyBriefGenerator, deadlineMs: number): Promise<BriefRunResult> {
+  makeGenerator: (onOutcome: (outcome: StreamOutcome) => void) => DailyBriefGenerator, signal: AbortSignal): Promise<BriefRunResult> {
   const config = activeBriefingConfig();
   const context = briefingFixture(fixture, config);
   let outcome: StreamOutcome | null = null;
@@ -610,9 +612,11 @@ export async function runBriefFixture(fixture: BriefingFixtureId, repeat: number
   let validation: BriefRunResult["validation"] = "pass";
   let validationCode: string | null = null;
   try {
-    await generateDailyBrief(context, { generate, config, signal: AbortSignal.timeout(deadlineMs), now: () => Temporal.Instant.from(context.capturedAt) });
+    await generateDailyBrief(context, { generate, config, signal, now: () => Temporal.Instant.from(context.capturedAt) });
   } catch (error) {
-    validationCode = error instanceof DailyBriefError ? error.code : error instanceof Error && error.name === "TimeoutError" ? "timeout" : "error";
+    // The pipeline reports any abort as its own "timeout"; the signal's reason says which it was.
+    validationCode = signal.aborted ? (signal.reason instanceof Error && signal.reason.name === "TimeoutError" ? "timeout" : "interrupted")
+      : error instanceof DailyBriefError ? error.code : "error";
     validation = (outcome as StreamOutcome | null)?.kind === "completed" ? "fail" : "not_reached";
   }
   const sent = outcome as StreamOutcome | null;
@@ -633,7 +637,7 @@ export function latencyStats(values: readonly number[]): { count: number; median
 
 /** Codes after which this account must not send more plan requests in this run. */
 export const STOP_CODES = new Set(["subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible", "subscription_sharing_invalid_user",
-  "chatpass_v2_scope_not_authorized", "chatpass_v2_invalid_authorization_context"]);
+  "subscription_sharing_route_not_supported", "chatpass_v2_scope_not_authorized", "chatpass_v2_invalid_authorization_context"]);
 
 // ---------------------------------------------------------------------------
 // CORS preflight
@@ -786,18 +790,20 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeReport> {
       log("2/8 OpenID discovery");
       try {
         const response = await options.fetchImpl(endpoints.discoveryUrl, { redirect: "error", cache: "no-store" });
-        const doc: unknown = await response.json();
-        if (response.ok && record(doc)) {
+        const doc: unknown = await response.json().catch(() => null);
+        if (!response.ok || !record(doc)) report.errors.push({ stage: "discovery", code: `http_${response.status}` });
+        else {
           const text = (key: string) => typeof doc[key] === "string" ? doc[key] as string : null;
           report.discovery = { fetched: true, issuer: text("issuer"), authorizationEndpoint: text("authorization_endpoint"), tokenEndpoint: text("token_endpoint"),
             jwksUri: text("jwks_uri"), revocationEndpoint: text("revocation_endpoint"), matchesDocs: {
               authorize: text("authorization_endpoint") ? text("authorization_endpoint") === endpoints.authorizeUrl : null,
               token: text("token_endpoint") ? text("token_endpoint") === endpoints.tokenUrl : null } };
-          endpoints = { ...endpoints, issuer: text("issuer") ?? endpoints.issuer, jwksUrl: text("jwks_uri") ?? endpoints.jwksUrl,
+          endpoints = { ...endpoints, jwksUrl: text("jwks_uri") ?? endpoints.jwksUrl,
             revocationUrl: text("revocation_endpoint") ?? endpoints.revocationUrl };
         }
       } catch (error) { fail("discovery", error); }
     }
+    assertTrustedEndpoints(report.discovery, endpoints, options.useDiscovery);
 
     const host = await loadHostRecord(options.configDir);
     report.hostRecord = { created: host.created, hasSavedClientId: !!host.clientId };
@@ -880,7 +886,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeReport> {
         for (const fixture of options.fixtures) {
           options.signal?.throwIfAborted();
           const result = await runBriefFixture(fixture, repeat, model, (onOutcome) => chatgptPlanGenerator({ fetchImpl: options.fetchImpl, endpoints, accessToken, model, contract, onOutcome }),
-            options.deadlineMs);
+            anySignal(options.signal, AbortSignal.timeout(options.deadlineMs)));
           report.briefs.push(result);
           log(`  ${model} ${fixture}#${repeat}: ${result.kind} ${result.validation}${result.validationCode ? ` ${result.validationCode}` : ""}${result.totalMs !== null ? ` ${result.totalMs} ms` : ""}`);
           if (result.errorCode && STOP_CODES.has(result.errorCode)) { report.stoppedEarly = result.errorCode; break modelLoop; }
@@ -923,6 +929,22 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeReport> {
   const serialized = JSON.stringify(report);
   if (bag.contains(serialized)) throw new Error("secret_in_report");
   return report;
+}
+
+/**
+ * Stops before sign-in unless discovery came from the expected issuer, the JWKS is on
+ * that origin, and a revocation endpoint exists, so a token is never issued that the
+ * run cannot revoke.
+ */
+export function assertTrustedEndpoints(discovery: SpikeReport["discovery"], endpoints: SpikeEndpoints, useDiscovery: boolean): void {
+  if (useDiscovery) {
+    if (!discovery.fetched) throw new SpikeStop("discovery", "not_fetched");
+    if (discovery.issuer !== endpoints.issuer) throw new SpikeStop("discovery", "unexpected_issuer");
+    const origin = new URL(endpoints.issuer).origin;
+    if (!discovery.jwksUri || new URL(discovery.jwksUri).origin !== origin) throw new SpikeStop("discovery", "jwks_off_issuer_origin");
+    if (discovery.revocationEndpoint && new URL(discovery.revocationEndpoint).origin !== origin) throw new SpikeStop("discovery", "revocation_off_issuer_origin");
+  }
+  if (!endpoints.revocationUrl) throw new SpikeStop("discovery", "no_revocation_endpoint");
 }
 
 export function summarize(report: Pick<SpikeReport, "briefs" | "contracts">): SpikeReport["summary"] {
@@ -1056,13 +1078,19 @@ export async function main(argv: readonly string[], deps: Readonly<{ startMock?:
   try { args = parseArgs(argv); } catch (error) { console.error(`${error instanceof Error ? error.message : "bad arguments"}\n${USAGE}`); return 2; }
   if (!args.mode) { console.error(USAGE); return 2; }
   const controller = new AbortController();
-  const onSigint = () => { console.error("Interrupted; revoking before exit."); controller.abort(); };
-  process.once("SIGINT", onSigint);
+  const onSigint = () => {
+    if (controller.signal.aborted) { console.error("Still revoking the refresh token; please wait."); return; }
+    console.error("Interrupted; revoking before exit.");
+    controller.abort();
+  };
+  // Stays installed until revocation has finished, so a second Ctrl-C cannot skip it.
+  process.on("SIGINT", onSigint);
+  const mockConfigDir = join(tmpdir(), `cadence-chatgpt-spike-mock-${process.pid}`);
   const mock = args.mode === "mock" ? await (deps.startMock ?? (() => Promise.reject(new Error("mock_unavailable"))))() : null;
   try {
     const endpoints = mock?.endpoints ?? OPENAI_ENDPOINTS;
     const report = await runSpike({
-      mode: args.mode, endpoints, useDiscovery: true, fetchImpl: fetch, configDir: args.mode === "mock" ? join(tmpdir(), `cadence-chatgpt-spike-mock-${process.pid}`) : args.configDir,
+      mode: args.mode, endpoints, useDiscovery: true, fetchImpl: fetch, configDir: args.mode === "mock" ? mockConfigDir : args.configDir,
       port: args.mode === "mock" ? 0 : args.port,
       openBrowser: args.mode === "mock" ? mockBrowser(fetch) : args.noBrowser ? async (url) => { console.log(`Open this URL to sign in:\n${url}`); } : async (url) => {
         console.log("Opening the system browser for ChatGPT sign-in. Waiting up to 10 minutes.");
@@ -1079,6 +1107,7 @@ export async function main(argv: readonly string[], deps: Readonly<{ startMock?:
   } finally {
     process.removeListener("SIGINT", onSigint);
     await mock?.close();
+    if (mock) await rm(mockConfigDir, { recursive: true, force: true });
   }
 }
 

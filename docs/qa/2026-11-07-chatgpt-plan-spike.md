@@ -54,7 +54,11 @@ file.
   `chatpass_v2_*` code. It does not retry them.
 - Tokens, the authorization code and the PKCE verifier stay in memory. Every log line
   is scrubbed against them, and the run fails if the report contains one. The refresh
-  token is revoked at the end, also after an error or Ctrl-C.
+  token is revoked at the end, also after an error or Ctrl-C. Ctrl-C stops the current
+  request at once; a second Ctrl-C only prints a reminder, so it cannot skip revocation.
+- Before sign-in, the script stops unless discovery succeeds, names the issuer
+  `https://auth.openai.com`, serves the JWKS from that origin and lists a revocation
+  endpoint. A token is never issued that the run cannot revoke.
 
 ## Commands
 
@@ -81,7 +85,7 @@ and `.md`; the Markdown holds the tables for this file.
 
 | Check | Result |
 | --- | --- |
-| `npx vitest run tests/chatgpt-plan-spike.test.ts` | 23 passed (2026-11-08) |
+| `npx vitest run tests/chatgpt-plan-spike.test.ts --exclude '.claude/**'` | 28 passed (2026-11-08) |
 | `node scripts/run-chatgpt-plan-spike.mjs --mock` | Exit 0; 16 of 16 briefs valid on 2 mock models; refresh rotated; revoke 200 |
 | Node | Run on Node 26.12.0. Uses only APIs present in Node 24 (`fetch`, `AbortSignal.any`, JWK `createPublicKey`) |
 
@@ -89,73 +93,82 @@ The mock follows the rules in OpenAI's docs. It is not evidence of OpenAI's beha
 
 ## Results (live run)
 
-Run: — (date, account plan, duration, spike version)
+Paste the tables from the run's `.md` report here; the columns below match it.
+
+Run: — (mode, start time, duration in ms, spike version; add the account plan)
 
 ### Sign-in
 
 | Check | Result |
 | --- | --- |
 | Registration | |
-| Issued client ID returned (`oaiapp_` form) | |
+| Issued client ID returned (oaiapp_ form) | |
 | ID token valid (signature, issuer, audience, nonce, expiry) | |
 | Token scopes | |
 | Callback scopes | |
-| `chatgpt.tokens.use.direct` granted | |
+| chatgpt.tokens.use.direct granted | |
 | Refresh token issued | |
 | Access token lifetime (s) | |
 | Discovery authorize / token match docs | |
 | Revocation endpoint | |
 
-### CORS preflight (Origin `tauri://localhost`)
+### CORS preflight (Origin tauri://localhost)
 
 | Target | Status | Allow-Origin | Allow-Methods | Allow-Headers | Webview can call |
 | --- | --- | --- | --- | --- | --- |
-| Token endpoint | | | | | |
-| `/v1/responses` | | | | | |
-| `/v1/responses` actual request (Allow-Origin) | | | | | |
+| token_endpoint | | | | | |
+| responses | | | | | |
+
+The Allow-Origin on an actual `/v1/responses` request is the `cors_actual` probe in
+"Request fields" (see the JSON report's `allowOrigin`).
 
 ### Model catalog
+
+Status —; model fields: —; gpt-5.6-luna listed: —.
 
 | Slug | Display name | Visibility | Tested |
 | --- | --- | --- | --- |
 | | | | |
 
-Model fields returned: —. `gpt-5.6-luna` listed: —.
-
 ### Request fields
 
-| Model | Probe | Expected | Accepted | HTTP | Error code | Param |
-| --- | --- | --- | --- | --- | --- | --- |
-| | baseline | accept | | | | |
-| | json_schema_strict | observe | | | | |
-| | reasoning_low | observe | | | | |
-| | tools_none | observe | | | | |
-| | max_output_tokens | reject | | | | |
-| | background_false | reject | | | | |
-| | input_string | reject | | | | |
-| | stream_false | reject | | | | |
+| Model | Probe | Expected | Accepted | HTTP | Error code | Param | ms |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| | baseline | accept | | | | | |
+| | json_schema_strict | observe | | | | | |
+| | reasoning_low | observe | | | | | |
+| | tools_none | observe | | | | | |
+| | max_output_tokens | reject | | | | | |
+| | background_false | reject | | | | | |
+| | input_string | reject | | | | | |
+| | stream_false | reject | | | | | |
+| | cors_actual | observe | | | | | |
 
 ### Daily Brief per model
 
-| Model | json_schema | reasoning | tools | Runs | Valid | Pass rate | Median ms | Max ms | Median first text ms | Over 30 s | Median input tokens | Median output tokens |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | | | | |
+| Model | json_schema | reasoning | tools | Runs | Completed | Valid | Pass rate | Median ms | Max ms | Median first text ms | Over 30 s | Median input tokens | Median output tokens |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | | | | | |
 
 "Over 30 s" counts calls longer than today's hosted model budget
 (`lib/services/daily-brief.service.ts`, 30 seconds inside a 60-second attempt).
 
 ### Daily Brief failures
 
-| Model | Fixture | Transport | HTTP | Error code | Validation code |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | |
+| Model | Fixture | Run | Transport | HTTP | Error code | Validation code |
+| --- | --- | --- | --- | --- | --- | --- |
+| — | — | — | — | — | — | — |
 
 ### Refresh and revocation
 
-| Step | OK | HTTP | Detail |
-| --- | --- | --- | --- |
-| Refresh | | | rotated —, plan scope kept — |
-| Revoke refresh token | | | |
+| Step | Attempted | OK | HTTP | Detail |
+| --- | --- | --- | --- | --- |
+| Refresh | | | | rotated —, plan scope kept — |
+| Revoke refresh token | | | | attempts — |
+
+### Stops and errors
+
+The report adds this section only when the run stopped early or recorded an error.
 
 ## Recommendations (after the live run)
 
