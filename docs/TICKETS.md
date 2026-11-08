@@ -16795,7 +16795,7 @@ Verification: evidence in `docs/qa/travel-release.md`, `dagger check --progress=
 
 ## Ticket 285: Installed Mac acceptance
 
-Status: installed acceptance run November 6–7, 2026 (`docs/qa/travel-release.md`). Calendar-event activation and the hosted named-place fix remain unchecked.
+Status: installed acceptance run November 6–7, 2026 (`docs/qa/travel-release.md`), including Calendar-event activation on published 0.1.9.
 The blank-window fix found during this acceptance is on `main` through PR #195. Mac 0.1.9
 ships from `main` with the travel revamp (D23); notarization and publication follow D24.
 Dependencies: Tickets 280 and 284.

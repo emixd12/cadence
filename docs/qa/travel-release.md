@@ -1427,7 +1427,7 @@ Center through the accessibility tree, and the Timeline text.
 | Reminder with Cadence running | Pass | 09:06:11 planned, banner at 09:06:14: "Leave by 9:26 AM for W6 Mac leave 5". 14:36:11 banner: "Leave by 2:56 PM for W6 Mac leave 7" / "Walking from Home, arrive 3:05 PM. Estimate checked 2:33 PM." (D17 wording). A reminder whose time had passed when first planned fired 10 seconds later (08:14:36). |
 | The one update | Pass | Raising the arrival buffer 15 → 30 moved the same trip's leave time 9:26 → 9:11. The memory recorded `update {fireAt 09:09:10, leaveAt 09:11:11}`; macOS delivered count went 3 → 4 at 09:09:10; the Timeline read "Leave in 3 minutes, by 9:11 AM for W6 Mac leave 5 from Home · walking, arrive 9:20 AM." The update banner text was not captured. Moving a Behavior's time instead made a new trip with its own first reminder, as NOTIFICATION_SPEC says ("A moved event is a new trip"). |
 | Reminder after quitting | Pass | Get-ready 20 → 60 moved "W6 Mac leave 8"'s pending reminder to 14:54:15 (pending notification moved, not an update). Cadence quit at 14:49:47 with 0 pending writes. Banner at 14:54:15 with Cadence not running: "Leave by 3:54 PM for W6 Mac leave 8" / "Walking from your previous stop, arrive 4:00 PM. Estimate checked 2:40 PM." |
-| Activation | Pass (Behavior), not run (Calendar event) | The owner clicked that banner; Cadence launched at 14:56:02 and showed "Opened reminder for W6 Mac leave 8 on 2026-11-07." The Calendar-event drawer path was not exercised: the 9:45 museum reminder fired while the test Mac was locked. A synthetic click on a banner reached no handler (banners expose only `AXShowMenu`). |
+| Activation | Pass (Behavior); Calendar event passed later on published 0.1.9 (see "Calendar-event activation on published 0.1.9") | The owner clicked that banner; Cadence launched at 14:56:02 and showed "Opened reminder for W6 Mac leave 8 on 2026-11-07." The Calendar-event drawer path was not exercised: the 9:45 museum reminder fired while the test Mac was locked. A synthetic click on a banner reached no handler (banners expose only `AXShowMenu`). |
 | Notification permission denied | Pass (November 6) | See above. |
 | Travel estimates off cancels | Pass | 14:37:57: memory became `{enabled: false, records: []}`, macOS pending 61 → 60 (Behavior reminders only), delivered 0. Back on at 14:40: both trips planned again, and "W6 Mac leave 7"'s reminder fired once more at 14:39:15 because turning travel off had cleared its record. With location blocked, Settings read "Device location: blocked." and "Saved places and Calendar trips keep working without device location."; the Travel panel read "To use your current position, turn on Cadence in System Settings › Privacy & Security › Location Services, then choose Check again." |
 | Sync with an older contract | Pass (November 6) | Published 0.1.8 synced against production; see above. The dev builds also synced against production `9064f5f`, which is older than the branch. |
@@ -1453,8 +1453,35 @@ reinstalled `0.1.10-dev.1` on the test Mac and created "W6 Mac event" (5:15–5:
 Library & Museum) in account A's "Cadence demonstration" calendar, but stopped before the Mac
 planned it, because the 0.1.9 release checks needed the test Mac. The test Mac is back on
 published 0.1.8 with Cadence quit, account A's leave reminders are off and Cadence's location
-access is on. Calendar-event drawer activation remains unchecked; the event remains in the test
-calendar.
+access is on.
+
+### Calendar-event activation on published 0.1.9 — November 7, 2026, 18:47–19:12 Eastern
+
+The test Mac ran published 0.1.9 as account A (installed by the 0.1.9 release checks). Setup: Cadence
+location turned off for the test so the trip started from Home; "W6 Mac event 2", 7:45–8:15 PM at
+The Morgan Library & Museum, 225 Madison Ave, created in account A's "Cadence demonstration"
+calendar; leave reminders turned on from the Mac's Settings ("Reminder setting saved."). The
+Timeline first read "Leave by 7:21 PM for your next stop from Home · walking, arrive 7:30 PM." with
+no reminder planned: the hosted route already had the new event, but the Mac's local Calendar list
+did not, so the line had no title and the planner had no event to remind for. After Settings ›
+Refresh Calendar the line read "Leave in 29 minutes, by 7:21 PM for W6 Mac event 2 from Home ·
+walking, arrive 7:30 PM.", the device memory held one record (reminder 00:01:11Z, leave 00:21:11Z)
+and macOS pending went 60 → 61.
+
+The banner appeared at 7:01 PM and the owner clicked it once, with Cadence running. Cadence opened
+"Calendar details" for "W6 Mac event 2": "Last estimate: leave by 7:21 PM · checked 6:55 PM.
+Refresh travel", "Last estimate: head home 8:15 PM · checked 6:55 PM.", "Free again 8:23 PM.",
+"Google Maps · checked 6:55 PM.", "Directions in Apple Maps", Travel by "Usual travel (Walking)",
+Time 7:45–8:15 PM, the Morgan Library location and Calendar "Google Calendar · Cadence
+demonstration". Evidence: the accessibility tree ("Close Calendar details" and the lines above) and
+a screenshot through `node scripts/test-device.mjs screenshot` (read, then deleted, because it
+showed the owner's desktop). Cadence writes no unified-log line for `notificationActivated`, so the
+log cannot show the activation itself; the drawer opened only after the owner's click, and the agent
+pressed nothing in that window. **Pass.**
+
+Cleanup: the drawer closed; leave reminders off for account A (memory `{enabled: false, records:
+[]}`); get-ready 20 and arrival buffer 15 unchanged; Cadence location access back on; "W6 Mac event"
+and "W6 Mac event 2" deleted from the test calendar; helper files removed from the test Mac.
 
 ### Named place after deploy — November 7, 2026
 
