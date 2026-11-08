@@ -8,10 +8,12 @@
   users first; no fallback to Cadence's OpenAI key when the user's plan cannot run a brief;
   Cadence picks the model from the user's ChatGPT catalog. Deferred: ChatGPT as a Cadence
   login, plan usage in the hosted web app, billing and any discount.
-- Ticket 286 (in progress, docs only): records D25, files Tickets 286–292 in
+- Ticket 286 (completed November 7, docs only; commits `155ee10b` and `d802882f`, not merged): records D25, files Tickets 286–292 in
   `docs/TICKETS.md`, adds the scope lines to `AGENTS.md` and `docs/PRODUCT_SPEC.md`, the
   follow-ups to `docs/FUTURE_UPDATES.md`, the cost effect to `docs/COSTS.md`, L-017 to L-019
-  and P-028 to P-031.
+  and P-028 to P-031. Checks: `agents:check` and `interactions:check` pass. Dagger passed every
+  check but `test`; its six failing files are environmental (missing `.claude` files, Chrome and
+  git access in the container, a timeout) and unrelated to the docs.
 - Ticket 287 (in progress): a development-only spike script that proves the Daily Brief
   request on a real ChatGPT plan. Mock mode first; the live run needs the owner's ChatGPT
   sign-in and consent. Results go to `docs/qa/2026-11-07-chatgpt-plan-spike.md`.

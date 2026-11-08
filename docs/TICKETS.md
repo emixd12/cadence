@@ -16867,7 +16867,7 @@ follow-ups.
 
 ## Ticket 286: Record the ChatGPT plan decision and tickets
 
-Status: in progress on branch `chatgpt-https`, November 7, 2026.
+Status: completed on branch `chatgpt-https`, November 7, 2026. Not merged.
 Dependencies: none.
 
 Goal: record the approved direction in the repository before any code changes.
