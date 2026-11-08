@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TravelStatusLine } from "@/components/timeline/DayProgressTimeline";
 import { DevelopmentBuildProvider } from "@cadence/ui/runtime";
-import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey, type TravelRoutesView, type TravelState } from "@/lib/ui/travel";
+import { TRAVEL_CLEARANCE_MESSAGE, travelSourceKey, travelStopRevisions, travelTomorrowStopKey, type TravelRoutesView, type TravelState } from "@/lib/ui/travel";
 
 const segments: TravelOccupiedSegment[] = [
   { id: "out", kind: "route", startAt: "2026-09-21T13:30:00Z", endAt: "2026-09-21T14:30:00Z", sourceRefs: ["event"], legId: "out" },
@@ -212,6 +212,25 @@ describe("travel sourceKey", () => {
     const before = travelSourceKey([], withBehavior, [{ id: "b", locationText: "1 St", updatedAt: "t1" }]);
     expect(travelSourceKey([], withBehavior, [{ id: "b", locationText: "1 St", updatedAt: "t1" }])).toBe(before);
     expect(travelSourceKey([], withBehavior, [{ id: "b", locationText: "2 St", updatedAt: "t2" }])).not.toBe(before);
+  });
+  it("changes when the occurrence's own Where changes, with no Behavior list (the web Timeline)", () => {
+    // The web Timeline passes no Behavior revisions, so a place edit must reach the key through the row.
+    type Where = Readonly<{ whereKind?: "home" | "place"; placeText?: string }>;
+    const day = (localDate: string, where: Where) => ({ localDate, occurrences: [{ id: `o-${localDate}`, behaviorId: "b", status: "unresolved",
+      scheduledFor: `${localDate}T15:00:00Z`, ...where }] });
+    const view = (where: Where) => ({ todayLocalDate: "2026-09-21", timezone: "America/New_York", durationEstimates: {},
+      daySections: [day("2026-09-21", where), day("2026-09-22", where)] }) as never;
+    const keys = (where: Where) => [travelSourceKey([], view(where)), travelStopRevisions([], view(where))["o-2026-09-21"], travelTomorrowStopKey([], view(where))];
+    const bryant = keys({ whereKind: "place", placeText: "Bryant Park, New York, NY 10018" });
+    // Nothing changed: the same keys, so no route request.
+    expect(keys({ whereKind: "place", placeText: "Bryant Park, New York, NY 10018" })).toEqual(bryant);
+    const morgan = keys({ whereKind: "place", placeText: "Morgan Library, New York, NY" });
+    const home = keys({ whereKind: "home" });
+    const none = keys({});
+    for (const [index, before] of bryant.entries()) expect(morgan[index]).not.toBe(before);
+    expect(home[0]).not.toBe(bryant[0]); expect(home[1]).not.toBe(bryant[1]);
+    // Home to no place withdraws the trip home too.
+    expect(none[0]).not.toBe(home[0]); expect(none[1]).not.toBe(home[1]);
   });
 });
 

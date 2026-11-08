@@ -19,6 +19,11 @@ export type TimelineOccurrenceInput = {
    * Absent otherwise. Source-authored text only; never route content.
    */
   placeText?: string;
+  /**
+   * The Behavior's Where when it is Home or A place, so the travel source key changes when a
+   * Behavior's place is edited. Absent otherwise.
+   */
+  whereKind?: "home" | "place";
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;
@@ -49,6 +54,8 @@ export type TimelineOccurrenceView = {
   scheduleEndTime?: string | null;
   /** Ticket 271: see `TimelineOccurrenceInput.placeText`. */
   placeText?: string;
+  /** See `TimelineOccurrenceInput.whereKind`. */
+  whereKind?: "home" | "place";
   localDate: string;
   status: TimelineStatus;
   statusMarkedAt: string | null;

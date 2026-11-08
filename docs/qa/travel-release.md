@@ -1530,3 +1530,10 @@ the copy. The web Timeline builds its travel source key without Behavior Where r
 (`components/timeline/DayProgressTimeline.tsx`, `buildTravelSourceKey(travelEvents, timeline)`). A
 Behavior place change therefore depends on the `cadence:travel-changed` event to withdraw the kept
 view. A missed event leaves a stale leave time until the session copy expires or the tab closes.
+
+**Fixed after this check (branch `travel-postdeploy-checks`, not deployed).** Each Timeline row now
+carries its Behavior's Where kind, and the travel source key, stop revisions and tomorrow key use
+the row's Where on the web. A Behavior place edit in any tab now changes the key, so the kept view
+withdraws that trip and routes again at the next refresh. Re-verify after deploy: as account A, open
+/timeline with a located Behavior, edit its place on /behaviors in a second tab, reload /timeline
+in the first tab, and expect a route request and the new leave line.

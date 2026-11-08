@@ -1,5 +1,21 @@
 # Implementation Status
 
+## Follow-up after the Wave 6 deploy: a Behavior place edit withdraws its leave time — November 7, 2026
+
+**On branch `travel-postdeploy-checks`. Not pushed.** Found after the Wave 6 deploy: once, a
+Behavior Where edit on /behaviors left the tab's `cadence:travel-session` copy, so /timeline kept
+the old leave time as current and made no route request. Cause: the web Timeline's travel source
+key had no Behavior Where, so only the `cadence:travel-changed` event withdrew the kept view, and
+that event never reaches another tab. Fixed: each Timeline row now carries its Behavior's Where
+kind (Home or A place) beside its place text, and `travelSourceKey`, `travelStopRevisions` and
+`travelTomorrowStopKey` use the row's Where when no Behavior list is passed. A place edit in any
+tab changes the key, so the kept view withdraws that trip and routes again at the next refresh.
+The keys stay the same when nothing changed. The Mac already passed its Behavior list and is
+unchanged. Test: `tests/travel-timeline.test.ts` fails on the base code; `tests/travel-navigation.test.ts`
+covers the row's Where kind. Platform impact: web, this fix (shared `lib/ui/travel.ts` and core
+Timeline rows); desktop uses the same shared code with its Behavior list, so no change; marketing
+and future mobile not applicable. Messaging impact: none. Not yet rechecked live.
+
 ## Follow-up after Mac 0.1.9: reminders for newly added Calendar events — November 7, 2026
 
 **On branch `travel-postdeploy-checks`. Not pushed.** Found on published 0.1.9: a Calendar event

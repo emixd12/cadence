@@ -120,16 +120,26 @@ export async function readTravelRoutingReport(
 }
 
 export type TravelBehaviorRevision = Readonly<{ id: string; whereKind?: string | null; locationText: string | null; updatedAt: string }>;
+type TravelOccurrenceWhere = Readonly<{ behaviorId?: string; whereKind?: string; placeText?: string }>;
+/**
+ * The Behavior Where part of a stop's travel inputs: from the Behavior list when the caller
+ * passes one (Mac), otherwise from the row itself (web), so a place edit always changes the key.
+ */
+function occurrenceWhereRevision(byId: ReadonlyMap<string, readonly unknown[]>, occurrence: TravelOccurrenceWhere): readonly unknown[] | null {
+  const listed = occurrence.behaviorId === undefined ? undefined : byId.get(occurrence.behaviorId);
+  if (listed) return listed;
+  return occurrence.whereKind || occurrence.placeText ? [occurrence.whereKind ?? null, occurrence.placeText ?? null] : null;
+}
 /**
  * Travel inputs only: visible events, occurrence schedule and owning Behavior Where revisions.
  * Status, Note and duration-history changes are excluded (Ticket 214): they make no provider call.
  * Core filters resolved stops and withdraws evidence when a reopened stop or duration needs new routes.
  */
 export function travelSourceKey(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections" | "durationEstimates">, behaviors: readonly TravelBehaviorRevision[] = []): string {
-  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
+  const byId = new Map<string, readonly unknown[]>(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
   const eventInputs = events.map((event) => [event.id, event.location, event.state, event.currentUserResponse, !!event.conference,
     event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-  return JSON.stringify([eventInputs, timeline.daySections.map((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null]))]);
+  return JSON.stringify([eventInputs, timeline.daySections.map((section) => section.occurrences.map((occurrence) => [occurrence.id, occurrence.scheduledFor, occurrenceWhereRevision(byId, occurrence)]))]);
 }
 
 
@@ -140,12 +150,12 @@ export function travelSourceKey(events: readonly NormalizedExternalEvent[], time
  * browser session holds only digests.
  */
 export function travelStopRevisions(events: readonly NormalizedExternalEvent[], timeline: Pick<TimelineView, "daySections">, behaviors: readonly TravelBehaviorRevision[] = []): Record<string, string> {
-  const byId = new Map(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
+  const byId = new Map<string, readonly unknown[]>(behaviors.map((behavior) => [behavior.id, [behavior.whereKind ?? null, behavior.locationText]]));
   return Object.fromEntries([
     ...events.map((event) => [event.id, JSON.stringify([event.location, event.state, event.currentUserResponse, !!event.conference,
       event.kind === "timed" ? [event.startAt, event.endAt, event.endUnspecified] : null])] as const),
     ...timeline.daySections.flatMap((section) => section.occurrences.map((occurrence) =>
-      [occurrence.id, JSON.stringify([occurrence.scheduledFor, byId.get(occurrence.behaviorId) ?? null])] as const)),
+      [occurrence.id, JSON.stringify([occurrence.scheduledFor, occurrenceWhereRevision(byId, occurrence)])] as const)),
   ]);
 }
 
