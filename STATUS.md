@@ -5,12 +5,13 @@
 **On branch `leave-reminder-send-read`. Not pushed.** Before this change, the hosted leave
 reminder job read Calendar after the send route to name the event. If an Outlook or iCloud read
 failed there, it cancelled that reminder. Fixed: the send and update steps read Calendar once
-per visit before their route. A destination the read left out is released with no route spent,
+per visit before their route. A destination or planned previous stop the read left out is
+released with no route spent,
 and the next visit sends while the leave time is ahead. A plan route that finds the reminder due
 keeps it pending at its reminder time. A send-time read that fails outright, as a Google read
 does, now releases the claims before any route. The three routes of D15 and the D16 update pause
-are unchanged; no migration. Remaining limit: a previous stop missing from that read still
-cancels or closes as before (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). Tests:
+are unchanged; no migration. Remaining limit: if the route used a different previous stop than
+planned and that stop is missing from the read, it still cancels or closes (`docs/NOTIFICATION_SPEC.md`, "Leave reminders"). Tests:
 `tests/leave-reminder-job.service.test.ts` (fails on the base code), `tests/leave-reminder-hosted-port.test.ts`.
 Platform impact: web hosted job only; desktop plans its own reminders and is unchanged;
 marketing and future mobile not applicable. Messaging impact: none.

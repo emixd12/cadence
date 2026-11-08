@@ -490,8 +490,8 @@ ship, nothing reads or writes the new tables.
   trip is missing and decides it once the Calendars read again. A kept reminder whose time
   passed during the outage sends then if its leave time is still ahead.
 - The send and update steps read Calendar and Behaviors once more before their route, to
-  name the event. If an Outlook or iCloud read fails there and the destination is missing,
-  the job releases the record with no route: a pending reminder stays pending at its check
+  name the event. If an Outlook or iCloud read fails there and the destination or the trip's
+  planned previous stop is missing, the job releases the record with no route: a pending reminder stays pending at its check
   and an open update check stays open. The next visit tries again, and the reminder sends
   then while its leave time is still ahead. A visit reads this once, for every trip it sends.
   If that read fails outright, as a Google read does, the visit fails before any route and
@@ -499,10 +499,11 @@ ship, nothing reads or writes the new tables.
   already due. If that read leaves the destination's Calendar out, the reminder stays pending
   at its reminder time, so the send route sends it at the next visit. This keeps the three
   routes of decision D15: no step routes again to retry.
-- Known limit: the previous stop is only known after the route. If it is missing because a
-  Calendar was left out of the send-time read, a send step cancels its reminder and an
-  update step closes its check, as before. A retry would need another route before sending,
-  and the database allows a third route only after a reminder is sent (decision D15).
+- Known limit: the route names the previous stop it used. If that differs from the planned
+  previous stop, because the day's stops changed between the read and the route, and it is
+  missing because a Calendar was left out of the send-time read, a send step cancels its
+  reminder and an update step closes its check. A retry would need another route before
+  sending, and the database allows a third route only after a reminder is sent (decision D15).
 - No action buttons, snooze or email leave reminders in this version.
 - Leave times never reach Daily Brief model input or MCP.
 

@@ -245,8 +245,9 @@ export async function visitLeaveReminderAccount(
     }
 
     // One send-time read per visit. The send and update steps read before their route: a
-    // destination whose Calendar a failed read left out is released unrouted, keeping its
-    // check, and the next visit tries again. The plan step reads only when it sends.
+    // destination or planned previous stop whose Calendar a failed read left out is released
+    // unrouted, keeping its check, and the next visit tries again. The plan step reads only
+    // when it sends.
     let sendCalendar: Promise<LeaveReminderSendCalendar> | null = null;
     const readSendCalendar = () => (sendCalendar ??= port.readSendCalendar(plan.localDate));
     if (toRoute.some((item) => item.step !== "plan")) {
@@ -257,7 +258,7 @@ export async function visitLeaveReminderAccount(
         for (const item of toRoute) await store.finish(item.record, { processing_started_at: null }).catch(() => false);
         throw error;
       }
-      const unread = toRoute.filter((item) => item.step !== "plan" && calendar.read(item.trip, null).kind === "left_out");
+      const unread = toRoute.filter((item) => item.step !== "plan" && calendar.read(item.trip, item.trip.originRef).kind === "left_out");
       for (const item of unread) await store.finish(item.record, { processing_started_at: null });
       toRoute = toRoute.filter((item) => !unread.includes(item));
     }
