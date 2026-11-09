@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { STATUS_MAX_BYTES } from "./archive-status.mjs";
 
 const root = process.cwd();
 const failures = [];
@@ -225,12 +226,25 @@ const docsToScan = [
   ".env.example",
   "package.json",
   ...fs.readdirSync(filePath("docs")).filter((file) => file.endsWith(".md")).map((file) => `docs/${file}`),
+  ...walk("docs/status").filter((file) => file.endsWith(".md")),
 ];
 
 for (const file of docsToScan) {
   const content = read(file);
   assert(!/resend/i.test(content), `Retired email provider reference remains in ${file}. Use Sequenzy instead.`);
 }
+
+if (exists("STATUS.md")) {
+  const statusBytes = fs.statSync(filePath("STATUS.md")).size;
+  assert(
+    statusBytes <= STATUS_MAX_BYTES,
+    `STATUS.md is ${statusBytes} bytes; the limit is ${STATUS_MAX_BYTES}. Run \`npm run status:archive\` to move older entries into docs/status/archive/.`,
+  );
+}
+assert(
+  exists("docs/status/README.md"),
+  "docs/status/README.md must exist; it explains the STATUS.md archive and holds its index.",
+);
 
 assert(
   !read("README.md").includes("CODEX_FIRST_PROMPT"),
